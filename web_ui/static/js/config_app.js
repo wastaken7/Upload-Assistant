@@ -243,15 +243,20 @@ const DEFAULT_WORKFLOW_GROUPS = [
     ],
   },
   {
-    id: "release-preparation",
-    label: "Release Preparation",
-    headings: ["TORRENT CREATION"],
-  },
-  {
     id: "upload",
     label: "Upload",
-    headings: ["TRACKER CHECKS AND UPLOAD", "POST-UPLOAD"],
+    headings: [
+      "TORRENT CREATION",
+      "TRACKER CHECKS AND UPLOAD",
+      "POST-UPLOAD",
+    ],
   },
+];
+
+const TRACKER_NAVIGATION_GROUPS = [
+  { id: "default", label: "Default Trackers" },
+  { id: "configured", label: "Configured Trackers" },
+  { id: "available", label: "Available Trackers" },
 ];
 
 const CONFIG_SECTION_LABELS = {
@@ -265,6 +270,22 @@ const CONFIG_BLOCK_LABELS = {
   qbittorrent: "qBittorrent",
   qbittorrent_searching: "qBittorrent (searching)",
   rtorrent: "rTorrent",
+};
+
+const TORRENT_CLIENT_TEMPLATE_LABELS = {
+  qbittorrent: "qBittorrent",
+  rtorrent: "rTorrent",
+  deluge: "Deluge",
+  transmission: "Transmission",
+  watch: "Watch Folder",
+};
+
+const TORRENT_CLIENT_TYPE_LABELS = {
+  qbit: "qBittorrent",
+  rtorrent: "rTorrent",
+  deluge: "Deluge",
+  transmission: "Transmission",
+  watch: "Watch Folder",
 };
 
 const METADATA_CACHE_SERVICE_LABELS = {
@@ -442,6 +463,16 @@ const formatDisplayLabel = (key) => {
 };
 
 const formatConfigFieldLabel = (key, pathParts = []) => {
+  if (pathParts[0] === "IMAGES") {
+    const databaseImageLabels = {
+      imdb_75: "IMDb Image URL",
+      tmdb_75: "TMDB Image URL",
+      tvdb_75: "TVDB Image URL",
+      tvmaze_75: "TVmaze Image URL",
+      mal_75: "MyAnimeList Image URL",
+    };
+    if (databaseImageLabels[key]) return databaseImageLabels[key];
+  }
   if (pathParts.includes("metadata_cache_services")) {
     const serviceFieldLabels = {
       enabled: "Caching enabled",
@@ -1054,10 +1085,16 @@ function ConfigLeaf({
     const originalValue = String(item.value || "");
 
     return (
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-start px-4 py-3">
+      <div
+        className={
+          fullWidth
+            ? "space-y-2"
+            : "grid grid-cols-1 items-start gap-3 px-4 py-3 md:grid-cols-12"
+        }
+      >
         <div
           className={
-            fullWidth ? "col-span-1 md:col-span-12" : "col-span-1 md:col-span-4"
+            fullWidth ? "" : "col-span-1 md:col-span-4"
           }
         >
           <div className="flex items-center gap-2">
@@ -1073,7 +1110,7 @@ function ConfigLeaf({
         </div>
         <div
           className={
-            fullWidth ? "col-span-1 md:col-span-12" : "col-span-1 md:col-span-7"
+            fullWidth ? "" : "col-span-1 md:col-span-7"
           }
         >
           <SelectDropdown
@@ -1816,6 +1853,603 @@ function ReleaseGroupOverrides({
   );
 }
 
+function TorrentClientCreator({
+  templateItems,
+  configuredNames,
+  onAddClient,
+}) {
+  const templateChoices = Object.entries(TORRENT_CLIENT_TEMPLATE_LABELS)
+    .filter(([templateName]) =>
+      templateItems.some((item) => item.key === templateName),
+    )
+    .map(([templateName, label]) => ({ templateName, label }));
+  const [isOpen, setIsOpen] = useState(false);
+  const [templateName, setTemplateName] = useState(
+    templateChoices[0]?.templateName || "",
+  );
+  const [clientName, setClientName] = useState("");
+  const [message, setMessage] = useState("");
+  const normalizedName = clientName.trim();
+  const validName = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(normalizedName);
+  const nameTaken = configuredNames.has(normalizedName.toLowerCase());
+
+  const addClient = (event) => {
+    event.preventDefault();
+    if (!validName || nameTaken || !templateName) return;
+    setMessage("");
+    try {
+      onAddClient(normalizedName, templateName);
+      setClientName("");
+      setIsOpen(false);
+    } catch (error) {
+      setMessage(error.message || "Failed to add torrent client");
+    }
+  };
+
+  return (
+    <section
+      className="ua-config-accordion overflow-hidden rounded-xl border"
+      data-open={isOpen ? "true" : "false"}
+    >
+      <button
+        type="button"
+        className="ua-config-accordion-trigger flex w-full items-center justify-between gap-4 px-4 py-3 text-left"
+        onClick={() => setIsOpen((open) => !open)}
+        aria-expanded={isOpen}
+      >
+        <span className="min-w-0">
+          <span className="block text-sm font-semibold">
+            Add Torrent Client
+          </span>
+          <span className="ua-config-service-description mt-1 block text-xs font-normal">
+            Create a named client from one of the supported connection templates.
+          </span>
+        </span>
+        <span
+          className="ua-config-accordion-chevron shrink-0 transition-transform"
+          style={{ transform: isOpen ? "rotate(90deg)" : "rotate(0deg)" }}
+          aria-hidden="true"
+        >
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="m9 18 6-6-6-6"></path>
+          </svg>
+        </span>
+      </button>
+
+      {isOpen && (
+        <form
+          className="ua-config-accordion-panel border-t p-4"
+          onSubmit={addClient}
+        >
+          <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+            <div className="space-y-2">
+              <label
+                htmlFor="new-torrent-client-name"
+                className="text-sm font-semibold"
+              >
+                Client Name
+              </label>
+              <input
+                id="new-torrent-client-name"
+                type="text"
+                value={clientName}
+                onChange={(event) => setClientName(event.target.value)}
+                placeholder="seedbox_qbit"
+                className="ua-config-input w-full rounded-lg border px-3 py-2"
+                autoComplete="off"
+              />
+              <p className="ua-config-service-description text-xs">
+                This name is used by Client Selection and may contain letters,
+                numbers, hyphens and underscores.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <label
+                htmlFor="new-torrent-client-template"
+                className="text-sm font-semibold"
+              >
+                Client Type
+              </label>
+              <select
+                id="new-torrent-client-template"
+                value={templateName}
+                onChange={(event) => setTemplateName(event.target.value)}
+                className="ua-config-select w-full rounded-lg border px-3 py-2"
+              >
+                {templateChoices.map((choice) => (
+                  <option
+                    key={choice.templateName}
+                    value={choice.templateName}
+                  >
+                    {choice.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              type="submit"
+              className="ua-config-save-button rounded-lg px-4 py-2 text-sm font-semibold md:mt-7"
+              disabled={!validName || nameTaken || !templateName}
+            >
+              Add Client
+            </button>
+          </div>
+          {normalizedName && !validName && (
+            <p className="mt-3 text-sm text-red-500">
+              Enter a valid client name using letters, numbers, hyphens or
+              underscores.
+            </p>
+          )}
+          {nameTaken && (
+            <p className="mt-3 text-sm text-red-500">
+              A client with that name already exists.
+            </p>
+          )}
+          {message && <p className="mt-3 text-sm text-red-500">{message}</p>}
+        </form>
+      )}
+    </section>
+  );
+}
+
+function TrackerManager({
+  items,
+  defaultTrackersItem,
+  trackerView,
+  trackerCatalog,
+  pathParts,
+  depth,
+  isDarkMode,
+  allImageHosts,
+  usedImageHosts,
+  expandedGroups,
+  toggleGroup,
+  torrentClients,
+  onValueChange,
+}) {
+  const trackerItems = items || [];
+  const trackerItemByName = new Map(
+    trackerItems.map((item) => [String(item.key).toUpperCase(), item]),
+  );
+  const normalizeTrackers = (value) =>
+    String(value || "")
+      .split(",")
+      .map((tracker) => tracker.trim().toUpperCase())
+      .filter(Boolean);
+  const originalDefaults = normalizeTrackers(defaultTrackersItem.value);
+  const originalDefaultValue = defaultTrackersItem.value;
+  const [selectedDefaults, setSelectedDefaults] = useState(originalDefaults);
+  const [newDefaultTracker, setNewDefaultTracker] = useState("");
+  const [trackerQuery, setTrackerQuery] = useState("");
+
+  useEffect(() => {
+    setSelectedDefaults(normalizeTrackers(defaultTrackersItem.value));
+  }, [defaultTrackersItem.value]);
+
+  useEffect(() => {
+    setTrackerQuery("");
+  }, [trackerView]);
+
+  const fallbackNames = getAvailableTrackers(defaultTrackersItem).map((name) =>
+    String(name).toUpperCase(),
+  );
+  const catalogEntries =
+    trackerCatalog?.trackers?.length > 0
+      ? trackerCatalog.trackers
+      : fallbackNames.map((name) => ({
+          name,
+          display_name: getTrackerDisplayName(name),
+          base_url: "",
+          favicon: "",
+          configured: selectedDefaults.includes(name),
+        }));
+  const catalogByName = new Map(
+    catalogEntries.map((tracker) => [String(tracker.name).toUpperCase(), tracker]),
+  );
+  const displayName = (name) =>
+    catalogByName.get(name)?.display_name || getTrackerDisplayName(name);
+  const sortedEntries = catalogEntries
+    .slice()
+    .sort((left, right) =>
+      String(left.display_name || left.name).localeCompare(
+        String(right.display_name || right.name),
+      ),
+    );
+  const defaultEntries = selectedDefaults.map((name) =>
+    catalogByName.get(name) || {
+      name,
+      display_name: getTrackerDisplayName(name),
+      base_url: "",
+      favicon: "",
+      configured: true,
+    },
+  );
+  const configuredEntries = sortedEntries.filter((tracker) => tracker.configured);
+  const availableEntries = sortedEntries.filter((tracker) => !tracker.configured);
+  const addableDefaultEntries = sortedEntries.filter(
+    (tracker) => !selectedDefaults.includes(String(tracker.name).toUpperCase()),
+  );
+
+  const queueDefaultTrackers = (nextTrackers) => {
+    setSelectedDefaults(nextTrackers);
+    onValueChange(
+      [...pathParts, "default_trackers"],
+      nextTrackers.join(", "),
+      {
+        originalValue: originalDefaultValue,
+        isSensitive: false,
+        isRedacted: false,
+        readOnly: false,
+      },
+    );
+  };
+
+  const addDefaultTracker = (trackerName) => {
+    const normalized = String(trackerName || "").toUpperCase();
+    if (!normalized || selectedDefaults.includes(normalized)) return;
+    queueDefaultTrackers([...selectedDefaults, normalized]);
+    setNewDefaultTracker("");
+  };
+
+  const removeDefaultTracker = (trackerName) => {
+    const normalized = String(trackerName || "").toUpperCase();
+    queueDefaultTrackers(
+      selectedDefaults.filter((tracker) => tracker !== normalized),
+    );
+  };
+
+  const trackerIdentity = (tracker) => {
+    const name = String(tracker.name).toUpperCase();
+    return (
+      <span className="flex min-w-0 items-center gap-3">
+        <span className="ua-config-tracker-icon flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg border">
+          {tracker.favicon ? (
+            <img
+              src={tracker.favicon}
+              alt=""
+              className="h-full w-full object-contain p-1"
+            />
+          ) : (
+            <span className="text-xs font-bold">{name.slice(0, 2)}</span>
+          )}
+        </span>
+        <span className="min-w-0">
+          <span className="block truncate text-sm font-semibold">
+            {tracker.display_name || getTrackerDisplayName(name)}
+          </span>
+          <span className="ua-config-service-description block truncate text-xs">
+            {name}
+          </span>
+        </span>
+      </span>
+    );
+  };
+
+  if (trackerView === "default") {
+    return (
+      <div className="space-y-4">
+        <section className="ua-config-section overflow-hidden rounded-xl border">
+          <div className="ua-config-section-heading border-b px-4 py-3">
+            <h2 className="text-sm font-semibold">Default Trackers</h2>
+          </div>
+          <div className="ua-config-section-panel space-y-4 p-4">
+            <p className="ua-config-page-subtitle text-sm">
+              These trackers are selected automatically when an upload does not
+              provide an explicit tracker list.
+            </p>
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 2xl:grid-cols-3">
+              {defaultEntries.map((tracker) => {
+                const name = String(tracker.name).toUpperCase();
+                return (
+                  <div
+                    key={name}
+                    className="ua-config-tracker-card flex items-center justify-between gap-3 rounded-xl border p-3"
+                  >
+                    {trackerIdentity(tracker)}
+                    <button
+                      type="button"
+                      className="shrink-0 rounded-lg border border-red-500/40 px-2.5 py-1.5 text-xs font-semibold text-red-500 hover:bg-red-500/10"
+                      onClick={() => removeDefaultTracker(name)}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+            {defaultEntries.length === 0 && (
+              <div className="ua-config-state-panel rounded-xl border p-4 text-sm">
+                No default trackers are selected.
+              </div>
+            )}
+            <div className="grid grid-cols-1 items-end gap-3 border-t pt-4 md:grid-cols-[minmax(0,1fr)_auto]">
+              <div className="space-y-2">
+                <label
+                  htmlFor="add-default-tracker"
+                  className="text-sm font-semibold"
+                >
+                  Add Default Tracker
+                </label>
+                <select
+                  id="add-default-tracker"
+                  className="ua-config-select w-full rounded-lg border px-3 py-2"
+                  value={newDefaultTracker}
+                  onChange={(event) => setNewDefaultTracker(event.target.value)}
+                >
+                  <option value="">Choose a tracker...</option>
+                  {addableDefaultEntries.map((tracker) => (
+                    <option key={tracker.name} value={tracker.name}>
+                      {tracker.display_name || tracker.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <button
+                type="button"
+                className="ua-config-save-button rounded-lg px-4 py-2 text-sm font-semibold"
+                disabled={!newDefaultTracker}
+                onClick={() => addDefaultTracker(newDefaultTracker)}
+              >
+                Add Tracker
+              </button>
+            </div>
+          </div>
+        </section>
+      </div>
+    );
+  }
+
+  const entries =
+    trackerView === "configured" ? configuredEntries : availableEntries;
+  const normalizedTrackerQuery = trackerQuery.trim().toLowerCase();
+  const visibleEntries = normalizedTrackerQuery
+    ? entries.filter((tracker) =>
+        [tracker.name, tracker.display_name, tracker.base_url].some((value) =>
+          String(value || "")
+            .toLowerCase()
+            .includes(normalizedTrackerQuery),
+        ),
+      )
+    : entries;
+  const emptyMessage =
+    normalizedTrackerQuery
+      ? "No trackers match that search."
+      : trackerView === "configured"
+        ? "No configured trackers were detected."
+        : "All supported trackers are already configured.";
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-end justify-between gap-4">
+        <div>
+          <h2 className="text-base font-semibold">
+            {trackerView === "configured"
+              ? "Configured Trackers"
+              : "Available Trackers"}
+          </h2>
+          <p className="ua-config-page-subtitle mt-1 text-sm">
+            {trackerView === "configured"
+              ? "Manage tracker credentials, preferences and description overrides."
+              : "Open a tracker to configure it, or add it directly to your defaults."}
+          </p>
+        </div>
+        <span className="ua-config-service-description shrink-0 text-sm">
+          {normalizedTrackerQuery
+            ? `${visibleEntries.length} of ${entries.length}`
+            : entries.length}{" "}
+          {entries.length === 1 ? "tracker" : "trackers"}
+        </span>
+      </div>
+
+      {entries.length > 0 && (
+        <div className="relative">
+          <label htmlFor={`tracker-search-${trackerView}`} className="sr-only">
+            Search {trackerView} trackers
+          </label>
+          <input
+            id={`tracker-search-${trackerView}`}
+            type="search"
+            value={trackerQuery}
+            onChange={(event) => setTrackerQuery(event.target.value)}
+            placeholder="Search by tracker name or acronym..."
+            className="ua-config-input w-full rounded-lg border px-3 py-2"
+          />
+        </div>
+      )}
+
+      {visibleEntries.length === 0 && (
+        <div className="ua-config-state-panel rounded-xl border p-5 text-sm">
+          {emptyMessage}
+        </div>
+      )}
+
+      {visibleEntries.map((tracker) => {
+        const name = String(tracker.name).toUpperCase();
+        const trackerItem = trackerItemByName.get(name);
+        const groupKey = [...pathParts, name].join("/");
+        const isOpen = expandedGroups.has(groupKey);
+        const isDefault = selectedDefaults.includes(name);
+        return (
+          <section
+            key={name}
+            className="ua-config-accordion overflow-hidden rounded-xl border"
+            data-open={isOpen ? "true" : "false"}
+          >
+            <div className="flex items-center gap-2 px-2">
+              <button
+                type="button"
+                className="ua-config-accordion-trigger flex min-w-0 flex-1 items-center justify-between gap-4 px-2 py-3 text-left"
+                onClick={() => toggleGroup(groupKey)}
+                aria-expanded={isOpen}
+              >
+                {trackerIdentity(tracker)}
+                <span
+                  className="ua-config-accordion-chevron shrink-0 transition-transform"
+                  style={{
+                    transform: isOpen ? "rotate(90deg)" : "rotate(0deg)",
+                  }}
+                  aria-hidden="true"
+                >
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="m9 18 6-6-6-6"></path>
+                  </svg>
+                </span>
+              </button>
+              <button
+                type="button"
+                className="ua-config-tracker-default-action shrink-0 rounded-lg border px-3 py-2 text-xs font-semibold"
+                data-selected={isDefault ? "true" : "false"}
+                onClick={() =>
+                  isDefault
+                    ? removeDefaultTracker(name)
+                    : addDefaultTracker(name)
+                }
+              >
+                {isDefault ? "Remove Default" : "Add to Defaults"}
+              </button>
+            </div>
+            {isOpen && (
+              <div className="ua-config-accordion-panel border-t p-4">
+                {tracker.base_url && (
+                  <a
+                    href={tracker.base_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mb-4 inline-block text-xs"
+                  >
+                    {tracker.base_url}
+                  </a>
+                )}
+                {trackerItem ? (
+                  <ItemList
+                    items={trackerItem.children}
+                    pathParts={[...pathParts, trackerItem.key]}
+                    depth={depth + 1}
+                    isDarkMode={isDarkMode}
+                    allImageHosts={allImageHosts}
+                    usedImageHosts={usedImageHosts}
+                    fullWidth={true}
+                    expandedGroups={expandedGroups}
+                    toggleGroup={toggleGroup}
+                    torrentClients={torrentClients}
+                    onValueChange={onValueChange}
+                  />
+                ) : (
+                  <div className="ua-config-state-panel rounded-lg border p-4 text-sm">
+                    No example configuration is available for this tracker.
+                  </div>
+                )}
+                {trackerView === "configured" &&
+                  trackerItem?.source === "config" && (
+                    <div className="mt-5 flex justify-end border-t pt-4">
+                      <button
+                        type="button"
+                        className="rounded-lg border border-red-500/50 px-3 py-2 text-sm font-semibold text-red-500 hover:bg-red-500/10"
+                        onClick={async () => {
+                          const confirmed = await showConfirmModal({
+                            title: "Remove tracker configuration",
+                            message: isDefault
+                              ? `Remove the saved configuration for ${displayName(name)} and remove it from your default trackers?`
+                              : `Remove the saved configuration for ${displayName(name)}?`,
+                            confirmLabel: "Remove Configuration",
+                          });
+                          if (!confirmed) return;
+                          try {
+                            const response = await apiFetch(
+                              `${API_BASE}/config_remove_subsection`,
+                              {
+                                method: "POST",
+                                headers: {
+                                  "Content-Type": "application/json",
+                                },
+                                body: JSON.stringify({
+                                  path: [...pathParts, trackerItem.key],
+                                }),
+                              },
+                            );
+                            const data = await response.json();
+                            if (!data.success) {
+                              throw new Error(
+                                data.error ||
+                                  "Failed to remove tracker configuration",
+                              );
+                            }
+                            if (isDefault) {
+                              const defaultResponse = await apiFetch(
+                                `${API_BASE}/config_update`,
+                                {
+                                  method: "POST",
+                                  headers: {
+                                    "Content-Type": "application/json",
+                                  },
+                                  body: JSON.stringify({
+                                    path: [...pathParts, "default_trackers"],
+                                    value: selectedDefaults
+                                      .filter((tracker) => tracker !== name)
+                                      .join(", "),
+                                  }),
+                                },
+                              );
+                              const defaultData = await defaultResponse.json();
+                              if (!defaultData.success) {
+                                throw new Error(
+                                  defaultData.error ||
+                                    "Tracker configuration was removed, but the default list could not be updated",
+                                );
+                              }
+                            }
+                            try {
+                              sessionStorage.setItem(
+                                "ua_active_tab",
+                                "trackers",
+                              );
+                              sessionStorage.setItem(
+                                "ua_active_subtab",
+                                "configured",
+                              );
+                            } catch (error) {
+                              // Storage is optional; removal still succeeded.
+                            }
+                            window.location.reload();
+                          } catch (error) {
+                            alert(
+                              error.message ||
+                                "Failed to remove tracker configuration",
+                            );
+                          }
+                        }}
+                      >
+                        Remove Configuration
+                      </button>
+                    </div>
+                  )}
+              </div>
+            )}
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
 function ItemList({
   items,
   pathParts,
@@ -1827,6 +2461,10 @@ function ItemList({
   expandedGroups,
   toggleGroup,
   torrentClients,
+  trackerView,
+  trackerCatalog,
+  onAddTorrentClient,
+  onRemovePendingTorrentClient,
   onValueChange,
 }) {
   // Group items into regular fields and subsections
@@ -1841,16 +2479,82 @@ function ItemList({
     }
   }
 
-  // If we're in the top-level TRACKERS section, extract the default_trackers item
-  // This must happen before we partition/group regularItems so the default_trackers
-  // field is not rendered twice (once in the tracker tabs and once in the grid).
+  // The tracker manager needs the default list separately from tracker blocks.
   const isTrackerConfig = pathParts.includes("TRACKERS") && depth === 0;
+  const isTorrentClientsRoot =
+    pathParts.includes("TORRENT_CLIENTS") && depth === 0;
+  const configuredTorrentClientNames = new Set(
+    (torrentClients || []).map((name) => String(name).toLowerCase()),
+  );
+  const userTorrentClientItems = isTorrentClientsRoot
+    ? subsections.filter((item) =>
+        ["config", "pending"].includes(item.source),
+      )
+    : [];
+  const configuredTorrentClientItems = isTorrentClientsRoot
+    ? userTorrentClientItems.filter((item) =>
+        configuredTorrentClientNames.has(String(item.key).toLowerCase()),
+      )
+    : [];
   let defaultTrackersItem = null;
   if (isTrackerConfig) {
     const idx = regularItems.findIndex((it) => it.key === "default_trackers");
     if (idx >= 0) {
       defaultTrackersItem = regularItems.splice(idx, 1)[0];
     }
+  }
+
+  if (isTrackerConfig && defaultTrackersItem) {
+    return (
+      <TrackerManager
+        items={subsections}
+        defaultTrackersItem={defaultTrackersItem}
+        trackerView={trackerView || "default"}
+        trackerCatalog={trackerCatalog}
+        pathParts={pathParts}
+        depth={depth}
+        isDarkMode={isDarkMode}
+        allImageHosts={allImageHosts}
+        usedImageHosts={usedImageHosts}
+        expandedGroups={expandedGroups}
+        toggleGroup={toggleGroup}
+        torrentClients={torrentClients}
+        onValueChange={onValueChange}
+      />
+    );
+  }
+
+  if (pathParts[0] === "IMAGES" && depth === 0) {
+    return (
+      <section className="ua-config-section overflow-hidden rounded-xl border">
+        <div className="ua-config-section-heading border-b px-4 py-3">
+          <h2 className="text-sm font-semibold">Database Link Images</h2>
+        </div>
+        <div className="ua-config-section-panel space-y-4 p-4">
+          <p className="ua-config-page-subtitle text-sm">
+            Shared database-link icons used in tracker descriptions, including
+            AlphaRatio and TVChaosUK. These are image URLs, not image-host API
+            credentials.
+          </p>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {regularItems.map((item) => (
+              <ConfigLeaf
+                key={[...pathParts, item.key].join("/")}
+                item={item}
+                pathParts={pathParts}
+                depth={depth}
+                isDarkMode={isDarkMode}
+                fullWidth={true}
+                allImageHosts={allImageHosts}
+                usedImageHosts={usedImageHosts}
+                torrentClients={torrentClients}
+                onValueChange={onValueChange}
+              />
+            ))}
+          </div>
+        </div>
+      </section>
+    );
   }
 
   // Define known subgroupings for better visual breakdown (screenshots-related)
@@ -1955,588 +2659,43 @@ function ItemList({
     if (!placed) ungrouped.push(it);
   }
 
-  // Track user choices to add available-only trackers into default_trackers
-  const [pendingDefaultAdds, setPendingDefaultAdds] = useState(() => new Set());
-  const [trackerTab, setTrackerTab] = useState(() => {
-    try {
-      return sessionStorage.getItem("ua_tracker_tab") || "default";
-    } catch (e) {
-      return "default";
-    }
-  });
-
-  const normalizeTrackers = (value) =>
-    String(value || "")
-      .split(",")
-      .map((t) => t.trim().toUpperCase())
-      .filter(Boolean);
-
-  let availableFromExample = [];
-  let selectedFromDefault = new Set();
-  let configuredFromSubsections = new Set();
-  let configuredSet = new Set();
-  let availableRemaining = [];
-  let configuredArray = [];
-  let availableArray = [];
-  if (isTrackerConfig && defaultTrackersItem) {
-    availableFromExample = getAvailableTrackers(defaultTrackersItem).map((t) =>
-      String(t).toUpperCase(),
-    );
-    selectedFromDefault = new Set(normalizeTrackers(defaultTrackersItem.value));
-    configuredFromSubsections = new Set(
-      (subsections || [])
-        .filter(
-          (s) =>
-            Array.isArray(s.children) &&
-            s.children.some((c) => c.source === "config"),
-        )
-        .map((s) => String(s.key).toUpperCase()),
-    );
-    configuredSet = new Set([
-      ...selectedFromDefault,
-      ...configuredFromSubsections,
-    ]);
-    availableRemaining = availableFromExample.filter(
-      (t) => !configuredSet.has(t),
-    );
-    // Present configured and available lists in alphabetical order by display name
-    configuredArray = Array.from(configuredSet).sort((a, b) =>
-      getTrackerDisplayName(a).localeCompare(getTrackerDisplayName(b)),
-    );
-    availableArray = (availableRemaining || [])
-      .slice()
-      .sort((a, b) =>
-        getTrackerDisplayName(a).localeCompare(getTrackerDisplayName(b)),
-      );
-  }
-  // Ensure arrays are defined in outer scope for rendering even when not tracker config
-  if (!configuredArray) configuredArray = [];
-  if (!availableArray) availableArray = [];
-
   return (
     <div className="space-y-6">
-      {/* TRACKERS tabbed subsections: Default / Configured / Available */}
-      {isTrackerConfig && defaultTrackersItem && (
-        <div>
-          <div className="ua-config-tabs ua-config-tracker-tabs mb-3 flex space-x-1 overflow-x-auto rounded-lg p-1">
-            <button
-              type="button"
-              onClick={() => setTrackerTab("default")}
-              className="ua-config-tracker-tab whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium transition-colors md:flex-1"
-              data-active={trackerTab === "default" ? "true" : "false"}
-            >
-              Default trackers
-            </button>
-            <button
-              type="button"
-              onClick={() => setTrackerTab("configured")}
-              className="ua-config-tracker-tab whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium transition-colors md:flex-1"
-              data-active={trackerTab === "configured" ? "true" : "false"}
-            >
-              Configured trackers
-            </button>
-            <button
-              type="button"
-              onClick={() => setTrackerTab("available")}
-              className="ua-config-tracker-tab whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium transition-colors md:flex-1"
-              data-active={trackerTab === "available" ? "true" : "false"}
-            >
-              Available trackers
-            </button>
+      {isTorrentClientsRoot && (
+        <React.Fragment>
+          <TorrentClientCreator
+            templateItems={subsections}
+            configuredNames={
+              new Set(
+                userTorrentClientItems.map((item) =>
+                  String(item.key).toLowerCase(),
+                ),
+              )
+            }
+            onAddClient={onAddTorrentClient}
+          />
+          <div className="flex items-end justify-between gap-4">
+            <div>
+              <h2 className="text-base font-semibold">Configured Clients</h2>
+              <p className="ua-config-page-subtitle mt-1 text-sm">
+                Open a client to edit its connection, paths and injection
+                settings.
+              </p>
+            </div>
+            <span className="ua-config-service-description shrink-0 text-sm">
+              {configuredTorrentClientItems.length}{" "}
+              {configuredTorrentClientItems.length === 1
+                ? "client"
+                : "clients"}
+            </span>
           </div>
-
-          <div>
-            <div className={trackerTab === "default" ? "" : "hidden"}>
-              <ConfigLeaf
-                key={[...pathParts, defaultTrackersItem.key].join("/")}
-                item={defaultTrackersItem}
-                pathParts={pathParts}
-                depth={depth}
-                isDarkMode={isDarkMode}
-                fullWidth={true}
-                allImageHosts={allImageHosts}
-                usedImageHosts={usedImageHosts}
-                torrentClients={torrentClients}
-                onValueChange={onValueChange}
-              />
+          {configuredTorrentClientItems.length === 0 && (
+            <div className="ua-config-state-panel rounded-xl border p-5 text-sm">
+              No torrent clients are configured yet. Use Add Torrent Client to
+              create one.
             </div>
-
-            <div
-              className={trackerTab === "configured" ? "space-y-4" : "hidden"}
-            >
-              {/* configured tab content */}
-              <div className="space-y-4">
-                <div
-                  className={
-                    isDarkMode
-                      ? "text-sm font-medium text-gray-200 mb-2"
-                      : "text-sm font-medium text-gray-700 mb-2"
-                  }
-                >
-                  Configured trackers
-                </div>
-                <div
-                  className={`rounded-lg border p-3 ${isDarkMode ? "border-gray-700 bg-gray-900/30" : "border-gray-200 bg-gray-50"}`}
-                >
-                  <div className="space-y-2">
-                    {configuredArray.length === 0 && (
-                      <div
-                        className={
-                          isDarkMode ? "text-gray-400" : "text-gray-500"
-                        }
-                      >
-                        No configured trackers
-                      </div>
-                    )}
-                    {configuredArray.map((tr) => {
-                      const subsection = subsections.find(
-                        (s) => String(s.key).toUpperCase() === tr,
-                      );
-                      if (subsection) {
-                        const groupKey = [...pathParts, subsection.key].join(
-                          "/",
-                        );
-                        const isOpen = expandedGroups.has(groupKey);
-                        return (
-                          <div key={tr} className="mb-2">
-                            <div className="flex items-center justify-between">
-                              <button
-                                type="button"
-                                onClick={() => toggleGroup(groupKey)}
-                                aria-expanded={isOpen}
-                                className={`flex items-center justify-between w-full px-3 py-2 text-sm font-medium rounded ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}
-                              >
-                                <span
-                                  className={
-                                    isDarkMode
-                                      ? "text-xs font-mono text-purple-300"
-                                      : "text-xs font-mono text-purple-700"
-                                  }
-                                >
-                                  {getTrackerDisplayName(tr)}
-                                </span>
-                                <span
-                                  className="transition-transform"
-                                  style={{
-                                    transform: isOpen
-                                      ? "rotate(90deg)"
-                                      : "rotate(0deg)",
-                                  }}
-                                >
-                                  &gt;
-                                </span>
-                              </button>
-                            </div>
-                            {isOpen && (
-                              <div
-                                className={`rounded-lg border p-3 mt-2 ${isDarkMode ? "border-gray-700 bg-gray-900/20" : "border-gray-200 bg-white"}`}
-                              >
-                                <ItemList
-                                  items={subsection.children}
-                                  pathParts={[...pathParts, subsection.key]}
-                                  depth={depth + 1}
-                                  isDarkMode={isDarkMode}
-                                  allImageHosts={allImageHosts}
-                                  usedImageHosts={usedImageHosts}
-                                  fullWidth={true}
-                                  expandedGroups={expandedGroups}
-                                  toggleGroup={toggleGroup}
-                                  torrentClients={torrentClients}
-                                  onValueChange={onValueChange}
-                                />
-                                <div className="mt-2 flex items-center justify-end">
-                                  <button
-                                    type="button"
-                                    onClick={async () => {
-                                      const ok = await showConfirmModal(
-                                        `Remove configured tracker ${tr}? This will remove the user's overrides for this tracker.`,
-                                      );
-                                      if (!ok) return;
-                                      try {
-                                        const resp = await apiFetch(
-                                          `${API_BASE}/config_remove_subsection`,
-                                          {
-                                            method: "POST",
-                                            headers: {
-                                              "Content-Type":
-                                                "application/json",
-                                            },
-                                            body: JSON.stringify({
-                                              path: [
-                                                ...pathParts,
-                                                subsection.key,
-                                              ],
-                                            }),
-                                          },
-                                        );
-                                        const data = await resp.json();
-                                        if (!data.success)
-                                          throw new Error(
-                                            data.error || "Failed",
-                                          );
-
-                                        // If this tracker is also in default_trackers, remove it there as well
-                                        try {
-                                          if (
-                                            selectedFromDefault &&
-                                            selectedFromDefault.has(tr)
-                                          ) {
-                                            const nextDefault = Array.from(
-                                              selectedFromDefault,
-                                            )
-                                              .filter((x) => x !== tr)
-                                              .join(", ");
-                                            const resp2 = await apiFetch(
-                                              `${API_BASE}/config_update`,
-                                              {
-                                                method: "POST",
-                                                headers: {
-                                                  "Content-Type":
-                                                    "application/json",
-                                                },
-                                                body: JSON.stringify({
-                                                  path: [
-                                                    ...pathParts,
-                                                    "default_trackers",
-                                                  ],
-                                                  value: nextDefault,
-                                                }),
-                                              },
-                                            );
-                                            const data2 = await resp2.json();
-                                            if (!data2.success)
-                                              throw new Error(
-                                                data2.error ||
-                                                  "Failed to update default_trackers",
-                                              );
-                                          }
-                                        } catch (err) {
-                                          console.warn(
-                                            "Failed to update default_trackers after removing subsection",
-                                            err,
-                                          );
-                                        }
-
-                                        try {
-                                          sessionStorage.setItem(
-                                            "ua_active_tab",
-                                            String(
-                                              pathParts[0] || "",
-                                            ).toLowerCase(),
-                                          );
-                                          sessionStorage.setItem(
-                                            "ua_tracker_tab",
-                                            trackerTab || "configured",
-                                          );
-                                        } catch (e) {
-                                          /* ignore */
-                                        }
-                                        window.location.reload();
-                                      } catch (err) {
-                                        alert(
-                                          err.message ||
-                                            "Failed to remove subsection",
-                                        );
-                                      }
-                                    }}
-                                    className="ml-2 px-2 py-1 text-xs rounded bg-red-600 text-white"
-                                  >
-                                    Remove
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      }
-                      // Tracker selected in default but not configured in file - allow removing from default
-                      return (
-                        <div
-                          key={tr}
-                          className="inline-flex items-center mr-2 mb-2 px-2 py-1 rounded text-xs"
-                        >
-                          <div
-                            className={
-                              isDarkMode
-                                ? "bg-purple-700 text-white px-2 py-1 rounded"
-                                : "bg-purple-100 text-purple-800 px-2 py-1 rounded"
-                            }
-                          >
-                            {getTrackerDisplayName(tr)}
-                          </div>
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              const ok = await showConfirmModal({
-                                message: `Remove ${tr} from default trackers?`,
-                                confirmLabel: "Remove",
-                              });
-                              if (!ok) return;
-                              try {
-                                const next = Array.from(selectedFromDefault)
-                                  .filter((x) => x !== tr)
-                                  .join(", ");
-                                const resp = await apiFetch(
-                                  `${API_BASE}/config_update`,
-                                  {
-                                    method: "POST",
-                                    headers: {
-                                      "Content-Type": "application/json",
-                                    },
-                                    body: JSON.stringify({
-                                      path: [...pathParts, "default_trackers"],
-                                      value: next,
-                                    }),
-                                  },
-                                );
-                                const data = await resp.json();
-                                if (!data.success)
-                                  throw new Error(data.error || "Failed");
-                                try {
-                                  sessionStorage.setItem(
-                                    "ua_active_tab",
-                                    String(pathParts[0] || "").toLowerCase(),
-                                  );
-                                  sessionStorage.setItem(
-                                    "ua_tracker_tab",
-                                    trackerTab || "default",
-                                  );
-                                } catch (e) {
-                                  /* ignore */
-                                }
-                                window.location.reload();
-                              } catch (err) {
-                                alert(
-                                  err.message ||
-                                    "Failed to update default trackers",
-                                );
-                              }
-                            }}
-                            className="ml-2 px-2 py-1 text-xs rounded bg-red-600 text-white"
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className={trackerTab === "available" ? "" : "hidden"}>
-              <div>
-                <div
-                  className={
-                    isDarkMode
-                      ? "text-sm font-medium text-gray-200 mb-2"
-                      : "text-sm font-medium text-gray-700 mb-2"
-                  }
-                >
-                  Available trackers
-                </div>
-                <div
-                  className={`rounded-lg border p-3 ${isDarkMode ? "border-gray-700 bg-gray-900/30" : "border-gray-200 bg-gray-50"}`}
-                >
-                  {availableArray.length === 0 && (
-                    <div
-                      className={isDarkMode ? "text-gray-400" : "text-gray-500"}
-                    >
-                      No additional available trackers
-                    </div>
-                  )}
-                  <div className="space-y-2">
-                    {availableArray.map((t) => {
-                      const subsection = subsections.find(
-                        (s) => String(s.key).toUpperCase() === t,
-                      );
-                      const isInDefault =
-                        selectedFromDefault && selectedFromDefault.has(t);
-                      const isPending = pendingDefaultAdds.has(t);
-                      if (subsection) {
-                        const groupKey = [...pathParts, subsection.key].join(
-                          "/",
-                        );
-                        const isOpen = expandedGroups.has(groupKey);
-                        return (
-                          <div key={t} className="mb-2">
-                            <button
-                              type="button"
-                              onClick={() => toggleGroup(groupKey)}
-                              aria-expanded={isOpen}
-                              className={`flex items-center justify-between w-full px-3 py-2 text-sm font-medium rounded ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}
-                            >
-                              <span
-                                className={
-                                  isDarkMode
-                                    ? "text-xs font-mono text-gray-200"
-                                    : "text-xs font-mono text-gray-700"
-                                }
-                              >
-                                {getTrackerDisplayName(t)}
-                              </span>
-                              <span
-                                className="transition-transform"
-                                style={{
-                                  transform: isOpen
-                                    ? "rotate(90deg)"
-                                    : "rotate(0deg)",
-                                }}
-                              >
-                                &gt;
-                              </span>
-                            </button>
-                            {isOpen && (
-                              <div
-                                className={`rounded-lg border p-3 mt-2 ${isDarkMode ? "border-gray-700 bg-gray-900/20" : "border-gray-200 bg-white"}`}
-                              >
-                                <ItemList
-                                  items={subsection.children}
-                                  pathParts={[...pathParts, subsection.key]}
-                                  depth={depth + 1}
-                                  isDarkMode={isDarkMode}
-                                  allImageHosts={allImageHosts}
-                                  usedImageHosts={usedImageHosts}
-                                  fullWidth={true}
-                                  expandedGroups={expandedGroups}
-                                  toggleGroup={toggleGroup}
-                                  torrentClients={torrentClients}
-                                  onValueChange={onValueChange}
-                                />
-                                <div className="mt-2">
-                                  <label className="inline-flex items-center text-xs mr-2">
-                                    <input
-                                      type="checkbox"
-                                      checked={isInDefault || isPending}
-                                      onChange={async (e) => {
-                                        const checked = e.target.checked;
-                                        const nextPending = new Set(
-                                          pendingDefaultAdds,
-                                        );
-                                        if (checked) {
-                                          nextPending.add(t);
-                                        } else {
-                                          nextPending.delete(t);
-                                        }
-                                        setPendingDefaultAdds(nextPending);
-                                        // Compute next default trackers value and queue change
-                                        const nextDefaultSet = new Set(
-                                          selectedFromDefault || [],
-                                        );
-                                        for (const x of nextPending)
-                                          nextDefaultSet.add(x);
-                                        // If user unchecked an already-selected default, remove it
-                                        if (
-                                          !checked &&
-                                          selectedFromDefault &&
-                                          selectedFromDefault.has(t)
-                                        ) {
-                                          nextDefaultSet.delete(t);
-                                        }
-                                        const nextDefault =
-                                          Array.from(nextDefaultSet).join(", ");
-                                        const originalDefault =
-                                          normalizeTrackers(
-                                            defaultTrackersItem.value,
-                                          ).join(", ");
-                                        onValueChange(
-                                          [...pathParts, "default_trackers"],
-                                          nextDefault,
-                                          {
-                                            originalValue: originalDefault,
-                                            isSensitive: false,
-                                            isRedacted: false,
-                                            readOnly: false,
-                                          },
-                                        );
-                                      }}
-                                      className="h-4 w-4 mr-2"
-                                    />
-                                    <span
-                                      className={
-                                        isDarkMode
-                                          ? "text-gray-300"
-                                          : "text-gray-700"
-                                      }
-                                    >
-                                      Add to default trackers
-                                    </span>
-                                  </label>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      }
-                      return (
-                        <div
-                          key={t}
-                          className={
-                            isDarkMode
-                              ? "inline-block px-2 py-1 bg-gray-800 text-gray-200 rounded text-xs"
-                              : "inline-block px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs"
-                          }
-                        >
-                          <div className="flex items-center gap-2">
-                            <div>{getTrackerDisplayName(t)}</div>
-                            <label className="inline-flex items-center text-xs">
-                              <input
-                                type="checkbox"
-                                checked={
-                                  (selectedFromDefault &&
-                                    selectedFromDefault.has(t)) ||
-                                  pendingDefaultAdds.has(t)
-                                }
-                                onChange={(e) => {
-                                  const checked = e.target.checked;
-                                  const nextPending = new Set(
-                                    pendingDefaultAdds,
-                                  );
-                                  if (checked) nextPending.add(t);
-                                  else nextPending.delete(t);
-                                  setPendingDefaultAdds(nextPending);
-                                  const nextDefaultSet = new Set(
-                                    selectedFromDefault || [],
-                                  );
-                                  for (const x of nextPending)
-                                    nextDefaultSet.add(x);
-                                  if (
-                                    !checked &&
-                                    selectedFromDefault &&
-                                    selectedFromDefault.has(t)
-                                  ) {
-                                    nextDefaultSet.delete(t);
-                                  }
-                                  const nextDefault =
-                                    Array.from(nextDefaultSet).join(", ");
-                                  const originalDefault = normalizeTrackers(
-                                    defaultTrackersItem.value,
-                                  ).join(", ");
-                                  onValueChange(
-                                    [...pathParts, "default_trackers"],
-                                    nextDefault,
-                                    {
-                                      originalValue: originalDefault,
-                                      isSensitive: false,
-                                      isRedacted: false,
-                                      readOnly: false,
-                                    },
-                                  );
-                                }}
-                                className="h-4 w-4"
-                              />
-                              <span className="ml-1">Add to defaults</span>
-                            </label>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+          )}
+        </React.Fragment>
       )}
       {/* Regular form fields, optionally grouped into subheaders */}
       {(ungrouped.length > 0 ||
@@ -2649,14 +2808,14 @@ function ItemList({
 
       {/* Subsections */}
       {subsections.map((item) => {
-        // When rendering the top-level TRACKERS section we handle tracker subsections
-        // inside the tabbed UI above, so skip the generic subsections rendering
-        // to avoid duplicate lists.
-        if (pathParts.includes("TRACKERS") && depth === 0) {
-          return null;
-        }
         const isTorrentClientConfig =
           pathParts.includes("TORRENT_CLIENTS") && depth === 0;
+        if (
+          isTorrentClientConfig &&
+          !configuredTorrentClientNames.has(String(item.key).toLowerCase())
+        ) {
+          return null;
+        }
         const isMetadataCachingSubsection =
           pathParts[0] === "DEFAULT" &&
           depth === 0 &&
@@ -2692,12 +2851,16 @@ function ItemList({
             "DESCRIPTION HEADERS AND OVERRIDES";
         const isStaticSubsection =
           item.subsection === true && !isMetadataCachingSubsection;
-        const isCollapsible =
-          isTrackerConfig || isTorrentClientConfig;
+        const isCollapsible = isTorrentClientConfig;
         const nextPath = item.subsection ? pathParts : [...pathParts, item.key];
         const nextDepth = item.subsection ? depth : depth + 1;
         const groupKey = [...pathParts, item.key].join("/");
         const isOpen = expandedGroups.has(groupKey);
+        const torrentClientType = isTorrentClientConfig
+          ? (item.children || []).find(
+              (child) => child.key === "torrent_client",
+            )?.value
+          : "";
 
         if (isMetadataCachingSubsection) {
           const serviceOverrides = (item.children || []).find(
@@ -2903,7 +3066,18 @@ function ItemList({
                   {item.subsection === true
                     ? formatConfigHeading(item.key)
                     : isTorrentClientConfig
-                      ? getConfigBlockLabel(item.key)
+                      ? (
+                          <span className="flex flex-wrap items-center gap-2">
+                            <span>{getConfigBlockLabel(item.key)}</span>
+                            {torrentClientType && (
+                              <span className="ua-config-client-type rounded-full px-2 py-0.5 text-xs font-medium">
+                                {TORRENT_CLIENT_TYPE_LABELS[
+                                  String(torrentClientType).toLowerCase()
+                                ] || formatDisplayLabel(torrentClientType)}
+                              </span>
+                            )}
+                          </span>
+                        )
                       : getTrackerDisplayName(item.key)}
                 </span>
                 <span
@@ -2930,6 +3104,66 @@ function ItemList({
               {isOpen && (
                 <div className="ua-config-accordion-panel border-t p-4">
                   {nested}
+                  {isTorrentClientConfig &&
+                    ["config", "pending"].includes(item.source) && (
+                      <div className="mt-5 flex justify-end border-t pt-4">
+                        <button
+                        type="button"
+                        className="rounded-lg border border-red-500/50 px-3 py-2 text-sm font-semibold text-red-500 hover:bg-red-500/10"
+                        onClick={async () => {
+                          if (item.source === "pending") {
+                            onRemovePendingTorrentClient(item.key);
+                            return;
+                          }
+                          const confirmed = await showConfirmModal({
+                            title: "Remove torrent client",
+                            message: `Remove ${item.key} from your configuration? References in Client Selection will not be changed.`,
+                            confirmLabel: "Remove Client",
+                          });
+                          if (!confirmed) return;
+                          try {
+                            const response = await apiFetch(
+                              `${API_BASE}/config_remove_subsection`,
+                              {
+                                method: "POST",
+                                headers: {
+                                  "Content-Type": "application/json",
+                                },
+                                body: JSON.stringify({
+                                  path: [...pathParts, item.key],
+                                }),
+                              },
+                            );
+                            const data = await response.json();
+                            if (!data.success) {
+                              throw new Error(
+                                data.error || "Failed to remove torrent client",
+                              );
+                            }
+                            try {
+                              sessionStorage.setItem(
+                                "ua_active_tab",
+                                "torrent_clients",
+                              );
+                              sessionStorage.setItem("ua_active_subtab", "");
+                            } catch (error) {
+                              // Storage is optional; removal still succeeded.
+                            }
+                            window.location.reload();
+                          } catch (error) {
+                            alert(
+                              error.message ||
+                                "Failed to remove torrent client",
+                            );
+                          }
+                        }}
+                      >
+                        {item.source === "pending"
+                          ? "Discard Client"
+                          : "Remove Client"}
+                        </button>
+                      </div>
+                    )}
                 </div>
               )}
             </div>
@@ -4022,9 +4256,85 @@ function ConfigSidebar({
     (section) => section.section === "DEFAULT",
   );
   const defaultGroups = getDefaultNavigationGroups(defaultSection);
-  const configurationSections = sections.filter(
-    (section) => section.section !== "DEFAULT",
+  const sectionByName = new Map(
+    sections.map((section) => [section.section, section]),
   );
+  const torrentClientsSection = sectionByName.get("TORRENT_CLIENTS");
+  const usenetSection = sectionByName.get("USENET");
+  const trackersSection = sectionByName.get("TRACKERS");
+  const databaseLinkImagesSection = sectionByName.get("IMAGES");
+  const reservedSections = new Set([
+    "DEFAULT",
+    "IMAGES",
+    "TRACKERS",
+    "TORRENT_CLIENTS",
+    "USENET",
+  ]);
+  const remainingConfigurationSections = sections.filter(
+    (section) => !reservedSections.has(section.section),
+  );
+  const configurationNavigationItems = [];
+
+  for (const group of defaultGroups) {
+    configurationNavigationItems.push({
+      id: `default-${group.id}`,
+      label: group.label,
+      tab: "default",
+      subTab: group.id,
+      nested: true,
+    });
+    if (group.id === "setup" && torrentClientsSection) {
+      configurationNavigationItems.push({
+        id: torrentClientsSection.section,
+        label: getConfigSectionLabel(torrentClientsSection.section),
+        tab: torrentClientsSection.section.toLowerCase(),
+        nested: true,
+      });
+    }
+    if (group.id === "upload" && usenetSection) {
+      configurationNavigationItems.push({
+        id: usenetSection.section,
+        label: getConfigSectionLabel(usenetSection.section),
+        tab: usenetSection.section.toLowerCase(),
+        nested: true,
+      });
+    }
+  }
+
+  if (
+    torrentClientsSection &&
+    !configurationNavigationItems.some(
+      (item) => item.id === torrentClientsSection.section,
+    )
+  ) {
+    configurationNavigationItems.push({
+      id: torrentClientsSection.section,
+      label: getConfigSectionLabel(torrentClientsSection.section),
+      tab: torrentClientsSection.section.toLowerCase(),
+      nested: true,
+    });
+  }
+  if (
+    usenetSection &&
+    !configurationNavigationItems.some(
+      (item) => item.id === usenetSection.section,
+    )
+  ) {
+    configurationNavigationItems.push({
+      id: usenetSection.section,
+      label: getConfigSectionLabel(usenetSection.section),
+      tab: usenetSection.section.toLowerCase(),
+      nested: true,
+    });
+  }
+  for (const section of remainingConfigurationSections) {
+    configurationNavigationItems.push({
+      id: section.section,
+      label: getConfigSectionLabel(section.section),
+      tab: section.section.toLowerCase(),
+      nested: true,
+    });
+  }
 
   const navButton = ({ id, label, tab, subTab = "", nested = false }) => {
     const isActive = activeTab === tab && (!subTab || activeSubTab === subTab);
@@ -4054,7 +4364,13 @@ function ConfigSidebar({
           />
           <div className="min-w-0">
             <div className="truncate text-xs font-semibold uppercase tracking-widest opacity-60">
-              Upload Assistant
+              <span>Upload Assistant</span>
+              {window.UA_APP_VERSION && (
+                <span className="ml-1 normal-case">
+                  <span aria-hidden="true">·</span>{" "}
+                  {window.UA_APP_VERSION}
+                </span>
+              )}
             </div>
             <div className="mt-1 truncate text-lg font-bold">
               Configuration
@@ -4075,38 +4391,42 @@ function ConfigSidebar({
         className="ua-config-sidebar-nav min-h-0 flex-1 overflow-y-auto px-3 py-4"
         aria-label="Configuration sections"
       >
-        {defaultGroups.length > 0 && (
-          <div className="mb-5">
-            <div className="ua-config-nav-heading px-3 pb-2 text-xs font-semibold uppercase tracking-wider">
-              General Settings
-            </div>
-            <div className="space-y-1">
-              {defaultGroups.map((group) =>
-                navButton({
-                  id: `default-${group.id}`,
-                  label: group.label,
-                  tab: "default",
-                  subTab: group.id,
-                  nested: true,
-                }),
-              )}
-            </div>
-          </div>
-        )}
-
-        {configurationSections.length > 0 && (
+        {configurationNavigationItems.length > 0 && (
           <div className="mb-5">
             <div className="ua-config-nav-heading px-3 pb-2 text-xs font-semibold uppercase tracking-wider">
               Configuration
             </div>
             <div className="space-y-1">
-              {configurationSections.map((section) =>
+              {configurationNavigationItems.map(navButton)}
+            </div>
+          </div>
+        )}
+
+        {(trackersSection || databaseLinkImagesSection) && (
+          <div className="mb-5">
+            <div className="ua-config-nav-heading px-3 pb-2 text-xs font-semibold uppercase tracking-wider">
+              Trackers
+            </div>
+            <div className="space-y-1">
+              {trackersSection &&
+                TRACKER_NAVIGATION_GROUPS.map((group) =>
+                  navButton({
+                    id: `trackers-${group.id}`,
+                    label: group.label,
+                    tab: "trackers",
+                    subTab: group.id,
+                    nested: true,
+                  }),
+                )}
+              {databaseLinkImagesSection &&
                 navButton({
-                  id: section.section,
-                  label: getConfigSectionLabel(section.section),
-                  tab: section.section.toLowerCase(),
-                }),
-              )}
+                  id: databaseLinkImagesSection.section,
+                  label: getConfigSectionLabel(
+                    databaseLinkImagesSection.section,
+                  ),
+                  tab: databaseLinkImagesSection.section.toLowerCase(),
+                  nested: true,
+                })}
             </div>
           </div>
         )}
@@ -4197,6 +4517,7 @@ function ConfigApp() {
   const [colorTheme, setColorThemeState] = useState(getStoredColorTheme);
   const [expandedGroups, setExpandedGroups] = useState(new Set());
   const [pendingChanges, setPendingChanges] = useState(new Map());
+  const [pendingTorrentClients, setPendingTorrentClients] = useState(new Map());
   const [isSaving, setIsSaving] = useState(false);
   const [configWarning, setConfigWarning] = useState("");
   const [activeTab, setActiveTab] = useState(() => {
@@ -4208,13 +4529,19 @@ function ConfigApp() {
   });
   const [activeSubTab, setActiveSubTab] = useState(() => {
     try {
-      return sessionStorage.getItem("ua_active_subtab") || "general";
+      const storedSubTab =
+        sessionStorage.getItem("ua_active_subtab") || "general";
+      return storedSubTab === "release-preparation" ? "upload" : storedSubTab;
     } catch (e) {
       return "general";
     }
   });
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [torrentClients, setTorrentClients] = useState([]);
+  const [trackerCatalog, setTrackerCatalog] = useState({
+    defaultTrackers: [],
+    trackers: [],
+  });
 
   useEffect(() => {
     const handleColorThemeChange = (event) => {
@@ -4231,6 +4558,9 @@ function ConfigApp() {
   const getSubTabsForSection = (section) => {
     if (section?.section === "DEFAULT") {
       return getDefaultNavigationGroups(section);
+    }
+    if (section?.section === "TRACKERS") {
+      return TRACKER_NAVIGATION_GROUPS;
     }
     return [];
   };
@@ -4293,6 +4623,7 @@ function ConfigApp() {
         newSections[0];
       setSections(newSections);
       setPendingChanges(new Map());
+      setPendingTorrentClients(new Map());
       setConfigWarning(data.config_warning || "");
       setStatus({ text: "", type: "info" });
 
@@ -4318,7 +4649,6 @@ function ConfigApp() {
           }
           sessionStorage.removeItem("ua_active_tab");
           sessionStorage.removeItem("ua_active_subtab");
-          // keep ua_tracker_tab; ItemList reads it directly on mount
           didRestoreTab = true;
         }
       } catch (e) {
@@ -4335,6 +4665,20 @@ function ConfigApp() {
       } catch (error) {
         console.warn("Failed to load torrent clients:", error);
         setTorrentClients([]);
+      }
+
+      try {
+        const trackersResponse = await apiFetch(`${API_BASE}/trackers`);
+        const trackersData = await trackersResponse.json();
+        if (trackersData.success) {
+          setTrackerCatalog({
+            defaultTrackers: trackersData.default_trackers || [],
+            trackers: trackersData.trackers || [],
+          });
+        }
+      } catch (error) {
+        console.warn("Failed to load tracker catalogue:", error);
+        setTrackerCatalog({ defaultTrackers: [], trackers: [] });
       }
 
       // Only set default tabs if we don't have any sections loaded yet
@@ -4419,17 +4763,134 @@ function ConfigApp() {
     });
   };
 
+  const addPendingTorrentClient = (clientName, templateName) => {
+    const torrentSection = sections.find(
+      (section) => section.section === "TORRENT_CLIENTS",
+    );
+    const templateItem = torrentSection?.items?.find(
+      (item) => item.key === templateName,
+    );
+    if (!templateItem) {
+      throw new Error("The selected torrent client template is unavailable.");
+    }
+
+    const cloneExampleTemplate = (item) => {
+      const clone = JSON.parse(JSON.stringify(item));
+      if (Array.isArray(clone.children)) {
+        clone.children = clone.children.map(cloneExampleTemplate);
+      } else if (Object.prototype.hasOwnProperty.call(clone, "example_value")) {
+        clone.value = clone.example_value;
+      }
+      clone.source = "example";
+      return clone;
+    };
+    const pendingItem = cloneExampleTemplate(templateItem);
+    pendingItem.key = clientName;
+    pendingItem.source = "pending";
+    setSections((currentSections) =>
+      currentSections.map((section) =>
+        section.section === "TORRENT_CLIENTS"
+          ? { ...section, items: [...section.items, pendingItem] }
+          : section,
+      ),
+    );
+    setTorrentClients((currentClients) =>
+      [...currentClients, clientName].sort((left, right) =>
+        String(left).localeCompare(String(right)),
+      ),
+    );
+    setPendingTorrentClients((currentClients) => {
+      const next = new Map(currentClients);
+      next.set(clientName, templateName);
+      return next;
+    });
+    setExpandedGroups((currentGroups) => {
+      const next = new Set(currentGroups);
+      next.add(`TORRENT_CLIENTS/${clientName}`);
+      return next;
+    });
+    setStatusWithClear(
+      `${clientName} added locally. Save Config to keep it.`,
+      "info",
+      2500,
+    );
+  };
+
+  const removePendingTorrentClient = (clientName) => {
+    const normalizedName = String(clientName).toLowerCase();
+    setSections((currentSections) =>
+      currentSections.map((section) =>
+        section.section === "TORRENT_CLIENTS"
+          ? {
+              ...section,
+              items: section.items.filter(
+                (item) =>
+                  !(
+                    item.source === "pending" &&
+                    String(item.key).toLowerCase() === normalizedName
+                  ),
+              ),
+            }
+          : section,
+      ),
+    );
+    setTorrentClients((currentClients) =>
+      currentClients.filter(
+        (name) => String(name).toLowerCase() !== normalizedName,
+      ),
+    );
+    setPendingTorrentClients((currentClients) => {
+      const next = new Map(currentClients);
+      for (const name of next.keys()) {
+        if (String(name).toLowerCase() === normalizedName) next.delete(name);
+      }
+      return next;
+    });
+    setPendingChanges((currentChanges) => {
+      const next = new Map(currentChanges);
+      const pathPrefix = `TORRENT_CLIENTS/${clientName}/`.toLowerCase();
+      for (const pathKey of next.keys()) {
+        if (String(pathKey).toLowerCase().startsWith(pathPrefix)) {
+          next.delete(pathKey);
+        }
+      }
+      return next;
+    });
+    setExpandedGroups((currentGroups) => {
+      const next = new Set(currentGroups);
+      next.delete(`TORRENT_CLIENTS/${clientName}`);
+      return next;
+    });
+  };
+
   const saveAllChanges = async () => {
-    if (pendingChanges.size === 0) {
+    const pendingChangeCount =
+      pendingChanges.size + pendingTorrentClients.size;
+    if (pendingChangeCount === 0) {
       setStatusWithClear("No changes to save.", "warn", 1500);
       return;
     }
     setIsSaving(true);
     setStatusWithClear(
-      `Saving ${pendingChanges.size} change${pendingChanges.size === 1 ? "" : "s"}...`,
+      `Saving ${pendingChangeCount} change${pendingChangeCount === 1 ? "" : "s"}...`,
       "info",
     );
     try {
+      for (const [clientName, templateName] of pendingTorrentClients) {
+        const response = await apiFetch(
+          `${API_BASE}/config_add_torrent_client`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: clientName, template: templateName }),
+          },
+        );
+        const data = await response.json();
+        if (!data.success && response.status !== 409) {
+          throw new Error(data.error || "Failed to add torrent client");
+        }
+      }
+
       // Some updates may target keys inside subsections that only exist in the example-config.
       // Ensure we create an empty subsection object in the user's config first so subsequent
       // nested updates succeed. Collect unique subsection creations needed.
@@ -4588,12 +5049,19 @@ function ConfigApp() {
           (group) => group.id === activeSubTab,
         )
       : null;
+  const activeTrackerGroup =
+    activeSection?.section === "TRACKERS"
+      ? TRACKER_NAVIGATION_GROUPS.find(
+          (group) => group.id === activeSubTab,
+        )
+      : null;
   const activeTitle =
     activeTab === "security"
       ? "Security"
       : activeTab === "access-log"
         ? "Access Log"
         : activeDefaultGroup?.label ||
+          activeTrackerGroup?.label ||
           getConfigSectionLabel(activeSection?.section || "Configuration");
   const activeSubtitle =
     activeSection?.section === "DEFAULT"
@@ -4615,7 +5083,9 @@ function ConfigApp() {
       : activeSection?.items || [];
 
   const statusClass = "ua-config-status text-sm";
-  const saveDisabled = isSaving || pendingChanges.size === 0;
+  const pendingChangeCount =
+    pendingChanges.size + pendingTorrentClients.size;
+  const saveDisabled = isSaving || pendingChangeCount === 0;
   const saveButtonClass =
     "ua-config-save-button rounded-lg px-4 py-2 text-sm font-semibold" +
     (saveDisabled ? " cursor-not-allowed opacity-50" : "");
@@ -4707,10 +5177,10 @@ function ConfigApp() {
                     {status.text}
                   </span>
                 )}
-                {pendingChanges.size > 0 && !status.text && (
+                {pendingChangeCount > 0 && !status.text && (
                   <span className="ua-config-pending-count hidden text-sm lg:inline">
-                    {pendingChanges.size} unsaved{" "}
-                    {pendingChanges.size === 1 ? "change" : "changes"}
+                    {pendingChangeCount} unsaved{" "}
+                    {pendingChangeCount === 1 ? "change" : "changes"}
                   </span>
                 )}
                 <button
@@ -4802,6 +5272,16 @@ function ConfigApp() {
                         expandedGroups={expandedGroups}
                         toggleGroup={toggleGroup}
                         torrentClients={torrentClients}
+                        trackerView={
+                          activeSection.section === "TRACKERS"
+                            ? activeSubTab
+                            : ""
+                        }
+                        trackerCatalog={trackerCatalog}
+                        onAddTorrentClient={addPendingTorrentClient}
+                        onRemovePendingTorrentClient={
+                          removePendingTorrentClient
+                        }
                         onValueChange={onValueChange}
                       />
                     )}

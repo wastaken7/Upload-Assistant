@@ -35,6 +35,7 @@ import web_ui.auth as auth_mod
 from src.webui_progress import PROGRESS_STDOUT_PREFIX, ProgressEvent, clear_progress_callback, reset_progress, set_progress_callback
 from src.app_paths import CODE_DIR, STATE_DIR
 from src.meta import Meta
+from src.version import __version__ as APP_VERSION
 
 
 def _module_name(*parts: str) -> str:
@@ -2244,6 +2245,7 @@ class ExecutionPreview(TypedDict, total=False):
 class ConfigItem(TypedDict, total=False):
     key: str
     value: object
+    example_value: object
     source: Literal["config", "example"]
     children: list[ConfigItem]
     help: list[str]
@@ -2716,6 +2718,13 @@ def _format_config_tree(tree: ast.AST) -> str:
                     else:
                         lines.append(ast.unparse(node))
                     break
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.target.id == "config":
+            if isinstance(node.value, ast.Dict):
+                lines.append(f"config: {ast.unparse(node.annotation)} = {{")
+                lines.extend(_format_dict(node.value, 1))
+                lines.append("}")
+            else:
+                lines.append(ast.unparse(node))
         else:
             # Keep other statements as-is
             lines.append(ast.unparse(node))
@@ -2744,13 +2753,15 @@ def _format_dict(dict_node: ast.Dict, indent_level: int) -> list[str]:
 
 def _replace_config_value_in_source(source: str, key_path: list[str], new_value: str) -> str:
     tree = ast.parse(source)
-    config_assign = None
+    config_assign: ast.Assign | ast.AnnAssign | None = None
     for node in tree.body:
         if isinstance(node, ast.Assign):
             for target in node.targets:
                 if isinstance(target, ast.Name) and target.id == "config":
                     config_assign = node
                     break
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.target.id == "config":
+            config_assign = node
         if config_assign:
             break
 
@@ -2820,13 +2831,15 @@ def _replace_config_value_in_source(source: str, key_path: list[str], new_value:
 def _remove_config_key_in_source(source: str, key_path: list[str]) -> str:
     """Remove a key from the config source if it exists"""
     tree = ast.parse(source)
-    config_assign = None
+    config_assign: ast.Assign | ast.AnnAssign | None = None
     for node in tree.body:
         if isinstance(node, ast.Assign):
             for target in node.targets:
                 if isinstance(target, ast.Name) and target.id == "config":
                     config_assign = node
                     break
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.target.id == "config":
+            config_assign = node
         if config_assign:
             break
 
@@ -2924,6 +2937,7 @@ def _build_config_items(
             item = {
                 "key": key,
                 "value": _json_safe(value),
+                "example_value": _json_safe(example_value),
                 "source": source,
                 "help": help_text,
             }
@@ -2981,6 +2995,51 @@ def _prepare_default_webui_section(
             comments_map.setdefault(f"DEFAULT/{client_key}", help_text)
             subsection_map[f"DEFAULT/{client_key}"] = "CLIENT SELECTION"
 
+    return prepared
+
+
+def _torrent_client_template(
+    example_clients: Mapping[str, Any],
+    client_type: str,
+) -> tuple[str, dict[str, Any]] | None:
+    """Return the preferred example template for a torrent client type."""
+    matches: list[tuple[str, dict[str, Any]]] = []
+    for template_name, template_value in example_clients.items():
+        template = _as_dict(template_value)
+        if template and str(template.get("torrent_client", "")).lower() == client_type.lower():
+            matches.append((str(template_name), template))
+    if not matches:
+        return None
+    matches.sort(key=lambda match: (match[0] != "qbittorrent", match[0]))
+    return matches[0]
+
+
+def _prepare_torrent_client_webui_section(
+    example_section: dict[str, Any],
+    user_section: Mapping[str, Any],
+    comments_map: dict[str, list[str]],
+) -> dict[str, Any]:
+    """Add example-backed metadata for custom-named torrent clients."""
+    prepared = dict(example_section)
+    for client_name, client_value in user_section.items():
+        if client_name in prepared:
+            continue
+        client_config = _as_dict(client_value)
+        if not client_config:
+            continue
+        match = _torrent_client_template(
+            example_section,
+            str(client_config.get("torrent_client", "")),
+        )
+        if match is None:
+            continue
+        template_name, template = match
+        prepared[str(client_name)] = dict(template)
+        for field_name in template:
+            source_path = f"TORRENT_CLIENTS/{template_name}/{field_name}"
+            target_path = f"TORRENT_CLIENTS/{client_name}/{field_name}"
+            if source_path in comments_map:
+                comments_map[target_path] = list(comments_map[source_path])
     return prepared
 
 
@@ -3549,7 +3608,11 @@ def config_page():
         with contextlib.suppress(Exception):
             if _is_authenticated() and not _session_get("csrf_token"):
                 _session_set("csrf_token", secrets.token_urlsafe(32))
-        return render_template("config.html", csrf_token=_session_get("csrf_token", ""))
+        return render_template(
+            "config.html",
+            app_version=APP_VERSION,
+            csrf_token=_session_get("csrf_token", ""),
+        )
     except Exception as e:
         console.print(f"Error loading config template: {e}", markup=False)
         console.print(traceback.format_exc(), markup=False)
@@ -3944,6 +4007,12 @@ def config_options():
 
         user_section_raw = user_config.get(section_name, {})
         user_section = cast(dict[str, Any], user_section_raw) if isinstance(user_section_raw, Mapping) else {}
+        if section_name == "TORRENT_CLIENTS":
+            example_section = _prepare_torrent_client_webui_section(
+                example_section,
+                user_section,
+                comments_map,
+            )
         items = _build_config_items(example_section, user_section, comments_map, subsection_map, [section_name])
 
         sections.append({"section": section_name, "items": items})
@@ -3964,9 +4033,39 @@ def config_options():
     return jsonify(result)
 
 
+def _configured_torrent_client_names(
+    user_config: Mapping[str, Any],
+    example_config: Mapping[str, Any],
+) -> list[str]:
+    """Return user-created, edited, or actively referenced torrent clients."""
+    user_clients = _as_dict(user_config.get("TORRENT_CLIENTS")) or {}
+    example_clients = _as_dict(example_config.get("TORRENT_CLIENTS")) or {}
+    example_by_name = {str(name).casefold(): _as_dict(value) or {} for name, value in example_clients.items()}
+
+    referenced: set[str] = set()
+    default_section = _as_dict(user_config.get("DEFAULT")) or {}
+    for key in ("default_torrent_client", "injecting_client_list", "searching_client_list"):
+        value = default_section.get(key)
+        if isinstance(value, str):
+            referenced.update(name.strip().casefold() for name in value.split(",") if name.strip())
+        elif isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+            referenced.update(str(name).strip().casefold() for name in value if str(name).strip())
+
+    configured: list[str] = []
+    for name, value in user_clients.items():
+        client_name = str(name)
+        normalized_name = client_name.casefold()
+        client_config = _as_dict(value) or {}
+        example_client = example_by_name.get(normalized_name)
+        if example_client is None or client_config != example_client or normalized_name in referenced:
+            configured.append(client_name)
+
+    return sorted(configured, key=str.casefold)
+
+
 @app.route("/api/torrent_clients")
 def torrent_clients():
-    """Return list of available torrent client names from TORRENT_CLIENTS section"""
+    """Return torrent clients that are configured or actively referenced."""
     # Require web session for config listing (disallow bearer token access)
     if not _is_authenticated():
         return jsonify({"success": False, "error": "Authentication required (web session)"}), 401
@@ -3980,14 +4079,10 @@ def torrent_clients():
 
     user_config = _load_config_from_file(config_path) or {}
 
-    # Get clients only from user config
-    user_clients_raw = user_config.get("TORRENT_CLIENTS", {})
-    user_clients = cast(dict[str, Any], user_clients_raw) if isinstance(user_clients_raw, Mapping) else {}
+    example_config = _load_config_from_file(CODE_DIR / "data" / "example_config.py") or {}
+    client_names = _configured_torrent_client_names(user_config, example_config)
 
-    # Include all configured clients in the dropdown
-    client_names: list[str] = [str(key) for key in user_clients]
-
-    return jsonify({"success": True, "clients": sorted(client_names)})
+    return jsonify({"success": True, "clients": client_names})
 
 
 _TRACKER_CONFIGURATION_KEYS = frozenset(
@@ -4186,6 +4281,20 @@ def config_update():
     example_config = _load_config_from_file(example_path) or {}
     example_value = _get_nested_value(example_config, path)
 
+    if example_value is None and len(path) >= 3 and path[0] == "TORRENT_CLIENTS":
+        user_config_for_template = _load_config_from_file(config_path) or {}
+        user_client = _get_nested_value(user_config_for_template, path[:2])
+        example_clients = _as_dict(example_config.get("TORRENT_CLIENTS")) or {}
+        user_client_config = _as_dict(user_client)
+        if user_client_config:
+            match = _torrent_client_template(
+                example_clients,
+                str(user_client_config.get("torrent_client", "")),
+            )
+            if match is not None:
+                _template_name, template = match
+                example_value = _get_nested_value(template, path[2:])
+
     # Special handling for client lists that don't exist in example config
     key = path[-1] if path else ""
     if key in ["injecting_client_list", "searching_client_list"]:
@@ -4277,6 +4386,70 @@ def config_remove_subsection():
         return jsonify({"success": True})
     except Exception:
         return jsonify({"success": False, "error": "An error occurred while removing the configuration subsection"}), 500
+
+
+@app.route("/api/config_add_torrent_client", methods=["POST"])
+def config_add_torrent_client():
+    """Create a custom-named torrent client from an example template."""
+    if not _is_authenticated():
+        return jsonify({"success": False, "error": "Authentication required (web session)"}), 401
+    if not _verify_csrf_header() or not _verify_same_origin():
+        return jsonify({"success": False, "error": "CSRF/Origin validation failed"}), 403
+
+    data = _request_json_dict()
+    client_name = str(data.get("name", "")).strip()
+    template_name = str(data.get("template", "")).strip()
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}", client_name):
+        return jsonify(
+            {
+                "success": False,
+                "error": "Client names may contain letters, numbers, hyphens, and underscores.",
+            }
+        ), 400
+
+    example_config = _load_config_from_file(CODE_DIR / "data" / "example_config.py") or {}
+    example_clients = _as_dict(example_config.get("TORRENT_CLIENTS")) or {}
+    template = _as_dict(example_clients.get(template_name))
+    if not template:
+        return jsonify({"success": False, "error": "Unknown torrent client template"}), 400
+
+    config_path = STATE_DIR / "data" / "config.py"
+    user_config = _load_config_from_file(config_path) or {}
+    user_clients = _as_dict(user_config.get("TORRENT_CLIENTS")) or {}
+    if client_name.casefold() in {str(name).casefold() for name in user_clients}:
+        return jsonify({"success": False, "error": "A client with that name already exists"}), 409
+
+    try:
+        source = config_path.read_text(encoding="utf-8")
+        if not isinstance(user_config.get("TORRENT_CLIENTS"), Mapping):
+            source = _replace_config_value_in_source(source, ["TORRENT_CLIENTS"], "{}")
+        updated = _replace_config_value_in_source(
+            source,
+            ["TORRENT_CLIENTS", client_name],
+            _python_literal(dict(template)),
+        )
+        config_path.write_text(updated, encoding="utf-8")
+        try:
+            _write_audit_log(
+                "add_subsection",
+                ["TORRENT_CLIENTS", client_name],
+                None,
+                {"template": template_name},
+                True,
+            )
+        except Exception as audit_error:
+            console.print(f"Failed to write config audit record: {audit_error}", markup=False)
+    except Exception as error:
+        console.print(f"Failed to add torrent client: {error}", markup=False)
+        return jsonify({"success": False, "error": "An error occurred while adding the torrent client"}), 500
+
+    return jsonify(
+        {
+            "success": True,
+            "name": client_name,
+            "torrent_client": template.get("torrent_client", ""),
+        }
+    )
 
 
 @app.route("/api/tokens", methods=["GET", "POST", "DELETE"])

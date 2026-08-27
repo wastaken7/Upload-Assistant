@@ -1,3 +1,4 @@
+import ast
 from pathlib import Path
 
 import web_ui.server as server
@@ -83,3 +84,123 @@ def test_default_client_lists_are_grouped_with_client_selection() -> None:
         item["key"] not in {"injecting_client_list", "searching_client_list"}
         for item in items
     )
+
+
+def test_torrent_client_template_prefers_primary_qbittorrent_example() -> None:
+    example_clients = {
+        "qbittorrent_searching": {"torrent_client": "qbit", "host": "searching"},
+        "qbittorrent": {"torrent_client": "qbit", "host": "primary"},
+        "rtorrent": {"torrent_client": "rtorrent", "host": "rtorrent"},
+    }
+
+    match = server._torrent_client_template(example_clients, "QBIT")
+
+    assert match == (
+        "qbittorrent",
+        {"torrent_client": "qbit", "host": "primary"},
+    )
+
+
+def test_custom_torrent_clients_inherit_template_fields_and_help() -> None:
+    example_clients = {
+        "qbittorrent": {
+            "torrent_client": "qbit",
+            "qbit_url": "http://127.0.0.1:8080",
+        },
+        "watch": {
+            "torrent_client": "watch",
+            "watch_folder": "",
+        },
+    }
+    user_clients = {
+        "seedbox_qbit": {
+            "torrent_client": "qbit",
+            "qbit_url": "https://seedbox.example",
+        },
+    }
+    comments = {
+        "TORRENT_CLIENTS/qbittorrent/qbit_url": ["qBittorrent WebUI URL."],
+    }
+
+    prepared = server._prepare_torrent_client_webui_section(
+        example_clients,
+        user_clients,
+        comments,
+    )
+
+    assert prepared["seedbox_qbit"] == example_clients["qbittorrent"]
+    assert comments["TORRENT_CLIENTS/seedbox_qbit/qbit_url"] == [
+        "qBittorrent WebUI URL."
+    ]
+
+
+def test_config_writer_supports_annotated_config_assignments() -> None:
+    source = """from typing import Any
+
+config: dict[str, Any] = {
+    "TORRENT_CLIENTS": {
+        "qbittorrent": {"torrent_client": "qbit"},
+    },
+}
+"""
+
+    updated = server._replace_config_value_in_source(
+        source,
+        ["TORRENT_CLIENTS", "seedbox"],
+        repr({"torrent_client": "qbit"}),
+    )
+    tree = ast.parse(updated)
+    config_assignment = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.AnnAssign)
+        and isinstance(node.target, ast.Name)
+        and node.target.id == "config"
+    )
+    loaded = ast.literal_eval(config_assignment.value)
+
+    assert loaded["TORRENT_CLIENTS"]["seedbox"] == {"torrent_client": "qbit"}
+    assert "config: dict[str, Any] = {" in updated
+
+
+def test_untouched_torrent_client_templates_are_not_configured_clients() -> None:
+    example_config = {
+        "DEFAULT": {"default_torrent_client": ""},
+        "TORRENT_CLIENTS": {
+            "qbittorrent": {"torrent_client": "qbit", "qbit_url": "localhost"},
+            "rtorrent": {"torrent_client": "rtorrent", "rtorrent_url": "localhost"},
+        },
+    }
+    user_config = {
+        "DEFAULT": {"default_torrent_client": ""},
+        "TORRENT_CLIENTS": {
+            "qbittorrent": {"torrent_client": "qbit", "qbit_url": "localhost"},
+            "rtorrent": {"torrent_client": "rtorrent", "rtorrent_url": "localhost"},
+            "seedbox": {"torrent_client": "qbit", "qbit_url": "localhost"},
+        },
+    }
+
+    assert server._configured_torrent_client_names(user_config, example_config) == [
+        "seedbox"
+    ]
+
+
+def test_referenced_or_edited_torrent_client_templates_remain_visible() -> None:
+    example_config = {
+        "TORRENT_CLIENTS": {
+            "qbittorrent": {"torrent_client": "qbit", "qbit_url": "localhost"},
+            "rtorrent": {"torrent_client": "rtorrent", "rtorrent_url": "localhost"},
+        },
+    }
+    user_config = {
+        "DEFAULT": {"default_torrent_client": "qbittorrent"},
+        "TORRENT_CLIENTS": {
+            "qbittorrent": {"torrent_client": "qbit", "qbit_url": "localhost"},
+            "rtorrent": {"torrent_client": "rtorrent", "rtorrent_url": "seedbox"},
+        },
+    }
+
+    assert server._configured_torrent_client_names(user_config, example_config) == [
+        "qbittorrent",
+        "rtorrent",
+    ]

@@ -631,6 +631,45 @@ select {
   color: var(--ua-config-muted);
 }
 
+.ua-config-input,
+.ua-config-select {
+  background-color: var(--ua-config-surface-raised);
+  border-color: var(--ua-config-border);
+  color: var(--ua-config-text);
+}
+
+.ua-config-select option {
+  background: var(--ua-config-surface-raised);
+  color: var(--ua-config-text);
+}
+
+.ua-config-client-type {
+  background: color-mix(in srgb, var(--ua-copper) 16%, transparent);
+  color: var(--ua-copper-bright);
+}
+
+.ua-config-tracker-card,
+.ua-config-tracker-icon {
+  background: var(--ua-config-surface-raised);
+  border-color: var(--ua-config-border);
+}
+
+.ua-config-tracker-default-action {
+  border-color: var(--ua-config-border);
+  color: var(--ua-config-muted);
+}
+
+.ua-config-tracker-default-action:hover,
+.ua-config-tracker-default-action[data-selected="true"] {
+  background: color-mix(in srgb, var(--ua-copper) 14%, transparent);
+  border-color: color-mix(
+    in srgb,
+    var(--ua-copper-bright) 45%,
+    var(--ua-config-border)
+  );
+  color: var(--ua-copper-bright);
+}
+
 .ua-config-service-group-title {
   background: color-mix(
     in srgb,
@@ -661,51 +700,9 @@ select {
   color: var(--ua-config-warning-text);
 }
 
-.ua-config-tracker-tabs {
-  background: var(--ua-config-surface-raised);
-  border: 1px solid var(--ua-config-border);
-}
-
-.ua-config-tracker-tab {
-  color: var(--ua-config-muted);
-}
-
-.ua-config-tracker-tab:hover {
-  background: var(--ua-config-hover);
-  color: var(--ua-config-text);
-}
-
-.ua-config-tracker-tab[data-active="true"] {
-  background: color-mix(
-    in srgb,
-    var(--ua-copper) 16%,
-    var(--ua-config-surface-raised)
-  );
-  color: var(--ua-config-text);
-  box-shadow: inset 0 0 0 1px
-    color-mix(in srgb, var(--ua-copper-bright) 32%, transparent);
-}
-
-/* Tracker tabs remain horizontally navigable on narrow screens without a
-   distracting native scrollbar or accidental page-wide overflow. */
-.ua-config-tabs {
-  scrollbar-width: none;
-  overscroll-behavior-x: contain;
-  scroll-snap-type: x proximity;
-}
-
-.ua-config-tabs::-webkit-scrollbar {
-  display: none;
-}
-
 @media (max-width: 767px) {
   .ua-config-sidebar {
     max-width: calc(100vw - 3rem);
-  }
-
-  .ua-config-tabs > button {
-    flex: 0 0 auto;
-    scroll-snap-align: start;
   }
 
   .ua-output-box-empty {

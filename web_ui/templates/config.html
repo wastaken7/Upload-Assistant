@@ -71,6 +71,7 @@
     </div>
     <script>
       window.UA_LOGO_URL = {{ url_for('static', filename='img/logo.svg') | tojson }};
+      window.UA_APP_VERSION = {{ app_version | tojson }};
     </script>
     <script
       type="text/javascript"
