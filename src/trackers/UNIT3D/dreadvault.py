@@ -70,7 +70,13 @@ class DreadVault(UNIT3D):
         # adult=true content from its API
         adult_keywords = ["xxx", "porn", "adult", "hentai", "softcore"]
         if any(re.search(rf"(^|,\s*){re.escape(keyword)}(\s*,|$)", genres, re.IGNORECASE) for keyword in adult_keywords):
-            logger.info(f"{self.tracker}: [bold red]Porn/xxx is not allowed at {self.tracker}.[/bold red]")
-            return False
+            if not meta.unattended or (meta.unattended and meta.unattended_confirm):
+                logger.info(f"{self.tracker}: [bold red]Porn/xxx is not allowed at {self.tracker}.[/bold red]")
+                if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
+                    pass
+                else:
+                    return False
+            else:
+                return False
 
         return self.common.check_and_confirm_adult_media_upload(meta, self.tracker)

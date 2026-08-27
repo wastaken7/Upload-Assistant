@@ -85,6 +85,13 @@ def test_dreadvault_rejects_non_horror_when_unattended():
     assert not asyncio.run(tracker.get_additional_checks(meta))  # noqa: S101
 
 
+def test_dreadvault_adult_keyword_skips_when_unattended():
+    # the waivable idiom: unattended runs skip without a prompt
+    tracker = _tracker()
+    meta = Meta(combined_genres="Horror", keywords=["porn"], unattended=True)
+    assert not asyncio.run(tracker.get_additional_checks(meta))  # noqa: S101
+
+
 def test_dreadvault_rejects_adult_content():
     tracker = _tracker()
     meta = Meta(combined_genres="Horror", keywords=["porn"], unattended=True)
