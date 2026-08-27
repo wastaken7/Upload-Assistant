@@ -257,12 +257,13 @@ class TvdbData:
             return None, None
 
         cache = cache_for(base_dir="", config=self.config)
-        cached = await cache.get("tvdb", "search", filename)
+        cache_key = f"{filename}_{year}" if year else filename
+        cached = await cache.get("tvdb", "search", cache_key)
         if not is_cache_miss(cached) and (cached is None or isinstance(cached, list)):
             results = cached
         else:
             results = await client.search(filename, year=year, type="series", lang="eng")
-            await cache.set("tvdb", "search", filename, results, negative=not bool(results))
+            await cache.set("tvdb", "search", cache_key, results, negative=not bool(results))
 
         try:
             if results and len(results) > 0:
