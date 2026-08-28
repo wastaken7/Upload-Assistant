@@ -5922,6 +5922,11 @@ function ConfigSidebar({
   onToggleMode,
   onLogout,
 }) {
+  const [isAppearanceOpen, setIsAppearanceOpen] = useState(() =>
+    window.matchMedia
+      ? !window.matchMedia("(max-height: 760px)").matches
+      : true,
+  );
   const defaultSection = sections.find(
     (section) => section.section === "DEFAULT",
   );
@@ -6107,65 +6112,79 @@ function ConfigSidebar({
         </div>
       </nav>
 
-      <div className="ua-config-sidebar-footer border-t p-4">
-        <div className="ua-config-nav-heading mb-2 text-xs font-semibold uppercase tracking-wider">
-          Appearance
-        </div>
-        <label
-          htmlFor="config-color-theme"
-          className="ua-config-service-description block text-xs font-semibold"
-        >
-          Color theme
-        </label>
-        <select
-          id="config-color-theme"
-          value={colorTheme}
-          onChange={onColorThemeChange}
-          aria-label="Color theme"
-          className="ua-theme-picker mt-1 w-full rounded-lg px-3 py-2 text-sm"
-        >
-          {colorThemes.map((theme) => (
-            <option key={theme.id} value={theme.id}>
-              {theme.label}
-            </option>
-          ))}
-        </select>
-        <label
-          htmlFor="config-interface-style"
-          className="ua-config-service-description mt-3 block text-xs font-semibold"
-        >
-          Corner style
-        </label>
-        <select
-          id="config-interface-style"
-          value={interfaceStyle}
-          onChange={onInterfaceStyleChange}
-          aria-label="Corner style"
-          className="ua-theme-picker mt-1 w-full rounded-lg px-3 py-2 text-sm"
-        >
-          {interfaceStyles.map((style) => (
-            <option key={style.id} value={style.id}>
-              {style.label}
-            </option>
-          ))}
-        </select>
+      <div className="ua-config-sidebar-footer shrink-0 border-t p-4">
         <button
           type="button"
-          className="ua-config-mode-button mt-2 flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm"
-          onClick={onToggleMode}
-          aria-label={`Switch to ${isDarkMode ? "light" : "dark"} mode`}
+          className="ua-config-nav-heading flex w-full items-center justify-between text-left text-xs font-semibold uppercase tracking-wider"
+          aria-expanded={isAppearanceOpen}
+          aria-controls="config-appearance-controls"
+          onClick={() => setIsAppearanceOpen((current) => !current)}
         >
-          <span>{isDarkMode ? "Dark mode" : "Light mode"}</span>
-          <span
-            className="ua-config-mode-switch relative inline-flex h-6 w-11 items-center rounded-full"
-            data-enabled={isDarkMode ? "true" : "false"}
-            aria-hidden="true"
-          >
-            <span className="ua-config-mode-knob inline-block h-4 w-4 rounded-full bg-white transition-transform"></span>
+          <span>Appearance</span>
+          <span className="text-base leading-none" aria-hidden="true">
+            {isAppearanceOpen ? "−" : "+"}
           </span>
         </button>
 
-        <div className="mt-4 grid gap-2">
+        {isAppearanceOpen && (
+          <div id="config-appearance-controls" className="mt-3">
+            <label
+              htmlFor="config-color-theme"
+              className="ua-config-service-description block text-xs font-semibold"
+            >
+              Color theme
+            </label>
+            <select
+              id="config-color-theme"
+              value={colorTheme}
+              onChange={onColorThemeChange}
+              aria-label="Color theme"
+              className="ua-theme-picker mt-1 w-full rounded-lg px-3 py-2 text-sm"
+            >
+              {colorThemes.map((theme) => (
+                <option key={theme.id} value={theme.id}>
+                  {theme.label}
+                </option>
+              ))}
+            </select>
+            <label
+              htmlFor="config-interface-style"
+              className="ua-config-service-description mt-3 block text-xs font-semibold"
+            >
+              Corner style
+            </label>
+            <select
+              id="config-interface-style"
+              value={interfaceStyle}
+              onChange={onInterfaceStyleChange}
+              aria-label="Corner style"
+              className="ua-theme-picker mt-1 w-full rounded-lg px-3 py-2 text-sm"
+            >
+              {interfaceStyles.map((style) => (
+                <option key={style.id} value={style.id}>
+                  {style.label}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="ua-config-mode-button mt-2 flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm"
+              onClick={onToggleMode}
+              aria-label={`Switch to ${isDarkMode ? "light" : "dark"} mode`}
+            >
+              <span>{isDarkMode ? "Dark mode" : "Light mode"}</span>
+              <span
+                className="ua-config-mode-switch relative inline-flex h-6 w-11 items-center rounded-full"
+                data-enabled={isDarkMode ? "true" : "false"}
+                aria-hidden="true"
+              >
+                <span className="ua-config-mode-knob inline-block h-4 w-4 rounded-full bg-white transition-transform"></span>
+              </span>
+            </button>
+          </div>
+        )}
+
+        <div className="mt-3 grid gap-2">
           <a
             href="/"
             className="ua-config-sidebar-action rounded-lg px-3 py-2 text-center text-sm font-semibold"
@@ -6186,6 +6205,40 @@ function ConfigSidebar({
 }
 
 function ConfigApp() {
+  useEffect(() => {
+    const root = document.documentElement;
+    const viewport = window.visualViewport;
+    let animationFrame = 0;
+
+    const updateViewportHeight = () => {
+      window.cancelAnimationFrame(animationFrame);
+      animationFrame = window.requestAnimationFrame(() => {
+        const visibleHeight = Math.round(
+          viewport?.height || window.innerHeight,
+        );
+        if (visibleHeight > 0) {
+          root.style.setProperty(
+            "--ua-config-viewport-height",
+            `${visibleHeight}px`,
+          );
+        }
+      });
+    };
+
+    updateViewportHeight();
+    window.addEventListener("resize", updateViewportHeight);
+    viewport?.addEventListener("resize", updateViewportHeight);
+    viewport?.addEventListener("scroll", updateViewportHeight);
+
+    return () => {
+      window.cancelAnimationFrame(animationFrame);
+      window.removeEventListener("resize", updateViewportHeight);
+      viewport?.removeEventListener("resize", updateViewportHeight);
+      viewport?.removeEventListener("scroll", updateViewportHeight);
+      root.style.removeProperty("--ua-config-viewport-height");
+    };
+  }, []);
+
   const [sections, setSections] = useState([]);
   // Keep a ref to the latest sections to avoid stale closures inside async loaders
   const currentSectionsRef = useRef(sections);
@@ -7851,12 +7904,12 @@ function ConfigApp() {
         ></button>
       )}
 
-      <div className="min-h-screen md:flex">
+      <div className="min-h-screen">
         <aside
           id="config-sidebar"
           className={
             "ua-config-sidebar fixed inset-y-0 left-0 z-50 w-72 transform transition-transform duration-200 " +
-            "md:sticky md:top-0 md:z-20 md:h-screen md:translate-x-0 " +
+            "md:z-20 md:translate-x-0 " +
             (isMobileNavOpen ? "translate-x-0" : "-translate-x-full")
           }
         >
@@ -7876,7 +7929,7 @@ function ConfigApp() {
           />
         </aside>
 
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 md:ml-72">
           <header className="ua-config-header sticky top-0 z-30 h-20 border-b">
             <div className="flex h-full items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
               <div className="flex min-w-0 items-center gap-3">

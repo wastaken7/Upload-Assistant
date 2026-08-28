@@ -4,7 +4,7 @@
   const COLOR_THEME_KEY = "ua_color_theme";
   const INTERFACE_STYLE_KEY = "ua_interface_style";
   const DEFAULT_COLOR_THEME = "charcoal";
-  const DEFAULT_INTERFACE_STYLE = "rounded";
+  const DEFAULT_INTERFACE_STYLE = "square";
   const UA_THEMES = Object.freeze([
     {
       id: "amethyst",

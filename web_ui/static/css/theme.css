@@ -450,6 +450,11 @@ a:hover {
 
 .ua-config-sidebar {
   border-right: 1px solid var(--ua-config-border);
+  height: var(--ua-config-viewport-height, 100vh);
+  height: var(--ua-config-viewport-height, 100dvh);
+  max-height: var(--ua-config-viewport-height, 100dvh);
+  overflow: hidden;
+  overscroll-behavior: contain;
   box-shadow: 12px 0 36px rgba(0, 0, 0, 0.2);
 }
 
@@ -464,6 +469,7 @@ a:hover {
 }
 
 .ua-config-sidebar-nav {
+  overscroll-behavior-y: contain;
   scrollbar-color: var(--ua-config-border) transparent;
   scrollbar-width: thin;
 }
