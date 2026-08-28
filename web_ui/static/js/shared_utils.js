@@ -2,15 +2,15 @@
 (() => {
   const THEME_KEY = "ua_config_theme";
   const COLOR_THEME_KEY = "ua_color_theme";
-  const DEFAULT_COLOR_THEME = "obsidian";
+  const DEFAULT_COLOR_THEME = "charcoal";
   const UA_THEMES = Object.freeze([
-    { id: "obsidian", label: "Obsidian", description: "Copper and gold" },
-    { id: "graphite", label: "Graphite", description: "Cool blue graphite" },
     {
       id: "charcoal",
       label: "Charcoal",
       description: "Neutral charcoal and blue",
     },
+    { id: "obsidian", label: "Obsidian", description: "Copper and gold" },
+    { id: "graphite", label: "Graphite", description: "Cool blue graphite" },
   ]);
   const UA_THEME_IDS = new Set(UA_THEMES.map((theme) => theme.id));
 

@@ -4102,6 +4102,36 @@ _TRACKER_CONFIGURATION_KEYS = frozenset(
     }
 )
 
+_TRACKER_DEFAULT_OVERRIDE_KEYS = (
+    "add_audio_spectrogram",
+    "add_bluray_link",
+    "add_dynamic_hdr_plot",
+    "add_logo",
+    "audio_spectrogram_header",
+    "bluray_image_size",
+    "charLimit",
+    "custom_description_header",
+    "custom_footer",
+    "custom_header",
+    "custom_signature",
+    "disc_menu_header",
+    "dynamic_hdr_plot_header",
+    "episode_overview",
+    "fileLimit",
+    "inject_delay",
+    "logo_size",
+    "mediainfo_header",
+    "multiScreens",
+    "pack_thumb_size",
+    "processLimit",
+    "screens_per_row",
+    "screenshot_header",
+    "thumbnail_size",
+    "tonemapped_header",
+    "use_bluray_images",
+    "user_description",
+)
+
 
 def _has_configured_tracker_value(tracker_config: Mapping[str, Any], example_tracker_config: Mapping[str, Any]) -> bool:
     """Return whether a tracker has a meaningful user-supplied setup value."""
@@ -4231,6 +4261,7 @@ def get_trackers():
     for tracker_name, tracker_class in tracker_class_map.items():
         display_name = getattr(tracker_class, "display_name", tracker_name)
         base_url = getattr(tracker_class, "base_url", "")
+        auth_type = str(getattr(tracker_class, "auth_type", "") or "").strip().lower()
         favicon_url = ""
         static_dir = Path(__file__).parent / "static"
         for ext in ["png", "svg", "ico"]:
@@ -4246,12 +4277,90 @@ def get_trackers():
                 "base_url": base_url,
                 "favicon": favicon_url,
                 "configured": tracker_name.upper() in configured_trackers,
+                "auth_type": auth_type,
+                "cookie_configured": tracker_name.upper() in cookie_trackers,
             }
         )
 
     trackers_data.sort(key=lambda x: x["display_name"].lower())
 
     return jsonify({"success": True, "default_trackers": default_trackers_list, "trackers": trackers_data})
+
+
+@app.route("/api/config_set_tracker_overrides", methods=["POST"])
+def config_set_tracker_overrides():
+    """Enable or remove the example-backed DEFAULT override block for a tracker."""
+    if not _is_authenticated():
+        return jsonify({"success": False, "error": "Authentication required (web session)"}), 401
+    if not _verify_csrf_header() or not _verify_same_origin():
+        return jsonify({"success": False, "error": "CSRF/Origin validation failed"}), 403
+
+    data = _request_json_dict()
+    tracker_name = str(data.get("tracker", "")).strip().upper()
+    enabled = data.get("enabled")
+    if not tracker_name or not isinstance(enabled, bool):
+        return jsonify({"success": False, "error": "Invalid tracker override request"}), 400
+
+    example_config = _load_config_from_file(CODE_DIR / "data" / "example_config.py") or {}
+    example_trackers = _as_dict(example_config.get("TRACKERS")) or {}
+    actual_example_name = next(
+        (str(name) for name in example_trackers if str(name).upper() == tracker_name),
+        None,
+    )
+    if actual_example_name is None:
+        return jsonify({"success": False, "error": "Unknown tracker"}), 404
+    example_tracker = _as_dict(example_trackers.get(actual_example_name)) or {}
+    override_keys = [key for key in _TRACKER_DEFAULT_OVERRIDE_KEYS if key in example_tracker]
+    if not override_keys:
+        return jsonify({"success": False, "error": "This tracker has no DEFAULT override block"}), 400
+
+    config_path = STATE_DIR / "data" / "config.py"
+    user_config = _load_config_from_file(config_path) or {}
+    user_trackers = _as_dict(user_config.get("TRACKERS")) or {}
+    actual_user_name = next(
+        (str(name) for name in user_trackers if str(name).upper() == tracker_name),
+        actual_example_name,
+    )
+
+    try:
+        source = config_path.read_text(encoding="utf-8")
+        if enabled:
+            if not isinstance(user_config.get("TRACKERS"), Mapping):
+                source = _replace_config_value_in_source(source, ["TRACKERS"], "{}")
+            if not isinstance(user_trackers.get(actual_user_name), Mapping):
+                source = _replace_config_value_in_source(source, ["TRACKERS", actual_user_name], "{}")
+            for key in override_keys:
+                source = _replace_config_value_in_source(
+                    source,
+                    ["TRACKERS", actual_user_name, key],
+                    _python_literal(example_tracker[key]),
+                )
+        else:
+            for key in override_keys:
+                source = _remove_config_key_in_source(source, ["TRACKERS", actual_user_name, key])
+        config_path.write_text(source, encoding="utf-8")
+        try:
+            _write_audit_log(
+                "set_tracker_default_overrides",
+                ["TRACKERS", actual_user_name],
+                None,
+                {"enabled": enabled, "keys": override_keys},
+                True,
+            )
+        except Exception as audit_error:
+            console.print(f"Failed to write config audit record: {audit_error}", markup=False)
+    except Exception as error:
+        console.print(f"Failed to update tracker DEFAULT overrides: {error}", markup=False)
+        return jsonify({"success": False, "error": "An error occurred while updating tracker overrides"}), 500
+
+    return jsonify(
+        {
+            "success": True,
+            "tracker": actual_user_name,
+            "enabled": enabled,
+            "keys": override_keys,
+        }
+    )
 
 
 @app.route("/api/config_update", methods=["POST"])
@@ -4450,6 +4559,240 @@ def config_add_torrent_client():
             "torrent_client": template.get("torrent_client", ""),
         }
     )
+
+
+@app.route("/api/config_rename_torrent_client", methods=["POST"])
+def config_rename_torrent_client():
+    """Rename a torrent-client block and its DEFAULT client references."""
+    if not _is_authenticated():
+        return jsonify({"success": False, "error": "Authentication required (web session)"}), 401
+    if not _verify_csrf_header() or not _verify_same_origin():
+        return jsonify({"success": False, "error": "CSRF/Origin validation failed"}), 403
+
+    data = _request_json_dict()
+    old_name = str(data.get("old_name", "")).strip()
+    new_name = str(data.get("new_name", "")).strip()
+    if not old_name or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}", new_name):
+        return jsonify(
+            {
+                "success": False,
+                "error": "Client names may contain letters, numbers, hyphens, and underscores.",
+            }
+        ), 400
+    if old_name.casefold() == new_name.casefold():
+        return jsonify({"success": False, "error": "Choose a different client name"}), 400
+
+    config_path = STATE_DIR / "data" / "config.py"
+    user_config = _load_config_from_file(config_path) or {}
+    user_clients = _as_dict(user_config.get("TORRENT_CLIENTS")) or {}
+    actual_old_name = next(
+        (str(name) for name in user_clients if str(name).casefold() == old_name.casefold()),
+        None,
+    )
+    existing_new_name = next(
+        (str(name) for name in user_clients if str(name).casefold() == new_name.casefold()),
+        None,
+    )
+
+    # Treat a completed earlier attempt as success so Save Config can be retried.
+    if actual_old_name is None and existing_new_name is not None:
+        return jsonify({"success": True, "old_name": old_name, "new_name": existing_new_name})
+    if actual_old_name is None:
+        return jsonify({"success": False, "error": "Torrent client not found"}), 404
+    if existing_new_name is not None:
+        return jsonify({"success": False, "error": "A client with that name already exists"}), 409
+
+    client_config = _as_dict(user_clients.get(actual_old_name))
+    if client_config is None:
+        return jsonify({"success": False, "error": "Torrent client configuration is invalid"}), 400
+
+    try:
+        source = config_path.read_text(encoding="utf-8")
+        updated = _replace_config_value_in_source(
+            source,
+            ["TORRENT_CLIENTS", new_name],
+            _python_literal(dict(client_config)),
+        )
+        updated = _remove_config_key_in_source(updated, ["TORRENT_CLIENTS", actual_old_name])
+
+        default_config = _as_dict(user_config.get("DEFAULT")) or {}
+        reference_keys = (
+            "default_torrent_client",
+            "injecting_client_list",
+            "searching_client_list",
+        )
+        updated_references: list[str] = []
+        for key in reference_keys:
+            current_value = default_config.get(key)
+            next_value: object = current_value
+            if isinstance(current_value, str) and current_value.casefold() == actual_old_name.casefold():
+                next_value = new_name
+            elif isinstance(current_value, list):
+                next_value = [
+                    new_name if isinstance(value, str) and value.casefold() == actual_old_name.casefold() else value
+                    for value in current_value
+                ]
+            if next_value != current_value:
+                updated = _replace_config_value_in_source(updated, ["DEFAULT", key], _python_literal(next_value))
+                updated_references.append(key)
+
+        config_path.write_text(updated, encoding="utf-8")
+        try:
+            _write_audit_log(
+                "rename_subsection",
+                ["TORRENT_CLIENTS", actual_old_name],
+                {"name": actual_old_name},
+                {"name": new_name},
+                True,
+            )
+        except Exception as audit_error:
+            console.print(f"Failed to write config audit record: {audit_error}", markup=False)
+    except Exception as error:
+        console.print(f"Failed to rename torrent client: {error}", markup=False)
+        return jsonify({"success": False, "error": "An error occurred while renaming the torrent client"}), 500
+
+    return jsonify(
+        {
+            "success": True,
+            "old_name": actual_old_name,
+            "new_name": new_name,
+            "updated_references": updated_references,
+        }
+    )
+
+
+@app.route("/api/config_test_torrent_client", methods=["POST"])
+@limiter.limit("30 per hour", key_func=_rate_limit_key_func)
+def config_test_torrent_client():
+    """Test a torrent-client draft without saving or mutating it."""
+    if not _is_authenticated():
+        return jsonify({"success": False, "error": "Authentication required (web session)"}), 401
+    if not _verify_csrf_header() or not _verify_same_origin():
+        return jsonify({"success": False, "error": "CSRF/Origin validation failed"}), 403
+
+    data = _request_json_dict()
+    client_name = str(data.get("name", "")).strip()
+    client_config = _as_dict(data.get("config"))
+    if not client_name or client_config is None:
+        return jsonify({"success": False, "error": "Invalid torrent client configuration"}), 400
+
+    client_type = str(client_config.get("torrent_client", "")).strip().lower()
+    if client_type not in {"qbit", "rtorrent", "deluge", "transmission", "watch"}:
+        return jsonify({"success": False, "error": "Unsupported torrent client type"}), 400
+
+    try:
+        message = "Connection successful"
+        if client_type == "qbit":
+            proxy_url = str(client_config.get("qui_proxy_url", "")).strip()
+            verify_certificate = bool(client_config.get("VERIFY_WEBUI_CERTIFICATE", True))
+            if proxy_url:
+                httpx = _dynamic_import("httpx")
+                response = httpx.get(
+                    f"{proxy_url.rstrip('/')}/api/v2/app/version",
+                    timeout=10.0,
+                    verify=verify_certificate,
+                )
+                response.raise_for_status()
+                version = str(response.text).strip().strip('"')
+            else:
+                qbittorrentapi = _dynamic_import("qbittorrentapi")
+                qbit_kwargs: dict[str, object] = {
+                    "host": str(client_config.get("qbit_url", "")),
+                    "port": str(client_config.get("qbit_port", "")),
+                    "VERIFY_WEBUI_CERTIFICATE": verify_certificate,
+                    "REQUESTS_ARGS": {"timeout": 10},
+                }
+                api_key = str(client_config.get("qbit_api_key", "")).strip()
+                if api_key:
+                    qbit_kwargs["api_key"] = api_key
+                else:
+                    qbit_kwargs["username"] = str(client_config.get("qbit_user", ""))
+                    qbit_kwargs["password"] = str(client_config.get("qbit_pass", ""))
+                qbit_client = qbittorrentapi.Client(**qbit_kwargs)
+                if not api_key:
+                    qbit_client.auth_log_in()
+                version_value = qbit_client.app_version
+                if callable(version_value):
+                    version_value = version_value()
+                version = str(version_value)
+            message = f"Connected to qBittorrent {version}" if version else "Connected to qBittorrent"
+        elif client_type == "rtorrent":
+            httpx = _dynamic_import("httpx")
+            xmlrpc_client = _dynamic_import("xmlrpc.client")
+            rtorrent_url = str(client_config.get("rtorrent_url", "")).strip()
+            if not rtorrent_url:
+                raise ValueError("Missing rTorrent URL")
+            payload = xmlrpc_client.dumps((), methodname="system.client_version")
+            response = httpx.post(
+                rtorrent_url,
+                content=payload,
+                headers={"Content-Type": "text/xml"},
+                timeout=10.0,
+            )
+            response.raise_for_status()
+            values, _method = xmlrpc_client.loads(response.content)
+            version = str(values[0]) if values else ""
+            message = f"Connected to rTorrent {version}" if version else "Connected to rTorrent"
+        elif client_type == "deluge":
+            deluge_client_module = _dynamic_import("deluge_client")
+            deluge_client = deluge_client_module.DelugeRPCClient(
+                str(client_config.get("deluge_url", "")),
+                int(client_config.get("deluge_port", 0)),
+                str(client_config.get("deluge_user", "")),
+                str(client_config.get("deluge_pass", "")),
+            )
+            deluge_client.connect()
+            if not deluge_client.connected:
+                raise ConnectionError("Deluge did not accept the connection")
+            if hasattr(deluge_client, "disconnect"):
+                deluge_client.disconnect()
+            message = "Connected to Deluge"
+        elif client_type == "transmission":
+            transmission_rpc = _dynamic_import("transmission_rpc")
+            transmission_client = transmission_rpc.Client(
+                protocol=str(client_config.get("transmission_protocol", "http")),
+                host=str(client_config.get("transmission_host", "")),
+                port=int(client_config.get("transmission_port", 0)),
+                username=str(client_config.get("transmission_username", "")),
+                password=str(client_config.get("transmission_password", "")),
+                path=str(client_config.get("transmission_path", "/transmission/rpc")),
+                timeout=10,
+            )
+            transmission_client.get_session()
+            message = "Connected to Transmission"
+        else:
+            watch_folder = Path(str(client_config.get("watch_folder", ""))).expanduser()
+            if not watch_folder.is_dir():
+                return jsonify({"success": False, "error": "Watch folder does not exist or is not a directory"}), 400
+            if not os.access(watch_folder, os.W_OK):
+                return jsonify({"success": False, "error": "Watch folder is not writable"}), 400
+            message = "Watch folder is available and writable"
+    except Exception as error:
+        error_type = type(error).__name__
+        console.print(
+            f"Torrent client connection test failed for {client_name} ({client_type}): {error_type}",
+            markup=False,
+        )
+        normalized_error = error_type.casefold()
+        if "login" in normalized_error or "auth" in normalized_error:
+            error_message = "Authentication failed. Check the configured credentials."
+        elif "timeout" in normalized_error:
+            error_message = "Connection timed out. Check the address, port, and network access."
+        elif "connect" in normalized_error or "connection" in normalized_error:
+            error_message = "Unable to reach the client. Check the address, port, and network access."
+        elif error_type == "HTTPStatusError":
+            status_code = getattr(getattr(error, "response", None), "status_code", None)
+            if status_code in {401, 403}:
+                error_message = "Authentication failed. Check the configured credentials."
+            elif status_code == 404:
+                error_message = "The client endpoint was not found. Check the configured URL or path."
+            else:
+                error_message = f"The client rejected the connection (HTTP {status_code or 'error'})."
+        else:
+            error_message = f"Connection failed ({error_type})."
+        return jsonify({"success": False, "error": error_message}), 400
+
+    return jsonify({"success": True, "message": message})
 
 
 @app.route("/api/tokens", methods=["GET", "POST", "DELETE"])
