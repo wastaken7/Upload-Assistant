@@ -117,6 +117,8 @@ def test_numeric_cli_arguments_parsed_as_correct_types(tmp_path):
         "500",
         "--qbit-bw-time",
         "30",
+        "--qbit-bw-control",
+        "--qbit-bw-control-after-usenet",
         "--year",
         "1994",
         "--dupe-size-difference-tolerance",
@@ -166,6 +168,9 @@ def test_numeric_cli_arguments_parsed_as_correct_types(tmp_path):
 
     assert meta.qbit_bandwidth_time == 30
     assert isinstance(meta.qbit_bandwidth_time, int)
+
+    assert meta.qbit_bandwidth_control is True
+    assert meta.qbit_bandwidth_control_after_usenet is True
 
     assert meta.manual_year == 1994
     assert isinstance(meta.manual_year, int)

@@ -15,7 +15,7 @@
 - [Fork Features & Differences from Upstream (Audionut/Upload-Assistant)](#fork-features--differences-from-upstream-audionutupload-assistant)
   - [1. New Media Category Support](#1-new-media-category-support)
   - [2. Audio Stream Spectrogram Generation](#2-audio-stream-spectrogram-generation)
-  - [3. qBittorrent Bandwidth Control](#3-qbittorrent-bandwidth-control)
+  - [3. Upload Order & qBittorrent Bandwidth Control](#3-upload-order--qbittorrent-bandwidth-control)
   - [4. Argument-Embedded Text Queue](#4-argument-embedded-text-queue)
   - [5. Usenet & Indexer Posting](#5-usenet--indexer-posting)
   - [6. Interactive Screenshot Review Workflow](#6-interactive-screenshot-review-workflow)
@@ -65,11 +65,9 @@ This branch introduces new media categories and automation features not present 
 - **Automated Upload**: Automatically uploads generated spectrograms along with your screenshots for release verification.
 - **Stream Selection**: Supports targeting specific tracks using `-ast` / `--audio-spectrogram-tracks` (e.g., track indexes or `all`).
 
-### 3. qBittorrent Bandwidth Control
+### 3. Upload Order & qBittorrent Bandwidth Control
 
-- **Traffic Control**: Prevents overloading your connection during uploads using `-qbcon` / `--qbit-bw-control`.
-- **Dynamic Wait**: Pauses uploading if your active client upload speed exceeds a threshold (`qbit_bandwidth_threshold` KB/s) and resumes once it stays below the limit for a set time (`qbit_bandwidth_time` seconds).
-- **Safe Rechecking**: Performs a second duplicate check after the bandwidth wait to ensure a duplicate wasn't posted while the client was waiting.
+Sequence Usenet and torrent tracker uploads while limiting contention with qBittorrent. See the dedicated [upload order and bandwidth control guide](docs/upload-order-and-bandwidth-control.md) for configuration and every supported workflow.
 
 ### 4. Argument-Embedded Text Queue
 
@@ -387,6 +385,7 @@ The file/folder path works best enclosed in double quotes.
 
 - CLI arguments: [docs/cli-args.md](docs/cli-args.md)
 - Usenet uploading: [docs/usenet.md](docs/usenet.md)
+- Upload order and bandwidth control: [docs/upload-order-and-bandwidth-control.md](docs/upload-order-and-bandwidth-control.md)
 
 ## **Docker Usage:**
 
@@ -420,4 +419,5 @@ Features automated binary managers for:
 </p>
 
 ## **Contributors:**
+
 [![Contributors](https://contrib.rocks/image?repo=wastaken7/Upload-Assistant)](https://github.com/wastaken7/Upload-Assistant/graphs/contributors)

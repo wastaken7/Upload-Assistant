@@ -216,7 +216,14 @@ Thise will use the specified hash to get tracker ids from qBitTorrent or rTorren
 - `-client`, `--client NAME`: Use this torrent client instead of default.
 - `-qbt`, `--qbit-tag TAG`: Add to qBittorrent with this tag.
 - `-qbc`, `--qbit-cat CATEGORY`: Add to qBittorrent with this category.
+- `-qbcon`, `--qbit-bw-control`: Enable all qBittorrent bandwidth checks for the upload workflow.
+- `--qbit-bw-control-after-usenet`: Keep per-tracker checks enabled after the Usenet phase. Requires bandwidth control and `upload_order=usenet`.
+- `-qbcrl`, `--qbit-bw-threshold KBPS`: Set the qBittorrent upload-speed threshold in KB/s.
+- `-qbctime`, `--qbit-bw-time SECONDS`: Set the requested averaging period, evaluated in five-second samples; see the workflow guide for effective timing.
+- `-uo`, `--upload-order {concurrent,usenet,tracker}`: Select the Usenet and torrent tracker phase order.
 - `-rtl`, `--rtorrent-label LABEL`: Add to rTorrent with this label.
+
+See [Upload Order and qBittorrent Bandwidth Control](upload-order-and-bandwidth-control.md) for workflow behavior and configuration requirements.
 
 ## Cleanup / temp directory
 

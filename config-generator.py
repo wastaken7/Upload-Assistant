@@ -560,7 +560,7 @@ def configure_default_section(
         },
         "qbit_bandwidth_control": {
             "condition": lambda value: value.lower() == "true",
-            "settings": ["qbit_bandwidth_threshold", "qbit_bandwidth_time"],
+            "settings": ["qbit_bandwidth_control_after_usenet", "qbit_bandwidth_threshold", "qbit_bandwidth_time"],
         },
     }
 

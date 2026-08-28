@@ -859,8 +859,13 @@ class Args:
         parser.add_argument("-client", "--client", nargs=1, required=False, help="Use this torrent client instead of default")
         parser.add_argument("-qbt", "--qbit-tag", dest="qbit_tag", nargs=1, required=False, help="Add to qbit with this tag")
         parser.add_argument("-qbc", "--qbit-cat", dest="qbit_cat", nargs=1, required=False, help="Add to qbit with this category")
+        parser.add_argument("-qbcon", "--qbit-bw-control", action="store_true", required=False, help="Enable all qBittorrent bandwidth checks", dest="qbit_bandwidth_control")
         parser.add_argument(
-            "-qbcon", "--qbit-bw-control", action="store_true", required=False, help="Enable qBittorrent bandwidth control logic before upload", dest="qbit_bandwidth_control"
+            "--qbit-bw-control-after-usenet",
+            action="store_true",
+            required=False,
+            help="Keep bandwidth checks enabled for torrent trackers uploaded after Usenet",
+            dest="qbit_bandwidth_control_after_usenet",
         )
         parser.add_argument("-qbcrl", "--qbit-bw-threshold", nargs=1, required=False, help="qBittorrent bandwidth limit threshold (KB/s)", dest="qbit_bandwidth_threshold")
         parser.add_argument("-qbctime", "--qbit-bw-time", nargs=1, required=False, help="Time to stay under qBittorrent threshold (seconds)", dest="qbit_bandwidth_time")
