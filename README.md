@@ -419,4 +419,5 @@ Features automated binary managers for:
 </p>
 
 ## **Contributors:**
+
 [![Contributors](https://contrib.rocks/image?repo=wastaken7/Upload-Assistant)](https://github.com/wastaken7/Upload-Assistant/graphs/contributors)

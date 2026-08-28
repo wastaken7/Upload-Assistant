@@ -48,11 +48,11 @@ The QUI reverse proxy is not used for bandwidth measurements. Direct qBittorrent
 
 ## Workflows
 
-| `upload_order` | Phase sequence | Per-tracker bandwidth control |
-| --- | --- | --- |
-| `concurrent` | Usenet and torrent tracker phases start together. There is no phase-boundary bandwidth check. | Checks before each tracker when enabled. |
-| `usenet` | When enabled, check bandwidth; complete the Usenet phase; then upload to all torrent trackers. | Follows `qbit_bandwidth_control_after_usenet`. |
-| `tracker` | Complete the torrent tracker phase; when enabled, check bandwidth; then start the Usenet phase. | Checks before each tracker when enabled. |
+| `upload_order` | Phase sequence                                                                                  | Per-tracker bandwidth control                  |
+| -------------- | ----------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| `concurrent`   | Usenet and torrent tracker phases start together. There is no phase-boundary bandwidth check.   | Checks before each tracker when enabled.       |
+| `usenet`       | When enabled, check bandwidth; complete the Usenet phase; then upload to all torrent trackers.  | Follows `qbit_bandwidth_control_after_usenet`. |
+| `tracker`      | Complete the torrent tracker phase; when enabled, check bandwidth; then start the Usenet phase. | Checks before each tracker when enabled.       |
 
 ### Concurrent
 
@@ -90,13 +90,13 @@ When only Usenet is selected, `"usenet"` checks bandwidth before posting only wh
 
 The equivalent CLI options are:
 
-| Short option | Long option | Purpose |
-| --- | --- | --- |
-| `-uo` | `--upload-order` | Select `concurrent`, `usenet`, or `tracker`. |
-| `-qbcon` | `--qbit-bw-control` | Enable every bandwidth check in the selected workflow. |
-|  | `--qbit-bw-control-after-usenet` | Retain per-tracker checks after the Usenet phase. |
-| `-qbcrl` | `--qbit-bw-threshold` | Set the threshold in KB/s. |
-| `-qbctime` | `--qbit-bw-time` | Set the requested averaging period, evaluated in five-second samples. |
+| Short option | Long option                      | Purpose                                                               |
+| ------------ | -------------------------------- | --------------------------------------------------------------------- |
+| `-uo`        | `--upload-order`                 | Select `concurrent`, `usenet`, or `tracker`.                          |
+| `-qbcon`     | `--qbit-bw-control`              | Enable every bandwidth check in the selected workflow.                |
+|              | `--qbit-bw-control-after-usenet` | Retain per-tracker checks after the Usenet phase.                     |
+| `-qbcrl`     | `--qbit-bw-threshold`            | Set the threshold in KB/s.                                            |
+| `-qbctime`   | `--qbit-bw-time`                 | Set the requested averaging period, evaluated in five-second samples. |
 
 For example, wait for qBittorrent to average no more than 500 KB/s for 30 seconds, upload to Usenet, and then upload to the torrent trackers without further checks:
 
