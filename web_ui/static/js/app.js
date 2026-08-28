@@ -13,6 +13,9 @@ const getStoredTheme = window.getUAStoredTheme;
 const colorThemes = window.UAThemes || [];
 const getStoredColorTheme = window.getUAStoredColorTheme;
 const setColorTheme = window.setUAColorTheme;
+const interfaceStyles = window.UAInterfaceStyles || [];
+const getStoredInterfaceStyle = window.getUAStoredInterfaceStyle;
+const setInterfaceStyle = window.setUAInterfaceStyle;
 let bbcodePreviewConfigured = false;
 
 const escapePreviewHtml = (value) =>
@@ -1479,6 +1482,9 @@ function AudionutsUAGUI() {
   const [isSendingInput, setIsSendingInput] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(getStoredTheme);
   const [colorTheme, setColorThemeState] = useState(getStoredColorTheme);
+  const [interfaceStyle, setInterfaceStyleState] = useState(
+    getStoredInterfaceStyle,
+  );
   const [isThemePaletteOpen, setIsThemePaletteOpen] = useState(false);
   const [argSearchFilter, setArgSearchFilter] = useState("");
   const [collapsedSections, setCollapsedSections] = useState(
@@ -1543,6 +1549,20 @@ function AudionutsUAGUI() {
   }, []);
 
   useEffect(() => {
+    const handleInterfaceStyleChange = (event) => {
+      setInterfaceStyleState(
+        event.detail?.style || getStoredInterfaceStyle(),
+      );
+    };
+    window.addEventListener("ua-shape-change", handleInterfaceStyleChange);
+    return () =>
+      window.removeEventListener(
+        "ua-shape-change",
+        handleInterfaceStyleChange,
+      );
+  }, []);
+
+  useEffect(() => {
     const handleColorThemeChange = (event) => {
       setColorThemeState(event.detail?.theme || getStoredColorTheme());
     };
@@ -1571,6 +1591,10 @@ function AudionutsUAGUI() {
 
   const handleColorThemeChange = (event) => {
     setColorThemeState(setColorTheme(event.target.value));
+  };
+
+  const handleInterfaceStyleChange = (event) => {
+    setInterfaceStyleState(setInterfaceStyle(event.target.value));
   };
 
   const renderThemePalette = () => (
@@ -1604,6 +1628,24 @@ function AudionutsUAGUI() {
             {colorThemes.map((theme) => (
               <option key={theme.id} value={theme.id}>
                 {theme.label}
+              </option>
+            ))}
+          </select>
+          <label className="mt-3 block text-xs font-semibold uppercase tracking-wide opacity-70">
+            Corner style
+          </label>
+          <select
+            value={interfaceStyle}
+            onChange={(event) => {
+              handleInterfaceStyleChange(event);
+              setIsThemePaletteOpen(false);
+            }}
+            aria-label="Corner style"
+            className="ua-theme-picker mt-1.5 w-full rounded px-2 py-1.5 text-sm"
+          >
+            {interfaceStyles.map((style) => (
+              <option key={style.id} value={style.id}>
+                {style.label}
               </option>
             ))}
           </select>
@@ -2210,11 +2252,10 @@ function AudionutsUAGUI() {
                 key={tracker.name}
                 onClick={() => handleTrackerToggle(tracker.name)}
                 disabled={isExecuting}
+                data-color-mode={isDarkMode ? "dark" : "light"}
                 className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium border transition-all ${
                   isSelected
-                    ? isDarkMode
-                      ? "bg-purple-900/60 border-purple-500 text-purple-200 hover:bg-purple-900/80"
-                      : "bg-purple-100 border-purple-300 text-purple-800 hover:bg-purple-200"
+                    ? "ua-tracker-chip-selected"
                     : isDarkMode
                       ? "bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700 hover:text-gray-200"
                       : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50 hover:text-gray-900"

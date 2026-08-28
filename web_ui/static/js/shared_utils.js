@@ -2,17 +2,41 @@
 (() => {
   const THEME_KEY = "ua_config_theme";
   const COLOR_THEME_KEY = "ua_color_theme";
+  const INTERFACE_STYLE_KEY = "ua_interface_style";
   const DEFAULT_COLOR_THEME = "charcoal";
+  const DEFAULT_INTERFACE_STYLE = "rounded";
   const UA_THEMES = Object.freeze([
+    {
+      id: "amethyst",
+      label: "Amethyst",
+      description: "Slate purple and lavender",
+    },
     {
       id: "charcoal",
       label: "Charcoal",
       description: "Neutral charcoal and blue",
     },
-    { id: "obsidian", label: "Obsidian", description: "Copper and gold" },
+    {
+      id: "evergreen",
+      label: "Evergreen",
+      description: "Deep green and teal",
+    },
     { id: "graphite", label: "Graphite", description: "Cool blue graphite" },
+    {
+      id: "midnight",
+      label: "Midnight",
+      description: "Near-black and indigo",
+    },
+    { id: "obsidian", label: "Obsidian", description: "Copper and gold" },
+  ]);
+  const UA_INTERFACE_STYLES = Object.freeze([
+    { id: "rounded", label: "Rounded" },
+    { id: "square", label: "Square" },
   ]);
   const UA_THEME_IDS = new Set(UA_THEMES.map((theme) => theme.id));
+  const UA_INTERFACE_STYLE_IDS = new Set(
+    UA_INTERFACE_STYLES.map((style) => style.id),
+  );
 
   const uaStorage = {
     get(key) {
@@ -76,7 +100,40 @@
     return nextTheme;
   }
 
+  function getUAStoredInterfaceStyle() {
+    const stored = uaStorage.get(INTERFACE_STYLE_KEY);
+    return UA_INTERFACE_STYLE_IDS.has(stored)
+      ? stored
+      : DEFAULT_INTERFACE_STYLE;
+  }
+
+  function applyUAInterfaceStyle(
+    styleId = getUAStoredInterfaceStyle(),
+  ) {
+    const nextStyle = UA_INTERFACE_STYLE_IDS.has(styleId)
+      ? styleId
+      : DEFAULT_INTERFACE_STYLE;
+    if (typeof document !== "undefined") {
+      document.documentElement.dataset.uaShape = nextStyle;
+    }
+    return nextStyle;
+  }
+
+  function setUAInterfaceStyle(styleId) {
+    const nextStyle = applyUAInterfaceStyle(styleId);
+    uaStorage.set(INTERFACE_STYLE_KEY, nextStyle);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent("ua-shape-change", {
+          detail: { style: nextStyle },
+        }),
+      );
+    }
+    return nextStyle;
+  }
+
   applyUAColorTheme();
+  applyUAInterfaceStyle();
 
   // CSRF + apiFetch helpers with automatic refresh on 401/403 responses.
   let uaCsrfToken = null;
@@ -210,10 +267,16 @@
   if (typeof window !== "undefined") {
     window.UAStorage = window.UAStorage || uaStorage;
     window.UAThemes = window.UAThemes || UA_THEMES;
+    window.UAInterfaceStyles =
+      window.UAInterfaceStyles || UA_INTERFACE_STYLES;
     window.getUAStoredTheme = window.getUAStoredTheme || getUAStoredTheme;
     window.getUAStoredColorTheme =
       window.getUAStoredColorTheme || getUAStoredColorTheme;
     window.setUAColorTheme = window.setUAColorTheme || setUAColorTheme;
+    window.getUAStoredInterfaceStyle =
+      window.getUAStoredInterfaceStyle || getUAStoredInterfaceStyle;
+    window.setUAInterfaceStyle =
+      window.setUAInterfaceStyle || setUAInterfaceStyle;
     window.loadCsrfToken = window.loadCsrfToken || loadCsrfToken;
     window.clearCsrfToken = window.clearCsrfToken || clearCsrfToken;
     window.uaApiFetch = window.uaApiFetch || uaApiFetch;

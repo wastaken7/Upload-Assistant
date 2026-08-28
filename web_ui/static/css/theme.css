@@ -62,6 +62,69 @@
   --ua-card-glow: rgba(0, 0, 0, 0);
 }
 
+[data-ua-theme="midnight"] {
+  --ua-obsidian: #070a12;
+  --ua-charcoal: #0d1220;
+  --ua-stone: #171d2d;
+  --ua-stone-light: #46506a;
+  --ua-copper: #4f46e5;
+  --ua-copper-bright: #818cf8;
+  --ua-gold: #a5b4fc;
+  --ua-gold-soft: #e0e7ff;
+  --ua-ink: #eef2ff;
+  --ua-muted: #9aa5bd;
+  --ua-border: rgba(129, 140, 248, 0.22);
+  --ua-glow: rgba(129, 140, 248, 0.22);
+  --ua-light-panel-start: #eef2ff;
+  --ua-light-panel-end: #f5f3ff;
+  --ua-atmosphere: rgba(79, 70, 229, 0.13);
+  --ua-card: rgba(13, 18, 32, 0.94);
+  --ua-card-border: rgba(129, 140, 248, 0.24);
+  --ua-card-glow: rgba(79, 70, 229, 0.1);
+}
+
+[data-ua-theme="evergreen"] {
+  --ua-obsidian: #07120f;
+  --ua-charcoal: #0d1b17;
+  --ua-stone: #162923;
+  --ua-stone-light: #46685e;
+  --ua-copper: #047857;
+  --ua-copper-bright: #10b981;
+  --ua-gold: #5eead4;
+  --ua-gold-soft: #ccfbf1;
+  --ua-ink: #ecfdf5;
+  --ua-muted: #9fb8ae;
+  --ua-border: rgba(94, 234, 212, 0.2);
+  --ua-glow: rgba(16, 185, 129, 0.2);
+  --ua-light-panel-start: #ecfdf5;
+  --ua-light-panel-end: #f0fdfa;
+  --ua-atmosphere: rgba(4, 120, 87, 0.13);
+  --ua-card: rgba(13, 27, 23, 0.94);
+  --ua-card-border: rgba(94, 234, 212, 0.22);
+  --ua-card-glow: rgba(4, 120, 87, 0.1);
+}
+
+[data-ua-theme="amethyst"] {
+  --ua-obsidian: #100b18;
+  --ua-charcoal: #1a1226;
+  --ua-stone: #281a39;
+  --ua-stone-light: #67527c;
+  --ua-copper: #7c3aed;
+  --ua-copper-bright: #a78bfa;
+  --ua-gold: #d8b4fe;
+  --ua-gold-soft: #f3e8ff;
+  --ua-ink: #faf5ff;
+  --ua-muted: #b8a9c7;
+  --ua-border: rgba(216, 180, 254, 0.21);
+  --ua-glow: rgba(167, 139, 250, 0.22);
+  --ua-light-panel-start: #faf5ff;
+  --ua-light-panel-end: #f5f3ff;
+  --ua-atmosphere: rgba(124, 58, 237, 0.13);
+  --ua-card: rgba(26, 18, 38, 0.94);
+  --ua-card-border: rgba(216, 180, 254, 0.23);
+  --ua-card-glow: rgba(124, 58, 237, 0.1);
+}
+
 html,
 body {
   min-height: 100%;
@@ -149,6 +212,50 @@ button:focus-visible {
 
 :where([class~="focus:ring-purple-500"]):focus {
   --tw-ring-color: var(--ua-gold) !important;
+}
+
+.ua-tracker-chip-selected[data-color-mode="dark"] {
+  background-color: color-mix(
+    in srgb,
+    var(--ua-copper) 11%,
+    var(--ua-charcoal)
+  ) !important;
+  border-color: var(--ua-copper-bright) !important;
+  color: color-mix(
+    in srgb,
+    var(--ua-copper-bright) 62%,
+    var(--ua-ink)
+  ) !important;
+}
+
+.ua-tracker-chip-selected[data-color-mode="dark"]:hover {
+  background-color: color-mix(
+    in srgb,
+    var(--ua-copper) 18%,
+    var(--ua-charcoal)
+  ) !important;
+}
+
+.ua-tracker-chip-selected[data-color-mode="light"] {
+  background-color: color-mix(
+    in srgb,
+    var(--ua-copper-bright) 7%,
+    #ffffff
+  ) !important;
+  border-color: color-mix(
+    in srgb,
+    var(--ua-copper-bright) 70%,
+    transparent
+  ) !important;
+  color: color-mix(in srgb, var(--ua-copper) 82%, #111827) !important;
+}
+
+.ua-tracker-chip-selected[data-color-mode="light"]:hover {
+  background-color: color-mix(
+    in srgb,
+    var(--ua-copper-bright) 14%,
+    #ffffff
+  ) !important;
 }
 
 /* Dark Tailwind surfaces become a restrained warm-black hierarchy. */
@@ -321,6 +428,27 @@ a:hover {
   --ua-config-text: #202326;
   --ua-config-muted: #4b5563;
   --ua-config-border: rgba(75, 85, 99, 0.2);
+}
+
+[data-ua-theme="midnight"] .ua-config-page.ua-mode-light {
+  --ua-config-bg: #f1f3ff;
+  --ua-config-text: #1e2340;
+  --ua-config-muted: #59617e;
+  --ua-config-border: rgba(79, 70, 229, 0.2);
+}
+
+[data-ua-theme="evergreen"] .ua-config-page.ua-mode-light {
+  --ua-config-bg: #effaf5;
+  --ua-config-text: #14372d;
+  --ua-config-muted: #4e6d63;
+  --ua-config-border: rgba(4, 120, 87, 0.2);
+}
+
+[data-ua-theme="amethyst"] .ua-config-page.ua-mode-light {
+  --ua-config-bg: #f8f3fc;
+  --ua-config-text: #352040;
+  --ua-config-muted: #6c5877;
+  --ua-config-border: rgba(124, 58, 237, 0.2);
 }
 
 .ua-config-page {
@@ -823,4 +951,24 @@ select {
     box-shadow: none;
     flex: 0 0 18rem;
   }
+}
+
+/* Interface shape is independent from the selected colour palette. */
+html[data-ua-shape="square"]
+  :where(
+    [class~="rounded"],
+    [class~="rounded-sm"],
+    [class~="rounded-md"],
+    [class~="rounded-lg"],
+    [class~="rounded-xl"],
+    [class~="rounded-2xl"],
+    [class~="rounded-3xl"],
+    [class~="rounded-full"],
+    [class~="rounded-t"],
+    [class~="rounded-b"],
+    .ua-config-nav-button,
+    .ua-config-nav-indicator,
+    .ua-config-icon-button
+  ) {
+  border-radius: 0.125rem !important;
 }

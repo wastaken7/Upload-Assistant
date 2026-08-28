@@ -190,6 +190,9 @@ const getStoredTheme = window.getUAStoredTheme;
 const colorThemes = window.UAThemes || [];
 const getStoredColorTheme = window.getUAStoredColorTheme;
 const setColorTheme = window.setUAColorTheme;
+const interfaceStyles = window.UAInterfaceStyles || [];
+const getStoredInterfaceStyle = window.getUAStoredInterfaceStyle;
+const setInterfaceStyle = window.setUAInterfaceStyle;
 
 const DEFAULT_WORKFLOW_GROUPS = [
   {
@@ -5723,6 +5726,8 @@ function ConfigSidebar({
   onClose,
   colorTheme,
   onColorThemeChange,
+  interfaceStyle,
+  onInterfaceStyleChange,
   isDarkMode,
   onToggleMode,
   onLogout,
@@ -5929,15 +5934,41 @@ function ConfigSidebar({
         <div className="ua-config-nav-heading mb-2 text-xs font-semibold uppercase tracking-wider">
           Appearance
         </div>
+        <label
+          htmlFor="config-color-theme"
+          className="ua-config-service-description block text-xs font-semibold"
+        >
+          Color theme
+        </label>
         <select
+          id="config-color-theme"
           value={colorTheme}
           onChange={onColorThemeChange}
           aria-label="Color theme"
-          className="ua-theme-picker w-full rounded-lg px-3 py-2 text-sm"
+          className="ua-theme-picker mt-1 w-full rounded-lg px-3 py-2 text-sm"
         >
           {colorThemes.map((theme) => (
             <option key={theme.id} value={theme.id}>
               {theme.label}
+            </option>
+          ))}
+        </select>
+        <label
+          htmlFor="config-interface-style"
+          className="ua-config-service-description mt-3 block text-xs font-semibold"
+        >
+          Corner style
+        </label>
+        <select
+          id="config-interface-style"
+          value={interfaceStyle}
+          onChange={onInterfaceStyleChange}
+          aria-label="Corner style"
+          className="ua-theme-picker mt-1 w-full rounded-lg px-3 py-2 text-sm"
+        >
+          {interfaceStyles.map((style) => (
+            <option key={style.id} value={style.id}>
+              {style.label}
             </option>
           ))}
         </select>
@@ -5990,6 +6021,9 @@ function ConfigApp() {
   });
   const [isDarkMode, setIsDarkMode] = useState(getStoredTheme);
   const [colorTheme, setColorThemeState] = useState(getStoredColorTheme);
+  const [interfaceStyle, setInterfaceStyleState] = useState(
+    getStoredInterfaceStyle,
+  );
   const [expandedGroups, setExpandedGroups] = useState(new Set());
   const [pendingChanges, setPendingChanges] = useState(new Map());
   const [pendingTorrentClients, setPendingTorrentClients] = useState(new Map());
@@ -6043,8 +6077,25 @@ function ConfigApp() {
       window.removeEventListener("ua-theme-change", handleColorThemeChange);
   }, []);
 
+  useEffect(() => {
+    const handleInterfaceStyleChange = (event) => {
+      setInterfaceStyleState(
+        event.detail?.style || getStoredInterfaceStyle(),
+      );
+    };
+    window.addEventListener("ua-shape-change", handleInterfaceStyleChange);
+    return () =>
+      window.removeEventListener(
+        "ua-shape-change",
+        handleInterfaceStyleChange,
+      );
+  }, []);
+
   const handleColorThemeChange = (event) => {
     setColorThemeState(setColorTheme(event.target.value));
+  };
+  const handleInterfaceStyleChange = (event) => {
+    setInterfaceStyleState(setInterfaceStyle(event.target.value));
   };
   const getSubTabsForSection = (section) => {
     if (section?.section === "DEFAULT") {
@@ -7328,6 +7379,8 @@ function ConfigApp() {
             onClose={() => setIsMobileNavOpen(false)}
             colorTheme={colorTheme}
             onColorThemeChange={handleColorThemeChange}
+            interfaceStyle={interfaceStyle}
+            onInterfaceStyleChange={handleInterfaceStyleChange}
             isDarkMode={isDarkMode}
             onToggleMode={() => setIsDarkMode((prev) => !prev)}
             onLogout={handleLogout}
