@@ -45,6 +45,7 @@ class Suio:
     base_url = "https://suio.cc"
     supported_categories = ("MOVIE", "TV", "GAME", "BOOK", "XXX")
     is_usenet = True
+    exact_match_only = False
 
     def __init__(self, config: Config) -> None:
         self.config = config

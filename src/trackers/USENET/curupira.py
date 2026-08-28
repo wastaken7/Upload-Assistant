@@ -117,6 +117,7 @@ class Curupira:
     supported_categories = ("TV", "MOVIE", "GAME", "BOOK")
     is_usenet = True
     allows_bloated_audio = True
+    exact_match_only = False
 
     def __init__(self, config: Config) -> None:
         self.config = config

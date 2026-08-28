@@ -29,6 +29,7 @@ class Seedpool(UNIT3D):
     supported_categories = ("TV", "MOVIE", "BOOK", "GAME", "MUSIC")
     tracker_urls = ("https://seedpool.org",)
     allows_bloated_audio = True
+    exact_match_only = False
 
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name="SEEDPOOL")

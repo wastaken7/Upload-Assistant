@@ -714,6 +714,7 @@ def _validate_trackers_section(trackers: dict[str, Any], active_trackers: list[s
             "refundable",
             "sticky",
             "exclusive",
+            "exact_match_only",
         ]
         for field in bool_fields:
             if field in tracker_config_dict:
