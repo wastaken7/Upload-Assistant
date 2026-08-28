@@ -401,7 +401,7 @@ Security note: these settings can allow the app (and the Web UI) to interact wit
 
 Typical keys:
 
-- `qui_proxy_url` (str): Optional. [QUI reverse proxy](https://getqui.com/docs/features/reverse-proxy) URL for qBittorrent. Create a **Client Proxy API Key** in QUI (**Settings → Client Proxy Keys**): name the client (e.g. "Upload Assistant"), choose the qBittorrent instance, then copy the generated proxy URL. Use the **full** URL, e.g. `http://localhost:7476/proxy/<client-api-key>`. The instance is fixed by the key you create. This proxy is not used by **Bandwidth Control**; when that feature is enabled, configure `qbit_url` / `qbit_port` and either `qbit_api_key` or `qbit_user` / `qbit_pass` as well.
+- `qui_proxy_url` (str): Optional. [QUI reverse proxy](https://getqui.com/docs/features/reverse-proxy) URL for qBittorrent. Create a **Client Proxy API Key** in QUI (**Settings → Client Proxy Keys**): name the client (e.g. "Upload Assistant"), choose the qBittorrent instance, then copy the generated proxy URL. Use the **full** URL, e.g. `http://localhost:7476/proxy/<client-api-key>`. The instance is fixed by the key you create.
 - `enable_search` (bool): Search client for existing torrents to reuse hashes. NOTE: independant of auto_torrent_searching
 - `qbit_url` / `qbit_port` (str): Web UI host/port.
 - `qbit_user` / `qbit_pass` (str): Credentials.
@@ -417,6 +417,8 @@ Typical keys:
 - `local_path` / `remote_path` (list[str]): Local/remote path mapping (docker/seedbox), matched case-insensitively. Local path is how UA sees the content, remote path is how the client sees the content.
 - `link_dir_name` (str): Optional single directory name for linked content. Path separators, parent traversal, absolute paths, and Windows drive/device names are rejected.
 - `torrent_storage_dir` (str, optional): Only needed if API searching doesn’t work. Falls back to search the client storage directory for existing torrents.
+
+For bandwidth-control connection requirements and workflow settings, see [Upload Order and qBittorrent Bandwidth Control](upload-order-and-bandwidth-control.md).
 
 ### ruTorrent / rTorrent
 
