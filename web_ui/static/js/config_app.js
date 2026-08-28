@@ -253,7 +253,7 @@ const TRACKER_NAVIGATION_GROUPS = [
 ];
 
 const CONFIG_SECTION_LABELS = {
-  IMAGES: "Database Link Images",
+  IMAGES: "Tracker Database Icons",
   TRACKERS: "Trackers",
   TORRENT_CLIENTS: "Torrent Clients",
   USENET: "Usenet Uploads",
@@ -461,6 +461,7 @@ const DISPLAY_LABEL_OVERRIDES = {
   dovi_tool_path: "Dolby Vision Tool Path",
   hdr10plus_tool_path: "HDR10+ Tool Path",
   "7z_path": "7-Zip Path",
+  skip_auto_torrent_personalrelease: "Skip Auto Torrent Personal Release",
 };
 const DISPLAY_WORD_LABELS = {
   api: "API",
@@ -1661,6 +1662,62 @@ function ConfigLeafEditor({
             });
           }}
           options={clientOptions}
+          isDarkMode={isDarkMode}
+        />
+      </div>
+    );
+  }
+
+  if (item.key === "tracker_description_mode") {
+    const originalValue =
+      item.value === null || item.value === undefined ? "" : String(item.value);
+    const modeOptions = [
+      { value: "", label: "Select an import mode..." },
+      { value: "ids", label: "IDs and metadata only" },
+      { value: "images", label: "IDs, metadata and screenshots" },
+      { value: "text", label: "IDs, metadata and description text" },
+      {
+        value: "text_and_images",
+        label: "IDs, metadata, description text and screenshots",
+      },
+    ];
+    if (
+      selectedValue &&
+      !modeOptions.some((option) => option.value === selectedValue)
+    ) {
+      modeOptions.splice(1, 0, {
+        value: selectedValue,
+        label: `${selectedValue} (Unsupported)`,
+      });
+    }
+
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <label htmlFor={fieldId} className={labelClass}>
+            {displayLabel}
+          </label>
+          {helpText && (
+            <Tooltip content={helpText}>
+              <InfoIcon
+                className={`h-4 w-4 ${isDarkMode ? "text-gray-400 hover:text-gray-300" : "text-gray-500 hover:text-gray-600"}`}
+              />
+            </Tooltip>
+          )}
+        </div>
+        <SelectDropdown
+          id={fieldId}
+          value={selectedValue}
+          onChange={(newValue) => {
+            setSelectedValue(newValue);
+            onValueChange(path, newValue, {
+              originalValue,
+              isSensitive: false,
+              isRedacted: false,
+              readOnly: false,
+            });
+          }}
+          options={modeOptions}
           isDarkMode={isDarkMode}
         />
       </div>
@@ -3297,9 +3354,9 @@ function DatabaseLinkImagesSettings({
   return (
     <div className="space-y-4">
       <div className="ua-config-state-panel rounded-xl border p-4 text-sm">
-        These URLs point to the small database icons used in some tracker
-        descriptions, primarily AlphaRatio. They are not image-host API keys and
-        normally do not need to be changed.
+        These URLs point to database icons used in AlphaRatio and TVChaosUK
+        descriptions. They are not image-host API keys and normally do not need
+        to be changed.
       </div>
       {groups.map((group) => (
         <section
@@ -3327,6 +3384,36 @@ function DatabaseLinkImagesSettings({
         </section>
       ))}
     </div>
+  );
+}
+
+function DescriptionImagesSection({
+  section,
+  isDarkMode,
+  allImageHosts,
+  usedImageHosts,
+  torrentClients,
+  onValueChange,
+}) {
+  return (
+    <section className="ua-config-section overflow-hidden rounded-xl border">
+      <div className="ua-config-section-heading border-b px-4 py-3">
+        <h2 className="text-sm font-semibold">
+          Tracker Database Icons (AlphaRatio &amp; TVChaosUK)
+        </h2>
+      </div>
+      <div className="ua-config-section-panel p-4">
+        <DatabaseLinkImagesSettings
+          items={section.items}
+          pathParts={[section.section]}
+          isDarkMode={isDarkMode}
+          allImageHosts={allImageHosts}
+          usedImageHosts={usedImageHosts}
+          torrentClients={torrentClients}
+          onValueChange={onValueChange}
+        />
+      </div>
+    </section>
   );
 }
 
@@ -4167,6 +4254,22 @@ function ItemList({
       }
     }
     if (!placed) ungrouped.push(it);
+  }
+
+  if (isScreenshotCaptureProcessingSection) {
+    const ffmpegFieldOrder = [
+      "ffmpeg_limit",
+      "process_limit",
+      "ffmpeg_compression",
+    ];
+    grouped["FFmpeg Processing"].sort((left, right) => {
+      const leftIndex = ffmpegFieldOrder.indexOf(left.key);
+      const rightIndex = ffmpegFieldOrder.indexOf(right.key);
+      return (
+        (leftIndex === -1 ? ffmpegFieldOrder.length : leftIndex) -
+        (rightIndex === -1 ? ffmpegFieldOrder.length : rightIndex)
+      );
+    });
   }
 
   return (
@@ -5829,7 +5932,6 @@ function ConfigSidebar({
   const torrentClientsSection = sectionByName.get("TORRENT_CLIENTS");
   const usenetSection = sectionByName.get("USENET");
   const trackersSection = sectionByName.get("TRACKERS");
-  const databaseLinkImagesSection = sectionByName.get("IMAGES");
   const reservedSections = new Set([
     "DEFAULT",
     "IMAGES",
@@ -5966,7 +6068,7 @@ function ConfigSidebar({
           </div>
         )}
 
-        {(trackersSection || databaseLinkImagesSection) && (
+        {trackersSection && (
           <div className="mb-5">
             <div className="ua-config-nav-heading px-3 pb-2 text-xs font-semibold uppercase tracking-wider">
               Trackers
@@ -5982,15 +6084,6 @@ function ConfigSidebar({
                     nested: true,
                   }),
                 )}
-              {databaseLinkImagesSection &&
-                navButton({
-                  id: databaseLinkImagesSection.section,
-                  label: getConfigSectionLabel(
-                    databaseLinkImagesSection.section,
-                  ),
-                  tab: databaseLinkImagesSection.section.toLowerCase(),
-                  nested: true,
-                })}
             </div>
           </div>
         )}
@@ -7465,6 +7558,9 @@ function ConfigApp() {
   const activeSection = sections.find(
     (section) => section.section.toLowerCase() === activeTab,
   );
+  const descriptionImagesSection = sections.find(
+    (section) => section.section === "IMAGES",
+  );
   const clientSelectionItem = sections
     .find((section) => section.section === "DEFAULT")
     ?.items?.find(
@@ -7975,44 +8071,58 @@ function ConfigApp() {
                       <AccessLogTab isDarkMode={isDarkMode} />
                     )}
                     {activeSection && (
-                      <ItemList
-                        items={visibleItems}
-                        pathParts={[activeSection.section]}
-                        depth={0}
-                        isDarkMode={isDarkMode}
-                        allImageHosts={allImageHosts}
-                        usedImageHosts={usedImageHosts}
-                        fullWidth={true}
-                        expandedGroups={expandedGroups}
-                        toggleGroup={toggleGroup}
-                        torrentClients={torrentClients}
-                        clientSelectionItem={clientSelectionItem}
-                        trackerView={
-                          activeSection.section === "TRACKERS"
-                            ? activeSubTab
-                            : ""
-                        }
-                        trackerCatalog={trackerCatalog}
-                        pendingChanges={pendingChanges}
-                        pendingTrackerOverrideModes={
-                          pendingTrackerOverrideModes
-                        }
-                        trackerOverrideEditors={trackerOverrideEditors}
-                        onToggleTrackerOverrides={toggleTrackerOverrides}
-                        onAddTorrentClient={addPendingTorrentClient}
-                        onRemovePendingTorrentClient={
-                          removePendingTorrentClient
-                        }
-                        onRenameTorrentClient={setRenameClientSource}
-                        onTestTorrentClient={testTorrentClient}
-                        onRemoveTorrentClient={removeTorrentClient}
-                        onUndoRemoveTorrentClient={undoRemoveTorrentClient}
-                        onRemoveTracker={removeTracker}
-                        onUndoRemoveTracker={undoRemoveTracker}
-                        clientTestStates={clientTestStates}
-                        onBrowseFolder={browseForFolder}
-                        onValueChange={onValueChange}
-                      />
+                      <React.Fragment>
+                        <ItemList
+                          items={visibleItems}
+                          pathParts={[activeSection.section]}
+                          depth={0}
+                          isDarkMode={isDarkMode}
+                          allImageHosts={allImageHosts}
+                          usedImageHosts={usedImageHosts}
+                          fullWidth={true}
+                          expandedGroups={expandedGroups}
+                          toggleGroup={toggleGroup}
+                          torrentClients={torrentClients}
+                          clientSelectionItem={clientSelectionItem}
+                          trackerView={
+                            activeSection.section === "TRACKERS"
+                              ? activeSubTab
+                              : ""
+                          }
+                          trackerCatalog={trackerCatalog}
+                          pendingChanges={pendingChanges}
+                          pendingTrackerOverrideModes={
+                            pendingTrackerOverrideModes
+                          }
+                          trackerOverrideEditors={trackerOverrideEditors}
+                          onToggleTrackerOverrides={toggleTrackerOverrides}
+                          onAddTorrentClient={addPendingTorrentClient}
+                          onRemovePendingTorrentClient={
+                            removePendingTorrentClient
+                          }
+                          onRenameTorrentClient={setRenameClientSource}
+                          onTestTorrentClient={testTorrentClient}
+                          onRemoveTorrentClient={removeTorrentClient}
+                          onUndoRemoveTorrentClient={undoRemoveTorrentClient}
+                          onRemoveTracker={removeTracker}
+                          onUndoRemoveTracker={undoRemoveTracker}
+                          clientTestStates={clientTestStates}
+                          onBrowseFolder={browseForFolder}
+                          onValueChange={onValueChange}
+                        />
+                        {activeSection.section === "DEFAULT" &&
+                          activeSubTab === "descriptions" &&
+                          descriptionImagesSection && (
+                            <DescriptionImagesSection
+                              section={descriptionImagesSection}
+                              isDarkMode={isDarkMode}
+                              allImageHosts={allImageHosts}
+                              usedImageHosts={usedImageHosts}
+                              torrentClients={torrentClients}
+                              onValueChange={onValueChange}
+                            />
+                          )}
+                      </React.Fragment>
                     )}
                   </div>
                 </div>
