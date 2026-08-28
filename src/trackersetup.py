@@ -182,7 +182,10 @@ class TrackerSetup:
             return
 
         supported_trackers: list[str] = []
-        for tracker_name in trackers:
+        for requested_tracker_name in trackers:
+            tracker_name = Meta.canonical_tracker_name(str(requested_tracker_name).strip())
+            if not tracker_name:
+                continue
             tracker_class = tracker_class_map.get(tracker_name.upper())
             if not tracker_class:
                 supported_trackers.append(tracker_name)
