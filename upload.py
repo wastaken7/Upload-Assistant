@@ -61,7 +61,7 @@ from src.book_prep import detect_newspaper, is_valid_book_language, resolve_book
 from src.cleanup import cleanup_manager
 from src.clients import Clients
 from src.cogs.redaction import PathAwareEncoder, Redaction
-from src.config_helpers import format_terminal_link
+from src.config_helpers import format_terminal_link, parse_bool
 from src.console import current_release_log_path, logger  # pyright: ignore[reportUnknownVariableType]
 from src.console import rich_handler as _rich_handler
 from src.disc_menus import process_disc_menus
@@ -2811,8 +2811,10 @@ async def do_the_thing(base_dir: str) -> None:
 
                     upload_order = meta.upload_order or config["DEFAULT"].get("upload_order", "concurrent")
                     upload_order = upload_order.strip().lower() if isinstance(upload_order, str) else "concurrent"
-                    qbit_bandwidth_control = bool(meta.qbit_bandwidth_control or config["DEFAULT"].get("qbit_bandwidth_control", False))
-                    qbit_bandwidth_control_after_usenet = bool(meta.qbit_bandwidth_control_after_usenet or config["DEFAULT"].get("qbit_bandwidth_control_after_usenet", False))
+                    qbit_bandwidth_control = parse_bool(meta.qbit_bandwidth_control) or parse_bool(config["DEFAULT"].get("qbit_bandwidth_control", False))
+                    qbit_bandwidth_control_after_usenet = parse_bool(meta.qbit_bandwidth_control_after_usenet) or parse_bool(
+                        config["DEFAULT"].get("qbit_bandwidth_control_after_usenet", False)
+                    )
 
                     async def run_usenet_flow(
                         meta: Meta = meta,

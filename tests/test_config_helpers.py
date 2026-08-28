@@ -2,7 +2,15 @@
 
 from rich.text import Text
 
-from src.config_helpers import format_terminal_link, should_embed_links
+from src.config_helpers import format_terminal_link, parse_bool, should_embed_links
+
+
+def test_parse_bool_does_not_enable_false_or_invalid_strings() -> None:
+    assert parse_bool(True)
+    assert parse_bool("true")
+    assert not parse_bool(False)
+    assert not parse_bool("False")
+    assert not parse_bool("invalid")
 
 
 def test_embed_links_controls_terminal_link_formatting() -> None:

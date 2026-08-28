@@ -9,7 +9,11 @@ Upload Assistant can coordinate two upload phases:
 
 ## Configuration
 
-Add these settings to `DEFAULT` in `data/config.py`:
+Add these settings to `DEFAULT` in the user-state `config.py` that Upload Assistant reads after initialization. Do not edit the bundled `data/example_config.py` in the checkout.
+
+- Windows: `%LOCALAPPDATA%\Upload-Assistant\data\config.py`
+- Linux/macOS: `$XDG_DATA_HOME/Upload-Assistant/data/config.py` (normally `~/.local/share/Upload-Assistant/data/config.py`)
+- Custom state directory: `<UA_DATA_DIR>/data/config.py`
 
 ```python
 "upload_order": "concurrent",
@@ -26,6 +30,8 @@ Add these settings to `DEFAULT` in `data/config.py`:
 - `qbit_bandwidth_time`: averaging period in seconds. The upload continues when the measured average is at or below the threshold.
 
 `qbit_bandwidth_control` must be `True`, and both the threshold and time must be greater than zero, for a bandwidth check to run.
+
+Bandwidth is sampled immediately and then every five seconds. The rolling window contains `max(1, qbit_bandwidth_time // 5)` samples, so values from 1 through 9 use one immediate sample and non-multiples of five do not measure the exact requested duration.
 
 Bandwidth checks require the `DEFAULT.default_torrent_client` to be a directly accessible qBittorrent client. Configure `qbit_url`, `qbit_port`, and either `qbit_api_key` or `qbit_user` and `qbit_pass` under that client in `TORRENT_CLIENTS`:
 
@@ -90,7 +96,7 @@ The equivalent CLI options are:
 | `-qbcon` | `--qbit-bw-control` | Enable every bandwidth check in the selected workflow. |
 |  | `--qbit-bw-control-after-usenet` | Retain per-tracker checks after the Usenet phase. |
 | `-qbcrl` | `--qbit-bw-threshold` | Set the threshold in KB/s. |
-| `-qbctime` | `--qbit-bw-time` | Set the averaging period in seconds. |
+| `-qbctime` | `--qbit-bw-time` | Set the requested averaging period, evaluated in five-second samples. |
 
 For example, wait for qBittorrent to average no more than 500 KB/s for 30 seconds, upload to Usenet, and then upload to the torrent trackers without further checks:
 

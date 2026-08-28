@@ -12,7 +12,7 @@ from rich.markup import escape
 from src.artwork import is_valid_cover_image
 from src.cleanup import cleanup_manager
 from src.cogs.redaction import Redaction
-from src.config_helpers import format_terminal_link
+from src.config_helpers import format_terminal_link, parse_bool
 from src.console import logger
 from src.dupe_checking import DupeChecker
 from src.get_desc import DescriptionBuilder
@@ -70,7 +70,7 @@ async def process_trackers(
     bandwidth_control: bool | None = None,
 ) -> None:
     if bandwidth_control is None:
-        bandwidth_control = meta.qbit_bandwidth_control or config["DEFAULT"].get("qbit_bandwidth_control", False)
+        bandwidth_control = parse_bool(meta.qbit_bandwidth_control) or parse_bool(config["DEFAULT"].get("qbit_bandwidth_control", False))
 
     tracker_setup = TrackerSetup(config=config)
     tracker_setup_any = cast(Any, tracker_setup)
