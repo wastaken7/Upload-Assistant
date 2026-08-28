@@ -1,5 +1,7 @@
 const { useEffect, useMemo, useRef, useState } = React;
 
+const CONFIG_FIELD_RESET_EVENT = "ua-config-field-reset";
+
 // Error boundary to catch render errors and prevent blank screen (e.g. on first run in Docker)
 class ConfigErrorBoundary extends React.Component {
   constructor(props) {
@@ -202,7 +204,7 @@ const DEFAULT_WORKFLOW_GROUPS = [
   },
   {
     id: "metadata",
-    label: "Metadata",
+    label: "Metadata Services",
     headings: [
       "METADATA API CREDENTIALS",
       "ARR INTEGRATION",
@@ -218,7 +220,7 @@ const DEFAULT_WORKFLOW_GROUPS = [
   },
   {
     id: "screenshots",
-    label: "Screenshots",
+    label: "Screenshot Handling",
     headings: [
       "SCREENSHOT CAPTURE AND PROCESSING",
       "SCREENSHOT ENHANCEMENTS",
@@ -228,7 +230,7 @@ const DEFAULT_WORKFLOW_GROUPS = [
   },
   {
     id: "descriptions",
-    label: "Descriptions",
+    label: "Description Formatting",
     headings: [
       "GENERAL DESCRIPTION SETTINGS",
       "PACK DESCRIPTIONS",
@@ -239,12 +241,8 @@ const DEFAULT_WORKFLOW_GROUPS = [
   },
   {
     id: "upload",
-    label: "Upload",
-    headings: [
-      "TORRENT CREATION",
-      "TRACKER CHECKS AND UPLOAD",
-      "POST-UPLOAD",
-    ],
+    label: "Upload Workflow",
+    headings: ["TORRENT CREATION", "TRACKER CHECKS AND UPLOAD", "POST-UPLOAD"],
   },
 ];
 
@@ -258,7 +256,7 @@ const CONFIG_SECTION_LABELS = {
   IMAGES: "Database Link Images",
   TRACKERS: "Trackers",
   TORRENT_CLIENTS: "Torrent Clients",
-  USENET: "Usenet",
+  USENET: "Usenet Uploads",
 };
 
 const CONFIG_BLOCK_LABELS = {
@@ -303,15 +301,7 @@ const METADATA_CACHE_SERVICE_LABELS = {
 const METADATA_CACHE_SERVICE_GROUPS = [
   {
     label: "Film, TV & Anime",
-    services: [
-      "tmdb",
-      "imdb",
-      "tvdb",
-      "tvmaze",
-      "anilist",
-      "douban",
-      "thexem",
-    ],
+    services: ["tmdb", "imdb", "tvdb", "tvmaze", "anilist", "douban", "thexem"],
   },
   { label: "Games", services: ["igdb", "steam"] },
   {
@@ -338,11 +328,9 @@ const CONFIG_HEADING_LABELS = {
   "XXX CONTACT SHEETS": "XXX Contact Sheets",
   "GENERAL DESCRIPTION SETTINGS": "General Description Settings",
   "PACK DESCRIPTIONS": "Pack Descriptions",
-  "DESCRIPTION HEADERS AND OVERRIDES":
-    "Description Headers and Overrides",
+  "DESCRIPTION HEADERS AND OVERRIDES": "Description Headers and Overrides",
   "BLU-RAY SETTINGS": "Blu-ray Settings",
-  "AUDIO SPECTROGRAMS AND HDR PLOTS":
-    "Audio Spectrograms and HDR Plots",
+  "AUDIO SPECTROGRAMS AND HDR PLOTS": "Audio Spectrograms and HDR Plots",
   "TORRENT CREATION": "Torrent Creation",
   "TRACKER CHECKS AND UPLOAD": "Tracker Checks and Upload",
   "POST-UPLOAD": "Post-Upload",
@@ -354,7 +342,10 @@ const CONFIG_HEADING_LABELS = {
   "OUTPUT PATHS": "Output Paths",
 };
 
-const normalizeConfigHeading = (value) => String(value || "").trim().toUpperCase();
+const normalizeConfigHeading = (value) =>
+  String(value || "")
+    .trim()
+    .toUpperCase();
 
 const formatConfigHeading = (value) => {
   const normalized = normalizeConfigHeading(value);
@@ -392,7 +383,7 @@ const getConfigSectionLabel = (sectionName) =>
 
 const getConfigBlockLabel = (blockName) =>
   CONFIG_BLOCK_LABELS[String(blockName || "").toLowerCase()] ||
-  formatDisplayLabel(blockName);
+  String(blockName || "");
 
 // Local CSRF cache used by fallback `apiFetch` when `uaApiFetch` isn't present.
 let localCsrf = null;
@@ -909,6 +900,7 @@ const NumberInput = ({
 
 // SelectDropdown component - styled select dropdown for categorical options
 const SelectDropdown = ({
+  id,
   value,
   onChange,
   options = [],
@@ -928,6 +920,7 @@ const SelectDropdown = ({
 
   return (
     <select
+      id={id}
       value={currentValue}
       onChange={handleSelectChange}
       className={`${selectClass} ${className}`}
@@ -1000,7 +993,9 @@ function StringListEditor({
             type="button"
             className="shrink-0 rounded-lg border border-red-500/40 px-3 py-2 text-sm font-semibold text-red-500 hover:bg-red-500/10"
             onClick={() =>
-              updateValues(values.filter((_value, valueIndex) => valueIndex !== index))
+              updateValues(
+                values.filter((_value, valueIndex) => valueIndex !== index),
+              )
             }
             aria-label={`Remove item ${index + 1}`}
           >
@@ -1042,6 +1037,32 @@ function PathMappingEditor({
   useEffect(() => {
     setRows(createRows(localItem.value, remoteItem.value));
   }, [localItem.value, remoteItem.value]);
+
+  const localPathKey = [...pathParts, localItem.key].join("/");
+  const remotePathKey = [...pathParts, remoteItem.key].join("/");
+  useEffect(() => {
+    const resetPath = (event) => {
+      const resetPathKey = String(event.detail?.pathKey || "");
+      if (resetPathKey === localPathKey) {
+        setRows((currentRows) =>
+          createRows(
+            localItem.value,
+            currentRows.map((row) => row.remote),
+          ),
+        );
+      } else if (resetPathKey === remotePathKey) {
+        setRows((currentRows) =>
+          createRows(
+            currentRows.map((row) => row.local),
+            remoteItem.value,
+          ),
+        );
+      }
+    };
+    window.addEventListener(CONFIG_FIELD_RESET_EVENT, resetPath);
+    return () =>
+      window.removeEventListener(CONFIG_FIELD_RESET_EVENT, resetPath);
+  }, [localItem.value, localPathKey, remoteItem.value, remotePathKey]);
 
   const commitRows = (nextRows) => {
     setRows(nextRows);
@@ -1159,7 +1180,25 @@ function PathMappingEditor({
   );
 }
 
-function ConfigLeaf({
+function ConfigLeaf(props) {
+  const [resetVersion, setResetVersion] = useState(0);
+  const pathKey = [...props.pathParts, props.item.key].join("/");
+
+  useEffect(() => {
+    const resetField = (event) => {
+      if (String(event.detail?.pathKey) === pathKey) {
+        setResetVersion((version) => version + 1);
+      }
+    };
+    window.addEventListener(CONFIG_FIELD_RESET_EVENT, resetField);
+    return () =>
+      window.removeEventListener(CONFIG_FIELD_RESET_EVENT, resetField);
+  }, [pathKey]);
+
+  return <ConfigLeafEditor key={resetVersion} {...props} />;
+}
+
+function ConfigLeafEditor({
   item,
   pathParts,
   isDarkMode,
@@ -1382,8 +1421,7 @@ function ConfigLeaf({
           placeholder={placeholders[item.key] || "Value"}
           addLabel={addLabels[item.key] || "Add Entry"}
           onBrowse={
-            ["linked_folder", "local_path"].includes(item.key) &&
-            onBrowseFolder
+            ["linked_folder", "local_path"].includes(item.key) && onBrowseFolder
               ? () => onBrowseFolder(displayLabel)
               : null
           }
@@ -1559,6 +1597,76 @@ function ConfigLeaf({
     );
   }
 
+  if (item.key === "default_torrent_client") {
+    const originalValue =
+      item.value === null || item.value === undefined ? "" : String(item.value);
+    const currentClient = String(selectedValue || "");
+    const currentClientKey = currentClient.toLowerCase();
+    const configuredClients = Array.from(
+      new Map(
+        (torrentClients || [])
+          .filter(Boolean)
+          .map((client) => [String(client).toLowerCase(), String(client)]),
+      ).values(),
+    ).sort((left, right) => left.localeCompare(right));
+    const configuredCurrentClient = configuredClients.find(
+      (client) => client.toLowerCase() === currentClientKey,
+    );
+    const clientOptions = [
+      {
+        value: "",
+        label:
+          configuredClients.length > 0
+            ? "Select a configured client..."
+            : "No configured clients available",
+      },
+      ...(currentClient
+        ? [
+            {
+              value: currentClient,
+              label:
+                configuredCurrentClient || `${currentClient} (Not configured)`,
+            },
+          ]
+        : []),
+      ...configuredClients
+        .filter((client) => client.toLowerCase() !== currentClientKey)
+        .map((client) => ({ value: client, label: client })),
+    ];
+
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <label htmlFor={fieldId} className={labelClass}>
+            {displayLabel}
+          </label>
+          {helpText && (
+            <Tooltip content={helpText}>
+              <InfoIcon
+                className={`h-4 w-4 ${isDarkMode ? "text-gray-400 hover:text-gray-300" : "text-gray-500 hover:text-gray-600"}`}
+              />
+            </Tooltip>
+          )}
+        </div>
+        <SelectDropdown
+          id={fieldId}
+          value={selectedValue}
+          onChange={(newValue) => {
+            setSelectedValue(newValue);
+            onValueChange(path, newValue, {
+              originalValue,
+              isSensitive: false,
+              isRedacted: false,
+              readOnly: false,
+            });
+          }}
+          options={clientOptions}
+          isDarkMode={isDarkMode}
+        />
+      </div>
+    );
+  }
+
   if (isLinkingField(item.key, pathParts)) {
     const linkingOptions = [
       { value: "", label: "None (Original Path)" },
@@ -1576,11 +1684,7 @@ function ConfigLeaf({
             : "grid grid-cols-1 items-start gap-3 px-4 py-3 md:grid-cols-12"
         }
       >
-        <div
-          className={
-            fullWidth ? "" : "col-span-1 md:col-span-4"
-          }
-        >
+        <div className={fullWidth ? "" : "col-span-1 md:col-span-4"}>
           <div className="flex items-center gap-2">
             <div className={labelClass}>{displayLabel}</div>
             {helpText && (
@@ -1592,11 +1696,7 @@ function ConfigLeaf({
             )}
           </div>
         </div>
-        <div
-          className={
-            fullWidth ? "" : "col-span-1 md:col-span-7"
-          }
-        >
+        <div className={fullWidth ? "" : "col-span-1 md:col-span-7"}>
           <SelectDropdown
             value={selectedValue}
             onChange={(newValue) => {
@@ -1814,10 +1914,7 @@ function ConfigLeaf({
             </Tooltip>
           )}
         </div>
-        <div
-          className={`relative ${isOpen ? "z-30" : ""}`}
-          ref={dropdownRef}
-        >
+        <div className={`relative ${isOpen ? "z-30" : ""}`} ref={dropdownRef}>
           <div
             className={`${inputClass} cursor-pointer flex items-center justify-between`}
             onClick={() => setIsOpen(!isOpen)}
@@ -2340,11 +2437,7 @@ function ReleaseGroupOverrides({
                         <ConfigLeaf
                           key={`${releaseGroupKey}/${field.key}`}
                           item={field}
-                          pathParts={[
-                            ...pathParts,
-                            item.key,
-                            releaseGroup.key,
-                          ]}
+                          pathParts={[...pathParts, item.key, releaseGroup.key]}
                           depth={depth + 2}
                           isDarkMode={isDarkMode}
                           fullWidth={true}
@@ -2401,9 +2494,7 @@ function FolderPickerModal({ fieldLabel, onCancel, onSelect }) {
           throw new Error(data.error || "Unable to browse folders");
         }
         if (active) {
-          setItems(
-            (data.items || []).filter((item) => item.type === "folder"),
-          );
+          setItems((data.items || []).filter((item) => item.type === "folder"));
         }
       } catch (loadError) {
         if (active) {
@@ -2529,11 +2620,7 @@ function FolderPickerModal({ fieldLabel, onCancel, onSelect }) {
   );
 }
 
-function TorrentClientCreator({
-  templateItems,
-  configuredNames,
-  onAddClient,
-}) {
+function TorrentClientCreator({ templateItems, configuredNames, onAddClient }) {
   const templateChoices = Object.entries(TORRENT_CLIENT_TEMPLATE_LABELS)
     .filter(([templateName]) =>
       templateItems.some((item) => item.key === templateName),
@@ -2578,7 +2665,8 @@ function TorrentClientCreator({
             Add Torrent Client
           </span>
           <span className="ua-config-service-description mt-1 block text-xs font-normal">
-            Create a named client from one of the supported connection templates.
+            Create a named client from one of the supported connection
+            templates.
           </span>
         </span>
         <span
@@ -2642,10 +2730,7 @@ function TorrentClientCreator({
                 className="ua-config-select w-full rounded-lg border px-3 py-2"
               >
                 {templateChoices.map((choice) => (
-                  <option
-                    key={choice.templateName}
-                    value={choice.templateName}
-                  >
+                  <option key={choice.templateName} value={choice.templateName}>
                     {choice.label}
                   </option>
                 ))}
@@ -2676,7 +2761,6 @@ function TorrentClientCreator({
     </section>
   );
 }
-
 
 function RenameTorrentClientModal({
   sourceName,
@@ -3068,8 +3152,7 @@ function TrackerSettings({
     .filter((group) => group.items.length > 0);
   const additionalItems = editableItems.filter(
     (item) =>
-      !groupedKeys.has(item.key) &&
-      !trackerDefaultOverrideKeys.has(item.key),
+      !groupedKeys.has(item.key) && !trackerDefaultOverrideKeys.has(item.key),
   );
   if (additionalItems.length > 0) {
     groups.push({
@@ -3215,8 +3298,8 @@ function DatabaseLinkImagesSettings({
     <div className="space-y-4">
       <div className="ua-config-state-panel rounded-xl border p-4 text-sm">
         These URLs point to the small database icons used in some tracker
-        descriptions, primarily AlphaRatio. They are not image-host API keys
-        and normally do not need to be changed.
+        descriptions, primarily AlphaRatio. They are not image-host API keys and
+        normally do not need to be changed.
       </div>
       {groups.map((group) => (
         <section
@@ -3282,7 +3365,9 @@ function TrackerManager({
       if (!pendingTrackerValues.has(trackerName)) {
         pendingTrackerValues.set(trackerName, new Map());
       }
-      pendingTrackerValues.get(trackerName).set(String(update.path[2]), update.value);
+      pendingTrackerValues
+        .get(trackerName)
+        .set(String(update.path[2]), update.value);
     }
   }
   const normalizeTrackers = (value) =>
@@ -3299,6 +3384,21 @@ function TrackerManager({
   useEffect(() => {
     setSelectedDefaults(normalizeTrackers(defaultTrackersItem.value));
   }, [defaultTrackersItem.value]);
+
+  const defaultTrackersPathKey = [...pathParts, "default_trackers"].join("/");
+  useEffect(() => {
+    const resetDefaultTrackers = (event) => {
+      if (String(event.detail?.pathKey) === defaultTrackersPathKey) {
+        setSelectedDefaults(normalizeTrackers(defaultTrackersItem.value));
+      }
+    };
+    window.addEventListener(CONFIG_FIELD_RESET_EVENT, resetDefaultTrackers);
+    return () =>
+      window.removeEventListener(
+        CONFIG_FIELD_RESET_EVENT,
+        resetDefaultTrackers,
+      );
+  }, [defaultTrackersItem.value, defaultTrackersPathKey]);
 
   useEffect(() => {
     setTrackerQuery("");
@@ -3318,7 +3418,10 @@ function TrackerManager({
           configured: selectedDefaults.includes(name),
         }));
   const catalogByName = new Map(
-    catalogEntries.map((tracker) => [String(tracker.name).toUpperCase(), tracker]),
+    catalogEntries.map((tracker) => [
+      String(tracker.name).toUpperCase(),
+      tracker,
+    ]),
   );
   const displayName = (name) =>
     catalogByName.get(name)?.display_name || getTrackerDisplayName(name);
@@ -3329,17 +3432,22 @@ function TrackerManager({
         String(right.display_name || right.name),
       ),
     );
-  const defaultEntries = selectedDefaults.map((name) =>
-    catalogByName.get(name) || {
-      name,
-      display_name: getTrackerDisplayName(name),
-      base_url: "",
-      favicon: "",
-      configured: true,
-    },
+  const defaultEntries = selectedDefaults.map(
+    (name) =>
+      catalogByName.get(name) || {
+        name,
+        display_name: getTrackerDisplayName(name),
+        base_url: "",
+        favicon: "",
+        configured: true,
+      },
   );
-  const configuredEntries = sortedEntries.filter((tracker) => tracker.configured);
-  const availableEntries = sortedEntries.filter((tracker) => !tracker.configured);
+  const configuredEntries = sortedEntries.filter(
+    (tracker) => tracker.configured,
+  );
+  const availableEntries = sortedEntries.filter(
+    (tracker) => !tracker.configured,
+  );
   const addableDefaultEntries = sortedEntries.filter((tracker) => {
     const name = String(tracker.name).toUpperCase();
     return (
@@ -3350,16 +3458,12 @@ function TrackerManager({
 
   const queueDefaultTrackers = (nextTrackers) => {
     setSelectedDefaults(nextTrackers);
-    onValueChange(
-      [...pathParts, "default_trackers"],
-      nextTrackers.join(", "),
-      {
-        originalValue: originalDefaultValue,
-        isSensitive: false,
-        isRedacted: false,
-        readOnly: false,
-      },
-    );
+    onValueChange([...pathParts, "default_trackers"], nextTrackers.join(", "), {
+      originalValue: originalDefaultValue,
+      isSensitive: false,
+      isRedacted: false,
+      readOnly: false,
+    });
   };
 
   const addDefaultTracker = (trackerName) => {
@@ -3434,14 +3538,13 @@ function TrackerManager({
       const value = pendingValues.has(item.key)
         ? pendingValues.get(item.key)
         : item.value;
-      if (value === null || value === undefined || value === false) return false;
+      if (value === null || value === undefined || value === false)
+        return false;
       if (typeof value !== "string") return true;
       const normalized = value.trim();
       if (!normalized) return false;
       const exampleValue =
-        typeof item.example_value === "string"
-          ? item.example_value.trim()
-          : "";
+        typeof item.example_value === "string" ? item.example_value.trim() : "";
       if (
         exampleValue &&
         normalized === exampleValue &&
@@ -3453,7 +3556,9 @@ function TrackerManager({
     };
     const requirements = [];
     const addRequirement = (id, label, keys, options = {}) => {
-      const requirementFields = keys.map((key) => fields.get(key)).filter(Boolean);
+      const requirementFields = keys
+        .map((key) => fields.get(key))
+        .filter(Boolean);
       if (requirementFields.length === 0 && !options.external) return;
       const complete = options.external
         ? Boolean(options.complete)
@@ -3490,10 +3595,10 @@ function TrackerManager({
   if (trackerView === "default") {
     return (
       <div className="space-y-4">
-        <p className="ua-config-page-subtitle text-sm">
+        <div className="ua-config-state-panel rounded-xl border p-4 text-sm">
           These trackers are selected automatically when an upload does not
           provide an explicit tracker list.
-        </p>
+        </div>
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 2xl:grid-cols-3">
           {defaultEntries.map((tracker) => {
             const name = String(tracker.name).toUpperCase();
@@ -3523,12 +3628,9 @@ function TrackerManager({
         )}
         {addableDefaultEntries.length > 0 ? (
           <div className="space-y-3 border-t pt-4">
-            <div>
-              <h3 className="text-sm font-semibold">Add Default Trackers</h3>
-              <p className="ua-config-service-description mt-1 text-xs">
-                These trackers are available but are not currently selected as
-                defaults.
-              </p>
+            <div className="ua-config-state-panel rounded-xl border p-4 text-sm">
+              These trackers are available but are not currently selected as
+              defaults.
             </div>
             <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 2xl:grid-cols-3">
               {addableDefaultEntries.map((tracker) => {
@@ -3579,28 +3681,20 @@ function TrackerManager({
         ),
       )
     : entries;
-  const emptyMessage =
-    normalizedTrackerQuery
-      ? "No trackers match that search."
-      : trackerView === "configured"
-        ? "No configured trackers were detected."
-        : "All supported trackers are already configured.";
+  const emptyMessage = normalizedTrackerQuery
+    ? "No trackers match that search."
+    : trackerView === "configured"
+      ? "No configured trackers were detected."
+      : "All supported trackers are already configured.";
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
-        <div>
-          <h2 className="text-base font-semibold">
-            {trackerView === "configured"
-              ? "Configured Trackers"
-              : "Available Trackers"}
-          </h2>
-          <p className="ua-config-page-subtitle mt-1 text-sm">
-            {trackerView === "configured"
-              ? "Manage tracker credentials, preferences and description overrides."
-              : "Open a tracker, enter its required credentials, then save it to make it available for uploads."}
-          </p>
-        </div>
+      <div className="ua-config-state-panel flex flex-col gap-2 rounded-xl border p-4 text-sm sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+        <span>
+          {trackerView === "configured"
+            ? "Manage tracker credentials, preferences and description overrides."
+            : "Open a tracker, enter its required credentials, then save it to make it available for uploads."}
+        </span>
         <span className="ua-config-service-description shrink-0 text-sm">
           {normalizedTrackerQuery
             ? `${visibleEntries.length} of ${entries.length}`
@@ -3764,10 +3858,11 @@ function TrackerManager({
                     </div>
                     {setupState.missing.length > 0 && (
                       <p className="ua-config-tracker-setup-warning mt-3 text-sm">
-                        Setup may be incomplete. Check: {" "}
+                        Setup may be incomplete. Check:{" "}
                         {setupState.missing
                           .map((requirement) => requirement.label)
-                          .join(", ")}.
+                          .join(", ")}
+                        .
                       </p>
                     )}
                     {setupState.requirements.some(
@@ -4126,9 +4221,7 @@ function ItemList({
             </div>
             <span className="ua-config-service-description shrink-0 text-sm">
               {configuredTorrentClientItems.length}{" "}
-              {configuredTorrentClientItems.length === 1
-                ? "client"
-                : "clients"}
+              {configuredTorrentClientItems.length === 1 ? "client" : "clients"}
             </span>
           </div>
           {configuredTorrentClientItems.length === 0 && (
@@ -4180,11 +4273,9 @@ function ItemList({
                 : isScreenshotCaptureProcessingSection
                   ? "SCREENSHOT CAPTURE AND PROCESSING"
                   : "SCREENSHOT ENHANCEMENTS";
-              const subgroupKey = [
-                ...pathParts,
-                subgroupParentKey,
-                gname,
-              ].join("/");
+              const subgroupKey = [...pathParts, subgroupParentKey, gname].join(
+                "/",
+              );
               return (
                 <section
                   key={subgroupKey}
@@ -4283,8 +4374,7 @@ function ItemList({
           pathParts[0] === "DEFAULT" &&
           depth === 0 &&
           item.subsection === true &&
-          normalizeConfigHeading(item.key) ===
-            "GENERAL DESCRIPTION SETTINGS";
+          normalizeConfigHeading(item.key) === "GENERAL DESCRIPTION SETTINGS";
         const isDescriptionHeadersOverridesSubsection =
           pathParts[0] === "DEFAULT" &&
           depth === 0 &&
@@ -4355,11 +4445,7 @@ function ItemList({
         }
 
         if (isGeneralDescriptionSettingsSubsection) {
-          const logoKeys = new Set([
-            "add_logo",
-            "logo_size",
-            "logo_language",
-          ]);
+          const logoKeys = new Set(["add_logo", "logo_size", "logo_language"]);
           const logoSettings = (item.children || []).filter((child) =>
             logoKeys.has(child.key),
           );
@@ -4519,32 +4605,32 @@ function ItemList({
                 aria-expanded={isOpen}
               >
                 <span>
-                  {item.subsection === true
-                    ? formatConfigHeading(item.key)
-                    : isTorrentClientConfig
-                      ? (
-                          <span className="flex flex-wrap items-center gap-2">
-                            <span>{getConfigBlockLabel(item.key)}</span>
-                            {torrentClientType && (
-                              <span className="ua-config-client-type rounded-full px-2 py-0.5 text-xs font-medium">
-                                {TORRENT_CLIENT_TYPE_LABELS[
-                                  String(torrentClientType).toLowerCase()
-                                ] || formatDisplayLabel(torrentClientType)}
-                              </span>
-                            )}
-                            {item.source === "removing" && (
-                              <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-xs font-medium text-red-500">
-                                Pending removal
-                              </span>
-                            )}
-                            {item.source === "renaming" && (
-                              <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-500">
-                                Renamed from {item.renamedFrom}
-                              </span>
-                            )}
-                          </span>
-                        )
-                      : getTrackerDisplayName(item.key)}
+                  {item.subsection === true ? (
+                    formatConfigHeading(item.key)
+                  ) : isTorrentClientConfig ? (
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span>{getConfigBlockLabel(item.key)}</span>
+                      {torrentClientType && (
+                        <span className="ua-config-client-type rounded-full px-2 py-0.5 text-xs font-medium">
+                          {TORRENT_CLIENT_TYPE_LABELS[
+                            String(torrentClientType).toLowerCase()
+                          ] || formatDisplayLabel(torrentClientType)}
+                        </span>
+                      )}
+                      {item.source === "removing" && (
+                        <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-xs font-medium text-red-500">
+                          Pending removal
+                        </span>
+                      )}
+                      {item.source === "renaming" && (
+                        <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-500">
+                          Renamed from {item.renamedFrom}
+                        </span>
+                      )}
+                    </span>
+                  ) : (
+                    getTrackerDisplayName(item.key)
+                  )}
                 </span>
                 <span
                   className="ua-config-accordion-chevron text-lg transition-transform"
@@ -4571,7 +4657,8 @@ function ItemList({
                 <div className="ua-config-accordion-panel border-t p-4">
                   {item.source === "removing" ? (
                     <div className="ua-config-state-panel rounded-lg border p-4 text-sm">
-                      This client will be removed when you save the configuration.
+                      This client will be removed when you save the
+                      configuration.
                     </div>
                   ) : (
                     nested
@@ -5847,14 +5934,11 @@ function ConfigSidebar({
               <span>Upload Assistant</span>
               {window.UA_APP_VERSION && (
                 <span className="ml-1 normal-case">
-                  <span aria-hidden="true">·</span>{" "}
-                  {window.UA_APP_VERSION}
+                  <span aria-hidden="true">·</span> {window.UA_APP_VERSION}
                 </span>
               )}
             </div>
-            <div className="mt-1 truncate text-lg font-bold">
-              Configuration
-            </div>
+            <div className="mt-1 truncate text-lg font-bold">Configuration</div>
           </div>
         </div>
         <button
@@ -6067,6 +6151,8 @@ function ConfigApp() {
   const [folderPicker, setFolderPicker] = useState(null);
   const [renameClientSource, setRenameClientSource] = useState("");
   const [clientTestStates, setClientTestStates] = useState(new Map());
+  const [isPendingSummaryOpen, setIsPendingSummaryOpen] = useState(false);
+  const pendingSummaryRef = useRef(null);
 
   useEffect(() => {
     const handleColorThemeChange = (event) => {
@@ -6079,17 +6165,30 @@ function ConfigApp() {
 
   useEffect(() => {
     const handleInterfaceStyleChange = (event) => {
-      setInterfaceStyleState(
-        event.detail?.style || getStoredInterfaceStyle(),
-      );
+      setInterfaceStyleState(event.detail?.style || getStoredInterfaceStyle());
     };
     window.addEventListener("ua-shape-change", handleInterfaceStyleChange);
     return () =>
-      window.removeEventListener(
-        "ua-shape-change",
-        handleInterfaceStyleChange,
-      );
+      window.removeEventListener("ua-shape-change", handleInterfaceStyleChange);
   }, []);
+
+  useEffect(() => {
+    if (!isPendingSummaryOpen) return undefined;
+    const closeWhenOutside = (event) => {
+      if (!pendingSummaryRef.current?.contains(event.target)) {
+        setIsPendingSummaryOpen(false);
+      }
+    };
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") setIsPendingSummaryOpen(false);
+    };
+    document.addEventListener("pointerdown", closeWhenOutside);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeWhenOutside);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [isPendingSummaryOpen]);
 
   const handleColorThemeChange = (event) => {
     setColorThemeState(setColorTheme(event.target.value));
@@ -6284,11 +6383,28 @@ function ConfigApp() {
           }
         }
       }
+      return true;
     } catch (error) {
       setStatus({
         text: error.message || "Failed to load config options",
         type: "error",
       });
+      return false;
+    }
+  };
+
+  const discardAllChanges = async () => {
+    const confirmed = await showConfirmModal({
+      title: "Discard unsaved changes",
+      message:
+        "Discard every pending configuration change and restore the last saved values?",
+      confirmLabel: "Discard Changes",
+    });
+    if (!confirmed) return;
+    setIsPendingSummaryOpen(false);
+    const didReload = await loadConfigOptions();
+    if (didReload) {
+      setStatusWithClear("Unsaved changes discarded.", "info", 2500);
     }
   };
 
@@ -6421,7 +6537,6 @@ function ConfigApp() {
     });
   };
 
-
   const findConfigItem = (items, targetKey) => {
     for (const item of items || []) {
       if (item.key === targetKey && !item.children) return item;
@@ -6473,9 +6588,7 @@ function ConfigApp() {
         return currentValue;
       }
     }
-    return rawValue === null || rawValue === undefined
-      ? ""
-      : String(rawValue);
+    return rawValue === null || rawValue === undefined ? "" : String(rawValue);
   };
 
   const replaceClientNameInValue = (value, oldName, newName) => {
@@ -6515,7 +6628,10 @@ function ConfigApp() {
       const result = {};
       for (const item of items || []) {
         if (Array.isArray(item.children)) {
-          result[item.key] = buildObject(item.children, [...pathParts, item.key]);
+          result[item.key] = buildObject(item.children, [
+            ...pathParts,
+            item.key,
+          ]);
           continue;
         }
         const update = pendingChanges.get([...pathParts, item.key].join("/"));
@@ -6538,7 +6654,10 @@ function ConfigApp() {
         String(item.key).toLowerCase() === String(currentName).toLowerCase(),
     );
     if (!sourceItem) {
-      setStatusWithClear("The selected torrent client is unavailable.", "error");
+      setStatusWithClear(
+        "The selected torrent client is unavailable.",
+        "error",
+      );
       return;
     }
 
@@ -6660,16 +6779,122 @@ function ConfigApp() {
     );
   };
 
+  const undoRenameTorrentClient = (originalName, currentName) => {
+    const currentNormalized = String(currentName).toLowerCase();
+    const referenceKeys = new Set([
+      "default_torrent_client",
+      "injecting_client_list",
+      "searching_client_list",
+    ]);
+    const restoreReferenceItems = (items) =>
+      (items || []).map((item) => {
+        if (Array.isArray(item.children)) {
+          return { ...item, children: restoreReferenceItems(item.children) };
+        }
+        return referenceKeys.has(item.key)
+          ? {
+              ...item,
+              value: replaceClientNameInValue(
+                item.value,
+                currentName,
+                originalName,
+              ),
+            }
+          : item;
+      });
+
+    setSections((currentSections) =>
+      currentSections.map((section) => {
+        if (section.section === "TORRENT_CLIENTS") {
+          return {
+            ...section,
+            items: section.items.map((item) =>
+              String(item.key).toLowerCase() === currentNormalized
+                ? {
+                    ...item,
+                    key: originalName,
+                    source: "config",
+                    renamedFrom: undefined,
+                  }
+                : item,
+            ),
+          };
+        }
+        if (section.section === "DEFAULT") {
+          return { ...section, items: restoreReferenceItems(section.items) };
+        }
+        return section;
+      }),
+    );
+    setPendingChanges((currentChanges) => {
+      const next = new Map();
+      const currentPrefix = `TORRENT_CLIENTS/${currentName}/`.toLowerCase();
+      for (const [pathKey, update] of currentChanges) {
+        if (
+          Array.isArray(update.path) &&
+          update.path[0] === "DEFAULT" &&
+          referenceKeys.has(update.path[1])
+        ) {
+          continue;
+        }
+        if (String(pathKey).toLowerCase().startsWith(currentPrefix)) {
+          const nextPath = [...update.path];
+          nextPath[1] = originalName;
+          next.set(nextPath.join("/"), { ...update, path: nextPath });
+        } else {
+          next.set(pathKey, update);
+        }
+      }
+      return next;
+    });
+    setPendingRenamedTorrentClients((currentRenames) => {
+      const next = new Map(currentRenames);
+      for (const name of next.keys()) {
+        if (String(name).toLowerCase() === String(originalName).toLowerCase()) {
+          next.delete(name);
+        }
+      }
+      return next;
+    });
+    setTorrentClients((currentClients) =>
+      currentClients
+        .map((name) =>
+          String(name).toLowerCase() === currentNormalized
+            ? originalName
+            : name,
+        )
+        .sort((left, right) => String(left).localeCompare(String(right))),
+    );
+    setExpandedGroups((currentGroups) => {
+      const next = new Set(currentGroups);
+      next.delete(`TORRENT_CLIENTS/${currentName}`);
+      next.add(`TORRENT_CLIENTS/${originalName}`);
+      return next;
+    });
+    setClientTestStates((currentStates) => {
+      const next = new Map(currentStates);
+      next.delete(currentNormalized);
+      return next;
+    });
+    setRenameClientSource("");
+  };
+
   const testTorrentClient = async (clientName) => {
     const clientConfig = effectiveTorrentClientConfig(clientName);
     if (!clientConfig) {
-      setStatusWithClear("The selected torrent client is unavailable.", "error");
+      setStatusWithClear(
+        "The selected torrent client is unavailable.",
+        "error",
+      );
       return;
     }
     const stateKey = String(clientName).toLowerCase();
     setClientTestStates((currentStates) => {
       const next = new Map(currentStates);
-      next.set(stateKey, { status: "loading", message: "Testing connection..." });
+      next.set(stateKey, {
+        status: "loading",
+        message: "Testing connection...",
+      });
       return next;
     });
     try {
@@ -6817,8 +7042,7 @@ function ConfigApp() {
   const toggleTrackerOverrides = (trackerName, enabled, overrideItems) => {
     const normalizedName = String(trackerName).toUpperCase();
     const originalEnabled = (overrideItems || []).some(
-      (item) =>
-        item.source === "config" || item.previousSource === "config",
+      (item) => item.source === "config" || item.previousSource === "config",
     );
 
     setTrackerOverrideEditors((currentEditors) => {
@@ -7145,7 +7369,9 @@ function ConfigApp() {
         );
         const data = await response.json();
         if (!data.success) {
-          throw new Error(data.error || "Failed to remove tracker configuration");
+          throw new Error(
+            data.error || "Failed to remove tracker configuration",
+          );
         }
       }
       setStatusWithClear("Saved", "success", 1500);
@@ -7254,9 +7480,7 @@ function ConfigApp() {
       : null;
   const activeTrackerGroup =
     activeSection?.section === "TRACKERS"
-      ? TRACKER_NAVIGATION_GROUPS.find(
-          (group) => group.id === activeSubTab,
-        )
+      ? TRACKER_NAVIGATION_GROUPS.find((group) => group.id === activeSubTab)
       : null;
   const activeTitle =
     activeTab === "security"
@@ -7293,6 +7517,175 @@ function ConfigApp() {
     pendingRemovedTorrentClients.size +
     pendingRemovedTrackers.size +
     pendingTrackerOverrideModes.size;
+  const pendingChangeSummaries = useMemo(() => {
+    const summaries = [];
+    const describeValue = (update) => {
+      const path = Array.isArray(update.path) ? update.path : [];
+      const key = String(path[path.length - 1] || "");
+      const parentPath = path.slice(0, -1);
+      if (
+        isSensitiveKeyForPath(key, parentPath) ||
+        /(cookie|token|secret|passkey)/i.test(key)
+      ) {
+        return "Sensitive value changed";
+      }
+      if (update.value === "" || update.value === null) return "Set to empty";
+      if (typeof update.value === "boolean") {
+        return `Set to ${update.value ? "True" : "False"}`;
+      }
+      let displayValue;
+      if (typeof update.value === "string") {
+        displayValue = update.value;
+      } else {
+        try {
+          displayValue = JSON.stringify(update.value);
+        } catch (error) {
+          displayValue = "Structured value changed";
+        }
+      }
+      if (displayValue === undefined) return "Value changed";
+      const conciseValue = String(displayValue);
+      return `Set to ${
+        conciseValue.length > 72
+          ? conciseValue.slice(0, 69) + "…"
+          : conciseValue
+      }`;
+    };
+    const describePath = (update) => {
+      const path = Array.isArray(update.path) ? update.path : [];
+      return path
+        .map((part, index) => {
+          const value = String(part);
+          if (index === 0) {
+            if (value.toUpperCase() === "DEFAULT") return "Main Settings";
+            return getConfigSectionLabel(value);
+          }
+          if (index === 1 && path[0] === "TORRENT_CLIENTS") {
+            return value;
+          }
+          if (index === 1 && path[0] === "TRACKERS") {
+            return getTrackerDisplayName(value);
+          }
+          return formatConfigFieldLabel(value, path.slice(0, index));
+        })
+        .join(" › ");
+    };
+
+    for (const [pathKey, update] of pendingChanges) {
+      summaries.push({
+        id: `field:${pathKey}`,
+        kind: "field",
+        pathKey,
+        title: describePath(update) || "Configuration value",
+        detail: describeValue(update),
+      });
+    }
+    for (const [clientName, templateName] of pendingTorrentClients) {
+      const templateLabel =
+        TORRENT_CLIENT_TEMPLATE_LABELS[
+          String(templateName || "").toLowerCase()
+        ] || formatDisplayLabel(templateName);
+      summaries.push({
+        id: `client-add:${clientName}`,
+        kind: "client-add",
+        clientName,
+        title: "Add torrent client",
+        detail: `${clientName} · ${templateLabel}`,
+      });
+    }
+    for (const [oldName, newName] of pendingRenamedTorrentClients) {
+      summaries.push({
+        id: `client-rename:${oldName}`,
+        kind: "client-rename",
+        originalName: oldName,
+        currentName: newName,
+        title: "Rename torrent client",
+        detail: `${oldName} → ${newName}`,
+      });
+    }
+    for (const clientName of pendingRemovedTorrentClients) {
+      summaries.push({
+        id: `client-remove:${clientName}`,
+        kind: "client-remove",
+        clientName,
+        title: "Remove torrent client",
+        detail: clientName,
+      });
+    }
+    for (const trackerName of pendingRemovedTrackers) {
+      summaries.push({
+        id: `tracker-remove:${trackerName}`,
+        kind: "tracker-remove",
+        trackerName,
+        title: "Remove tracker configuration",
+        detail: getTrackerDisplayName(String(trackerName)),
+      });
+    }
+    for (const [trackerName, enabled] of pendingTrackerOverrideModes) {
+      summaries.push({
+        id: `tracker-overrides:${trackerName}`,
+        kind: "tracker-overrides",
+        trackerName,
+        enabled,
+        title: "Tracker-specific DEFAULT overrides",
+        detail: `${getTrackerDisplayName(String(trackerName))}: ${
+          enabled ? "Enable" : "Remove"
+        }`,
+      });
+    }
+    return summaries;
+  }, [
+    pendingChanges,
+    pendingRemovedTorrentClients,
+    pendingRemovedTrackers,
+    pendingRenamedTorrentClients,
+    pendingTorrentClients,
+    pendingTrackerOverrideModes,
+  ]);
+  useEffect(() => {
+    if (pendingChangeCount === 0) {
+      setIsPendingSummaryOpen(false);
+    }
+  }, [pendingChangeCount]);
+  const discardPendingSummary = (summary) => {
+    if (summary.kind === "field") {
+      setPendingChanges((currentChanges) => {
+        const next = new Map(currentChanges);
+        next.delete(summary.pathKey);
+        return next;
+      });
+      window.dispatchEvent(
+        new CustomEvent(CONFIG_FIELD_RESET_EVENT, {
+          detail: { pathKey: summary.pathKey },
+        }),
+      );
+    } else if (summary.kind === "client-add") {
+      removePendingTorrentClient(summary.clientName);
+    } else if (summary.kind === "client-rename") {
+      undoRenameTorrentClient(summary.originalName, summary.currentName);
+    } else if (summary.kind === "client-remove") {
+      undoRemoveTorrentClient(summary.clientName);
+    } else if (summary.kind === "tracker-remove") {
+      undoRemoveTracker(summary.trackerName);
+    } else if (summary.kind === "tracker-overrides") {
+      const trackerSection = sections.find(
+        (section) => section.section === "TRACKERS",
+      );
+      const trackerItem = trackerSection?.items?.find(
+        (item) =>
+          String(item.key).toUpperCase() ===
+          String(summary.trackerName).toUpperCase(),
+      );
+      const overrideItems = (trackerItem?.children || []).filter((item) =>
+        trackerDefaultOverrideKeys.has(item.key),
+      );
+      toggleTrackerOverrides(
+        summary.trackerName,
+        !summary.enabled,
+        overrideItems,
+      );
+    }
+  };
   const saveDisabled = isSaving || pendingChangeCount === 0;
   const saveButtonClass =
     "ua-config-save-button rounded-lg px-4 py-2 text-sm font-semibold" +
@@ -7414,17 +7807,95 @@ function ConfigApp() {
               <div className="flex shrink-0 items-center gap-3">
                 {status.text && sections.length > 0 && (
                   <span
-                    className={statusClass + " " + statusTypeClass + " hidden lg:inline"}
+                    className={
+                      statusClass + " " + statusTypeClass + " hidden lg:inline"
+                    }
                     role="status"
                   >
                     {status.text}
                   </span>
                 )}
-                {pendingChangeCount > 0 && !status.text && (
-                  <span className="ua-config-pending-count hidden text-sm lg:inline">
-                    {pendingChangeCount} unsaved{" "}
-                    {pendingChangeCount === 1 ? "change" : "changes"}
-                  </span>
+                {pendingChangeCount > 0 && (
+                  <div className="relative" ref={pendingSummaryRef}>
+                    <button
+                      type="button"
+                      className="ua-config-pending-trigger rounded-lg px-3 py-2 text-sm font-semibold"
+                      onClick={() =>
+                        setIsPendingSummaryOpen((isOpen) => !isOpen)
+                      }
+                      aria-expanded={isPendingSummaryOpen}
+                      aria-controls="pending-change-summary"
+                      title={`${pendingChangeCount} unsaved ${
+                        pendingChangeCount === 1 ? "change" : "changes"
+                      }`}
+                    >
+                      <span className="hidden lg:inline">
+                        {pendingChangeCount} unsaved{" "}
+                        {pendingChangeCount === 1 ? "change" : "changes"}
+                      </span>
+                      <span className="lg:hidden">{pendingChangeCount}</span>
+                    </button>
+                    {isPendingSummaryOpen && (
+                      <div
+                        id="pending-change-summary"
+                        className="ua-config-pending-popover absolute right-0 top-full z-50 mt-2 w-[min(24rem,calc(100vw-2rem))] overflow-hidden rounded-xl border shadow-2xl"
+                      >
+                        <div className="ua-config-pending-popover-header flex items-start justify-between gap-4 border-b px-4 py-3">
+                          <div>
+                            <h2 className="text-sm font-bold">
+                              Pending changes
+                            </h2>
+                            <p className="mt-0.5 text-xs">
+                              These changes have not been saved.
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            className="ua-config-pending-close rounded-md px-2 py-1 text-sm"
+                            onClick={() => setIsPendingSummaryOpen(false)}
+                            aria-label="Close pending changes"
+                          >
+                            ×
+                          </button>
+                        </div>
+                        <div className="max-h-80 space-y-2 overflow-y-auto p-2">
+                          {pendingChangeSummaries.map((summary) => (
+                            <div
+                              className="ua-config-pending-item flex items-center gap-3 rounded-lg border px-3 py-2"
+                              key={summary.id}
+                            >
+                              <div className="min-w-0 flex-1">
+                                <div className="break-words text-sm font-semibold">
+                                  {summary.title}
+                                </div>
+                                <div className="ua-config-pending-item-detail mt-0.5 break-words text-xs">
+                                  {summary.detail}
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                className="ua-config-pending-item-discard shrink-0 rounded-md border px-2.5 py-1.5 text-xs font-semibold"
+                                onClick={() => discardPendingSummary(summary)}
+                                aria-label={`Discard change: ${summary.title}`}
+                              >
+                                Discard
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="ua-config-pending-popover-footer border-t p-3">
+                          <button
+                            type="button"
+                            className="ua-config-discard-button w-full rounded-lg border px-3 py-2 text-sm font-semibold"
+                            onClick={discardAllChanges}
+                            disabled={isSaving}
+                          >
+                            Discard all changes
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 )}
                 <button
                   type="button"

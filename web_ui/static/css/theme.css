@@ -368,11 +368,7 @@ a:hover {
    light/dark surface hierarchy. */
 .ua-config-page.ua-mode-dark {
   --ua-config-bg: var(--ua-obsidian);
-  --ua-config-surface: color-mix(
-    in srgb,
-    var(--ua-charcoal) 94%,
-    transparent
-  );
+  --ua-config-surface: color-mix(in srgb, var(--ua-charcoal) 94%, transparent);
   --ua-config-surface-raised: color-mix(
     in srgb,
     var(--ua-stone) 74%,
@@ -381,22 +377,14 @@ a:hover {
   --ua-config-text: var(--ua-ink);
   --ua-config-muted: var(--ua-muted);
   --ua-config-border: var(--ua-border);
-  --ua-config-hover: color-mix(
-    in srgb,
-    var(--ua-stone) 72%,
-    transparent
-  );
+  --ua-config-hover: color-mix(in srgb, var(--ua-stone) 72%, transparent);
   --ua-config-warning-bg: rgba(120, 53, 15, 0.34);
   --ua-config-warning-border: rgba(251, 191, 36, 0.42);
   --ua-config-warning-text: #fde68a;
 }
 
 .ua-config-page.ua-mode-light {
-  --ua-config-bg: color-mix(
-    in srgb,
-    var(--ua-light-panel-start) 38%,
-    #f5f5f4
-  );
+  --ua-config-bg: color-mix(in srgb, var(--ua-light-panel-start) 38%, #f5f5f4);
   --ua-config-surface: rgba(255, 255, 255, 0.94);
   --ua-config-surface-raised: #ffffff;
   --ua-config-text: #1c1917;
@@ -413,11 +401,7 @@ a:hover {
 }
 
 [data-ua-theme="graphite"] .ua-config-page.ua-mode-light {
-  --ua-config-bg: color-mix(
-    in srgb,
-    var(--ua-light-panel-start) 48%,
-    #f8fafc
-  );
+  --ua-config-bg: color-mix(in srgb, var(--ua-light-panel-start) 48%, #f8fafc);
   --ua-config-text: #0f172a;
   --ua-config-muted: #475569;
   --ua-config-border: rgba(71, 85, 105, 0.2);
@@ -453,11 +437,7 @@ a:hover {
 
 .ua-config-page {
   background:
-    radial-gradient(
-      circle at 100% 0%,
-      var(--ua-atmosphere),
-      transparent 30rem
-    ),
+    radial-gradient(circle at 100% 0%, var(--ua-atmosphere), transparent 30rem),
     var(--ua-config-bg);
   color: var(--ua-config-text);
 }
@@ -494,6 +474,92 @@ a:hover {
   color: var(--ua-config-muted);
 }
 
+.ua-config-pending-trigger {
+  background: var(--ua-config-surface-raised);
+  border: 1px solid var(--ua-config-border);
+  color: var(--ua-copper-bright);
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
+}
+
+.ua-config-pending-trigger:hover,
+.ua-config-pending-trigger[aria-expanded="true"] {
+  background: var(--ua-config-hover);
+  border-color: color-mix(
+    in srgb,
+    var(--ua-copper-bright) 52%,
+    var(--ua-config-border)
+  );
+  color: var(--ua-config-text);
+}
+
+.ua-config-pending-popover {
+  background: var(--ua-config-surface);
+  border-color: var(--ua-config-border);
+  color: var(--ua-config-text);
+}
+
+.ua-config-pending-popover-header,
+.ua-config-pending-popover-footer {
+  border-color: var(--ua-config-border);
+}
+
+.ua-config-pending-popover-header p,
+.ua-config-pending-item-detail {
+  color: var(--ua-config-muted);
+}
+
+.ua-config-pending-close {
+  color: var(--ua-config-muted);
+}
+
+.ua-config-pending-close:hover {
+  background: var(--ua-config-hover);
+  color: var(--ua-config-text);
+}
+
+.ua-config-pending-item {
+  background: var(--ua-config-surface-raised);
+  border-color: var(--ua-config-border);
+}
+
+.ua-config-pending-item-discard {
+  background: transparent;
+  border-color: var(--ua-config-border);
+  color: var(--ua-config-muted);
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
+}
+
+.ua-config-pending-item-discard:hover {
+  background: color-mix(in srgb, #ef4444 10%, transparent);
+  border-color: color-mix(in srgb, #ef4444 55%, var(--ua-config-border));
+  color: #ef4444;
+}
+
+.ua-config-discard-button {
+  background: transparent;
+  border-color: color-mix(in srgb, #ef4444 55%, var(--ua-config-border));
+  color: #ef4444;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease;
+}
+
+.ua-config-discard-button:hover:not(:disabled) {
+  background: color-mix(in srgb, #ef4444 12%, transparent);
+  border-color: #ef4444;
+}
+
+.ua-config-discard-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 .ua-config-nav-button {
   align-items: center;
   border: 1px solid transparent;
@@ -528,11 +594,7 @@ a:hover {
     var(--ua-copper) 17%,
     var(--ua-config-surface-raised)
   );
-  border-color: color-mix(
-    in srgb,
-    var(--ua-copper-bright) 42%,
-    transparent
-  );
+  border-color: color-mix(in srgb, var(--ua-copper-bright) 42%, transparent);
   color: var(--ua-config-text);
 }
 
@@ -634,11 +696,7 @@ select {
     var(--ua-config-surface-raised)
   );
   border: 1px solid
-    color-mix(
-      in srgb,
-      var(--ua-config-muted) 62%,
-      var(--ua-config-border)
-    );
+    color-mix(in srgb, var(--ua-config-muted) 62%, var(--ua-config-border));
   box-sizing: border-box;
 }
 
@@ -661,8 +719,7 @@ select {
     var(--ua-config-text) 90%,
     var(--ua-config-muted)
   );
-  border: 1px solid
-    color-mix(in srgb, var(--ua-config-muted) 48%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ua-config-muted) 48%, transparent);
   box-shadow:
     0 1px 3px rgba(0, 0, 0, 0.38),
     inset 0 0 0 1px rgba(255, 255, 255, 0.18);
@@ -670,11 +727,7 @@ select {
 
 .ua-config-page.ua-mode-light .ua-config-boolean-knob {
   background: #ffffff;
-  border-color: color-mix(
-    in srgb,
-    var(--ua-config-muted) 42%,
-    transparent
-  );
+  border-color: color-mix(in srgb, var(--ua-config-muted) 42%, transparent);
   box-shadow:
     0 1px 3px rgba(15, 23, 42, 0.28),
     inset 0 0 0 1px rgba(255, 255, 255, 0.72);
@@ -710,11 +763,7 @@ select {
 }
 
 .ua-config-section-heading {
-  background: color-mix(
-    in srgb,
-    var(--ua-copper) 8%,
-    var(--ua-config-surface)
-  );
+  background: color-mix(in srgb, var(--ua-copper) 8%, var(--ua-config-surface));
   border-color: var(--ua-config-border);
   color: var(--ua-config-text);
 }
@@ -906,11 +955,7 @@ select {
 }
 
 .ua-config-service-group-title {
-  background: color-mix(
-    in srgb,
-    var(--ua-copper) 6%,
-    var(--ua-config-surface)
-  );
+  background: color-mix(in srgb, var(--ua-copper) 6%, var(--ua-config-surface));
   border-color: var(--ua-config-border);
 }
 
@@ -924,8 +969,7 @@ select {
 @media (min-width: 1024px) {
   .ua-config-service-row {
     align-items: start;
-    grid-template-columns:
-      minmax(12rem, 1.1fr) repeat(3, minmax(0, 1fr));
+    grid-template-columns: minmax(12rem, 1.1fr) repeat(3, minmax(0, 1fr));
   }
 }
 
