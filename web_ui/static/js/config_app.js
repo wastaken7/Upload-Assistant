@@ -2921,6 +2921,200 @@ function RenameTorrentClientModal({
   );
 }
 
+function HelpResourcesModal({ onClose }) {
+  const resourceGroups = [
+    {
+      title: "Start here",
+      links: [
+        {
+          label: "Documentation home",
+          description: "Overview and links to the main guides.",
+          href: "https://github.com/wastaken7/Upload-Assistant/blob/development/docs/home.md",
+        },
+        {
+          label: "WebUI guide",
+          description: "Basic WebUI setup and usage.",
+          href: "https://github.com/wastaken7/Upload-Assistant/blob/development/docs/web-ui-basic.md",
+        },
+      ],
+    },
+    {
+      title: "Configuration",
+      links: [
+        {
+          label: "Configuration reference",
+          description: "Detailed settings, defaults and implementation notes.",
+          href: "https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md",
+        },
+        {
+          label: "CLI arguments",
+          description: "Command-line options that can override configuration.",
+          href: "https://github.com/wastaken7/Upload-Assistant/blob/development/docs/cli-args.md",
+        },
+        {
+          label: "Description builder",
+          description: "How description formatting and layout options work.",
+          href: "https://github.com/wastaken7/Upload-Assistant/blob/development/docs/description-builder.md",
+        },
+      ],
+    },
+    {
+      title: "Installation and hosting",
+      links: [
+        {
+          label: "Windows installation",
+          description: "Install and run Upload Assistant on Windows.",
+          href: "https://github.com/wastaken7/Upload-Assistant/blob/development/docs/windows-install.md",
+        },
+        {
+          label: "Docker",
+          description: "Container setup and configuration.",
+          href: "https://github.com/wastaken7/Upload-Assistant/blob/development/docs/docker.md",
+        },
+        {
+          label: "Unraid",
+          description: "Deployment guidance for Unraid.",
+          href: "https://github.com/wastaken7/Upload-Assistant/blob/development/docs/unraid.md",
+        },
+        {
+          label: "Seedbox setup",
+          description: "Paths and setup considerations for seedboxes.",
+          href: "https://github.com/wastaken7/Upload-Assistant/blob/development/docs/seedbox.md",
+        },
+      ],
+    },
+    {
+      title: "Upload workflows",
+      links: [
+        {
+          label: "Usenet",
+          description: "Configure and use Usenet uploading.",
+          href: "https://github.com/wastaken7/Upload-Assistant/blob/development/docs/usenet.md",
+        },
+        {
+          label: "Book uploads",
+          description: "Book-specific preparation and uploading.",
+          href: "https://github.com/wastaken7/Upload-Assistant/blob/development/docs/book-upload.md",
+        },
+        {
+          label: "Music uploads",
+          description: "Music-specific preparation and uploading.",
+          href: "https://github.com/wastaken7/Upload-Assistant/blob/development/docs/music-upload.md",
+        },
+        {
+          label: "Game uploads",
+          description: "Game-specific preparation and uploading.",
+          href: "https://github.com/wastaken7/Upload-Assistant/blob/development/docs/game-upload.md",
+        },
+      ],
+    },
+  ];
+
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-3 sm:p-4"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <section
+        className="ua-config-modal flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl border shadow-2xl"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="help-resources-title"
+      >
+        <div className="ua-config-section-heading flex items-start justify-between gap-4 border-b px-4 py-3 sm:px-5 sm:py-4">
+          <div>
+            <h2 id="help-resources-title" className="text-lg font-semibold">
+              Help &amp; Resources
+            </h2>
+            <p className="ua-config-service-description mt-1 text-sm">
+              Official Upload Assistant documentation and setup guides.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="ua-config-icon-button shrink-0"
+            aria-label="Close help and resources"
+            autoFocus
+            onClick={onClose}
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
+          <div className="ua-config-state-panel mb-4 rounded-lg border p-3 text-sm">
+            These links open GitHub in a new tab, keeping guidance aligned with
+            the upstream development documentation.
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            {resourceGroups.map((group) => (
+              <section
+                key={group.title}
+                className="ua-config-state-panel rounded-xl border p-3 sm:p-4"
+              >
+                <h3 className="mb-3 text-sm font-semibold">{group.title}</h3>
+                <div className="space-y-2">
+                  {group.links.map((link) => (
+                    <a
+                      key={link.href}
+                      href={link.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="ua-config-folder-row flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5"
+                    >
+                      <span className="min-w-0">
+                        <span className="block text-sm font-semibold">
+                          {link.label}
+                        </span>
+                        <span className="ua-config-service-description mt-0.5 block text-xs">
+                          {link.description}
+                        </span>
+                      </span>
+                      <span
+                        className="ua-config-service-action shrink-0 text-sm"
+                        aria-hidden="true"
+                      >
+                        ↗
+                      </span>
+                    </a>
+                  ))}
+                </div>
+              </section>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex justify-end border-t px-4 py-3 sm:px-5">
+          <a
+            href="https://github.com/wastaken7/Upload-Assistant/tree/development/docs"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="ua-config-service-action rounded-lg border px-4 py-2 text-sm font-semibold"
+          >
+            Browse all documentation ↗
+          </a>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function TorrentClientSettings({
   items,
   pathParts,
@@ -5920,11 +6114,12 @@ function ConfigSidebar({
   onInterfaceStyleChange,
   isDarkMode,
   onToggleMode,
+  onOpenHelp,
   onLogout,
 }) {
   const [isAppearanceOpen, setIsAppearanceOpen] = useState(() =>
     window.matchMedia
-      ? !window.matchMedia("(max-height: 760px)").matches
+      ? !window.matchMedia("(max-width: 767px), (max-height: 760px)").matches
       : true,
   );
   const defaultSection = sections.find(
@@ -6029,18 +6224,18 @@ function ConfigSidebar({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="ua-config-sidebar-brand flex h-20 shrink-0 items-center justify-between gap-3 border-b px-5 py-3">
-        <div className="flex min-w-0 items-center gap-3">
+      <div className="ua-config-sidebar-brand flex h-20 shrink-0 items-center justify-between gap-2 border-b px-3 py-3 sm:gap-3 sm:px-5">
+        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
           <img
             src={window.UA_LOGO_URL || "/static/img/logo.svg"}
             alt="Upload-Assistant logo"
-            className="h-8 w-8 shrink-0"
+            className="h-7 w-7 shrink-0 sm:h-8 sm:w-8"
           />
           <div className="min-w-0">
-            <div className="truncate text-xs font-semibold uppercase tracking-widest opacity-60">
-              <span>Upload Assistant</span>
+            <div className="flex min-w-0 items-baseline gap-1 text-[0.68rem] font-semibold uppercase tracking-[0.12em] opacity-60 sm:text-xs sm:tracking-widest">
+              <span className="truncate">Upload Assistant</span>
               {window.UA_APP_VERSION && (
-                <span className="ml-1 normal-case">
+                <span className="shrink-0 normal-case tracking-normal">
                   <span aria-hidden="true">·</span> {window.UA_APP_VERSION}
                 </span>
               )}
@@ -6185,6 +6380,14 @@ function ConfigSidebar({
         )}
 
         <div className="mt-3 grid gap-2">
+          <button
+            type="button"
+            className="ua-config-sidebar-action rounded-lg px-3 py-2 text-center text-sm font-semibold"
+            aria-haspopup="dialog"
+            onClick={onOpenHelp}
+          >
+            Help &amp; Resources
+          </button>
           <a
             href="/"
             className="ua-config-sidebar-action rounded-lg px-3 py-2 text-center text-sm font-semibold"
@@ -6288,6 +6491,7 @@ function ConfigApp() {
     }
   });
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  const [isHelpResourcesOpen, setIsHelpResourcesOpen] = useState(false);
   const [torrentClients, setTorrentClients] = useState([]);
   const [trackerCatalog, setTrackerCatalog] = useState({
     defaultTrackers: [],
@@ -6299,6 +6503,8 @@ function ConfigApp() {
   const [clientTestStates, setClientTestStates] = useState(new Map());
   const [isPendingSummaryOpen, setIsPendingSummaryOpen] = useState(false);
   const pendingSummaryRef = useRef(null);
+  const mobileNavGestureRef = useRef(null);
+  const suppressMobileNavClickRef = useRef(false);
 
   useEffect(() => {
     const handleColorThemeChange = (event) => {
@@ -6392,6 +6598,72 @@ function ConfigApp() {
       document.removeEventListener("keydown", closeOnEscape);
     };
   }, [isMobileNavOpen]);
+
+  const startMobileNavGesture = (event) => {
+    if (
+      event.pointerType === "mouse" ||
+      !window.matchMedia("(max-width: 767px)").matches
+    ) {
+      return;
+    }
+    if (
+      event.target.closest("input, select, textarea, [contenteditable='true']")
+    ) {
+      return;
+    }
+    mobileNavGestureRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+    };
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  };
+
+  const moveMobileNavGesture = (event) => {
+    const gesture = mobileNavGestureRef.current;
+    if (!gesture || gesture.pointerId !== event.pointerId) return;
+    const horizontalDistance = event.clientX - gesture.startX;
+    const verticalDistance = event.clientY - gesture.startY;
+    if (
+      Math.abs(horizontalDistance) > 12 &&
+      Math.abs(horizontalDistance) > Math.abs(verticalDistance)
+    ) {
+      event.preventDefault();
+    }
+  };
+
+  const finishMobileNavGesture = (event) => {
+    const gesture = mobileNavGestureRef.current;
+    if (!gesture || gesture.pointerId !== event.pointerId) return;
+    mobileNavGestureRef.current = null;
+
+    const horizontalDistance = event.clientX - gesture.startX;
+    const verticalDistance = event.clientY - gesture.startY;
+    const isDeliberateHorizontalSwipe =
+      Math.abs(horizontalDistance) >= 72 &&
+      Math.abs(verticalDistance) <= 56 &&
+      Math.abs(horizontalDistance) > Math.abs(verticalDistance) * 1.25;
+    if (!isDeliberateHorizontalSwipe) return;
+
+    if (horizontalDistance < 0) {
+      suppressMobileNavClickRef.current = true;
+      setIsMobileNavOpen(false);
+      window.setTimeout(() => {
+        suppressMobileNavClickRef.current = false;
+      }, 250);
+    }
+  };
+
+  const cancelMobileNavGesture = () => {
+    mobileNavGestureRef.current = null;
+  };
+
+  const suppressClickAfterMobileNavSwipe = (event) => {
+    if (!suppressMobileNavClickRef.current) return;
+    event.preventDefault();
+    event.stopPropagation();
+    suppressMobileNavClickRef.current = false;
+  };
 
   const loadConfigOptions = async (isRetry = false) => {
     try {
@@ -7885,6 +8157,9 @@ function ConfigApp() {
           onSelect={finishFolderPicker}
         />
       )}
+      {isHelpResourcesOpen && (
+        <HelpResourcesModal onClose={() => setIsHelpResourcesOpen(false)} />
+      )}
       {renameClientSource && (
         <RenameTorrentClientModal
           sourceName={renameClientSource}
@@ -7912,6 +8187,12 @@ function ConfigApp() {
             "md:z-20 md:translate-x-0 " +
             (isMobileNavOpen ? "translate-x-0" : "-translate-x-full")
           }
+          style={{ touchAction: "pan-y" }}
+          onClickCapture={suppressClickAfterMobileNavSwipe}
+          onPointerDown={startMobileNavGesture}
+          onPointerMove={moveMobileNavGesture}
+          onPointerUp={finishMobileNavGesture}
+          onPointerCancel={cancelMobileNavGesture}
         >
           <ConfigSidebar
             sections={sections}
@@ -7925,6 +8206,10 @@ function ConfigApp() {
             onInterfaceStyleChange={handleInterfaceStyleChange}
             isDarkMode={isDarkMode}
             onToggleMode={() => setIsDarkMode((prev) => !prev)}
+            onOpenHelp={() => {
+              setIsHelpResourcesOpen(true);
+              setIsMobileNavOpen(false);
+            }}
             onLogout={handleLogout}
           />
         </aside>
