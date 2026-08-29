@@ -1025,6 +1025,333 @@ const PaletteIcon = () => <WebUiIcon name="palette" />;
 
 const SettingsIcon = () => <WebUiIcon name="settings" />;
 
+const HelpIcon = () => (
+  <svg
+    className="h-5 w-5"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+    aria-hidden="true"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M12 6.75c-2.5-1.5-5.5-1.5-8-.5v11c2.5-1 5.5-1 8 .5m0-11c2.5-1.5 5.5-1.5 8-.5v11c-2.5-1-5.5-1-8 .5m0-11v11"
+    />
+  </svg>
+);
+
+const UploadRailIcon = () => (
+  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M12 16V4m0 0L7 9m5-5 5 5M5 20h14"
+    />
+  </svg>
+);
+
+const LogoutIcon = () => (
+  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M10 17l5-5-5-5m5 5H3m10-8h5a2 2 0 012 2v12a2 2 0 01-2 2h-5"
+    />
+  </svg>
+);
+
+const WorkspaceSwitcher = ({
+  activeWorkspace,
+  appBase,
+  isDarkMode,
+  stretch,
+}) => {
+  const workspaces = [
+    { id: "upload", label: "Upload Workspace", href: `${appBase}/` },
+    { id: "config", label: "Configuration", href: `${appBase}/config` },
+  ];
+
+  return (
+    <nav
+      className="ua-workspace-switcher rounded-lg"
+      data-mode={isDarkMode ? "dark" : "light"}
+      data-stretch={stretch ? "true" : "false"}
+      aria-label="Workspace"
+    >
+      {workspaces.map((workspace) => {
+        const isActive = workspace.id === activeWorkspace;
+        return (
+          <a
+            key={workspace.id}
+            href={workspace.href}
+            className="ua-workspace-link rounded-md"
+            data-active={isActive ? "true" : "false"}
+            aria-current={isActive ? "page" : undefined}
+            onClick={isActive ? (event) => event.preventDefault() : undefined}
+          >
+            {workspace.label}
+          </a>
+        );
+      })}
+    </nav>
+  );
+};
+
+const ApplicationRail = ({
+  activeWorkspace,
+  appBase,
+  appearanceControl,
+  onOpenHelp,
+  onLogout,
+}) => {
+  const workspaceLinks = [
+    {
+      id: "upload",
+      label: "Upload",
+      href: `${appBase}/`,
+      icon: <UploadRailIcon />,
+    },
+    {
+      id: "config",
+      label: "Config",
+      href: `${appBase}/config`,
+      icon: <SettingsIcon />,
+    },
+  ];
+
+  return (
+    <aside
+      className="ua-app-rail hidden h-screen w-20 shrink-0 flex-col border-r md:flex"
+      aria-label="Application navigation"
+    >
+      <div className="ua-app-rail-brand flex h-20 shrink-0 flex-col items-center justify-center gap-1 border-b px-2">
+        <img
+          src={`${appBase}/static/img/logo.svg`}
+          alt="Upload Assistant"
+          className="h-8 w-8"
+        />
+        {window.UA_APP_VERSION && (
+          <span className="text-[0.65rem] font-semibold opacity-60">
+            {window.UA_APP_VERSION}
+          </span>
+        )}
+      </div>
+
+      <nav className="grid gap-1 p-2" aria-label="Workspaces">
+        {workspaceLinks.map((workspace) => {
+          const isActive = workspace.id === activeWorkspace;
+          return (
+            <a
+              key={workspace.id}
+              href={workspace.href}
+              className="ua-app-rail-button rounded-lg"
+              data-active={isActive ? "true" : "false"}
+              aria-current={isActive ? "page" : undefined}
+              onClick={isActive ? (event) => event.preventDefault() : undefined}
+            >
+              {workspace.icon}
+              <span>{workspace.label}</span>
+            </a>
+          );
+        })}
+      </nav>
+
+      <div className="min-h-4 flex-1"></div>
+
+      <div className="ua-app-rail-footer grid shrink-0 gap-1 border-t p-2">
+        <button
+          type="button"
+          className="ua-app-rail-button rounded-lg"
+          onClick={onOpenHelp}
+          aria-haspopup="dialog"
+        >
+          <HelpIcon />
+          <span>Help</span>
+        </button>
+        {appearanceControl}
+        <button
+          type="button"
+          className="ua-app-rail-button rounded-lg text-red-500"
+          onClick={onLogout}
+        >
+          <LogoutIcon />
+          <span>Log out</span>
+        </button>
+      </div>
+    </aside>
+  );
+};
+
+const UploadWorkspaceBrand = ({
+  appBase,
+  isDarkMode,
+  isExecuting,
+  compact,
+  contextOnly = false,
+}) => (
+  <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+    {!contextOnly && (
+      <LogoIcon
+        src={`${appBase}/static/img/logo.svg`}
+        className={compact ? "h-7 w-7" : "h-8 w-8"}
+      />
+    )}
+    <div className="min-w-0">
+      {!contextOnly && (
+        <div
+          className={`flex min-w-0 items-baseline gap-1 font-semibold uppercase opacity-60 ${
+            compact
+              ? "text-[0.68rem] tracking-[0.12em]"
+              : "text-xs tracking-widest"
+          }`}
+        >
+          <span className="truncate">Upload Assistant</span>
+          {window.UA_APP_VERSION && (
+            <span className="shrink-0 normal-case tracking-normal">
+              <span aria-hidden="true">·</span> {window.UA_APP_VERSION}
+            </span>
+          )}
+        </div>
+      )}
+      <div
+        className={`${contextOnly ? "" : "mt-0.5"} flex min-w-0 items-center gap-2`}
+      >
+        <h1
+          className={`truncate font-bold ${compact ? "text-base" : "text-xl"} ${
+            isDarkMode ? "text-white" : "text-gray-800"
+          }`}
+        >
+          Upload
+        </h1>
+        {isExecuting && (
+          <span
+            className="ua-workspace-run-status shrink-0 rounded-full"
+            role="status"
+          >
+            <span
+              className="ua-workspace-run-dot animate-pulse"
+              aria-hidden="true"
+            ></span>
+            Running
+          </span>
+        )}
+      </div>
+    </div>
+  </div>
+);
+
+function UploadHelpResourcesModal({ onClose }) {
+  const resourceGroups = window.UAHelpResourceGroups || [];
+
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-3 sm:p-4"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <section
+        className="ua-upload-help-modal flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl border shadow-2xl"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="upload-help-resources-title"
+      >
+        <div className="ua-upload-panel-header flex items-start justify-between gap-4 border-b px-4 py-3 sm:px-5 sm:py-4">
+          <div>
+            <h2
+              id="upload-help-resources-title"
+              className="text-lg font-semibold"
+            >
+              Help &amp; Resources
+            </h2>
+            <p className="ua-upload-muted mt-1 text-sm">
+              Official Upload Assistant documentation and setup guides.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="ua-upload-header-action h-10 w-10 shrink-0 rounded-lg text-xl"
+            aria-label="Close help and resources"
+            autoFocus
+            onClick={onClose}
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
+          <div className="ua-upload-help-card mb-4 rounded-lg border p-3 text-sm">
+            These links open GitHub in a new tab, keeping guidance aligned with
+            the upstream development documentation.
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            {resourceGroups.map((group) => (
+              <section
+                key={group.title}
+                className="ua-upload-help-card rounded-xl border p-3 sm:p-4"
+              >
+                <h3 className="mb-3 text-sm font-semibold">{group.title}</h3>
+                <div className="space-y-2">
+                  {group.links.map((link) => (
+                    <a
+                      key={link.href}
+                      href={link.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="ua-upload-help-link flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5"
+                    >
+                      <span className="min-w-0">
+                        <span className="block text-sm font-semibold">
+                          {link.label}
+                        </span>
+                        <span className="ua-upload-muted mt-0.5 block text-xs">
+                          {link.description}
+                        </span>
+                      </span>
+                      <span className="shrink-0 text-sm" aria-hidden="true">
+                        ↗
+                      </span>
+                    </a>
+                  ))}
+                </div>
+              </section>
+            ))}
+          </div>
+        </div>
+
+        <div className="ua-upload-modal-footer flex justify-end border-t px-4 py-3 sm:px-5">
+          <a
+            href="https://github.com/wastaken7/Upload-Assistant/tree/development/docs"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="ua-upload-modal-action rounded-lg px-4 py-2 text-sm font-semibold"
+          >
+            Browse all documentation ↗
+          </a>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 const ProgressIcon = () => (
   <svg
     className="w-5 h-5"
@@ -1486,6 +1813,7 @@ function AudionutsUAGUI() {
     getStoredInterfaceStyle,
   );
   const [isThemePaletteOpen, setIsThemePaletteOpen] = useState(false);
+  const [isHelpResourcesOpen, setIsHelpResourcesOpen] = useState(false);
   const [argSearchFilter, setArgSearchFilter] = useState("");
   const [collapsedSections, setCollapsedSections] = useState(
     () => new Set(getStoredCollapsedSections()),
@@ -1550,16 +1878,11 @@ function AudionutsUAGUI() {
 
   useEffect(() => {
     const handleInterfaceStyleChange = (event) => {
-      setInterfaceStyleState(
-        event.detail?.style || getStoredInterfaceStyle(),
-      );
+      setInterfaceStyleState(event.detail?.style || getStoredInterfaceStyle());
     };
     window.addEventListener("ua-shape-change", handleInterfaceStyleChange);
     return () =>
-      window.removeEventListener(
-        "ua-shape-change",
-        handleInterfaceStyleChange,
-      );
+      window.removeEventListener("ua-shape-change", handleInterfaceStyleChange);
   }, []);
 
   useEffect(() => {
@@ -1605,13 +1928,13 @@ function AudionutsUAGUI() {
         aria-label="Theme settings"
         aria-expanded={isThemePaletteOpen}
         title="Theme settings"
-        className={`p-2 rounded-lg transition-colors ${isDarkMode ? "text-gray-200 hover:bg-gray-700" : "text-gray-600 hover:bg-gray-100"}`}
+        className={`ua-upload-header-action p-2 rounded-lg transition-colors ${isDarkMode ? "text-gray-200 hover:bg-gray-700" : "text-gray-600 hover:bg-gray-100"}`}
       >
         <PaletteIcon />
       </button>
       {isThemePaletteOpen && (
         <div
-          className={`absolute right-0 top-full z-50 mt-2 w-56 rounded-lg border p-3 shadow-xl ${isDarkMode ? "border-gray-700 bg-gray-800 text-gray-100" : "border-gray-200 bg-white text-gray-800"}`}
+          className={`ua-upload-panel absolute right-0 top-full z-50 mt-2 w-56 rounded-lg border p-3 shadow-xl ${isDarkMode ? "border-gray-700 bg-gray-800 text-gray-100" : "border-gray-200 bg-white text-gray-800"}`}
         >
           <label className="block text-xs font-semibold uppercase tracking-wide opacity-70">
             Color theme
@@ -1666,6 +1989,92 @@ function AudionutsUAGUI() {
               />
             </button>
           </div>
+        </div>
+      )}
+    </div>
+  );
+
+  const renderHelpButton = () => (
+    <button
+      type="button"
+      onClick={() => setIsHelpResourcesOpen(true)}
+      aria-label="Help and resources"
+      aria-haspopup="dialog"
+      title="Help and resources"
+      className="ua-upload-header-action gap-2 rounded-lg p-2 text-sm font-semibold"
+    >
+      <HelpIcon />
+    </button>
+  );
+
+  const handleLogout = async () => {
+    try {
+      const response = await apiFetch(`${APP_BASE}/logout`, { method: "POST" });
+      window.location = response?.redirected
+        ? response.url
+        : `${APP_BASE}/login`;
+    } catch (_error) {
+      window.location = `${APP_BASE}/login`;
+    }
+  };
+
+  const renderRailAppearance = () => (
+    <div ref={themePaletteRef} className="relative min-w-0 w-full">
+      <button
+        type="button"
+        className="ua-app-rail-button rounded-lg"
+        onClick={() => setIsThemePaletteOpen((open) => !open)}
+        aria-label="Appearance"
+        aria-expanded={isThemePaletteOpen}
+      >
+        <PaletteIcon />
+        <span>Appearance</span>
+      </button>
+      {isThemePaletteOpen && (
+        <div className="ua-app-rail-popover absolute bottom-0 left-full z-[60] ml-2 w-64 rounded-xl border p-4 shadow-2xl">
+          <h2 className="text-sm font-semibold">Appearance</h2>
+          <label className="ua-app-rail-popover-label mt-3 block text-xs font-semibold">
+            Color theme
+          </label>
+          <select
+            value={colorTheme}
+            onChange={(event) => {
+              handleColorThemeChange(event);
+              setIsThemePaletteOpen(false);
+            }}
+            className="ua-theme-picker mt-1 w-full rounded-lg px-3 py-2 text-sm"
+          >
+            {colorThemes.map((theme) => (
+              <option key={theme.id} value={theme.id}>
+                {theme.label}
+              </option>
+            ))}
+          </select>
+          <label className="ua-app-rail-popover-label mt-3 block text-xs font-semibold">
+            Corner style
+          </label>
+          <select
+            value={interfaceStyle}
+            onChange={(event) => {
+              handleInterfaceStyleChange(event);
+              setIsThemePaletteOpen(false);
+            }}
+            className="ua-theme-picker mt-1 w-full rounded-lg px-3 py-2 text-sm"
+          >
+            {interfaceStyles.map((style) => (
+              <option key={style.id} value={style.id}>
+                {style.label}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            className="ua-upload-modal-action mt-3 flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm"
+            onClick={() => setIsDarkMode((dark) => !dark)}
+          >
+            <span>{isDarkMode ? "Dark mode" : "Light mode"}</span>
+            <span aria-hidden="true">{isDarkMode ? "●" : "○"}</span>
+          </button>
         </div>
       )}
     </div>
@@ -1870,7 +2279,7 @@ function AudionutsUAGUI() {
     return (
       <div className="flex flex-col h-full">
         <div
-          className={`p-3 border-b flex-shrink-0 ${isDarkMode ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-gradient-to-l from-cyan-50 to-sky-50"}`}
+          className={`ua-upload-panel-header p-3 border-b flex-shrink-0 ${isDarkMode ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-gradient-to-l from-cyan-50 to-sky-50"}`}
         >
           <h2
             className={`text-base font-bold ${isDarkMode ? "text-white" : "text-gray-800"} flex items-center gap-2`}
@@ -4205,7 +4614,7 @@ function AudionutsUAGUI() {
     return (
       <div className="flex h-full flex-col">
         <div
-          className={`border-b p-3 ${isDarkMode ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-gradient-to-l from-sky-50 to-indigo-50"}`}
+          className={`ua-upload-panel-header border-b p-3 ${isDarkMode ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-gradient-to-l from-sky-50 to-indigo-50"}`}
         >
           <h2
             className={`text-base font-bold ${isDarkMode ? "text-white" : "text-gray-800"}`}
@@ -4385,7 +4794,7 @@ function AudionutsUAGUI() {
       <>
         <div className="flex flex-col h-full">
           <div
-            className={`p-3 border-b flex-shrink-0 ${isDarkMode ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-gradient-to-l from-purple-50 to-indigo-50"}`}
+            className={`ua-upload-panel-header p-3 border-b flex-shrink-0 ${isDarkMode ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-gradient-to-l from-purple-50 to-indigo-50"}`}
           >
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -4845,7 +5254,7 @@ function AudionutsUAGUI() {
     return (
       <div className="flex flex-col h-full">
         <div
-          className={`${panelPadding} border-b flex-shrink-0 ${isDarkMode ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-gradient-to-l from-amber-50 to-orange-50"}`}
+          className={`ua-upload-panel-header ${panelPadding} border-b flex-shrink-0 ${isDarkMode ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-gradient-to-l from-amber-50 to-orange-50"}`}
         >
           <h2
             className={`${titleSize} font-bold ${isDarkMode ? "text-white" : "text-gray-800"} flex items-center gap-2`}
@@ -5095,28 +5504,38 @@ function AudionutsUAGUI() {
 
     return (
       <div
-        className={`flex flex-col h-screen ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}
+        className={`ua-upload-page flex flex-col h-screen ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}
+        data-mode={isDarkMode ? "dark" : "light"}
       >
+        {isHelpResourcesOpen && (
+          <UploadHelpResourcesModal
+            onClose={() => setIsHelpResourcesOpen(false)}
+          />
+        )}
+
         {/* Mobile Header */}
         <div
-          className={`flex items-center justify-between px-4 py-3 border-b flex-shrink-0 ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}`}
+          className={`border-b flex-shrink-0 ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}`}
         >
-          <h1
-            className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-gray-800"} flex items-center gap-2`}
-          >
-            <LogoIcon src={`${APP_BASE}/static/img/logo.svg`} />
-            Upload-Assistant
-          </h1>
-          <div className="flex items-center gap-2">
-            {renderThemePalette()}
-            <a
-              href={`${APP_BASE}/config`}
-              aria-label="Config"
-              title="Config"
-              className={`p-2 rounded-lg transition-colors ${isDarkMode ? "text-gray-200 hover:bg-gray-700" : "text-gray-600 hover:bg-gray-100"}`}
-            >
-              <SettingsIcon />
-            </a>
+          <div className="flex items-center justify-between px-4 py-3">
+            <UploadWorkspaceBrand
+              appBase={APP_BASE}
+              isDarkMode={isDarkMode}
+              isExecuting={isExecuting}
+              compact
+            />
+            <div className="ml-2 flex shrink-0 items-center gap-1">
+              {renderHelpButton()}
+              {renderThemePalette()}
+            </div>
+          </div>
+          <div className="px-4 pb-3">
+            <WorkspaceSwitcher
+              activeWorkspace="upload"
+              appBase={APP_BASE}
+              isDarkMode={isDarkMode}
+              stretch
+            />
           </div>
         </div>
 
@@ -5129,7 +5548,7 @@ function AudionutsUAGUI() {
             ) : (
               <div className="flex flex-col h-full">
                 <div
-                  className={`p-3 border-b flex-shrink-0 ${isDarkMode ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-gradient-to-r from-purple-50 to-blue-50"}`}
+                  className={`ua-upload-panel-header p-3 border-b flex-shrink-0 ${isDarkMode ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-gradient-to-r from-purple-50 to-blue-50"}`}
                 >
                   <h2
                     className={`text-base font-bold ${isDarkMode ? "text-white" : "text-gray-800"} flex items-center gap-2`}
@@ -5219,7 +5638,7 @@ function AudionutsUAGUI() {
                 {hasDescFile && (
                   <>
                     <div
-                      className={`p-3 border-t flex-shrink-0 ${!descBrowserCollapsed ? "border-b" : ""} ${isDarkMode ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-gradient-to-r from-green-50 to-emerald-50"} ${descBrowserCollapsed ? "cursor-pointer" : ""}`}
+                      className={`ua-upload-panel-header p-3 border-t flex-shrink-0 ${!descBrowserCollapsed ? "border-b" : ""} ${isDarkMode ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-gradient-to-r from-green-50 to-emerald-50"} ${descBrowserCollapsed ? "cursor-pointer" : ""}`}
                       onClick={
                         descBrowserCollapsed
                           ? () => setDescBrowserCollapsed(false)
@@ -5558,7 +5977,7 @@ function AudionutsUAGUI() {
             ) : (
               <div className="flex flex-col h-full">
                 <div
-                  className={`p-3 border-b flex-shrink-0 ${isDarkMode ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-gradient-to-l from-purple-50 to-blue-50"}`}
+                  className={`ua-upload-panel-header p-3 border-b flex-shrink-0 ${isDarkMode ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-gradient-to-l from-purple-50 to-blue-50"}`}
                 >
                   <h2
                     className={`text-base font-bold ${isDarkMode ? "text-white" : "text-gray-800"} flex items-center gap-2`}
@@ -5785,11 +6204,26 @@ function AudionutsUAGUI() {
   // Desktop Layout
   return (
     <div
-      className={`flex h-screen ${isDarkMode ? "bg-gray-900" : "bg-gray-50"} overflow-hidden`}
+      className={`ua-upload-page flex h-screen ${isDarkMode ? "bg-gray-900" : "bg-gray-50"} overflow-hidden`}
+      data-mode={isDarkMode ? "dark" : "light"}
     >
+      {isHelpResourcesOpen && (
+        <UploadHelpResourcesModal
+          onClose={() => setIsHelpResourcesOpen(false)}
+        />
+      )}
+
+      <ApplicationRail
+        activeWorkspace="upload"
+        appBase={APP_BASE}
+        appearanceControl={renderRailAppearance()}
+        onOpenHelp={() => setIsHelpResourcesOpen(true)}
+        onLogout={handleLogout}
+      />
+
       {/* Left Sidebar - Resizable */}
       <div
-        className={`${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"} border-r flex flex-col`}
+        className={`ua-upload-panel ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"} border-r flex flex-col`}
         style={{
           width: `${sidebarWidth}px`,
           minWidth: "200px",
@@ -5801,7 +6235,7 @@ function AudionutsUAGUI() {
         ) : (
           <>
             <div
-              className={`p-4 border-b ${isDarkMode ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-gradient-to-r from-purple-50 to-blue-50"}`}
+              className={`ua-upload-panel-header p-4 border-b ${isDarkMode ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-gradient-to-r from-purple-50 to-blue-50"}`}
             >
               <h2
                 className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-gray-800"} flex items-center gap-2`}
@@ -5891,7 +6325,7 @@ function AudionutsUAGUI() {
             {hasDescFile && (
               <>
                 <div
-                  className={`p-4 border-t ${!descBrowserCollapsed ? "border-b" : ""} ${isDarkMode ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-gradient-to-r from-green-50 to-emerald-50"} ${descBrowserCollapsed ? "cursor-pointer" : ""}`}
+                  className={`ua-upload-panel-header p-4 border-t ${!descBrowserCollapsed ? "border-b" : ""} ${isDarkMode ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-gradient-to-r from-green-50 to-emerald-50"} ${descBrowserCollapsed ? "cursor-pointer" : ""}`}
                   onClick={
                     descBrowserCollapsed
                       ? () => setDescBrowserCollapsed(false)
@@ -6051,7 +6485,7 @@ function AudionutsUAGUI() {
 
       {/* Resize Handle */}
       <div
-        className={`w-1 ${isDarkMode ? "bg-gray-700 hover:bg-purple-500" : "bg-gray-300 hover:bg-purple-500"} cursor-col-resize transition-colors`}
+        className={`ua-upload-resize-handle w-1 ${isDarkMode ? "bg-gray-700 hover:bg-purple-500" : "bg-gray-300 hover:bg-purple-500"} cursor-col-resize transition-colors`}
         onMouseDown={startResizing}
         style={{ userSelect: "none" }}
       />
@@ -6060,26 +6494,28 @@ function AudionutsUAGUI() {
       <div className="relative flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Top Panel */}
         <div
-          className={`${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"} border-b ${isExecuting ? "p-3" : "p-4"} ${!isExecuting && !isOutputExpanded ? "flex-1 overflow-y-auto" : "flex-shrink-0"}`}
+          className={`ua-upload-workspace-main ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"} border-b ${isExecuting ? "p-3" : "p-4"} ${!isExecuting && !isOutputExpanded ? "flex-1 overflow-y-auto" : "flex-shrink-0"}`}
         >
-          <div
-            className={`max-w-6xl mx-auto ${isExecuting ? "" : "space-y-4"}`}
-          >
+          <div className="mx-auto max-w-6xl space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <UploadWorkspaceBrand
+                appBase={APP_BASE}
+                isDarkMode={isDarkMode}
+                isExecuting={isExecuting}
+                contextOnly
+              />
+            </div>
+
             {isExecuting ? (
-              <div className="flex items-center justify-between gap-4">
+              <div className="flex flex-wrap items-center justify-between gap-4">
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-green-400 animate-pulse">
-                      ● Running
+                  {selectedPath && (
+                    <span
+                      className={`text-xs uppercase tracking-wide ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                    >
+                      Selected path
                     </span>
-                    {selectedPath && (
-                      <span
-                        className={`text-xs uppercase tracking-wide ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
-                      >
-                        Selected path
-                      </span>
-                    )}
-                  </div>
+                  )}
                   {selectedPath && (
                     <p
                       className={`mt-1 truncate font-mono text-sm ${isDarkMode ? "text-white" : "text-gray-800"}`}
@@ -6128,33 +6564,6 @@ function AudionutsUAGUI() {
               </div>
             ) : (
               <>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <h1
-                      className={`text-2xl font-bold ${isDarkMode ? "text-white" : "text-gray-800"} flex items-center gap-2`}
-                    >
-                      <LogoIcon
-                        src={`${APP_BASE}/static/img/logo.svg`}
-                        className="w-8 h-8"
-                      />
-                      Upload-Assistant Web UI
-                    </h1>
-                  </div>
-
-                  {/* Controls */}
-                  <div className="flex items-center gap-3">
-                    {renderThemePalette()}
-                    <a
-                      href={`${APP_BASE}/config`}
-                      aria-label="Config"
-                      title="Config"
-                      className={`p-2 rounded-lg transition-colors ${isDarkMode ? "text-gray-200 hover:bg-gray-700" : "text-gray-600 hover:bg-gray-100"}`}
-                    >
-                      <SettingsIcon />
-                    </a>
-                  </div>
-                </div>
-
                 {/* Selected Path Display / Queue */}
                 {renderSelectedPathOrQueue(false)}
 
@@ -6350,7 +6759,7 @@ function AudionutsUAGUI() {
 
         {/* Execution Output */}
         <div
-          className={`${isExecuting || isOutputExpanded ? "flex-1 p-4" : "flex-none p-2"} ${isDarkMode ? "bg-gray-900" : "bg-gray-100"} flex flex-col min-h-0 overflow-hidden`}
+          className={`ua-upload-output-panel ${isExecuting || isOutputExpanded ? "flex-1 p-4" : "flex-none p-2"} ${isDarkMode ? "bg-gray-900" : "bg-gray-100"} flex flex-col min-h-0 overflow-hidden`}
           style={
             isExecuting || isOutputExpanded
               ? undefined
@@ -6448,14 +6857,14 @@ function AudionutsUAGUI() {
       </div>
       {/* Right Resize Handle */}
       <div
-        className={`w-1 ${isDarkMode ? "bg-gray-700 hover:bg-purple-500" : "bg-gray-300 hover:bg-purple-500"} cursor-col-resize transition-colors`}
+        className={`ua-upload-resize-handle w-1 ${isDarkMode ? "bg-gray-700 hover:bg-purple-500" : "bg-gray-300 hover:bg-purple-500"} cursor-col-resize transition-colors`}
         onMouseDown={startResizingRight}
         style={{ userSelect: "none" }}
       />
 
       {/* Right Sidebar - Arguments / Execution Preview */}
       <div
-        className={`${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"} border-l flex flex-col`}
+        className={`ua-upload-panel ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"} border-l flex flex-col`}
         style={{
           width: `${rightSidebarWidth}px`,
           minWidth: "200px",
@@ -6473,7 +6882,7 @@ function AudionutsUAGUI() {
         ) : (
           <>
             <div
-              className={`p-4 border-b ${isDarkMode ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-gradient-to-l from-purple-50 to-blue-50"}`}
+              className={`ua-upload-panel-header p-4 border-b ${isDarkMode ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-gradient-to-l from-purple-50 to-blue-50"}`}
             >
               <h2
                 className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-gray-800"} flex items-center gap-2`}

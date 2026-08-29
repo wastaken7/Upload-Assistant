@@ -186,6 +186,7 @@ const Tooltip = ({ children, content, className = "" }) => {
 };
 
 const API_BASE = window.location.origin + "/api";
+const APP_BASE = API_BASE.replace(/\/api$/, "");
 const THEME_KEY = "ua_config_theme";
 const storage = window.UAStorage;
 const getStoredTheme = window.getUAStoredTheme;
@@ -195,6 +196,244 @@ const setColorTheme = window.setUAColorTheme;
 const interfaceStyles = window.UAInterfaceStyles || [];
 const getStoredInterfaceStyle = window.getUAStoredInterfaceStyle;
 const setInterfaceStyle = window.setUAInterfaceStyle;
+
+const WorkspaceSwitcher = ({ activeWorkspace, isDarkMode, stretch }) => {
+  const workspaces = [
+    { id: "upload", label: "Upload Workspace", href: `${APP_BASE}/` },
+    { id: "config", label: "Configuration", href: `${APP_BASE}/config` },
+  ];
+
+  return (
+    <nav
+      className="ua-workspace-switcher rounded-lg"
+      data-mode={isDarkMode ? "dark" : "light"}
+      data-stretch={stretch ? "true" : "false"}
+      aria-label="Workspace"
+    >
+      {workspaces.map((workspace) => {
+        const isActive = workspace.id === activeWorkspace;
+        return (
+          <a
+            key={workspace.id}
+            href={workspace.href}
+            className="ua-workspace-link rounded-md"
+            data-active={isActive ? "true" : "false"}
+            aria-current={isActive ? "page" : undefined}
+            onClick={isActive ? (event) => event.preventDefault() : undefined}
+          >
+            {workspace.label}
+          </a>
+        );
+      })}
+    </nav>
+  );
+};
+
+const RailUploadIcon = () => (
+  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M12 16V4m0 0L7 9m5-5 5 5M5 20h14"
+    />
+  </svg>
+);
+
+const RailConfigIcon = () => (
+  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M12 15.5a3.5 3.5 0 100-7 3.5 3.5 0 000 7zM19.4 15a1.7 1.7 0 00.34 1.88l.06.06-2.83 2.83-.06-.06A1.7 1.7 0 0015 19.4a1.7 1.7 0 00-1 .6l-.04.08h-4l-.04-.08a1.7 1.7 0 00-1-.6 1.7 1.7 0 00-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 004.6 15a1.7 1.7 0 00-.6-1l-.08-.04v-4L4 9.92a1.7 1.7 0 00.6-1 1.7 1.7 0 00-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 009 4.6a1.7 1.7 0 001-.6l.04-.08h4l.04.08a1.7 1.7 0 001 .6 1.7 1.7 0 001.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0019.4 9c.08.38.3.73.6 1l.08.04v4L20 14.08a1.7 1.7 0 00-.6.92z"
+    />
+  </svg>
+);
+
+const RailHelpIcon = () => (
+  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M12 6.75c-2.5-1.5-5.5-1.5-8-.5v11c2.5-1 5.5-1 8 .5m0-11c2.5-1.5 5.5-1.5 8-.5v11c-2.5-1-5.5-1-8 .5m0-11v11"
+    />
+  </svg>
+);
+
+const RailPaletteIcon = () => (
+  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M12 3a9 9 0 100 18h1.4a1.6 1.6 0 001.1-2.73 1.6 1.6 0 011.1-2.73H18A3 3 0 0021 12a9 9 0 00-9-9zM7.5 10h.01M10 6.5h.01M15 7h.01M17 11h.01"
+    />
+  </svg>
+);
+
+const RailLogoutIcon = () => (
+  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M10 17l5-5-5-5m5 5H3m10-8h5a2 2 0 012 2v12a2 2 0 01-2 2h-5"
+    />
+  </svg>
+);
+
+function ConfigApplicationRail({
+  colorTheme,
+  onColorThemeChange,
+  interfaceStyle,
+  onInterfaceStyleChange,
+  isDarkMode,
+  onToggleMode,
+  onOpenHelp,
+  onLogout,
+}) {
+  const [isAppearanceOpen, setIsAppearanceOpen] = useState(false);
+  const appearanceRef = useRef(null);
+
+  useEffect(() => {
+    if (!isAppearanceOpen) return undefined;
+    const closeWhenOutside = (event) => {
+      if (!appearanceRef.current?.contains(event.target)) {
+        setIsAppearanceOpen(false);
+      }
+    };
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") setIsAppearanceOpen(false);
+    };
+    document.addEventListener("pointerdown", closeWhenOutside);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeWhenOutside);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [isAppearanceOpen]);
+
+  return (
+    <aside
+      className="ua-app-rail fixed inset-y-0 left-0 z-30 hidden w-20 flex-col border-r md:flex"
+      aria-label="Application navigation"
+    >
+      <div className="ua-app-rail-brand flex h-20 shrink-0 flex-col items-center justify-center gap-1 border-b px-2">
+        <img
+          src={window.UA_LOGO_URL || "/static/img/logo.svg"}
+          alt="Upload Assistant"
+          className="h-8 w-8"
+        />
+        {window.UA_APP_VERSION && (
+          <span className="text-[0.65rem] font-semibold opacity-60">
+            {window.UA_APP_VERSION}
+          </span>
+        )}
+      </div>
+
+      <nav className="grid gap-1 p-2" aria-label="Workspaces">
+        <a href={`${APP_BASE}/`} className="ua-app-rail-button rounded-lg">
+          <RailUploadIcon />
+          <span>Upload</span>
+        </a>
+        <a
+          href={`${APP_BASE}/config`}
+          className="ua-app-rail-button rounded-lg"
+          data-active="true"
+          aria-current="page"
+          onClick={(event) => event.preventDefault()}
+        >
+          <RailConfigIcon />
+          <span>Config</span>
+        </a>
+      </nav>
+
+      <div className="min-h-4 flex-1"></div>
+
+      <div className="ua-app-rail-footer grid shrink-0 gap-1 border-t p-2">
+        <button
+          type="button"
+          className="ua-app-rail-button rounded-lg"
+          onClick={onOpenHelp}
+          aria-haspopup="dialog"
+        >
+          <RailHelpIcon />
+          <span>Help</span>
+        </button>
+        <div ref={appearanceRef} className="relative min-w-0 w-full">
+          <button
+            type="button"
+            className="ua-app-rail-button rounded-lg"
+            onClick={() => setIsAppearanceOpen((open) => !open)}
+            aria-expanded={isAppearanceOpen}
+          >
+            <RailPaletteIcon />
+            <span>Appearance</span>
+          </button>
+          {isAppearanceOpen && (
+            <div className="ua-app-rail-popover absolute bottom-0 left-full z-[60] ml-2 w-64 rounded-xl border p-4 shadow-2xl">
+              <h2 className="text-sm font-semibold">Appearance</h2>
+              <label className="ua-app-rail-popover-label mt-3 block text-xs font-semibold">
+                Color theme
+              </label>
+              <select
+                aria-label="Color theme"
+                value={colorTheme}
+                onChange={(event) => {
+                  onColorThemeChange(event);
+                  setIsAppearanceOpen(false);
+                }}
+                className="ua-theme-picker mt-1 w-full rounded-lg px-3 py-2 text-sm"
+              >
+                {colorThemes.map((theme) => (
+                  <option key={theme.id} value={theme.id}>
+                    {theme.label}
+                  </option>
+                ))}
+              </select>
+              <label className="ua-app-rail-popover-label mt-3 block text-xs font-semibold">
+                Corner style
+              </label>
+              <select
+                aria-label="Corner style"
+                value={interfaceStyle}
+                onChange={(event) => {
+                  onInterfaceStyleChange(event);
+                  setIsAppearanceOpen(false);
+                }}
+                className="ua-theme-picker mt-1 w-full rounded-lg px-3 py-2 text-sm"
+              >
+                {interfaceStyles.map((style) => (
+                  <option key={style.id} value={style.id}>
+                    {style.label}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                className="ua-config-mode-button mt-3 flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm"
+                onClick={onToggleMode}
+              >
+                <span>{isDarkMode ? "Dark mode" : "Light mode"}</span>
+                <span aria-hidden="true">{isDarkMode ? "●" : "○"}</span>
+              </button>
+            </div>
+          )}
+        </div>
+        <button
+          type="button"
+          className="ua-app-rail-button rounded-lg text-red-500"
+          onClick={onLogout}
+        >
+          <RailLogoutIcon />
+          <span>Log out</span>
+        </button>
+      </div>
+    </aside>
+  );
+}
 
 const DEFAULT_WORKFLOW_GROUPS = [
   {
@@ -2922,93 +3161,7 @@ function RenameTorrentClientModal({
 }
 
 function HelpResourcesModal({ onClose }) {
-  const resourceGroups = [
-    {
-      title: "Start here",
-      links: [
-        {
-          label: "Documentation home",
-          description: "Overview and links to the main guides.",
-          href: "https://github.com/wastaken7/Upload-Assistant/blob/development/docs/home.md",
-        },
-        {
-          label: "WebUI guide",
-          description: "Basic WebUI setup and usage.",
-          href: "https://github.com/wastaken7/Upload-Assistant/blob/development/docs/web-ui-basic.md",
-        },
-      ],
-    },
-    {
-      title: "Configuration",
-      links: [
-        {
-          label: "Configuration reference",
-          description: "Detailed settings, defaults and implementation notes.",
-          href: "https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md",
-        },
-        {
-          label: "CLI arguments",
-          description: "Command-line options that can override configuration.",
-          href: "https://github.com/wastaken7/Upload-Assistant/blob/development/docs/cli-args.md",
-        },
-        {
-          label: "Description builder",
-          description: "How description formatting and layout options work.",
-          href: "https://github.com/wastaken7/Upload-Assistant/blob/development/docs/description-builder.md",
-        },
-      ],
-    },
-    {
-      title: "Installation and hosting",
-      links: [
-        {
-          label: "Windows installation",
-          description: "Install and run Upload Assistant on Windows.",
-          href: "https://github.com/wastaken7/Upload-Assistant/blob/development/docs/windows-install.md",
-        },
-        {
-          label: "Docker",
-          description: "Container setup and configuration.",
-          href: "https://github.com/wastaken7/Upload-Assistant/blob/development/docs/docker.md",
-        },
-        {
-          label: "Unraid",
-          description: "Deployment guidance for Unraid.",
-          href: "https://github.com/wastaken7/Upload-Assistant/blob/development/docs/unraid.md",
-        },
-        {
-          label: "Seedbox setup",
-          description: "Paths and setup considerations for seedboxes.",
-          href: "https://github.com/wastaken7/Upload-Assistant/blob/development/docs/seedbox.md",
-        },
-      ],
-    },
-    {
-      title: "Upload workflows",
-      links: [
-        {
-          label: "Usenet",
-          description: "Configure and use Usenet uploading.",
-          href: "https://github.com/wastaken7/Upload-Assistant/blob/development/docs/usenet.md",
-        },
-        {
-          label: "Book uploads",
-          description: "Book-specific preparation and uploading.",
-          href: "https://github.com/wastaken7/Upload-Assistant/blob/development/docs/book-upload.md",
-        },
-        {
-          label: "Music uploads",
-          description: "Music-specific preparation and uploading.",
-          href: "https://github.com/wastaken7/Upload-Assistant/blob/development/docs/music-upload.md",
-        },
-        {
-          label: "Game uploads",
-          description: "Game-specific preparation and uploading.",
-          href: "https://github.com/wastaken7/Upload-Assistant/blob/development/docs/game-upload.md",
-        },
-      ],
-    },
-  ];
+  const resourceGroups = window.UAHelpResourceGroups || [];
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
@@ -6224,7 +6377,7 @@ function ConfigSidebar({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="ua-config-sidebar-brand flex h-20 shrink-0 items-center justify-between gap-2 border-b px-3 py-3 sm:gap-3 sm:px-5">
+      <div className="ua-config-sidebar-brand flex h-20 shrink-0 items-center justify-between gap-2 border-b px-3 py-3 sm:gap-3 sm:px-5 md:hidden">
         <div className="flex min-w-0 items-center gap-2 sm:gap-3">
           <img
             src={window.UA_LOGO_URL || "/static/img/logo.svg"}
@@ -6253,6 +6406,18 @@ function ConfigSidebar({
         </button>
       </div>
 
+      <div className="ua-config-sidebar-brand hidden h-20 shrink-0 items-center border-b px-5 md:flex">
+        <h2 className="text-lg font-bold">Configuration</h2>
+      </div>
+
+      <div className="shrink-0 px-3 pt-4 md:hidden">
+        <WorkspaceSwitcher
+          activeWorkspace="config"
+          isDarkMode={isDarkMode}
+          stretch
+        />
+      </div>
+
       <nav
         className="ua-config-sidebar-nav min-h-0 flex-1 overflow-y-auto px-3 py-4"
         aria-label="Configuration sections"
@@ -6260,7 +6425,7 @@ function ConfigSidebar({
         {configurationNavigationItems.length > 0 && (
           <div className="mb-5">
             <div className="ua-config-nav-heading px-3 pb-2 text-xs font-semibold uppercase tracking-wider">
-              Configuration
+              Settings
             </div>
             <div className="space-y-1">
               {configurationNavigationItems.map(navButton)}
@@ -6307,7 +6472,7 @@ function ConfigSidebar({
         </div>
       </nav>
 
-      <div className="ua-config-sidebar-footer shrink-0 border-t p-4">
+      <div className="ua-config-sidebar-footer shrink-0 border-t p-4 md:hidden">
         <button
           type="button"
           className="ua-config-nav-heading flex w-full items-center justify-between text-left text-xs font-semibold uppercase tracking-wider"
@@ -6388,12 +6553,6 @@ function ConfigSidebar({
           >
             Help &amp; Resources
           </button>
-          <a
-            href="/"
-            className="ua-config-sidebar-action rounded-lg px-3 py-2 text-center text-sm font-semibold"
-          >
-            ← Back to Upload
-          </a>
           <button
             type="button"
             onClick={onLogout}
@@ -8180,11 +8339,22 @@ function ConfigApp() {
       )}
 
       <div className="min-h-screen">
+        <ConfigApplicationRail
+          colorTheme={colorTheme}
+          onColorThemeChange={handleColorThemeChange}
+          interfaceStyle={interfaceStyle}
+          onInterfaceStyleChange={handleInterfaceStyleChange}
+          isDarkMode={isDarkMode}
+          onToggleMode={() => setIsDarkMode((prev) => !prev)}
+          onOpenHelp={() => setIsHelpResourcesOpen(true)}
+          onLogout={handleLogout}
+        />
+
         <aside
           id="config-sidebar"
           className={
             "ua-config-sidebar fixed inset-y-0 left-0 z-50 w-72 transform transition-transform duration-200 " +
-            "md:z-20 md:translate-x-0 " +
+            "md:left-20 md:z-20 md:w-64 md:translate-x-0 " +
             (isMobileNavOpen ? "translate-x-0" : "-translate-x-full")
           }
           style={{ touchAction: "pan-y" }}
@@ -8214,7 +8384,7 @@ function ConfigApp() {
           />
         </aside>
 
-        <div className="min-w-0 md:ml-72">
+        <div className="min-w-0 md:ml-[21rem]">
           <header className="ua-config-header sticky top-0 z-30 h-20 border-b">
             <div className="flex h-full items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
               <div className="flex min-w-0 items-center gap-3">

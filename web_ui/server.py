@@ -3348,7 +3348,7 @@ def strip_ansi(text: str) -> str:
 def index():
     """Serve the main UI"""
     try:
-        return render_template("index.html")
+        return render_template("index.html", app_version=APP_VERSION)
     except Exception as e:
         console.print(f"Error loading template: {e}", markup=False)
         console.print(traceback.format_exc(), markup=False)

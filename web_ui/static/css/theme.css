@@ -364,6 +364,400 @@ a:hover {
   flex: 0 0 auto;
 }
 
+/* Primary navigation shared by the upload and configuration workspaces. */
+.ua-workspace-switcher {
+  --ua-workspace-surface: color-mix(
+    in srgb,
+    var(--ua-charcoal) 92%,
+    transparent
+  );
+  --ua-workspace-raised: var(--ua-stone);
+  --ua-workspace-text: var(--ua-muted);
+  --ua-workspace-active-text: var(--ua-ink);
+  --ua-workspace-border: var(--ua-border);
+  align-items: center;
+  background: var(--ua-workspace-surface);
+  border: 1px solid var(--ua-workspace-border);
+  display: inline-flex;
+  gap: 0.25rem;
+  padding: 0.25rem;
+}
+
+.ua-workspace-switcher[data-mode="light"] {
+  --ua-workspace-surface: rgba(255, 255, 255, 0.82);
+  --ua-workspace-raised: color-mix(
+    in srgb,
+    var(--ua-light-panel-start) 62%,
+    white
+  );
+  --ua-workspace-text: #57534e;
+  --ua-workspace-active-text: #1c1917;
+  --ua-workspace-border: rgba(87, 83, 78, 0.22);
+}
+
+.ua-config-page .ua-workspace-switcher {
+  --ua-workspace-surface: var(--ua-config-surface-raised);
+  --ua-workspace-raised: var(--ua-config-hover);
+  --ua-workspace-text: var(--ua-config-muted);
+  --ua-workspace-active-text: var(--ua-config-text);
+  --ua-workspace-border: var(--ua-config-border);
+}
+
+.ua-workspace-switcher[data-stretch="true"] {
+  display: flex;
+  width: 100%;
+}
+
+.ua-workspace-link {
+  align-items: center;
+  border: 1px solid transparent;
+  color: var(--ua-workspace-text);
+  display: inline-flex;
+  font-size: 0.75rem;
+  font-weight: 650;
+  justify-content: center;
+  line-height: 1.1;
+  min-height: 2rem;
+  padding: 0.45rem 0.7rem;
+  text-align: center;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
+  white-space: nowrap;
+}
+
+.ua-workspace-switcher[data-stretch="true"] .ua-workspace-link {
+  flex: 1 1 0;
+}
+
+.ua-workspace-link:hover {
+  background: color-mix(in srgb, var(--ua-copper-bright) 9%, transparent);
+  color: var(--ua-workspace-active-text);
+}
+
+.ua-workspace-link:focus-visible {
+  border-color: var(--ua-copper-bright);
+  box-shadow: 0 0 0 3px var(--ua-glow);
+  outline: none;
+}
+
+.ua-workspace-link[data-active="true"] {
+  background: color-mix(
+    in srgb,
+    var(--ua-copper) 16%,
+    var(--ua-workspace-raised)
+  );
+  border-color: color-mix(
+    in srgb,
+    var(--ua-copper-bright) 44%,
+    var(--ua-workspace-border)
+  );
+  color: var(--ua-workspace-active-text);
+  cursor: default;
+}
+
+.ua-workspace-run-status {
+  align-items: center;
+  background: color-mix(in srgb, #22c55e 10%, transparent);
+  border: 1px solid
+    color-mix(in srgb, #22c55e 42%, var(--ua-upload-border, var(--ua-border)));
+  color: color-mix(in srgb, #22c55e 78%, var(--ua-upload-text, var(--ua-ink)));
+  display: inline-flex;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  gap: 0.35rem;
+  line-height: 1;
+  padding: 0.3rem 0.5rem;
+}
+
+.ua-workspace-run-dot {
+  background: currentColor;
+  border-radius: 999px;
+  height: 0.4rem;
+  width: 0.4rem;
+}
+
+/* Upload Workspace surfaces mirror the configuration editor hierarchy while
+   keeping the existing resizable three-panel layout intact. */
+.ua-upload-page[data-mode="dark"] {
+  --ua-upload-bg: var(--ua-obsidian);
+  --ua-upload-surface: color-mix(in srgb, var(--ua-charcoal) 94%, transparent);
+  --ua-upload-surface-raised: color-mix(
+    in srgb,
+    var(--ua-stone) 74%,
+    var(--ua-charcoal)
+  );
+  --ua-upload-text: var(--ua-ink);
+  --ua-upload-muted: var(--ua-muted);
+  --ua-upload-border: var(--ua-border);
+  --ua-upload-hover: color-mix(in srgb, var(--ua-stone) 72%, transparent);
+}
+
+.ua-upload-page[data-mode="light"] {
+  --ua-upload-bg: color-mix(in srgb, var(--ua-light-panel-start) 30%, #f5f5f4);
+  --ua-upload-surface: rgba(255, 255, 255, 0.94);
+  --ua-upload-surface-raised: #ffffff;
+  --ua-upload-text: #1c1917;
+  --ua-upload-muted: #57534e;
+  --ua-upload-border: rgba(87, 83, 78, 0.2);
+  --ua-upload-hover: color-mix(
+    in srgb,
+    var(--ua-light-panel-start) 62%,
+    #f5f5f4
+  );
+}
+
+.ua-upload-page {
+  background:
+    radial-gradient(circle at 100% 0%, var(--ua-atmosphere), transparent 30rem),
+    var(--ua-upload-bg) !important;
+  color: var(--ua-upload-text);
+}
+
+.ua-upload-panel,
+.ua-upload-workspace-main {
+  background: var(--ua-upload-surface) !important;
+  border-color: var(--ua-upload-border) !important;
+}
+
+.ua-upload-panel-header {
+  background: color-mix(
+    in srgb,
+    var(--ua-copper) 6%,
+    var(--ua-upload-surface)
+  ) !important;
+  border-color: var(--ua-upload-border) !important;
+}
+
+.ua-upload-output-panel {
+  background: var(--ua-upload-bg) !important;
+  border-color: var(--ua-upload-border) !important;
+}
+
+.ua-upload-resize-handle {
+  background:
+    linear-gradient(
+      to right,
+      transparent calc(50% - 0.5px),
+      var(--ua-upload-border) calc(50% - 0.5px),
+      var(--ua-upload-border) calc(50% + 0.5px),
+      transparent calc(50% + 0.5px)
+    ),
+    var(--ua-upload-bg) !important;
+  transition:
+    background-color 150ms ease,
+    box-shadow 150ms ease;
+  width: 0.4rem !important;
+}
+
+.ua-upload-resize-handle:hover {
+  background:
+    linear-gradient(
+      to right,
+      transparent calc(50% - 1px),
+      var(--ua-copper-bright) calc(50% - 1px),
+      var(--ua-copper-bright) calc(50% + 1px),
+      transparent calc(50% + 1px)
+    ),
+    color-mix(in srgb, var(--ua-copper) 8%, var(--ua-upload-bg)) !important;
+  box-shadow: 0 0 10px var(--ua-glow);
+}
+
+.ua-upload-header-action,
+.ua-upload-modal-action {
+  align-items: center;
+  background: var(--ua-upload-surface-raised);
+  border: 1px solid var(--ua-upload-border);
+  color: var(--ua-upload-text);
+  display: inline-flex;
+  justify-content: center;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
+}
+
+.ua-upload-header-action:hover,
+.ua-upload-modal-action:hover {
+  background: var(--ua-upload-hover);
+  border-color: color-mix(
+    in srgb,
+    var(--ua-copper-bright) 38%,
+    var(--ua-upload-border)
+  );
+  color: var(--ua-upload-text) !important;
+}
+
+.ua-upload-page .ua-theme-picker {
+  background: var(--ua-upload-surface-raised);
+  border-color: var(--ua-upload-border);
+  color: var(--ua-upload-text);
+}
+
+.ua-upload-page .ua-theme-picker option {
+  background: var(--ua-upload-surface-raised);
+  color: var(--ua-upload-text);
+}
+
+.ua-upload-help-modal,
+.ua-upload-help-card {
+  background: var(--ua-upload-surface);
+  border-color: var(--ua-upload-border);
+  color: var(--ua-upload-text);
+}
+
+.ua-upload-modal-footer {
+  border-color: var(--ua-upload-border);
+}
+
+.ua-upload-help-link {
+  background: var(--ua-upload-surface-raised);
+  border-color: var(--ua-upload-border);
+  color: var(--ua-upload-text);
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease;
+}
+
+.ua-upload-help-link:hover {
+  background: var(--ua-upload-hover);
+  border-color: color-mix(
+    in srgb,
+    var(--ua-copper-bright) 38%,
+    var(--ua-upload-border)
+  );
+  color: var(--ua-upload-text) !important;
+}
+
+.ua-upload-muted {
+  color: var(--ua-upload-muted);
+}
+
+/* Compact application rail shared by both desktop workspaces. Contextual
+   navigation and tools remain in the adjacent workspace-specific sidebar. */
+.ua-app-rail {
+  background: color-mix(in srgb, var(--ua-charcoal) 96%, transparent);
+  border-color: var(--ua-border);
+  color: var(--ua-ink);
+  isolation: isolate;
+}
+
+.ua-upload-page .ua-app-rail {
+  background: var(--ua-upload-surface);
+  border-color: var(--ua-upload-border);
+  color: var(--ua-upload-text);
+}
+
+.ua-config-page .ua-app-rail {
+  background: var(--ua-config-surface);
+  border-color: var(--ua-config-border);
+  color: var(--ua-config-text);
+  height: var(--ua-config-viewport-height, 100vh);
+  height: var(--ua-config-viewport-height, 100dvh);
+  max-height: var(--ua-config-viewport-height, 100dvh);
+}
+
+.ua-app-rail-brand,
+.ua-app-rail-footer {
+  border-color: inherit;
+}
+
+.ua-app-rail-footer,
+.ua-app-rail-footer > * {
+  min-width: 0;
+  width: 100%;
+}
+
+.ua-app-rail-footer .ua-app-rail-button {
+  font-size: 0.65rem;
+  max-width: 100%;
+  min-width: 0;
+  padding-inline: 0.125rem;
+}
+
+.ua-app-rail-button {
+  align-items: center;
+  border: 1px solid transparent;
+  color: var(--ua-muted);
+  display: flex;
+  flex-direction: column;
+  font-size: 0.6875rem;
+  font-weight: 650;
+  gap: 0.3rem;
+  justify-content: center;
+  line-height: 1.1;
+  min-height: 3.5rem;
+  padding: 0.45rem 0.25rem;
+  text-align: center;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
+  width: 100%;
+}
+
+.ua-upload-page .ua-app-rail-button {
+  color: var(--ua-upload-muted);
+}
+
+.ua-config-page .ua-app-rail-button {
+  color: var(--ua-config-muted);
+}
+
+.ua-app-rail-button:hover,
+.ua-app-rail-button[aria-expanded="true"] {
+  background: color-mix(in srgb, var(--ua-copper-bright) 9%, transparent);
+  color: inherit !important;
+}
+
+.ua-app-rail-button[data-active="true"] {
+  background: color-mix(in srgb, var(--ua-copper) 16%, transparent);
+  border-color: color-mix(in srgb, var(--ua-copper-bright) 44%, transparent);
+  color: inherit;
+}
+
+.ua-app-rail-button svg {
+  height: 1.25rem;
+  width: 1.25rem;
+}
+
+.ua-app-rail-popover {
+  background: var(--ua-charcoal);
+  border-color: var(--ua-border);
+  color: var(--ua-ink);
+}
+
+.ua-upload-page .ua-app-rail-popover {
+  background: var(--ua-upload-surface);
+  border-color: var(--ua-upload-border);
+  color: var(--ua-upload-text);
+}
+
+.ua-config-page .ua-app-rail-popover {
+  background: var(--ua-config-surface);
+  border-color: var(--ua-config-border);
+  color: var(--ua-config-text);
+}
+
+.ua-app-rail-popover-label {
+  color: var(--ua-muted);
+}
+
+.ua-upload-page .ua-app-rail-popover-label {
+  color: var(--ua-upload-muted);
+}
+
+.ua-config-page .ua-app-rail-popover-label {
+  color: var(--ua-config-muted);
+}
+
+@media (pointer: coarse) and (min-width: 768px) {
+  .ua-upload-resize-handle {
+    width: 0.65rem !important;
+  }
+}
+
 /* The config editor uses the shared colour theme while maintaining its own
    light/dark surface hierarchy. */
 .ua-config-page.ua-mode-dark {

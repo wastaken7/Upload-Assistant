@@ -33,6 +33,93 @@
     { id: "rounded", label: "Rounded" },
     { id: "square", label: "Square" },
   ]);
+  const UA_HELP_RESOURCE_GROUPS = Object.freeze([
+    {
+      title: "Start here",
+      links: [
+        {
+          label: "Documentation home",
+          description: "Overview and links to the main guides.",
+          href: "https://github.com/wastaken7/Upload-Assistant/blob/development/docs/home.md",
+        },
+        {
+          label: "WebUI guide",
+          description: "Basic WebUI setup and usage.",
+          href: "https://github.com/wastaken7/Upload-Assistant/blob/development/docs/web-ui-basic.md",
+        },
+      ],
+    },
+    {
+      title: "Configuration",
+      links: [
+        {
+          label: "Configuration reference",
+          description: "Detailed settings, defaults and implementation notes.",
+          href: "https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md",
+        },
+        {
+          label: "CLI arguments",
+          description: "Command-line options that can override configuration.",
+          href: "https://github.com/wastaken7/Upload-Assistant/blob/development/docs/cli-args.md",
+        },
+        {
+          label: "Description builder",
+          description: "How description formatting and layout options work.",
+          href: "https://github.com/wastaken7/Upload-Assistant/blob/development/docs/description-builder.md",
+        },
+      ],
+    },
+    {
+      title: "Installation and hosting",
+      links: [
+        {
+          label: "Windows installation",
+          description: "Install and run Upload Assistant on Windows.",
+          href: "https://github.com/wastaken7/Upload-Assistant/blob/development/docs/windows-install.md",
+        },
+        {
+          label: "Docker",
+          description: "Container setup and configuration.",
+          href: "https://github.com/wastaken7/Upload-Assistant/blob/development/docs/docker.md",
+        },
+        {
+          label: "Unraid",
+          description: "Deployment guidance for Unraid.",
+          href: "https://github.com/wastaken7/Upload-Assistant/blob/development/docs/unraid.md",
+        },
+        {
+          label: "Seedbox setup",
+          description: "Paths and setup considerations for seedboxes.",
+          href: "https://github.com/wastaken7/Upload-Assistant/blob/development/docs/seedbox.md",
+        },
+      ],
+    },
+    {
+      title: "Upload workflows",
+      links: [
+        {
+          label: "Usenet",
+          description: "Configure and use Usenet uploading.",
+          href: "https://github.com/wastaken7/Upload-Assistant/blob/development/docs/usenet.md",
+        },
+        {
+          label: "Book uploads",
+          description: "Book-specific preparation and uploading.",
+          href: "https://github.com/wastaken7/Upload-Assistant/blob/development/docs/book-upload.md",
+        },
+        {
+          label: "Music uploads",
+          description: "Music-specific preparation and uploading.",
+          href: "https://github.com/wastaken7/Upload-Assistant/blob/development/docs/music-upload.md",
+        },
+        {
+          label: "Game uploads",
+          description: "Game-specific preparation and uploading.",
+          href: "https://github.com/wastaken7/Upload-Assistant/blob/development/docs/game-upload.md",
+        },
+      ],
+    },
+  ]);
   const UA_THEME_IDS = new Set(UA_THEMES.map((theme) => theme.id));
   const UA_INTERFACE_STYLE_IDS = new Set(
     UA_INTERFACE_STYLES.map((style) => style.id),
@@ -107,9 +194,7 @@
       : DEFAULT_INTERFACE_STYLE;
   }
 
-  function applyUAInterfaceStyle(
-    styleId = getUAStoredInterfaceStyle(),
-  ) {
+  function applyUAInterfaceStyle(styleId = getUAStoredInterfaceStyle()) {
     const nextStyle = UA_INTERFACE_STYLE_IDS.has(styleId)
       ? styleId
       : DEFAULT_INTERFACE_STYLE;
@@ -267,8 +352,9 @@
   if (typeof window !== "undefined") {
     window.UAStorage = window.UAStorage || uaStorage;
     window.UAThemes = window.UAThemes || UA_THEMES;
-    window.UAInterfaceStyles =
-      window.UAInterfaceStyles || UA_INTERFACE_STYLES;
+    window.UAInterfaceStyles = window.UAInterfaceStyles || UA_INTERFACE_STYLES;
+    window.UAHelpResourceGroups =
+      window.UAHelpResourceGroups || UA_HELP_RESOURCE_GROUPS;
     window.getUAStoredTheme = window.getUAStoredTheme || getUAStoredTheme;
     window.getUAStoredColorTheme =
       window.getUAStoredColorTheme || getUAStoredColorTheme;

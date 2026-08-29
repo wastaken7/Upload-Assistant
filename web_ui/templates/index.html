@@ -118,6 +118,9 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      window.UA_APP_VERSION = {{ app_version | tojson }};
+    </script>
     <script
       type="text/javascript"
       src="{{ url_for('static', filename='js/shared_utils.js') }}"
