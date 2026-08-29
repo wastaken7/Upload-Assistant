@@ -13,6 +13,7 @@ from src.meta import Meta
 
 guessit_module = import_module("guessit")
 GuessitFn = Callable[[str, dict[str, Any] | None], dict[str, Any]]
+_TECHNICAL_HYPHEN_PREFIXES = {"blu", "dts", "web"}
 
 
 def guessit_fn(value: str, options: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -80,9 +81,13 @@ async def get_tag(video: str, meta: Meta, season_pack_check: bool = False) -> st
         )
         if non_anime_match:
             release_group = non_anime_match.group(1).strip()
+            hyphen_idx = non_anime_match.start() - 1
+            technical_prefix_match = re.search(r"([A-Za-z]+)$", basename_stripped[:hyphen_idx])
+            if technical_prefix_match and technical_prefix_match.group(1).casefold() in _TECHNICAL_HYPHEN_PREFIXES:
+                release_group = None
+
             # Prevent misinterpreting "Author - Title" space-hyphen-space separators as release groups
-            if meta.category in ("BOOK", "GAME") and release_group:
-                hyphen_idx = non_anime_match.start() - 1
+            if release_group and meta.category in ("BOOK", "GAME"):
                 if hyphen_idx > 0 and basename_stripped[hyphen_idx - 1].isspace():
                     release_group = None
                 else:
