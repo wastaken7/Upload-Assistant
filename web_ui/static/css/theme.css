@@ -649,6 +649,29 @@ html.ua-upload-document #root {
   color: var(--ua-upload-text);
 }
 
+.ua-upload-mode-switch {
+  background: color-mix(
+    in srgb,
+    var(--ua-upload-muted) 38%,
+    var(--ua-upload-surface-raised)
+  );
+  padding: 0.25rem;
+  transition: background-color 150ms ease;
+}
+
+.ua-upload-mode-switch[data-enabled="true"] {
+  background: var(--ua-copper);
+}
+
+.ua-upload-mode-knob {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  transform: translateX(0);
+}
+
+.ua-upload-mode-switch[data-enabled="true"] .ua-upload-mode-knob {
+  transform: translateX(1.25rem);
+}
+
 .ua-upload-help-modal,
 .ua-upload-help-card {
   background: var(--ua-upload-surface);
@@ -894,6 +917,13 @@ html.ua-upload-document #root {
   background: var(--ua-charcoal);
   border: 1px solid var(--ua-border);
   color: var(--ua-ink);
+}
+
+.ua-update-close {
+  align-items: center;
+  display: inline-flex;
+  justify-content: center;
+  line-height: 1;
 }
 
 .ua-upload-page :where(.ua-update-close, .ua-update-action) {

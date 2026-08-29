@@ -378,13 +378,26 @@
             "button",
             {
               type: "button",
-              className:
-                "ua-update-close h-10 w-10 shrink-0 rounded-lg text-xl",
+              className: "ua-update-close h-10 w-10 shrink-0 rounded-lg p-0",
               "aria-label": "Close update details",
               onClick: onClose,
               autoFocus: true,
             },
-            "×",
+            React.createElement(
+              "svg",
+              {
+                className: "h-4 w-4",
+                viewBox: "0 0 24 24",
+                fill: "none",
+                stroke: "currentColor",
+                "aria-hidden": "true",
+              },
+              React.createElement("path", {
+                d: "M6 6l12 12M18 6L6 18",
+                strokeWidth: "2",
+                strokeLinecap: "round",
+              }),
+            ),
           ),
         ),
         React.createElement(

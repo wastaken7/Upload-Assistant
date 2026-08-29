@@ -440,9 +440,17 @@ function ConfigApplicationRail({
                 type="button"
                 className="ua-config-mode-button mt-3 flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm"
                 onClick={onToggleMode}
+                aria-pressed={isDarkMode}
+                aria-label={`Switch to ${isDarkMode ? "light" : "dark"} mode`}
               >
                 <span>{isDarkMode ? "Dark mode" : "Light mode"}</span>
-                <span aria-hidden="true">{isDarkMode ? "●" : "○"}</span>
+                <span
+                  className="ua-config-mode-switch relative inline-flex h-6 w-11 items-center rounded-full"
+                  data-enabled={isDarkMode ? "true" : "false"}
+                  aria-hidden="true"
+                >
+                  <span className="ua-config-mode-knob inline-block h-4 w-4 rounded-full bg-white transition-transform"></span>
+                </span>
               </button>
             </div>
           )}
@@ -3302,12 +3310,24 @@ function HelpResourcesModal({
           </div>
           <button
             type="button"
-            className="ua-config-icon-button shrink-0"
+            className="ua-config-icon-button shrink-0 p-0"
             aria-label="Close help and resources"
             autoFocus
             onClick={onClose}
           >
-            ×
+            <svg
+              className="h-4 w-4"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              aria-hidden="true"
+            >
+              <path
+                d="M6 6l12 12M18 6L6 18"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+            </svg>
           </button>
         </div>
 
