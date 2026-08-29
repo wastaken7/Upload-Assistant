@@ -8,7 +8,6 @@ const FILE_BROWSER_SORT_KEY = "ua_webui_file_browser_sort";
 const DEFAULT_LEFT_SIDEBAR_WIDTH = 256;
 const DEFAULT_RIGHT_SIDEBAR_WIDTH = 320;
 const APPLICATION_RAIL_WIDTH = 80;
-const SIDEBAR_MIN_WIDTH = 200;
 const LEFT_SIDEBAR_MAX_WIDTH = 600;
 const RIGHT_SIDEBAR_MAX_WIDTH = 800;
 
@@ -165,11 +164,16 @@ const renderBbcodePreview = (content) => {
   );
 };
 
-const getStoredSidebarWidth = (key, defaultWidth, maxWidth) => {
+const getStoredSidebarWidth = (
+  key,
+  defaultWidth,
+  maxWidth,
+  minWidth = defaultWidth,
+) => {
   const storedWidth = Number(storage.get(key));
   if (
     Number.isFinite(storedWidth) &&
-    storedWidth >= SIDEBAR_MIN_WIDTH &&
+    storedWidth >= minWidth &&
     storedWidth <= maxWidth
   ) {
     return storedWidth;
@@ -4729,11 +4733,13 @@ function AudionutsUAGUI() {
 
   const resize = useCallback(
     (e) => {
-      const newWidth = e.clientX - APPLICATION_RAIL_WIDTH;
-      if (newWidth >= SIDEBAR_MIN_WIDTH && newWidth <= LEFT_SIDEBAR_MAX_WIDTH) {
-        setSidebarWidth(newWidth);
-        storage.set(LEFT_SIDEBAR_WIDTH_KEY, String(newWidth));
-      }
+      const requestedWidth = e.clientX - APPLICATION_RAIL_WIDTH;
+      const newWidth = Math.min(
+        LEFT_SIDEBAR_MAX_WIDTH,
+        Math.max(DEFAULT_LEFT_SIDEBAR_WIDTH, requestedWidth),
+      );
+      setSidebarWidth(newWidth);
+      storage.set(LEFT_SIDEBAR_WIDTH_KEY, String(newWidth));
     },
     [setSidebarWidth],
   );
@@ -4761,14 +4767,13 @@ function AudionutsUAGUI() {
   const resizeRight = useCallback(
     (e) => {
       // Calculate width from right edge
-      const newWidth = window.innerWidth - e.clientX;
-      if (
-        newWidth >= SIDEBAR_MIN_WIDTH &&
-        newWidth <= RIGHT_SIDEBAR_MAX_WIDTH
-      ) {
-        setRightSidebarWidth(newWidth);
-        storage.set(RIGHT_SIDEBAR_WIDTH_KEY, String(newWidth));
-      }
+      const requestedWidth = window.innerWidth - e.clientX;
+      const newWidth = Math.min(
+        RIGHT_SIDEBAR_MAX_WIDTH,
+        Math.max(DEFAULT_RIGHT_SIDEBAR_WIDTH, requestedWidth),
+      );
+      setRightSidebarWidth(newWidth);
+      storage.set(RIGHT_SIDEBAR_WIDTH_KEY, String(newWidth));
     },
     [setRightSidebarWidth],
   );
@@ -6728,7 +6733,7 @@ function AudionutsUAGUI() {
             className="ua-upload-context-title flex shrink-0 items-center border-r px-5"
             style={{
               width: `${sidebarWidth}px`,
-              minWidth: "200px",
+              minWidth: `${DEFAULT_LEFT_SIDEBAR_WIDTH}px`,
               maxWidth: "600px",
             }}
           >
@@ -6779,7 +6784,7 @@ function AudionutsUAGUI() {
             className={`ua-upload-panel ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"} border-r flex flex-col`}
             style={{
               width: `${sidebarWidth}px`,
-              minWidth: "200px",
+              minWidth: `${DEFAULT_LEFT_SIDEBAR_WIDTH}px`,
               maxWidth: "600px",
             }}
           >
@@ -7401,7 +7406,7 @@ function AudionutsUAGUI() {
         className={`ua-upload-panel ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"} border-l flex flex-col`}
         style={{
           width: `${rightSidebarWidth}px`,
-          minWidth: "200px",
+          minWidth: `${DEFAULT_RIGHT_SIDEBAR_WIDTH}px`,
           maxWidth: "800px",
         }}
       >
