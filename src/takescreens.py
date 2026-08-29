@@ -385,6 +385,7 @@ async def run_ffmpeg(command: Any) -> tuple[int | None, bytes, bytes]:
     # Spawn the selected bundled binary or the system/default command.
     process = await asyncio.create_subprocess_exec(
         *cmd_list,
+        stdin=asyncio.subprocess.DEVNULL,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
         env=process_env,
