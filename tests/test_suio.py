@@ -33,6 +33,15 @@ def test_suio_exact_match_ignores_size():
     assert len(result) == 1  # noqa: S101
 
 
+def test_suio_incomplete_candidate_is_not_exact_without_file_list():
+    meta = Meta(name="Release", filelist=["/path/Release.mkv"], source_size=100)
+    candidate = {"name": "Related Release", "size": 200, "files": [], "file_count": 1}
+
+    result = asyncio.run(DupeChecker.is_exact_match(candidate, meta, ignore_size=True))
+
+    assert result is False  # noqa: S101
+
+
 def test_tracker_config_ignores_exact_match_only_when_tracker_does_not_support_it(monkeypatch):
     warning = Mock()
     monkeypatch.setattr(dupe_checking.logger, "warning", warning)

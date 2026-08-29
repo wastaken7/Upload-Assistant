@@ -913,12 +913,12 @@ class DupeChecker:
             return files_match and size_match
 
         # 6. If file list unavailable for one or both (e.g. disc release)
-        if size_match and same_file_count:
+        if not ignore_size and size_match and same_file_count:
             return True
 
         # Disc releases have no reliable local file count, so compare their
         # total size when neither side provides a file list.
-        if not local_files and not candidate_files and size_match:
+        if not ignore_size and not local_files and not candidate_files and size_match:
             return True
 
         # 7. Exact name match fallback
