@@ -1194,7 +1194,7 @@ const ApplicationRail = ({
 
   return (
     <aside
-      className="ua-app-rail hidden h-full min-h-0 w-20 shrink-0 flex-col border-r md:flex"
+      className="ua-app-rail relative z-40 hidden h-full min-h-0 w-20 shrink-0 flex-col border-r md:flex"
       aria-label="Application navigation"
     >
       <div className="ua-app-rail-brand flex h-20 shrink-0 flex-col items-center justify-center gap-1 border-b px-2">
