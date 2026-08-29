@@ -266,6 +266,210 @@
     return response;
   }
 
+  async function loadUAUpdateStatus(force = false) {
+    const endpoint = force
+      ? "/api/update_status?refresh=1"
+      : "/api/update_status";
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 15_000);
+    try {
+      const response = await uaApiFetch(endpoint, {
+        cache: "no-store",
+        signal: controller.signal,
+      });
+      const status = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(status?.error || "The update check failed.");
+      }
+      if (!status || typeof status !== "object") {
+        throw new Error("The update checker returned an invalid response.");
+      }
+      return status;
+    } catch (error) {
+      if (error?.name === "AbortError") {
+        throw new Error(
+          "The update check timed out. Check the server’s internet connection and try again.",
+        );
+      }
+      throw error;
+    } finally {
+      window.clearTimeout(timeout);
+    }
+  }
+
+  function getUADismissedUpdateVersion() {
+    return uaStorage.get("ua_dismissed_update_version") || "";
+  }
+
+  function dismissUAUpdateVersion(version) {
+    if (version) uaStorage.set("ua_dismissed_update_version", String(version));
+  }
+
+  function UAUpdateStatusModal({ status, onClose, onDismiss }) {
+    React.useEffect(() => {
+      const previousOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      const closeOnEscape = (event) => {
+        if (event.key === "Escape") onClose();
+      };
+      window.addEventListener("keydown", closeOnEscape);
+      return () => {
+        document.body.style.overflow = previousOverflow;
+        window.removeEventListener("keydown", closeOnEscape);
+      };
+    }, [onClose]);
+
+    return React.createElement(
+      "div",
+      {
+        className:
+          "fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-3 sm:p-4",
+        role: "presentation",
+        onMouseDown: (event) => {
+          if (event.target === event.currentTarget) onClose();
+        },
+      },
+      React.createElement(
+        "section",
+        {
+          className:
+            "ua-update-modal flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border shadow-2xl",
+          role: "dialog",
+          "aria-modal": "true",
+          "aria-labelledby": "ua-update-status-title",
+        },
+        React.createElement(
+          "header",
+          {
+            className:
+              "ua-update-modal-header flex items-start justify-between gap-4 border-b px-4 py-3 sm:px-5 sm:py-4",
+          },
+          React.createElement(
+            "div",
+            null,
+            React.createElement(
+              "p",
+              {
+                className:
+                  "ua-update-eyebrow text-xs font-semibold uppercase tracking-wider",
+              },
+              "Update available",
+            ),
+            React.createElement(
+              "h2",
+              {
+                id: "ua-update-status-title",
+                className: "mt-1 text-lg font-semibold",
+              },
+              `${status.current_version || "Current"} → ${status.latest_version || "Latest"}`,
+            ),
+          ),
+          React.createElement(
+            "button",
+            {
+              type: "button",
+              className:
+                "ua-update-close h-10 w-10 shrink-0 rounded-lg text-xl",
+              "aria-label": "Close update details",
+              onClick: onClose,
+              autoFocus: true,
+            },
+            "×",
+          ),
+        ),
+        React.createElement(
+          "div",
+          { className: "min-h-0 flex-1 overflow-y-auto p-4 sm:p-5" },
+          React.createElement(
+            "div",
+            { className: "ua-update-version-grid mb-4 grid grid-cols-2 gap-3" },
+            React.createElement(
+              "div",
+              { className: "ua-update-version-card rounded-lg border p-3" },
+              React.createElement(
+                "span",
+                { className: "block text-xs opacity-70" },
+                "Installed",
+              ),
+              React.createElement(
+                "strong",
+                { className: "mt-1 block" },
+                status.current_version || "Unknown",
+              ),
+            ),
+            React.createElement(
+              "div",
+              { className: "ua-update-version-card rounded-lg border p-3" },
+              React.createElement(
+                "span",
+                { className: "block text-xs opacity-70" },
+                "Latest",
+              ),
+              React.createElement(
+                "strong",
+                { className: "mt-1 block" },
+                status.latest_version || "Unknown",
+              ),
+            ),
+          ),
+          React.createElement(
+            "h3",
+            { className: "mb-2 text-sm font-semibold" },
+            "What’s changed",
+          ),
+          React.createElement(
+            "pre",
+            {
+              className:
+                "ua-update-changelog whitespace-pre-wrap rounded-lg border p-3 text-sm leading-6",
+            },
+            status.changelog || "No changelog was included with this release.",
+          ),
+        ),
+        React.createElement(
+          "footer",
+          {
+            className:
+              "ua-update-modal-footer flex flex-wrap justify-end gap-2 border-t px-4 py-3 sm:px-5",
+          },
+          React.createElement(
+            "button",
+            {
+              type: "button",
+              className:
+                "ua-update-action rounded-lg border px-4 py-2 text-sm font-semibold",
+              onClick: onClose,
+            },
+            "Remind me later",
+          ),
+          React.createElement(
+            "button",
+            {
+              type: "button",
+              className:
+                "ua-update-action rounded-lg border px-4 py-2 text-sm font-semibold",
+              onClick: onDismiss,
+            },
+            `Dismiss ${status.latest_version || "release"}`,
+          ),
+          React.createElement(
+            "a",
+            {
+              href:
+                status.release_url ||
+                "https://github.com/wastaken7/Upload-Assistant/releases",
+              target: "_blank",
+              rel: "noopener noreferrer",
+              className:
+                "ua-update-primary rounded-lg px-4 py-2 text-sm font-semibold",
+            },
+            "View release ↗",
+          ),
+        ),
+      ),
+    );
+  }
+
   // Shared HTML sanitizer. Uses DOMPurify when available; falls back to DOMParser-based sanitizer.
   function sanitizeHtml(html) {
     const rawHtml = String(html || "");
@@ -366,6 +570,13 @@
     window.loadCsrfToken = window.loadCsrfToken || loadCsrfToken;
     window.clearCsrfToken = window.clearCsrfToken || clearCsrfToken;
     window.uaApiFetch = window.uaApiFetch || uaApiFetch;
+    window.loadUAUpdateStatus = window.loadUAUpdateStatus || loadUAUpdateStatus;
+    window.getUADismissedUpdateVersion =
+      window.getUADismissedUpdateVersion || getUADismissedUpdateVersion;
+    window.dismissUAUpdateVersion =
+      window.dismissUAUpdateVersion || dismissUAUpdateVersion;
+    window.UAUpdateStatusModal =
+      window.UAUpdateStatusModal || UAUpdateStatusModal;
     window.sanitizeHtml = window.sanitizeHtml || sanitizeHtml;
   }
 })();

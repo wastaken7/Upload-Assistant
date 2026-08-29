@@ -3,6 +3,8 @@ const THEME_KEY = "ua_config_theme";
 const LEFT_SIDEBAR_WIDTH_KEY = "ua_webui_left_sidebar_width";
 const RIGHT_SIDEBAR_WIDTH_KEY = "ua_webui_right_sidebar_width";
 const COLLAPSED_ARGUMENT_SECTIONS_KEY = "ua_webui_collapsed_argument_sections";
+const FILE_BROWSER_CUSTOM_ORDER_KEY = "ua_webui_file_browser_custom_order";
+const FILE_BROWSER_SORT_KEY = "ua_webui_file_browser_sort";
 const DEFAULT_SIDEBAR_WIDTH = 320;
 const SIDEBAR_MIN_WIDTH = 200;
 const LEFT_SIDEBAR_MAX_WIDTH = 600;
@@ -184,6 +186,30 @@ const getStoredCollapsedSections = () => {
   } catch (error) {
     return [];
   }
+};
+
+const getStoredFileBrowserCustomOrder = () => {
+  try {
+    const storedOrder = JSON.parse(
+      storage.get(FILE_BROWSER_CUSTOM_ORDER_KEY) || "[]",
+    );
+    return Array.isArray(storedOrder)
+      ? storedOrder.filter((path) => typeof path === "string" && path)
+      : [];
+  } catch (error) {
+    return [];
+  }
+};
+
+const getStoredFileBrowserSort = () => {
+  const storedSort = storage.get(FILE_BROWSER_SORT_KEY) || "name-asc";
+  const [by, order] = storedSort.split("-");
+  const validSorts = new Set(["name", "date", "size", "custom"]);
+  const validOrders = new Set(["asc", "desc"]);
+  return {
+    by: validSorts.has(by) ? by : "name",
+    order: validOrders.has(order) ? order : "asc",
+  };
 };
 
 // Local CSRF cache used by fallback `apiFetch` when `uaApiFetch` isn't present.
@@ -1042,6 +1068,23 @@ const HelpIcon = () => (
   </svg>
 );
 
+const UpdateIcon = () => (
+  <svg
+    className="h-5 w-5"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+    aria-hidden="true"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14"
+    />
+  </svg>
+);
+
 const UploadRailIcon = () => (
   <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
     <path
@@ -1071,7 +1114,7 @@ const WorkspaceSwitcher = ({
   stretch,
 }) => {
   const workspaces = [
-    { id: "upload", label: "Upload Workspace", href: `${appBase}/` },
+    { id: "upload", label: "Upload", href: `${appBase}/` },
     { id: "config", label: "Configuration", href: `${appBase}/config` },
   ];
 
@@ -1105,6 +1148,8 @@ const ApplicationRail = ({
   activeWorkspace,
   appBase,
   appearanceControl,
+  updateStatus,
+  onOpenUpdate,
   onOpenHelp,
   onLogout,
 }) => {
@@ -1125,7 +1170,7 @@ const ApplicationRail = ({
 
   return (
     <aside
-      className="ua-app-rail hidden h-screen w-20 shrink-0 flex-col border-r md:flex"
+      className="ua-app-rail hidden h-full min-h-0 w-20 shrink-0 flex-col border-r md:flex"
       aria-label="Application navigation"
     >
       <div className="ua-app-rail-brand flex h-20 shrink-0 flex-col items-center justify-center gap-1 border-b px-2">
@@ -1163,6 +1208,18 @@ const ApplicationRail = ({
       <div className="min-h-4 flex-1"></div>
 
       <div className="ua-app-rail-footer grid shrink-0 gap-1 border-t p-2">
+        {updateStatus?.update_available && (
+          <button
+            type="button"
+            className="ua-app-rail-button ua-update-rail-button rounded-lg"
+            onClick={onOpenUpdate}
+            aria-haspopup="dialog"
+            title={`${updateStatus.latest_version} is available`}
+          >
+            <UpdateIcon />
+            <span>Update</span>
+          </button>
+        )}
         <button
           type="button"
           className="ua-app-rail-button rounded-lg"
@@ -1244,8 +1301,24 @@ const UploadWorkspaceBrand = ({
   </div>
 );
 
-function UploadHelpResourcesModal({ onClose }) {
+function UploadHelpResourcesModal({
+  updateStatus,
+  isCheckingForUpdates,
+  onCheckForUpdates,
+  onClose,
+}) {
   const resourceGroups = window.UAHelpResourceGroups || [];
+  const updateMessage = isCheckingForUpdates
+    ? "Checking GitHub for the latest release… This can take up to 15 seconds."
+    : !updateStatus
+      ? "No update check has completed yet."
+      : !updateStatus.success
+        ? updateStatus.error || "Unable to check for updates."
+        : updateStatus.enabled === false
+          ? "Automatic update notifications are disabled. You can still check manually."
+          : updateStatus.update_available
+            ? `${updateStatus.latest_version} is available. You have ${updateStatus.current_version}.`
+            : `You’re up to date (${updateStatus.current_version || window.UA_APP_VERSION}).`;
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
@@ -1302,6 +1375,20 @@ function UploadHelpResourcesModal({ onClose }) {
             These links open GitHub in a new tab, keeping guidance aligned with
             the upstream development documentation.
           </div>
+          <section className="ua-upload-help-card mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3">
+            <div className="min-w-0">
+              <h3 className="text-sm font-semibold">Updates</h3>
+              <p className="ua-upload-muted mt-1 text-xs">{updateMessage}</p>
+            </div>
+            <button
+              type="button"
+              className="ua-upload-modal-action shrink-0 rounded-lg px-3 py-2 text-sm font-semibold disabled:cursor-wait disabled:opacity-60"
+              disabled={isCheckingForUpdates}
+              onClick={onCheckForUpdates}
+            >
+              {isCheckingForUpdates ? "Checking…" : "Check now"}
+            </button>
+          </section>
           <div className="grid gap-4 md:grid-cols-2">
             {resourceGroups.map((group) => (
               <section
@@ -1755,6 +1842,43 @@ function AudionutsUAGUI() {
   // Derive an application base path from the API base so links work under subpath deployments
   const APP_BASE = API_BASE.replace(/\/api$/, "");
 
+  useEffect(() => {
+    const root = document.documentElement;
+    const viewport = window.visualViewport;
+    let animationFrame = 0;
+
+    root.classList.add("ua-upload-document");
+
+    const updateViewportHeight = () => {
+      window.cancelAnimationFrame(animationFrame);
+      animationFrame = window.requestAnimationFrame(() => {
+        const visibleHeight = Math.round(
+          viewport?.height || window.innerHeight,
+        );
+        if (visibleHeight > 0) {
+          root.style.setProperty(
+            "--ua-upload-viewport-height",
+            `${visibleHeight}px`,
+          );
+        }
+      });
+    };
+
+    updateViewportHeight();
+    window.addEventListener("resize", updateViewportHeight);
+    viewport?.addEventListener("resize", updateViewportHeight);
+    viewport?.addEventListener("scroll", updateViewportHeight);
+
+    return () => {
+      window.cancelAnimationFrame(animationFrame);
+      window.removeEventListener("resize", updateViewportHeight);
+      viewport?.removeEventListener("resize", updateViewportHeight);
+      viewport?.removeEventListener("scroll", updateViewportHeight);
+      root.style.removeProperty("--ua-upload-viewport-height");
+      root.classList.remove("ua-upload-document");
+    };
+  }, []);
+
   const [directories, setDirectories] = useState([
     { name: "data", type: "folder", path: "/data", children: [] },
     {
@@ -1814,6 +1938,12 @@ function AudionutsUAGUI() {
   );
   const [isThemePaletteOpen, setIsThemePaletteOpen] = useState(false);
   const [isHelpResourcesOpen, setIsHelpResourcesOpen] = useState(false);
+  const [updateStatus, setUpdateStatus] = useState(null);
+  const [isUpdateStatusOpen, setIsUpdateStatusOpen] = useState(false);
+  const [isCheckingForUpdates, setIsCheckingForUpdates] = useState(false);
+  const [dismissedUpdateVersion, setDismissedUpdateVersion] = useState(
+    () => window.getUADismissedUpdateVersion?.() || "",
+  );
   const [argSearchFilter, setArgSearchFilter] = useState("");
   const [collapsedSections, setCollapsedSections] = useState(
     () => new Set(getStoredCollapsedSections()),
@@ -1846,8 +1976,76 @@ function AudionutsUAGUI() {
   const [isDescriptionReviewOpen, setIsDescriptionReviewOpen] = useState(false);
   const [progressItems, setProgressItems] = useState([]);
   const [selectedPaths, setSelectedPaths] = useState([]);
-  const [sortBy, setSortBy] = useState("name");
-  const [sortOrder, setSortOrder] = useState("asc");
+  const [sortBy, setSortBy] = useState(() => getStoredFileBrowserSort().by);
+  const [sortOrder, setSortOrder] = useState(
+    () => getStoredFileBrowserSort().order,
+  );
+  const [customFolderOrder, setCustomFolderOrder] = useState(
+    getStoredFileBrowserCustomOrder,
+  );
+  const [isCustomOrderEditing, setIsCustomOrderEditing] = useState(false);
+  const [draggedRootFolderPath, setDraggedRootFolderPath] = useState("");
+  const [rootFolderDropTarget, setRootFolderDropTarget] = useState(null);
+
+  const visibleUpdateStatus =
+    updateStatus?.update_available &&
+    updateStatus.latest_version !== dismissedUpdateVersion
+      ? updateStatus
+      : null;
+
+  useEffect(() => {
+    if (!window.loadUAUpdateStatus) return undefined;
+    let cancelled = false;
+    const loadUpdateStatus = () => {
+      if (document.visibilityState === "hidden") return;
+      window
+        .loadUAUpdateStatus()
+        .then((status) => {
+          if (!cancelled) setUpdateStatus(status);
+        })
+        .catch(() => {});
+    };
+    loadUpdateStatus();
+    const pollTimer = window.setInterval(loadUpdateStatus, 30 * 60 * 1000);
+    document.addEventListener("visibilitychange", loadUpdateStatus);
+    return () => {
+      cancelled = true;
+      window.clearInterval(pollTimer);
+      document.removeEventListener("visibilitychange", loadUpdateStatus);
+    };
+  }, []);
+
+  const checkForUpdatesNow = async () => {
+    if (!window.loadUAUpdateStatus || isCheckingForUpdates) return;
+    setIsCheckingForUpdates(true);
+    try {
+      const status = await window.loadUAUpdateStatus(true);
+      setUpdateStatus(status);
+      if (status?.update_available) {
+        storage.remove("ua_dismissed_update_version");
+        setDismissedUpdateVersion("");
+        setIsHelpResourcesOpen(false);
+        setIsUpdateStatusOpen(true);
+      }
+    } catch (error) {
+      setUpdateStatus((currentStatus) => ({
+        ...(currentStatus || {}),
+        success: false,
+        error: error?.message || "Unable to check for updates.",
+      }));
+    } finally {
+      setIsCheckingForUpdates(false);
+    }
+  };
+
+  const dismissCurrentUpdate = () => {
+    const version = updateStatus?.latest_version;
+    if (version) {
+      window.dismissUAUpdateVersion?.(version);
+      setDismissedUpdateVersion(version);
+    }
+    setIsUpdateStatusOpen(false);
+  };
 
   useEffect(() => {
     storage.set(
@@ -1855,6 +2053,17 @@ function AudionutsUAGUI() {
       JSON.stringify(Array.from(collapsedSections)),
     );
   }, [collapsedSections]);
+
+  useEffect(() => {
+    storage.set(
+      FILE_BROWSER_CUSTOM_ORDER_KEY,
+      JSON.stringify(customFolderOrder),
+    );
+  }, [customFolderOrder]);
+
+  useEffect(() => {
+    storage.set(FILE_BROWSER_SORT_KEY, `${sortBy}-${sortOrder}`);
+  }, [sortBy, sortOrder]);
 
   useEffect(() => {
     let cancelled = false;
@@ -2006,6 +2215,20 @@ function AudionutsUAGUI() {
       <HelpIcon />
     </button>
   );
+
+  const renderUpdateButton = () =>
+    visibleUpdateStatus ? (
+      <button
+        type="button"
+        onClick={() => setIsUpdateStatusOpen(true)}
+        aria-label={`Update ${visibleUpdateStatus.latest_version} is available`}
+        aria-haspopup="dialog"
+        title={`Update ${visibleUpdateStatus.latest_version} is available`}
+        className="ua-upload-header-action ua-update-mobile-button gap-2 rounded-lg p-2 text-sm font-semibold"
+      >
+        <UpdateIcon />
+      </button>
+    ) : null;
 
   const handleLogout = async () => {
     try {
@@ -3363,15 +3586,81 @@ function AudionutsUAGUI() {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
   };
 
-  const sortItems = (items) => {
+  const getEffectiveRootFolderOrder = () => {
+    const rootPaths = (directories || [])
+      .filter((item) => item.type === "folder")
+      .sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")))
+      .map((item) => item.path);
+    const rootPathSet = new Set(rootPaths);
+    return [
+      ...customFolderOrder.filter((path) => rootPathSet.has(path)),
+      ...rootPaths.filter((path) => !customFolderOrder.includes(path)),
+    ];
+  };
+
+  const moveRootFolder = (path, offset) => {
+    const nextOrder = getEffectiveRootFolderOrder();
+    const currentIndex = nextOrder.indexOf(path);
+    const targetIndex = currentIndex + offset;
+    if (
+      currentIndex < 0 ||
+      targetIndex < 0 ||
+      targetIndex >= nextOrder.length
+    ) {
+      return;
+    }
+    [nextOrder[currentIndex], nextOrder[targetIndex]] = [
+      nextOrder[targetIndex],
+      nextOrder[currentIndex],
+    ];
+    setCustomFolderOrder(nextOrder);
+  };
+
+  const placeRootFolder = (sourcePath, targetPath, position) => {
+    if (!sourcePath || sourcePath === targetPath) return;
+    const nextOrder = getEffectiveRootFolderOrder().filter(
+      (path) => path !== sourcePath,
+    );
+    const targetIndex = nextOrder.indexOf(targetPath);
+    if (targetIndex < 0) return;
+    const insertionIndex = targetIndex + (position === "after" ? 1 : 0);
+    nextOrder.splice(insertionIndex, 0, sourcePath);
+    setCustomFolderOrder(nextOrder);
+  };
+
+  const getRootFolderDropPosition = (event) => {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    return event.clientY < bounds.top + bounds.height / 2 ? "before" : "after";
+  };
+
+  const finishCustomOrderEditing = () => {
+    setIsCustomOrderEditing(false);
+    setDraggedRootFolderPath("");
+    setRootFolderDropTarget(null);
+  };
+
+  const sortItems = (items, level = 0) => {
     if (!items) return [];
+    const customOrder =
+      sortBy === "custom" && level === 0
+        ? new Map(
+            getEffectiveRootFolderOrder().map((path, index) => [path, index]),
+          )
+        : null;
     return [...items].sort((a, b) => {
       const aIsDir = a.type === "folder" ? 0 : 1;
       const bIsDir = b.type === "folder" ? 0 : 1;
       if (aIsDir !== bIsDir) return aIsDir - bIsDir;
 
+      if (customOrder && a.type === "folder" && b.type === "folder") {
+        return (
+          (customOrder.get(a.path) ?? Number.MAX_SAFE_INTEGER) -
+          (customOrder.get(b.path) ?? Number.MAX_SAFE_INTEGER)
+        );
+      }
+
       let valA, valB;
-      if (sortBy === "name") {
+      if (sortBy === "name" || sortBy === "custom") {
         valA = (a.name || "").toLowerCase();
         valB = (b.name || "").toLowerCase();
         return sortOrder === "asc"
@@ -3448,8 +3737,9 @@ function AudionutsUAGUI() {
               const [by, order] = e.target.value.split("-");
               setSortBy(by);
               setSortOrder(order);
+              if (by !== "custom") finishCustomOrderEditing();
             }}
-            className={`flex-1 px-2 py-1 text-xs border rounded focus:ring-1 focus:ring-purple-500 focus:border-transparent ${
+            className={`min-w-0 flex-1 px-2 py-1 text-xs border rounded focus:ring-1 focus:ring-purple-500 focus:border-transparent ${
               isDarkMode
                 ? "bg-gray-800 border-gray-700 text-gray-200"
                 : "bg-white border-gray-300 text-gray-700"
@@ -3461,7 +3751,36 @@ function AudionutsUAGUI() {
             <option value="date-asc">Date Modified (Oldest)</option>
             <option value="size-desc">Size (Largest)</option>
             <option value="size-asc">Size (Smallest)</option>
+            <option value="custom-asc">Custom</option>
           </select>
+          {sortBy === "custom" && (
+            <div className="flex shrink-0 items-center gap-1">
+              <button
+                type="button"
+                className="ua-file-order-toggle shrink-0 rounded px-2 py-1 font-semibold"
+                onClick={() => {
+                  if (isCustomOrderEditing) {
+                    finishCustomOrderEditing();
+                  } else {
+                    setIsCustomOrderEditing(true);
+                  }
+                }}
+                aria-pressed={isCustomOrderEditing}
+              >
+                {isCustomOrderEditing ? "Done" : "Reorder"}
+              </button>
+              {isCustomOrderEditing && (
+                <button
+                  type="button"
+                  className="ua-file-order-reset shrink-0 rounded px-2 py-1 font-semibold"
+                  onClick={() => setCustomFolderOrder([])}
+                  title="Reset root folders to alphabetical order"
+                >
+                  Reset
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
     );
@@ -3742,17 +4061,10 @@ function AudionutsUAGUI() {
       const parentPath =
         separatorIdx > 0 ? item.path.substring(0, separatorIdx) : "";
       return (
-        <div key={idx}>
+        <div key={item.path || idx}>
           <div
-            className={`flex items-center gap-2 px-3 ${isMobile ? "py-3" : "py-2"} cursor-pointer transition-colors ${
-              selectedPath === item.path
-                ? isDarkMode
-                  ? "bg-purple-900 border-l-4 border-purple-500"
-                  : "bg-blue-100 border-l-4 border-blue-500"
-                : isDarkMode
-                  ? "hover:bg-gray-700"
-                  : "hover:bg-gray-100"
-            }`}
+            className={`ua-file-browser-item flex items-center gap-2 px-3 ${isMobile ? "py-3" : "py-2"} cursor-pointer transition-colors`}
+            data-selected={selectedPath === item.path ? "true" : "false"}
             style={{ paddingLeft: "12px" }}
             onClick={() => {
               setSelectedPath(item.path);
@@ -3803,22 +4115,84 @@ function AudionutsUAGUI() {
   };
 
   const renderFileTree = (items, level = 0) => {
-    const sorted = sortItems(items);
+    const sorted = sortItems(items, level);
+    const rootFolderPaths =
+      level === 0
+        ? sorted
+            .filter((item) => item.type === "folder")
+            .map((item) => item.path)
+        : [];
     return sorted.map((item, idx) => {
       const isLoading = item.type === "folder" && loadingFolders.has(item.path);
+      const isCustomRootFolder =
+        sortBy === "custom" &&
+        isCustomOrderEditing &&
+        level === 0 &&
+        item.type === "folder";
+      const rootFolderIndex = rootFolderPaths.indexOf(item.path);
       return (
-        <div key={idx}>
+        <div key={item.path || idx}>
           <div
-            className={`flex items-center gap-2 px-3 ${isMobile ? "py-3" : "py-2"} cursor-pointer transition-colors ${
-              selectedPath === item.path
-                ? isDarkMode
-                  ? "bg-purple-900 border-l-4 border-purple-500"
-                  : "bg-blue-100 border-l-4 border-blue-500"
-                : isDarkMode
-                  ? "hover:bg-gray-700"
-                  : "hover:bg-gray-100"
-            }`}
+            className={`ua-file-browser-item flex items-center gap-2 px-3 ${isMobile ? "py-3" : "py-2"} cursor-pointer transition-colors`}
+            data-selected={selectedPath === item.path ? "true" : "false"}
+            data-dragging={
+              draggedRootFolderPath === item.path ? "true" : "false"
+            }
+            data-drag-position={
+              rootFolderDropTarget?.path === item.path
+                ? rootFolderDropTarget.position
+                : undefined
+            }
             style={{ paddingLeft: `${level * 20 + 12}px` }}
+            onDragOver={
+              isCustomRootFolder
+                ? (event) => {
+                    event.preventDefault();
+                    event.dataTransfer.dropEffect = "move";
+                    if (draggedRootFolderPath === item.path) {
+                      setRootFolderDropTarget(null);
+                      return;
+                    }
+                    const nextTarget = {
+                      path: item.path,
+                      position: getRootFolderDropPosition(event),
+                    };
+                    setRootFolderDropTarget((currentTarget) =>
+                      currentTarget?.path === nextTarget.path &&
+                      currentTarget?.position === nextTarget.position
+                        ? currentTarget
+                        : nextTarget,
+                    );
+                  }
+                : undefined
+            }
+            onDragLeave={
+              isCustomRootFolder
+                ? (event) => {
+                    if (!event.currentTarget.contains(event.relatedTarget)) {
+                      setRootFolderDropTarget((currentTarget) =>
+                        currentTarget?.path === item.path
+                          ? null
+                          : currentTarget,
+                      );
+                    }
+                  }
+                : undefined
+            }
+            onDrop={
+              isCustomRootFolder
+                ? (event) => {
+                    event.preventDefault();
+                    placeRootFolder(
+                      draggedRootFolderPath,
+                      item.path,
+                      getRootFolderDropPosition(event),
+                    );
+                    setDraggedRootFolderPath("");
+                    setRootFolderDropTarget(null);
+                  }
+                : undefined
+            }
             onClick={() => {
               if (item.type === "folder") {
                 toggleFolder(item.path);
@@ -3884,6 +4258,71 @@ function AudionutsUAGUI() {
                 ) : null}
               </span>
             </div>
+            {isCustomRootFolder && (
+              <div
+                className="ua-file-order-controls ml-auto flex shrink-0 items-center gap-1"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <span
+                  className="ua-file-order-handle rounded"
+                  draggable={true}
+                  title="Drag to reorder"
+                  onDragStart={(event) => {
+                    const row = event.currentTarget.closest(
+                      ".ua-file-browser-item",
+                    );
+                    event.dataTransfer.effectAllowed = "move";
+                    event.dataTransfer.setData("text/plain", item.path);
+                    if (row) {
+                      event.dataTransfer.setDragImage(
+                        row,
+                        18,
+                        Math.round(row.getBoundingClientRect().height / 2),
+                      );
+                    }
+                    setDraggedRootFolderPath(item.path);
+                    setRootFolderDropTarget(null);
+                  }}
+                  onDragEnd={() => {
+                    setDraggedRootFolderPath("");
+                    setRootFolderDropTarget(null);
+                  }}
+                >
+                  <svg
+                    viewBox="0 0 16 16"
+                    aria-hidden="true"
+                    className="h-4 w-4"
+                  >
+                    <circle cx="5" cy="3.5" r="1" fill="currentColor" />
+                    <circle cx="11" cy="3.5" r="1" fill="currentColor" />
+                    <circle cx="5" cy="8" r="1" fill="currentColor" />
+                    <circle cx="11" cy="8" r="1" fill="currentColor" />
+                    <circle cx="5" cy="12.5" r="1" fill="currentColor" />
+                    <circle cx="11" cy="12.5" r="1" fill="currentColor" />
+                  </svg>
+                </span>
+                <button
+                  type="button"
+                  className="ua-file-order-control rounded px-1.5 py-1"
+                  disabled={rootFolderIndex <= 0}
+                  aria-label={`Move ${item.name} up`}
+                  title="Move up"
+                  onClick={() => moveRootFolder(item.path, -1)}
+                >
+                  ↑
+                </button>
+                <button
+                  type="button"
+                  className="ua-file-order-control rounded px-1.5 py-1"
+                  disabled={rootFolderIndex >= rootFolderPaths.length - 1}
+                  aria-label={`Move ${item.name} down`}
+                  title="Move down"
+                  onClick={() => moveRootFolder(item.path, 1)}
+                >
+                  ↓
+                </button>
+              </div>
+            )}
           </div>
           {item.type === "folder" &&
             expandedFolders.has(item.path) &&
@@ -5509,7 +5948,17 @@ function AudionutsUAGUI() {
       >
         {isHelpResourcesOpen && (
           <UploadHelpResourcesModal
+            updateStatus={updateStatus}
+            isCheckingForUpdates={isCheckingForUpdates}
+            onCheckForUpdates={checkForUpdatesNow}
             onClose={() => setIsHelpResourcesOpen(false)}
+          />
+        )}
+        {isUpdateStatusOpen && visibleUpdateStatus && (
+          <window.UAUpdateStatusModal
+            status={visibleUpdateStatus}
+            onClose={() => setIsUpdateStatusOpen(false)}
+            onDismiss={dismissCurrentUpdate}
           />
         )}
 
@@ -5525,6 +5974,7 @@ function AudionutsUAGUI() {
               compact
             />
             <div className="ml-2 flex shrink-0 items-center gap-1">
+              {renderUpdateButton()}
               {renderHelpButton()}
               {renderThemePalette()}
             </div>
@@ -6209,7 +6659,17 @@ function AudionutsUAGUI() {
     >
       {isHelpResourcesOpen && (
         <UploadHelpResourcesModal
+          updateStatus={updateStatus}
+          isCheckingForUpdates={isCheckingForUpdates}
+          onCheckForUpdates={checkForUpdatesNow}
           onClose={() => setIsHelpResourcesOpen(false)}
+        />
+      )}
+      {isUpdateStatusOpen && visibleUpdateStatus && (
+        <window.UAUpdateStatusModal
+          status={visibleUpdateStatus}
+          onClose={() => setIsUpdateStatusOpen(false)}
+          onDismiss={dismissCurrentUpdate}
         />
       )}
 
@@ -6217,6 +6677,8 @@ function AudionutsUAGUI() {
         activeWorkspace="upload"
         appBase={APP_BASE}
         appearanceControl={renderRailAppearance()}
+        updateStatus={visibleUpdateStatus}
+        onOpenUpdate={() => setIsUpdateStatusOpen(true)}
         onOpenHelp={() => setIsHelpResourcesOpen(true)}
         onLogout={handleLogout}
       />

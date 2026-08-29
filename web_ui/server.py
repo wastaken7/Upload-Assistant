@@ -36,6 +36,7 @@ from src.webui_progress import PROGRESS_STDOUT_PREFIX, ProgressEvent, clear_prog
 from src.app_paths import CODE_DIR, STATE_DIR
 from src.meta import Meta
 from src.version import __version__ as APP_VERSION
+from src.update_checker import get_update_status
 
 
 def _module_name(*parts: str) -> str:
@@ -224,7 +225,7 @@ def _load_argument_presets() -> list[dict[str, str]]:
             if isinstance(name, str) and isinstance(arguments, str) and name.strip() and arguments.strip():
                 presets.append({"name": name.strip(), "arguments": arguments.strip()})
         return presets[-MAX_ARGUMENT_PRESETS:]
-    except OSError, TypeError, ValueError:
+    except (OSError, TypeError, ValueError):
         return []
 
 
@@ -796,14 +797,22 @@ def _verify_csrf_header() -> bool:
 
 
 def _verify_same_origin() -> bool:
-    """Require same-origin via Origin or Referer header.
+    """Require same-origin browser metadata, Origin, or Referer headers.
 
-    Returns True if the request appears to be same-origin against the
-    server's `request.host_url`. If an Origin header is present it must
-    exactly match the host_url; otherwise falls back to checking the
-    Referer prefix. Absence or mismatch results in False.
+    Fetch Metadata is preferred when the browser identifies the request as
+    same-origin. Otherwise the Origin or Referer host must match the server's
+    request host. Absence or mismatch results in False.
     """
     try:
+        # Modern browsers provide Fetch Metadata independently of Referer.
+        # This remains reliable when privacy settings or a reverse proxy omit
+        # or rewrite the Referer/Host values. Sec-Fetch-* headers cannot be set
+        # by cross-origin browser JavaScript, and protected routes still require
+        # the per-session CSRF token separately.
+        fetch_site = _request_header("Sec-Fetch-Site").strip().lower()
+        if fetch_site == "same-origin":
+            return True
+
         # Prefer comparing the origin/referer host:port (netloc) to the
         # request host. This is scheme-insensitive and avoids failures
         # when proxies/Cloudflare terminate TLS or don't forward the
@@ -811,11 +820,11 @@ def _verify_same_origin() -> bool:
         from urllib.parse import urlparse
 
         origin: str = _request_header("Origin")
-        if origin:
+        if origin and origin.strip().lower() != "null":
             with contextlib.suppress(Exception):
                 parsed = urlparse(origin)
                 if parsed.netloc:
-                    return parsed.netloc == request.host
+                    return parsed.netloc.lower() == request.host.lower()
             # Fallback to strict host_url match if parsing fails
             host_url = (request.host_url or "").rstrip("/") + "/"
             return origin.rstrip("/") + "/" == host_url
@@ -825,7 +834,7 @@ def _verify_same_origin() -> bool:
             with contextlib.suppress(Exception):
                 parsed = urlparse(referer)
                 if parsed.netloc:
-                    return parsed.netloc == request.host
+                    return parsed.netloc.lower() == request.host.lower()
             host_url = (request.host_url or "").rstrip("/") + "/"
             return referer.startswith(host_url)
 
@@ -1071,7 +1080,7 @@ def _verify_remember_token(token: str) -> str | None:
         elif isinstance(expiry_value, str):
             try:
                 expiry = int(expiry_value)
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 return None
         else:
             return None
@@ -2070,7 +2079,7 @@ def _find_execution_preview_cover_file(session_id: str) -> Path | None:
                 candidate.relative_to(release_root)
                 if candidate.is_file() and candidate.suffix.casefold() in {".jpg", ".jpeg", ".png", ".webp"}:
                     return candidate
-            except OSError, ValueError:
+            except (OSError, ValueError):
                 pass
 
     seen: set[str] = set()
@@ -2108,7 +2117,7 @@ def _resolve_execution_review_temp_dir(meta_data: Mapping[str, object]) -> Path 
     try:
         temp_dir = (temp_root / meta_uuid).resolve()
         temp_dir.relative_to(temp_root)
-    except OSError, ValueError:
+    except (OSError, ValueError):
         return None
     if not temp_dir.is_dir():
         return None
@@ -3626,6 +3635,38 @@ def health():
     return jsonify({"status": "healthy", "success": True, "message": "Upload-Assistant Web UI is running"})
 
 
+@app.route("/api/update_status")
+def update_status():
+    """Return the cached upstream release status for the shared application rail."""
+    if not _is_authenticated():
+        return jsonify({"success": False, "error": "Authentication required (web session)"}), 401
+    if not _verify_csrf_header() or not _verify_same_origin():
+        return jsonify({"success": False, "error": "CSRF/Origin validation failed"}), 403
+
+    user_config = _load_config_from_file(STATE_DIR / "data" / "config.py") or {}
+    example_config = _load_config_from_file(CODE_DIR / "data" / "example_config.py") or {}
+    user_defaults = _as_dict(user_config.get("DEFAULT")) or {}
+    example_defaults = _as_dict(example_config.get("DEFAULT")) or {}
+    force = str(request.args.get("refresh", "")).strip().lower() in {"1", "true", "yes"}
+    enabled = bool(user_defaults.get("update_notification", example_defaults.get("update_notification", True)))
+    raw_cache_hours = user_defaults.get(
+        "update_notification_cache_hours",
+        example_defaults.get("update_notification_cache_hours", 4),
+    )
+    try:
+        cache_hours = max(0.0, float(raw_cache_hours))
+    except (TypeError, ValueError):
+        cache_hours = 4.0
+
+    return jsonify(
+        get_update_status(
+            enabled=enabled or force,
+            cache_hours=cache_hours,
+            force=force,
+        )
+    )
+
+
 @app.route("/api/csrf_token")
 def csrf_token():
     """Return the per-session CSRF token for use by the frontend."""
@@ -3726,7 +3767,7 @@ def access_log_entries_api():
         n = int(n)
         if n < 1 or n > 200:
             n = 50
-    except ValueError, TypeError:
+    except (ValueError, TypeError):
         n = 50
 
     try:
@@ -3892,7 +3933,7 @@ def twofa_disable():
 
     try:
         auth_mod.set_twofa_state(None, [])
-    except OSError, ValueError, TypeError, auth_mod.EncryptionError, json.JSONDecodeError:
+    except (OSError, ValueError, TypeError, auth_mod.EncryptionError, json.JSONDecodeError):
         return jsonify({"error": "Failed to disable 2FA", "success": False}), 500
 
     # Update global variable
@@ -4198,7 +4239,7 @@ def _configured_cookie_tracker_names(
     for tracker_name in supported_trackers:
         try:
             has_cookie_file = Path(cookie_file_finder(str(state_dir), tracker_name, user_config)).is_file()
-        except AttributeError, OSError, TypeError, ValueError:
+        except (AttributeError, OSError, TypeError, ValueError):
             has_cookie_file = False
         if has_cookie_file:
             configured.add(tracker_name.upper())
@@ -4971,7 +5012,7 @@ def browse_path():
                             "size": size,
                         }
                     )
-                except PermissionError, OSError:
+                except (PermissionError, OSError):
                     continue
 
             console.print(f"Found {len(items)} items in {path}", markup=False)
@@ -5011,7 +5052,7 @@ def browse_search():
         max_results = min(int(request.args.get("max_results", "100")), 500)
         if max_results < 1:
             max_results = 100
-    except ValueError, TypeError:
+    except (ValueError, TypeError):
         max_results = 100
 
     if not query:

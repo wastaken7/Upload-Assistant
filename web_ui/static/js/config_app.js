@@ -199,7 +199,7 @@ const setInterfaceStyle = window.setUAInterfaceStyle;
 
 const WorkspaceSwitcher = ({ activeWorkspace, isDarkMode, stretch }) => {
   const workspaces = [
-    { id: "upload", label: "Upload Workspace", href: `${APP_BASE}/` },
+    { id: "upload", label: "Upload", href: `${APP_BASE}/` },
     { id: "config", label: "Configuration", href: `${APP_BASE}/config` },
   ];
 
@@ -262,6 +262,17 @@ const RailHelpIcon = () => (
   </svg>
 );
 
+const RailUpdateIcon = () => (
+  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14"
+    />
+  </svg>
+);
+
 const RailPaletteIcon = () => (
   <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
     <path
@@ -291,6 +302,8 @@ function ConfigApplicationRail({
   onInterfaceStyleChange,
   isDarkMode,
   onToggleMode,
+  updateStatus,
+  onOpenUpdate,
   onOpenHelp,
   onLogout,
 }) {
@@ -353,6 +366,18 @@ function ConfigApplicationRail({
       <div className="min-h-4 flex-1"></div>
 
       <div className="ua-app-rail-footer grid shrink-0 gap-1 border-t p-2">
+        {updateStatus?.update_available && (
+          <button
+            type="button"
+            className="ua-app-rail-button ua-update-rail-button rounded-lg"
+            onClick={onOpenUpdate}
+            aria-haspopup="dialog"
+            title={`${updateStatus.latest_version} is available`}
+          >
+            <RailUpdateIcon />
+            <span>Update</span>
+          </button>
+        )}
         <button
           type="button"
           className="ua-app-rail-button rounded-lg"
@@ -3160,8 +3185,24 @@ function RenameTorrentClientModal({
   );
 }
 
-function HelpResourcesModal({ onClose }) {
+function HelpResourcesModal({
+  updateStatus,
+  isCheckingForUpdates,
+  onCheckForUpdates,
+  onClose,
+}) {
   const resourceGroups = window.UAHelpResourceGroups || [];
+  const updateMessage = isCheckingForUpdates
+    ? "Checking GitHub for the latest release… This can take up to 15 seconds."
+    : !updateStatus
+      ? "No update check has completed yet."
+      : !updateStatus.success
+        ? updateStatus.error || "Unable to check for updates."
+        : updateStatus.enabled === false
+          ? "Automatic update notifications are disabled. You can still check manually."
+          : updateStatus.update_available
+            ? `${updateStatus.latest_version} is available. You have ${updateStatus.current_version}.`
+            : `You’re up to date (${updateStatus.current_version || window.UA_APP_VERSION}).`;
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
@@ -3215,6 +3256,22 @@ function HelpResourcesModal({ onClose }) {
             These links open GitHub in a new tab, keeping guidance aligned with
             the upstream development documentation.
           </div>
+          <section className="ua-config-state-panel mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3">
+            <div className="min-w-0">
+              <h3 className="text-sm font-semibold">Updates</h3>
+              <p className="ua-config-service-description mt-1 text-xs">
+                {updateMessage}
+              </p>
+            </div>
+            <button
+              type="button"
+              className="ua-config-service-action shrink-0 rounded-lg border px-3 py-2 text-sm font-semibold disabled:cursor-wait disabled:opacity-60"
+              disabled={isCheckingForUpdates}
+              onClick={onCheckForUpdates}
+            >
+              {isCheckingForUpdates ? "Checking…" : "Check now"}
+            </button>
+          </section>
           <div className="grid gap-4 md:grid-cols-2">
             {resourceGroups.map((group) => (
               <section
@@ -6267,6 +6324,8 @@ function ConfigSidebar({
   onInterfaceStyleChange,
   isDarkMode,
   onToggleMode,
+  updateStatus,
+  onOpenUpdate,
   onOpenHelp,
   onLogout,
 }) {
@@ -6545,6 +6604,16 @@ function ConfigSidebar({
         )}
 
         <div className="mt-3 grid gap-2">
+          {updateStatus?.update_available && (
+            <button
+              type="button"
+              className="ua-config-sidebar-action ua-update-sidebar-action rounded-lg px-3 py-2 text-sm font-semibold"
+              aria-haspopup="dialog"
+              onClick={onOpenUpdate}
+            >
+              Update available
+            </button>
+          )}
           <button
             type="button"
             className="ua-config-sidebar-action rounded-lg px-3 py-2 text-center text-sm font-semibold"
@@ -6651,6 +6720,12 @@ function ConfigApp() {
   });
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [isHelpResourcesOpen, setIsHelpResourcesOpen] = useState(false);
+  const [updateStatus, setUpdateStatus] = useState(null);
+  const [isUpdateStatusOpen, setIsUpdateStatusOpen] = useState(false);
+  const [isCheckingForUpdates, setIsCheckingForUpdates] = useState(false);
+  const [dismissedUpdateVersion, setDismissedUpdateVersion] = useState(
+    () => window.getUADismissedUpdateVersion?.() || "",
+  );
   const [torrentClients, setTorrentClients] = useState([]);
   const [trackerCatalog, setTrackerCatalog] = useState({
     defaultTrackers: [],
@@ -6664,6 +6739,66 @@ function ConfigApp() {
   const pendingSummaryRef = useRef(null);
   const mobileNavGestureRef = useRef(null);
   const suppressMobileNavClickRef = useRef(false);
+
+  const visibleUpdateStatus =
+    updateStatus?.update_available &&
+    updateStatus.latest_version !== dismissedUpdateVersion
+      ? updateStatus
+      : null;
+
+  useEffect(() => {
+    if (!window.loadUAUpdateStatus) return undefined;
+    let cancelled = false;
+    const loadUpdateStatus = () => {
+      if (document.visibilityState === "hidden") return;
+      window
+        .loadUAUpdateStatus()
+        .then((nextStatus) => {
+          if (!cancelled) setUpdateStatus(nextStatus);
+        })
+        .catch(() => {});
+    };
+    loadUpdateStatus();
+    const pollTimer = window.setInterval(loadUpdateStatus, 30 * 60 * 1000);
+    document.addEventListener("visibilitychange", loadUpdateStatus);
+    return () => {
+      cancelled = true;
+      window.clearInterval(pollTimer);
+      document.removeEventListener("visibilitychange", loadUpdateStatus);
+    };
+  }, []);
+
+  const checkForUpdatesNow = async () => {
+    if (!window.loadUAUpdateStatus || isCheckingForUpdates) return;
+    setIsCheckingForUpdates(true);
+    try {
+      const nextStatus = await window.loadUAUpdateStatus(true);
+      setUpdateStatus(nextStatus);
+      if (nextStatus?.update_available) {
+        storage.remove("ua_dismissed_update_version");
+        setDismissedUpdateVersion("");
+        setIsHelpResourcesOpen(false);
+        setIsUpdateStatusOpen(true);
+      }
+    } catch (error) {
+      setUpdateStatus((currentStatus) => ({
+        ...(currentStatus || {}),
+        success: false,
+        error: error?.message || "Unable to check for updates.",
+      }));
+    } finally {
+      setIsCheckingForUpdates(false);
+    }
+  };
+
+  const dismissCurrentUpdate = () => {
+    const version = updateStatus?.latest_version;
+    if (version) {
+      window.dismissUAUpdateVersion?.(version);
+      setDismissedUpdateVersion(version);
+    }
+    setIsUpdateStatusOpen(false);
+  };
 
   useEffect(() => {
     const handleColorThemeChange = (event) => {
@@ -8317,7 +8452,19 @@ function ConfigApp() {
         />
       )}
       {isHelpResourcesOpen && (
-        <HelpResourcesModal onClose={() => setIsHelpResourcesOpen(false)} />
+        <HelpResourcesModal
+          updateStatus={updateStatus}
+          isCheckingForUpdates={isCheckingForUpdates}
+          onCheckForUpdates={checkForUpdatesNow}
+          onClose={() => setIsHelpResourcesOpen(false)}
+        />
+      )}
+      {isUpdateStatusOpen && visibleUpdateStatus && (
+        <window.UAUpdateStatusModal
+          status={visibleUpdateStatus}
+          onClose={() => setIsUpdateStatusOpen(false)}
+          onDismiss={dismissCurrentUpdate}
+        />
       )}
       {renameClientSource && (
         <RenameTorrentClientModal
@@ -8346,6 +8493,8 @@ function ConfigApp() {
           onInterfaceStyleChange={handleInterfaceStyleChange}
           isDarkMode={isDarkMode}
           onToggleMode={() => setIsDarkMode((prev) => !prev)}
+          updateStatus={visibleUpdateStatus}
+          onOpenUpdate={() => setIsUpdateStatusOpen(true)}
           onOpenHelp={() => setIsHelpResourcesOpen(true)}
           onLogout={handleLogout}
         />
@@ -8376,6 +8525,11 @@ function ConfigApp() {
             onInterfaceStyleChange={handleInterfaceStyleChange}
             isDarkMode={isDarkMode}
             onToggleMode={() => setIsDarkMode((prev) => !prev)}
+            updateStatus={visibleUpdateStatus}
+            onOpenUpdate={() => {
+              setIsUpdateStatusOpen(true);
+              setIsMobileNavOpen(false);
+            }}
             onOpenHelp={() => {
               setIsHelpResourcesOpen(true);
               setIsMobileNavOpen(false);
