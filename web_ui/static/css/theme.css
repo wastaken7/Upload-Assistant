@@ -970,6 +970,224 @@ html.ua-upload-document #root {
   color: #fff !important;
 }
 
+.ua-update-changelog-container {
+  max-height: 45vh;
+  overflow: auto;
+}
+
+.ua-changelog-modal .ua-update-changelog,
+.ua-changelog-modal .ua-update-changelog-container {
+  max-height: none;
+  overflow: visible;
+}
+
+:where(
+  .ua-changelog-toolbar,
+  .ua-changelog-release,
+  .ua-changelog-release-header,
+  .ua-changelog-entry-list,
+  .ua-changelog-entry,
+  .ua-changelog-supplemental,
+  .ua-changelog-empty,
+  .ua-changelog-warning,
+  .ua-changelog-error
+) {
+  border-color: var(--ua-border);
+}
+
+:where(
+  .ua-changelog-toolbar,
+  .ua-changelog-release-header,
+  .ua-changelog-entry,
+  .ua-changelog-supplemental,
+  .ua-changelog-empty
+) {
+  background: color-mix(in srgb, var(--ua-stone) 42%, var(--ua-charcoal));
+}
+
+.ua-upload-page
+  :where(
+    .ua-changelog-toolbar,
+    .ua-changelog-release,
+    .ua-changelog-release-header,
+    .ua-changelog-entry-list,
+    .ua-changelog-entry,
+    .ua-changelog-supplemental,
+    .ua-changelog-empty
+  ) {
+  border-color: var(--ua-upload-border);
+}
+
+.ua-upload-page
+  :where(
+    .ua-changelog-toolbar,
+    .ua-changelog-release-header,
+    .ua-changelog-entry,
+    .ua-changelog-supplemental,
+    .ua-changelog-empty
+  ) {
+  background: color-mix(
+    in srgb,
+    var(--ua-copper) 4%,
+    var(--ua-upload-surface-raised)
+  );
+}
+
+.ua-config-page
+  :where(
+    .ua-changelog-toolbar,
+    .ua-changelog-release,
+    .ua-changelog-release-header,
+    .ua-changelog-entry-list,
+    .ua-changelog-entry,
+    .ua-changelog-supplemental,
+    .ua-changelog-empty
+  ) {
+  border-color: var(--ua-config-border);
+}
+
+.ua-config-page
+  :where(
+    .ua-changelog-toolbar,
+    .ua-changelog-release-header,
+    .ua-changelog-entry,
+    .ua-changelog-supplemental,
+    .ua-changelog-empty
+  ) {
+  background: color-mix(
+    in srgb,
+    var(--ua-copper) 4%,
+    var(--ua-config-surface-raised)
+  );
+}
+
+.ua-changelog-filter {
+  background: transparent;
+  border-color: currentColor;
+  color: inherit;
+  opacity: 0.72;
+}
+
+.ua-changelog-filter:hover {
+  opacity: 1;
+}
+
+.ua-changelog-filter.is-active {
+  background: var(--ua-copper);
+  border-color: var(--ua-copper-bright);
+  color: #fff;
+  opacity: 1;
+}
+
+.ua-changelog-release-header > button:hover,
+.ua-changelog-release-link:hover {
+  background: color-mix(in srgb, var(--ua-copper) 12%, transparent);
+}
+
+.ua-changelog-release-link,
+.ua-changelog-contribution-link,
+.ua-changelog-area-heading {
+  color: var(--ua-copper-bright);
+}
+
+.ua-changelog-release-body {
+  background: color-mix(in srgb, var(--ua-charcoal) 76%, transparent);
+}
+
+.ua-upload-page .ua-changelog-release-body {
+  background: var(--ua-upload-surface);
+}
+
+.ua-config-page .ua-changelog-release-body {
+  background: var(--ua-config-surface);
+}
+
+.ua-changelog-release-badge,
+.ua-changelog-type-feature,
+.ua-changelog-type-feat {
+  background: color-mix(in srgb, #16a34a 22%, transparent);
+  color: #86efac;
+}
+
+.ua-changelog-prerelease-badge,
+.ua-changelog-type-performance,
+.ua-changelog-type-perf {
+  background: color-mix(in srgb, #d97706 24%, transparent);
+  color: #fcd34d;
+}
+
+.ua-changelog-installed-badge {
+  background: color-mix(in srgb, #2563eb 22%, transparent);
+  color: #93c5fd;
+}
+
+.ua-changelog-type-fix,
+.ua-changelog-error {
+  background: color-mix(in srgb, #dc2626 18%, transparent);
+  border-color: color-mix(in srgb, #ef4444 55%, transparent);
+  color: #fca5a5;
+}
+
+.ua-changelog-type-refactor,
+.ua-changelog-type-docs,
+.ua-changelog-type-documentation {
+  background: color-mix(in srgb, #2563eb 20%, transparent);
+  color: #93c5fd;
+}
+
+.ua-changelog-type-change,
+.ua-changelog-type-chore,
+.ua-changelog-type-maintenance,
+.ua-changelog-type-build,
+.ua-changelog-type-ci,
+.ua-changelog-type-test,
+.ua-changelog-type-tests,
+.ua-changelog-type-style,
+.ua-changelog-type-revert {
+  background: color-mix(in srgb, var(--ua-copper) 18%, transparent);
+  color: var(--ua-copper-bright);
+}
+
+.ua-changelog-warning {
+  background: color-mix(in srgb, #d97706 12%, transparent);
+  border-color: color-mix(in srgb, #d97706 48%, transparent);
+  color: #fcd34d;
+}
+
+:where(.ua-upload-page[data-mode="light"], .ua-config-page.ua-mode-light)
+  .ua-changelog-release-badge,
+:where(.ua-upload-page[data-mode="light"], .ua-config-page.ua-mode-light)
+  .ua-changelog-type-feat {
+  color: #166534;
+}
+
+:where(.ua-upload-page[data-mode="light"], .ua-config-page.ua-mode-light)
+  :where(.ua-changelog-prerelease-badge, .ua-changelog-type-perf) {
+  color: #92400e;
+}
+
+:where(.ua-upload-page[data-mode="light"], .ua-config-page.ua-mode-light)
+  .ua-changelog-installed-badge {
+  color: #1e40af;
+}
+
+:where(.ua-upload-page[data-mode="light"], .ua-config-page.ua-mode-light)
+  .ua-changelog-type-fix,
+:where(.ua-upload-page[data-mode="light"], .ua-config-page.ua-mode-light)
+  .ua-changelog-error {
+  color: #991b1b;
+}
+
+:where(.ua-upload-page[data-mode="light"], .ua-config-page.ua-mode-light)
+  :where(.ua-changelog-type-refactor, .ua-changelog-type-docs) {
+  color: #1e40af;
+}
+
+:where(.ua-upload-page[data-mode="light"], .ua-config-page.ua-mode-light)
+  .ua-changelog-warning {
+  color: #92400e;
+}
+
 .ua-app-rail-footer,
 .ua-app-rail-footer > * {
   min-width: 0;

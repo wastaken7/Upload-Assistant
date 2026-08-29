@@ -15,6 +15,8 @@ from src.app_paths import CODE_DIR, STATE_DIR
 
 REMOTE_VERSION_URL = "https://raw.githubusercontent.com/wastaken7/Upload-Assistant/master/src/version.py"
 RELEASES_URL = "https://github.com/wastaken7/Upload-Assistant/releases"
+RELEASES_API_URL = "https://api.github.com/repos/wastaken7/Upload-Assistant/releases?per_page=100"
+MAX_CHANGELOG_RELEASES = 100
 
 
 def parse_version_tuple(value: str) -> tuple[int, ...]:
@@ -48,6 +50,53 @@ def fetch_remote_version(url: str = REMOTE_VERSION_URL) -> tuple[str | None, str
     return (match.group(1), content) if match else (None, None)
 
 
+def fetch_release_history(url: str = RELEASES_API_URL) -> list[dict[str, object]] | None:
+    """Fetch a WebUI-safe subset of the upstream GitHub release history."""
+    try:
+        request = urllib.request.Request(
+            url,
+            headers={
+                "Accept": "application/vnd.github+json",
+                "User-Agent": "Upload-Assistant-WebUI",
+                "X-GitHub-Api-Version": "2022-11-28",
+            },
+        )
+        with urllib.request.urlopen(request, timeout=10) as response:  # nosec B310 - fixed HTTPS URL
+            payload = json.loads(response.read().decode("utf-8"))
+    except (OSError, UnicodeError, ValueError, urllib.error.URLError, json.JSONDecodeError):
+        return None
+
+    if not isinstance(payload, list):
+        return None
+
+    releases: list[dict[str, object]] = []
+    for release in payload:
+        if not isinstance(release, dict) or release.get("draft") is True:
+            continue
+        version = release.get("tag_name")
+        if not isinstance(version, str) or not version.strip():
+            continue
+        release_url = release.get("html_url")
+        if not isinstance(release_url, str) or not release_url.startswith(f"{RELEASES_URL}/tag/"):
+            release_url = f"{RELEASES_URL}/tag/{version.strip()}"
+        title = release.get("name")
+        changelog = release.get("body")
+        published_at = release.get("published_at")
+        releases.append(
+            {
+                "version": version.strip(),
+                "title": title.strip() if isinstance(title, str) and title.strip() else version.strip(),
+                "changelog": changelog.strip() if isinstance(changelog, str) else "",
+                "release_url": release_url,
+                "published_at": published_at if isinstance(published_at, str) else "",
+                "prerelease": release.get("prerelease") is True,
+            }
+        )
+        if len(releases) >= MAX_CHANGELOG_RELEASES:
+            break
+    return releases
+
+
 def extract_changelog(content: str, version: str) -> str | None:
     """Extract the string expression following a matching ``__version__`` assignment."""
     try:
@@ -70,6 +119,10 @@ def extract_changelog(content: str, version: str) -> str | None:
 
 def _cache_path(state_dir: Path) -> Path:
     return state_dir / "update_notification.json"
+
+
+def _changelog_cache_path(state_dir: Path) -> Path:
+    return state_dir / "webui_changelog.json"
 
 
 def _read_cache(state_dir: Path, cache_hours: float) -> tuple[str, str, float] | None:
@@ -104,6 +157,120 @@ def _write_cache(state_dir: Path, remote_version: str, remote_content: str) -> f
     )
     temporary_path.replace(cache_path)
     return checked_at
+
+
+def _read_changelog_cache(
+    state_dir: Path,
+    cache_hours: float | None,
+) -> tuple[list[dict[str, object]], float] | None:
+    try:
+        cached: Any = json.loads(_changelog_cache_path(state_dir).read_text(encoding="utf-8"))
+        checked_at = cached["checked_at"]
+        releases = cached["releases"]
+        if not isinstance(checked_at, (int, float)) or not isinstance(releases, list):
+            return None
+        if cache_hours is not None and time.time() - checked_at >= cache_hours * 3600:
+            return None
+        safe_releases = [release for release in releases if isinstance(release, dict)]
+        return safe_releases[:MAX_CHANGELOG_RELEASES], float(checked_at)
+    except (OSError, TypeError, ValueError, KeyError, json.JSONDecodeError):
+        return None
+
+
+def _write_changelog_cache(state_dir: Path, releases: list[dict[str, object]]) -> float:
+    checked_at = time.time()
+    state_dir.mkdir(parents=True, exist_ok=True)
+    cache_path = _changelog_cache_path(state_dir)
+    temporary_path = cache_path.with_suffix(".tmp")
+    temporary_path.write_text(
+        json.dumps({"checked_at": checked_at, "releases": releases}),
+        encoding="utf-8",
+    )
+    temporary_path.replace(cache_path)
+    return checked_at
+
+
+def _local_release(code_dir: Path) -> dict[str, object] | None:
+    version_file = code_dir / "src" / "version.py"
+    try:
+        content = version_file.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    version = read_local_version(version_file)
+    if not version:
+        return None
+    return {
+        "version": version,
+        "title": version,
+        "changelog": extract_changelog(content, version) or "",
+        "release_url": f"{RELEASES_URL}/tag/{version}",
+        "published_at": "",
+        "prerelease": False,
+    }
+
+
+def get_changelog_history(
+    *,
+    cache_hours: float = 4,
+    force: bool = False,
+    code_dir: Path = CODE_DIR,
+    state_dir: Path = STATE_DIR,
+) -> dict[str, object]:
+    """Return cached upstream releases with a bundled current-release fallback."""
+    cache_hours = max(0.0, float(cache_hours))
+    cached = None if force else _read_changelog_cache(state_dir, cache_hours)
+    if cached:
+        releases, checked_at = cached
+        return {
+            "success": True,
+            "source": "cache",
+            "releases": releases,
+            "checked_at": checked_at,
+            "stale": False,
+        }
+
+    releases = fetch_release_history()
+    if releases:
+        checked_at = _write_changelog_cache(state_dir, releases)
+        return {
+            "success": True,
+            "source": "github",
+            "releases": releases,
+            "checked_at": checked_at,
+            "stale": False,
+        }
+
+    stale_cache = _read_changelog_cache(state_dir, None)
+    if stale_cache:
+        stale_releases, checked_at = stale_cache
+        return {
+            "success": True,
+            "source": "cache",
+            "releases": stale_releases,
+            "checked_at": checked_at,
+            "stale": True,
+            "warning": "GitHub could not be reached. Showing cached release history.",
+        }
+
+    local_release = _local_release(code_dir)
+    if local_release:
+        return {
+            "success": True,
+            "source": "local",
+            "releases": [local_release],
+            "checked_at": None,
+            "stale": True,
+            "warning": "GitHub could not be reached. Showing the bundled release notes.",
+        }
+
+    return {
+        "success": False,
+        "source": "none",
+        "releases": [],
+        "checked_at": None,
+        "stale": True,
+        "error": "Unable to load the release history.",
+    }
 
 
 def get_update_status(

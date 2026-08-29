@@ -36,7 +36,7 @@ from src.webui_progress import PROGRESS_STDOUT_PREFIX, ProgressEvent, clear_prog
 from src.app_paths import CODE_DIR, STATE_DIR
 from src.meta import Meta
 from src.version import __version__ as APP_VERSION
-from src.update_checker import get_update_status
+from src.update_checker import get_changelog_history, get_update_status
 
 
 def _module_name(*parts: str) -> str:
@@ -3672,6 +3672,36 @@ def update_status():
     return jsonify(
         get_update_status(
             enabled=enabled or force,
+            cache_hours=cache_hours,
+            force=force,
+        )
+    )
+
+
+@app.route("/api/changelog")
+def changelog():
+    """Return cached upstream release history for the shared changelog viewer."""
+    if not _is_authenticated():
+        return jsonify({"success": False, "error": "Authentication required (web session)"}), 401
+    if not _verify_csrf_header() or not _verify_same_origin():
+        return jsonify({"success": False, "error": "CSRF/Origin validation failed"}), 403
+
+    user_config = _load_config_from_file(STATE_DIR / "data" / "config.py") or {}
+    example_config = _load_config_from_file(CODE_DIR / "data" / "example_config.py") or {}
+    user_defaults = _as_dict(user_config.get("DEFAULT")) or {}
+    example_defaults = _as_dict(example_config.get("DEFAULT")) or {}
+    force = request.args.get("refresh", "").strip().lower() in {"1", "true", "yes"}
+    raw_cache_hours = user_defaults.get(
+        "update_notification_cache_hours",
+        example_defaults.get("update_notification_cache_hours", 4),
+    )
+    try:
+        cache_hours = max(0.0, float(raw_cache_hours))
+    except (TypeError, ValueError):
+        cache_hours = 4.0
+
+    return jsonify(
+        get_changelog_history(
             cache_hours=cache_hours,
             force=force,
         )

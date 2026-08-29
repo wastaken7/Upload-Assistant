@@ -273,6 +273,18 @@ const RailUpdateIcon = () => (
   </svg>
 );
 
+const RailChangelogIcon = () => (
+  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+    <circle cx="12" cy="12" r="9" strokeWidth={2} />
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M12 7v5l3 2"
+    />
+  </svg>
+);
+
 const RailPaletteIcon = () => (
   <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
     <path
@@ -366,18 +378,24 @@ function ConfigApplicationRail({
       <div className="min-h-4 flex-1"></div>
 
       <div className="ua-app-rail-footer grid shrink-0 gap-1 border-t p-2">
-        {updateStatus?.update_available && (
-          <button
-            type="button"
-            className="ua-app-rail-button ua-update-rail-button rounded-lg"
-            onClick={onOpenUpdate}
-            aria-haspopup="dialog"
-            title={`${updateStatus.latest_version} is available`}
-          >
+        <button
+          type="button"
+          className={`ua-app-rail-button rounded-lg ${updateStatus?.update_available ? "ua-update-rail-button" : ""}`}
+          onClick={onOpenUpdate}
+          aria-haspopup="dialog"
+          title={
+            updateStatus?.update_available
+              ? `${updateStatus.latest_version} is available`
+              : "View release history"
+          }
+        >
+          {updateStatus?.update_available ? (
             <RailUpdateIcon />
-            <span>Update</span>
-          </button>
-        )}
+          ) : (
+            <RailChangelogIcon />
+          )}
+          <span>{updateStatus?.update_available ? "Update" : "Changelog"}</span>
+        </button>
         <button
           type="button"
           className="ua-app-rail-button rounded-lg"
@@ -3257,6 +3275,7 @@ function HelpResourcesModal({
   updateStatus,
   isCheckingForUpdates,
   onCheckForUpdates,
+  onOpenChangelog,
   onClose,
 }) {
   const resourceGroups = window.UAHelpResourceGroups || [];
@@ -3343,14 +3362,23 @@ function HelpResourcesModal({
                 {updateMessage}
               </p>
             </div>
-            <button
-              type="button"
-              className="ua-config-service-action shrink-0 rounded-lg border px-3 py-2 text-sm font-semibold disabled:cursor-wait disabled:opacity-60"
-              disabled={isCheckingForUpdates}
-              onClick={onCheckForUpdates}
-            >
-              {isCheckingForUpdates ? "Checking…" : "Check now"}
-            </button>
+            <div className="flex shrink-0 flex-wrap gap-2">
+              <button
+                type="button"
+                className="ua-config-service-action rounded-lg border px-3 py-2 text-sm font-semibold"
+                onClick={onOpenChangelog}
+              >
+                View changelog
+              </button>
+              <button
+                type="button"
+                className="ua-config-service-action rounded-lg border px-3 py-2 text-sm font-semibold disabled:cursor-wait disabled:opacity-60"
+                disabled={isCheckingForUpdates}
+                onClick={onCheckForUpdates}
+              >
+                {isCheckingForUpdates ? "Checking…" : "Check now"}
+              </button>
+            </div>
           </section>
           <div className="grid gap-4 md:grid-cols-2">
             {resourceGroups.map((group) => (
@@ -6689,16 +6717,14 @@ function ConfigSidebar({
         )}
 
         <div className="mt-3 grid gap-2">
-          {updateStatus?.update_available && (
-            <button
-              type="button"
-              className="ua-config-sidebar-action ua-update-sidebar-action rounded-lg px-3 py-2 text-sm font-semibold"
-              aria-haspopup="dialog"
-              onClick={onOpenUpdate}
-            >
-              Update available
-            </button>
-          )}
+          <button
+            type="button"
+            className={`ua-config-sidebar-action rounded-lg px-3 py-2 text-sm font-semibold ${updateStatus?.update_available ? "ua-update-sidebar-action" : ""}`}
+            aria-haspopup="dialog"
+            onClick={onOpenUpdate}
+          >
+            {updateStatus?.update_available ? "Update available" : "Changelog"}
+          </button>
           <button
             type="button"
             className="ua-config-sidebar-action rounded-lg px-3 py-2 text-center text-sm font-semibold"
@@ -6805,6 +6831,7 @@ function ConfigApp() {
   });
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [isHelpResourcesOpen, setIsHelpResourcesOpen] = useState(false);
+  const [isChangelogOpen, setIsChangelogOpen] = useState(false);
   const [updateStatus, setUpdateStatus] = useState(null);
   const [isUpdateStatusOpen, setIsUpdateStatusOpen] = useState(false);
   const [isCheckingForUpdates, setIsCheckingForUpdates] = useState(false);
@@ -6883,6 +6910,12 @@ function ConfigApp() {
       setDismissedUpdateVersion(version);
     }
     setIsUpdateStatusOpen(false);
+  };
+
+  const openChangelog = () => {
+    setIsHelpResourcesOpen(false);
+    setIsUpdateStatusOpen(false);
+    setIsChangelogOpen(true);
   };
 
   useEffect(() => {
@@ -8541,14 +8574,19 @@ function ConfigApp() {
           updateStatus={updateStatus}
           isCheckingForUpdates={isCheckingForUpdates}
           onCheckForUpdates={checkForUpdatesNow}
+          onOpenChangelog={openChangelog}
           onClose={() => setIsHelpResourcesOpen(false)}
         />
+      )}
+      {isChangelogOpen && (
+        <window.UAChangelogModal onClose={() => setIsChangelogOpen(false)} />
       )}
       {isUpdateStatusOpen && visibleUpdateStatus && (
         <window.UAUpdateStatusModal
           status={visibleUpdateStatus}
           onClose={() => setIsUpdateStatusOpen(false)}
           onDismiss={dismissCurrentUpdate}
+          onOpenChangelog={openChangelog}
         />
       )}
       {renameClientSource && (
@@ -8579,7 +8617,9 @@ function ConfigApp() {
           isDarkMode={isDarkMode}
           onToggleMode={() => setIsDarkMode((prev) => !prev)}
           updateStatus={visibleUpdateStatus}
-          onOpenUpdate={() => setIsUpdateStatusOpen(true)}
+          onOpenUpdate={() =>
+            visibleUpdateStatus ? setIsUpdateStatusOpen(true) : openChangelog()
+          }
           onOpenHelp={() => setIsHelpResourcesOpen(true)}
           onLogout={handleLogout}
         />
@@ -8612,7 +8652,8 @@ function ConfigApp() {
             onToggleMode={() => setIsDarkMode((prev) => !prev)}
             updateStatus={visibleUpdateStatus}
             onOpenUpdate={() => {
-              setIsUpdateStatusOpen(true);
+              if (visibleUpdateStatus) setIsUpdateStatusOpen(true);
+              else openChangelog();
               setIsMobileNavOpen(false);
             }}
             onOpenHelp={() => {
