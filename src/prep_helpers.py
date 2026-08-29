@@ -1625,7 +1625,7 @@ async def finalize_metadata(
             meta.service_longname = max((k for k, v in services.items() if v == service_code), key=len, default=service_code)
 
         # Parse NFO for scene releases to get service
-        if meta.scene and not meta.service and meta.category == "TV":
+        if meta.scene and not meta.service and meta.category in ("TV", "MOVIE"):
             await prep_instance.parse_scene_nfo(meta)
 
         # Combine genres from TMDB and IMDb

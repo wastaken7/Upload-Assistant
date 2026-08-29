@@ -39,6 +39,7 @@ try:
     from src.music.prep import enrich_music_from_discogs as _enrich_music_from_discogs_fn
     from src.music.prep import enrich_music_from_orpheus as _enrich_music_from_orpheus_fn
     from src.music.prep import gather_music_prep as _gather_music_prep_fn
+    from src.nfo import parse_nfo_streaming_service
     from src.prep_game import gather_game_prep as _gather_game_prep_fn
     from src.prep_game import resolve_game_filelist as _resolve_game_filelist_fn
     from src.radarr import RadarrManager
@@ -444,22 +445,12 @@ class Prep:
             async with aiofiles.open(nfo_file, encoding="utf-8", errors="ignore") as f:
                 nfo_content = await f.read()
 
-            # Parse Source field
-            source_match = re.search(r"^Source\s*:\s*(.+?)$", nfo_content, re.MULTILINE | re.IGNORECASE)
-            if source_match:
-                nfo_source = source_match.group(1).strip()
+            services = cast(dict[str, str], await get_service(get_services_only=True))
+            service = parse_nfo_streaming_service(nfo_content, services)
+            if service:
+                nfo_source, meta.service, meta.service_longname = service
                 logger.debug(f"[cyan]Found source in NFO: {nfo_source}[/cyan]")
-
-                # Check if source matches any service
-                services = cast(dict[str, str], await get_service(get_services_only=True))
-
-                # Exact match
-                for service_name, service_code in services.items():
-                    if nfo_source.upper() == service_name.upper() or nfo_source.upper() == service_code.upper():
-                        meta.service = service_code
-                        meta.service_longname = service_name
-                        logger.debug(f"[green]Matched service: {service_code} ({service_name})[/green]")
-                        break
+                logger.debug(f"[green]Matched service: {meta.service} ({meta.service_longname})[/green]")
 
         except Exception as e:
             logger.debug(f"[red]Error parsing NFO file: {e}[/red]")
