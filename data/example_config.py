@@ -1049,6 +1049,8 @@ config: dict[str, Any] = {
             # Your API Key, obtained from Perfil -> API Key
             "api_key": "",
             "anon": True,
+            # Only block uploads when the existing release exactly matches files.
+            "exact_match_only": False,
             "inject_delay": 0,
         },
         "DARKPEERS": {
@@ -1172,6 +1174,8 @@ config: dict[str, Any] = {
             "use_for_search": False,
             "api_key": "",
             "anon": True,
+            # Only block uploads when the existing release exactly matches files and size.
+            "exact_match_only": True,
             # For authorized users only. Do not change this unless you know what you are doing
             # Upload as featured
             "featured": False,
@@ -1213,6 +1217,8 @@ config: dict[str, Any] = {
             # Maximum number of API hits the script may make within 24 hours for duplicate search.
             # Set to 0 to disable duplicate search via API.
             "daily_api_hit_limit": 0,
+            # Only block uploads when the existing release exactly matches files.
+            "exact_match_only": False,
             "inject_delay": 0,
         },
         "EMUWAREZ": {
@@ -2085,6 +2091,8 @@ config: dict[str, Any] = {
             # Maximum number of API hits the script may make within 24 hours for duplicate search.
             # Set to 0 to disable duplicate search via API.
             "daily_api_hit_limit": 0,
+            # Only block uploads when the existing release exactly matches files.
+            "exact_match_only": False,
             "inject_delay": 0,
         },
         "OLDTOONSWORLD": {
@@ -2196,6 +2204,8 @@ config: dict[str, Any] = {
             "use_for_search": False,
             "api_key": "",
             "anon": True,
+            # Only block uploads when the existing release exactly matches files and size.
+            "exact_match_only": True,
             # Send uploads to PEERGARDEN modq for staff approval
             "modq": False,
             # For authorized users only. Do not change this unless you know what you are doing
@@ -2779,6 +2789,8 @@ config: dict[str, Any] = {
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
             "use_for_search": False,
             "api_key": "",
+            # Only block uploads when the existing release exactly matches files and size.
+            "exact_match_only": False,
             # For authorized users only. Do not change this unless you know what you are doing
             # Upload as featured
             "featured": False,
@@ -2942,6 +2954,8 @@ config: dict[str, Any] = {
             # Set to 0 to disable duplicate search via API.
             "daily_api_hit_limit": 0,
             "anon": True,
+            # Only block uploads when the existing release exactly matches files.
+            "exact_match_only": False,
             # If False, the indexer will decide (uses ID "0").
             # If True, the script will resolve the audio language ID:
             #   - 1 language: uses the ID for that language.

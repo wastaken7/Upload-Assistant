@@ -196,7 +196,25 @@ class DupeChecker:
         from src.trackersetup import tracker_class_map
 
         tracker_cls = tracker_class_map.get(tracker_name.upper())
-        is_exact_match_only = bool(getattr(tracker_cls, "exact_match_only", False))
+        # Usenet releases may include optional PAR2 recovery files, so their
+        # reported size can differ even when the payload files are identical.
+        # Torrent releases do not have this packaging difference, so retain
+        # the size check for them.
+        is_usenet = bool(getattr(tracker_cls, "is_usenet", False))
+        tracker_config = self.config.get("TRACKERS", {}).get(tracker_name.upper(), {})
+        supports_exact_match_only = hasattr(tracker_cls, "exact_match_only")
+        has_configured_exact_match_only = isinstance(tracker_config, dict) and "exact_match_only" in tracker_config
+        configured_exact_match_only = tracker_config.get("exact_match_only") if has_configured_exact_match_only else None
+        if has_configured_exact_match_only and not supports_exact_match_only:
+            logger.warning(
+                f"{tracker_name}: 'exact_match_only' is not supported by this tracker and will be ignored.",
+                extra={"markup": False},
+            )
+        is_exact_match_only = (
+            configured_exact_match_only
+            if supports_exact_match_only and isinstance(configured_exact_match_only, bool)
+            else bool(getattr(tracker_cls, "exact_match_only", False))
+        )
 
         async def log_exclusion(reason: str, item: str) -> None:
             if meta.debug:
@@ -211,7 +229,7 @@ class DupeChecker:
             sized = entry.get("size")  # This may come as a string, such as "1.5 GB"
 
             if is_exact_match_only:
-                is_exact = await DupeChecker.is_exact_match(entry, meta)
+                is_exact = await DupeChecker.is_exact_match(entry, meta, ignore_size=is_usenet)
                 if not is_exact:
                     await log_exclusion("non-exact release (allowed on exact-match-only tracker)", each)
                     return True
@@ -847,8 +865,8 @@ class DupeChecker:
         return new_dupes
 
     @staticmethod
-    async def is_exact_match(candidate: dict[str, Any] | DupeEntry, meta: Meta) -> bool:
-        """Check if candidate torrent is an exact match / exact renamed release of local upload."""
+    async def is_exact_match(candidate: dict[str, Any] | DupeEntry, meta: Meta, *, ignore_size: bool = False) -> bool:
+        """Check whether a candidate is an exact (possibly renamed) release of the local upload."""
         from pathlib import Path
 
         from src.uphelper import parse_size_to_bytes
@@ -888,24 +906,25 @@ class DupeChecker:
         files_match = bool(local_files and candidate_files and sorted(local_files) == sorted(candidate_files))
         same_file_count = local_file_count is not None and candidate_file_count > 0 and local_file_count == candidate_file_count
         same_size = local_size is not None and candidate_size is not None and local_size == candidate_size
+        size_match = ignore_size or same_size
 
         # 5. Check if both have file lists
         if local_files and candidate_files:
-            return files_match and same_size
+            return files_match and size_match
 
         # 6. If file list unavailable for one or both (e.g. disc release)
-        if same_size and same_file_count:
+        if not ignore_size and size_match and same_file_count:
             return True
 
         # Disc releases have no reliable local file count, so compare their
         # total size when neither side provides a file list.
-        if not local_files and not candidate_files and same_size:
+        if not ignore_size and not local_files and not candidate_files and size_match:
             return True
 
         # 7. Exact name match fallback
         candidate_name = str(candidate.get("name", "")).strip().lower()
         local_name = str(meta.name or "").strip().lower()
-        return bool(candidate_name and local_name and candidate_name == local_name and (same_size or local_size is None or candidate_size is None))
+        return bool(candidate_name and local_name and candidate_name == local_name and (size_match or local_size is None or candidate_size is None))
 
     @staticmethod
     async def normalize_filename(filename: str | MutableMapping[str, Any]) -> str:
