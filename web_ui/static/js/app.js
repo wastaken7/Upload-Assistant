@@ -5910,7 +5910,7 @@ function AudionutsUAGUI() {
                     className={`ml-auto flex items-center gap-1 rounded px-2 py-1 text-xs ${isDarkMode ? "text-gray-300 hover:bg-gray-700" : "text-gray-600 hover:bg-gray-200"}`}
                   >
                     <span
-                      className={`transition-transform ${isOutputExpanded ? "rotate-180" : ""}`}
+                      className={`transition-transform ${isOutputExpanded ? "" : "rotate-180"}`}
                     >
                       <ChevronDownIcon />
                     </span>
@@ -6793,7 +6793,7 @@ function AudionutsUAGUI() {
                   className={`ml-auto flex items-center gap-1.5 rounded px-3 py-1.5 text-sm ${isDarkMode ? "text-gray-300 hover:bg-gray-800" : "text-gray-600 hover:bg-gray-200"}`}
                 >
                   <span
-                    className={`transition-transform ${isOutputExpanded ? "rotate-180" : ""}`}
+                    className={`transition-transform ${isOutputExpanded ? "" : "rotate-180"}`}
                   >
                     <ChevronDownIcon />
                   </span>
