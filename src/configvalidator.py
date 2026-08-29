@@ -136,6 +136,10 @@ DEFAULT_KEY_TYPES: dict[str, tuple[type, ...]] = {
     "twitch_client_id": (str,),
     "twitch_client_secret": (str,),
     "upload_order": (str,),
+    "qbit_bandwidth_control": (bool,),
+    "qbit_bandwidth_control_after_usenet": (bool,),
+    "qbit_bandwidth_threshold": (str, int),
+    "qbit_bandwidth_time": (str, int),
     "music_enrichment_enabled": (bool,),
     "music_discogs_token": (str,),
     "metadata_cache_enabled": (bool,),
@@ -710,6 +714,7 @@ def _validate_trackers_section(trackers: dict[str, Any], active_trackers: list[s
             "refundable",
             "sticky",
             "exclusive",
+            "exact_match_only",
         ]
         for field in bool_fields:
             if field in tracker_config_dict:

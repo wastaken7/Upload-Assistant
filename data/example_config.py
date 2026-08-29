@@ -449,16 +449,11 @@ config: dict[str, Any] = {
         # For example, 20 excludes a duplicate that is at least 20% larger or smaller.
         # Set to None or remove this setting to disable the feature.
         "dupe_size_difference_tolerance": None,
-        # upload_order configures the order of uploads when both torrent trackers and Usenet are selected.
-        # - "concurrent" (default): upload to Usenet and torrent trackers at the same time.
-        # - "usenet": upload to Usenet first, followed by the torrent trackers.
-        # - "tracker": upload to the torrent trackers first, run the bandwidth check, then upload to Usenet.
+        # See docs/upload-order-and-bandwidth-control.md for workflows and qBittorrent requirements.
         "upload_order": "concurrent",
-        # Set to True to wait for qBittorrent upload speed to fall before uploading the next tracker.
         "qbit_bandwidth_control": False,
-        # Threshold in KB/s. If the average upload speed is below this value, the next upload can start.
+        "qbit_bandwidth_control_after_usenet": False,
         "qbit_bandwidth_threshold": 0,
-        # Number of seconds over which the upload speed is averaged.
         "qbit_bandwidth_time": 0,
         # Number of retry attempts after network or server errors, such as HTTP 500 responses or timeouts.
         # Can be overridden per tracker by adding the same setting to its configuration.
@@ -1054,6 +1049,8 @@ config: dict[str, Any] = {
             # Your API Key, obtained from Perfil -> API Key
             "api_key": "",
             "anon": True,
+            # Only block uploads when the existing release exactly matches files.
+            "exact_match_only": False,
             "inject_delay": 0,
         },
         "DARKPEERS": {
@@ -1177,6 +1174,8 @@ config: dict[str, Any] = {
             "use_for_search": False,
             "api_key": "",
             "anon": True,
+            # Only block uploads when the existing release exactly matches files and size.
+            "exact_match_only": True,
             # For authorized users only. Do not change this unless you know what you are doing
             # Upload as featured
             "featured": False,
@@ -1218,6 +1217,8 @@ config: dict[str, Any] = {
             # Maximum number of API hits the script may make within 24 hours for duplicate search.
             # Set to 0 to disable duplicate search via API.
             "daily_api_hit_limit": 0,
+            # Only block uploads when the existing release exactly matches files.
+            "exact_match_only": False,
             "inject_delay": 0,
         },
         "EMUWAREZ": {
@@ -2090,6 +2091,8 @@ config: dict[str, Any] = {
             # Maximum number of API hits the script may make within 24 hours for duplicate search.
             # Set to 0 to disable duplicate search via API.
             "daily_api_hit_limit": 0,
+            # Only block uploads when the existing release exactly matches files.
+            "exact_match_only": False,
             "inject_delay": 0,
         },
         "OLDTOONSWORLD": {
@@ -2201,6 +2204,8 @@ config: dict[str, Any] = {
             "use_for_search": False,
             "api_key": "",
             "anon": True,
+            # Only block uploads when the existing release exactly matches files and size.
+            "exact_match_only": True,
             # Send uploads to PEERGARDEN modq for staff approval
             "modq": False,
             # For authorized users only. Do not change this unless you know what you are doing
@@ -2784,6 +2789,8 @@ config: dict[str, Any] = {
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
             "use_for_search": False,
             "api_key": "",
+            # Only block uploads when the existing release exactly matches files and size.
+            "exact_match_only": False,
             # For authorized users only. Do not change this unless you know what you are doing
             # Upload as featured
             "featured": False,
@@ -2947,6 +2954,8 @@ config: dict[str, Any] = {
             # Set to 0 to disable duplicate search via API.
             "daily_api_hit_limit": 0,
             "anon": True,
+            # Only block uploads when the existing release exactly matches files.
+            "exact_match_only": False,
             # If False, the indexer will decide (uses ID "0").
             # If True, the script will resolve the audio language ID:
             #   - 1 language: uses the ID for that language.
@@ -3399,7 +3408,8 @@ config: dict[str, Any] = {
             "torrent_client": "qbit",
             # QUI reverse proxy: https://getqui.com/docs/features/reverse-proxy
             # Create a Client Proxy API Key in QUI (Settings → Client Proxy Keys), pick the instance, paste the full proxy URL here.
-            # Example: "http://localhost:7476/proxy/<your-client-api-key>". Bandwidth Control still requires qbit_url/qbit_port and qbit_api_key or qbit_user/qbit_pass.
+            # Example: "http://localhost:7476/proxy/<your-client-api-key>".
+            # QUI is not used for bandwidth measurements; see docs/upload-order-and-bandwidth-control.md.
             "qui_proxy_url": "",
             # enable_search to True will automatically try and find a suitable hash to save having to rehash when creating torrents
             "enable_search": True,
@@ -3453,7 +3463,8 @@ config: dict[str, Any] = {
             "torrent_client": "qbit",
             # QUI reverse proxy: https://getqui.com/docs/features/reverse-proxy
             # Create a Client Proxy API Key in QUI (Settings → Client Proxy Keys), pick the instance, paste the full proxy URL here.
-            # Example: "http://localhost:7476/proxy/<your-client-api-key>". Bandwidth Control still requires qbit_url/qbit_port and qbit_api_key or qbit_user/qbit_pass.
+            # Example: "http://localhost:7476/proxy/<your-client-api-key>".
+            # QUI is not used for bandwidth measurements; see docs/upload-order-and-bandwidth-control.md.
             "qui_proxy_url": "",
             # enable_search to True will automatically try and find a suitable hash to save having to rehash when creating torrents
             "enable_search": True,

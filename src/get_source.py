@@ -10,6 +10,7 @@ from typing import Any
 from src.console import logger
 from src.exceptions import WeirdSystemError
 from src.meta import Meta
+from src.tags import get_tag
 
 GuessitFn = Callable[[str, dict[str, Any] | None], dict[str, Any]]
 _guessit_module = importlib.import_module("guessit")
@@ -18,6 +19,26 @@ _guessit_fn: GuessitFn = _guessit_module.guessit
 
 def guessit_fn(value: str, options: dict[str, Any] | None = None) -> dict[str, Any]:
     return _guessit_fn(value, options)
+
+
+async def _without_release_group(value: str, meta: Meta) -> str:
+    """Remove a recognized trailing release group before GuessIt detects the source."""
+    tag = await get_tag(value, meta)
+    if not tag:
+        return value
+
+    value_path = Path(value)
+    if value_path.is_dir():
+        stem = value_path.name
+        suffix = ""
+    else:
+        stem = value_path.stem
+        suffix = value_path.suffix
+
+    if not stem.casefold().endswith(tag.casefold()):
+        return value
+
+    return str(value_path.with_name(f"{stem[: -len(tag)]}{suffix}"))
 
 
 async def get_source(type: str, video: str, path: str, is_disc: str, meta: Meta, folder_id: str, base_dir: str) -> tuple[str, str]:
@@ -35,10 +56,12 @@ async def get_source(type: str, video: str, path: str, is_disc: str, meta: Meta,
             source = meta.manual_source
         else:
             try:
-                source = guessit_fn(video).get("source", source)
+                source_input = await _without_release_group(video, meta)
+                source = guessit_fn(source_input).get("source", source)
             except Exception:
                 try:
-                    source = guessit_fn(path).get("source", source)
+                    source_input = await _without_release_group(path, meta)
+                    source = guessit_fn(source_input).get("source", source)
                 except Exception:
                     source = "BluRay"
         if source in ("Blu-ray", "Ultra HD Blu-ray", "BluRay", "BR") or is_disc == "BDMV":

@@ -35,6 +35,7 @@ class NZBGeek:
     banned_groups: tuple[str, ...] = ()
     supported_categories = ("TV", "MOVIE", "GAME", "BOOK", "MUSIC")
     is_usenet = True
+    exact_match_only = False
 
     def __init__(self, config: Config) -> None:
         self.config = config

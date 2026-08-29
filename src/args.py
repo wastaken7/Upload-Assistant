@@ -169,6 +169,7 @@ Common options:
   -tvdb, --tvdb              Specify the TVDB id to use
   --queue (queue name)       Process an entire folder (including files/subfolders) in a queue
   -mf, --manual_frames       Comma-separated list of frame numbers to use for screenshots
+  --description              Inline custom description block
   -df, --descfile            Path to custom description file
   -boverview, --book-overview  Book/Audiobook overview/synopsis (overrides auto-detected value)
   -serv, --service           Streaming service
@@ -700,6 +701,13 @@ class Args:
             help="Custom description block to insert (link to hastebin/pastebin). This is added as a section inside the final description and does NOT replace the auto-generated description (MediaInfo, screenshots, etc.)",
         )
         parser.add_argument(
+            "--description",
+            dest="description_inline",
+            nargs=1,
+            required=False,
+            help="Inline custom description block to insert. This is added as a section inside the final description and does NOT replace auto-generated sections (MediaInfo, screenshots, etc.)",
+        )
+        parser.add_argument(
             "-df",
             "--descfile",
             dest="description_file",
@@ -851,8 +859,13 @@ class Args:
         parser.add_argument("-client", "--client", nargs=1, required=False, help="Use this torrent client instead of default")
         parser.add_argument("-qbt", "--qbit-tag", dest="qbit_tag", nargs=1, required=False, help="Add to qbit with this tag")
         parser.add_argument("-qbc", "--qbit-cat", dest="qbit_cat", nargs=1, required=False, help="Add to qbit with this category")
+        parser.add_argument("-qbcon", "--qbit-bw-control", action="store_true", required=False, help="Enable all qBittorrent bandwidth checks", dest="qbit_bandwidth_control")
         parser.add_argument(
-            "-qbcon", "--qbit-bw-control", action="store_true", required=False, help="Enable qBittorrent bandwidth control logic before upload", dest="qbit_bandwidth_control"
+            "--qbit-bw-control-after-usenet",
+            action="store_true",
+            required=False,
+            help="Keep bandwidth checks enabled for torrent trackers uploaded after Usenet",
+            dest="qbit_bandwidth_control_after_usenet",
         )
         parser.add_argument("-qbcrl", "--qbit-bw-threshold", nargs=1, required=False, help="qBittorrent bandwidth limit threshold (KB/s)", dest="qbit_bandwidth_threshold")
         parser.add_argument("-qbctime", "--qbit-bw-time", nargs=1, required=False, help="Time to stay under qBittorrent threshold (seconds)", dest="qbit_bandwidth_time")

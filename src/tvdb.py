@@ -10,9 +10,10 @@ from pathlib import Path
 from typing import Any, cast
 from urllib.error import URLError
 
-from tvdb_v4_official import TVDB
+import httpx
 
 from src.console import logger
+from src.metadata_cache import cache_for, is_cache_miss
 
 YEAR_PATTERN = re.compile(r"\((19\d\d|20[0-3]\d)\)")
 
@@ -69,7 +70,7 @@ def _best_effort_series_year(series_info: dict[str, Any] | None) -> str | None:
     return _extract_year_from_text(series_info.get("year")) or _extract_year_from_text(series_info.get("slug"))
 
 
-def _series_translation_metadata(
+async def _series_translation_metadata(
     client: Any,
     series_id: int,
     aliases: list[dict[str, Any]],
@@ -79,7 +80,7 @@ def _series_translation_metadata(
     translation_aliases: list[str] = []
 
     try:
-        translation = cast(dict[str, Any], client.get_series_translation(series_id, "eng"))
+        translation = await client.get_series_translation(series_id, "eng")
         name = translation.get("name")
         if isinstance(name, str) and name.strip():
             translation_name = name.strip()
@@ -108,6 +109,112 @@ def _series_translation_metadata(
         "series_title": title,
         "series_year": year,
     }
+
+
+class TVDB:
+    def __init__(self, apikey: str):
+        self.apikey = apikey
+        self.token = None
+        self.base_url = "https://api4.thetvdb.com/v4"
+        self._client = httpx.AsyncClient(base_url=self.base_url, timeout=15.0)
+        self._login_lock = asyncio.Lock()
+
+    async def aclose(self) -> None:
+        await self._client.aclose()
+
+    async def login(self) -> bool:
+        async with self._login_lock:
+            try:
+                resp = await self._client.post("/login", json={"apikey": self.apikey})
+                resp.raise_for_status()
+                data = resp.json()
+                self.token = data.get("data", {}).get("token")
+                if self.token:
+                    self._client.headers.update({"Authorization": f"Bearer {self.token}"})
+                    return True
+                return False
+            except Exception as e:
+                logger.error(f"[red]TVDB login failed: {e}[/red]")
+                return False
+
+    async def _request(self, method: str, endpoint: str, **kwargs) -> Any:
+        if not self.token:
+            success = await self.login()
+            if not success:
+                raise RuntimeError("TVDB authentication failed")
+
+        try:
+            resp = await self._client.request(method, endpoint, **kwargs)
+            if resp.status_code == 401:
+                logger.debug("[yellow]TVDB token expired. Refreshing...[/yellow]")
+                success = await self.login()
+                if not success:
+                    raise RuntimeError("TVDB authentication refresh failed")
+                resp = await self._client.request(method, endpoint, **kwargs)
+
+            resp.raise_for_status()
+            payload = resp.json()
+            if not isinstance(payload, dict) or "data" not in payload:
+                raise ValueError("TVDB response did not contain data")
+            return payload["data"]
+        except Exception as e:
+            logger.debug(f"[red]TVDB API request failed: {e}[/red]")
+            raise
+
+    async def search(self, query, **kwargs) -> list[dict[str, Any]]:
+        # Handle the case where `{filename}` is passed as a set
+        if isinstance(query, set):
+            query = next(iter(query))
+        params = {"query": query}
+        params.update(kwargs)
+        res = await self._request("GET", "/search", params=params)
+        if not isinstance(res, list):
+            raise TypeError("TVDB search response data was not a list")
+        return res
+
+    async def search_by_remote_id(self, remoteid: str) -> list[dict[str, Any]]:
+        res = await self._request("GET", f"/search/remoteid/{remoteid}")
+        if not isinstance(res, list):
+            raise TypeError("TVDB remote ID search response data was not a list")
+        return res
+
+    async def get_series_extended(self, id: int, **kwargs) -> dict[str, Any]:
+        res = await self._request("GET", f"/series/{id}/extended", params=kwargs)
+        if not isinstance(res, dict):
+            raise TypeError("TVDB extended series response data was not a dictionary")
+        return res
+
+    async def get_series_episodes(self, id: int, season_type="default", page=0, lang=None, **kwargs) -> dict[str, Any]:
+        url = f"/series/{id}/episodes/{season_type}"
+        if lang:
+            url += f"/{lang}"
+        params = {"page": page}
+        params.update(kwargs)
+        res = await self._request("GET", url, params=params)
+        if not isinstance(res, dict):
+            raise TypeError("TVDB series episodes response data was not a dictionary")
+        return res
+
+    async def get_episode_extended(self, id: int, **kwargs) -> dict[str, Any]:
+        res = await self._request("GET", f"/episodes/{id}/extended", params=kwargs)
+        if not isinstance(res, dict):
+            raise TypeError("TVDB extended episode response data was not a dictionary")
+        return res
+
+    async def get_series_translation(self, id: int, lang: str, **kwargs) -> dict[str, Any]:
+        res = await self._request("GET", f"/series/{id}/translations/{lang}", params=kwargs)
+        if not isinstance(res, dict):
+            raise TypeError("TVDB series translation response data was not a dictionary")
+        return res
+
+
+async def close_tvdb() -> None:
+    global tvdb
+
+    client = tvdb
+    tvdb = None
+    if client is not None:
+        await client.aclose()
 
 
 def _get_tvdb_or_warn(config: dict[str, Any] | None = None) -> TVDB | None:
@@ -174,8 +281,15 @@ class TvdbData:
         if client is None:
             return None, None
 
-        results = _as_dict_list(cast(Any, client).search({filename}, year=year, type="series", lang="eng"))
-        await asyncio.sleep(0.1)
+        cache = cache_for(base_dir="", config=self.config)
+        cache_key = f"{filename}_{year}" if year else filename
+        cached = await cache.get("tvdb", "search", cache_key)
+        if not is_cache_miss(cached) and (cached is None or isinstance(cached, list)):
+            results = cached
+        else:
+            results = await client.search(filename, year=year, type="series", lang="eng")
+            await cache.set("tvdb", "search", cache_key, results, negative=not bool(results))
+
         try:
             if results and len(results) > 0:
                 # Try to find the best match based on year
@@ -315,9 +429,9 @@ class TvdbData:
                                 client = _get_tvdb_or_warn(self.config)
                                 if client is not None:
                                     try:
-                                        series_info = cast(dict[str, Any], cast(Any, client).get_series_extended(series_id_int))
+                                        series_info = await client.get_series_extended(series_id_int)
                                         aliases_list = _as_dict_list(series_info.get("aliases", episodes_data.get("aliases")))
-                                        series_metadata = _series_translation_metadata(
+                                        series_metadata = await _series_translation_metadata(
                                             client,
                                             series_id_int,
                                             aliases_list,
@@ -352,7 +466,7 @@ class TvdbData:
                     logger.debug(f"[cyan]Fetching TVDB episodes page {page + 1}[/cyan]")
 
                 try:
-                    episodes_response = cast(Any, client).get_series_episodes(series_id_int, season_type="default", page=page, lang="eng")
+                    episodes_response = await client.get_series_episodes(series_id_int, season_type="default", page=page, lang="eng")
 
                     # Handle both dict response and direct episodes list
                     if isinstance(episodes_response, dict):
@@ -405,12 +519,12 @@ class TvdbData:
             try:
                 if all_episodes:
                     # Get series details for aliases
-                    series_info = cast(dict[str, Any], cast(Any, client).get_series_extended(series_id_int))
+                    series_info = await client.get_series_extended(series_id_int)
                     if "aliases" in series_info:
                         episodes_data["aliases"] = series_info["aliases"]
                     aliases_list = _as_dict_list(episodes_data["aliases"])
                     episodes_data.update(
-                        _series_translation_metadata(
+                        await _series_translation_metadata(
                             client,
                             series_id_int,
                             aliases_list,
@@ -461,21 +575,29 @@ class TvdbData:
         if client is None:
             return None, None
 
-        def _translated_series_name(series_id_value: Any, fallback: Any) -> str | None:
+        async def _translated_series_name(series_id_value: Any, fallback: Any) -> str | None:
             series_id_int = _coerce_int(series_id_value)
             fallback_name = str(fallback).strip() if fallback else None
             if series_id_int is None:
                 return fallback_name
+            cache = cache_for(base_dir="", config=self.config)
+            cache_key = f"translation_{series_id_int}"
+            cached = await cache.get("tvdb", "series_extended", cache_key)
+            if not is_cache_miss(cached) and isinstance(cached, dict):
+                return cached.get("series_title") or fallback_name
+
             try:
-                series_info = cast(dict[str, Any], cast(Any, client).get_series_extended(series_id_int))
+                series_info = await client.get_series_extended(series_id_int)
                 aliases = _as_dict_list(series_info.get("aliases", []))
-                series_metadata = _series_translation_metadata(
+                series_metadata = await _series_translation_metadata(
                     client,
                     series_id_int,
                     aliases,
                     _series_info=series_info,
                 )
-                return series_metadata.get("series_title") or fallback_name
+                title = series_metadata.get("series_title")
+                await cache.set("tvdb", "series_extended", cache_key, {"series_title": title})
+                return title or fallback_name
             except Exception as series_error:
                 logger.debug(f"[yellow]Could not retrieve translated TVDB series name: {series_error}[/yellow]")
                 return fallback_name
@@ -494,8 +616,7 @@ class TvdbData:
 
                 logger.debug(f"[cyan]Trying TVDB lookup with IMDB ID: {imdb_formatted}[/cyan]")
 
-                results = _as_dict_list(cast(Any, client).search_by_remote_id(imdb_formatted))
-                await asyncio.sleep(0.1)
+                results = await client.search_by_remote_id(imdb_formatted)
 
                 if results and len(results) > 0:
                     logger.debug(f"[blue]results: {results}[/blue]")
@@ -504,7 +625,7 @@ class TvdbData:
                     for result in results:
                         if "series" in result and isinstance(result.get("series"), dict):
                             series_id = result["series"]["id"]
-                            series_name = _translated_series_name(series_id, result["series"].get("name"))
+                            series_name = await _translated_series_name(series_id, result["series"].get("name"))
                             logger.debug(f"[blue]TVDB series ID from IMDB: {series_id}[/blue]")
                             return _coerce_int(series_id), series_name
 
@@ -514,7 +635,7 @@ class TvdbData:
                         for result in results:
                             if "episode" in result and isinstance(result.get("episode"), dict) and result["episode"].get("seriesId"):
                                 series_id = result["episode"]["seriesId"]
-                                series_name = _translated_series_name(series_id, result["episode"].get("seriesName"))
+                                series_name = await _translated_series_name(series_id, result["episode"].get("seriesName"))
                                 logger.debug(f"[blue]TVDB series ID from episode entry (tv_movie): {series_id}[/blue]")
                                 return _coerce_int(series_id), series_name
 
@@ -539,8 +660,7 @@ class TvdbData:
 
                 logger.debug(f"[cyan]Trying TVDB lookup with TMDB ID: {tmdb_str}[/cyan]")
 
-                results = _as_dict_list(cast(Any, client).search_by_remote_id(tmdb_str))
-                await asyncio.sleep(0.1)
+                results = await client.search_by_remote_id(tmdb_str)
 
                 if results and len(results) > 0:
                     logger.debug(f"[blue]results: {results}[/blue]")
@@ -549,7 +669,7 @@ class TvdbData:
                     for result in results:
                         if "series" in result and isinstance(result.get("series"), dict):
                             series_id = result["series"]["id"]
-                            series_name = _translated_series_name(series_id, result["series"].get("name"))
+                            series_name = await _translated_series_name(series_id, result["series"].get("name"))
                             logger.debug(f"[blue]TVDB series ID from TMDB: {series_id}[/blue]")
                             return _coerce_int(series_id), series_name
 
@@ -559,7 +679,7 @@ class TvdbData:
                         for result in results:
                             if "episode" in result and isinstance(result.get("episode"), dict) and result["episode"].get("seriesId"):
                                 series_id = result["episode"]["seriesId"]
-                                series_name = _translated_series_name(series_id, result["episode"].get("seriesName"))
+                                series_name = await _translated_series_name(series_id, result["episode"].get("seriesName"))
                                 logger.debug(f"[blue]TVDB series ID from episode entry (tv_movie): {series_id}[/blue]")
                                 return _coerce_int(series_id), series_name
 
@@ -596,7 +716,13 @@ class TvdbData:
                 logger.debug(f"[yellow]Invalid TVDB episode ID: {episode_id}[/yellow]")
                 return None
 
-            episode_data = cast(dict[str, Any], cast(Any, client).get_episode_extended(episode_id_int))
+            cache = cache_for(base_dir="", config=self.config)
+            cache_key = f"episode_imdb_{episode_id_int}"
+            cached = await cache.get("tvdb", "episode_extended", cache_key)
+            if not is_cache_miss(cached) and (cached is None or isinstance(cached, str)):
+                return cached
+
+            episode_data = await client.get_episode_extended(episode_id_int)
             logger.debug(f"[yellow]Episode data retrieved for episode ID {episode_id}[/yellow]")
 
             remote_ids = _as_dict_list(episode_data.get("remoteIds", []))
@@ -606,6 +732,8 @@ class TvdbData:
                 if remote_id.get("type") == 2 or remote_id.get("sourceName") == "IMDB":
                     imdb_id = remote_id.get("id")
                     break
+
+            await cache.set("tvdb", "episode_extended", cache_key, imdb_id, negative=not bool(imdb_id))
 
             if imdb_id:
                 logger.debug(f"[blue]TVDB episode ID: {episode_id} maps to IMDB ID: {imdb_id}[/blue]")

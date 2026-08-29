@@ -2140,15 +2140,6 @@ wheels = [
 ]
 
 [[package]]
-name = "tvdb-v4-official"
-version = "1.1.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/8d/63/1ee5d021451205daa455d975ebb795af739f31ca637862c5ee6ae2e1b56f/tvdb_v4_official-1.1.0.tar.gz", hash = "sha256:c315979f71f4b5e76a92202822c31c3ad7e695237d0901afbeec4e09dbb2218d", size = 4325, upload-time = "2022-09-22T19:11:51.285Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/50/d2/3f3e03fe96c23701fa24890dcd393034f4d37fb1e4649f573b1a6f3cf994/tvdb_v4_official-1.1.0-py3-none-any.whl", hash = "sha256:1d66f87f7d3d36feb4923b37aefd5a048dd208096bc640d1898acb1956fc0ba1", size = 3801, upload-time = "2022-09-22T19:11:49.819Z" },
-]
-
-[[package]]
 name = "typing-extensions"
 version = "4.15.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2227,7 +2218,6 @@ dependencies = [
     { name = "torf" },
     { name = "tqdm" },
     { name = "transmission-rpc" },
-    { name = "tvdb-v4-official" },
     { name = "typing-extensions" },
     { name = "unidecode" },
     { name = "urllib3" },
@@ -2298,7 +2288,6 @@ requires-dist = [
     { name = "torf", specifier = "==4.3.0" },
     { name = "tqdm", specifier = "==4.67.1" },
     { name = "transmission-rpc", specifier = "==7.0.11" },
-    { name = "tvdb-v4-official", specifier = "==1.1.0" },
     { name = "typing-extensions", specifier = "==4.15.0" },
     { name = "unidecode", specifier = "==1.4.0" },
     { name = "urllib3", specifier = "==2.7.0" },

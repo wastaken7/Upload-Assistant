@@ -12,7 +12,7 @@ from rich.markup import escape
 from src.artwork import is_valid_cover_image
 from src.cleanup import cleanup_manager
 from src.cogs.redaction import Redaction
-from src.config_helpers import format_terminal_link
+from src.config_helpers import format_terminal_link, parse_bool
 from src.console import logger
 from src.dupe_checking import DupeChecker
 from src.get_desc import DescriptionBuilder
@@ -67,7 +67,11 @@ async def process_trackers(
     http_trackers: Sequence[str],
     other_api_trackers: Sequence[str],
     upload_target: str = "tracker",
+    bandwidth_control: bool | None = None,
 ) -> None:
+    if bandwidth_control is None:
+        bandwidth_control = parse_bool(meta.qbit_bandwidth_control) or parse_bool(config["DEFAULT"].get("qbit_bandwidth_control", False))
+
     tracker_setup = TrackerSetup(config=config)
     tracker_setup_any = cast(Any, tracker_setup)
     enabled_trackers = list(cast(Sequence[str], tracker_setup_any.trackers_enabled(meta)))
@@ -169,8 +173,7 @@ async def process_trackers(
         async def check_bandwidth_and_dupes(tracker_name: str, t_class: Any) -> bool:
             if t_class and getattr(t_class, "is_usenet", False):
                 return True
-            qbit_bw_control = meta.qbit_bandwidth_control or config["DEFAULT"].get("qbit_bandwidth_control", False)
-            if qbit_bw_control:
+            if bandwidth_control:
                 logger.info(f"\n[yellow]{tracker_name}: Checking bandwidth...[/yellow]")
                 waiter = Wait(config)
                 bw_thresh = meta.qbit_bandwidth_threshold or config["DEFAULT"].get("qbit_bandwidth_threshold", 0)
@@ -382,8 +385,6 @@ async def process_trackers(
         one_disc = True
     elif discs and len(discs) > 1:
         one_disc = False
-
-    bandwidth_control = meta.qbit_bandwidth_control or config["DEFAULT"].get("qbit_bandwidth_control", False)
 
     if ((not meta.tv_pack and one_disc) or multi_screens == 0) and not bandwidth_control:
         # Run all tracker tasks concurrently with individual error handling

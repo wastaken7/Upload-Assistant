@@ -126,3 +126,5 @@ You can combine torrent tracker uploads and Usenet posting in a single run:
 ```bash
 python upload.py "/path/to/Movie.Name.2026.1080p.mkv" -tk BLUTOPIA,CURUPIRA
 ```
+
+See [Upload Order and qBittorrent Bandwidth Control](upload-order-and-bandwidth-control.md) to choose whether the Usenet and torrent tracker phases run concurrently or sequentially.

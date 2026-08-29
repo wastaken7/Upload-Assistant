@@ -2280,6 +2280,7 @@ async def get_service(
         "PMTP": "PMTP",
         "POGO": "POGO",
         "PokerGO": "POGO",
+        "Prime Video": "AMZN",
         "PSN": "PSN",
         "PUHU": "PUHU",
         "QIBI": "QIBI",
