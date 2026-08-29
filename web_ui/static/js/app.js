@@ -1,11 +1,13 @@
 const { useState, useRef, useEffect, useCallback } = React;
 const THEME_KEY = "ua_config_theme";
-const LEFT_SIDEBAR_WIDTH_KEY = "ua_webui_left_sidebar_width";
+const LEFT_SIDEBAR_WIDTH_KEY = "ua_webui_left_sidebar_width_v2";
 const RIGHT_SIDEBAR_WIDTH_KEY = "ua_webui_right_sidebar_width";
 const COLLAPSED_ARGUMENT_SECTIONS_KEY = "ua_webui_collapsed_argument_sections";
 const FILE_BROWSER_CUSTOM_ORDER_KEY = "ua_webui_file_browser_custom_order";
 const FILE_BROWSER_SORT_KEY = "ua_webui_file_browser_sort";
-const DEFAULT_SIDEBAR_WIDTH = 320;
+const DEFAULT_LEFT_SIDEBAR_WIDTH = 256;
+const DEFAULT_RIGHT_SIDEBAR_WIDTH = 320;
+const APPLICATION_RAIL_WIDTH = 80;
 const SIDEBAR_MIN_WIDTH = 200;
 const LEFT_SIDEBAR_MAX_WIDTH = 600;
 const RIGHT_SIDEBAR_MAX_WIDTH = 800;
@@ -1916,7 +1918,7 @@ function AudionutsUAGUI() {
   const [sidebarWidth, setSidebarWidth] = useState(() =>
     getStoredSidebarWidth(
       LEFT_SIDEBAR_WIDTH_KEY,
-      DEFAULT_SIDEBAR_WIDTH,
+      DEFAULT_LEFT_SIDEBAR_WIDTH,
       LEFT_SIDEBAR_MAX_WIDTH,
     ),
   );
@@ -1924,7 +1926,7 @@ function AudionutsUAGUI() {
   const [rightSidebarWidth, setRightSidebarWidth] = useState(() =>
     getStoredSidebarWidth(
       RIGHT_SIDEBAR_WIDTH_KEY,
-      DEFAULT_SIDEBAR_WIDTH,
+      DEFAULT_RIGHT_SIDEBAR_WIDTH,
       RIGHT_SIDEBAR_MAX_WIDTH,
     ),
   );
@@ -4707,7 +4709,7 @@ function AudionutsUAGUI() {
 
   const resize = useCallback(
     (e) => {
-      const newWidth = e.clientX;
+      const newWidth = e.clientX - APPLICATION_RAIL_WIDTH;
       if (newWidth >= SIDEBAR_MIN_WIDTH && newWidth <= LEFT_SIDEBAR_MAX_WIDTH) {
         setSidebarWidth(newWidth);
         storage.set(LEFT_SIDEBAR_WIDTH_KEY, String(newWidth));
@@ -6651,6 +6653,23 @@ function AudionutsUAGUI() {
     );
   }
 
+  const activeUploadPath =
+    executionPreview?.path || selectedPath || selectedPaths[0]?.path || "";
+  const desktopUploadStatusTitle = isAwaitingTerminalInput
+    ? "Input required"
+    : isExecuting
+      ? "Upload running"
+      : selectedPaths.length > 0 || selectedPath
+        ? "Ready to upload"
+        : "Ready";
+  const desktopUploadStatusDetail = isExecuting
+    ? activeUploadPath || "Upload Assistant is processing the current session."
+    : selectedPaths.length > 1
+      ? `${selectedPaths.length} items selected and ready to queue.`
+      : selectedPaths.length === 1 || selectedPath
+        ? "1 item selected. Review the options below, then execute the upload."
+        : "Select a file or folder to begin.";
+
   // Desktop Layout
   return (
     <div
@@ -6683,60 +6702,94 @@ function AudionutsUAGUI() {
         onLogout={handleLogout}
       />
 
-      {/* Left Sidebar - Resizable */}
-      <div
-        className={`ua-upload-panel ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"} border-r flex flex-col`}
-        style={{
-          width: `${sidebarWidth}px`,
-          minWidth: "200px",
-          maxWidth: "600px",
-        }}
-      >
-        {isExecuting ? (
-          renderProgressWorkspace()
-        ) : (
-          <>
-            <div
-              className={`ua-upload-panel-header p-4 border-b ${isDarkMode ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-gradient-to-r from-purple-50 to-blue-50"}`}
-            >
-              <h2
-                className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-gray-800"} flex items-center gap-2`}
-              >
-                <FolderIcon />
-                File Browser
-              </h2>
-              <div className="relative mt-2">
-                <input
-                  type="text"
-                  value={fileBrowserSearch}
-                  onChange={(e) => handleFileBrowserSearch(e.target.value)}
-                  placeholder="Search files and folders..."
-                  className={`w-full pl-8 pr-8 py-1.5 text-sm rounded border ${
-                    isDarkMode
-                      ? "bg-gray-800 border-gray-600 text-gray-200 placeholder-gray-500 focus:border-purple-500"
-                      : "bg-white border-gray-300 text-gray-700 placeholder-gray-400 focus:border-blue-500"
-                  } focus:outline-none focus:ring-1 ${isDarkMode ? "focus:ring-purple-500" : "focus:ring-blue-500"}`}
-                />
-                <svg
-                  className={`absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                  />
-                </svg>
-                {fileBrowserSearch && (
-                  <button
-                    onClick={() => handleFileBrowserSearch("")}
-                    className={`absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded ${isDarkMode ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-200 text-gray-500"}`}
+      <div className="ua-upload-desktop-shell flex min-w-0 flex-1 flex-col overflow-hidden">
+        <header className="ua-upload-context-header flex h-20 shrink-0 border-b">
+          <div
+            className="ua-upload-context-title flex shrink-0 items-center border-r px-5"
+            style={{
+              width: `${sidebarWidth}px`,
+              minWidth: "200px",
+              maxWidth: "600px",
+            }}
+          >
+            <div className="min-w-0">
+              <p className="truncate text-xs font-semibold uppercase tracking-widest opacity-60">
+                Upload Assistant
+              </p>
+              <h1 className="mt-1 truncate text-lg font-bold">Upload</h1>
+            </div>
+          </div>
+          <div className="ua-upload-context-resize-gutter shrink-0" />
+          <div className="ua-upload-context-status flex min-w-0 flex-1 items-center px-4 sm:px-6 lg:px-8">
+            <div className="min-w-0">
+              <div className="flex min-w-0 items-center gap-2">
+                <h2 className="truncate text-lg font-bold sm:text-xl">
+                  {desktopUploadStatusTitle}
+                </h2>
+                {isExecuting && (
+                  <span
+                    className="ua-workspace-run-status shrink-0 rounded-full"
+                    role="status"
                   >
+                    <span
+                      className="ua-workspace-run-dot animate-pulse"
+                      aria-hidden="true"
+                    ></span>
+                    Running
+                  </span>
+                )}
+              </div>
+              <p
+                className={`ua-upload-context-detail mt-0.5 truncate text-sm ${isExecuting && activeUploadPath ? "font-mono" : ""}`}
+                title={
+                  isExecuting && activeUploadPath
+                    ? activeUploadPath
+                    : desktopUploadStatusDetail
+                }
+              >
+                {desktopUploadStatusDetail}
+              </p>
+            </div>
+          </div>
+        </header>
+
+        <div className="ua-upload-desktop-body flex min-h-0 flex-1 overflow-hidden">
+          {/* Left Sidebar - Resizable */}
+          <div
+            className={`ua-upload-panel ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"} border-r flex flex-col`}
+            style={{
+              width: `${sidebarWidth}px`,
+              minWidth: "200px",
+              maxWidth: "600px",
+            }}
+          >
+            {isExecuting ? (
+              renderProgressWorkspace()
+            ) : (
+              <>
+                <div
+                  className={`ua-upload-panel-header p-4 border-b ${isDarkMode ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-gradient-to-r from-purple-50 to-blue-50"}`}
+                >
+                  <h2
+                    className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-gray-800"} flex items-center gap-2`}
+                  >
+                    <FolderIcon />
+                    File Browser
+                  </h2>
+                  <div className="relative mt-2">
+                    <input
+                      type="text"
+                      value={fileBrowserSearch}
+                      onChange={(e) => handleFileBrowserSearch(e.target.value)}
+                      placeholder="Search files and folders..."
+                      className={`w-full pl-8 pr-8 py-1.5 text-sm rounded border ${
+                        isDarkMode
+                          ? "bg-gray-800 border-gray-600 text-gray-200 placeholder-gray-500 focus:border-purple-500"
+                          : "bg-white border-gray-300 text-gray-700 placeholder-gray-400 focus:border-blue-500"
+                      } focus:outline-none focus:ring-1 ${isDarkMode ? "focus:ring-purple-500" : "focus:ring-blue-500"}`}
+                    />
                     <svg
-                      className="w-3.5 h-3.5"
+                      className={`absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -6745,123 +6798,16 @@ function AudionutsUAGUI() {
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         strokeWidth={2}
-                        d="M6 18L18 6M6 6l12 12"
+                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                       />
                     </svg>
-                  </button>
-                )}
-              </div>
-            </div>
-            {renderSelectAllBar()}
-            <div
-              className={`${hasDescFile && !descBrowserCollapsed ? "flex-1 max-h-[50%]" : "flex-1"} overflow-y-auto`}
-            >
-              {fileBrowserSearch ? (
-                fileBrowserSearchLoading ? (
-                  <div
-                    className={`p-4 text-center ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
-                  >
-                    <SpinnerIcon />
-                    <p className="text-sm mt-2">Searching...</p>
-                  </div>
-                ) : (
-                  <>
-                    {fileBrowserSearchResults &&
-                      fileBrowserSearchResults.truncated && (
-                        <div
-                          className={`px-3 py-1.5 text-xs ${isDarkMode ? "text-yellow-400 bg-gray-900" : "text-yellow-700 bg-yellow-50"} border-b ${isDarkMode ? "border-gray-700" : "border-yellow-200"}`}
-                        >
-                          Results limited to {fileBrowserSearchResults.count}{" "}
-                          items
-                        </div>
-                      )}
-                    {renderSearchResults(fileBrowserSearchResults)}
-                  </>
-                )
-              ) : (
-                renderFileTree(directories)
-              )}
-            </div>
-
-            {/* Description File Browser - shown when --descfile is in args */}
-            {hasDescFile && (
-              <>
-                <div
-                  className={`ua-upload-panel-header p-4 border-t ${!descBrowserCollapsed ? "border-b" : ""} ${isDarkMode ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-gradient-to-r from-green-50 to-emerald-50"} ${descBrowserCollapsed ? "cursor-pointer" : ""}`}
-                  onClick={
-                    descBrowserCollapsed
-                      ? () => setDescBrowserCollapsed(false)
-                      : undefined
-                  }
-                >
-                  <div className="flex items-center justify-between">
-                    <h2
-                      className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-gray-800"} flex items-center gap-2`}
-                    >
-                      <FileIcon />
-                      Description File
-                      {descBrowserCollapsed &&
-                        descFilePath &&
-                        !descFileError && (
-                          <span className="text-green-500 ml-1">
-                            <svg
-                              className="w-4 h-4 inline"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M5 13l4 4L19 7"
-                              />
-                            </svg>
-                          </span>
-                        )}
-                    </h2>
-                    {descBrowserCollapsed ? (
+                    {fileBrowserSearch && (
                       <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setDescBrowserCollapsed(false);
-                        }}
-                        className={`p-1 rounded ${isDarkMode ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-200 text-gray-500"}`}
-                        title="Expand browser"
-                      >
-                        <ChevronDownIcon />
-                      </button>
-                    ) : (
-                      descFilePath &&
-                      !descFileError && (
-                        <button
-                          onClick={() => setDescBrowserCollapsed(true)}
-                          className={`p-1 rounded ${isDarkMode ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-200 text-gray-500"}`}
-                          title="Collapse browser"
-                        >
-                          <ChevronRightIcon />
-                        </button>
-                      )
-                    )}
-                  </div>
-                  {descBrowserCollapsed && descFilePath ? (
-                    <div className="flex items-center gap-2 mt-2">
-                      <p
-                        className={`text-xs ${descFileError ? (isDarkMode ? "text-red-400" : "text-red-600") : isDarkMode ? "text-green-400" : "text-green-700"} break-all font-mono flex-1`}
-                      >
-                        {descFilePath}
-                      </p>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          updateDescFile("");
-                          setDescBrowserCollapsed(false);
-                        }}
-                        className={`p-1 rounded ${isDarkMode ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-200 text-gray-500"}`}
-                        title="Clear selection"
+                        onClick={() => handleFileBrowserSearch("")}
+                        className={`absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded ${isDarkMode ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-200 text-gray-500"}`}
                       >
                         <svg
-                          className="w-4 h-4"
+                          className="w-3.5 h-3.5"
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
@@ -6874,49 +6820,114 @@ function AudionutsUAGUI() {
                           />
                         </svg>
                       </button>
-                    </div>
-                  ) : (
-                    !descBrowserCollapsed && (
-                      <p
-                        className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                    )}
+                  </div>
+                </div>
+                {renderSelectAllBar()}
+                <div
+                  className={`${hasDescFile && !descBrowserCollapsed ? "flex-1 max-h-[50%]" : "flex-1"} overflow-y-auto`}
+                >
+                  {fileBrowserSearch ? (
+                    fileBrowserSearchLoading ? (
+                      <div
+                        className={`p-4 text-center ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
                       >
-                        Select a .txt, .nfo, or .md file
-                      </p>
+                        <SpinnerIcon />
+                        <p className="text-sm mt-2">Searching...</p>
+                      </div>
+                    ) : (
+                      <>
+                        {fileBrowserSearchResults &&
+                          fileBrowserSearchResults.truncated && (
+                            <div
+                              className={`px-3 py-1.5 text-xs ${isDarkMode ? "text-yellow-400 bg-gray-900" : "text-yellow-700 bg-yellow-50"} border-b ${isDarkMode ? "border-gray-700" : "border-yellow-200"}`}
+                            >
+                              Results limited to{" "}
+                              {fileBrowserSearchResults.count} items
+                            </div>
+                          )}
+                        {renderSearchResults(fileBrowserSearchResults)}
+                      </>
                     )
+                  ) : (
+                    renderFileTree(directories)
                   )}
                 </div>
-                {!descBrowserCollapsed && (
+
+                {/* Description File Browser - shown when --descfile is in args */}
+                {hasDescFile && (
                   <>
-                    <div className="flex-1 overflow-y-auto">
-                      {descDirectories.length > 0 ? (
-                        renderDescFileTree(descDirectories)
-                      ) : (
-                        <div
-                          className={`p-4 text-center ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                    <div
+                      className={`ua-upload-panel-header p-4 border-t ${!descBrowserCollapsed ? "border-b" : ""} ${isDarkMode ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-gradient-to-r from-green-50 to-emerald-50"} ${descBrowserCollapsed ? "cursor-pointer" : ""}`}
+                      onClick={
+                        descBrowserCollapsed
+                          ? () => setDescBrowserCollapsed(false)
+                          : undefined
+                      }
+                    >
+                      <div className="flex items-center justify-between">
+                        <h2
+                          className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-gray-800"} flex items-center gap-2`}
                         >
-                          <p className="text-sm">
-                            Loading description files...
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                    {descFilePath && (
-                      <div
-                        className={`p-3 border-t ${isDarkMode ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-green-50"}`}
-                      >
-                        <p
-                          className={`text-xs font-semibold ${isDarkMode ? "text-gray-300" : "text-gray-600"} mb-1`}
-                        >
-                          Selected Description:
-                        </p>
-                        <div className="flex items-center gap-2">
+                          <FileIcon />
+                          Description File
+                          {descBrowserCollapsed &&
+                            descFilePath &&
+                            !descFileError && (
+                              <span className="text-green-500 ml-1">
+                                <svg
+                                  className="w-4 h-4 inline"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M5 13l4 4L19 7"
+                                  />
+                                </svg>
+                              </span>
+                            )}
+                        </h2>
+                        {descBrowserCollapsed ? (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDescBrowserCollapsed(false);
+                            }}
+                            className={`p-1 rounded ${isDarkMode ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-200 text-gray-500"}`}
+                            title="Expand browser"
+                          >
+                            <ChevronDownIcon />
+                          </button>
+                        ) : (
+                          descFilePath &&
+                          !descFileError && (
+                            <button
+                              onClick={() => setDescBrowserCollapsed(true)}
+                              className={`p-1 rounded ${isDarkMode ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-200 text-gray-500"}`}
+                              title="Collapse browser"
+                            >
+                              <ChevronRightIcon />
+                            </button>
+                          )
+                        )}
+                      </div>
+                      {descBrowserCollapsed && descFilePath ? (
+                        <div className="flex items-center gap-2 mt-2">
                           <p
-                            className={`text-xs ${isDarkMode ? "text-green-400" : "text-green-700"} break-all font-mono flex-1`}
+                            className={`text-xs ${descFileError ? (isDarkMode ? "text-red-400" : "text-red-600") : isDarkMode ? "text-green-400" : "text-green-700"} break-all font-mono flex-1`}
                           >
                             {descFilePath}
                           </p>
                           <button
-                            onClick={() => updateDescFile("")}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              updateDescFile("");
+                              setDescBrowserCollapsed(false);
+                            }}
                             className={`p-1 rounded ${isDarkMode ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-200 text-gray-500"}`}
                             title="Clear selection"
                           >
@@ -6935,388 +6946,429 @@ function AudionutsUAGUI() {
                             </svg>
                           </button>
                         </div>
-                      </div>
+                      ) : (
+                        !descBrowserCollapsed && (
+                          <p
+                            className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                          >
+                            Select a .txt, .nfo, or .md file
+                          </p>
+                        )
+                      )}
+                    </div>
+                    {!descBrowserCollapsed && (
+                      <>
+                        <div className="flex-1 overflow-y-auto">
+                          {descDirectories.length > 0 ? (
+                            renderDescFileTree(descDirectories)
+                          ) : (
+                            <div
+                              className={`p-4 text-center ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                            >
+                              <p className="text-sm">
+                                Loading description files...
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                        {descFilePath && (
+                          <div
+                            className={`p-3 border-t ${isDarkMode ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-green-50"}`}
+                          >
+                            <p
+                              className={`text-xs font-semibold ${isDarkMode ? "text-gray-300" : "text-gray-600"} mb-1`}
+                            >
+                              Selected Description:
+                            </p>
+                            <div className="flex items-center gap-2">
+                              <p
+                                className={`text-xs ${isDarkMode ? "text-green-400" : "text-green-700"} break-all font-mono flex-1`}
+                              >
+                                {descFilePath}
+                              </p>
+                              <button
+                                onClick={() => updateDescFile("")}
+                                className={`p-1 rounded ${isDarkMode ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-200 text-gray-500"}`}
+                                title="Clear selection"
+                              >
+                                <svg
+                                  className="w-4 h-4"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M6 18L18 6M6 6l12 12"
+                                  />
+                                </svg>
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </>
                     )}
                   </>
                 )}
               </>
             )}
-          </>
-        )}
-      </div>
+          </div>
 
-      {/* Resize Handle */}
-      <div
-        className={`ua-upload-resize-handle w-1 ${isDarkMode ? "bg-gray-700 hover:bg-purple-500" : "bg-gray-300 hover:bg-purple-500"} cursor-col-resize transition-colors`}
-        onMouseDown={startResizing}
-        style={{ userSelect: "none" }}
-      />
+          {/* Resize Handle */}
+          <div
+            className={`ua-upload-resize-handle w-1 ${isDarkMode ? "bg-gray-700 hover:bg-purple-500" : "bg-gray-300 hover:bg-purple-500"} cursor-col-resize transition-colors`}
+            onMouseDown={startResizing}
+            style={{ userSelect: "none" }}
+          />
 
-      {/* Main Content */}
-      <div className="relative flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Top Panel */}
-        <div
-          className={`ua-upload-workspace-main ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"} border-b ${isExecuting ? "p-3" : "p-4"} ${!isExecuting && !isOutputExpanded ? "flex-1 overflow-y-auto" : "flex-shrink-0"}`}
-        >
-          <div className="mx-auto max-w-6xl space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <UploadWorkspaceBrand
-                appBase={APP_BASE}
-                isDarkMode={isDarkMode}
-                isExecuting={isExecuting}
-                contextOnly
-              />
-            </div>
-
-            {isExecuting ? (
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <div className="min-w-0 flex-1">
-                  {selectedPath && (
-                    <span
-                      className={`text-xs uppercase tracking-wide ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+          {/* Main Content */}
+          <div className="relative flex-1 flex flex-col min-w-0 overflow-hidden">
+            {/* Top Panel */}
+            <div
+              className={`ua-upload-workspace-main ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"} border-b ${isExecuting ? "p-3" : "p-4"} ${!isExecuting && !isOutputExpanded ? "flex-1 overflow-y-auto" : "flex-shrink-0"}`}
+            >
+              <div className="mx-auto max-w-6xl space-y-4">
+                {isExecuting ? (
+                  <div className="flex flex-wrap items-center justify-end gap-4">
+                    <button
+                      onClick={() => {
+                        setIsScreenshotReviewOpen((open) => !open);
+                        setIsDescriptionReviewOpen(false);
+                      }}
+                      aria-pressed={isScreenshotReviewOpen}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors flex-shrink-0 ${isScreenshotReviewOpen ? "bg-purple-600 text-white" : isDarkMode ? "bg-gray-700 hover:bg-gray-600 text-gray-100" : "bg-gray-100 hover:bg-gray-200 text-gray-700"}`}
+                      title="Review generated screenshots"
                     >
-                      Selected path
-                    </span>
-                  )}
-                  {selectedPath && (
-                    <p
-                      className={`mt-1 truncate font-mono text-sm ${isDarkMode ? "text-white" : "text-gray-800"}`}
-                      title={selectedPath}
+                      <ScreenshotsIcon />
+                      Screenshots
+                      {executionScreenshots.length
+                        ? ` (${executionScreenshots.length})`
+                        : ""}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setIsDescriptionReviewOpen((open) => !open);
+                        setIsScreenshotReviewOpen(false);
+                      }}
+                      aria-pressed={isDescriptionReviewOpen}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors flex-shrink-0 ${isDescriptionReviewOpen ? "bg-purple-600 text-white" : isDarkMode ? "bg-gray-700 hover:bg-gray-600 text-gray-100" : "bg-gray-100 hover:bg-gray-200 text-gray-700"}`}
+                      title="Review and edit the base description"
                     >
-                      {selectedPath}
-                    </p>
-                  )}
-                </div>
-                <button
-                  onClick={() => {
-                    setIsScreenshotReviewOpen((open) => !open);
-                    setIsDescriptionReviewOpen(false);
-                  }}
-                  aria-pressed={isScreenshotReviewOpen}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors flex-shrink-0 ${isScreenshotReviewOpen ? "bg-purple-600 text-white" : isDarkMode ? "bg-gray-700 hover:bg-gray-600 text-gray-100" : "bg-gray-100 hover:bg-gray-200 text-gray-700"}`}
-                  title="Review generated screenshots"
-                >
-                  <ScreenshotsIcon />
-                  Screenshots
-                  {executionScreenshots.length
-                    ? ` (${executionScreenshots.length})`
-                    : ""}
-                </button>
-                <button
-                  onClick={() => {
-                    setIsDescriptionReviewOpen((open) => !open);
-                    setIsScreenshotReviewOpen(false);
-                  }}
-                  aria-pressed={isDescriptionReviewOpen}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors flex-shrink-0 ${isDescriptionReviewOpen ? "bg-purple-600 text-white" : isDarkMode ? "bg-gray-700 hover:bg-gray-600 text-gray-100" : "bg-gray-100 hover:bg-gray-200 text-gray-700"}`}
-                  title="Review and edit the base description"
-                >
-                  <TerminalIcon />
-                  Description
-                </button>
-                <button
-                  onClick={clearTerminal}
-                  aria-label="Kill process and clear terminal"
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg transition-colors bg-red-600 hover:bg-red-700 text-white flex-shrink-0"
-                  title="Kill process and clear terminal"
-                >
-                  <TrashIcon />
-                  Kill
-                </button>
-              </div>
-            ) : (
-              <>
-                {/* Selected Path Display / Queue */}
-                {renderSelectedPathOrQueue(false)}
+                      <TerminalIcon />
+                      Description
+                    </button>
+                    <button
+                      onClick={clearTerminal}
+                      aria-label="Kill process and clear terminal"
+                      className="flex items-center gap-2 px-4 py-2 rounded-lg transition-colors bg-red-600 hover:bg-red-700 text-white flex-shrink-0"
+                      title="Kill process and clear terminal"
+                    >
+                      <TrashIcon />
+                      Kill
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    {/* Selected Path Display / Queue */}
+                    {renderSelectedPathOrQueue(false)}
 
-                {/* Arguments */}
-                <div className="space-y-2">
-                  <label
-                    className={`text-sm font-semibold ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}
-                  >
-                    Additional Arguments:
-                  </label>
-                  <input
-                    type="text"
-                    value={customArgs}
-                    onChange={(e) => setCustomArgs(e.target.value)}
-                    placeholder="--tmdb movie/12345 --trackers passthepopcorn,aither,ulcx --no-edition --no-tag"
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
-                      isDarkMode
-                        ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
-                        : "bg-white border-gray-300 text-gray-900"
-                    }`}
-                    disabled={isExecuting}
-                  />
-                  {renderArgumentPresetControls()}
-                </div>
-
-                {/* Description Link URL Input - shown when --desclink is in args */}
-                {/* Hide when valid URL and not focused; show when empty, focused, or invalid */}
-                {hasDescLink &&
-                  (!descLinkUrl || descLinkFocused || descLinkError) && (
+                    {/* Arguments */}
                     <div className="space-y-2">
                       <label
-                        className={`text-sm font-semibold ${isDarkMode ? "text-gray-300" : "text-gray-700"} flex items-center gap-2`}
+                        className={`text-sm font-semibold ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}
                       >
-                        <svg
-                          className="w-4 h-4"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
-                          />
-                        </svg>
-                        Description Link URL (pastebin, hastebin, etc.):
+                        Additional Arguments:
                       </label>
                       <input
-                        type="url"
-                        value={descLinkUrl}
-                        onChange={(e) => updateDescLink(e.target.value)}
-                        onFocus={() => setDescLinkFocused(true)}
-                        onBlur={() => setDescLinkFocused(false)}
-                        placeholder="https://pastebin.com/abc123"
+                        type="text"
+                        value={customArgs}
+                        onChange={(e) => setCustomArgs(e.target.value)}
+                        placeholder="--tmdb movie/12345 --trackers passthepopcorn,aither,ulcx --no-edition --no-tag"
                         className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
-                          descLinkError
-                            ? "border-red-500 focus:ring-red-500"
-                            : isDarkMode
-                              ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
-                              : "bg-white border-gray-300 text-gray-900"
+                          isDarkMode
+                            ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                            : "bg-white border-gray-300 text-gray-900"
                         }`}
                         disabled={isExecuting}
                       />
-                      {descLinkError && (
-                        <p className="text-xs text-red-500 mt-1">
-                          {descLinkError}
-                        </p>
-                      )}
-                      {descLinkUrl && !descLinkError && (
-                        <p className="text-xs text-green-500 mt-1">
-                          Valid paste URL
-                        </p>
-                      )}
+                      {renderArgumentPresetControls()}
                     </div>
-                  )}
 
-                {/* Description File Status - only show on error or when no file selected */}
-                {hasDescFile && (descFileError || !descFilePath) && (
-                  <div
-                    className={`p-3 rounded-lg ${
-                      descFileError
-                        ? isDarkMode
-                          ? "bg-red-900 border border-red-700"
-                          : "bg-red-50 border border-red-200"
-                        : isDarkMode
-                          ? "bg-yellow-900 border border-yellow-700"
-                          : "bg-yellow-50 border border-yellow-200"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <svg
-                        className={`w-4 h-4 ${
-                          descFileError ? "text-red-500" : "text-yellow-500"
-                        }`}
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        {descFileError ? (
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M6 18L18 6M6 6l12 12"
+                    {/* Description Link URL Input - shown when --desclink is in args */}
+                    {/* Hide when valid URL and not focused; show when empty, focused, or invalid */}
+                    {hasDescLink &&
+                      (!descLinkUrl || descLinkFocused || descLinkError) && (
+                        <div className="space-y-2">
+                          <label
+                            className={`text-sm font-semibold ${isDarkMode ? "text-gray-300" : "text-gray-700"} flex items-center gap-2`}
+                          >
+                            <svg
+                              className="w-4 h-4"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
+                              />
+                            </svg>
+                            Description Link URL (pastebin, hastebin, etc.):
+                          </label>
+                          <input
+                            type="url"
+                            value={descLinkUrl}
+                            onChange={(e) => updateDescLink(e.target.value)}
+                            onFocus={() => setDescLinkFocused(true)}
+                            onBlur={() => setDescLinkFocused(false)}
+                            placeholder="https://pastebin.com/abc123"
+                            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+                              descLinkError
+                                ? "border-red-500 focus:ring-red-500"
+                                : isDarkMode
+                                  ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                                  : "bg-white border-gray-300 text-gray-900"
+                            }`}
+                            disabled={isExecuting}
                           />
-                        ) : (
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                          />
-                        )}
-                      </svg>
-                      <span
-                        className={`text-sm font-medium ${
+                          {descLinkError && (
+                            <p className="text-xs text-red-500 mt-1">
+                              {descLinkError}
+                            </p>
+                          )}
+                          {descLinkUrl && !descLinkError && (
+                            <p className="text-xs text-green-500 mt-1">
+                              Valid paste URL
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                    {/* Description File Status - only show on error or when no file selected */}
+                    {hasDescFile && (descFileError || !descFilePath) && (
+                      <div
+                        className={`p-3 rounded-lg ${
                           descFileError
                             ? isDarkMode
-                              ? "text-red-300"
-                              : "text-red-700"
+                              ? "bg-red-900 border border-red-700"
+                              : "bg-red-50 border border-red-200"
                             : isDarkMode
-                              ? "text-yellow-300"
-                              : "text-yellow-700"
+                              ? "bg-yellow-900 border border-yellow-700"
+                              : "bg-yellow-50 border border-yellow-200"
                         }`}
                       >
-                        {descFileError
-                          ? "Invalid description file path"
-                          : "Select a description file from the left panel or enter a path"}
-                      </span>
+                        <div className="flex items-center gap-2">
+                          <svg
+                            className={`w-4 h-4 ${
+                              descFileError ? "text-red-500" : "text-yellow-500"
+                            }`}
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            {descFileError ? (
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M6 18L18 6M6 6l12 12"
+                              />
+                            ) : (
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                              />
+                            )}
+                          </svg>
+                          <span
+                            className={`text-sm font-medium ${
+                              descFileError
+                                ? isDarkMode
+                                  ? "text-red-300"
+                                  : "text-red-700"
+                                : isDarkMode
+                                  ? "text-yellow-300"
+                                  : "text-yellow-700"
+                            }`}
+                          >
+                            {descFileError
+                              ? "Invalid description file path"
+                              : "Select a description file from the left panel or enter a path"}
+                          </span>
+                        </div>
+                        {descFilePath && descFileError && (
+                          <p
+                            className={`text-xs mt-1 break-all font-mono ${isDarkMode ? "text-red-400" : "text-red-600"}`}
+                          >
+                            {descFilePath}
+                          </p>
+                        )}
+                        {descFileError && (
+                          <p
+                            className={`text-xs mt-1 ${isDarkMode ? "text-red-400" : "text-red-600"}`}
+                          >
+                            {descFileError}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Execute Button */}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={executeCommand}
+                        disabled={
+                          (!selectedPath && selectedPaths.length === 0) ||
+                          isExecuting
+                        }
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors font-medium text-lg"
+                      >
+                        <PlayIcon />
+                        {isExecuting
+                          ? "Executing..."
+                          : selectedPaths.length > 1
+                            ? "Execute Queue"
+                            : "Execute Upload"}
+                      </button>
+                      <button
+                        onClick={clearTerminal}
+                        aria-label={
+                          isExecuting
+                            ? "Kill process and clear terminal"
+                            : "Clear terminal"
+                        }
+                        className={`flex items-center gap-2 px-4 py-3 rounded-lg transition-colors ${
+                          isExecuting
+                            ? "bg-red-600 hover:bg-red-700 text-white"
+                            : "bg-gray-600 hover:bg-gray-700 text-white"
+                        }`}
+                        title={
+                          isExecuting
+                            ? "Kill process and clear terminal"
+                            : "Clear terminal"
+                        }
+                      >
+                        <TrashIcon />
+                        {isExecuting ? "Kill & Clear" : "Clear"}
+                      </button>
                     </div>
-                    {descFilePath && descFileError && (
-                      <p
-                        className={`text-xs mt-1 break-all font-mono ${isDarkMode ? "text-red-400" : "text-red-600"}`}
-                      >
-                        {descFilePath}
-                      </p>
-                    )}
-                    {descFileError && (
-                      <p
-                        className={`text-xs mt-1 ${isDarkMode ? "text-red-400" : "text-red-600"}`}
-                      >
-                        {descFileError}
-                      </p>
-                    )}
-                  </div>
-                )}
-
-                {/* Execute Button */}
-                <div className="flex gap-2">
-                  <button
-                    onClick={executeCommand}
-                    disabled={
-                      (!selectedPath && selectedPaths.length === 0) ||
-                      isExecuting
-                    }
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors font-medium text-lg"
-                  >
-                    <PlayIcon />
-                    {isExecuting
-                      ? "Executing..."
-                      : selectedPaths.length > 1
-                        ? "Execute Queue"
-                        : "Execute Upload"}
-                  </button>
-                  <button
-                    onClick={clearTerminal}
-                    aria-label={
-                      isExecuting
-                        ? "Kill process and clear terminal"
-                        : "Clear terminal"
-                    }
-                    className={`flex items-center gap-2 px-4 py-3 rounded-lg transition-colors ${
-                      isExecuting
-                        ? "bg-red-600 hover:bg-red-700 text-white"
-                        : "bg-gray-600 hover:bg-gray-700 text-white"
-                    }`}
-                    title={
-                      isExecuting
-                        ? "Kill process and clear terminal"
-                        : "Clear terminal"
-                    }
-                  >
-                    <TrashIcon />
-                    {isExecuting ? "Kill & Clear" : "Clear"}
-                  </button>
-                </div>
-                {renderTrackerSelector()}
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* Execution Output */}
-        <div
-          className={`ua-upload-output-panel ${isExecuting || isOutputExpanded ? "flex-1 p-4" : "flex-none p-2"} ${isDarkMode ? "bg-gray-900" : "bg-gray-100"} flex flex-col min-h-0 overflow-hidden`}
-          style={
-            isExecuting || isOutputExpanded
-              ? undefined
-              : { flex: "0 0 auto", minHeight: 0 }
-          }
-        >
-          <div
-            className={`max-w-6xl mx-auto w-full ${isExecuting || isOutputExpanded ? "flex-1" : "flex-none"} flex flex-col min-h-0`}
-          >
-            <div
-              className={`flex items-center gap-2 ${isExecuting || isOutputExpanded ? "mb-3" : ""} flex-shrink-0`}
-            >
-              <span className={isDarkMode ? "text-white" : "text-gray-800"}>
-                <TerminalIcon />
-              </span>
-              <h3
-                className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-gray-800"}`}
-              >
-                Execution Output
-              </h3>
-              {isExecuting && (
-                <span className="ml-auto text-sm text-green-400 animate-pulse">
-                  ● Running
-                </span>
-              )}
-              {!isExecuting && (
-                <button
-                  onClick={() => setIsOutputExpanded((expanded) => !expanded)}
-                  aria-expanded={isOutputExpanded}
-                  title={isOutputExpanded ? "Collapse output" : "Expand output"}
-                  className={`ml-auto flex items-center gap-1.5 rounded px-3 py-1.5 text-sm ${isDarkMode ? "text-gray-300 hover:bg-gray-800" : "text-gray-600 hover:bg-gray-200"}`}
-                >
-                  <span
-                    className={`transition-transform ${isOutputExpanded ? "" : "rotate-180"}`}
-                  >
-                    <ChevronDownIcon />
-                  </span>
-                  {isOutputExpanded ? "Collapse" : "Expand"}
-                </button>
-              )}
-            </div>
-            {/* Rich HTML output (rendered from Rich export_html fragments) */}
-            <div
-              ref={richOutputRef}
-              id="rich-output"
-              className={`rounded-lg overflow-auto p-3 border bg-black border-gray-700 text-white ${isExecuting || isOutputExpanded ? "flex-1" : "hidden"}`}
-            ></div>
-            {isExecuting && (
-              <div
-                className={`mt-2 flex gap-2 ${isAwaitingTerminalInput ? "animate-pulse" : ""}`}
-              >
-                {isYesNoPrompt && (
-                  <>
-                    <button
-                      onClick={() => sendInput(sessionId, "yes")}
-                      disabled={!sessionId || isSendingInput}
-                      className="px-4 py-2 rounded-lg text-white bg-green-600 hover:bg-green-700 disabled:opacity-50"
-                    >
-                      Yes
-                    </button>
-                    <button
-                      onClick={() => sendInput(sessionId, "no")}
-                      disabled={!sessionId || isSendingInput}
-                      className="px-4 py-2 rounded-lg text-white bg-red-600 hover:bg-red-700 disabled:opacity-50"
-                    >
-                      No
-                    </button>
+                    {renderTrackerSelector()}
                   </>
                 )}
-                <input
-                  ref={inputRef}
-                  value={userInput}
-                  onChange={(e) => setUserInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      sendInput(sessionId, userInput);
-                    }
-                  }}
-                  placeholder="Type input and press Enter"
-                  className={`flex-1 px-3 py-2 rounded-lg border focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-shadow ${isDarkMode ? "bg-gray-700 text-white" : "bg-white text-gray-900"} ${isAwaitingTerminalInput ? (isDarkMode ? "border-amber-400 shadow-[0_0_0_2px_rgba(251,191,36,0.18)]" : "border-amber-500 shadow-[0_0_0_2px_rgba(245,158,11,0.18)]") : isDarkMode ? "border-gray-600" : "border-gray-300"}`}
-                />
-                <button
-                  onClick={() => sendInput(sessionId, userInput)}
-                  disabled={!sessionId || !userInput || isSendingInput}
-                  className={`px-4 py-2 rounded-lg text-white disabled:opacity-50 ${isAwaitingTerminalInput ? "bg-amber-600 hover:bg-amber-700" : "bg-green-600 hover:bg-green-700"}`}
-                >
-                  Send
-                </button>
               </div>
-            )}
+            </div>
+
+            {/* Execution Output */}
+            <div
+              className={`ua-upload-output-panel ${isExecuting || isOutputExpanded ? "flex-1 p-4" : "flex-none p-2"} ${isDarkMode ? "bg-gray-900" : "bg-gray-100"} flex flex-col min-h-0 overflow-hidden`}
+              style={
+                isExecuting || isOutputExpanded
+                  ? undefined
+                  : { flex: "0 0 auto", minHeight: 0 }
+              }
+            >
+              <div
+                className={`max-w-6xl mx-auto w-full ${isExecuting || isOutputExpanded ? "flex-1" : "flex-none"} flex flex-col min-h-0`}
+              >
+                <div
+                  className={`flex items-center gap-2 ${isExecuting || isOutputExpanded ? "mb-3" : ""} flex-shrink-0`}
+                >
+                  <span className={isDarkMode ? "text-white" : "text-gray-800"}>
+                    <TerminalIcon />
+                  </span>
+                  <h3
+                    className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-gray-800"}`}
+                  >
+                    Execution Output
+                  </h3>
+                  {isExecuting && (
+                    <span className="ml-auto text-sm text-green-400 animate-pulse">
+                      ● Running
+                    </span>
+                  )}
+                  {!isExecuting && (
+                    <button
+                      onClick={() =>
+                        setIsOutputExpanded((expanded) => !expanded)
+                      }
+                      aria-expanded={isOutputExpanded}
+                      title={
+                        isOutputExpanded ? "Collapse output" : "Expand output"
+                      }
+                      className={`ml-auto flex items-center gap-1.5 rounded px-3 py-1.5 text-sm ${isDarkMode ? "text-gray-300 hover:bg-gray-800" : "text-gray-600 hover:bg-gray-200"}`}
+                    >
+                      <span
+                        className={`transition-transform ${isOutputExpanded ? "" : "rotate-180"}`}
+                      >
+                        <ChevronDownIcon />
+                      </span>
+                      {isOutputExpanded ? "Collapse" : "Expand"}
+                    </button>
+                  )}
+                </div>
+                {/* Rich HTML output (rendered from Rich export_html fragments) */}
+                <div
+                  ref={richOutputRef}
+                  id="rich-output"
+                  className={`rounded-lg overflow-auto p-3 border bg-black border-gray-700 text-white ${isExecuting || isOutputExpanded ? "flex-1" : "hidden"}`}
+                ></div>
+                {isExecuting && (
+                  <div
+                    className={`mt-2 flex gap-2 ${isAwaitingTerminalInput ? "animate-pulse" : ""}`}
+                  >
+                    {isYesNoPrompt && (
+                      <>
+                        <button
+                          onClick={() => sendInput(sessionId, "yes")}
+                          disabled={!sessionId || isSendingInput}
+                          className="px-4 py-2 rounded-lg text-white bg-green-600 hover:bg-green-700 disabled:opacity-50"
+                        >
+                          Yes
+                        </button>
+                        <button
+                          onClick={() => sendInput(sessionId, "no")}
+                          disabled={!sessionId || isSendingInput}
+                          className="px-4 py-2 rounded-lg text-white bg-red-600 hover:bg-red-700 disabled:opacity-50"
+                        >
+                          No
+                        </button>
+                      </>
+                    )}
+                    <input
+                      ref={inputRef}
+                      value={userInput}
+                      onChange={(e) => setUserInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          sendInput(sessionId, userInput);
+                        }
+                      }}
+                      placeholder="Type input and press Enter"
+                      className={`flex-1 px-3 py-2 rounded-lg border focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-shadow ${isDarkMode ? "bg-gray-700 text-white" : "bg-white text-gray-900"} ${isAwaitingTerminalInput ? (isDarkMode ? "border-amber-400 shadow-[0_0_0_2px_rgba(251,191,36,0.18)]" : "border-amber-500 shadow-[0_0_0_2px_rgba(245,158,11,0.18)]") : isDarkMode ? "border-gray-600" : "border-gray-300"}`}
+                    />
+                    <button
+                      onClick={() => sendInput(sessionId, userInput)}
+                      disabled={!sessionId || !userInput || isSendingInput}
+                      className={`px-4 py-2 rounded-lg text-white disabled:opacity-50 ${isAwaitingTerminalInput ? "bg-amber-600 hover:bg-amber-700" : "bg-green-600 hover:bg-green-700"}`}
+                    >
+                      Send
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+            {renderFloatingProgressPanel()}
           </div>
         </div>
-        {renderFloatingProgressPanel()}
       </div>
+
       {/* Right Resize Handle */}
       <div
         className={`ua-upload-resize-handle w-1 ${isDarkMode ? "bg-gray-700 hover:bg-purple-500" : "bg-gray-300 hover:bg-purple-500"} cursor-col-resize transition-colors`}
@@ -7431,7 +7483,8 @@ function AudionutsUAGUI() {
                   className={`text-center py-8 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
                 >
                   <p className="text-sm">
-                    No arguments found matching &quot;{argSearchFilter}&quot;
+                    No arguments found matching &quot;{argSearchFilter}
+                    &quot;
                   </p>
                 </div>
               ) : (

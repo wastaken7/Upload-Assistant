@@ -6466,7 +6466,12 @@ function ConfigSidebar({
       </div>
 
       <div className="ua-config-sidebar-brand hidden h-20 shrink-0 items-center border-b px-5 md:flex">
-        <h2 className="text-lg font-bold">Configuration</h2>
+        <div className="min-w-0">
+          <p className="truncate text-xs font-semibold uppercase tracking-widest opacity-60">
+            Upload Assistant
+          </p>
+          <h2 className="mt-1 truncate text-lg font-bold">Configuration</h2>
+        </div>
       </div>
 
       <div className="shrink-0 px-3 pt-4 md:hidden">

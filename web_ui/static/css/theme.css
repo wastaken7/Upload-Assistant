@@ -531,6 +531,39 @@ html.ua-upload-document #root {
   width: 100%;
 }
 
+.ua-upload-desktop-shell,
+.ua-upload-desktop-body {
+  min-height: 0;
+}
+
+.ua-upload-context-header {
+  background: var(--ua-upload-surface);
+  border-color: var(--ua-upload-border);
+  color: var(--ua-upload-text);
+  backdrop-filter: blur(14px);
+}
+
+.ua-upload-context-title {
+  border-color: var(--ua-upload-border);
+}
+
+.ua-upload-context-resize-gutter {
+  background:
+    linear-gradient(
+      to right,
+      transparent calc(50% - 0.5px),
+      var(--ua-upload-border) calc(50% - 0.5px),
+      var(--ua-upload-border) calc(50% + 0.5px),
+      transparent calc(50% + 0.5px)
+    ),
+    var(--ua-upload-bg);
+  width: 0.4rem;
+}
+
+.ua-upload-context-detail {
+  color: var(--ua-upload-muted);
+}
+
 .ua-upload-panel,
 .ua-upload-workspace-main {
   background: var(--ua-upload-surface) !important;
@@ -1012,7 +1045,8 @@ html.ua-upload-document #root {
 }
 
 @media (pointer: coarse) and (min-width: 768px) {
-  .ua-upload-resize-handle {
+  .ua-upload-resize-handle,
+  .ua-upload-context-resize-gutter {
     width: 0.65rem !important;
   }
 }
