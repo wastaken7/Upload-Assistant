@@ -500,6 +500,18 @@ def _session_set(key: str, value: object) -> None:
     _commit_session_dict(d)
 
 
+def _ensure_csrf_token() -> str:
+    """Return the current session CSRF token, creating it when required."""
+    token = _session_get("csrf_token")
+    if token:
+        return str(token)
+    if not _is_authenticated():
+        return ""
+    token = secrets.token_urlsafe(32)
+    _session_set("csrf_token", token)
+    return token
+
+
 def _session_pop(key: str, default: object = None) -> object:
     d = _load_session_dict()
     val = d.pop(key, default)
@@ -3357,7 +3369,11 @@ def strip_ansi(text: str) -> str:
 def index():
     """Serve the main UI"""
     try:
-        return render_template("index.html", app_version=APP_VERSION)
+        return render_template(
+            "index.html",
+            app_version=APP_VERSION,
+            csrf_token=_ensure_csrf_token(),
+        )
     except Exception as e:
         console.print(f"Error loading template: {e}", markup=False)
         console.print(traceback.format_exc(), markup=False)
@@ -3612,15 +3628,10 @@ def config_page():
             )
 
     try:
-        # Ensure a session CSRF token exists and expose it to the template so
-        # client-side JS can read it without an extra round-trip if desired.
-        with contextlib.suppress(Exception):
-            if _is_authenticated() and not _session_get("csrf_token"):
-                _session_set("csrf_token", secrets.token_urlsafe(32))
         return render_template(
             "config.html",
             app_version=APP_VERSION,
-            csrf_token=_session_get("csrf_token", ""),
+            csrf_token=_ensure_csrf_token(),
         )
     except Exception as e:
         console.print(f"Error loading config template: {e}", markup=False)
@@ -3675,7 +3686,7 @@ def csrf_token():
         return jsonify({"success": False, "error": "Authentication required (web session)"}), 401
 
     try:
-        token = _session_get("csrf_token") or ""
+        token = _ensure_csrf_token()
         return jsonify({"csrf_token": token, "success": True})
     except Exception:
         # Returning an empty CSRF token on error is an explicit non-secret

@@ -120,6 +120,7 @@
     <div id="root"></div>
     <script>
       window.UA_APP_VERSION = {{ app_version | tojson }};
+      window.UA_CSRF_TOKEN = {{ csrf_token | tojson }};
     </script>
     <script
       type="text/javascript"

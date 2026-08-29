@@ -221,18 +221,28 @@
   applyUAInterfaceStyle();
 
   // CSRF + apiFetch helpers with automatic refresh on 401/403 responses.
-  let uaCsrfToken = null;
+  let uaCsrfToken = window.UA_CSRF_TOKEN ? String(window.UA_CSRF_TOKEN) : null;
+  let uaCsrfRequest = null;
 
   async function loadCsrfToken(force = false) {
     if (uaCsrfToken && !force) return;
-    try {
-      const r = await fetch("/api/csrf_token", { credentials: "same-origin" });
-      if (!r.ok) return;
-      const d = await r.json();
-      uaCsrfToken = d && d.csrf_token ? String(d.csrf_token) : null;
-    } catch (e) {
-      // ignore
-    }
+    if (uaCsrfRequest) return uaCsrfRequest;
+    uaCsrfRequest = (async () => {
+      try {
+        const r = await fetch("/api/csrf_token", {
+          credentials: "same-origin",
+          cache: "no-store",
+        });
+        if (!r.ok) return;
+        const d = await r.json();
+        uaCsrfToken = d && d.csrf_token ? String(d.csrf_token) : null;
+      } catch (e) {
+        // The protected request will surface the authentication error.
+      } finally {
+        uaCsrfRequest = null;
+      }
+    })();
+    return uaCsrfRequest;
   }
 
   function clearCsrfToken() {
