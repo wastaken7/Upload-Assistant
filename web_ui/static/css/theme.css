@@ -1791,6 +1791,60 @@ select {
   color: var(--ua-config-text);
 }
 
+.ua-confirm-overlay {
+  background: rgba(0, 0, 0, 0.62);
+  backdrop-filter: blur(2px);
+}
+
+.ua-confirm-dialog {
+  background: var(--ua-config-surface);
+  border-color: var(--ua-config-border);
+  color: var(--ua-config-text);
+}
+
+.ua-confirm-title,
+.ua-confirm-actions {
+  background: var(--ua-config-surface-raised);
+  border-color: var(--ua-config-border);
+}
+
+.ua-confirm-message {
+  color: var(--ua-config-muted);
+}
+
+.ua-confirm-cancel,
+.ua-confirm-danger {
+  border-color: var(--ua-config-border);
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
+}
+
+.ua-confirm-cancel {
+  background: var(--ua-config-hover);
+  color: var(--ua-config-text);
+}
+
+.ua-confirm-cancel:hover {
+  background: color-mix(
+    in srgb,
+    var(--ua-config-text) 9%,
+    var(--ua-config-surface-raised)
+  );
+}
+
+.ua-confirm-danger {
+  background: color-mix(in srgb, #dc2626 88%, var(--ua-config-surface));
+  border-color: color-mix(in srgb, #ef4444 70%, var(--ua-config-border));
+  color: #ffffff;
+}
+
+.ua-confirm-danger:hover {
+  background: #ef4444;
+  border-color: #f87171;
+}
+
 .ua-config-folder-row {
   background: var(--ua-config-surface-raised);
   border-color: var(--ua-config-border);
@@ -1932,6 +1986,19 @@ select {
   background: var(--ua-config-warning-bg);
   border-color: var(--ua-config-warning-border);
   color: var(--ua-config-warning-text);
+}
+
+.ua-upload-screenshot-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(14rem, 100%), 1fr));
+}
+
+@media (max-width: 1023px) {
+  :where(.ua-upload-help-modal, .ua-config-help-modal, .ua-changelog-modal) {
+    max-height: min(95vh, 52rem) !important;
+    max-height: min(95dvh, 52rem) !important;
+    max-width: 36rem !important;
+    width: calc(100vw - 2rem) !important;
+  }
 }
 
 @media (max-width: 767px) {

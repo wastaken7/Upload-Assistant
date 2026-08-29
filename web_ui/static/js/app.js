@@ -5364,7 +5364,7 @@ function AudionutsUAGUI() {
                           Add to this group
                         </button>
                       </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="ua-upload-screenshot-grid grid gap-3">
                         {screenshots.map((screenshot, index) => {
                           const replacing =
                             screenshotActionId === `replace:${screenshot.id}`;
@@ -7112,7 +7112,9 @@ function AudionutsUAGUI() {
             <div
               className={`ua-upload-workspace-main ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"} border-b ${isExecuting ? "p-3" : "p-4"} ${!isExecuting && !isOutputExpanded ? "flex-1 overflow-y-auto" : "flex-shrink-0"}`}
             >
-              <div className="mx-auto max-w-6xl space-y-4">
+              <div
+                className={`${isExecuting ? "w-full" : "mx-auto max-w-6xl"} space-y-4`}
+              >
                 {isExecuting ? (
                   <div className="flex flex-wrap items-center justify-end gap-4">
                     <button

@@ -500,7 +500,6 @@ const DEFAULT_WORKFLOW_GROUPS = [
       "ARR INTEGRATION",
       "METADATA CACHING",
       "MUSIC METADATA",
-      "TRACKER SEARCH AND IMPORT",
     ],
   },
   {
@@ -532,7 +531,12 @@ const DEFAULT_WORKFLOW_GROUPS = [
   {
     id: "upload",
     label: "Upload Workflow",
-    headings: ["TORRENT CREATION", "TRACKER CHECKS AND UPLOAD", "POST-UPLOAD"],
+    headings: [
+      "TRACKER SEARCH AND IMPORT",
+      "TRACKER CHECKS AND UPLOAD",
+      "TORRENT CREATION",
+      "POST-UPLOAD",
+    ],
   },
 ];
 
@@ -621,8 +625,11 @@ const CONFIG_HEADING_LABELS = {
   "DESCRIPTION HEADERS AND OVERRIDES": "Description Headers and Overrides",
   "BLU-RAY SETTINGS": "Blu-ray Settings",
   "AUDIO SPECTROGRAMS AND HDR PLOTS": "Audio Spectrograms and HDR Plots",
+  "TRACKER CHECKS": "Tracker Checks",
   "TORRENT CREATION": "Torrent Creation",
   "TRACKER CHECKS AND UPLOAD": "Tracker Checks and Upload",
+  "UPLOAD BEHAVIOUR": "Upload Behaviour",
+  "UPLOAD CONSOLE OUTPUT": "Upload Console Output",
   "POST-UPLOAD": "Post-Upload",
   "GENERAL SETTINGS": "General Settings",
   "SERVER CONNECTION": "Server Connection",
@@ -640,6 +647,103 @@ const normalizeConfigHeading = (value) =>
 const formatConfigHeading = (value) => {
   const normalized = normalizeConfigHeading(value);
   return CONFIG_HEADING_LABELS[normalized] || formatDisplayLabel(value);
+};
+
+const UPLOAD_WORKFLOW_HEADING_ORDER = [
+  "TRACKER SEARCH AND IMPORT",
+  "TRACKER CHECKS",
+  "TORRENT CREATION",
+  "UPLOAD BEHAVIOUR",
+  "UPLOAD CONSOLE OUTPUT",
+  "POST-UPLOAD",
+];
+
+const UPLOAD_CONSOLE_OUTPUT_KEYS = new Set([
+  "show_upload_duration",
+  "print_tracker_messages",
+  "print_tracker_links",
+]);
+
+const prepareUploadWorkflowItems = (items) => {
+  const preparedItems = [];
+  for (const item of items || []) {
+    const heading = normalizeConfigHeading(
+      item?.subsection === true ? item.key : item?.subsection,
+    );
+    if (item?.subsection === true && heading === "TRACKER SEARCH AND IMPORT") {
+      preparedItems.push({
+        ...item,
+        children: (item.children || []).slice().sort((left, right) => {
+          if (left.key === "tracker_description_mode") return -1;
+          if (right.key === "tracker_description_mode") return 1;
+          return 0;
+        }),
+      });
+      continue;
+    }
+    if (item?.subsection !== true || heading !== "TRACKER CHECKS AND UPLOAD") {
+      preparedItems.push(item);
+      continue;
+    }
+
+    const uploadBehaviourStart = (item.children || []).findIndex(
+      (child) => child.key === "upload_order",
+    );
+    if (uploadBehaviourStart <= 0) {
+      preparedItems.push(item);
+      continue;
+    }
+
+    // Keep the upstream config subsection intact and split it only for WebUI
+    // presentation. Static subsections still save their children under DEFAULT.
+    const uploadBehaviourItems = item.children.slice(uploadBehaviourStart);
+    const consoleOutputItems = uploadBehaviourItems.filter((child) =>
+      UPLOAD_CONSOLE_OUTPUT_KEYS.has(child.key),
+    );
+    preparedItems.push({
+      ...item,
+      key: "TRACKER CHECKS",
+      children: item.children.slice(0, uploadBehaviourStart),
+    });
+    preparedItems.push({
+      ...item,
+      key: "UPLOAD BEHAVIOUR",
+      children: uploadBehaviourItems.filter(
+        (child) => !UPLOAD_CONSOLE_OUTPUT_KEYS.has(child.key),
+      ),
+    });
+    if (consoleOutputItems.length > 0) {
+      preparedItems.push({
+        ...item,
+        key: "UPLOAD CONSOLE OUTPUT",
+        children: consoleOutputItems,
+      });
+    }
+  }
+
+  const headingOrder = new Map(
+    UPLOAD_WORKFLOW_HEADING_ORDER.map((heading, index) => [heading, index]),
+  );
+  return preparedItems
+    .map((item, originalIndex) => ({ item, originalIndex }))
+    .sort((left, right) => {
+      const leftHeading = normalizeConfigHeading(
+        left.item?.subsection === true ? left.item.key : left.item?.subsection,
+      );
+      const rightHeading = normalizeConfigHeading(
+        right.item?.subsection === true
+          ? right.item.key
+          : right.item?.subsection,
+      );
+      const leftOrder = headingOrder.get(leftHeading);
+      const rightOrder = headingOrder.get(rightHeading);
+      return (
+        (leftOrder ?? Number.MAX_SAFE_INTEGER) -
+          (rightOrder ?? Number.MAX_SAFE_INTEGER) ||
+        left.originalIndex - right.originalIndex
+      );
+    })
+    .map(({ item }) => item);
 };
 
 const getDefaultItemGroupId = (item) => {
@@ -1097,20 +1201,25 @@ const getImageHostForApiKey = (key) => {
   return null;
 };
 
-const getImageHostOptions = (item, allHosts, usedHosts) => {
+const getImageHostOptions = (item, allHosts) => {
   if (!item || !item.key || !item.key.startsWith("img_host_")) {
-    return [];
-  }
-  if (!allHosts.length) {
     return [];
   }
   const currentValue = String(item.value || "")
     .trim()
     .toLowerCase();
-  return allHosts.filter((host) => {
-    const normalizedHost = String(host).trim().toLowerCase();
-    return !usedHosts.has(normalizedHost) || currentValue === normalizedHost;
-  });
+  if (!allHosts.length) {
+    return currentValue ? [currentValue] : [];
+  }
+  const options = Array.from(
+    new Set(
+      allHosts.map((host) => String(host).trim().toLowerCase()).filter(Boolean),
+    ),
+  );
+  if (currentValue && !options.includes(currentValue)) {
+    options.push(currentValue);
+  }
+  return options;
 };
 
 const getAvailableTrackers = (item) => {
@@ -1495,7 +1604,6 @@ function ConfigLeafEditor({
   isDarkMode,
   fullWidth,
   allImageHosts,
-  usedImageHosts,
   torrentClients,
   onBrowseFolder,
   onValueChange,
@@ -2168,7 +2276,7 @@ function ConfigLeafEditor({
   }
 
   if (item.key && item.key.startsWith("img_host_")) {
-    const options = getImageHostOptions(item, allImageHosts, usedImageHosts);
+    const options = getImageHostOptions(item, allImageHosts);
     const [value, setValue] = useState(
       item.value === null || item.value === undefined
         ? ""
@@ -3313,7 +3421,7 @@ function HelpResourcesModal({
       }}
     >
       <section
-        className="ua-config-modal flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl border shadow-2xl"
+        className="ua-config-modal ua-config-help-modal flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl border shadow-2xl"
         role="dialog"
         aria-modal="true"
         aria-labelledby="help-resources-title"
@@ -4682,7 +4790,6 @@ function ItemList({
       "get_bluray_info",
       "bluray_score",
       "bluray_single_score",
-      "ping_unit3d",
     ],
     Headers: [
       "custom_description_header",
@@ -5356,44 +5463,57 @@ function ItemList({
   );
 }
 
-// Promise-based confirmation modal to avoid blocking `confirm()`.
+// Promise-based, theme-aware confirmation modal to avoid blocking `confirm()`.
 // Returns a Promise that resolves to true (confirmed) or false (cancelled).
 function showConfirmModal(opts) {
   // Accept either a string (message) or an options object { title, message, confirmLabel }
   const options = typeof opts === "string" ? { message: opts } : opts || {};
   return new Promise((resolve) => {
+    const previousFocus = document.activeElement;
+    const configRoot = document.querySelector(".ua-config-page");
+    const modeClass = configRoot?.classList.contains("ua-mode-light")
+      ? "ua-mode-light"
+      : "ua-mode-dark";
+    const modalHost = document.body;
     const overlay = document.createElement("div");
-    overlay.className =
-      "ua-confirm-overlay fixed inset-0 z-50 flex items-center justify-center";
-    overlay.style.background = "rgba(0,0,0,0.4)";
+    overlay.className = `ua-config-page ${modeClass} ua-confirm-overlay fixed inset-0 z-50 flex items-center justify-center p-4`;
 
     const dlg = document.createElement("div");
     dlg.className =
-      "ua-confirm-dialog max-w-md w-full rounded-lg p-4 bg-white text-gray-900";
-    dlg.style.boxShadow = "0 10px 30px rgba(0,0,0,0.3)";
+      "ua-confirm-dialog w-full max-w-md overflow-hidden rounded-xl border shadow-2xl";
+    dlg.setAttribute("role", "dialog");
+    dlg.setAttribute("aria-modal", "true");
 
     const msg = document.createElement("div");
-    msg.className = "mb-4 text-sm";
+    msg.className = "ua-confirm-message px-5 py-4 text-sm";
     msg.textContent = options.message || "";
+    msg.id = "ua-confirm-message";
+    dlg.setAttribute("aria-describedby", msg.id);
 
     if (options.title) {
       const titleEl = document.createElement("div");
-      titleEl.className = "mb-2 font-semibold";
+      titleEl.className =
+        "ua-confirm-title border-b px-5 py-4 text-base font-semibold";
       titleEl.textContent = options.title;
+      titleEl.id = "ua-confirm-title";
+      dlg.setAttribute("aria-labelledby", titleEl.id);
       dlg.appendChild(titleEl);
     }
 
     const btnRow = document.createElement("div");
-    btnRow.className = "flex justify-end gap-2";
+    btnRow.className =
+      "ua-confirm-actions flex justify-end gap-2 border-t px-5 py-3";
 
     const cancelBtn = document.createElement("button");
     cancelBtn.type = "button";
-    cancelBtn.className = "px-3 py-1 rounded bg-gray-200";
+    cancelBtn.className =
+      "ua-confirm-cancel rounded-lg border px-3 py-2 text-sm font-semibold";
     cancelBtn.textContent = "Cancel";
 
     const okBtn = document.createElement("button");
     okBtn.type = "button";
-    okBtn.className = "px-3 py-1 rounded bg-red-600 text-white";
+    okBtn.className =
+      "ua-confirm-danger rounded-lg border px-3 py-2 text-sm font-semibold";
     okBtn.textContent = options.confirmLabel || "Remove";
 
     btnRow.appendChild(cancelBtn);
@@ -5401,14 +5521,14 @@ function showConfirmModal(opts) {
     dlg.appendChild(msg);
     dlg.appendChild(btnRow);
     overlay.appendChild(dlg);
-    document.body.appendChild(overlay);
+    modalHost.appendChild(overlay);
 
     // Focus management
     okBtn.focus();
 
     function cleanup(result) {
       try {
-        document.body.removeChild(overlay);
+        modalHost.removeChild(overlay);
       } catch (e) {
         /* ignore */
       }
@@ -5417,6 +5537,7 @@ function showConfirmModal(opts) {
       } catch (e) {
         /* ignore */
       }
+      window.requestAnimationFrame(() => previousFocus?.focus?.());
       resolve(result);
     }
 
@@ -5435,7 +5556,7 @@ function showConfirmModal(opts) {
         cleanup(true);
       }
     }
-    window.addEventListener("keydown", keyHandler, { once: true });
+    window.addEventListener("keydown", keyHandler);
   });
 }
 
@@ -7231,11 +7352,30 @@ function ConfigApp() {
       confirmLabel: "Discard Changes",
     });
     if (!confirmed) return;
+    const fieldPathsToReset = Array.from(pendingChanges.keys());
+    const requiresStructuralReload =
+      pendingTorrentClients.size > 0 ||
+      pendingRenamedTorrentClients.size > 0 ||
+      pendingRemovedTorrentClients.size > 0 ||
+      pendingRemovedTrackers.size > 0 ||
+      pendingTrackerOverrideModes.size > 0;
     setIsPendingSummaryOpen(false);
-    const didReload = await loadConfigOptions();
-    if (didReload) {
-      setStatusWithClear("Unsaved changes discarded.", "info", 2500);
+
+    if (requiresStructuralReload) {
+      const didReload = await loadConfigOptions();
+      if (!didReload) return;
+    } else {
+      setPendingChanges(new Map());
     }
+
+    fieldPathsToReset.forEach((pathKey) => {
+      window.dispatchEvent(
+        new CustomEvent(CONFIG_FIELD_RESET_EVENT, {
+          detail: { pathKey },
+        }),
+      );
+    });
+    setStatusWithClear("Unsaved changes discarded.", "info", 2500);
   };
 
   const onValueChange = (path, value, meta) => {
@@ -7261,7 +7401,11 @@ function ConfigApp() {
       if (value === meta.originalValue) {
         next.delete(pathKey);
       } else {
-        next.set(pathKey, { path, value });
+        next.set(pathKey, {
+          path,
+          value,
+          originalValue: meta.originalValue,
+        });
       }
       return next;
     });
@@ -8031,6 +8175,46 @@ function ConfigApp() {
     });
   };
 
+  const getDuplicateImageHostSelections = () => {
+    const selections = new Map();
+    const collectImageHosts = (items) => {
+      for (const item of items || []) {
+        if (item.children?.length) collectImageHosts(item.children);
+        if (item.key?.startsWith("img_host_")) {
+          selections.set(
+            item.key,
+            String(item.value || "")
+              .trim()
+              .toLowerCase(),
+          );
+        }
+      }
+    };
+    sections.forEach((section) => collectImageHosts(section.items));
+    for (const update of pendingChanges.values()) {
+      const fieldKey = String(update.path?.[update.path.length - 1] || "");
+      if (fieldKey.startsWith("img_host_")) {
+        selections.set(
+          fieldKey,
+          String(update.value || "")
+            .trim()
+            .toLowerCase(),
+        );
+      }
+    }
+
+    const prioritiesByHost = new Map();
+    for (const [fieldKey, host] of selections) {
+      if (!host) continue;
+      const priorities = prioritiesByHost.get(host) || [];
+      priorities.push(fieldKey);
+      prioritiesByHost.set(host, priorities);
+    }
+    return Array.from(prioritiesByHost.entries()).filter(
+      ([, priorities]) => priorities.length > 1,
+    );
+  };
+
   const saveAllChanges = async () => {
     const pendingChangeCount =
       pendingChanges.size +
@@ -8042,6 +8226,32 @@ function ConfigApp() {
     if (pendingChangeCount === 0) {
       setStatusWithClear("No changes to save.", "warn", 1500);
       return;
+    }
+    const hasPendingImageHostChange = Array.from(pendingChanges.values()).some(
+      (update) =>
+        String(update.path?.[update.path.length - 1] || "").startsWith(
+          "img_host_",
+        ),
+    );
+    if (hasPendingImageHostChange) {
+      const duplicateImageHosts = getDuplicateImageHostSelections();
+      if (duplicateImageHosts.length) {
+        const duplicateSummary = duplicateImageHosts
+          .map(([host, priorities]) => {
+            const hostLabel = IMAGE_HOST_LABELS[host] || host;
+            const priorityLabels = priorities.map(
+              (fieldKey) => `Image Host ${fieldKey.replace("img_host_", "")}`,
+            );
+            return `${hostLabel} (${priorityLabels.join(", ")})`;
+          })
+          .join("; ");
+        setStatusWithClear(
+          `Each image host can only be selected once. Resolve: ${duplicateSummary}.`,
+          "error",
+          6000,
+        );
+        return;
+      }
     }
     for (const clientName of pendingRemovedTorrentClients) {
       const references = torrentClientReferences(clientName);
@@ -8335,12 +8545,16 @@ function ConfigApp() {
               getConfigSectionLabel(activeSection.section).toLowerCase() +
               "."
             : "Manage Upload Assistant settings.";
-  const visibleItems =
+  const groupedVisibleItems =
     activeSection?.section === "DEFAULT" && activeSubTab
       ? activeSection.items.filter(
           (item) => getDefaultItemGroupId(item) === activeSubTab,
         )
       : activeSection?.items || [];
+  const visibleItems =
+    activeSection?.section === "DEFAULT" && activeSubTab === "upload"
+      ? prepareUploadWorkflowItems(groupedVisibleItems)
+      : groupedVisibleItems;
 
   const statusClass = "ua-config-status text-sm";
   const pendingChangeCount =
@@ -8352,10 +8566,46 @@ function ConfigApp() {
     pendingTrackerOverrideModes.size;
   const pendingChangeSummaries = useMemo(() => {
     const summaries = [];
+    const availableTrackerNames = new Set(
+      (trackerCatalog?.trackers || [])
+        .filter((tracker) => !tracker.configured)
+        .map((tracker) => String(tracker.name || "").toUpperCase())
+        .filter(Boolean),
+    );
+    const availableTrackerChanges = new Map();
     const describeValue = (update) => {
       const path = Array.isArray(update.path) ? update.path : [];
       const key = String(path[path.length - 1] || "");
       const parentPath = path.slice(0, -1);
+      if (path[0] === "TRACKERS" && key === "default_trackers") {
+        const normalizeTrackers = (value) =>
+          String(value || "")
+            .split(",")
+            .map((tracker) => tracker.trim().toUpperCase())
+            .filter(Boolean);
+        const originalTrackers = normalizeTrackers(update.originalValue);
+        const nextTrackers = normalizeTrackers(update.value);
+        const originalSet = new Set(originalTrackers);
+        const nextSet = new Set(nextTrackers);
+        const added = nextTrackers.filter(
+          (tracker) => !originalSet.has(tracker),
+        );
+        const removed = originalTrackers.filter(
+          (tracker) => !nextSet.has(tracker),
+        );
+        const descriptions = [];
+        if (added.length) {
+          descriptions.push(
+            `Added ${added.map(getTrackerDisplayName).join(", ")}`,
+          );
+        }
+        if (removed.length) {
+          descriptions.push(
+            `Removed ${removed.map(getTrackerDisplayName).join(", ")}`,
+          );
+        }
+        return descriptions.join("; ") || "Default tracker order changed";
+      }
       if (
         isSensitiveKeyForPath(key, parentPath) ||
         /(cookie|token|secret|passkey)/i.test(key)
@@ -8397,6 +8647,7 @@ function ConfigApp() {
             return value;
           }
           if (index === 1 && path[0] === "TRACKERS") {
+            if (value === "default_trackers") return "Default Trackers";
             return getTrackerDisplayName(value);
           }
           return formatConfigFieldLabel(value, path.slice(0, index));
@@ -8405,12 +8656,35 @@ function ConfigApp() {
     };
 
     for (const [pathKey, update] of pendingChanges) {
+      const path = Array.isArray(update.path) ? update.path : [];
+      const trackerName = String(path[1] || "").toUpperCase();
+      const isAvailableTrackerChange =
+        path[0] === "TRACKERS" &&
+        path.length > 2 &&
+        availableTrackerNames.has(trackerName);
+      if (isAvailableTrackerChange) {
+        const trackerChanges = availableTrackerChanges.get(trackerName) || [];
+        trackerChanges.push(pathKey);
+        availableTrackerChanges.set(trackerName, trackerChanges);
+        continue;
+      }
       summaries.push({
         id: `field:${pathKey}`,
         kind: "field",
         pathKey,
         title: describePath(update) || "Configuration value",
         detail: describeValue(update),
+      });
+    }
+    for (const [trackerName, pathKeys] of availableTrackerChanges) {
+      const settingCount = pathKeys.length;
+      summaries.push({
+        id: `available-tracker:${trackerName}`,
+        kind: "available-tracker",
+        trackerName,
+        pathKeys,
+        title: `Configure tracker › ${getTrackerDisplayName(trackerName)}`,
+        detail: `${settingCount} setting${settingCount === 1 ? "" : "s"} changed`,
       });
     }
     for (const [clientName, templateName] of pendingTorrentClients) {
@@ -8474,6 +8748,7 @@ function ConfigApp() {
     pendingRenamedTorrentClients,
     pendingTorrentClients,
     pendingTrackerOverrideModes,
+    trackerCatalog,
   ]);
   useEffect(() => {
     if (pendingChangeCount === 0) {
@@ -8492,6 +8767,19 @@ function ConfigApp() {
           detail: { pathKey: summary.pathKey },
         }),
       );
+    } else if (summary.kind === "available-tracker") {
+      setPendingChanges((currentChanges) => {
+        const next = new Map(currentChanges);
+        summary.pathKeys.forEach((pathKey) => next.delete(pathKey));
+        return next;
+      });
+      summary.pathKeys.forEach((pathKey) => {
+        window.dispatchEvent(
+          new CustomEvent(CONFIG_FIELD_RESET_EVENT, {
+            detail: { pathKey },
+          }),
+        );
+      });
     } else if (summary.kind === "client-add") {
       removePendingTorrentClient(summary.clientName);
     } else if (summary.kind === "client-rename") {
