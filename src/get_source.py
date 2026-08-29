@@ -64,6 +64,8 @@ async def get_source(type: str, video: str, path: str, is_disc: str, meta: Meta,
                     source = guessit_fn(source_input).get("source", source)
                 except Exception:
                     source = "BluRay"
+        if isinstance(source, list):
+            source = source[-1] if source else "BluRay"
         if source in ("Blu-ray", "Ultra HD Blu-ray", "BluRay", "BR") or is_disc == "BDMV":
             if type == "DISC":
                 source = "Blu-ray"
