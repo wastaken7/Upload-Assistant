@@ -1988,6 +1988,66 @@ function ConfigLeafEditor({
     );
   }
 
+  if (item.key === "upload_order") {
+    const originalValue =
+      item.value === null || item.value === undefined ? "" : String(item.value);
+    const uploadOrderOptions = [
+      {
+        value: "concurrent",
+        label: "Concurrent — Upload to Usenet and torrent trackers together",
+      },
+      {
+        value: "usenet",
+        label: "Usenet first — Finish Usenet before torrent trackers",
+      },
+      {
+        value: "tracker",
+        label: "Torrent trackers first — Finish trackers before Usenet",
+      },
+    ];
+    if (
+      selectedValue &&
+      !uploadOrderOptions.some((option) => option.value === selectedValue)
+    ) {
+      uploadOrderOptions.unshift({
+        value: selectedValue,
+        label: `${selectedValue} (Unsupported)`,
+      });
+    }
+
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <label htmlFor={fieldId} className={labelClass}>
+            {displayLabel}
+          </label>
+          {helpText && (
+            <Tooltip content={helpText}>
+              <InfoIcon
+                className={`h-4 w-4 ${isDarkMode ? "text-gray-400 hover:text-gray-300" : "text-gray-500 hover:text-gray-600"}`}
+              />
+            </Tooltip>
+          )}
+        </div>
+        <SelectDropdown
+          id={fieldId}
+          value={selectedValue}
+          onChange={(newValue) => {
+            setSelectedValue(newValue);
+            onValueChange(path, newValue, {
+              originalValue,
+              isSensitive: false,
+              isRedacted: false,
+              readOnly: false,
+            });
+          }}
+          options={uploadOrderOptions}
+          isDarkMode={isDarkMode}
+        />
+      </div>
+    );
+  }
+
   if (isLinkingField(item.key, pathParts)) {
     const linkingOptions = [
       { value: "", label: "None (Original Path)" },
