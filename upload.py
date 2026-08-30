@@ -7,6 +7,8 @@ import os
 import sys
 from pathlib import Path
 
+from src.app_paths import LegacyConfigLocationError, ensure_legacy_config_absent
+
 _entrypoint_name = Path(sys.argv[0]).stem.lower()
 _is_uploader_entrypoint = __name__ == "__main__" or _entrypoint_name == "ua"
 
@@ -26,6 +28,13 @@ if _is_uploader_entrypoint and ("-h" in sys.argv or "--help" in sys.argv):
     with contextlib.suppress(SystemExit):
         Args({"DEFAULT": {"screens": 0}}).parse(sys.argv[1:], None)
     sys.exit(0)
+
+if _is_uploader_entrypoint:
+    try:
+        ensure_legacy_config_absent()
+    except LegacyConfigLocationError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        sys.exit(1)
 
 import ast
 import asyncio
