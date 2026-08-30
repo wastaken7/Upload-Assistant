@@ -274,9 +274,14 @@ class DigitalCore:
                             torrent_id = str(response_data["id"])
                             meta.tracker_status[self.tracker]["torrent_id"] = torrent_id + "/"
                             meta.tracker_status[self.tracker]["status_message"] = response_data.get("message")
-                            await self.common.download_tracker_torrent(
-                                meta, self.tracker, headers=dict(self.session.headers), downurl=f"{self.api_base_url}/download/{torrent_id}"
-                            )
+                            # the .torrent is generated asynchronously; an immediate download 404s
+                            for attempt in range(4):
+                                if await self.common.download_tracker_torrent(
+                                    meta, self.tracker, headers=dict(self.session.headers), downurl=f"{self.api_base_url}/download/{torrent_id}"
+                                ):
+                                    break
+                                if attempt < 3:
+                                    await asyncio.sleep(10 * (attempt + 1))
                             return True
 
                         meta.tracker_status[self.tracker]["status_message"] = f"data error: {response_data.get('message', 'Unknown API error.')}"
