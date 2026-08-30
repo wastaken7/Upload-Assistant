@@ -172,6 +172,7 @@ class NordicQuality(UNIT3D):
 
         name = name.replace("HDR10+", "HDR10P").replace("DD+", "DDP").replace("DTS:X", "DTS-X").replace("&", "and")
         name = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode("ascii")
+        name = re.sub(r"\(((?:19|20)\d{2})\)", r"\1", name)
         name = re.sub(r"[^A-Za-z0-9._()\-]+", ".", name)
         name = re.sub(r"\.{2,}", ".", name).strip(".")
 
