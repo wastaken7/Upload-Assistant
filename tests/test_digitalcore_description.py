@@ -19,6 +19,16 @@ def test_digitalcore_rewrites_sized_img_tags_to_plain_img():
     assert "[img]https://img.example/1.png[/img]" in formatted
 
 
+def test_digitalcore_rewrites_ptscreens_host_to_the_csp_allowed_one():
+    builder = DescriptionBuilder("DIGITALCORE", {"DEFAULT": {}, "TRACKERS": {"DIGITALCORE": {}}})
+    description = "[url=https://ptscreens.com/image/x][img]https://img.ptscreens.com/a.png[/img][/url]"
+
+    formatted = builder.tracker_specific_formats("DIGITALCORE", description)
+
+    assert "[img]https://img2.ptscreens.com/a.png[/img]" in formatted
+    assert "[url=https://ptscreens.com/image/x]" in formatted
+
+
 def _patch_client(monkeypatch, fail):
     class Client:
         def __init__(self, *args, **kwargs):

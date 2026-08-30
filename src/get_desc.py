@@ -2116,6 +2116,8 @@ class DescriptionBuilder:
 
         if tracker == "DIGITALCORE":
             description = bbcode.remove_img_resize(description)
+            # DC's CSP img-src allows img2.ptscreens.com, not img.ptscreens.com
+            description = description.replace("//img.ptscreens.com/", "//img2.ptscreens.com/")
             description = description.replace("[user]", "").replace("[/user]", "")
             description = description.replace("[align=left]", "").replace("[/align]", "")
             description = description.replace("[right]", "").replace("[/right]", "")
