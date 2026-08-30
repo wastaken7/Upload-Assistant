@@ -34,6 +34,20 @@ CONFIG_PATH = DATA_DIR / "config.py"
 LEGACY_CONFIG_PATH = CODE_DIR / "data" / "config.py"
 
 
+class LegacyConfigLocationError(RuntimeError):
+    """Raised when configuration remains in the obsolete checkout location."""
+
+
+def ensure_legacy_config_absent() -> None:
+    """Reject a checkout config that the application no longer reads."""
+    if LEGACY_CONFIG_PATH.is_file() and LEGACY_CONFIG_PATH.resolve() != CONFIG_PATH.resolve():
+        raise LegacyConfigLocationError(
+            f"Configuration file found in the obsolete location: {LEGACY_CONFIG_PATH}\n"
+            f"Copy your settings to the active configuration: {CONFIG_PATH}\n"
+            "Then remove the obsolete file and try again."
+        )
+
+
 def ensure_data_dir() -> Path:
     """Create and return the user-owned runtime directory."""
     STATE_DIR.mkdir(parents=True, exist_ok=True)

@@ -4,6 +4,8 @@ import sys
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 
 def test_user_data_override_holds_runtime_config(tmp_path: Path) -> None:
     """``data.config`` must resolve from UA_DATA_DIR, never the checkout."""
@@ -34,6 +36,35 @@ def test_state_layout_has_one_data_directory(tmp_path: Path) -> None:
     config_path = state_dir / "data" / "config.py"
     assert config_path.parent == state_dir / "data"  # noqa: S101
     assert not (state_dir / "data" / "data" / "config.py").exists()  # noqa: S101
+
+
+def test_legacy_checkout_config_blocks_upload(monkeypatch, tmp_path: Path) -> None:
+    from src import app_paths
+
+    legacy_config = tmp_path / "checkout" / "data" / "config.py"
+    active_config = tmp_path / "state" / "data" / "config.py"
+    legacy_config.parent.mkdir(parents=True)
+    legacy_config.write_text("config = {}", encoding="utf-8")
+    monkeypatch.setattr(app_paths, "LEGACY_CONFIG_PATH", legacy_config)
+    monkeypatch.setattr(app_paths, "CONFIG_PATH", active_config)
+
+    with pytest.raises(app_paths.LegacyConfigLocationError, match="obsolete location") as exc_info:
+        app_paths.ensure_legacy_config_absent()
+
+    assert str(legacy_config) in str(exc_info.value)  # noqa: S101
+    assert str(active_config) in str(exc_info.value)  # noqa: S101
+
+
+def test_active_config_is_not_mistaken_for_legacy(monkeypatch, tmp_path: Path) -> None:
+    from src import app_paths
+
+    config_path = tmp_path / "data" / "config.py"
+    config_path.parent.mkdir(parents=True)
+    config_path.write_text("config = {}", encoding="utf-8")
+    monkeypatch.setattr(app_paths, "LEGACY_CONFIG_PATH", config_path)
+    monkeypatch.setattr(app_paths, "CONFIG_PATH", config_path)
+
+    app_paths.ensure_legacy_config_absent()
 
 
 def test_default_data_dir_unix_default(monkeypatch) -> None:
