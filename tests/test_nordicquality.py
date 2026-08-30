@@ -99,6 +99,16 @@ def test_nordicquality_sanitizes_upload_name():
     assert asyncio.run(_tracker().get_name(meta)) == {"name": "AEroskobing.Ar.2025.HDR10P.DDP.DTS-X.and"}  # noqa: S101
 
 
+def test_nordicquality_removes_parentheses_around_release_year():
+    meta = Meta(
+        category="MOVIE",
+        filelist=["D:/Movies/Congo (1995) 1080p UHD BluRay OPUS 5.1 SDR AV1-WhiskeyJack.mkv"],
+    )
+    assert asyncio.run(_tracker().get_name(meta)) == {  # noqa: S101
+        "name": "Congo.1995.1080p.UHD.BluRay.OPUS.5.1.SDR.AV1-WhiskeyJack"
+    }
+
+
 def test_nordicquality_preserves_release_suffix_in_extensionless_uuid():
     meta = Meta(category="MOVIE", uuid="Snatched.2017.UHD.BluRay.2160p.DTS-HD.MA.7.1.HEVC.REMUX-FraMeSToR")
 
