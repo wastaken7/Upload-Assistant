@@ -1,6 +1,6 @@
-# Upload Assistant — Web UI API Reference
+# Upload Assistant — WebUI API Reference
 
-This document summarizes the Web UI HTTP API implemented in web_ui/server.py. For each endpoint: HTTP methods, authentication/CSRF requirements, accepted payload or query parameters, special rules (token rules, rate limits), and example response shapes.
+This document summarizes the WebUI HTTP API implemented in `web_ui/server.py`. For each endpoint it lists HTTP methods, authentication and CSRF requirements, accepted payload or query parameters, special rules, and example response shapes. For normal browser usage, see the [WebUI guide](web-ui.md).
 
 ---
 

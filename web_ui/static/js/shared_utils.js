@@ -44,8 +44,8 @@
         },
         {
           label: "WebUI guide",
-          description: "Basic WebUI setup and usage.",
-          href: "https://github.com/wastaken7/Upload-Assistant/blob/development/docs/web-ui-basic.md",
+          description: "Complete WebUI setup, usage and administration.",
+          href: "https://github.com/wastaken7/Upload-Assistant/blob/development/docs/web-ui.md",
         },
       ],
     },

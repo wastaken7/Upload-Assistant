@@ -1,97 +1,64 @@
-# Upload Assistant — Web UI (Quick Guide)
+# Upload Assistant — WebUI Quick Start
 
-This short guide explains how to use the built-in Web UI.
+This page covers the shortest path from starting the WebUI to running an upload. For the complete workspace, configuration, security, and troubleshooting guide, see the [full WebUI guide](web-ui.md).
 
-### Starting the Web UI & environment variables
+## 1. Start the WebUI
 
-- Start the web UI by running `upload.py` with the `--webui HOST:PORT` argument. Example:
+Pass one or more directories to browse, followed by `--webui`:
 
 ```bash
-python upload.py "/path/to/folder" "/another/path" --webui 127.0.0.1:8080
+python upload.py "/path/to/media" --webui 127.0.0.1:5000
 ```
 
-- Path handling: browse roots can be provided in two ways:
-  - **Command-line paths** (when running as script): pass one or more paths before `--webui`, e.g. `python upload.py /path/to/folder --webui 127.0.0.1:8080`. These become the browse roots when `UA_BROWSE_ROOTS` is not set.
-  - **`UA_BROWSE_ROOTS`** (environment variable): comma-separated list of directories. Takes precedence over command-line paths. **Required when running in Docker** — the Docker command typically uses `--webui` only with no paths, so without `UA_BROWSE_ROOTS` the app would use a dummy path and the file browser would not work.
+Then open <http://127.0.0.1:5000>.
 
-- Other optional environment variables used by the Web UI:
-  - `UA_WEBUI_USE_SUBPROCESS` — if set (non-empty) the server will run uploads in a subprocess rather than in-process (affects interactive behavior and Rich output recording).
-  - `UA_WEBUI_CORS_ORIGINS` — comma-separated list of allowed origins for `/api/*` when remote clients need cross-origin access.
-  - `SESSION_SECRET` or `SESSION_SECRET_FILE` — provide a stable session secret (permission handling needed). Do not just use this by default.
+`127.0.0.1:5000` is the default address. Bind to another interface only when other devices need to connect and the network is trusted or protected by an authenticated reverse proxy.
 
-Notes:
+### Browse roots
 
-- The server enforces that browse roots are the only configured roots (it will not expose arbitrary filesystem locations). Paths supplied on the command line or via `UA_BROWSE_ROOTS` are normalized and validated by the server before being exposed.
-- If you get "No browse roots specified" when starting with `--webui`: when running as a script, pass paths on the command line (e.g. `python upload.py /path/to/folder --webui 127.0.0.1:5000`) or set `UA_BROWSE_ROOTS`. When running in Docker, you must set `UA_BROWSE_ROOTS` because the command has no paths.
-- The webui arg uses `127.0.0.1:5000` by default. `HOST:PORT` are only needed if overriding.
+The File Browser only exposes configured browse roots. They can be supplied as:
 
-### Open the UI
+- positional paths before `--webui`; or
+- a comma-separated `UA_BROWSE_ROOTS` environment variable, which takes precedence.
 
-- Point your browser to the host and port where Upload Assistant is running, for example `http://127.0.0.1:5000`, you will be redirect to `login`.
+`UA_BROWSE_ROOTS` is required for the normal Docker setup because its command starts the WebUI without positional paths. Use container-side paths, not host-side paths. See [Docker WebUI setup](docker-gui.md).
 
-### Login / First run
+## 2. Create the local account
 
-- If no local user exists, the UI allows a first-run user creation from the login page. Enter a username and a strong password to create the local user. Only one user may be created.
-- The login page supports optional 2FA and recovery codes when 2FA is enabled.
-- The UI supports a "Remember me" cookie so you can remain logged in across restarts.
+The first visit opens account setup. Choose the username and a strong password for the single local WebUI account. Later visits open the sign-in page.
 
-### Two-factor authentication (2FA)
+The account can optionally use Remember me, authenticator-app two-factor authentication (2FA), and one-time recovery codes.
 
-- You can enable TOTP 2FA from the Security settings page in the Config UI section. The setup generates a TOTP secret and provisioning URI (QR code) plus one-time recovery codes — scan the QR with your authenticator app, verify a generated code in the UI to enable 2FA, and store recovery codes securely (they are consumed when used). These 2FA operations require a logged-in browser session.
+## 3. Configure Upload Assistant
 
-### File browser
+Open **Configuration** and work through the relevant sections. At minimum, configure the metadata services, clients, image hosts, and trackers required by your workflow.
 
-- The left panel shows configured browse roots and filesystem folders. The browse roots are provided either by the runtime path (see `upload.py`) or the environment variable `UA_BROWSE_ROOTS` (comma-separated). The browser only shows configured roots — it will not expose the whole filesystem. Supported video extensions shown in the browser are `.mkv`, `.mp4`, and `.ts`, as well as disc based paths. Everything else is filtered.
+Edits are staged in **Pending changes**. Review them, then choose **Save Config**. Closing the page or using a discard action does not save those edits.
 
-### Argument list
+## 4. Run an upload
 
-- The right panel (resizable) shows all of the available arguments that can be used. Click an argument to add that argument to the `additional arguments` list.
+1. Return to **Upload** and select a file or folder in **File Browser**.
+2. Add optional CLI flags through **Arguments**, the command field, or a saved argument preset.
+3. Select the trackers for this run.
+4. Choose **Execute Upload**.
+5. Follow the live output and answer any interactive prompt at the bottom of the output panel.
 
-### Running an upload (interactive)
+During a run, the workspace also exposes binary progress and current media information. When available, **Screenshots** and **Description** let you review generated assets before the upload continues. **Kill** stops the active run.
 
-- Select a file or folder from the left panel, add optional CLI arguments in the Arguments field, then click "Execute Upload". The UI calls `/api/execute` and streams output back using Server-Sent Events (SSE). The UI renders Rich HTML fragments from the uploader.
-- If the running process prompts for input the UI shows an input box — responses are sent via the input box at the bottom of the page (calls `/api/input`) for the active session. You can cancel or kill a running job with the "Kill"/"Clear" control (calls `/api/kill`).
-- Execution can run either in-process (preserving Rich output and interactive prompts) or as a subprocess. The runtime mode can be controlled with the environment variable `UA_WEBUI_USE_SUBPROCESS`.
+## 5. Secure remote access
 
-### Config editor
+- Prefer a localhost binding when the WebUI is only used on the same machine.
+- Restrict `UA_BROWSE_ROOTS` to the directories the application genuinely needs.
+- Use a stable `SESSION_SECRET` or `SESSION_SECRET_FILE`, especially in containers.
+- Put internet-facing access behind an authenticated HTTPS reverse proxy and appropriate firewall rules.
+- Run Upload Assistant as an unprivileged user.
 
-- The "View Config" button opens a config editor served at `/config`. The editor reads bundled options from `data/example_config.py` and applies overrides in the user-state `data/config.py`. Users without a config.py file will have one created from the example.
-- The editor performs type coercion and writes updates back into the user-state config file. Changes are audited to the user-state `data/config_audit.log`.
-- Use the config editor for common changes like adding torrent clients, image hosts, or toggling features.
+See [Security and administration](web-ui.md#security-and-administration) for 2FA, API tokens, IP controls, and access logging.
 
-### Access control
+## Related documentation
 
-- You can monitor and control access from the UI (Config → Access Log). By default, the webui will log all failed api requests (bad calls, wrong credentials). You can adjust the log level via the Access Log Settings. The access log is stored in the same location as `webui_auth.json`. Recent access log entries are viewable in the UI.
-- Repeated failed api endpoint access attempts, will have the associated IP address automatically blacklisted.
-- Blacklisted IP's take precedence, and will be blacklisted even if they have been whitelisted.
-
-### API tokens
-
-- You can create API bearer tokens from the UI (Config → Security → API Tokens). Tokens are stored with the user record and can be used as `Authorization: Bearer <token>` for API requests. The UI manages tokens via `/api/tokens`.
-- Bearer tokens are accepted for certain API calls (for example `/api/browse` and `/api/execute`). Bearer tokens cannot be used for api endpoints that touch sensitive areas.
-
-### CORS and remote access
-
-- Cross-origin API access for `/api/*` can be configured with the `UA_WEBUI_CORS_ORIGINS` environment variable (comma-separated). Without that, the UI is intended to be used from the same host or a reverse proxy.
-
-### Cloudflare proxy access
-
-- When running through a cloudflare proxy, you likely need to disable `Real User Measurements` from the cloudflare dashboard, then `caching/configuration` and `purge everything`.
-
-### Notes and troubleshooting
-
-- If browsing is not configured (no browse roots), the file browser will be empty. When running as a script: pass paths on the command line or set `UA_BROWSE_ROOTS`. When running in Docker: set `UA_BROWSE_ROOTS` (required — Docker uses `--webui` only, so no paths are passed and the app would otherwise use a dummy path).
-- Credentials and recovery storage: the Web UI stores the encrypted local user record (password hash, API tokens, 2FA secret/recovery hashes) in `webui_auth.json` under the application config directory. On Windows this is under `%APPDATA%/upload-assistant` by default; on Unix-like systems it prefers `XDG_CONFIG_HOME` or the repository `data/` directory depending on environment (docker users should correctly map as needed).
-
-- Resetting password / 2FA problems: stopping the web UI and removing the `webui_auth.json` file in the app config dir will remove the persisted user record and allow you to recreate a local user via the login page (this also removes persisted API tokens and recovery codes). If you rely on a persisted session secret, `session_secret` in the config dir may be used to derive encryption keys — removing or changing it will invalidate encrypted fields, so treat that file carefully.
-
-### Security checklist
-
-Use this checklist when deploying the Web UI to reduce risk and harden the runtime:
-
-- **Bind to localhost by default:** set `UA_WEBUI_HOST=127.0.0.1` unless you intentionally need network access; expose via an authenticated reverse proxy when remote access is required.
-- **Prefer managed secrets:** provide `SESSION_SECRET`, `SESSION_SECRET_FILE`, via environment variables when possible. Ensure any file/directory has the correct permissions.
-- **Restrict `UA_BROWSE_ROOTS`:** list only the absolute paths required for upload/browse operations. This gives granular access—you can mount volumes the app needs without exposing them to the file browser. Mount volumes read-only where feasible.
-- **Run unprivileged:** do not run the Web UI as root; restrict filesystem permissions so the server user cannot write to unrelated user data or system locations.
-- **Network controls:** firewall host ports, avoid automatic UPnP/port-forwarding, and publish ports only on necessary interfaces.
-- **Monitor and alert:** collect server logs and monitor for unexpected config changes, token writes, or repeated failed auth attempts.
+- [Full WebUI guide](web-ui.md)
+- [Docker WebUI / Unraid setup](docker-gui.md)
+- [Configuration reference](example-config.md)
+- [CLI arguments](cli-args.md)
+- [WebUI API reference](web-ui-api.md)

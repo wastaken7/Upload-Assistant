@@ -2,6 +2,10 @@
 [Custom Hooks](custom-hooks.md)
 [Upload Order and qBittorrent Bandwidth Control](upload-order-and-bandwidth-control.md)
 
+[WebUI](web-ui.md)
+[WebUI Quick Start](web-ui-basic.md)
+[WebUI API Reference](web-ui-api.md)
+
 [Docker](docker.md)
 
 [Install tips for Unraid](unraid.md)
