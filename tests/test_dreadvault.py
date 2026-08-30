@@ -4,7 +4,7 @@ import pytest
 
 from src.meta import _TRACKER_ID_ALIASES, Meta
 from src.trackers.UNIT3D.dreadvault import DreadVault
-from src.trackersetup import tracker_class_map
+from src.trackersetup import TrackerSetup, tracker_class_map
 
 
 def _tracker() -> DreadVault:
@@ -21,6 +21,15 @@ def test_dreadvault_dvl_alias_resolves_to_the_canonical_name():
     # DVL is the site's own abbreviation, confirmed by DreadVault staff.
     assert _TRACKER_ID_ALIASES["DVL"] == "DREADVAULT"  # noqa: S101
     assert Meta().canonical_tracker_name("dvl") == "DREADVAULT"  # noqa: S101
+
+
+def test_dreadvault_dvl_cli_alias_is_canonicalized_before_tracker_checks():
+    meta = Meta(category="MOVIE", trackers=["DVL"])
+    setup = TrackerSetup({"TRACKERS": {"DREADVAULT": {"api_key": "test-token"}}})
+
+    setup.filter_unsupported_trackers(meta)
+
+    assert meta.trackers == ["DREADVAULT"]  # noqa: S101
 
 
 def test_dreadvault_bans_the_published_groups():
