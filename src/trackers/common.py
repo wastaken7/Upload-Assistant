@@ -363,7 +363,7 @@ class Common:
 
                 if hash_is_id:
                     return await self.get_torrent_hash(meta, tracker)
-                return None
+                return path
 
             except Exception as e:
                 logger.warning(f"[yellow]Warning: Could not download torrent file: {e!s}[/yellow]")
