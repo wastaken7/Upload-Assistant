@@ -433,8 +433,8 @@ async def _get_audio_v2(
                         bloated_check(meta, non_eng_non_orig_languages, is_eng_original_with_non_eng=is_eng_original)
 
                     if ((eng and (orig or non_en_non_commentary)) or (orig and non_en_non_commentary)) and len(audio_tracks) > 1 and not meta.no_dual:
-                        dual = "Dual-Audio"
-                        meta.dual_audio = True
+                        dual = "MULTI" if len(audio_tracks) >= 3 else "Dual-Audio"
+                        meta.dual_audio = dual == "Dual-Audio"
                     elif eng and not orig and orig_lang not in ["zxx", "xx", "en", None] and not meta.no_dub:
                         dual = "Dubbed"
                 except Exception:
