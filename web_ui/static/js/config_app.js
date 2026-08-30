@@ -5585,6 +5585,7 @@ function SecurityTab({ isDarkMode }) {
       const response = await apiFetch(`${API_BASE}/2fa/status`);
       if (!response.ok) {
         console.error(`Failed to load 2FA status: HTTP ${response.status}`);
+        setMessage("Unable to load the current 2FA status.");
         return;
       }
       const data = await response.json();
@@ -5595,10 +5596,11 @@ function SecurityTab({ isDarkMode }) {
           "Unexpected 2FA status response shape, defaulting to disabled",
           data,
         );
-        setTwofaStatus(false);
+        setMessage("Unable to read the current 2FA status.");
       }
     } catch (error) {
       console.error("Failed to load 2FA status:", error);
+      setMessage("Unable to load the current 2FA status.");
     }
   };
 
@@ -5824,20 +5826,28 @@ function SecurityTab({ isDarkMode }) {
     };
   }, [setupData?.uri]);
 
+  const twofaMessageStatus = /failed|invalid|unable|error/i.test(message)
+    ? "error"
+    : /success|enabled|disabled/i.test(message)
+      ? "success"
+      : "info";
+  const tokenMessageStatus = /failed|unavailable|no token|read-only/i.test(
+    tokenMessage,
+  )
+    ? "error"
+    : "success";
+
   return (
     <div
-      className={`rounded-lg border p-6 ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}`}
+      className="ua-config-section overflow-hidden rounded-xl border"
+      data-color-mode={isDarkMode ? "dark" : "light"}
     >
-      <h2
-        className={`text-xl font-semibold mb-4 ${isDarkMode ? "text-white" : "text-gray-900"}`}
-      >
+      <h2 className="ua-config-section-heading border-b px-4 py-3 text-base font-semibold sm:px-5 sm:py-4">
         Two-Factor Authentication (2FA)
       </h2>
 
-      <div className="space-y-4">
-        <div
-          className={`p-4 rounded-lg ${isDarkMode ? "bg-gray-700" : "bg-gray-50"}`}
-        >
+      <div className="ua-config-section-panel space-y-4 p-4 sm:p-5">
+        <div className="ua-config-state-panel rounded-xl border p-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
               <h3
@@ -5858,21 +5868,23 @@ function SecurityTab({ isDarkMode }) {
                   : "Enable 2FA to add an extra layer of security to your account."}
               </p>
             </div>
-            <div className="flex gap-2 flex-shrink-0">
-              {!twofaStatus && (
+            <div className="flex flex-shrink-0 gap-2">
+              {twofaStatus === false && (
                 <button
+                  type="button"
                   onClick={handleSetup2FA}
                   disabled={loading}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                  className="ua-config-save-button w-full rounded-lg px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                 >
                   {loading ? "Setting up..." : "Enable 2FA"}
                 </button>
               )}
               {twofaStatus && (
                 <button
+                  type="button"
                   onClick={handleDisable2FA}
                   disabled={loading}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+                  className="ua-config-danger-button w-full rounded-lg border px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                 >
                   {loading ? "Disabling..." : "Disable 2FA"}
                 </button>
@@ -5882,9 +5894,7 @@ function SecurityTab({ isDarkMode }) {
         </div>
 
         {setupData && (
-          <div
-            className={`p-4 rounded-lg border ${isDarkMode ? "bg-gray-700 border-gray-600" : "bg-yellow-50 border-yellow-200"}`}
-          >
+          <div className="ua-config-admin-setup rounded-xl border p-4">
             <h4
               className={`font-medium mb-2 ${isDarkMode ? "text-white" : "text-gray-900"}`}
             >
@@ -5896,12 +5906,13 @@ function SecurityTab({ isDarkMode }) {
               Scan this QR code with your authenticator app (Google
               Authenticator, Authy, etc.):
             </p>
-            <div className="mb-4">
+            <div className="mb-4 overflow-hidden">
               {qrDataUrl
                 ? React.createElement("img", {
                     src: qrDataUrl,
                     alt: "2FA QR Code",
-                    className: "mx-auto border rounded",
+                    className:
+                      "mx-auto h-auto max-w-full rounded-lg border bg-white p-2",
                   })
                 : React.createElement(
                     "div",
@@ -5927,17 +5938,14 @@ function SecurityTab({ isDarkMode }) {
               className={`text-xs mb-4 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
             >
               <strong>To store in environment variable:</strong> Set{" "}
-              <code
-                className={`px-1 py-0.5 rounded text-xs ${isDarkMode ? "bg-gray-600" : "bg-gray-200"}`}
-              >
-                UA_WEBUI_TOTP_SECRET={"{"}setupData.secret
+              <code className="ua-config-admin-code break-all rounded px-1 py-0.5 text-xs">
+                UA_WEBUI_TOTP_SECRET={setupData.secret}
               </code>
               <br />
-              <strong>To copy to password manager:</strong> Save the secret{" "}
-              {"{"}setupData.secret{"}"} in your password manager&#39;s TOTP
-              field.
+              <strong>To copy to a password manager:</strong> Save the secret
+              shown above in its TOTP field.
             </p>
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row">
               <input
                 type="text"
                 value={verificationCode}
@@ -5947,13 +5955,17 @@ function SecurityTab({ isDarkMode }) {
                   )
                 }
                 placeholder="000000"
-                className={`flex-1 px-3 py-2 border rounded-lg ${isDarkMode ? "bg-gray-600 border-gray-500 text-white" : "bg-white border-gray-300"}`}
+                className="ua-config-input min-w-0 flex-1 rounded-lg border px-3 py-2"
                 maxLength="6"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                aria-label="Six-digit verification code"
               />
               <button
+                type="button"
                 onClick={handleVerifyAndEnable}
                 disabled={loading || verificationCode.length !== 6}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                className="ua-config-save-button rounded-lg px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Verify & Enable
               </button>
@@ -5965,7 +5977,7 @@ function SecurityTab({ isDarkMode }) {
                 <div className="font-medium mb-2">
                   One-time recovery codes (store these safely)
                 </div>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   {recoveryCodes.map((c, idx) =>
                     React.createElement(
                       "div",
@@ -5984,14 +5996,17 @@ function SecurityTab({ isDarkMode }) {
 
         {message && (
           <div
-            className={`p-3 rounded-lg ${message.includes("success") || message.includes("enabled") ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}
+            className="ua-config-admin-message rounded-lg border p-3 text-sm"
+            data-status={twofaMessageStatus}
+            role={twofaMessageStatus === "error" ? "alert" : "status"}
+            aria-live="polite"
           >
             {message}
           </div>
         )}
 
         {/* API Tokens management */}
-        <div className="mt-6">
+        <div className="ua-config-admin-divider mt-6 border-t pt-5">
           <h2
             className={`text-lg font-semibold mb-3 ${isDarkMode ? "text-white" : "text-gray-900"}`}
           >
@@ -6005,18 +6020,16 @@ function SecurityTab({ isDarkMode }) {
           </p>
 
           {createdTokenRaw && (
-            <div
-              className={`p-3 mb-3 rounded ${isDarkMode ? "bg-gray-700 text-white" : "bg-yellow-50 text-gray-900"}`}
-            >
+            <div className="ua-config-admin-setup mb-3 rounded-xl border p-3">
               <div className="font-medium mb-2">New token (store this now)</div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <input
                   readOnly
                   value={createdTokenRaw}
                   className={
                     isDarkMode
-                      ? "flex-1 px-2 py-1 rounded border border-gray-700 bg-gray-900 text-gray-100"
-                      : "flex-1 px-2 py-1 rounded border border-gray-300 bg-white text-gray-800"
+                      ? "ua-config-input min-w-0 flex-1 rounded-lg border px-3 py-2 font-mono text-sm"
+                      : "ua-config-input min-w-0 flex-1 rounded-lg border px-3 py-2 font-mono text-sm"
                   }
                 />
                 <button
@@ -6034,54 +6047,57 @@ function SecurityTab({ isDarkMode }) {
                       setTokenMessage("Failed to copy token");
                     }
                   }}
-                  className="px-3 py-1 bg-gray-800 text-white rounded"
+                  type="button"
+                  className="ua-config-service-action rounded-lg border px-3 py-2 text-sm font-semibold"
                 >
                   {createdTokenCopied ? "Copied!" : "Copy"}
                 </button>
                 <button
+                  type="button"
                   onClick={() => handleStoreToken(createdTokenRaw)}
-                  className="px-3 py-1 bg-blue-600 text-white rounded"
+                  className="ua-config-save-button rounded-lg px-3 py-2 text-sm font-semibold"
                 >
                   Store
                 </button>
               </div>
             </div>
           )}
-          <div
-            className={`p-3 mb-3 rounded ${isDarkMode ? "bg-gray-800 text-white" : "bg-white text-gray-900"}`}
-          >
-            <div className="mb-2 font-medium">Token label</div>
+          <div className="ua-config-state-panel mb-3 rounded-xl border p-4">
+            <label
+              htmlFor="new-api-token-label"
+              className="mb-2 block font-medium"
+            >
+              Token label
+            </label>
             <input
+              id="new-api-token-label"
               value={newTokenLabel}
               onChange={(e) => setNewTokenLabel(e.target.value)}
               placeholder="Optional label"
-              className={`w-full px-3 py-2 rounded border ${isDarkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300"}`}
+              className="ua-config-input w-full rounded-lg border px-3 py-2"
             />
 
-            <div className="mt-3 flex gap-2">
+            <div className="mt-3 flex flex-wrap gap-2">
               <button
+                type="button"
                 onClick={handleCreateToken}
-                className="px-3 py-1 bg-green-600 text-white rounded"
+                className="ua-config-save-button rounded-lg px-3 py-2 text-sm font-semibold"
               >
                 Generate
-              </button>
-              <button
-                onClick={() => {
-                  if (createdTokenRaw) handleStoreToken(createdTokenRaw);
-                  else setTokenMessage("No token to store");
-                }}
-                className="px-3 py-1 bg-blue-600 text-white rounded"
-              >
-                Store
               </button>
             </div>
           </div>
 
-          <div
-            className={`p-3 rounded border ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}`}
-          >
+          <div className="ua-config-state-panel rounded-xl border p-4">
             {tokenMessage && (
-              <div className="text-sm text-red-600">{tokenMessage}</div>
+              <div
+                className="ua-config-admin-message rounded-lg border px-3 py-2 text-sm"
+                data-status={tokenMessageStatus}
+                role={tokenMessageStatus === "error" ? "alert" : "status"}
+                aria-live="polite"
+              >
+                {tokenMessage}
+              </div>
             )}
             <div className="mt-4">
               <div className="flex items-center justify-between">
@@ -6118,8 +6134,9 @@ function SecurityTab({ isDarkMode }) {
                             : "no expiry"}
                         </div>
                         <button
+                          type="button"
                           onClick={() => handleRevokeToken(t.id)}
-                          className="px-2 py-1 bg-red-600 text-white rounded text-sm"
+                          className="ua-config-danger-button rounded-lg border px-2.5 py-1.5 text-sm font-semibold"
                         >
                           Revoke
                         </button>
@@ -6146,6 +6163,9 @@ function AccessLogTab({ isDarkMode }) {
   const [blacklist, setBlacklist] = useState([]);
   const [ipLoading, setIpLoading] = useState(false);
   const [ipMessage, setIpMessage] = useState("");
+  const [whitelistInput, setWhitelistInput] = useState("");
+  const [blacklistInput, setBlacklistInput] = useState("");
+  const [logMessage, setLogMessage] = useState("");
 
   useEffect(() => {
     loadLevel();
@@ -6172,6 +6192,7 @@ function AccessLogTab({ isDarkMode }) {
 
   const loadLogEntries = async () => {
     setLogLoading(true);
+    setLogMessage("");
     try {
       const response = await apiFetch(`${API_BASE}/access_log/entries?n=50`);
       if (!response.ok) {
@@ -6182,9 +6203,11 @@ function AccessLogTab({ isDarkMode }) {
         setLogEntries(data.entries || []);
       } else {
         console.warn("Failed to load log entries:", data.error);
+        setLogMessage(data.error || "Failed to load log entries");
       }
     } catch (error) {
       console.warn("Failed to load log entries:", error);
+      setLogMessage("Failed to load log entries");
     }
     setLogLoading(false);
   };
@@ -6224,9 +6247,11 @@ function AccessLogTab({ isDarkMode }) {
         setBlacklist(data.blacklist || []);
       } else {
         console.warn("Failed to load IP settings:", data.error);
+        setIpMessage(data.error || "Failed to load IP settings");
       }
     } catch (error) {
       console.warn("Failed to load IP settings:", error);
+      setIpMessage("Failed to load IP settings");
     }
   };
 
@@ -6271,219 +6296,235 @@ function AccessLogTab({ isDarkMode }) {
     setBlacklist(blacklist.filter((item) => item !== ip));
   };
 
+  const commitWhitelistInput = () => {
+    const ip = whitelistInput.trim();
+    if (!ip) return;
+    addToWhitelist(ip);
+    setWhitelistInput("");
+  };
+
+  const commitBlacklistInput = () => {
+    const ip = blacklistInput.trim();
+    if (!ip) return;
+    addToBlacklist(ip);
+    setBlacklistInput("");
+  };
+
   return (
-    <div>
+    <div className="space-y-5" data-color-mode={isDarkMode ? "dark" : "light"}>
       {/* IP Control Panel */}
-      <div
-        className={`rounded-lg border p-6 mb-6 ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}`}
-      >
-        <h2
-          className={`text-xl font-semibold mb-4 ${isDarkMode ? "text-white" : "text-gray-900"}`}
-        >
-          IP Access Control
-        </h2>
-        <p
-          className={`text-sm mb-4 ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}
-        >
-          Control which IP addresses can access the Web UI. If whitelist is set,
-          only listed IPs are allowed. Otherwise, listed IPs in blacklist are
-          denied.
-        </p>
+      <section className="ua-config-section overflow-hidden rounded-xl border">
+        <div className="ua-config-section-heading border-b px-4 py-3 sm:px-5 sm:py-4">
+          <h2 className="text-base font-semibold">IP Access Control</h2>
+          <p className="ua-config-service-description mt-1 text-sm">
+            Control which IP addresses can access the Web UI. When a whitelist
+            is present, only those addresses are allowed. Otherwise, addresses
+            on the blacklist are denied.
+          </p>
+        </div>
+        <div className="ua-config-section-panel p-4 sm:p-5">
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+            <div className="ua-config-state-panel rounded-xl border p-4">
+              <label
+                className={`block text-sm font-medium mb-2 ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}
+              >
+                Whitelist (allowed IPs)
+              </label>
+              <div className="mb-2 flex flex-col gap-2 sm:flex-row">
+                <input
+                  type="text"
+                  placeholder="192.168.1.100"
+                  value={whitelistInput}
+                  onChange={(event) => setWhitelistInput(event.target.value)}
+                  className="ua-config-input min-w-0 flex-1 rounded-lg border px-3 py-2 text-sm"
+                  aria-label="IP address to add to the whitelist"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      commitWhitelistInput();
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={commitWhitelistInput}
+                  className="ua-config-save-button rounded-lg px-3 py-2 text-sm font-semibold"
+                >
+                  Add
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {whitelist.map((ip) => (
+                  <span
+                    key={ip}
+                    className={`inline-flex items-center px-2 py-1 rounded text-xs ${isDarkMode ? "bg-green-800 text-green-200" : "bg-green-100 text-green-800"}`}
+                  >
+                    {ip}
+                    <button
+                      type="button"
+                      onClick={() => removeFromWhitelist(ip)}
+                      className="ml-1 inline-flex h-5 w-5 items-center justify-center rounded text-red-500 hover:text-red-700"
+                      aria-label={`Remove ${ip} from the whitelist`}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            </div>
 
-        <div className="mb-4">
-          <label
-            className={`block text-sm font-medium mb-2 ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}
-          >
-            Whitelist (allowed IPs)
-          </label>
-          <div className="flex gap-2 mb-2">
-            <input
-              type="text"
-              placeholder="192.168.1.100"
-              className={`flex-1 rounded-md border px-3 py-2 text-sm ${isDarkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"}`}
-              onKeyPress={(e) => {
-                if (e.key === "Enter") {
-                  addToWhitelist(e.target.value.trim());
-                  e.target.value = "";
-                }
-              }}
-            />
+            <div className="ua-config-state-panel rounded-xl border p-4">
+              <label
+                className={`block text-sm font-medium mb-2 ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}
+              >
+                Blacklist (denied IPs)
+              </label>
+              <div className="mb-2 flex flex-col gap-2 sm:flex-row">
+                <input
+                  type="text"
+                  placeholder="192.168.1.100"
+                  value={blacklistInput}
+                  onChange={(event) => setBlacklistInput(event.target.value)}
+                  className="ua-config-input min-w-0 flex-1 rounded-lg border px-3 py-2 text-sm"
+                  aria-label="IP address to add to the blacklist"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      commitBlacklistInput();
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={commitBlacklistInput}
+                  className="ua-config-danger-button rounded-lg border px-3 py-2 text-sm font-semibold"
+                >
+                  Add
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {blacklist.map((ip) => (
+                  <span
+                    key={ip}
+                    className={`inline-flex items-center px-2 py-1 rounded text-xs ${isDarkMode ? "bg-red-800 text-red-200" : "bg-red-100 text-red-800"}`}
+                  >
+                    {ip}
+                    <button
+                      type="button"
+                      onClick={() => removeFromBlacklist(ip)}
+                      className="ml-1 inline-flex h-5 w-5 items-center justify-center rounded text-red-500 hover:text-red-700"
+                      aria-label={`Remove ${ip} from the blacklist`}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-5 flex gap-2">
             <button
-              onClick={(e) => {
-                const input = e.target.previousElementSibling;
-                addToWhitelist(input.value.trim());
-                input.value = "";
-              }}
-              className="px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm"
+              type="button"
+              onClick={handleIpSave}
+              disabled={ipLoading}
+              className="ua-config-save-button w-full rounded-lg px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
             >
-              Add
+              {ipLoading ? "Saving..." : "Save IP Settings"}
             </button>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {whitelist.map((ip) => (
-              <span
-                key={ip}
-                className={`inline-flex items-center px-2 py-1 rounded text-xs ${isDarkMode ? "bg-green-800 text-green-200" : "bg-green-100 text-green-800"}`}
-              >
-                {ip}
-                <button
-                  onClick={() => removeFromWhitelist(ip)}
-                  className="ml-1 text-red-500 hover:text-red-700"
-                >
-                  ×
-                </button>
-              </span>
-            ))}
-          </div>
-        </div>
 
-        <div className="mb-4">
-          <label
-            className={`block text-sm font-medium mb-2 ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}
-          >
-            Blacklist (denied IPs)
-          </label>
-          <div className="flex gap-2 mb-2">
-            <input
-              type="text"
-              placeholder="192.168.1.100"
-              className={`flex-1 rounded-md border px-3 py-2 text-sm ${isDarkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"}`}
-              onKeyPress={(e) => {
-                if (e.key === "Enter") {
-                  addToBlacklist(e.target.value.trim());
-                  e.target.value = "";
-                }
-              }}
-            />
-            <button
-              onClick={(e) => {
-                const input = e.target.previousElementSibling;
-                addToBlacklist(input.value.trim());
-                input.value = "";
-              }}
-              className="px-3 py-2 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
+          {ipMessage && (
+            <div
+              className="ua-config-admin-message mt-4 rounded-lg border px-3 py-2 text-sm"
+              data-status={ipMessage === "Saved." ? "success" : "error"}
+              role={ipMessage === "Saved." ? "status" : "alert"}
+              aria-live="polite"
             >
-              Add
-            </button>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {blacklist.map((ip) => (
-              <span
-                key={ip}
-                className={`inline-flex items-center px-2 py-1 rounded text-xs ${isDarkMode ? "bg-red-800 text-red-200" : "bg-red-100 text-red-800"}`}
-              >
-                {ip}
-                <button
-                  onClick={() => removeFromBlacklist(ip)}
-                  className="ml-1 text-red-500 hover:text-red-700"
-                >
-                  ×
-                </button>
-              </span>
-            ))}
-          </div>
+              {ipMessage}
+            </div>
+          )}
         </div>
-
-        <div className="flex gap-2">
-          <button
-            onClick={handleIpSave}
-            disabled={ipLoading}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-          >
-            {ipLoading ? "Saving..." : "Save IP Settings"}
-          </button>
-        </div>
-
-        {ipMessage && (
-          <div
-            className={`mt-4 text-sm ${ipMessage === "Saved." ? "text-green-600" : "text-red-600"}`}
-          >
-            {ipMessage}
-          </div>
-        )}
-      </div>
+      </section>
 
       {/* Access Log Settings */}
-
-      <h2
-        className={`text-xl font-semibold mb-4 ${isDarkMode ? "text-white" : "text-gray-900"}`}
-      >
-        Access Log Settings
-      </h2>
-      <p
-        className={`text-sm mb-4 ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}
-      >
-        Control what the Web UI logs. Default is{" "}
-        <code
-          className={`px-1 rounded ${isDarkMode ? "bg-gray-700" : "bg-gray-100"}`}
-        >
-          access_denied
-        </code>{" "}
-        (only failed API attempts). Choose{" "}
-        <code
-          className={`px-1 rounded ${isDarkMode ? "bg-gray-700" : "bg-gray-100"}`}
-        >
-          disabled
-        </code>{" "}
-        to turn off all logging.
-      </p>
-
-      <div className="mb-4">
-        <label
-          className={`block text-sm font-medium mb-1 ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}
-        >
-          Level
-        </label>
-        <select
-          value={level}
-          onChange={(e) => setLevel(e.target.value)}
-          className={`mt-1 block w-full rounded-md border px-3 py-2 text-sm ${isDarkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"}`}
-        >
-          <option value="access_denied">
-            access_denied (failed attempts only)
-          </option>
-          <option value="access">access (log all API accesses)</option>
-          <option value="disabled">disabled (no logging)</option>
-        </select>
-      </div>
-
-      <div className="flex gap-2">
-        <button
-          onClick={handleSave}
-          disabled={loading}
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-        >
-          {loading ? "Saving..." : "Save"}
-        </button>
-      </div>
-
-      {message && (
-        <div
-          className={`mt-4 text-sm ${message === "Saved." ? "text-green-600" : "text-red-600"}`}
-        >
-          {message}
+      <section className="ua-config-section overflow-hidden rounded-xl border">
+        <div className="ua-config-section-heading border-b px-4 py-3 sm:px-5 sm:py-4">
+          <h2 className="text-base font-semibold">Access Log Settings</h2>
+          <p className="ua-config-service-description mt-1 text-sm">
+            Choose whether to record denied requests, every API request, or no
+            access activity.
+          </p>
         </div>
-      )}
+        <div className="ua-config-section-panel p-4 sm:p-5">
+          <div className="mb-4 max-w-2xl">
+            <label
+              className="mb-1 block text-sm font-medium"
+              htmlFor="access-log-level"
+            >
+              Level
+            </label>
+            <select
+              id="access-log-level"
+              value={level}
+              onChange={(e) => setLevel(e.target.value)}
+              className="ua-config-select mt-1 block w-full rounded-lg border px-3 py-2 text-sm"
+            >
+              <option value="access_denied">
+                access_denied (failed attempts only)
+              </option>
+              <option value="access">access (log all API accesses)</option>
+              <option value="disabled">disabled (no logging)</option>
+            </select>
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={loading}
+              className="ua-config-save-button w-full rounded-lg px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+            >
+              {loading ? "Saving..." : "Save Log Settings"}
+            </button>
+          </div>
+
+          {message && (
+            <div
+              className="ua-config-admin-message mt-4 rounded-lg border px-3 py-2 text-sm"
+              data-status={message === "Saved." ? "success" : "error"}
+              role={message === "Saved." ? "status" : "alert"}
+              aria-live="polite"
+            >
+              {message}
+            </div>
+          )}
+        </div>
+      </section>
 
       {/* Access Log Display */}
-      <div className="mt-6">
-        <div className="flex justify-between items-center mb-3">
-          <h3
-            className={`text-lg font-semibold ${isDarkMode ? "text-white" : "text-gray-900"}`}
-          >
-            Recent Access Log
-          </h3>
+      <section className="ua-config-section overflow-hidden rounded-xl border">
+        <div className="ua-config-section-heading flex flex-col gap-3 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-4">
+          <h3 className="text-base font-semibold">Recent Access Log</h3>
           <button
+            type="button"
             onClick={loadLogEntries}
             disabled={logLoading}
-            className="px-3 py-1 bg-gray-600 text-white rounded hover:bg-gray-700 disabled:opacity-50 text-sm"
+            className="ua-config-service-action w-full rounded-lg border px-3 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
           >
             {logLoading ? "Loading..." : "Refresh"}
           </button>
         </div>
-        <div
-          className={`p-3 rounded border ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}`}
-        >
+        <div className="ua-config-section-panel p-4 sm:p-5">
+          {logMessage && (
+            <div
+              className="ua-config-admin-message mb-3 rounded-lg border px-3 py-2 text-sm"
+              data-status="error"
+              role="alert"
+            >
+              {logMessage}
+            </div>
+          )}
           {logLoading ? (
             <div
               className={`text-sm ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}
@@ -6497,25 +6538,25 @@ function AccessLogTab({ isDarkMode }) {
               No log entries found.
             </div>
           ) : (
-            <div className="space-y-2 max-h-96 overflow-y-auto">
+            <div className="max-h-96 space-y-2 overflow-y-auto pr-1">
               {logEntries.map((entry, index) => (
                 <div
                   key={index}
                   className={`p-2 rounded text-xs ${isDarkMode ? "bg-gray-700 text-gray-200" : "bg-gray-50 text-gray-800"}`}
                 >
                   <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-1">
-                    <div className="flex-1">
+                    <div className="min-w-0 flex-1 break-words">
                       <span
                         className={`font-medium ${entry.success ? "text-green-600" : "text-red-600"}`}
                       >
                         {entry.method} {entry.endpoint}
                       </span>
-                      <span className="ml-2 text-gray-500">
+                      <span className="ml-0 block text-gray-500 sm:ml-2 sm:inline">
                         {entry.user || "anonymous"} @{" "}
                         {entry.remote_addr || "unknown"}
                       </span>
                     </div>
-                    <div className="text-right">
+                    <div className="shrink-0 text-left sm:text-right">
                       <div className="text-gray-500">
                         {new Date(entry.timestamp).toLocaleString()}
                       </div>
@@ -6527,7 +6568,7 @@ function AccessLogTab({ isDarkMode }) {
                     </div>
                   </div>
                   {entry.details && (
-                    <div className="mt-1 text-gray-600 text-xs">
+                    <div className="mt-1 break-words text-xs text-gray-600">
                       {entry.details}
                     </div>
                   )}
@@ -6536,7 +6577,7 @@ function AccessLogTab({ isDarkMode }) {
             </div>
           )}
         </div>
-      </div>
+      </section>
     </div>
   );
 }
@@ -8808,6 +8849,8 @@ function ConfigApp() {
     }
   };
   const saveDisabled = isSaving || pendingChangeCount === 0;
+  const isAdministrationTab =
+    activeTab === "security" || activeTab === "access-log";
   const saveButtonClass =
     "ua-config-save-button rounded-lg px-4 py-2 text-sm font-semibold" +
     (saveDisabled ? " cursor-not-allowed opacity-50" : "");
@@ -9069,14 +9112,16 @@ function ConfigApp() {
                     )}
                   </div>
                 )}
-                <button
-                  type="button"
-                  className={saveButtonClass}
-                  onClick={saveAllChanges}
-                  disabled={saveDisabled}
-                >
-                  {isSaving ? "Saving..." : "Save Config"}
-                </button>
+                {!isAdministrationTab && (
+                  <button
+                    type="button"
+                    className={saveButtonClass}
+                    onClick={saveAllChanges}
+                    disabled={saveDisabled}
+                  >
+                    {isSaving ? "Saving..." : "Save Config"}
+                  </button>
+                )}
               </div>
             </div>
           </header>
