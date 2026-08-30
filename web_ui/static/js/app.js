@@ -19,6 +19,7 @@ const setColorTheme = window.setUAColorTheme;
 const interfaceStyles = window.UAInterfaceStyles || [];
 const getStoredInterfaceStyle = window.getUAStoredInterfaceStyle;
 const setInterfaceStyle = window.setUAInterfaceStyle;
+const useModalFocus = window.useUAModalFocus;
 let bbcodePreviewConfigured = false;
 
 const escapePreviewHtml = (value) =>
@@ -1335,6 +1336,7 @@ function UploadHelpResourcesModal({
   onClose,
 }) {
   const resourceGroups = window.UAHelpResourceGroups || [];
+  const dialogRef = useModalFocus(onClose);
   const updateMessage = isCheckingForUpdates
     ? "Checking GitHub for the latest release… This can take up to 15 seconds."
     : !updateStatus
@@ -1347,19 +1349,6 @@ function UploadHelpResourcesModal({
             ? `${updateStatus.latest_version} is available. You have ${updateStatus.current_version}.`
             : `You’re up to date (${updateStatus.current_version || window.UA_APP_VERSION}).`;
 
-  useEffect(() => {
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const closeOnEscape = (event) => {
-      if (event.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", closeOnEscape);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", closeOnEscape);
-    };
-  }, [onClose]);
-
   return (
     <div
       className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-3 sm:p-4"
@@ -1369,10 +1358,12 @@ function UploadHelpResourcesModal({
       }}
     >
       <section
+        ref={dialogRef}
         className="ua-upload-help-modal flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl border shadow-2xl"
         role="dialog"
         aria-modal="true"
         aria-labelledby="upload-help-resources-title"
+        tabIndex="-1"
       >
         <div className="ua-upload-panel-header flex items-start justify-between gap-4 border-b px-4 py-3 sm:px-5 sm:py-4">
           <div>
@@ -1390,7 +1381,7 @@ function UploadHelpResourcesModal({
             type="button"
             className="ua-upload-header-action h-10 w-10 shrink-0 rounded-lg p-0"
             aria-label="Close help and resources"
-            autoFocus
+            data-ua-modal-initial-focus
             onClick={onClose}
           >
             <svg
@@ -2015,12 +2006,14 @@ function AudionutsUAGUI() {
   const coverRequestRef = useRef(0);
   const [expandedScreenshot, setExpandedScreenshot] = useState(null);
   const themePaletteRef = useRef(null);
-  const screenshotModalRef = useRef(null);
+  const screenshotModalRef = useModalFocus(
+    () => setExpandedScreenshot(null),
+    Boolean(expandedScreenshot),
+  );
 
   useEffect(() => {
     descriptionDirtyRef.current = descriptionDirty;
   }, [descriptionDirty]);
-  const screenshotModalCloseRef = useRef(null);
   const [isScreenshotReviewOpen, setIsScreenshotReviewOpen] = useState(false);
   const [isDescriptionReviewOpen, setIsDescriptionReviewOpen] = useState(false);
   const [progressItems, setProgressItems] = useState([]);
@@ -3280,22 +3273,6 @@ function AudionutsUAGUI() {
   };
 
   useEffect(() => {
-    if (!expandedScreenshot) return undefined;
-    const closeOnEscape = (event) => {
-      if (event.key === "Escape") setExpandedScreenshot(null);
-    };
-    document.addEventListener("keydown", closeOnEscape);
-    const focusTimer = window.setTimeout(
-      () => screenshotModalCloseRef.current?.focus(),
-      0,
-    );
-    return () => {
-      document.removeEventListener("keydown", closeOnEscape);
-      window.clearTimeout(focusTimer);
-    };
-  }, [expandedScreenshot]);
-
-  useEffect(() => {
     if (
       expandedScreenshot &&
       !executionScreenshots.some(
@@ -3804,6 +3781,7 @@ function AudionutsUAGUI() {
             Sort by:
           </span>
           <select
+            aria-label="Sort files and folders"
             value={`${sortBy}-${sortOrder}`}
             onChange={(e) => {
               const [by, order] = e.target.value.split("-");
@@ -4132,17 +4110,18 @@ function AudionutsUAGUI() {
       );
       const parentPath =
         separatorIdx > 0 ? item.path.substring(0, separatorIdx) : "";
+      const activateSearchResult = () => {
+        setSelectedPath(item.path);
+        setSelectedName(item.name);
+        if (isMobile) setActivePanel("main");
+      };
       return (
         <div key={item.path || idx}>
           <div
             className={`ua-file-browser-item flex items-center gap-2 px-3 ${isMobile ? "py-3" : "py-2"} cursor-pointer transition-colors`}
             data-selected={selectedPath === item.path ? "true" : "false"}
             style={{ paddingLeft: "12px" }}
-            onClick={() => {
-              setSelectedPath(item.path);
-              setSelectedName(item.name);
-              if (isMobile) setActivePanel("main");
-            }}
+            onClick={activateSearchResult}
           >
             <input
               type="checkbox"
@@ -4158,28 +4137,38 @@ function AudionutsUAGUI() {
                   : "bg-white border-gray-300"
               }`}
             />
-            <span
-              className={`flex-shrink-0 ${item.type === "folder" ? "text-yellow-600" : "text-blue-600"}`}
+            <button
+              type="button"
+              className="flex min-w-0 flex-1 items-center gap-2 bg-transparent p-0 text-left"
+              aria-label={`Use ${item.type === "folder" ? "folder" : "file"} ${item.name}`}
+              onClick={(event) => {
+                event.stopPropagation();
+                activateSearchResult();
+              }}
             >
-              {item.type === "folder" ? <FolderIcon /> : <FileIcon />}
-            </span>
-            <div className="flex flex-col min-w-0 flex-1">
               <span
-                className={`text-sm font-medium ${isDarkMode ? "text-gray-200" : "text-gray-700"} truncate`}
+                className={`flex-shrink-0 ${item.type === "folder" ? "text-yellow-600" : "text-blue-600"}`}
               >
-                {item.name}
+                {item.type === "folder" ? <FolderIcon /> : <FileIcon />}
               </span>
-              <span
-                className={`text-[10px] ${isDarkMode ? "text-gray-500" : "text-gray-400"} flex items-center gap-1.5 truncate`}
-                title={parentPath}
-              >
-                {item.mtime ? <span>{formatMtime(item.mtime)}</span> : null}
-                {item.type === "file" && item.size ? (
-                  <span>• {formatSize(item.size)}</span>
-                ) : null}
-                <span>• {parentPath}</span>
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span
+                  className={`text-sm font-medium ${isDarkMode ? "text-gray-200" : "text-gray-700"} truncate`}
+                >
+                  {item.name}
+                </span>
+                <span
+                  className={`text-[10px] ${isDarkMode ? "text-gray-500" : "text-gray-400"} flex items-center gap-1.5 truncate`}
+                  title={parentPath}
+                >
+                  {item.mtime ? <span>{formatMtime(item.mtime)}</span> : null}
+                  {item.type === "file" && item.size ? (
+                    <span>• {formatSize(item.size)}</span>
+                  ) : null}
+                  <span>• {parentPath}</span>
+                </span>
               </span>
-            </div>
+            </button>
           </div>
         </div>
       );
@@ -4202,6 +4191,14 @@ function AudionutsUAGUI() {
         level === 0 &&
         item.type === "folder";
       const rootFolderIndex = rootFolderPaths.indexOf(item.path);
+      const activateTreeItem = () => {
+        if (item.type === "folder") {
+          toggleFolder(item.path);
+        }
+        setSelectedPath(item.path);
+        setSelectedName(item.name);
+        if (isMobile && item.type !== "folder") setActivePanel("main");
+      };
       return (
         <div key={item.path || idx}>
           <div
@@ -4265,14 +4262,7 @@ function AudionutsUAGUI() {
                   }
                 : undefined
             }
-            onClick={() => {
-              if (item.type === "folder") {
-                toggleFolder(item.path);
-              }
-              setSelectedPath(item.path);
-              setSelectedName(item.name);
-              if (isMobile && item.type !== "folder") setActivePanel("main");
-            }}
+            onClick={activateTreeItem}
           >
             <input
               type="checkbox"
@@ -4288,48 +4278,67 @@ function AudionutsUAGUI() {
                   : "bg-white border-gray-300"
               }`}
             />
-            <span
-              className={`flex-shrink-0 ${isLoading ? "text-purple-500" : "text-yellow-600"}`}
+            <button
+              type="button"
+              className="flex min-w-0 flex-1 items-center gap-2 bg-transparent p-0 text-left"
+              aria-label={
+                item.type === "folder"
+                  ? `${expandedFolders.has(item.path) ? "Collapse" : "Expand"} folder ${item.name}`
+                  : `Use file ${item.name}`
+              }
+              aria-expanded={
+                item.type === "folder"
+                  ? expandedFolders.has(item.path)
+                  : undefined
+              }
+              onClick={(event) => {
+                event.stopPropagation();
+                activateTreeItem();
+              }}
             >
-              {item.type === "folder" ? (
-                isLoading ? (
-                  <SpinnerIcon />
-                ) : expandedFolders.has(item.path) ? (
-                  <FolderOpenIcon />
-                ) : (
-                  <FolderIcon />
-                )
-              ) : (
-                <span className="text-blue-600">
-                  <FileIcon />
-                </span>
-              )}
-            </span>
-            <div className="flex flex-col min-w-0 flex-1">
               <span
-                className={`text-sm font-medium ${isDarkMode ? "text-gray-200" : "text-gray-700"} truncate`}
+                className={`flex-shrink-0 ${isLoading ? "text-purple-500" : "text-yellow-600"}`}
               >
-                {item.name}
-                {isLoading && (
-                  <span
-                    className={`ml-2 text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
-                  >
-                    Loading...
+                {item.type === "folder" ? (
+                  isLoading ? (
+                    <SpinnerIcon />
+                  ) : expandedFolders.has(item.path) ? (
+                    <FolderOpenIcon />
+                  ) : (
+                    <FolderIcon />
+                  )
+                ) : (
+                  <span className="text-blue-600">
+                    <FileIcon />
                   </span>
                 )}
               </span>
-              <span
-                className={`text-[10px] ${isDarkMode ? "text-gray-500" : "text-gray-400"} flex items-center gap-1.5 truncate`}
-              >
-                {item.mtime ? <span>{formatMtime(item.mtime)}</span> : null}
-                {item.type === "file" && item.size ? (
-                  <span>• {formatSize(item.size)}</span>
-                ) : null}
-                {item.subtitle ? (
-                  <span title={item.subtitle}>• {item.subtitle}</span>
-                ) : null}
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span
+                  className={`text-sm font-medium ${isDarkMode ? "text-gray-200" : "text-gray-700"} truncate`}
+                >
+                  {item.name}
+                  {isLoading && (
+                    <span
+                      className={`ml-2 text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                    >
+                      Loading...
+                    </span>
+                  )}
+                </span>
+                <span
+                  className={`text-[10px] ${isDarkMode ? "text-gray-500" : "text-gray-400"} flex items-center gap-1.5 truncate`}
+                >
+                  {item.mtime ? <span>{formatMtime(item.mtime)}</span> : null}
+                  {item.type === "file" && item.size ? (
+                    <span>• {formatSize(item.size)}</span>
+                  ) : null}
+                  {item.subtitle ? (
+                    <span title={item.subtitle}>• {item.subtitle}</span>
+                  ) : null}
+                </span>
               </span>
-            </div>
+            </button>
             {isCustomRootFolder && (
               <div
                 className="ua-file-order-controls ml-auto flex shrink-0 items-center gap-1"
@@ -4414,8 +4423,9 @@ function AudionutsUAGUI() {
         item.type === "folder" && descLoadingFolders.has(item.path);
       return (
         <div key={idx}>
-          <div
-            className={`flex items-center gap-2 px-3 ${isMobile ? "py-3" : "py-2"} cursor-pointer transition-colors ${
+          <button
+            type="button"
+            className={`flex w-full items-center gap-2 px-3 text-left ${isMobile ? "py-3" : "py-2"} cursor-pointer transition-colors ${
               descFilePath === item.path
                 ? isDarkMode
                   ? "bg-green-900 border-l-4 border-green-500"
@@ -4425,6 +4435,16 @@ function AudionutsUAGUI() {
                   : "hover:bg-gray-100"
             }`}
             style={{ paddingLeft: `${level * 20 + 12}px` }}
+            aria-label={
+              item.type === "folder"
+                ? `${descExpandedFolders.has(item.path) ? "Collapse" : "Expand"} folder ${item.name}`
+                : `Use description file ${item.name}`
+            }
+            aria-expanded={
+              item.type === "folder"
+                ? descExpandedFolders.has(item.path)
+                : undefined
+            }
             onClick={() => {
               if (item.type === "folder") {
                 toggleDescFolder(item.path);
@@ -4451,7 +4471,7 @@ function AudionutsUAGUI() {
                 </span>
               )}
             </span>
-            <div className="flex flex-col min-w-0">
+            <span className="flex min-w-0 flex-col">
               <span
                 className={`text-sm font-medium ${isDarkMode ? "text-gray-200" : "text-gray-700"} truncate`}
               >
@@ -4472,8 +4492,8 @@ function AudionutsUAGUI() {
                   {item.subtitle}
                 </span>
               )}
-            </div>
-          </div>
+            </span>
+          </button>
           {item.type === "folder" &&
             descExpandedFolders.has(item.path) &&
             item.children &&
@@ -4922,6 +4942,7 @@ function AudionutsUAGUI() {
       <div className="flex gap-2">
         <input
           type="text"
+          aria-label="Preset name"
           value={argumentPresetName}
           onChange={(e) => setArgumentPresetName(e.target.value)}
           onKeyDown={(e) => {
@@ -5503,21 +5524,15 @@ function AudionutsUAGUI() {
             aria-label={`Expanded ${expandedItem.filename}`}
             tabIndex="-1"
             onClick={() => setExpandedScreenshot(null)}
-            onKeyDown={(event) => {
-              if (event.key === "Tab") {
-                event.preventDefault();
-                screenshotModalCloseRef.current?.focus();
-              }
-            }}
           >
             <div
               className="relative max-h-full max-w-full"
               onClick={(event) => event.stopPropagation()}
             >
               <button
-                ref={screenshotModalCloseRef}
                 onClick={() => setExpandedScreenshot(null)}
                 className="absolute right-2 top-2 z-10 rounded-md bg-black/70 px-3 py-1.5 text-sm text-white hover:bg-black"
+                data-ua-modal-initial-focus
               >
                 Close
               </button>
@@ -6087,6 +6102,7 @@ function AudionutsUAGUI() {
                   <div className="relative mt-2">
                     <input
                       type="text"
+                      aria-label="Search files and folders"
                       value={fileBrowserSearch}
                       onChange={(e) => handleFileBrowserSearch(e.target.value)}
                       placeholder="Search files and folders..."
@@ -6111,6 +6127,8 @@ function AudionutsUAGUI() {
                     </svg>
                     {fileBrowserSearch && (
                       <button
+                        type="button"
+                        aria-label="Clear file search"
                         onClick={() => handleFileBrowserSearch("")}
                         className={`absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded ${isDarkMode ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-200 text-gray-500"}`}
                       >
@@ -6295,6 +6313,7 @@ function AudionutsUAGUI() {
                 {/* Args input */}
                 <input
                   type="text"
+                  aria-label="Additional arguments"
                   value={customArgs}
                   onChange={(e) => setCustomArgs(e.target.value)}
                   placeholder="--tmdb movie/12345 --trackers passthepopcorn,aither"
@@ -6527,6 +6546,7 @@ function AudionutsUAGUI() {
                     </div>
                     <input
                       type="text"
+                      aria-label="Search arguments"
                       value={argSearchFilter}
                       onChange={(e) => setArgSearchFilter(e.target.value)}
                       placeholder="Search arguments..."
@@ -6538,6 +6558,8 @@ function AudionutsUAGUI() {
                     />
                     {argSearchFilter && (
                       <button
+                        type="button"
+                        aria-label="Clear argument search"
                         onClick={() => setArgSearchFilter("")}
                         className={`absolute inset-y-0 right-0 pr-3 flex items-center ${isDarkMode ? "text-gray-400 hover:text-gray-200" : "text-gray-500 hover:text-gray-700"}`}
                       >
@@ -6862,6 +6884,7 @@ function AudionutsUAGUI() {
                   <div className="relative mt-2">
                     <input
                       type="text"
+                      aria-label="Search files and folders"
                       value={fileBrowserSearch}
                       onChange={(e) => handleFileBrowserSearch(e.target.value)}
                       placeholder="Search files and folders..."
@@ -6886,6 +6909,8 @@ function AudionutsUAGUI() {
                     </svg>
                     {fileBrowserSearch && (
                       <button
+                        type="button"
+                        aria-label="Clear file search"
                         onClick={() => handleFileBrowserSearch("")}
                         className={`absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded ${isDarkMode ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-200 text-gray-500"}`}
                       >
@@ -7168,6 +7193,7 @@ function AudionutsUAGUI() {
                       </label>
                       <input
                         type="text"
+                        aria-label="Additional arguments"
                         value={customArgs}
                         onChange={(e) => setCustomArgs(e.target.value)}
                         placeholder="--tmdb movie/12345 --trackers passthepopcorn,aither,ulcx --no-edition --no-tag"
@@ -7504,6 +7530,7 @@ function AudionutsUAGUI() {
                 </div>
                 <input
                   type="text"
+                  aria-label="Search arguments"
                   value={argSearchFilter}
                   onChange={(e) => setArgSearchFilter(e.target.value)}
                   placeholder="Search arguments..."
@@ -7515,6 +7542,8 @@ function AudionutsUAGUI() {
                 />
                 {argSearchFilter && (
                   <button
+                    type="button"
+                    aria-label="Clear argument search"
                     onClick={() => setArgSearchFilter("")}
                     className={`absolute inset-y-0 right-0 pr-3 flex items-center ${isDarkMode ? "text-gray-400 hover:text-gray-200" : "text-gray-500 hover:text-gray-700"}`}
                   >

@@ -701,6 +701,101 @@
     );
   }
 
+  const UA_MODAL_FOCUSABLE_SELECTOR = [
+    "a[href]",
+    "button:not([disabled])",
+    "input:not([disabled]):not([type='hidden'])",
+    "select:not([disabled])",
+    "textarea:not([disabled])",
+    "[tabindex]:not([tabindex='-1'])",
+  ].join(",");
+
+  function getUAModalFocusableElements(dialog) {
+    if (!dialog) return [];
+    return Array.from(
+      dialog.querySelectorAll(UA_MODAL_FOCUSABLE_SELECTOR),
+    ).filter((element) => {
+      const style = window.getComputedStyle(element);
+      return (
+        element.getClientRects().length > 0 &&
+        style.visibility !== "hidden" &&
+        element.getAttribute("aria-hidden") !== "true"
+      );
+    });
+  }
+
+  function useUAModalFocus(onClose, isOpen = true) {
+    const dialogRef = React.useRef(null);
+    const closeHandlerRef = React.useRef(onClose);
+    closeHandlerRef.current = onClose;
+
+    React.useEffect(() => {
+      if (!isOpen) return undefined;
+
+      const previousFocus = document.activeElement;
+      const previousOverflow = document.body.style.overflow;
+      const dialog = dialogRef.current;
+      document.body.style.overflow = "hidden";
+
+      const focusFrame = window.requestAnimationFrame(() => {
+        if (!dialog) return;
+        const initialFocus = dialog.querySelector(
+          "[data-ua-modal-initial-focus]",
+        );
+        const focusTarget =
+          initialFocus || getUAModalFocusableElements(dialog)[0] || dialog;
+        focusTarget.focus?.();
+      });
+
+      const handleKeyDown = (event) => {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          closeHandlerRef.current?.();
+          return;
+        }
+        if (event.key !== "Tab" || !dialog) return;
+
+        const focusableElements = getUAModalFocusableElements(dialog);
+        if (!focusableElements.length) {
+          event.preventDefault();
+          dialog.focus();
+          return;
+        }
+
+        const firstElement = focusableElements[0];
+        const lastElement = focusableElements[focusableElements.length - 1];
+        const activeElement = document.activeElement;
+        if (
+          event.shiftKey &&
+          (activeElement === firstElement || !dialog.contains(activeElement))
+        ) {
+          event.preventDefault();
+          lastElement.focus();
+        } else if (!event.shiftKey && activeElement === lastElement) {
+          event.preventDefault();
+          firstElement.focus();
+        }
+      };
+
+      window.addEventListener("keydown", handleKeyDown);
+      return () => {
+        window.cancelAnimationFrame(focusFrame);
+        window.removeEventListener("keydown", handleKeyDown);
+        document.body.style.overflow = previousOverflow;
+        window.requestAnimationFrame(() => {
+          const activeModal = document.activeElement?.closest?.(
+            '[role="dialog"][aria-modal="true"]',
+          );
+          if (!activeModal && previousFocus?.isConnected) {
+            previousFocus.focus?.();
+          }
+        });
+      };
+    }, [isOpen]);
+
+    return dialogRef;
+  }
+
   function UAUpdateStatusModal({
     status,
     onClose,
@@ -708,21 +803,9 @@
     onOpenChangelog,
   }) {
     const [activeArea, setActiveArea] = React.useState("all");
+    const dialogRef = useUAModalFocus(onClose);
     const parsed = parseUAReleaseNotes(status.changelog);
     const counts = getUAChangelogAreaCounts([{ parsed }]);
-
-    React.useEffect(() => {
-      const previousOverflow = document.body.style.overflow;
-      document.body.style.overflow = "hidden";
-      const closeOnEscape = (event) => {
-        if (event.key === "Escape") onClose();
-      };
-      window.addEventListener("keydown", closeOnEscape);
-      return () => {
-        document.body.style.overflow = previousOverflow;
-        window.removeEventListener("keydown", closeOnEscape);
-      };
-    }, [onClose]);
 
     return React.createElement(
       "div",
@@ -737,11 +820,13 @@
       React.createElement(
         "section",
         {
+          ref: dialogRef,
           className:
             "ua-update-modal flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border shadow-2xl",
           role: "dialog",
           "aria-modal": "true",
           "aria-labelledby": "ua-update-status-title",
+          tabIndex: -1,
         },
         React.createElement(
           "header",
@@ -776,7 +861,7 @@
               className: "ua-update-close h-10 w-10 shrink-0 rounded-lg p-0",
               "aria-label": "Close update details",
               onClick: onClose,
-              autoFocus: true,
+              "data-ua-modal-initial-focus": true,
             },
             React.createElement(
               "svg",
@@ -932,6 +1017,7 @@
     const [isRefreshing, setIsRefreshing] = React.useState(false);
     const [activeArea, setActiveArea] = React.useState("all");
     const [expandedVersions, setExpandedVersions] = React.useState(new Set());
+    const dialogRef = useUAModalFocus(onClose);
 
     const applyHistory = React.useCallback((nextHistory) => {
       setHistory(nextHistory);
@@ -962,19 +1048,6 @@
         cancelled = true;
       };
     }, [applyHistory]);
-
-    React.useEffect(() => {
-      const previousOverflow = document.body.style.overflow;
-      document.body.style.overflow = "hidden";
-      const closeOnEscape = (event) => {
-        if (event.key === "Escape") onClose();
-      };
-      window.addEventListener("keydown", closeOnEscape);
-      return () => {
-        document.body.style.overflow = previousOverflow;
-        window.removeEventListener("keydown", closeOnEscape);
-      };
-    }, [onClose]);
 
     const refreshHistory = async () => {
       setIsRefreshing(true);
@@ -1045,11 +1118,13 @@
       h(
         "section",
         {
+          ref: dialogRef,
           className:
             "ua-update-modal ua-changelog-modal flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl border shadow-2xl",
           role: "dialog",
           "aria-modal": "true",
           "aria-labelledby": "ua-changelog-title",
+          tabIndex: -1,
         },
         h(
           "header",
@@ -1089,7 +1164,7 @@
               className: "ua-update-close h-10 w-10 shrink-0 rounded-lg p-0",
               "aria-label": "Close changelog",
               onClick: onClose,
-              autoFocus: true,
+              "data-ua-modal-initial-focus": true,
             },
             h(
               "svg",
@@ -1467,6 +1542,7 @@
     window.UAUpdateStatusModal =
       window.UAUpdateStatusModal || UAUpdateStatusModal;
     window.UAChangelogModal = window.UAChangelogModal || UAChangelogModal;
+    window.useUAModalFocus = window.useUAModalFocus || useUAModalFocus;
     window.sanitizeHtml = window.sanitizeHtml || sanitizeHtml;
   }
 })();

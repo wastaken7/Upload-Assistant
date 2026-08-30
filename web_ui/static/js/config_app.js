@@ -1,4 +1,5 @@
 const { useEffect, useMemo, useRef, useState } = React;
+const useModalFocus = window.useUAModalFocus;
 
 const CONFIG_FIELD_RESET_EVENT = "ua-config-field-reset";
 
@@ -2980,19 +2981,7 @@ function FolderPickerModal({ fieldLabel, onCancel, onSelect }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const currentPath = pathHistory[pathHistory.length - 1] || "";
-
-  useEffect(() => {
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const closeOnEscape = (event) => {
-      if (event.key === "Escape") onCancel();
-    };
-    window.addEventListener("keydown", closeOnEscape);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", closeOnEscape);
-    };
-  }, [onCancel]);
+  const dialogRef = useModalFocus(onCancel);
 
   useEffect(() => {
     let active = true;
@@ -3043,10 +3032,12 @@ function FolderPickerModal({ fieldLabel, onCancel, onSelect }) {
       }}
     >
       <section
+        ref={dialogRef}
         className="ua-config-modal flex max-h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border shadow-2xl"
         role="dialog"
         aria-modal="true"
         aria-labelledby="folder-picker-title"
+        tabIndex="-1"
       >
         <div className="ua-config-section-heading border-b px-4 py-3">
           <h2 id="folder-picker-title" className="text-base font-semibold">
@@ -3293,19 +3284,7 @@ function RenameTorrentClientModal({
       String(name).toLowerCase() === normalizedName.toLowerCase() &&
       String(name).toLowerCase() !== String(sourceName).toLowerCase(),
   );
-
-  useEffect(() => {
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const closeOnEscape = (event) => {
-      if (event.key === "Escape") onCancel();
-    };
-    window.addEventListener("keydown", closeOnEscape);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", closeOnEscape);
-    };
-  }, [onCancel]);
+  const dialogRef = useModalFocus(onCancel);
 
   return (
     <div
@@ -3316,10 +3295,12 @@ function RenameTorrentClientModal({
       }}
     >
       <form
+        ref={dialogRef}
         className="ua-config-modal w-full max-w-md overflow-hidden rounded-xl border shadow-2xl"
         role="dialog"
         aria-modal="true"
         aria-labelledby="rename-client-title"
+        tabIndex="-1"
         onSubmit={(event) => {
           event.preventDefault();
           if (validName && !unchanged && !nameTaken) onRename(normalizedName);
@@ -3343,7 +3324,7 @@ function RenameTorrentClientModal({
             value={clientName}
             className="ua-config-input w-full rounded-lg border px-3 py-2"
             autoComplete="off"
-            autoFocus
+            data-ua-modal-initial-focus
             onFocus={(event) => event.target.select()}
             onChange={(event) => setClientName(event.target.value)}
           />
@@ -3387,6 +3368,7 @@ function HelpResourcesModal({
   onClose,
 }) {
   const resourceGroups = window.UAHelpResourceGroups || [];
+  const dialogRef = useModalFocus(onClose);
   const updateMessage = isCheckingForUpdates
     ? "Checking GitHub for the latest release… This can take up to 15 seconds."
     : !updateStatus
@@ -3399,19 +3381,6 @@ function HelpResourcesModal({
             ? `${updateStatus.latest_version} is available. You have ${updateStatus.current_version}.`
             : `You’re up to date (${updateStatus.current_version || window.UA_APP_VERSION}).`;
 
-  useEffect(() => {
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const closeOnEscape = (event) => {
-      if (event.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", closeOnEscape);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", closeOnEscape);
-    };
-  }, [onClose]);
-
   return (
     <div
       className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-3 sm:p-4"
@@ -3421,10 +3390,12 @@ function HelpResourcesModal({
       }}
     >
       <section
+        ref={dialogRef}
         className="ua-config-modal ua-config-help-modal flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl border shadow-2xl"
         role="dialog"
         aria-modal="true"
         aria-labelledby="help-resources-title"
+        tabIndex="-1"
       >
         <div className="ua-config-section-heading flex items-start justify-between gap-4 border-b px-4 py-3 sm:px-5 sm:py-4">
           <div>
@@ -3439,7 +3410,7 @@ function HelpResourcesModal({
             type="button"
             className="ua-config-icon-button shrink-0 p-0"
             aria-label="Close help and resources"
-            autoFocus
+            data-ua-modal-initial-focus
             onClick={onClose}
           >
             <svg
@@ -5470,6 +5441,9 @@ function showConfirmModal(opts) {
   const options = typeof opts === "string" ? { message: opts } : opts || {};
   return new Promise((resolve) => {
     const previousFocus = document.activeElement;
+    const fallbackFocus = options.returnFocusSelector
+      ? document.querySelector(options.returnFocusSelector)
+      : null;
     const configRoot = document.querySelector(".ua-config-page");
     const modeClass = configRoot?.classList.contains("ua-mode-light")
       ? "ua-mode-light"
@@ -5537,7 +5511,12 @@ function showConfirmModal(opts) {
       } catch (e) {
         /* ignore */
       }
-      window.requestAnimationFrame(() => previousFocus?.focus?.());
+      window.requestAnimationFrame(() => {
+        const focusTarget = previousFocus?.isConnected
+          ? previousFocus
+          : fallbackFocus;
+        focusTarget?.focus?.();
+      });
       resolve(result);
     }
 
@@ -5551,9 +5530,18 @@ function showConfirmModal(opts) {
       if (ev.key === "Escape") {
         ev.preventDefault();
         cleanup(false);
-      } else if (ev.key === "Enter") {
+        return;
+      }
+      if (ev.key !== "Tab") return;
+
+      const firstButton = cancelBtn;
+      const lastButton = okBtn;
+      if (ev.shiftKey && document.activeElement === firstButton) {
         ev.preventDefault();
-        cleanup(true);
+        lastButton.focus();
+      } else if (!ev.shiftKey && document.activeElement === lastButton) {
+        ev.preventDefault();
+        firstButton.focus();
       }
     }
     window.addEventListener("keydown", keyHandler);
@@ -7391,6 +7379,7 @@ function ConfigApp() {
       message:
         "Discard every pending configuration change and restore the last saved values?",
       confirmLabel: "Discard Changes",
+      returnFocusSelector: '[aria-controls="pending-change-summary"]',
     });
     if (!confirmed) return;
     const fieldPathsToReset = Array.from(pendingChanges.keys());
