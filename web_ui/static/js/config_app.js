@@ -2418,11 +2418,7 @@ function ConfigLeafEditor({
                   type="checkbox"
                   checked={selected.has(tracker.toUpperCase())}
                   onChange={(e) => toggleTracker(tracker, e.target.checked)}
-                  className={
-                    isDarkMode
-                      ? "h-4 w-4 accent-purple-500"
-                      : "h-4 w-4 accent-purple-600"
-                  }
+                  className="ua-theme-checkbox h-4 w-4"
                 />
                 <span>{getTrackerDisplayName(tracker)}</span>
               </label>
@@ -2659,11 +2655,7 @@ function ConfigLeafEditor({
                         type="checkbox"
                         checked={selected.includes(client)}
                         onChange={() => {}} // Handled by parent div
-                        className={
-                          isDarkMode
-                            ? "h-4 w-4 accent-purple-500"
-                            : "h-4 w-4 accent-purple-600"
-                        }
+                        className="ua-theme-checkbox h-4 w-4"
                       />
                       {client}
                     </label>

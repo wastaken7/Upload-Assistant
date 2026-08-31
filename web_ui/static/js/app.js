@@ -2972,7 +2972,7 @@ function AudionutsUAGUI() {
                 onChange={(event) =>
                   setShowAllSupportedTrackers(event.target.checked)
                 }
-                className="h-3.5 w-3.5 accent-purple-600"
+                className="ua-theme-checkbox h-3.5 w-3.5"
                 disabled={isExecuting}
               />
               <span>Show all supported trackers</span>
@@ -3104,7 +3104,7 @@ function AudionutsUAGUI() {
           </div>
         )}
         <div
-          className={`flex flex-wrap gap-2 pr-1 ${!isExecuting && !isOutputExpanded ? "" : "max-h-48 overflow-y-auto"}`}
+          className={`ua-tracker-chip-list grid gap-2 pr-1 ${!isExecuting && !isOutputExpanded ? "" : "max-h-48 overflow-y-auto"}`}
         >
           {visibleTrackers.length === 0 && (
             <span className="text-xs opacity-70">
@@ -3133,7 +3133,7 @@ function AudionutsUAGUI() {
                 onClick={() => handleTrackerToggle(tracker.name)}
                 disabled={isExecuting}
                 data-color-mode={isDarkMode ? "dark" : "light"}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium border transition-all ${
+                className={`ua-tracker-chip flex min-w-0 items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium border transition-all ${
                   isSelected
                     ? "ua-tracker-chip-selected"
                     : isDarkMode
@@ -3170,7 +3170,9 @@ function AudionutsUAGUI() {
                     {tracker.display_name.charAt(0)}
                   </span>
                 )}
-                <span>{tracker.display_name}</span>
+                <span className="ua-tracker-chip-label min-w-0 flex-1 truncate text-left">
+                  {tracker.display_name}
+                </span>
                 <span
                   className="ua-tracker-health-dot"
                   data-state={

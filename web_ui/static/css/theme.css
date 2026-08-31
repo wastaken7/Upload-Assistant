@@ -304,6 +304,10 @@ textarea {
   accent-color: var(--ua-copper-bright);
 }
 
+.ua-theme-checkbox {
+  accent-color: var(--ua-copper-bright) !important;
+}
+
 input:focus,
 select:focus,
 textarea:focus,
@@ -398,6 +402,38 @@ button:focus-visible {
     var(--ua-copper-bright) 14%,
     #ffffff
   ) !important;
+}
+
+.ua-tracker-chip-list {
+  align-items: stretch;
+  grid-template-columns: repeat(auto-fill, minmax(10.5rem, 1fr));
+}
+
+.ua-tracker-chip {
+  justify-content: flex-start;
+  width: 100%;
+}
+
+.ua-tracker-chip-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ua-tracker-chip > .ua-tracker-health-dot {
+  margin-left: auto;
+}
+
+@media (max-width: 480px) {
+  .ua-tracker-chip-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 340px) {
+  .ua-tracker-chip-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .ua-tracker-health-dot {
