@@ -655,6 +655,11 @@ const CONFIG_HEADING_LABELS = {
   "OUTPUT PATHS": "Output Paths",
 };
 
+const CONFIG_HEADING_DESCRIPTIONS = {
+  "EXTERNAL TOOL PATHS":
+    "Optional executable overrides. Leave a field blank to use the bundled tool when available or the corresponding executable on the system PATH.",
+};
+
 const normalizeConfigHeading = (value) =>
   String(value || "")
     .trim()
@@ -664,6 +669,9 @@ const formatConfigHeading = (value) => {
   const normalized = normalizeConfigHeading(value);
   return CONFIG_HEADING_LABELS[normalized] || formatDisplayLabel(value);
 };
+
+const getConfigHeadingDescription = (value) =>
+  CONFIG_HEADING_DESCRIPTIONS[normalizeConfigHeading(value)] || "";
 
 const UPLOAD_WORKFLOW_HEADING_ORDER = [
   "TRACKER SEARCH AND IMPORT",
@@ -868,8 +876,15 @@ const DISPLAY_LABEL_OVERRIDES = {
   sharex_api_key: "ShareX API Key",
   utppm_api: "UTPPM API Key",
   zipline_api_key: "Zipline API Key",
-  dovi_tool_path: "Dolby Vision Tool Path",
-  hdr10plus_tool_path: "HDR10+ Tool Path",
+  ffmpeg_path: "FFmpeg",
+  ffprobe_path: "FFprobe",
+  mediainfo_path: "MediaInfo",
+  dvd_mediainfo_path: "DVD MediaInfo",
+  bdinfo_path: "BDInfo",
+  mkbrr_path: "mkbrr",
+  dovi_tool_path: "Dolby Vision Tool",
+  hdr10plus_tool_path: "HDR10+ Tool",
+  unrar_path: "UnRAR",
   "7z_path": "7-Zip Path",
   skip_auto_torrent_personalrelease: "Skip Auto Torrent Personal Release",
 };
@@ -1733,7 +1748,11 @@ function ConfigLeafEditor({
   const fieldId = path.join("--");
   const displayLabel = formatConfigFieldLabel(item.key, pathParts);
 
-  const helpText = item.help && item.help.length ? item.help.join("\n") : "";
+  const helpBelongsToSection = path.join("/") === "DEFAULT/ffmpeg_path";
+  const helpText =
+    !helpBelongsToSection && item.help && item.help.length
+      ? item.help.join("\n")
+      : "";
   const labelClass = isDarkMode
     ? "text-sm font-medium text-gray-200"
     : "text-sm font-medium text-gray-700";
@@ -5638,6 +5657,7 @@ function ItemList({
         }
 
         if (isStaticSubsection) {
+          const headingDescription = getConfigHeadingDescription(item.key);
           return (
             <section
               key={groupKey}
@@ -5647,6 +5667,11 @@ function ItemList({
                 <h2 className="text-sm font-semibold">
                   {formatConfigHeading(item.key)}
                 </h2>
+                {headingDescription && (
+                  <p className="ua-config-service-description mt-1 text-xs">
+                    {headingDescription}
+                  </p>
+                )}
               </div>
               <div className="ua-config-section-panel p-4">{nested}</div>
             </section>

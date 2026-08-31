@@ -90,11 +90,11 @@ config: dict[str, Any] = {
         # --- EXTERNAL TOOL PATHS ---
         # Optional paths to external media tools. Leave blank to use the bundled
         # tool when available, or the corresponding executable on the system PATH.
-        # The DVD-specific MediaInfo executable must remain on version 23.04 because
-        # newer releases do not preserve its DVD parsing behavior.
         "ffmpeg_path": "",
         "ffprobe_path": "",
         "mediainfo_path": "",
+        # The DVD-specific MediaInfo executable must remain on version 23.04 because
+        # newer releases do not preserve its DVD parsing behavior.
         "dvd_mediainfo_path": "",
         "bdinfo_path": "",
         "mkbrr_path": "",
