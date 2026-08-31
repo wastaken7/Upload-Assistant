@@ -4215,6 +4215,10 @@ function TrackerManager({
   const originalDefaultValue = defaultTrackersItem.value;
   const [selectedDefaults, setSelectedDefaults] = useState(originalDefaults);
   const [trackerQuery, setTrackerQuery] = useState("");
+  const [trackerStatuses, setTrackerStatuses] = useState({});
+  const [isCheckingTrackerStatuses, setIsCheckingTrackerStatuses] =
+    useState(false);
+  const [trackerStatusError, setTrackerStatusError] = useState("");
 
   useEffect(() => {
     setSelectedDefaults(normalizeTrackers(defaultTrackersItem.value));
@@ -4238,6 +4242,22 @@ function TrackerManager({
   useEffect(() => {
     setTrackerQuery("");
   }, [trackerView]);
+
+  useEffect(() => {
+    if (!window.loadUATrackerStatuses) return undefined;
+    let cancelled = false;
+    window
+      .loadUATrackerStatuses()
+      .then((payload) => {
+        if (!cancelled) setTrackerStatuses(payload.statuses || {});
+      })
+      .catch(() => {
+        // Cached status is optional; a manual check can surface any error.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const fallbackNames = getAvailableTrackers(defaultTrackersItem).map((name) =>
     String(name).toUpperCase(),
@@ -4314,6 +4334,25 @@ function TrackerManager({
     );
   };
 
+  const checkTrackerStatuses = async (trackerNames) => {
+    if (!window.checkUATrackerStatuses || trackerNames.length === 0) return;
+    setIsCheckingTrackerStatuses(true);
+    setTrackerStatusError("");
+    try {
+      const payload = await window.checkUATrackerStatuses(trackerNames);
+      setTrackerStatuses((current) => ({
+        ...current,
+        ...(payload.statuses || {}),
+      }));
+    } catch (error) {
+      setTrackerStatusError(
+        error?.message || "The tracker status check failed.",
+      );
+    } finally {
+      setIsCheckingTrackerStatuses(false);
+    }
+  };
+
   const trackerStatusBadge = (label, tone = "neutral") => (
     <span
       key={label}
@@ -4324,8 +4363,15 @@ function TrackerManager({
     </span>
   );
 
-  const trackerIdentity = (tracker, statuses = []) => {
+  const trackerIdentity = (tracker, statuses = [], showHealth = false) => {
     const name = String(tracker.name).toUpperCase();
+    const trackerStatus = trackerStatuses[name] || {
+      state: "not_checked",
+      message: "Not checked yet.",
+    };
+    const trackerStatusText = window.getUATrackerStatusText
+      ? window.getUATrackerStatusText(trackerStatus)
+      : "Not checked";
     return (
       <span className="flex min-w-0 items-center gap-3">
         <span className="ua-config-tracker-icon flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg border">
@@ -4344,6 +4390,19 @@ function TrackerManager({
             <span className="min-w-0 truncate text-sm font-semibold">
               {tracker.display_name || getTrackerDisplayName(name)}
             </span>
+            {showHealth && (
+              <span
+                className="ua-tracker-health-dot"
+                data-state={
+                  trackerStatus.stale
+                    ? "not_checked"
+                    : trackerStatus.state || "not_checked"
+                }
+                role="img"
+                aria-label={trackerStatusText}
+                title={trackerStatusText}
+              />
+            )}
             {statuses.length > 0 && (
               <span className="flex flex-wrap gap-1.5">
                 {statuses.map((status) =>
@@ -4357,6 +4416,92 @@ function TrackerManager({
           </span>
         </span>
       </span>
+    );
+  };
+
+  const trackerStatusPanel = (statusEntries) => {
+    const uniqueEntries = Array.from(
+      new Map(
+        statusEntries.map((tracker) => [
+          String(tracker.name).toUpperCase(),
+          tracker,
+        ]),
+      ).values(),
+    );
+    const targetNames = uniqueEntries
+      .filter((tracker) => tracker.base_url)
+      .map((tracker) => String(tracker.name).toUpperCase());
+    const relevantStatuses = Object.fromEntries(
+      uniqueEntries
+        .map((tracker) => String(tracker.name).toUpperCase())
+        .filter((name) => trackerStatuses[name]?.checked_at)
+        .map((name) => [name, trackerStatuses[name]]),
+    );
+    const issueEntries = uniqueEntries.filter((tracker) => {
+      const status = trackerStatuses[String(tracker.name).toUpperCase()];
+      return (
+        !status?.stale &&
+        (status?.state === "issue" || status?.state === "unavailable")
+      );
+    });
+    const checkedAge = window.formatUATrackerStatusAge
+      ? window.formatUATrackerStatusAge(relevantStatuses)
+      : "Not checked";
+
+    return (
+      <React.Fragment>
+        <div className="ua-config-tracker-health-controls flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3">
+          <div>
+            <p className="text-sm font-semibold">Tracker availability</p>
+            <p className="ua-config-service-description mt-0.5 text-xs">
+              Advisory website checks only — no credentials or uploads are used.
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="ua-config-service-description text-xs">
+              {checkedAge}
+            </span>
+            <button
+              type="button"
+              className="ua-config-tracker-default-action rounded-lg border px-3 py-2 text-xs font-semibold"
+              disabled={
+                isCheckingTrackerStatuses || targetNames.length === 0
+              }
+              onClick={() => checkTrackerStatuses(targetNames)}
+            >
+              {isCheckingTrackerStatuses
+                ? "Checking…"
+                : "Check tracker status"}
+            </button>
+          </div>
+        </div>
+        {trackerStatusError && (
+          <div
+            className="ua-tracker-status-advisory rounded-xl border px-4 py-3 text-sm"
+            data-tone="danger"
+            role="alert"
+          >
+            {trackerStatusError}
+          </div>
+        )}
+        {issueEntries.length > 0 && (
+          <div
+            className="ua-tracker-status-advisory rounded-xl border px-4 py-3 text-sm"
+            data-tone="warning"
+            role="status"
+          >
+            <span className="font-semibold">Tracker status warning: </span>
+            {issueEntries
+              .map(
+                (tracker) =>
+                  tracker.display_name ||
+                  getTrackerDisplayName(String(tracker.name)),
+              )
+              .join(", ")} may be experiencing an issue. This check is
+            advisory; verify the tracker before uploading if needed.
+          </div>
+        )}
+      </React.Fragment>
     );
   };
 
@@ -4434,6 +4579,7 @@ function TrackerManager({
           These trackers are selected automatically when an upload does not
           provide an explicit tracker list.
         </div>
+        {trackerStatusPanel([...defaultEntries, ...addableDefaultEntries])}
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 2xl:grid-cols-3">
           {defaultEntries.map((tracker) => {
             const name = String(tracker.name).toUpperCase();
@@ -4442,9 +4588,11 @@ function TrackerManager({
                 key={name}
                 className="ua-config-tracker-card flex flex-col items-stretch justify-between gap-3 rounded-xl border p-3 sm:flex-row sm:items-center"
               >
-                {trackerIdentity(tracker, [
-                  { label: "Default", tone: "accent" },
-                ])}
+                {trackerIdentity(
+                  tracker,
+                  [{ label: "Default", tone: "accent" }],
+                  true,
+                )}
                 <button
                   type="button"
                   className="w-full shrink-0 rounded-lg border border-red-500/40 px-2.5 py-1.5 text-xs font-semibold text-red-500 hover:bg-red-500/10 sm:w-auto"
@@ -4480,6 +4628,7 @@ function TrackerManager({
                       tracker.configured
                         ? [{ label: "Configured", tone: "success" }]
                         : [],
+                      true,
                     )}
                     <button
                       type="button"
@@ -4537,6 +4686,8 @@ function TrackerManager({
           {entries.length === 1 ? "tracker" : "trackers"}
         </span>
       </div>
+
+      {trackerView === "configured" && trackerStatusPanel(configuredEntries)}
 
       {entries.length > 0 && (
         <div className="relative">
@@ -4604,7 +4755,11 @@ function TrackerManager({
                 onClick={() => toggleGroup(groupKey)}
                 aria-expanded={isOpen}
               >
-                {trackerIdentity(tracker, statuses)}
+                {trackerIdentity(
+                  tracker,
+                  statuses,
+                  trackerView === "configured",
+                )}
                 <span
                   className="ua-config-accordion-chevron shrink-0 transition-transform"
                   style={{

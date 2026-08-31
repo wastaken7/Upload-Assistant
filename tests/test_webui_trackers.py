@@ -86,3 +86,51 @@ def test_cookie_discovery_continues_after_one_lookup_failure(tmp_path: Path) -> 
 
     assert lookups == ["BROKEN", "MAKINGOFF", "LATER"]
     assert configured == {"MAKINGOFF"}
+
+
+def test_tracker_status_http_classification_is_advisory() -> None:
+    assert server._tracker_status_from_http_code(200)[0] == "available"
+    assert server._tracker_status_from_http_code(403)[0] == "available"
+    assert server._tracker_status_from_http_code(429)[0] == "issue"
+    assert server._tracker_status_from_http_code(503)[0] == "issue"
+
+
+def test_tracker_status_cache_marks_expired_results_stale(monkeypatch) -> None:
+    monkeypatch.setattr(server.time, "time", lambda: 2_000.0)
+    with server._tracker_status_cache_lock:
+        server._tracker_status_cache.clear()
+        server._tracker_status_cache["AITHER"] = {
+            "name": "AITHER",
+            "state": "available",
+            "message": "The tracker website responded.",
+            "checked_at": "2026-08-31T12:00:00+00:00",
+            "_checked_epoch": 2_000.0 - server._TRACKER_STATUS_CACHE_SECONDS - 1,
+        }
+
+    payload = server._tracker_status_cache_payload(["AITHER", "BLUTOPIA"])
+
+    assert payload["AITHER"]["stale"] is True
+    assert "_checked_epoch" not in payload["AITHER"]
+    assert payload["BLUTOPIA"]["state"] == "not_checked"
+
+    with server._tracker_status_cache_lock:
+        server._tracker_status_cache.clear()
+
+
+def test_refresh_tracker_status_rejects_unknown_tracker(monkeypatch) -> None:
+    monkeypatch.setattr(server, "_is_authenticated", lambda: True)
+    monkeypatch.setattr(server, "_verify_csrf_header", lambda: True)
+    monkeypatch.setattr(server, "_verify_same_origin", lambda: True)
+    monkeypatch.setattr(
+        server,
+        "_supported_tracker_status_targets",
+        lambda: {"AITHER": "https://aither.cc"},
+    )
+
+    response = server.app.test_client().post(
+        "/api/tracker_status",
+        json={"trackers": ["NOT-A-TRACKER"]},
+    )
+
+    assert response.status_code == 400
+    assert response.get_json()["success"] is False

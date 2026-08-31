@@ -123,6 +123,8 @@ To save a preset, enter a name and choose **Save**. Saving an existing name upda
 
 Argument controls update the same command field, so advanced users can still edit the resulting string directly. The [CLI arguments reference](cli-args.md) explains each available flag.
 
+Choose **Check status** to run a lightweight website-reachability check for the configured trackers. The dot beside each tracker shows available, issue detected, unavailable, or not checked. Results are cached for 15 minutes and reused between the Upload and Configuration pages. These checks do not use tracker credentials and cannot confirm that an account or upload endpoint is working, so warnings are advisory and never prevent an upload.
+
 ### Start the upload
 
 After selecting content and reviewing the command:
@@ -215,6 +217,8 @@ Each priority selector continues to list all configured image hosts, including h
 - Use **Default Trackers** to choose the normal starting set shown on the Upload page.
 - Use **Configured Trackers** to review, rename, edit, or remove existing tracker entries.
 - Use **Available Trackers** to add a supported tracker from its template.
+
+Default and Configured Trackers also show the cached availability dot used by the Upload page. Choose **Check tracker status** to refresh those credential-free checks. Any detected issue is summarized above the tracker list; Available Trackers are not checked until they have been configured.
 
 New trackers and tracker edits remain pending until the configuration is saved.
 

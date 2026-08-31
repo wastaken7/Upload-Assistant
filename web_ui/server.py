@@ -3,6 +3,7 @@
 import ast
 import asyncio
 import base64
+import concurrent.futures
 import contextlib
 import importlib
 import hashlib
@@ -206,6 +207,11 @@ MAX_ARGUMENT_PRESETS = 50
 _argument_presets_lock = threading.Lock()
 _description_review_locks: weakref.WeakValueDictionary[str, threading.Lock] = weakref.WeakValueDictionary()
 _description_review_locks_lock = threading.Lock()
+_TRACKER_STATUS_CACHE_SECONDS = 15 * 60
+_TRACKER_STATUS_MAX_WORKERS = 8
+_tracker_status_cache: dict[str, dict[str, Any]] = {}
+_tracker_status_cache_lock = threading.Lock()
+_tracker_status_check_lock = threading.Lock()
 
 
 def _load_argument_presets() -> list[dict[str, str]]:
@@ -4286,6 +4292,171 @@ def _configured_cookie_tracker_names(
             configured.add(tracker_name.upper())
 
     return configured
+
+
+def _tracker_status_from_http_code(status_code: int) -> tuple[str, str]:
+    """Map a tracker homepage response to a deliberately advisory state."""
+    if status_code == 429:
+        return "issue", "The tracker is reachable but is rate limiting requests (HTTP 429)."
+    if status_code >= 500:
+        return "issue", f"The tracker returned a server error (HTTP {status_code})."
+    if 100 <= status_code < 500:
+        return "available", "The tracker website responded."
+    return "issue", "The tracker returned an unexpected response."
+
+
+def _probe_tracker_url(tracker_name: str, base_url: str) -> dict[str, Any]:
+    """Perform a lightweight website reachability probe without using credentials."""
+    checked_at = datetime.now(UTC).isoformat()
+    parsed_url = urllib.parse.urlsplit(base_url)
+    if parsed_url.scheme not in {"http", "https"} or not parsed_url.hostname:
+        return {
+            "name": tracker_name,
+            "state": "not_checked",
+            "message": "No status URL is available for this tracker.",
+            "checked_at": checked_at,
+        }
+
+    try:
+        httpx = _dynamic_import("httpx")
+        with httpx.Client(
+            follow_redirects=True,
+            timeout=4.0,
+            headers={"User-Agent": f"Upload-Assistant-WebUI/{APP_VERSION}"},
+        ) as client:
+            # Streaming avoids downloading tracker homepages just to confirm
+            # that the service can answer an HTTP request.
+            with client.stream("GET", base_url) as response:
+                status_code = int(response.status_code)
+        state, message = _tracker_status_from_http_code(status_code)
+        return {
+            "name": tracker_name,
+            "state": state,
+            "message": message,
+            "status_code": status_code,
+            "checked_at": checked_at,
+        }
+    except Exception:
+        # Keep network and DNS exception details out of the browser response.
+        # A later check can distinguish a transient local-network problem from
+        # a tracker outage.
+        return {
+            "name": tracker_name,
+            "state": "unavailable",
+            "message": "The tracker website could not be reached.",
+            "checked_at": checked_at,
+        }
+
+
+def _tracker_status_cache_payload(tracker_names: Sequence[str]) -> dict[str, dict[str, Any]]:
+    """Return cached status entries, marking old results as stale."""
+    now = time.time()
+    payload: dict[str, dict[str, Any]] = {}
+    with _tracker_status_cache_lock:
+        for tracker_name in tracker_names:
+            cached = _tracker_status_cache.get(tracker_name)
+            if cached is None:
+                payload[tracker_name] = {
+                    "name": tracker_name,
+                    "state": "not_checked",
+                    "message": "Not checked yet.",
+                    "checked_at": None,
+                    "stale": False,
+                }
+                continue
+            entry = {key: value for key, value in cached.items() if key != "_checked_epoch"}
+            checked_epoch = float(cached.get("_checked_epoch", 0.0))
+            entry["stale"] = now - checked_epoch > _TRACKER_STATUS_CACHE_SECONDS
+            payload[tracker_name] = entry
+    return payload
+
+
+def _supported_tracker_status_targets() -> dict[str, str]:
+    """Return trusted tracker names and homepage URLs from the class catalogue."""
+    from src.trackersetup import tracker_class_map
+
+    return {
+        str(tracker_name).upper(): str(getattr(tracker_class, "base_url", "") or "").strip()
+        for tracker_name, tracker_class in tracker_class_map.items()
+    }
+
+
+@app.route("/api/tracker_status")
+def get_tracker_status():
+    """Return cached, credential-free tracker reachability checks."""
+    if not _is_authenticated():
+        return jsonify({"success": False, "error": "Authentication required (web session)"}), 401
+    if not _verify_csrf_header() or not _verify_same_origin():
+        return jsonify({"success": False, "error": "CSRF/Origin validation failed"}), 403
+
+    with _tracker_status_cache_lock:
+        cached_names = sorted(_tracker_status_cache)
+
+    return jsonify(
+        {
+            "success": True,
+            "cache_seconds": _TRACKER_STATUS_CACHE_SECONDS,
+            "statuses": _tracker_status_cache_payload(cached_names),
+        }
+    )
+
+
+@app.route("/api/tracker_status", methods=["POST"])
+@limiter.limit("30 per hour", key_func=_rate_limit_key_func)
+def refresh_tracker_status():
+    """Refresh selected tracker reachability checks."""
+    if not _is_authenticated():
+        return jsonify({"success": False, "error": "Authentication required (web session)"}), 401
+    if not _verify_csrf_header() or not _verify_same_origin():
+        return jsonify({"success": False, "error": "CSRF/Origin validation failed"}), 403
+
+    try:
+        supported_targets = _supported_tracker_status_targets()
+    except Exception as error:
+        return jsonify({"success": False, "error": f"Failed to load trackers: {error}"}), 500
+
+    data = _request_json_dict()
+    requested = data.get("trackers")
+    if not isinstance(requested, list):
+        return jsonify({"success": False, "error": "Trackers must be provided as a list"}), 400
+
+    tracker_names = list(
+        dict.fromkeys(
+            str(name).strip().upper()
+            for name in requested[:100]
+            if str(name).strip()
+        )
+    )
+    unknown = [name for name in tracker_names if name not in supported_targets]
+    if unknown:
+        return jsonify({"success": False, "error": "One or more trackers are not supported"}), 400
+    if not tracker_names:
+        return jsonify({"success": False, "error": "Select at least one tracker to check"}), 400
+
+    checked_results: list[dict[str, Any]] = []
+    with _tracker_status_check_lock:
+        worker_count = min(_TRACKER_STATUS_MAX_WORKERS, len(tracker_names))
+        with concurrent.futures.ThreadPoolExecutor(max_workers=worker_count) as executor:
+            futures = {
+                executor.submit(_probe_tracker_url, name, supported_targets[name]): name
+                for name in tracker_names
+            }
+            for future in concurrent.futures.as_completed(futures):
+                checked_results.append(future.result())
+
+        checked_epoch = time.time()
+        with _tracker_status_cache_lock:
+            for result in checked_results:
+                name = str(result["name"])
+                _tracker_status_cache[name] = {**result, "_checked_epoch": checked_epoch}
+
+    return jsonify(
+        {
+            "success": True,
+            "cache_seconds": _TRACKER_STATUS_CACHE_SECONDS,
+            "statuses": _tracker_status_cache_payload(tracker_names),
+        }
+    )
 
 
 @app.route("/api/trackers")

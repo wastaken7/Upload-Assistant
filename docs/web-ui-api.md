@@ -206,6 +206,22 @@ The following endpoints via a valid web session.
 - Description: returns list of configured torrent client names
 - Response: {"success": true, "clients": ["qbit", ...]}
 
+### /api/trackers
+
+- Methods: GET
+- Auth: requires web session + CSRF + Origin (disallows bearer token)
+- Description: returns the supported tracker catalogue, including display names, local icons, homepage URLs, and default/configured state
+- Response: {"success": true, "default_trackers": ["AITHER", ...], "trackers": [...]}
+
+### /api/tracker_status
+
+- Methods: GET, POST
+- Auth: requires web session + CSRF + Origin (disallows bearer token)
+- Rate limit: POST is limited to 30 checks per hour; GET only reads the in-memory cache
+- POST payload: {"trackers": ["AITHER", "BLUTOPIA"]}
+- Description: GET returns cached tracker website-reachability results. POST refreshes the named supported trackers concurrently without using credentials or downloading response bodies. Results expire after 15 minutes and are advisory only.
+- Response: {"success": true, "cache_seconds": 900, "statuses": {"AITHER": {"state": "available", "message": "...", "checked_at": "...", "stale": false}}}
+
 ### /api/config_update
 
 - Methods: POST

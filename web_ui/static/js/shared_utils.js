@@ -276,6 +276,72 @@
     return response;
   }
 
+  async function requestUATrackerStatuses(trackerNames = null) {
+    const isRefresh = Array.isArray(trackerNames);
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 45_000);
+    try {
+      const response = await uaApiFetch("/api/tracker_status", {
+        method: isRefresh ? "POST" : "GET",
+        cache: "no-store",
+        signal: controller.signal,
+        headers: isRefresh ? { "Content-Type": "application/json" } : {},
+        body: isRefresh
+          ? JSON.stringify({ trackers: trackerNames })
+          : undefined,
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(payload?.error || "The tracker status check failed.");
+      }
+      if (!payload?.success || typeof payload.statuses !== "object") {
+        throw new Error("The tracker status check returned an invalid response.");
+      }
+      return payload;
+    } catch (error) {
+      if (error?.name === "AbortError") {
+        throw new Error(
+          "The tracker status check timed out. Check the server’s internet connection and try again.",
+        );
+      }
+      throw error;
+    } finally {
+      window.clearTimeout(timeout);
+    }
+  }
+
+  function formatUATrackerStatusAge(statuses = {}) {
+    const checkedTimes = Object.values(statuses)
+      .map((status) => Date.parse(status?.checked_at || ""))
+      .filter(Number.isFinite);
+    if (checkedTimes.length === 0) return "Not checked";
+    const elapsedSeconds = Math.max(
+      0,
+      Math.floor((Date.now() - Math.max(...checkedTimes)) / 1000),
+    );
+    if (elapsedSeconds < 60) return "Just checked";
+    const minutes = Math.floor(elapsedSeconds / 60);
+    if (minutes < 60) return `${minutes} min ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours} hr ago`;
+    const days = Math.floor(hours / 24);
+    return `${days} day${days === 1 ? "" : "s"} ago`;
+  }
+
+  function getUATrackerStatusText(status) {
+    const labels = {
+      available: "Available",
+      issue: "Issue detected",
+      unavailable: "Unavailable",
+      not_checked: "Not checked",
+    };
+    const label = status?.stale
+      ? "Previous result expired — check again"
+      : labels[status?.state] || labels.not_checked;
+    const message = String(status?.message || "").trim();
+    return message ? `${label}: ${message}` : label;
+  }
+
   async function loadUAUpdateStatus(force = false) {
     const endpoint = force
       ? "/api/update_status?refresh=1"
@@ -1826,6 +1892,14 @@
     window.loadCsrfToken = window.loadCsrfToken || loadCsrfToken;
     window.clearCsrfToken = window.clearCsrfToken || clearCsrfToken;
     window.uaApiFetch = window.uaApiFetch || uaApiFetch;
+    window.loadUATrackerStatuses =
+      window.loadUATrackerStatuses || (() => requestUATrackerStatuses());
+    window.checkUATrackerStatuses =
+      window.checkUATrackerStatuses || requestUATrackerStatuses;
+    window.formatUATrackerStatusAge =
+      window.formatUATrackerStatusAge || formatUATrackerStatusAge;
+    window.getUATrackerStatusText =
+      window.getUATrackerStatusText || getUATrackerStatusText;
     window.loadUAUpdateStatus = window.loadUAUpdateStatus || loadUAUpdateStatus;
     window.loadUAChangelog = window.loadUAChangelog || loadUAChangelog;
     window.getUADismissedUpdateVersion =

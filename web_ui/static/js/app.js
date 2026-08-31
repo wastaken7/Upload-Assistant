@@ -1956,6 +1956,10 @@ function AudionutsUAGUI() {
   const [trackers, setTrackers] = useState([]);
   const [defaultTrackers, setDefaultTrackers] = useState(new Set());
   const [selectedTrackers, setSelectedTrackers] = useState(new Set());
+  const [trackerStatuses, setTrackerStatuses] = useState({});
+  const [isCheckingTrackerStatuses, setIsCheckingTrackerStatuses] =
+    useState(false);
+  const [trackerStatusError, setTrackerStatusError] = useState("");
   const [showAllSupportedTrackers, setShowAllSupportedTrackers] =
     useState(false);
   const [failedFavicons, setFailedFavicons] = useState(new Set());
@@ -2849,6 +2853,25 @@ function AudionutsUAGUI() {
     setCustomArgs((prev) => syncTrackersToArgs(prev, nextSet, defaultTrackers));
   };
 
+  const checkTrackerStatuses = async (trackerNames) => {
+    if (!window.checkUATrackerStatuses || trackerNames.length === 0) return;
+    setIsCheckingTrackerStatuses(true);
+    setTrackerStatusError("");
+    try {
+      const payload = await window.checkUATrackerStatuses(trackerNames);
+      setTrackerStatuses((current) => ({
+        ...current,
+        ...(payload.statuses || {}),
+      }));
+    } catch (error) {
+      setTrackerStatusError(
+        error?.message || "The tracker status check failed.",
+      );
+    } finally {
+      setIsCheckingTrackerStatuses(false);
+    }
+  };
+
   const renderTrackerSelector = () => {
     if (!trackers || trackers.length === 0) return null;
 
@@ -2862,6 +2885,29 @@ function AudionutsUAGUI() {
             (tracker) =>
               tracker.configured || selectedTrackers.has(tracker.name),
           );
+    const statusTargets = trackers
+      .filter(
+        (tracker) =>
+          tracker.configured || selectedTrackers.has(tracker.name),
+      )
+      .map((tracker) => tracker.name);
+    const selectedStatusIssues = trackers.filter((tracker) => {
+      const status = trackerStatuses[tracker.name];
+      const state = status?.state;
+      return (
+        selectedTrackers.has(tracker.name) &&
+        !status?.stale &&
+        (state === "issue" || state === "unavailable")
+      );
+    });
+    const relevantStatuses = Object.fromEntries(
+      statusTargets
+        .filter((name) => trackerStatuses[name]?.checked_at)
+        .map((name) => [name, trackerStatuses[name]]),
+    );
+    const checkedAge = window.formatUATrackerStatusAge
+      ? window.formatUATrackerStatusAge(relevantStatuses)
+      : "Not checked";
 
     const getInitialsColor = (name) => {
       let hash = 0;
@@ -2893,6 +2939,21 @@ function AudionutsUAGUI() {
             Select Trackers (-tk):
           </span>
           <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => checkTrackerStatuses(statusTargets)}
+                className="ua-tracker-status-check rounded-md border px-2 py-1 text-[10px] font-semibold"
+                disabled={
+                  isExecuting ||
+                  isCheckingTrackerStatuses ||
+                  statusTargets.length === 0
+                }
+              >
+                {isCheckingTrackerStatuses ? "Checking…" : "Check status"}
+              </button>
+              <span className="text-[10px] opacity-60">{checkedAge}</span>
+            </div>
             <label className="inline-flex cursor-pointer items-center gap-1.5 text-[10px] font-medium">
               <input
                 type="checkbox"
@@ -2940,6 +3001,28 @@ function AudionutsUAGUI() {
             </div>
           </div>
         </div>
+        {trackerStatusError && (
+          <div
+            className="ua-tracker-status-advisory rounded-md border px-3 py-2 text-xs"
+            data-tone="danger"
+            role="alert"
+          >
+            {trackerStatusError}
+          </div>
+        )}
+        {selectedStatusIssues.length > 0 && (
+          <div
+            className="ua-tracker-status-advisory rounded-md border px-3 py-2 text-xs"
+            data-tone="warning"
+            role="status"
+          >
+            <span className="font-semibold">Tracker status warning: </span>
+            {selectedStatusIssues
+              .map((tracker) => tracker.display_name)
+              .join(", ")} may be experiencing an issue. This check is
+            advisory; verify the tracker before continuing if needed.
+          </div>
+        )}
         <div
           className={`flex flex-wrap gap-2 pr-1 ${!isExecuting && !isOutputExpanded ? "" : "max-h-48 overflow-y-auto"}`}
         >
@@ -2955,6 +3038,13 @@ function AudionutsUAGUI() {
             const isConfigured = tracker.configured !== false;
             const hasFavicon =
               tracker.favicon && !failedFavicons.has(tracker.name);
+            const trackerStatus = trackerStatuses[tracker.name] || {
+              state: "not_checked",
+              message: "Not checked yet.",
+            };
+            const trackerStatusText = window.getUATrackerStatusText
+              ? window.getUATrackerStatusText(trackerStatus)
+              : "Not checked";
 
             return (
               <button
@@ -2970,7 +3060,9 @@ function AudionutsUAGUI() {
                       ? "bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700 hover:text-gray-200"
                       : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                 }`}
-                title={`${tracker.display_name}${isDefault ? " (Default)" : ""}${!isConfigured ? " (Not configured)" : ""}`}
+                title={`${tracker.display_name}${isDefault ? " (Default)" : ""}${
+                  !isConfigured ? " (Not configured)" : ""
+                } — ${trackerStatusText}`}
               >
                 {hasFavicon ? (
                   <img
@@ -2999,6 +3091,16 @@ function AudionutsUAGUI() {
                   </span>
                 )}
                 <span>{tracker.display_name}</span>
+                <span
+                  className="ua-tracker-health-dot"
+                  data-state={
+                    trackerStatus.stale
+                      ? "not_checked"
+                      : trackerStatus.state || "not_checked"
+                  }
+                  role="img"
+                  aria-label={trackerStatusText}
+                />
               </button>
             );
           })}
@@ -3517,6 +3619,17 @@ function AudionutsUAGUI() {
 
           const initialSet = parseTrackersFromArgs(customArgs, defaultSet);
           setSelectedTrackers(initialSet);
+
+          if (window.loadUATrackerStatuses) {
+            window
+              .loadUATrackerStatuses()
+              .then((statusPayload) =>
+                setTrackerStatuses(statusPayload.statuses || {}),
+              )
+              .catch(() => {
+                // Cached status is optional; a manual check surfaces errors.
+              });
+          }
         }
       } catch (err) {
         console.error("Failed to load trackers:", err);
