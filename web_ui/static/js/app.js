@@ -10,6 +10,19 @@ const DEFAULT_RIGHT_SIDEBAR_WIDTH = 320;
 const APPLICATION_RAIL_WIDTH = 80;
 const LEFT_SIDEBAR_MAX_WIDTH = 600;
 const RIGHT_SIDEBAR_MAX_WIDTH = 800;
+const COMPACT_LAYOUT_BREAKPOINT = 768;
+
+const isMobileBrowserSession = () => {
+  const clientHint = navigator.userAgentData?.mobile;
+  if (clientHint === true) return true;
+
+  return /Android.*Mobile|iPhone|iPod|BlackBerry|IEMobile|Opera Mini|Mobile.*Firefox/i.test(
+    navigator.userAgent || "",
+  );
+};
+
+const shouldUseMobileLayout = () =>
+  window.innerWidth < COMPACT_LAYOUT_BREAKPOINT || isMobileBrowserSession();
 
 const storage = window.UAStorage;
 const getStoredTheme = window.getUAStoredTheme;
@@ -2369,7 +2382,7 @@ function AudionutsUAGUI() {
   );
 
   // Mobile state
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [isMobile, setIsMobile] = useState(() => shouldUseMobileLayout());
   const [activePanel, setActivePanel] = useState("main"); // 'main' | 'files' | 'args'
 
   // File Browser search states
@@ -3477,7 +3490,7 @@ function AudionutsUAGUI() {
     const handleResize = () => {
       clearTimeout(resizeTimer);
       resizeTimer = setTimeout(() => {
-        const mobile = window.innerWidth < 768;
+        const mobile = shouldUseMobileLayout();
         setIsMobile(mobile);
         if (!mobile) setActivePanel("main");
       }, 100);

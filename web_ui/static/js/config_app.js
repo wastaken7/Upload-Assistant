@@ -2,6 +2,20 @@ const { useEffect, useMemo, useRef, useState } = React;
 const useModalFocus = window.useUAModalFocus;
 
 const CONFIG_FIELD_RESET_EVENT = "ua-config-field-reset";
+const CONFIG_COMPACT_LAYOUT_BREAKPOINT = 768;
+
+const isMobileConfigBrowserSession = () => {
+  const clientHint = navigator.userAgentData?.mobile;
+  if (clientHint === true) return true;
+
+  return /Android.*Mobile|iPhone|iPod|BlackBerry|IEMobile|Opera Mini|Mobile.*Firefox/i.test(
+    navigator.userAgent || "",
+  );
+};
+
+const shouldUseMobileConfigLayout = () =>
+  window.innerWidth < CONFIG_COMPACT_LAYOUT_BREAKPOINT ||
+  isMobileConfigBrowserSession();
 
 // Error boundary to catch render errors and prevent blank screen (e.g. on first run in Docker)
 class ConfigErrorBoundary extends React.Component {
@@ -309,6 +323,7 @@ const RailLogoutIcon = () => (
 );
 
 function ConfigApplicationRail({
+  isMobileLayout,
   colorTheme,
   onColorThemeChange,
   interfaceStyle,
@@ -343,7 +358,7 @@ function ConfigApplicationRail({
 
   return (
     <aside
-      className="ua-app-rail fixed inset-y-0 left-0 z-30 hidden w-20 flex-col border-r md:flex"
+      className={`ua-app-rail fixed inset-y-0 left-0 z-30 w-20 flex-col border-r ${isMobileLayout ? "hidden" : "flex"}`}
       aria-label="Application navigation"
     >
       <div className="ua-app-rail-brand flex h-20 shrink-0 flex-col items-center justify-center gap-1 border-b px-2">
@@ -6713,6 +6728,7 @@ function AccessLogTab({ isDarkMode }) {
 }
 
 function ConfigSidebar({
+  isMobileLayout,
   sections,
   activeTab,
   activeSubTab,
@@ -6836,7 +6852,9 @@ function ConfigSidebar({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="ua-config-sidebar-brand flex h-20 shrink-0 items-center justify-between gap-2 border-b px-3 py-3 sm:gap-3 sm:px-5 md:hidden">
+      <div
+        className={`ua-config-sidebar-brand h-20 shrink-0 items-center justify-between gap-2 border-b px-3 py-3 sm:gap-3 sm:px-5 ${isMobileLayout ? "flex" : "hidden"}`}
+      >
         <div className="flex min-w-0 items-center gap-2 sm:gap-3">
           <img
             src={window.UA_LOGO_URL || "/static/img/logo.svg"}
@@ -6857,7 +6875,7 @@ function ConfigSidebar({
         </div>
         <button
           type="button"
-          className="ua-config-icon-button md:hidden"
+          className="ua-config-icon-button"
           aria-label="Close configuration navigation"
           onClick={onClose}
         >
@@ -6865,7 +6883,9 @@ function ConfigSidebar({
         </button>
       </div>
 
-      <div className="ua-config-sidebar-brand hidden h-20 shrink-0 items-center border-b px-5 md:flex">
+      <div
+        className={`ua-config-sidebar-brand h-20 shrink-0 items-center border-b px-5 ${isMobileLayout ? "hidden" : "flex"}`}
+      >
         <div className="min-w-0">
           <p className="truncate text-xs font-semibold uppercase tracking-widest opacity-60">
             Upload Assistant
@@ -6874,7 +6894,7 @@ function ConfigSidebar({
         </div>
       </div>
 
-      <div className="shrink-0 px-3 pt-4 md:hidden">
+      <div className={`shrink-0 px-3 pt-4 ${isMobileLayout ? "" : "hidden"}`}>
         <WorkspaceSwitcher
           activeWorkspace="config"
           isDarkMode={isDarkMode}
@@ -6936,7 +6956,9 @@ function ConfigSidebar({
         </div>
       </nav>
 
-      <div className="ua-config-sidebar-footer shrink-0 border-t p-4 md:hidden">
+      <div
+        className={`ua-config-sidebar-footer shrink-0 border-t p-4 ${isMobileLayout ? "" : "hidden"}`}
+      >
         <button
           type="button"
           className="ua-config-nav-heading flex w-full items-center justify-between text-left text-xs font-semibold uppercase tracking-wider"
@@ -7121,6 +7143,9 @@ function ConfigApp() {
       return "general";
     }
   });
+  const [isMobileLayout, setIsMobileLayout] = useState(() =>
+    shouldUseMobileConfigLayout(),
+  );
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [isHelpResourcesOpen, setIsHelpResourcesOpen] = useState(false);
   const [isChangelogOpen, setIsChangelogOpen] = useState(false);
@@ -7290,6 +7315,23 @@ function ConfigApp() {
   };
 
   useEffect(() => {
+    let resizeTimer;
+    const handleResize = () => {
+      window.clearTimeout(resizeTimer);
+      resizeTimer = window.setTimeout(() => {
+        const mobile = shouldUseMobileConfigLayout();
+        setIsMobileLayout(mobile);
+        if (!mobile) setIsMobileNavOpen(false);
+      }, 100);
+    };
+    window.addEventListener("resize", handleResize);
+    return () => {
+      window.clearTimeout(resizeTimer);
+      window.removeEventListener("resize", handleResize);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!isMobileNavOpen) return undefined;
     const previousOverflow = document.body.style.overflow;
     const closeOnEscape = (event) => {
@@ -7304,10 +7346,7 @@ function ConfigApp() {
   }, [isMobileNavOpen]);
 
   const startMobileNavGesture = (event) => {
-    if (
-      event.pointerType === "mouse" ||
-      !window.matchMedia("(max-width: 767px)").matches
-    ) {
+    if (event.pointerType === "mouse" || !isMobileLayout) {
       return;
     }
     if (
@@ -9092,10 +9131,10 @@ function ConfigApp() {
           }
         />
       )}
-      {isMobileNavOpen && (
+      {isMobileLayout && isMobileNavOpen && (
         <button
           type="button"
-          className="ua-config-drawer-overlay fixed inset-0 z-40 md:hidden"
+          className="ua-config-drawer-overlay fixed inset-0 z-40"
           aria-label="Close configuration navigation"
           onClick={() => setIsMobileNavOpen(false)}
         ></button>
@@ -9103,6 +9142,7 @@ function ConfigApp() {
 
       <div className="min-h-screen">
         <ConfigApplicationRail
+          isMobileLayout={isMobileLayout}
           colorTheme={colorTheme}
           onColorThemeChange={handleColorThemeChange}
           interfaceStyle={interfaceStyle}
@@ -9120,9 +9160,10 @@ function ConfigApp() {
         <aside
           id="config-sidebar"
           className={
-            "ua-config-sidebar fixed inset-y-0 left-0 z-50 w-72 transform transition-transform duration-200 " +
-            "md:left-20 md:z-20 md:w-64 md:translate-x-0 " +
-            (isMobileNavOpen ? "translate-x-0" : "-translate-x-full")
+            "ua-config-sidebar fixed inset-y-0 transform transition-transform duration-200 " +
+            (isMobileLayout
+              ? `left-0 z-50 w-72 ${isMobileNavOpen ? "translate-x-0" : "-translate-x-full"}`
+              : "left-20 z-20 w-64 translate-x-0")
           }
           style={{ touchAction: "pan-y" }}
           onClickCapture={suppressClickAfterMobileNavSwipe}
@@ -9132,6 +9173,7 @@ function ConfigApp() {
           onPointerCancel={cancelMobileNavGesture}
         >
           <ConfigSidebar
+            isMobileLayout={isMobileLayout}
             sections={sections}
             activeTab={activeTab}
             activeSubTab={activeSubTab}
@@ -9157,20 +9199,22 @@ function ConfigApp() {
           />
         </aside>
 
-        <div className="min-w-0 md:ml-[21rem]">
+        <div className={`min-w-0 ${isMobileLayout ? "" : "ml-[21rem]"}`}>
           <header className="ua-config-header sticky top-0 z-30 h-20 border-b">
             <div className="flex h-full items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
               <div className="flex min-w-0 items-center gap-3">
-                <button
-                  type="button"
-                  className="ua-config-icon-button shrink-0 md:hidden"
-                  aria-label="Open configuration navigation"
-                  aria-controls="config-sidebar"
-                  aria-expanded={isMobileNavOpen}
-                  onClick={() => setIsMobileNavOpen(true)}
-                >
-                  <span aria-hidden="true">☰</span>
-                </button>
+                {isMobileLayout && (
+                  <button
+                    type="button"
+                    className="ua-config-icon-button shrink-0"
+                    aria-label="Open configuration navigation"
+                    aria-controls="config-sidebar"
+                    aria-expanded={isMobileNavOpen}
+                    onClick={() => setIsMobileNavOpen(true)}
+                  >
+                    <span aria-hidden="true">☰</span>
+                  </button>
+                )}
                 <div className="min-w-0">
                   <h1 className="ua-config-page-title truncate text-lg font-bold sm:text-xl">
                     {activeTitle}

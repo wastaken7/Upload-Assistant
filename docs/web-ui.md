@@ -288,6 +288,8 @@ The same functions are reorganized for smaller screens:
 - Help, Changelog, and Appearance open as viewport-sized dialogs with their own scrolling content.
 - Configuration uses a compact settings navigator while preserving pending-change and save controls.
 
+Phones retain the tabbed Upload workspace and compact Configuration navigator in landscape, using the additional width for the active panel. On supported mobile browsers, requesting the desktop site opts back into the desktop workspace.
+
 Resizable desktop sidebar widths do not change the mobile layout.
 
 ## Troubleshooting
