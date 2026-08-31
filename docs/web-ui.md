@@ -123,7 +123,7 @@ To save a preset, enter a name and choose **Save**. Saving an existing name upda
 
 Argument controls update the same command field, so advanced users can still edit the resulting string directly. The [CLI arguments reference](cli-args.md) explains each available flag.
 
-Choose **Check status** to run a lightweight website-reachability check for the configured trackers. The dot beside each tracker shows available, issue detected, unavailable, or not checked. Results are cached for 15 minutes and reused between the Upload and Configuration pages. These checks do not use tracker credentials and cannot confirm that an account or upload endpoint is working, so warnings are advisory and never prevent an upload.
+Choose **Check status** to run a lightweight website-reachability check for the configured trackers. The dot beside each tracker shows available, issue detected, unavailable, or not checked. An affected selected tracker also gets a compact warning with its check age and expandable details; on the Upload page it can be deselected directly from that warning. Results are cached for 15 minutes and reused between the Upload and Configuration pages. These checks do not use tracker credentials and cannot confirm that an account or upload endpoint is working, so warnings never prevent an upload.
 
 ### Start the upload
 

@@ -220,7 +220,7 @@ The following endpoints via a valid web session.
 - Rate limit: POST is limited to 30 checks per hour; GET only reads the in-memory cache
 - POST payload: {"trackers": ["AITHER", "BLUTOPIA"]}
 - Description: GET returns cached tracker website-reachability results. POST refreshes the named supported trackers concurrently without using credentials or downloading response bodies. Results expire after 15 minutes and are advisory only.
-- Response: {"success": true, "cache_seconds": 900, "statuses": {"AITHER": {"state": "available", "message": "...", "checked_at": "...", "stale": false}}}
+- Response: {"success": true, "cache_seconds": 900, "statuses": {"AITHER": {"state": "available", "message": "...", "checked_at": "...", "stale": false}}}. Issue and unavailable results can also include a machine-readable `reason`, such as `timeout`, `connection`, `rate_limit`, or `server_error`.
 
 ### /api/config_update
 

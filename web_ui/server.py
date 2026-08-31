@@ -4317,6 +4317,7 @@ def _probe_tracker_url(tracker_name: str, base_url: str) -> dict[str, Any]:
             "checked_at": checked_at,
         }
 
+    httpx = None
     try:
         httpx = _dynamic_import("httpx")
         with httpx.Client(
@@ -4329,21 +4330,35 @@ def _probe_tracker_url(tracker_name: str, base_url: str) -> dict[str, Any]:
             with client.stream("GET", base_url) as response:
                 status_code = int(response.status_code)
         state, message = _tracker_status_from_http_code(status_code)
-        return {
+        result = {
             "name": tracker_name,
             "state": state,
             "message": message,
             "status_code": status_code,
             "checked_at": checked_at,
         }
-    except Exception:
+        if status_code == 429:
+            result["reason"] = "rate_limit"
+        elif status_code >= 500:
+            result["reason"] = "server_error"
+        return result
+    except Exception as error:
         # Keep network and DNS exception details out of the browser response.
         # A later check can distinguish a transient local-network problem from
         # a tracker outage.
+        is_timeout = bool(
+            httpx is not None
+            and isinstance(error, getattr(httpx, "TimeoutException", ()))
+        )
         return {
             "name": tracker_name,
             "state": "unavailable",
-            "message": "The tracker website could not be reached.",
+            "reason": "timeout" if is_timeout else "connection",
+            "message": (
+                "The tracker website did not respond before the status check timed out."
+                if is_timeout
+                else "The tracker website could not be reached."
+            ),
             "checked_at": checked_at,
         }
 

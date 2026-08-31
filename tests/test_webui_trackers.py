@@ -95,6 +95,26 @@ def test_tracker_status_http_classification_is_advisory() -> None:
     assert server._tracker_status_from_http_code(503)[0] == "issue"
 
 
+def test_tracker_status_probe_identifies_timeouts(monkeypatch) -> None:
+    class FakeTimeoutError(Exception):
+        pass
+
+    class FakeHttpx:
+        TimeoutException = FakeTimeoutError
+
+        @staticmethod
+        def Client(**_kwargs):
+            raise FakeTimeoutError
+
+    monkeypatch.setattr(server, "_dynamic_import", lambda _name: FakeHttpx)
+
+    result = server._probe_tracker_url("AITHER", "https://aither.cc")
+
+    assert result["state"] == "unavailable"
+    assert result["reason"] == "timeout"
+    assert "timed out" in result["message"]
+
+
 def test_tracker_status_cache_marks_expired_results_stale(monkeypatch) -> None:
     monkeypatch.setattr(server.time, "time", lambda: 2_000.0)
     with server._tracker_status_cache_lock:

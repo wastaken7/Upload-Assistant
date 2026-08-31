@@ -342,6 +342,36 @@
     return message ? `${label}: ${message}` : label;
   }
 
+  function getUATrackerStatusSummary(displayName, status) {
+    const name = String(displayName || status?.name || "Tracker").trim();
+    const statusCode = Number(status?.status_code);
+    if (status?.reason === "timeout") {
+      return `${name} reported a timeout`;
+    }
+    if (status?.state === "unavailable") {
+      return `${name} could not be reached`;
+    }
+    if (status?.reason === "rate_limit" || statusCode === 429) {
+      return `${name} returned a rate-limit response`;
+    }
+    if (
+      status?.reason === "server_error" ||
+      (Number.isFinite(statusCode) && statusCode >= 500)
+    ) {
+      return `${name} reported a server error`;
+    }
+    return `${name} reported an issue`;
+  }
+
+  function formatUATrackerStatusTimestamp(status) {
+    const checkedAt = Date.parse(status?.checked_at || "");
+    if (!Number.isFinite(checkedAt)) return "";
+    return new Date(checkedAt).toLocaleString([], {
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
+  }
+
   async function loadUAUpdateStatus(force = false) {
     const endpoint = force
       ? "/api/update_status?refresh=1"
@@ -1900,6 +1930,11 @@
       window.formatUATrackerStatusAge || formatUATrackerStatusAge;
     window.getUATrackerStatusText =
       window.getUATrackerStatusText || getUATrackerStatusText;
+    window.getUATrackerStatusSummary =
+      window.getUATrackerStatusSummary || getUATrackerStatusSummary;
+    window.formatUATrackerStatusTimestamp =
+      window.formatUATrackerStatusTimestamp ||
+      formatUATrackerStatusTimestamp;
     window.loadUAUpdateStatus = window.loadUAUpdateStatus || loadUAUpdateStatus;
     window.loadUAChangelog = window.loadUAChangelog || loadUAChangelog;
     window.getUADismissedUpdateVersion =

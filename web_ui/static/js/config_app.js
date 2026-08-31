@@ -4219,6 +4219,8 @@ function TrackerManager({
   const [isCheckingTrackerStatuses, setIsCheckingTrackerStatuses] =
     useState(false);
   const [trackerStatusError, setTrackerStatusError] = useState("");
+  const [expandedTrackerStatusDetails, setExpandedTrackerStatusDetails] =
+    useState(new Set());
 
   useEffect(() => {
     setSelectedDefaults(normalizeTrackers(defaultTrackersItem.value));
@@ -4353,6 +4355,15 @@ function TrackerManager({
     }
   };
 
+  const toggleTrackerStatusDetails = (trackerName) => {
+    setExpandedTrackerStatusDetails((current) => {
+      const next = new Set(current);
+      if (next.has(trackerName)) next.delete(trackerName);
+      else next.add(trackerName);
+      return next;
+    });
+  };
+
   const trackerStatusBadge = (label, tone = "neutral") => (
     <span
       key={label}
@@ -4485,20 +4496,74 @@ function TrackerManager({
           </div>
         )}
         {issueEntries.length > 0 && (
-          <div
-            className="ua-tracker-status-advisory rounded-xl border px-4 py-3 text-sm"
-            data-tone="warning"
-            role="status"
-          >
-            <span className="font-semibold">Tracker status warning: </span>
-            {issueEntries
-              .map(
-                (tracker) =>
-                  tracker.display_name ||
-                  getTrackerDisplayName(String(tracker.name)),
-              )
-              .join(", ")} may be experiencing an issue. This check is
-            advisory; verify the tracker before uploading if needed.
+          <div className="space-y-2" role="status">
+            {issueEntries.map((tracker) => {
+              const name = String(tracker.name).toUpperCase();
+              const status = trackerStatuses[name];
+              const trackerDisplayName =
+                tracker.display_name || getTrackerDisplayName(name);
+              const summary = window.getUATrackerStatusSummary
+                ? window.getUATrackerStatusSummary(
+                    trackerDisplayName,
+                    status,
+                  )
+                : `${trackerDisplayName} reported an issue`;
+              const statusAge = window.formatUATrackerStatusAge
+                ? window.formatUATrackerStatusAge({ [name]: status })
+                : "Just checked";
+              const ageText =
+                statusAge === "Just checked"
+                  ? "just now"
+                  : statusAge.toLowerCase();
+              const isExpanded = expandedTrackerStatusDetails.has(name);
+              const detailId = `config-tracker-status-details-${name
+                .toLowerCase()
+                .replace(/[^a-z0-9_-]+/g, "-")}`;
+              const checkedAt = window.formatUATrackerStatusTimestamp
+                ? window.formatUATrackerStatusTimestamp(status)
+                : "";
+
+              return (
+                <div
+                  key={name}
+                  className="ua-tracker-status-advisory ua-tracker-status-warning-row rounded-xl border px-4 py-3 text-sm"
+                  data-tone="warning"
+                >
+                  <div className="flex min-w-0 flex-1 items-start gap-2">
+                    <span
+                      className="ua-tracker-status-warning-icon"
+                      aria-hidden="true"
+                    >
+                      ⚠
+                    </span>
+                    <p className="min-w-0 flex-1">
+                      <span className="font-semibold">{summary}</span>{" "}
+                      {ageText}. Verify it before uploading.
+                    </p>
+                  </div>
+                  <div className="ua-tracker-status-warning-actions flex shrink-0 items-center gap-3">
+                    <button
+                      type="button"
+                      className="ua-tracker-status-warning-action"
+                      aria-expanded={isExpanded}
+                      aria-controls={detailId}
+                      onClick={() => toggleTrackerStatusDetails(name)}
+                    >
+                      {isExpanded ? "Hide details" : "Details"}
+                    </button>
+                  </div>
+                  {isExpanded && (
+                    <div
+                      id={detailId}
+                      className="ua-tracker-status-warning-details"
+                    >
+                      {status?.message || "No additional details are available."}
+                      {checkedAt ? ` Checked ${checkedAt}.` : ""}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </React.Fragment>

@@ -476,6 +476,54 @@ button:focus-visible {
   );
 }
 
+.ua-tracker-status-warning-row {
+  align-items: flex-start;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  justify-content: space-between;
+}
+
+.ua-tracker-status-warning-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 0.9em;
+  font-weight: 800;
+  line-height: 1.2rem;
+}
+
+.ua-tracker-status-warning-action {
+  color: inherit;
+  font-weight: 700;
+  opacity: 0.88;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.ua-tracker-status-warning-action:hover:not(:disabled) {
+  opacity: 1;
+}
+
+.ua-tracker-status-warning-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.ua-tracker-status-warning-details {
+  border-top: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+  flex: 0 0 100%;
+  line-height: 1.45;
+  margin-top: 0.15rem;
+  opacity: 0.82;
+  padding-top: 0.55rem;
+}
+
+@media (max-width: 640px) {
+  .ua-tracker-status-warning-actions {
+    margin-left: 1.4rem;
+  }
+}
+
 /* Dark Tailwind surfaces become a restrained warm-black hierarchy. */
 :where([class~="bg-gray-900"], [class~="bg-gray-950"]) {
   background-color: var(--ua-obsidian) !important;
