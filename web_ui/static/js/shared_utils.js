@@ -1084,9 +1084,41 @@
         })),
       [releases],
     );
+    const parsedUnreleasedCommits = React.useMemo(
+      () =>
+        unreleasedCommits.map((commit, index) => {
+          const originalSummary = String(commit.summary || "Untitled commit");
+          const parsedEntry = parseUAReleaseNotes(`- ${originalSummary}`)
+            .entries[0];
+          return {
+            commit,
+            entry: {
+              ...parsedEntry,
+              id: `unreleased-${commit.sha || commit.short_sha || index}`,
+              url: commit.commit_url || parsedEntry.url,
+            },
+          };
+        }),
+      [unreleasedCommits],
+    );
     const counts = React.useMemo(
-      () => getUAChangelogAreaCounts(parsedReleases),
-      [parsedReleases],
+      () =>
+        getUAChangelogAreaCounts([
+          ...parsedReleases,
+          {
+            parsed: {
+              entries: parsedUnreleasedCommits.map(({ entry }) => entry),
+            },
+          },
+        ]),
+      [parsedReleases, parsedUnreleasedCommits],
+    );
+    const visibleUnreleasedCommits = parsedUnreleasedCommits.filter(
+      ({ entry }) => activeArea === "all" || entry.area === activeArea,
+    );
+    const hasVisibleUnreleased = Boolean(
+      unreleased &&
+      (activeArea === "all" || visibleUnreleasedCommits.length > 0),
     );
     const visibleReleases = parsedReleases.filter(
       ({ parsed }) =>
@@ -1097,6 +1129,9 @@
     const changeArea = (area) => {
       setActiveArea(area);
       if (area === "all") return;
+      if (parsedUnreleasedCommits.some(({ entry }) => entry.area === area)) {
+        setIsUnreleasedExpanded(true);
+      }
       const firstMatchingRelease = parsedReleases.find(({ parsed }) =>
         parsed.entries.some((entry) => entry.area === area),
       );
@@ -1244,7 +1279,7 @@
                 error,
               )
             : null,
-          !isLoading && unreleased
+          !isLoading && hasVisibleUnreleased
             ? h(
                 "article",
                 {
@@ -1353,7 +1388,7 @@
                             },
                             "Development activity could not be loaded. Use Refresh to try again.",
                           )
-                        : unreleasedCommits.length
+                        : visibleUnreleasedCommits.length
                           ? h(
                               React.Fragment,
                               null,
@@ -1370,84 +1405,109 @@
                                   className:
                                     "ua-changelog-entry-list overflow-hidden rounded-lg border",
                                 },
-                                ...unreleasedCommits.map((commit, index) => {
-                                  const summary = String(
-                                    commit.summary || "Untitled commit",
-                                  );
-                                  const shortSha = String(
-                                    commit.short_sha || "",
-                                  );
-                                  const author = String(commit.author || "");
-                                  const commitDate = formatUAReleaseDate(
-                                    commit.committed_at,
-                                  );
-                                  const details = [
-                                    shortSha,
-                                    author ? `by ${author}` : "",
-                                    commitDate,
-                                  ]
-                                    .filter(Boolean)
-                                    .join(" · ");
-                                  return h(
-                                    "div",
-                                    {
-                                      key:
-                                        commit.sha ||
-                                        `${shortSha}-${summary}-${index}`,
-                                      className:
-                                        "ua-changelog-entry flex items-start justify-between gap-3 border-b p-3 last:border-b-0",
-                                    },
-                                    h(
+                                ...visibleUnreleasedCommits.map(
+                                  ({ commit, entry }, index) => {
+                                    const summary = entry.summary;
+                                    const shortSha = String(
+                                      commit.short_sha || "",
+                                    );
+                                    const author = String(commit.author || "");
+                                    const commitDate = formatUAReleaseDate(
+                                      commit.committed_at,
+                                    );
+                                    const details = [
+                                      shortSha,
+                                      author ? `by ${author}` : "",
+                                      commitDate,
+                                    ]
+                                      .filter(Boolean)
+                                      .join(" · ");
+                                    return h(
                                       "div",
-                                      { className: "min-w-0" },
-                                      commit.commit_url
+                                      {
+                                        key:
+                                          commit.sha ||
+                                          entry.id ||
+                                          `${shortSha}-${summary}-${index}`,
+                                        className:
+                                          "ua-changelog-entry flex items-start justify-between gap-3 border-b p-3 last:border-b-0",
+                                      },
+                                      h(
+                                        "div",
+                                        { className: "min-w-0" },
+                                        h(
+                                          "div",
+                                          {
+                                            className:
+                                              "mb-1 flex flex-wrap items-center gap-1.5",
+                                          },
+                                          h(
+                                            "span",
+                                            {
+                                              className: `ua-changelog-type ua-changelog-type-${entry.type} rounded-full px-2 py-0.5 text-[0.68rem] font-semibold uppercase tracking-wide`,
+                                            },
+                                            entry.typeLabel,
+                                          ),
+                                          entry.scope
+                                            ? h(
+                                                "span",
+                                                {
+                                                  className:
+                                                    "ua-changelog-scope text-xs opacity-60",
+                                                },
+                                                entry.scope,
+                                              )
+                                            : null,
+                                        ),
+                                        entry.url
+                                          ? h(
+                                              "a",
+                                              {
+                                                href: entry.url,
+                                                target: "_blank",
+                                                rel: "noopener noreferrer",
+                                                className:
+                                                  "ua-changelog-contribution-link break-words text-sm font-medium",
+                                              },
+                                              summary,
+                                            )
+                                          : h(
+                                              "p",
+                                              {
+                                                className:
+                                                  "break-words text-sm font-medium",
+                                              },
+                                              summary,
+                                            ),
+                                        details
+                                          ? h(
+                                              "p",
+                                              {
+                                                className:
+                                                  "mt-1 text-xs opacity-55",
+                                              },
+                                              details,
+                                            )
+                                          : null,
+                                      ),
+                                      entry.url
                                         ? h(
                                             "a",
                                             {
-                                              href: commit.commit_url,
+                                              href: entry.url,
                                               target: "_blank",
                                               rel: "noopener noreferrer",
                                               className:
-                                                "ua-changelog-contribution-link break-words text-sm font-medium",
+                                                "ua-changelog-contribution-link shrink-0 text-xs font-semibold",
+                                              title: `View commit ${shortSha || summary} on GitHub`,
+                                              "aria-label": `View commit ${shortSha || summary} on GitHub`,
                                             },
-                                            summary,
-                                          )
-                                        : h(
-                                            "p",
-                                            {
-                                              className:
-                                                "break-words text-sm font-medium",
-                                            },
-                                            summary,
-                                          ),
-                                      details
-                                        ? h(
-                                            "p",
-                                            {
-                                              className:
-                                                "mt-1 text-xs opacity-55",
-                                            },
-                                            details,
+                                            "↗",
                                           )
                                         : null,
-                                    ),
-                                    commit.commit_url
-                                      ? h(
-                                          "a",
-                                          {
-                                            href: commit.commit_url,
-                                            target: "_blank",
-                                            rel: "noopener noreferrer",
-                                            className:
-                                              "ua-changelog-contribution-link shrink-0 text-xs font-semibold",
-                                            title: `View commit ${shortSha || summary} on GitHub`,
-                                            "aria-label": `View commit ${shortSha || summary} on GitHub`,
-                                          },
-                                          "↗",
-                                        )
-                                      : null,
-                                  );
-                                }),
+                                    );
+                                  },
+                                ),
                               ),
                             )
                           : h(
@@ -1624,16 +1684,18 @@
                     },
                   ),
                 )
-              : h(
-                  "div",
-                  {
-                    className:
-                      "ua-changelog-empty rounded-lg border p-6 text-center text-sm",
-                  },
-                  releases.length
-                    ? "No releases contain changes in the selected area."
-                    : "No release history is available.",
-                ),
+              : hasVisibleUnreleased
+                ? null
+                : h(
+                    "div",
+                    {
+                      className:
+                        "ua-changelog-empty rounded-lg border p-6 text-center text-sm",
+                    },
+                    releases.length
+                      ? "No releases contain changes in the selected area."
+                      : "No release history is available.",
+                  ),
         ),
         h(
           "footer",
