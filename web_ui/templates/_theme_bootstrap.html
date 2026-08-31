@@ -1,0 +1,32 @@
+<script>
+  (() => {
+    const root = document.documentElement;
+    const supportedThemes = new Set([
+      "amethyst",
+      "charcoal",
+      "evergreen",
+      "graphite",
+      "midnight",
+      "obsidian",
+    ]);
+
+    try {
+      const storedTheme = localStorage.getItem("ua_color_theme");
+      root.dataset.uaTheme = supportedThemes.has(storedTheme)
+        ? storedTheme
+        : "charcoal";
+      root.dataset.uaMode =
+        localStorage.getItem("ua_config_theme") === "light"
+          ? "light"
+          : "dark";
+      root.dataset.uaShape =
+        localStorage.getItem("ua_interface_style") === "rounded"
+          ? "rounded"
+          : "square";
+    } catch (error) {
+      root.dataset.uaTheme = "charcoal";
+      root.dataset.uaMode = "dark";
+      root.dataset.uaShape = "square";
+    }
+  })();
+</script>

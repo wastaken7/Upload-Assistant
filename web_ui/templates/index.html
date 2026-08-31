@@ -25,35 +25,16 @@
     />
     <meta name="apple-mobile-web-app-title" content="Upload-Assistant" />
     <meta name="theme-color" content="#171615" />
+    {% include "_theme_bootstrap.html" %}
     <link
       rel="shortcut icon"
       href="{{ url_for('static', filename='favicon.ico') }}"
     />
-    <script
-      crossorigin
-      src="https://unpkg.com/react@18/umd/react.production.min.js"
-    ></script>
-    <script
-      crossorigin
-      src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"
-    ></script>
-    <script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link
       rel="stylesheet"
       href="{{ url_for('static', filename='css/theme.css') }}"
     />
-    <!-- DOMPurify for sanitizing Rich-generated HTML fragments -->
-    <script
-      src="https://cdn.jsdelivr.net/npm/dompurify@3.2.7/dist/purify.min.js"
-      integrity="sha384-qJNkHwhlYywDHfyoEe1np+1lYvX/8x+3gHCKFhSSBMQyCFlvFnn+zXmaebXl21rV"
-      crossorigin="anonymous"
-    ></script>
-    <script
-      src="https://cdn.jsdelivr.net/npm/xbbcode-parser@0.3.1/xbbcode.min.js"
-      integrity="sha384-WDYMYmCuXkFj0FX/C0kpV1U5pxmo83sVh+ZFvGHm+4umR3+3JkUokAhJrfXmj3Cj"
-      crossorigin="anonymous"
-    ></script>
     <style>
       /* Rich output area styling (keeps preformatted blocks readable) */
       #rich-output pre {
@@ -117,11 +98,74 @@
     </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div
+        id="root-loading"
+        class="ua-startup-screen"
+        role="status"
+        aria-live="polite"
+      >
+        <div class="ua-startup-card">
+          <div class="ua-startup-brand">
+            <span class="ua-startup-logo-frame" aria-hidden="true">
+              <img
+                class="ua-startup-logo"
+                src="{{ url_for('static', filename='img/logo.svg') }}"
+                alt=""
+              />
+            </span>
+            <div>
+              <p class="ua-startup-eyebrow">
+                Upload Assistant · {{ app_version }}
+              </p>
+              <h1 class="ua-startup-title">Preparing upload workspace</h1>
+            </div>
+          </div>
+          <p class="ua-startup-description">
+            Loading your files, arguments, and workspace controls.
+          </p>
+          <div class="ua-startup-progress-track" aria-hidden="true">
+            <span class="ua-startup-progress-bar"></span>
+          </div>
+          <p class="ua-startup-delayed-hint">
+            Taking longer than expected? Check that this browser can reach the
+            required CDN resources.
+          </p>
+        </div>
+      </div>
+      <noscript>
+        <style>
+          #root-loading {
+            display: none;
+          }
+        </style>
+        JavaScript is required for the Upload page.
+      </noscript>
+    </div>
     <script>
       window.UA_APP_VERSION = {{ app_version | tojson }};
       window.UA_CSRF_TOKEN = {{ csrf_token | tojson }};
     </script>
+    <script
+      crossorigin
+      src="https://unpkg.com/react@18/umd/react.production.min.js"
+    ></script>
+    <script
+      crossorigin
+      src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"
+    ></script>
+    <script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
+    <!-- DOMPurify for sanitizing Rich-generated HTML fragments -->
+    <script
+      src="https://cdn.jsdelivr.net/npm/dompurify@3.2.7/dist/purify.min.js"
+      integrity="sha384-qJNkHwhlYywDHfyoEe1np+1lYvX/8x+3gHCKFhSSBMQyCFlvFnn+zXmaebXl21rV"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/xbbcode-parser@0.3.1/xbbcode.min.js"
+      integrity="sha384-WDYMYmCuXkFj0FX/C0kpV1U5pxmo83sVh+ZFvGHm+4umR3+3JkUokAhJrfXmj3Cj"
+      crossorigin="anonymous"
+    ></script>
     <script
       type="text/javascript"
       src="{{ url_for('static', filename='js/shared_utils.js') }}"

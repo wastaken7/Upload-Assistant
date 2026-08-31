@@ -3,11 +3,9 @@
   --ua-obsidian: #0c0a09;
   --ua-charcoal: #1c1917;
   --ua-stone: #292524;
-  --ua-stone-light: #57534e;
   --ua-copper: #b45309;
   --ua-copper-bright: #d97706;
   --ua-gold: #fbbf24;
-  --ua-gold-soft: #fef3c7;
   --ua-ink: #f5f5f4;
   --ua-muted: #a8a29e;
   --ua-border: rgba(168, 162, 158, 0.24);
@@ -15,8 +13,6 @@
   --ua-light-panel-start: #fff7ed;
   --ua-light-panel-end: #fffbeb;
   --ua-atmosphere: rgba(180, 83, 9, 0.1);
-  --ua-card: rgba(28, 25, 23, 0.86);
-  --ua-card-border: rgba(251, 191, 36, 0.22);
   --ua-card-glow: rgba(180, 83, 9, 0.08);
 }
 
@@ -24,11 +20,9 @@
   --ua-obsidian: #0b1220;
   --ua-charcoal: #111827;
   --ua-stone: #1f2937;
-  --ua-stone-light: #475569;
   --ua-copper: #2563eb;
   --ua-copper-bright: #38bdf8;
   --ua-gold: #67e8f9;
-  --ua-gold-soft: #cffafe;
   --ua-ink: #f8fafc;
   --ua-muted: #94a3b8;
   --ua-border: rgba(148, 163, 184, 0.28);
@@ -36,8 +30,6 @@
   --ua-light-panel-start: #eff6ff;
   --ua-light-panel-end: #ecfeff;
   --ua-atmosphere: rgba(37, 99, 235, 0.12);
-  --ua-card: rgba(17, 24, 39, 0.88);
-  --ua-card-border: rgba(56, 189, 248, 0.24);
   --ua-card-glow: rgba(37, 99, 235, 0.1);
 }
 
@@ -45,11 +37,9 @@
   --ua-obsidian: #151718;
   --ua-charcoal: #1a1d1f;
   --ua-stone: #25292c;
-  --ua-stone-light: #555b60;
   --ua-copper: #1d5fc2;
   --ua-copper-bright: #3b82f6;
   --ua-gold: #93c5fd;
-  --ua-gold-soft: #dbeafe;
   --ua-ink: #e5e7eb;
   --ua-muted: #9ca3af;
   --ua-border: rgba(156, 163, 175, 0.22);
@@ -57,8 +47,6 @@
   --ua-light-panel-start: #f3f4f6;
   --ua-light-panel-end: #f9fafb;
   --ua-atmosphere: rgba(107, 114, 128, 0.055);
-  --ua-card: rgba(26, 29, 31, 0.94);
-  --ua-card-border: rgba(156, 163, 175, 0.2);
   --ua-card-glow: rgba(0, 0, 0, 0);
 }
 
@@ -66,11 +54,9 @@
   --ua-obsidian: #070a12;
   --ua-charcoal: #0d1220;
   --ua-stone: #171d2d;
-  --ua-stone-light: #46506a;
   --ua-copper: #4f46e5;
   --ua-copper-bright: #818cf8;
   --ua-gold: #a5b4fc;
-  --ua-gold-soft: #e0e7ff;
   --ua-ink: #eef2ff;
   --ua-muted: #9aa5bd;
   --ua-border: rgba(129, 140, 248, 0.22);
@@ -78,8 +64,6 @@
   --ua-light-panel-start: #eef2ff;
   --ua-light-panel-end: #f5f3ff;
   --ua-atmosphere: rgba(79, 70, 229, 0.13);
-  --ua-card: rgba(13, 18, 32, 0.94);
-  --ua-card-border: rgba(129, 140, 248, 0.24);
   --ua-card-glow: rgba(79, 70, 229, 0.1);
 }
 
@@ -87,11 +71,9 @@
   --ua-obsidian: #07120f;
   --ua-charcoal: #0d1b17;
   --ua-stone: #162923;
-  --ua-stone-light: #46685e;
   --ua-copper: #047857;
   --ua-copper-bright: #10b981;
   --ua-gold: #5eead4;
-  --ua-gold-soft: #ccfbf1;
   --ua-ink: #ecfdf5;
   --ua-muted: #9fb8ae;
   --ua-border: rgba(94, 234, 212, 0.2);
@@ -99,8 +81,6 @@
   --ua-light-panel-start: #ecfdf5;
   --ua-light-panel-end: #f0fdfa;
   --ua-atmosphere: rgba(4, 120, 87, 0.13);
-  --ua-card: rgba(13, 27, 23, 0.94);
-  --ua-card-border: rgba(94, 234, 212, 0.22);
   --ua-card-glow: rgba(4, 120, 87, 0.1);
 }
 
@@ -108,11 +88,9 @@
   --ua-obsidian: #100b18;
   --ua-charcoal: #1a1226;
   --ua-stone: #281a39;
-  --ua-stone-light: #67527c;
   --ua-copper: #7c3aed;
   --ua-copper-bright: #a78bfa;
   --ua-gold: #d8b4fe;
-  --ua-gold-soft: #f3e8ff;
   --ua-ink: #faf5ff;
   --ua-muted: #b8a9c7;
   --ua-border: rgba(216, 180, 254, 0.21);
@@ -120,8 +98,6 @@
   --ua-light-panel-start: #faf5ff;
   --ua-light-panel-end: #f5f3ff;
   --ua-atmosphere: rgba(124, 58, 237, 0.13);
-  --ua-card: rgba(26, 18, 38, 0.94);
-  --ua-card-border: rgba(216, 180, 254, 0.23);
   --ua-card-glow: rgba(124, 58, 237, 0.1);
 }
 
@@ -153,6 +129,172 @@ body::before {
   pointer-events: none;
   position: fixed;
   z-index: -1;
+}
+
+/* A lightweight, theme-aware first paint while the browser prepares React. */
+.ua-startup-screen {
+  --ua-startup-bg: var(--ua-obsidian);
+  --ua-startup-surface: color-mix(
+    in srgb,
+    var(--ua-charcoal) 94%,
+    transparent
+  );
+  --ua-startup-surface-raised: color-mix(
+    in srgb,
+    var(--ua-stone) 72%,
+    var(--ua-charcoal)
+  );
+  --ua-startup-text: var(--ua-ink);
+  --ua-startup-muted: var(--ua-muted);
+  --ua-startup-border: var(--ua-border);
+  align-items: center;
+  background:
+    radial-gradient(circle at 85% 0%, var(--ua-atmosphere), transparent 28rem),
+    var(--ua-startup-bg);
+  color: var(--ua-startup-text);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: 1rem;
+  position: fixed;
+}
+
+html[data-ua-mode="light"] .ua-startup-screen {
+  --ua-startup-bg: color-mix(
+    in srgb,
+    var(--ua-light-panel-start) 32%,
+    #f5f5f4
+  );
+  --ua-startup-surface: rgba(255, 255, 255, 0.96);
+  --ua-startup-surface-raised: #ffffff;
+  --ua-startup-text: #1c1917;
+  --ua-startup-muted: #57534e;
+  --ua-startup-border: rgba(87, 83, 78, 0.22);
+}
+
+.ua-startup-card {
+  background: var(--ua-startup-surface);
+  border: 1px solid var(--ua-startup-border);
+  border-radius: 0.75rem;
+  box-shadow:
+    0 24px 70px rgba(0, 0, 0, 0.3),
+    0 0 36px var(--ua-card-glow);
+  padding: 1.5rem;
+  width: min(29rem, 100%);
+}
+
+.ua-startup-brand {
+  align-items: center;
+  display: flex;
+  gap: 0.875rem;
+}
+
+.ua-startup-logo-frame {
+  align-items: center;
+  background: var(--ua-startup-surface-raised);
+  border: 1px solid var(--ua-startup-border);
+  border-radius: 0.625rem;
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 3rem;
+  justify-content: center;
+  width: 3rem;
+}
+
+.ua-startup-logo {
+  display: block;
+  height: 2rem;
+  width: 2rem;
+}
+
+.ua-startup-eyebrow {
+  color: var(--ua-copper-bright);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.11em;
+  margin: 0 0 0.25rem;
+  text-transform: uppercase;
+}
+
+.ua-startup-title {
+  color: var(--ua-startup-text);
+  font-size: 1.125rem;
+  font-weight: 700;
+  line-height: 1.3;
+  margin: 0;
+}
+
+.ua-startup-description,
+.ua-startup-delayed-hint {
+  color: var(--ua-startup-muted);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.ua-startup-description {
+  margin: 1.25rem 0 0.75rem;
+}
+
+.ua-startup-progress-track {
+  background: color-mix(
+    in srgb,
+    var(--ua-startup-border) 74%,
+    transparent
+  );
+  border-radius: 9999px;
+  height: 0.25rem;
+  overflow: hidden;
+}
+
+.ua-startup-progress-bar {
+  animation: ua-startup-progress 1.25s ease-in-out infinite;
+  background: linear-gradient(
+    90deg,
+    var(--ua-copper),
+    var(--ua-copper-bright),
+    var(--ua-gold)
+  );
+  border-radius: inherit;
+  display: block;
+  height: 100%;
+  width: 42%;
+}
+
+.ua-startup-delayed-hint {
+  animation: ua-startup-reveal 0s linear 8s forwards;
+  margin: 0.875rem 0 0;
+  opacity: 0;
+}
+
+html[data-ua-shape="square"]
+  :where(.ua-startup-card, .ua-startup-logo-frame, .ua-startup-progress-track) {
+  border-radius: 0 !important;
+}
+
+@keyframes ua-startup-progress {
+  from {
+    transform: translateX(-110%);
+  }
+  to {
+    transform: translateX(345%);
+  }
+}
+
+@keyframes ua-startup-reveal {
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ua-startup-progress-bar {
+    animation: none;
+    opacity: 0.72;
+    transform: none;
+    width: 100%;
+  }
 }
 
 button,
@@ -313,15 +455,6 @@ button:focus-visible {
 [data-ua-theme="graphite"]
   :where([class~="to-blue-50"], [class~="to-cyan-50"], [class~="to-sky-50"]) {
   --tw-gradient-to: var(--ua-light-panel-end) var(--tw-gradient-to-position);
-}
-
-/* Login cards use inline styles, so these intentional overrides keep them on-brand. */
-.bg-card {
-  background-color: var(--ua-card) !important;
-  border-color: var(--ua-card-border) !important;
-  box-shadow:
-    0 24px 70px rgba(0, 0, 0, 0.45),
-    0 0 36px var(--ua-card-glow) !important;
 }
 
 /* Authentication pages use the same stored palette, mode, and corner style as
@@ -667,16 +800,6 @@ a:hover {
     animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
   }
-}
-
-/* Keep the empty terminal useful without letting it dominate the upload form. */
-.ua-output-box-empty {
-  flex: 0 0 8rem;
-  min-height: 8rem;
-}
-
-.ua-output-section-empty {
-  flex: 0 0 auto;
 }
 
 /* Primary navigation shared by the upload and configuration workspaces. */
@@ -1730,8 +1853,7 @@ html.ua-upload-document #root {
 }
 
 .ua-config-nav-heading,
-.ua-config-page-subtitle,
-.ua-config-pending-count {
+.ua-config-page-subtitle {
   color: var(--ua-config-muted);
 }
 
@@ -2420,11 +2542,6 @@ select {
 @media (max-width: 767px) {
   .ua-config-sidebar {
     max-width: calc(100vw - 3rem);
-  }
-
-  .ua-output-box-empty {
-    flex-basis: 7rem;
-    min-height: 7rem;
   }
 }
 
