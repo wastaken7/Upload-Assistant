@@ -274,7 +274,7 @@ Help links to the documentation home, this WebUI guide, configuration and CLI re
 
 When update notifications are enabled, the WebUI checks GitHub when the page loads or becomes visible and polls again every 30 minutes while it remains open. A successful result is reused for `update_notification_cache_hours` (four hours by default), so polling does not normally make a new GitHub request every time. An available update is shown on the application rail.
 
-Open **Help & Resources** and choose **Check now** to bypass the normal cache. **View changelog** opens release history with filters for WebUI, Core, Trackers, and Configuration changes. The current installed release and latest release have separate badges. If GitHub cannot be reached, cached or bundled release information is used when available.
+Open **Help & Resources** and choose **Check now** to bypass the normal cache. **View changelog** opens release history with filters for WebUI, Core, Trackers, and Configuration changes. A separate, collapsed **Development — Unreleased** panel lists commits merged into the development branch since the latest official release; these entries may change before publication. The current installed release and latest release have separate badges. If GitHub cannot be reached, cached or bundled release information is used when available.
 
 The changelog is derived from the normal Upload Assistant releases; WebUI changes are categorized within those releases rather than using a separate version number.
 

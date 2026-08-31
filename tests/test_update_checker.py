@@ -1,8 +1,55 @@
 from __future__ import annotations
 
+import io
 import json
 
 from src import update_checker
+
+
+def test_fetch_unreleased_changes_returns_safe_latest_first_commits(monkeypatch) -> None:
+    payload = {
+        "ahead_by": 2,
+        "html_url": "https://github.com/wastaken7/Upload-Assistant/compare/v3.9...development",
+        "commits": [
+            {
+                "sha": "aaaaaaaa",
+                "html_url": "https://example.invalid/unsafe",
+                "author": {"login": "first-author"},
+                "commit": {
+                    "message": "feat(core): first change\n\nLonger description",
+                    "author": {"name": "Fallback Author", "date": "2026-08-29T10:00:00Z"},
+                    "committer": {"date": "2026-08-29T11:00:00Z"},
+                },
+            },
+            {
+                "sha": "bbbbbbbb",
+                "html_url": "https://github.com/wastaken7/Upload-Assistant/commit/bbbbbbbb",
+                "author": None,
+                "commit": {
+                    "message": "fix(webui): second change",
+                    "author": {"name": "Second Author", "date": "2026-08-30T10:00:00Z"},
+                    "committer": {},
+                },
+            },
+        ],
+    }
+    monkeypatch.setattr(
+        update_checker.urllib.request,
+        "urlopen",
+        lambda _request, timeout: io.BytesIO(json.dumps(payload).encode("utf-8")),
+    )
+
+    result = update_checker.fetch_unreleased_changes("v3.9")
+
+    assert result is not None
+    assert result["available"] is True
+    assert result["ahead_by"] == 2
+    assert [commit["short_sha"] for commit in result["commits"]] == ["bbbbbbb", "aaaaaaa"]
+    assert result["commits"][0]["author"] == "Second Author"
+    assert result["commits"][1]["summary"] == "feat(core): first change"
+    assert result["commits"][1]["commit_url"] == (
+        "https://github.com/wastaken7/Upload-Assistant/commit/aaaaaaaa"
+    )
 
 
 def test_update_status_reuses_cli_compatible_cache(tmp_path, monkeypatch) -> None:
@@ -107,14 +154,33 @@ def test_changelog_history_fetches_and_reuses_cache(tmp_path, monkeypatch) -> No
             "prerelease": False,
         }
     ]
+    unreleased = {
+        "available": True,
+        "base_version": "v2.0",
+        "branch": "development",
+        "compare_url": "https://github.com/wastaken7/Upload-Assistant/compare/v2.0...development",
+        "ahead_by": 1,
+        "commits": [
+            {
+                "sha": "abcdef1234567890",
+                "short_sha": "abcdef1",
+                "summary": "feat(webui): show unreleased changes",
+                "commit_url": "https://github.com/wastaken7/Upload-Assistant/commit/abcdef1234567890",
+                "author": "contributor",
+                "committed_at": "2026-08-30T00:00:00Z",
+            }
+        ],
+    }
     monkeypatch.setattr(update_checker.time, "time", lambda: 100)
     monkeypatch.setattr(update_checker, "fetch_release_history", lambda: releases)
+    monkeypatch.setattr(update_checker, "fetch_unreleased_changes", lambda _base: unreleased)
 
     status = update_checker.get_changelog_history(state_dir=state_dir)
 
     assert status["success"] is True
     assert status["source"] == "github"
     assert status["releases"] == releases
+    assert status["unreleased"] == unreleased
 
     monkeypatch.setattr(update_checker.time, "time", lambda: 101)
     monkeypatch.setattr(
@@ -122,12 +188,18 @@ def test_changelog_history_fetches_and_reuses_cache(tmp_path, monkeypatch) -> No
         "fetch_release_history",
         lambda: (_ for _ in ()).throw(AssertionError("cache should be reused")),
     )
+    monkeypatch.setattr(
+        update_checker,
+        "fetch_unreleased_changes",
+        lambda _base: (_ for _ in ()).throw(AssertionError("cache should be reused")),
+    )
 
     cached_status = update_checker.get_changelog_history(state_dir=state_dir)
 
     assert cached_status["success"] is True
     assert cached_status["source"] == "cache"
     assert cached_status["releases"] == releases
+    assert cached_status["unreleased"] == unreleased
 
 
 def test_changelog_history_falls_back_to_bundled_release(tmp_path, monkeypatch) -> None:

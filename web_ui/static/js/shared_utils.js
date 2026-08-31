@@ -1017,6 +1017,8 @@
     const [isRefreshing, setIsRefreshing] = React.useState(false);
     const [activeArea, setActiveArea] = React.useState("all");
     const [expandedVersions, setExpandedVersions] = React.useState(new Set());
+    const [isUnreleasedExpanded, setIsUnreleasedExpanded] =
+      React.useState(false);
     const dialogRef = useUAModalFocus(onClose);
 
     const applyHistory = React.useCallback((nextHistory) => {
@@ -1062,6 +1064,17 @@
     };
 
     const releases = Array.isArray(history?.releases) ? history.releases : [];
+    const unreleased =
+      history?.unreleased && typeof history.unreleased === "object"
+        ? history.unreleased
+        : null;
+    const unreleasedCommits = Array.isArray(unreleased?.commits)
+      ? unreleased.commits
+      : [];
+    const unreleasedCount = Number.isInteger(unreleased?.ahead_by)
+      ? unreleased.ahead_by
+      : unreleasedCommits.length;
+    const unreleasedPanelId = "ua-changelog-unreleased-panel";
     const parsedReleases = React.useMemo(
       () =>
         releases.map((release, index) => ({
@@ -1229,6 +1242,224 @@
                   role: "alert",
                 },
                 error,
+              )
+            : null,
+          !isLoading && unreleased
+            ? h(
+                "article",
+                {
+                  className:
+                    "ua-changelog-release ua-changelog-unreleased mb-4 overflow-hidden rounded-lg border",
+                },
+                h(
+                  "div",
+                  {
+                    className:
+                      "ua-changelog-release-header flex items-stretch border-b",
+                  },
+                  h(
+                    "button",
+                    {
+                      type: "button",
+                      className:
+                        "flex min-w-0 flex-1 items-center justify-between gap-3 px-3 py-3 text-left sm:px-4",
+                      "aria-expanded": isUnreleasedExpanded,
+                      "aria-controls": unreleasedPanelId,
+                      onClick: () =>
+                        setIsUnreleasedExpanded((expanded) => !expanded),
+                    },
+                    h(
+                      "span",
+                      { className: "min-w-0" },
+                      h(
+                        "span",
+                        { className: "flex flex-wrap items-center gap-2" },
+                        h(
+                          "strong",
+                          { className: "text-sm" },
+                          "Development — Unreleased",
+                        ),
+                        h(
+                          "span",
+                          {
+                            className:
+                              "ua-changelog-unreleased-badge rounded-full px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide",
+                          },
+                          `${unreleasedCount} ${unreleasedCount === 1 ? "commit" : "commits"}`,
+                        ),
+                      ),
+                      h(
+                        "span",
+                        { className: "mt-1 block text-xs opacity-70" },
+                        `Changes on ${String(unreleased.branch || "development")} since ${String(unreleased.base_version || "the latest release")}`,
+                      ),
+                    ),
+                    h(
+                      "svg",
+                      {
+                        className: `h-4 w-4 shrink-0 transition-transform ${isUnreleasedExpanded ? "rotate-180" : ""}`,
+                        viewBox: "0 0 24 24",
+                        fill: "none",
+                        stroke: "currentColor",
+                        "aria-hidden": "true",
+                      },
+                      h("path", {
+                        d: "M6 9l6 6 6-6",
+                        strokeWidth: "2",
+                        strokeLinecap: "round",
+                        strokeLinejoin: "round",
+                      }),
+                    ),
+                  ),
+                  unreleased.compare_url
+                    ? h(
+                        "a",
+                        {
+                          href: unreleased.compare_url,
+                          target: "_blank",
+                          rel: "noopener noreferrer",
+                          className:
+                            "ua-changelog-release-link flex shrink-0 items-center border-l px-3 text-xs font-semibold sm:px-4",
+                          title: "Compare unreleased changes on GitHub",
+                          "aria-label": "Compare unreleased changes on GitHub",
+                        },
+                        "↗",
+                      )
+                    : null,
+                ),
+                isUnreleasedExpanded
+                  ? h(
+                      "div",
+                      {
+                        id: unreleasedPanelId,
+                        className:
+                          "ua-changelog-release-body space-y-3 p-3 sm:p-4",
+                      },
+                      h(
+                        "p",
+                        {
+                          className:
+                            "ua-changelog-unreleased-note text-xs leading-5 opacity-70",
+                        },
+                        "These commits have not been included in an official release and may change before publication.",
+                      ),
+                      unreleased.available !== true
+                        ? h(
+                            "div",
+                            {
+                              className:
+                                "ua-changelog-empty rounded-lg border p-4 text-sm",
+                              role: "status",
+                            },
+                            "Development activity could not be loaded. Use Refresh to try again.",
+                          )
+                        : unreleasedCommits.length
+                          ? h(
+                              React.Fragment,
+                              null,
+                              unreleasedCount > unreleasedCommits.length
+                                ? h(
+                                    "p",
+                                    { className: "text-xs opacity-60" },
+                                    `Showing the latest ${unreleasedCommits.length} of ${unreleasedCount} commits.`,
+                                  )
+                                : null,
+                              h(
+                                "div",
+                                {
+                                  className:
+                                    "ua-changelog-entry-list overflow-hidden rounded-lg border",
+                                },
+                                ...unreleasedCommits.map((commit, index) => {
+                                  const summary = String(
+                                    commit.summary || "Untitled commit",
+                                  );
+                                  const shortSha = String(
+                                    commit.short_sha || "",
+                                  );
+                                  const author = String(commit.author || "");
+                                  const commitDate = formatUAReleaseDate(
+                                    commit.committed_at,
+                                  );
+                                  const details = [
+                                    shortSha,
+                                    author ? `by ${author}` : "",
+                                    commitDate,
+                                  ]
+                                    .filter(Boolean)
+                                    .join(" · ");
+                                  return h(
+                                    "div",
+                                    {
+                                      key:
+                                        commit.sha ||
+                                        `${shortSha}-${summary}-${index}`,
+                                      className:
+                                        "ua-changelog-entry flex items-start justify-between gap-3 border-b p-3 last:border-b-0",
+                                    },
+                                    h(
+                                      "div",
+                                      { className: "min-w-0" },
+                                      commit.commit_url
+                                        ? h(
+                                            "a",
+                                            {
+                                              href: commit.commit_url,
+                                              target: "_blank",
+                                              rel: "noopener noreferrer",
+                                              className:
+                                                "ua-changelog-contribution-link break-words text-sm font-medium",
+                                            },
+                                            summary,
+                                          )
+                                        : h(
+                                            "p",
+                                            {
+                                              className:
+                                                "break-words text-sm font-medium",
+                                            },
+                                            summary,
+                                          ),
+                                      details
+                                        ? h(
+                                            "p",
+                                            {
+                                              className:
+                                                "mt-1 text-xs opacity-55",
+                                            },
+                                            details,
+                                          )
+                                        : null,
+                                    ),
+                                    commit.commit_url
+                                      ? h(
+                                          "a",
+                                          {
+                                            href: commit.commit_url,
+                                            target: "_blank",
+                                            rel: "noopener noreferrer",
+                                            className:
+                                              "ua-changelog-contribution-link shrink-0 text-xs font-semibold",
+                                            title: `View commit ${shortSha || summary} on GitHub`,
+                                            "aria-label": `View commit ${shortSha || summary} on GitHub`,
+                                          },
+                                          "↗",
+                                        )
+                                      : null,
+                                  );
+                                }),
+                              ),
+                            )
+                          : h(
+                              "div",
+                              {
+                                className:
+                                  "ua-changelog-empty rounded-lg border p-4 text-sm",
+                              },
+                              "No unreleased commits are currently listed.",
+                            ),
+                    )
+                  : null,
               )
             : null,
           isLoading

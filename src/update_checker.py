@@ -7,6 +7,7 @@ import json
 import re
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 from typing import Any
@@ -16,7 +17,11 @@ from src.app_paths import CODE_DIR, STATE_DIR
 REMOTE_VERSION_URL = "https://raw.githubusercontent.com/wastaken7/Upload-Assistant/master/src/version.py"
 RELEASES_URL = "https://github.com/wastaken7/Upload-Assistant/releases"
 RELEASES_API_URL = "https://api.github.com/repos/wastaken7/Upload-Assistant/releases?per_page=100"
+REPOSITORY_URL = "https://github.com/wastaken7/Upload-Assistant"
+COMPARE_API_URL = "https://api.github.com/repos/wastaken7/Upload-Assistant/compare"
+DEVELOPMENT_BRANCH = "development"
 MAX_CHANGELOG_RELEASES = 100
+MAX_UNRELEASED_COMMITS = 100
 
 
 def parse_version_tuple(value: str) -> tuple[int, ...]:
@@ -97,6 +102,123 @@ def fetch_release_history(url: str = RELEASES_API_URL) -> list[dict[str, object]
     return releases
 
 
+def _unreleased_compare_url(base_version: str, branch: str = DEVELOPMENT_BRANCH) -> str:
+    base = urllib.parse.quote(base_version.strip(), safe="")
+    head = urllib.parse.quote(branch.strip(), safe="")
+    return f"{REPOSITORY_URL}/compare/{base}...{head}"
+
+
+def _unavailable_unreleased_changes(base_version: str) -> dict[str, object]:
+    return {
+        "available": False,
+        "base_version": base_version,
+        "branch": DEVELOPMENT_BRANCH,
+        "compare_url": _unreleased_compare_url(base_version),
+        "ahead_by": None,
+        "commits": [],
+    }
+
+
+def fetch_unreleased_changes(
+    base_version: str,
+    branch: str = DEVELOPMENT_BRANCH,
+) -> dict[str, object] | None:
+    """Fetch a safe summary of commits after the latest release tag."""
+    clean_base = str(base_version or "").strip()
+    clean_branch = str(branch or "").strip()
+    if not clean_base or not clean_branch:
+        return None
+
+    encoded_base = urllib.parse.quote(clean_base, safe="")
+    encoded_branch = urllib.parse.quote(clean_branch, safe="")
+    api_url = f"{COMPARE_API_URL}/{encoded_base}...{encoded_branch}"
+    try:
+        request = urllib.request.Request(
+            api_url,
+            headers={
+                "Accept": "application/vnd.github+json",
+                "User-Agent": "Upload-Assistant-WebUI",
+                "X-GitHub-Api-Version": "2022-11-28",
+            },
+        )
+        with urllib.request.urlopen(request, timeout=10) as response:  # nosec B310 - fixed HTTPS URL
+            payload = json.loads(response.read().decode("utf-8"))
+    except (OSError, UnicodeError, ValueError, urllib.error.URLError, json.JSONDecodeError):
+        return None
+
+    if not isinstance(payload, dict):
+        return None
+
+    commits: list[dict[str, object]] = []
+    raw_commits = payload.get("commits")
+    if isinstance(raw_commits, list):
+        for commit in raw_commits:
+            if not isinstance(commit, dict):
+                continue
+            sha = commit.get("sha")
+            if not isinstance(sha, str) or not re.fullmatch(r"[0-9a-fA-F]{7,40}", sha):
+                continue
+            commit_details = commit.get("commit")
+            if not isinstance(commit_details, dict):
+                continue
+            message = commit_details.get("message")
+            if not isinstance(message, str) or not message.strip():
+                continue
+            summary = next(
+                (line.strip() for line in message.splitlines() if line.strip()),
+                "",
+            )
+            if not summary:
+                continue
+            commit_url = commit.get("html_url")
+            expected_commit_prefix = f"{REPOSITORY_URL}/commit/"
+            if not isinstance(commit_url, str) or not commit_url.startswith(expected_commit_prefix):
+                commit_url = f"{expected_commit_prefix}{sha}"
+
+            author = ""
+            github_author = commit.get("author")
+            if isinstance(github_author, dict) and isinstance(github_author.get("login"), str):
+                author = github_author["login"].strip()
+            author_details = commit_details.get("author")
+            if not author and isinstance(author_details, dict) and isinstance(author_details.get("name"), str):
+                author = author_details["name"].strip()
+
+            committed_at = ""
+            committer_details = commit_details.get("committer")
+            if isinstance(committer_details, dict) and isinstance(committer_details.get("date"), str):
+                committed_at = committer_details["date"].strip()
+            elif isinstance(author_details, dict) and isinstance(author_details.get("date"), str):
+                committed_at = author_details["date"].strip()
+
+            commits.append(
+                {
+                    "sha": sha.lower(),
+                    "short_sha": sha[:7].lower(),
+                    "summary": summary,
+                    "commit_url": commit_url,
+                    "author": author,
+                    "committed_at": committed_at,
+                }
+            )
+
+    ahead_by = payload.get("ahead_by")
+    if not isinstance(ahead_by, int) or isinstance(ahead_by, bool) or ahead_by < 0:
+        ahead_by = len(commits)
+    compare_url = payload.get("html_url")
+    expected_compare_prefix = f"{REPOSITORY_URL}/compare/"
+    if not isinstance(compare_url, str) or not compare_url.startswith(expected_compare_prefix):
+        compare_url = _unreleased_compare_url(clean_base, clean_branch)
+
+    return {
+        "available": True,
+        "base_version": clean_base,
+        "branch": clean_branch,
+        "compare_url": compare_url,
+        "ahead_by": ahead_by,
+        "commits": list(reversed(commits[-MAX_UNRELEASED_COMMITS:])),
+    }
+
+
 def extract_changelog(content: str, version: str) -> str | None:
     """Extract the string expression following a matching ``__version__`` assignment."""
     try:
@@ -162,28 +284,41 @@ def _write_cache(state_dir: Path, remote_version: str, remote_content: str) -> f
 def _read_changelog_cache(
     state_dir: Path,
     cache_hours: float | None,
-) -> tuple[list[dict[str, object]], float] | None:
+) -> tuple[list[dict[str, object]], dict[str, object] | None, float] | None:
     try:
         cached: Any = json.loads(_changelog_cache_path(state_dir).read_text(encoding="utf-8"))
         checked_at = cached["checked_at"]
         releases = cached["releases"]
+        unreleased = cached.get("unreleased")
         if not isinstance(checked_at, (int, float)) or not isinstance(releases, list):
             return None
+        if unreleased is not None and not isinstance(unreleased, dict):
+            unreleased = None
         if cache_hours is not None and time.time() - checked_at >= cache_hours * 3600:
             return None
         safe_releases = [release for release in releases if isinstance(release, dict)]
-        return safe_releases[:MAX_CHANGELOG_RELEASES], float(checked_at)
+        return safe_releases[:MAX_CHANGELOG_RELEASES], unreleased, float(checked_at)
     except (OSError, TypeError, ValueError, KeyError, json.JSONDecodeError):
         return None
 
 
-def _write_changelog_cache(state_dir: Path, releases: list[dict[str, object]]) -> float:
+def _write_changelog_cache(
+    state_dir: Path,
+    releases: list[dict[str, object]],
+    unreleased: dict[str, object] | None,
+) -> float:
     checked_at = time.time()
     state_dir.mkdir(parents=True, exist_ok=True)
     cache_path = _changelog_cache_path(state_dir)
     temporary_path = cache_path.with_suffix(".tmp")
     temporary_path.write_text(
-        json.dumps({"checked_at": checked_at, "releases": releases}),
+        json.dumps(
+            {
+                "checked_at": checked_at,
+                "releases": releases,
+                "unreleased": unreleased,
+            }
+        ),
         encoding="utf-8",
     )
     temporary_path.replace(cache_path)
@@ -220,33 +355,43 @@ def get_changelog_history(
     cache_hours = max(0.0, float(cache_hours))
     cached = None if force else _read_changelog_cache(state_dir, cache_hours)
     if cached:
-        releases, checked_at = cached
+        releases, unreleased, checked_at = cached
+        if unreleased is None and releases:
+            base_version = str(releases[0].get("version") or "").strip()
+            unreleased = _unavailable_unreleased_changes(base_version) if base_version else None
         return {
             "success": True,
             "source": "cache",
             "releases": releases,
+            "unreleased": unreleased,
             "checked_at": checked_at,
             "stale": False,
         }
 
     releases = fetch_release_history()
     if releases:
-        checked_at = _write_changelog_cache(state_dir, releases)
+        base_version = str(releases[0].get("version") or "").strip()
+        unreleased = fetch_unreleased_changes(base_version) if base_version else None
+        if unreleased is None and base_version:
+            unreleased = _unavailable_unreleased_changes(base_version)
+        checked_at = _write_changelog_cache(state_dir, releases, unreleased)
         return {
             "success": True,
             "source": "github",
             "releases": releases,
+            "unreleased": unreleased,
             "checked_at": checked_at,
             "stale": False,
         }
 
     stale_cache = _read_changelog_cache(state_dir, None)
     if stale_cache:
-        stale_releases, checked_at = stale_cache
+        stale_releases, unreleased, checked_at = stale_cache
         return {
             "success": True,
             "source": "cache",
             "releases": stale_releases,
+            "unreleased": unreleased,
             "checked_at": checked_at,
             "stale": True,
             "warning": "GitHub could not be reached. Showing cached release history.",
@@ -258,6 +403,7 @@ def get_changelog_history(
             "success": True,
             "source": "local",
             "releases": [local_release],
+            "unreleased": None,
             "checked_at": None,
             "stale": True,
             "warning": "GitHub could not be reached. Showing the bundled release notes.",
@@ -267,6 +413,7 @@ def get_changelog_history(
         "success": False,
         "source": "none",
         "releases": [],
+        "unreleased": None,
         "checked_at": None,
         "stale": True,
         "error": "Unable to load the release history.",

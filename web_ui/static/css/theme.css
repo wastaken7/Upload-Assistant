@@ -1424,6 +1424,11 @@ html.ua-upload-document #root {
   color: #86efac;
 }
 
+.ua-changelog-unreleased-badge {
+  background: color-mix(in srgb, var(--ua-copper) 20%, transparent);
+  color: var(--ua-copper-bright);
+}
+
 .ua-changelog-prerelease-badge,
 .ua-changelog-type-performance,
 .ua-changelog-type-perf {
