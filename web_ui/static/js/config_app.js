@@ -1339,6 +1339,8 @@ function StringListEditor({
   value,
   placeholder,
   addLabel,
+  emptyText,
+  itemLabel = "item",
   onBrowse,
   onChange,
 }) {
@@ -1359,6 +1361,9 @@ function StringListEditor({
 
   return (
     <div className="space-y-2">
+      {values.length === 0 && emptyText && (
+        <p className="text-sm opacity-70">{emptyText}</p>
+      )}
       {values.map((entry, index) => (
         <div
           key={index}
@@ -1368,6 +1373,7 @@ function StringListEditor({
             type="text"
             value={entry}
             placeholder={placeholder}
+            aria-label={`${itemLabel} ${index + 1}`}
             className="ua-config-input w-full rounded-lg border px-3 py-2"
             onChange={(event) => {
               const nextValues = [...values];
@@ -1398,7 +1404,7 @@ function StringListEditor({
                 values.filter((_value, valueIndex) => valueIndex !== index),
               )
             }
-            aria-label={`Remove item ${index + 1}`}
+            aria-label={`Remove ${itemLabel.toLowerCase()} ${entry.trim() || index + 1}`}
           >
             Remove
           </button>
@@ -1411,6 +1417,105 @@ function StringListEditor({
       >
         + {addLabel}
       </button>
+    </div>
+  );
+}
+
+function ReleaseGroupTagEditor({ value, placeholder, onChange }) {
+  const normalizeGroups = (rawValue) => {
+    const seen = new Set();
+    return (Array.isArray(rawValue) ? rawValue : [])
+      .map((entry) => String(entry ?? "").trim())
+      .filter((entry) => {
+        const normalizedEntry = entry.toLowerCase();
+        if (!entry || seen.has(normalizedEntry)) return false;
+        seen.add(normalizedEntry);
+        return true;
+      });
+  };
+  const [groups, setGroups] = useState(() => normalizeGroups(value));
+  const [draft, setDraft] = useState("");
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    setGroups(normalizeGroups(value));
+    setDraft("");
+  }, [value]);
+
+  const updateGroups = (nextGroups) => {
+    setGroups(nextGroups);
+    onChange(nextGroups);
+  };
+
+  const commitDraft = () => {
+    const candidates = draft
+      .split(/[\s,]+/)
+      .map((group) => group.trim())
+      .filter(Boolean);
+    if (candidates.length === 0) {
+      setDraft("");
+      return;
+    }
+    const seen = new Set(groups.map((group) => group.toLowerCase()));
+    const nextGroups = [...groups];
+    candidates.forEach((group) => {
+      const normalizedGroup = group.toLowerCase();
+      if (seen.has(normalizedGroup)) return;
+      seen.add(normalizedGroup);
+      nextGroups.push(group);
+    });
+    if (nextGroups.length !== groups.length) updateGroups(nextGroups);
+    setDraft("");
+  };
+
+  const removeGroup = (groupToRemove) => {
+    updateGroups(groups.filter((group) => group !== groupToRemove));
+  };
+
+  return (
+    <div
+      className="ua-config-tag-field flex min-h-10 w-full cursor-text flex-wrap items-center gap-1.5 rounded-lg border px-2 py-1.5"
+      onClick={() => inputRef.current?.focus()}
+    >
+      {groups.map((group) => (
+        <span
+          key={group.toLowerCase()}
+          className="ua-config-list-tag inline-flex max-w-full items-center gap-1 rounded-md border px-2 py-1 text-xs font-semibold"
+        >
+          <span className="truncate">{group}</span>
+          <button
+            type="button"
+            className="ua-config-list-tag-remove inline-flex h-4 w-4 shrink-0 items-center justify-center rounded"
+            aria-label={`Remove release group ${group}`}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={(event) => {
+              event.stopPropagation();
+              removeGroup(group);
+            }}
+          >
+            ×
+          </button>
+        </span>
+      ))}
+      <input
+        ref={inputRef}
+        type="text"
+        value={draft}
+        placeholder={groups.length === 0 ? placeholder : "Add another group"}
+        aria-label="Add a personal release group"
+        className="ua-config-tag-input min-w-32 flex-1 border-0 bg-transparent px-1 py-1 text-sm outline-none"
+        onChange={(event) => setDraft(event.target.value)}
+        onBlur={commitDraft}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " " || event.key === ",") {
+            event.preventDefault();
+            commitDraft();
+          } else if (event.key === "Backspace" && !draft && groups.length > 0) {
+            event.preventDefault();
+            removeGroup(groups[groups.length - 1]);
+          }
+        }}
+      />
     </div>
   );
 }
@@ -1668,6 +1773,11 @@ function ConfigLeafEditor({
     pathParts.includes("TORRENT_CLIENTS") &&
     torrentClientListFields.has(item.key) &&
     Array.isArray(item.value);
+  const isPersonalReleaseGroupField =
+    pathParts.includes("DEFAULT") &&
+    item.key === "personal_release_groups" &&
+    Array.isArray(item.value);
+  const isStringListField = isTorrentClientListField;
 
   // Hooks for boolean values
   const [checked, setChecked] = useState(Boolean(item.value));
@@ -1790,7 +1900,37 @@ function ConfigLeafEditor({
     setSelected(selections);
   };
 
-  if (isTorrentClientListField) {
+  if (isPersonalReleaseGroupField) {
+    const originalValue = JSON.stringify(item.value);
+    return (
+      <div className={fullWidth ? "space-y-2" : "px-4 py-3"}>
+        <div className="mb-2 flex items-center gap-2">
+          <div className={labelClass}>{displayLabel}</div>
+          {helpText && (
+            <Tooltip content={helpText}>
+              <InfoIcon
+                className={`h-4 w-4 ${isDarkMode ? "text-gray-400 hover:text-gray-300" : "text-gray-500 hover:text-gray-600"}`}
+              />
+            </Tooltip>
+          )}
+        </div>
+        <ReleaseGroupTagEditor
+          value={item.value}
+          placeholder="Type a release group and press Enter"
+          onChange={(nextGroups) =>
+            onValueChange(path, JSON.stringify(nextGroups), {
+              originalValue,
+              isSensitive: false,
+              isRedacted: false,
+              readOnly: false,
+            })
+          }
+        />
+      </div>
+    );
+  }
+
+  if (isStringListField) {
     const originalValue = JSON.stringify(item.value);
     const placeholders = {
       super_seed_trackers: "Tracker acronym, e.g. AITHER",
@@ -1820,19 +1960,21 @@ function ConfigLeafEditor({
           value={item.value}
           placeholder={placeholders[item.key] || "Value"}
           addLabel={addLabels[item.key] || "Add Entry"}
+          emptyText=""
+          itemLabel="List item"
           onBrowse={
             ["linked_folder", "local_path"].includes(item.key) && onBrowseFolder
               ? () => onBrowseFolder(displayLabel)
               : null
           }
-          onChange={(nextValues) =>
+          onChange={(nextValues) => {
             onValueChange(path, JSON.stringify(nextValues), {
               originalValue,
               isSensitive: false,
               isRedacted: false,
               readOnly: false,
-            })
-          }
+            });
+          }}
         />
       </div>
     );
@@ -8635,6 +8777,37 @@ function ConfigApp() {
           );
         }
         return descriptions.join("; ") || "Default tracker order changed";
+      }
+      if (path[0] === "DEFAULT" && key === "personal_release_groups") {
+        const normalizeReleaseGroups = (value) => {
+          let parsedValue = value;
+          if (typeof parsedValue === "string") {
+            try {
+              parsedValue = JSON.parse(parsedValue);
+            } catch (error) {
+              parsedValue = parsedValue.split(/[\s,]+/);
+            }
+          }
+          return (Array.isArray(parsedValue) ? parsedValue : [])
+            .map((group) => String(group ?? "").trim())
+            .filter(Boolean);
+        };
+        const originalGroups = normalizeReleaseGroups(update.originalValue);
+        const nextGroups = normalizeReleaseGroups(update.value);
+        const originalSet = new Set(
+          originalGroups.map((group) => group.toLowerCase()),
+        );
+        const nextSet = new Set(nextGroups.map((group) => group.toLowerCase()));
+        const added = nextGroups.filter(
+          (group) => !originalSet.has(group.toLowerCase()),
+        );
+        const removed = originalGroups.filter(
+          (group) => !nextSet.has(group.toLowerCase()),
+        );
+        const descriptions = [];
+        if (added.length) descriptions.push(`Added ${added.join(", ")}`);
+        if (removed.length) descriptions.push(`Removed ${removed.join(", ")}`);
+        return descriptions.join("; ") || "Personal release groups changed";
       }
       if (
         isSensitiveKeyForPath(key, parentPath) ||

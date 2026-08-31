@@ -190,6 +190,10 @@ Hover or focus an information icon beside a setting to read its description. The
 
 The editor combines bundled defaults from `data/example_config.py` with overrides from the user-state `data/config.py`. If no usable `config.py` exists, the interface displays the example defaults and warns that they have not yet been saved. Successful configuration writes are recorded in `data/config_audit.log`; sensitive values are redacted from that audit trail.
 
+### Personal release groups
+
+Under **Configuration → General → Main Settings**, enter a release-group name in **Personal Release Groups** and press Space, Enter, or comma to add it. Each group appears as a compact tag; select its **×** button to remove it. Matching is case-insensitive, and a detected matching group automatically marks the upload as a personal release.
+
 ### Pending changes
 
 Configuration edits are staged in the browser instead of being written immediately.
