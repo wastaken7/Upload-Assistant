@@ -406,7 +406,7 @@ button:focus-visible {
 
 .ua-tracker-chip-list {
   align-items: stretch;
-  grid-template-columns: repeat(auto-fill, minmax(10.5rem, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(12.5rem, 1fr));
 }
 
 .ua-tracker-chip {
@@ -424,7 +424,7 @@ button:focus-visible {
   margin-left: auto;
 }
 
-@media (max-width: 480px) {
+@media (max-width: 640px) {
   .ua-tracker-chip-list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
