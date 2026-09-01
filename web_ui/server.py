@@ -35,6 +35,7 @@ import psutil
 import web_ui.auth as auth_mod
 from src.webui_progress import PROGRESS_STDOUT_PREFIX, ProgressEvent, clear_progress_callback, reset_progress, set_progress_callback
 from src.app_paths import CODE_DIR, STATE_DIR
+from src.external_tools import EXTERNAL_TOOL_KEYS, check_external_tools
 from src.meta import Meta
 from src.version import __version__ as APP_VERSION
 from src.update_checker import get_changelog_history, get_update_status
@@ -3712,6 +3713,48 @@ def changelog():
             force=force,
         )
     )
+
+
+@app.route("/api/external_tools_status", methods=["POST"])
+@limiter.limit("60 per hour", key_func=_rate_limit_key_func)
+def external_tools_status():
+    """Check configured, detected, and runtime-managed external tools."""
+    if not _is_authenticated():
+        return jsonify({"success": False, "error": "Authentication required (web session)"}), 401
+    if not _verify_csrf_header() or not _verify_same_origin():
+        return jsonify({"success": False, "error": "CSRF/Origin validation failed"}), 403
+
+    payload = request.get_json(silent=True)
+    payload_map = cast(Mapping[str, object], payload) if isinstance(payload, Mapping) else {}
+    raw_paths = payload_map.get("paths", {})
+    if not isinstance(raw_paths, Mapping):
+        return jsonify({"success": False, "error": "Invalid external tool paths"}), 400
+
+    user_config = _load_config_from_file(STATE_DIR / "data" / "config.py") or {}
+    example_config = _load_config_from_file(CODE_DIR / "data" / "example_config.py") or {}
+    user_defaults = _as_dict(user_config.get("DEFAULT")) or {}
+    example_defaults = _as_dict(example_config.get("DEFAULT")) or {}
+    effective_defaults: dict[str, Any] = {}
+
+    for key in EXTERNAL_TOOL_KEYS:
+        value = raw_paths.get(key, user_defaults.get(key, example_defaults.get(key, "")))
+        if value is None:
+            value = ""
+        if not isinstance(value, str) or len(value) > 4096:
+            return jsonify({"success": False, "error": f"Invalid path value for {key}"}), 400
+        effective_defaults[key] = value
+
+    try:
+        statuses = check_external_tools(
+            effective_defaults,
+            state_dir=STATE_DIR,
+            code_dir=CODE_DIR,
+        )
+    except Exception as error:
+        console.print(f"External tool status check failed: {error}", markup=False)
+        return jsonify({"success": False, "error": "Unable to check external tools"}), 500
+
+    return jsonify({"success": True, "statuses": statuses})
 
 
 @app.route("/api/csrf_token")

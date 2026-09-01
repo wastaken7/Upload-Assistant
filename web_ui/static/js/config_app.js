@@ -657,8 +657,20 @@ const CONFIG_HEADING_LABELS = {
 
 const CONFIG_HEADING_DESCRIPTIONS = {
   "EXTERNAL TOOL PATHS":
-    "Optional executable overrides. Leave a field blank to use the bundled tool when available or the corresponding executable on the system PATH.",
+    "Optional executable overrides. Leave fields blank to use automatically managed tools or executables on the system PATH. Check Tools detects their availability without downloading or installing anything.",
 };
+
+const EXTERNAL_TOOL_KEYS = [
+  "ffmpeg_path",
+  "ffprobe_path",
+  "mediainfo_path",
+  "dvd_mediainfo_path",
+  "bdinfo_path",
+  "mkbrr_path",
+  "dovi_tool_path",
+  "hdr10plus_tool_path",
+  "unrar_path",
+];
 
 const normalizeConfigHeading = (value) =>
   String(value || "")
@@ -1734,6 +1746,75 @@ function ConfigLeaf(props) {
   return <ConfigLeafEditor key={resetVersion} {...props} />;
 }
 
+function ExternalToolStatus({ status }) {
+  const hasDetails = Boolean(
+    status.message || status.path || status.source || status.version,
+  );
+  const shouldAutoExpand = ["warning", "danger"].includes(status.tone);
+  const statusIdentity = [
+    status.state,
+    status.tone,
+    status.path,
+    status.message,
+  ].join(":");
+  const [isOpen, setIsOpen] = useState(shouldAutoExpand);
+
+  useEffect(() => {
+    setIsOpen(shouldAutoExpand);
+  }, [statusIdentity, shouldAutoExpand]);
+
+  return (
+    <details
+      className="ua-external-tool-status rounded-lg border px-2.5 py-1.5 text-xs"
+      data-tone={status.tone || "neutral"}
+      open={isOpen}
+      onToggle={(event) => setIsOpen(event.currentTarget.open)}
+    >
+      <summary className="flex cursor-pointer list-none items-center gap-2 font-semibold">
+        <span
+          className="ua-external-tool-status-dot"
+          data-tone={status.tone || "neutral"}
+          aria-hidden="true"
+        />
+        <span>{status.badge || "Checked"}</span>
+        {hasDetails && (
+          <React.Fragment>
+            <span className="ua-external-tool-status-more ml-auto font-medium">
+              Details
+            </span>
+            <span
+              className="ua-external-tool-status-chevron"
+              aria-hidden="true"
+            >
+              ▾
+            </span>
+          </React.Fragment>
+        )}
+      </summary>
+      {hasDetails && (
+        <div className="ua-external-tool-status-details mt-2 space-y-1 border-t pt-2 font-normal">
+          {status.message && <p>{status.message}</p>}
+          {status.source && (
+            <p>
+              <span className="font-semibold">Source:</span> {status.source}
+            </p>
+          )}
+          {status.version && (
+            <p>
+              <span className="font-semibold">Version:</span> {status.version}
+            </p>
+          )}
+          {status.path && (
+            <p className="break-all">
+              <span className="font-semibold">Path:</span> {status.path}
+            </p>
+          )}
+        </div>
+      )}
+    </details>
+  );
+}
+
 function ConfigLeafEditor({
   item,
   pathParts,
@@ -1741,6 +1822,7 @@ function ConfigLeafEditor({
   fullWidth,
   allImageHosts,
   torrentClients,
+  externalToolStatus,
   onBrowseFolder,
   onValueChange,
 }) {
@@ -2853,6 +2935,9 @@ function ConfigLeafEditor({
           </button>
         )}
       </div>
+      {externalToolStatus && (
+        <ExternalToolStatus status={externalToolStatus} />
+      )}
     </div>
   );
 }
@@ -5054,6 +5139,10 @@ function ItemList({
   onRemoveTracker,
   onUndoRemoveTracker,
   clientTestStates,
+  externalToolStatuses,
+  externalToolStatusError,
+  isCheckingExternalTools,
+  onCheckExternalTools,
   onBrowseFolder,
   onValueChange,
 }) {
@@ -5275,6 +5364,7 @@ function ItemList({
                     allImageHosts={allImageHosts}
                     usedImageHosts={usedImageHosts}
                     torrentClients={torrentClients}
+                    externalToolStatus={externalToolStatuses?.[item.key]}
                     onValueChange={onValueChange}
                   />
                 ))}
@@ -5333,6 +5423,7 @@ function ItemList({
                     allImageHosts={allImageHosts}
                     usedImageHosts={usedImageHosts}
                     torrentClients={torrentClients}
+                    externalToolStatus={externalToolStatuses?.[item.key]}
                     onValueChange={onValueChange}
                   />
                 );
@@ -5380,6 +5471,7 @@ function ItemList({
                             allImageHosts={allImageHosts}
                             usedImageHosts={usedImageHosts}
                             torrentClients={torrentClients}
+                            externalToolStatus={externalToolStatuses?.[item.key]}
                             onValueChange={onValueChange}
                           />
                         );
@@ -5409,6 +5501,7 @@ function ItemList({
                         allImageHosts={allImageHosts}
                         usedImageHosts={usedImageHosts}
                         torrentClients={torrentClients}
+                        externalToolStatus={externalToolStatuses?.[item.key]}
                         onValueChange={onValueChange}
                       />
                     );
@@ -5435,6 +5528,11 @@ function ItemList({
           depth === 0 &&
           item.subsection === true &&
           normalizeConfigHeading(item.key) === "METADATA CACHING";
+        const isExternalToolsSubsection =
+          pathParts[0] === "DEFAULT" &&
+          depth === 0 &&
+          item.subsection === true &&
+          normalizeConfigHeading(item.key) === "EXTERNAL TOOL PATHS";
         const isImageHostingSubsection =
           pathParts[0] === "DEFAULT" &&
           depth === 0 &&
@@ -5503,6 +5601,10 @@ function ItemList({
                     expandedGroups={expandedGroups}
                     toggleGroup={toggleGroup}
                     torrentClients={torrentClients}
+                    externalToolStatuses={externalToolStatuses}
+                    externalToolStatusError={externalToolStatusError}
+                    isCheckingExternalTools={isCheckingExternalTools}
+                    onCheckExternalTools={onCheckExternalTools}
                     onValueChange={onValueChange}
                   />
                 </div>
@@ -5551,6 +5653,10 @@ function ItemList({
                   expandedGroups={expandedGroups}
                   toggleGroup={toggleGroup}
                   torrentClients={torrentClients}
+                  externalToolStatuses={externalToolStatuses}
+                  externalToolStatusError={externalToolStatusError}
+                  isCheckingExternalTools={isCheckingExternalTools}
+                  onCheckExternalTools={onCheckExternalTools}
                   onValueChange={onValueChange}
                 />
               </div>
@@ -5644,6 +5750,10 @@ function ItemList({
             expandedGroups={expandedGroups}
             toggleGroup={toggleGroup}
             torrentClients={torrentClients}
+            externalToolStatuses={externalToolStatuses}
+            externalToolStatusError={externalToolStatusError}
+            isCheckingExternalTools={isCheckingExternalTools}
+            onCheckExternalTools={onCheckExternalTools}
             onValueChange={onValueChange}
           />
         );
@@ -5664,13 +5774,35 @@ function ItemList({
               className="ua-config-section overflow-hidden rounded-xl border"
             >
               <div className="ua-config-section-heading border-b px-4 py-3">
-                <h2 className="text-sm font-semibold">
-                  {formatConfigHeading(item.key)}
-                </h2>
-                {headingDescription && (
-                  <p className="ua-config-service-description mt-1 text-xs">
-                    {headingDescription}
-                  </p>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h2 className="text-sm font-semibold">
+                      {formatConfigHeading(item.key)}
+                    </h2>
+                    {headingDescription && (
+                      <p className="ua-config-service-description mt-1 text-xs">
+                        {headingDescription}
+                      </p>
+                    )}
+                  </div>
+                  {isExternalToolsSubsection && (
+                    <button
+                      type="button"
+                      className="ua-config-service-action shrink-0 rounded-lg border px-3 py-2 text-sm font-semibold"
+                      disabled={isCheckingExternalTools}
+                      onClick={onCheckExternalTools}
+                    >
+                      {isCheckingExternalTools ? "Checking…" : "Check tools"}
+                    </button>
+                  )}
+                </div>
+                {isExternalToolsSubsection && externalToolStatusError && (
+                  <div
+                    className="ua-config-warning mt-3 rounded-lg border px-3 py-2 text-xs"
+                    role="alert"
+                  >
+                    {externalToolStatusError}
+                  </div>
                 )}
               </div>
               <div className="ua-config-section-panel p-4">{nested}</div>
@@ -7401,6 +7533,9 @@ function ConfigApp() {
   const [folderPicker, setFolderPicker] = useState(null);
   const [renameClientSource, setRenameClientSource] = useState("");
   const [clientTestStates, setClientTestStates] = useState(new Map());
+  const [externalToolStatuses, setExternalToolStatuses] = useState({});
+  const [externalToolStatusError, setExternalToolStatusError] = useState("");
+  const [isCheckingExternalTools, setIsCheckingExternalTools] = useState(false);
   const [isPendingSummaryOpen, setIsPendingSummaryOpen] = useState(false);
   const pendingSummaryRef = useRef(null);
   const mobileNavGestureRef = useRef(null);
@@ -7828,6 +7963,15 @@ function ConfigApp() {
 
   const onValueChange = (path, value, meta) => {
     const pathKey = path.join("/");
+    if (path[0] === "DEFAULT" && EXTERNAL_TOOL_KEYS.includes(path[1])) {
+      setExternalToolStatuses((currentStatuses) => {
+        if (!currentStatuses[path[1]]) return currentStatuses;
+        const next = { ...currentStatuses };
+        delete next[path[1]];
+        return next;
+      });
+      setExternalToolStatusError("");
+    }
     if (path[0] === "TORRENT_CLIENTS" && path[1]) {
       setClientTestStates((currentStates) => {
         const stateKey = String(path[1]).toLowerCase();
@@ -7977,6 +8121,36 @@ function ConfigApp() {
       (section) => section.section === "DEFAULT",
     );
     return findConfigItem(defaultSection?.items, key)?.value;
+  };
+
+  const checkExternalTools = async () => {
+    if (isCheckingExternalTools) return;
+    setIsCheckingExternalTools(true);
+    setExternalToolStatusError("");
+    try {
+      const paths = Object.fromEntries(
+        EXTERNAL_TOOL_KEYS.map((key) => [
+          key,
+          String(getEffectiveDefaultValue(key) ?? ""),
+        ]),
+      );
+      const response = await apiFetch(`${API_BASE}/external_tools_status`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ paths }),
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.success) {
+        throw new Error(payload.error || "Unable to check external tools");
+      }
+      setExternalToolStatuses(payload.statuses || {});
+    } catch (error) {
+      setExternalToolStatusError(
+        error?.message || "Unable to check external tools.",
+      );
+    } finally {
+      setIsCheckingExternalTools(false);
+    }
   };
 
   const editorValueForRuntime = (rawValue, currentValue) => {
@@ -9671,6 +9845,10 @@ function ConfigApp() {
                           onRemoveTracker={removeTracker}
                           onUndoRemoveTracker={undoRemoveTracker}
                           clientTestStates={clientTestStates}
+                          externalToolStatuses={externalToolStatuses}
+                          externalToolStatusError={externalToolStatusError}
+                          isCheckingExternalTools={isCheckingExternalTools}
+                          onCheckExternalTools={checkExternalTools}
                           onBrowseFolder={browseForFolder}
                           onValueChange={onValueChange}
                         />

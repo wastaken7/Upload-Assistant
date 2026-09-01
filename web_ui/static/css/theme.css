@@ -2426,6 +2426,91 @@ select {
   color: var(--ua-config-muted);
 }
 
+.ua-external-tool-status {
+  background: color-mix(in srgb, var(--ua-config-surface) 72%, transparent);
+  border-color: var(--ua-config-border);
+  color: var(--ua-config-muted);
+}
+
+.ua-external-tool-status > summary::-webkit-details-marker {
+  display: none;
+}
+
+.ua-external-tool-status-dot {
+  background: #94a3b8;
+  border-radius: 999px;
+  box-shadow: 0 0 0 2px color-mix(in srgb, #94a3b8 14%, transparent);
+  flex: 0 0 auto;
+  height: 0.48rem;
+  width: 0.48rem;
+}
+
+.ua-external-tool-status[data-tone="success"] {
+  border-color: color-mix(in srgb, #22c55e 38%, var(--ua-config-border));
+  color: color-mix(in srgb, #22c55e 76%, var(--ua-config-text));
+}
+
+.ua-external-tool-status-dot[data-tone="success"] {
+  background: #22c55e;
+  box-shadow: 0 0 0 2px color-mix(in srgb, #22c55e 16%, transparent);
+}
+
+.ua-external-tool-status[data-tone="accent"] {
+  border-color: color-mix(
+    in srgb,
+    var(--ua-copper-bright) 38%,
+    var(--ua-config-border)
+  );
+  color: var(--ua-copper-bright);
+}
+
+.ua-external-tool-status-dot[data-tone="accent"] {
+  background: var(--ua-copper-bright);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ua-copper) 18%, transparent);
+}
+
+.ua-external-tool-status[data-tone="warning"] {
+  border-color: color-mix(in srgb, #f59e0b 42%, var(--ua-config-border));
+  color: color-mix(in srgb, #f59e0b 80%, var(--ua-config-text));
+}
+
+.ua-external-tool-status-dot[data-tone="warning"] {
+  background: #f59e0b;
+  box-shadow: 0 0 0 2px color-mix(in srgb, #f59e0b 18%, transparent);
+}
+
+.ua-external-tool-status[data-tone="danger"] {
+  border-color: color-mix(in srgb, #ef4444 42%, var(--ua-config-border));
+  color: color-mix(in srgb, #ef4444 80%, var(--ua-config-text));
+}
+
+.ua-external-tool-status-dot[data-tone="danger"] {
+  background: #ef4444;
+  box-shadow: 0 0 0 2px color-mix(in srgb, #ef4444 18%, transparent);
+}
+
+.ua-external-tool-status-chevron {
+  transition: transform 160ms ease;
+}
+
+.ua-external-tool-status-more {
+  color: var(--ua-config-text);
+  opacity: 0.82;
+}
+
+.ua-external-tool-status > summary:hover .ua-external-tool-status-more {
+  text-decoration: underline;
+}
+
+.ua-external-tool-status[open] .ua-external-tool-status-chevron {
+  transform: rotate(180deg);
+}
+
+.ua-external-tool-status-details {
+  border-color: color-mix(in srgb, currentColor 22%, transparent);
+  color: var(--ua-config-muted);
+}
+
 .ua-config-input,
 .ua-config-select {
   background-color: var(--ua-config-surface-raised);
