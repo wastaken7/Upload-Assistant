@@ -14,6 +14,13 @@ def test_tracker_destination_type_uses_existing_usenet_marker() -> None:
     assert server._tracker_destination_type(UsenetIndexer) == "usenet"
 
 
+def test_tracker_supported_categories_are_normalized_and_deduplicated() -> None:
+    class Tracker:
+        supported_categories = ("TV", "movie", " TV ", "BOOK")
+
+    assert server._tracker_supported_categories(Tracker) == ["TV", "MOVIE", "BOOK"]
+
+
 def test_configured_trackers_include_defaults_and_non_default_setup() -> None:
     trackers_section = {
         "default_trackers": "AITHER",

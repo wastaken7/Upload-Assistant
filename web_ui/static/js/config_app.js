@@ -579,6 +579,37 @@ const getTrackerDestinationType = (tracker) => {
     : "torrent";
 };
 
+const TRACKER_CATEGORY_OPTIONS = [
+  { id: "MOVIE", label: "Movies" },
+  { id: "TV", label: "TV" },
+  { id: "BOOK", label: "Books" },
+  { id: "GAME", label: "Games" },
+  { id: "MUSIC", label: "Music" },
+  { id: "XXX", label: "Adult" },
+];
+
+const getTrackerCategories = (tracker) => {
+  const categories = Array.isArray(tracker?.supported_categories)
+    ? tracker.supported_categories
+    : [];
+  const normalized = new Set(
+    categories
+      .map((category) => String(category || "").trim().toUpperCase())
+      .filter(Boolean),
+  );
+  const ordered = TRACKER_CATEGORY_OPTIONS.filter((category) =>
+    normalized.has(category.id),
+  );
+  const knownIds = new Set(
+    TRACKER_CATEGORY_OPTIONS.map((category) => category.id),
+  );
+  const unknown = Array.from(normalized)
+    .filter((category) => !knownIds.has(category))
+    .sort()
+    .map((category) => ({ id: category, label: category }));
+  return [...ordered, ...unknown];
+};
+
 const CONFIG_SECTION_LABELS = {
   IMAGES: "Tracker Database Icons",
   TRACKERS: "Trackers",
@@ -4446,6 +4477,7 @@ function TrackerManager({
   const [selectedDefaults, setSelectedDefaults] = useState(originalDefaults);
   const [trackerQuery, setTrackerQuery] = useState("");
   const [destinationFilter, setDestinationFilter] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState("all");
   const [trackerStatuses, setTrackerStatuses] = useState({});
   const [isCheckingTrackerStatuses, setIsCheckingTrackerStatuses] =
     useState(false);
@@ -4475,6 +4507,7 @@ function TrackerManager({
   useEffect(() => {
     setTrackerQuery("");
     setDestinationFilter("all");
+    setCategoryFilter("all");
   }, [trackerView]);
 
   useEffect(() => {
@@ -4618,6 +4651,9 @@ function TrackerManager({
   ) => {
     const name = String(tracker.name).toUpperCase();
     const destinationType = getTrackerDestinationType(tracker);
+    const categoryLabels = getTrackerCategories(tracker).map(
+      (category) => category.label,
+    );
     const trackerStatus = trackerStatuses[name] || {
       state: "not_checked",
       message: "Not checked yet.",
@@ -4672,8 +4708,11 @@ function TrackerManager({
               </span>
             )}
           </span>
-          <span className="ua-config-service-description block truncate text-xs">
+          <span className="ua-config-service-description block text-xs leading-5">
             {name}
+            {showDestinationType && categoryLabels.length > 0
+              ? ` · ${categoryLabels.join(" · ")}`
+              : ""}
           </span>
         </span>
       </span>
@@ -4907,6 +4946,7 @@ function TrackerManager({
                   tracker,
                   [{ label: "Default", tone: "accent" }],
                   true,
+                  true,
                 )}
                 <button
                   type="button"
@@ -4943,6 +4983,7 @@ function TrackerManager({
                       tracker.configured
                         ? [{ label: "Configured", tone: "success" }]
                         : [],
+                      true,
                       true,
                     )}
                     <button
@@ -4984,25 +5025,42 @@ function TrackerManager({
           (tracker) =>
             getTrackerDestinationType(tracker) === destinationFilter,
         );
+  const categoryEntries =
+    categoryFilter === "all"
+      ? destinationEntries
+      : destinationEntries.filter((tracker) =>
+          getTrackerCategories(tracker).some(
+            (category) => category.id === categoryFilter,
+          ),
+        );
   const normalizedTrackerQuery = trackerQuery.trim().toLowerCase();
   const visibleEntries = normalizedTrackerQuery
-    ? destinationEntries.filter((tracker) =>
-        [tracker.name, tracker.display_name, tracker.base_url].some((value) =>
+    ? categoryEntries.filter((tracker) =>
+        [
+          tracker.name,
+          tracker.display_name,
+          tracker.base_url,
+          getTrackerCategories(tracker)
+            .map((category) => category.label)
+            .join(" "),
+        ].some((value) =>
           String(value || "")
             .toLowerCase()
             .includes(normalizedTrackerQuery),
         ),
       )
-    : destinationEntries;
+    : categoryEntries;
   const emptyMessage = normalizedTrackerQuery
     ? "No trackers match that search."
-    : destinationFilter !== "all"
-      ? destinationFilter === "usenet"
-        ? "No Usenet indexers are available in this list."
-        : "No torrent trackers are available in this list."
-      : trackerView === "configured"
-        ? "No configured trackers were detected."
-        : "All supported trackers are already configured.";
+    : categoryFilter !== "all"
+      ? "No destinations match the selected type and category filters."
+      : destinationFilter !== "all"
+        ? destinationFilter === "usenet"
+          ? "No Usenet indexers are available in this list."
+          : "No torrent trackers are available in this list."
+        : trackerView === "configured"
+          ? "No configured trackers were detected."
+          : "All supported trackers are already configured.";
   const filters = [
     { id: "all", label: "All", count: entries.length },
     { id: "torrent", label: "Torrent", count: destinationCounts.torrent },
@@ -5020,7 +5078,7 @@ function TrackerManager({
         <span className="ua-config-service-description shrink-0 text-sm">
           {normalizedTrackerQuery
             ? `${visibleEntries.length} of ${entries.length}`
-            : destinationFilter !== "all"
+            : destinationFilter !== "all" || categoryFilter !== "all"
               ? `${visibleEntries.length} of ${entries.length}`
               : entries.length}{" "}
           {entries.length === 1 ? "tracker" : "trackers"}
@@ -5049,6 +5107,27 @@ function TrackerManager({
                 <span className="ml-1.5 tabular-nums">{filter.count}</span>
               </button>
             ))}
+          </div>
+          <div className="w-full lg:w-48 lg:shrink-0">
+            <label
+              htmlFor={`tracker-category-${trackerView}`}
+              className="sr-only"
+            >
+              Filter {trackerView} trackers by supported category
+            </label>
+            <select
+              id={`tracker-category-${trackerView}`}
+              value={categoryFilter}
+              onChange={(event) => setCategoryFilter(event.target.value)}
+              className="ua-config-select w-full rounded-lg border px-3 py-2 text-sm"
+            >
+              <option value="all">All categories</option>
+              {TRACKER_CATEGORY_OPTIONS.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.label}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="relative min-w-0 flex-1">
             <label htmlFor={`tracker-search-${trackerView}`} className="sr-only">

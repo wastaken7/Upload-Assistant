@@ -4342,6 +4342,22 @@ def _tracker_destination_type(tracker_class: Any) -> str:
     return "usenet" if bool(getattr(tracker_class, "is_usenet", False)) else "torrent"
 
 
+def _tracker_supported_categories(tracker_class: Any) -> list[str]:
+    """Return normalized upload categories declared by a tracker class."""
+    categories = getattr(tracker_class, "supported_categories", ()) or ()
+    if isinstance(categories, str):
+        categories = (categories,)
+    if not isinstance(categories, (list, tuple, set)):
+        return []
+    return list(
+        dict.fromkeys(
+            str(category).strip().upper()
+            for category in categories
+            if str(category).strip()
+        )
+    )
+
+
 def _tracker_status_from_http_code(status_code: int) -> tuple[str, str]:
     """Map a tracker homepage response to a deliberately advisory state."""
     if status_code == 429:
@@ -4579,6 +4595,7 @@ def get_trackers():
         base_url = getattr(tracker_class, "base_url", "")
         auth_type = str(getattr(tracker_class, "auth_type", "") or "").strip().lower()
         destination_type = _tracker_destination_type(tracker_class)
+        supported_categories = _tracker_supported_categories(tracker_class)
         favicon_url = ""
         static_dir = Path(__file__).parent / "static"
         for ext in ["png", "svg", "ico"]:
@@ -4597,6 +4614,7 @@ def get_trackers():
                 "auth_type": auth_type,
                 "cookie_configured": tracker_name.upper() in cookie_trackers,
                 "destination_type": destination_type,
+                "supported_categories": supported_categories,
             }
         )
 
