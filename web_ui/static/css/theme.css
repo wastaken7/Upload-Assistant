@@ -2723,22 +2723,6 @@ select {
   color: color-mix(in srgb, #ef4444 80%, var(--ua-config-text));
 }
 
-.ua-config-tracker-type-badge {
-  background: color-mix(in srgb, var(--ua-copper) 10%, transparent);
-  border-color: color-mix(
-    in srgb,
-    var(--ua-copper-bright) 38%,
-    var(--ua-config-border)
-  );
-  color: var(--ua-copper-bright);
-}
-
-.ua-config-tracker-type-badge[data-type="usenet"] {
-  background: color-mix(in srgb, #38bdf8 10%, transparent);
-  border-color: color-mix(in srgb, #38bdf8 38%, var(--ua-config-border));
-  color: color-mix(in srgb, #38bdf8 78%, var(--ua-config-text));
-}
-
 .ua-config-tracker-type-filter {
   background: var(--ua-config-surface);
   border-color: var(--ua-config-border);

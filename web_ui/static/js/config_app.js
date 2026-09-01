@@ -4692,14 +4692,6 @@ function TrackerManager({
                 title={trackerStatusText}
               />
             )}
-            {showDestinationType && (
-              <span
-                className="ua-config-tracker-type-badge rounded-full border px-2 py-0.5 text-[0.62rem] font-bold uppercase tracking-wide"
-                data-type={destinationType}
-              >
-                {destinationType === "usenet" ? "Usenet" : "Torrent"}
-              </span>
-            )}
             {statuses.length > 0 && (
               <span className="flex flex-wrap gap-1.5">
                 {statuses.map((status) =>
@@ -4708,12 +4700,19 @@ function TrackerManager({
               </span>
             )}
           </span>
-          <span className="ua-config-service-description block text-xs leading-5">
-            {name}
-            {showDestinationType && categoryLabels.length > 0
-              ? ` · ${categoryLabels.join(" · ")}`
-              : ""}
-          </span>
+          {showDestinationType && (
+            <span className="ua-config-service-description block min-w-0 text-xs leading-5">
+              <span className="font-semibold">
+                {destinationType === "usenet" ? "Usenet" : "Torrent"}
+              </span>
+              {categoryLabels.length > 0 && (
+                <React.Fragment>
+                  <span aria-hidden="true"> · </span>
+                  <span>{categoryLabels.join(" · ")}</span>
+                </React.Fragment>
+              )}
+            </span>
+          )}
         </span>
       </span>
     );
@@ -4944,7 +4943,7 @@ function TrackerManager({
               >
                 {trackerIdentity(
                   tracker,
-                  [{ label: "Default", tone: "accent" }],
+                  [],
                   true,
                   true,
                 )}
@@ -5164,9 +5163,6 @@ function TrackerManager({
           pendingTrackerOverrideModes.has(name) ||
           isDefaultPending;
         const statuses = [];
-        if (tracker.configured && !isRemoving) {
-          statuses.push({ label: "Configured", tone: "success" });
-        }
         if (isDefault) statuses.push({ label: "Default", tone: "accent" });
         if (isRemoving) {
           statuses.push({ label: "Removal pending", tone: "danger" });
@@ -5248,6 +5244,9 @@ function TrackerManager({
             </div>
             {isOpen && (
               <div className="ua-config-accordion-panel border-t p-4">
+                <p className="ua-config-service-description mb-4 text-xs">
+                  Tracker code: <code className="font-semibold">{name}</code>
+                </p>
                 {trackerView === "available" && (
                   <div className="ua-config-state-panel mb-4 rounded-lg border p-4 text-sm">
                     Enter the required authentication details and choose Save
