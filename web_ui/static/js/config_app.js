@@ -4959,7 +4959,7 @@ function TrackerManager({
               >
                 {trackerIdentity(
                   tracker,
-                  [],
+                  [{ label: "Default", tone: "accent" }],
                   true,
                   true,
                 )}
