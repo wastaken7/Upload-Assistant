@@ -3414,7 +3414,7 @@ def login_page():
                     _session_set("csrf_token", secrets.token_urlsafe(32))
                 if remember:
                     session.permanent = True
-                resp = redirect(url_for("config_page"))
+                resp = redirect(url_for("index"))
                 if remember:
                     with contextlib.suppress(Exception):
                         token = _create_remember_token(username)
@@ -3533,10 +3533,10 @@ def login_recovery():
                 with contextlib.suppress(Exception):
                     token = _create_remember_token(username)
                     if token:
-                        resp = redirect(url_for("config_page"))
+                        resp = redirect(url_for("index"))
                         resp.set_cookie("ua_remember", token, max_age=30 * 86400, httponly=True, secure=True, samesite="Lax")
                         return resp
-            return redirect(url_for("config_page"))
+            return redirect(url_for("index"))
         # Failed recovery attempt -> record and show recovery page
         _handle_failed_auth(get_remote_address())
         return render_template("login_recovery.html", error="Recovery code invalid", show_2fa=_totp_enabled())

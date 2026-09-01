@@ -1072,6 +1072,55 @@ const formatConfigFieldLabel = (key, pathParts = []) => {
   return formatDisplayLabel(key);
 };
 
+const METADATA_CREDENTIAL_HELP = {
+  tmdb_api: {
+    required: true,
+    description: "Create an API key in your TMDb account settings.",
+    href: "https://www.themoviedb.org/settings/api",
+    linkLabel: "Get a TMDb API key",
+  },
+  tvdb_api: {
+    description: "Optional. Sign up for an API key to enable TVDb metadata.",
+    href: "https://www.thetvdb.com/api-information/signup",
+    linkLabel: "Get a TVDb API key",
+  },
+  tvdb_token: {
+    description:
+      "Optional. Generate a token through the TVDb v4 login endpoint; enter only your API key and leave the PIN unchanged.",
+    href: "https://thetvdb.github.io/v4-api/#/Login/post_login",
+    linkLabel: "Open the TVDb login documentation",
+  },
+  google_books_api_key: {
+    description:
+      "Optional. Enable the Google Books API and create an API key for book metadata.",
+    href: "https://console.cloud.google.com/apis/library/books.googleapis.com",
+    linkLabel: "Open Google Cloud",
+    linkOnNewLine: true,
+  },
+  twitch_client_id: {
+    description:
+      "Optional. Create a Twitch application to obtain credentials for IGDB metadata.",
+    href: "https://dev.twitch.tv/console",
+    linkLabel: "Open the Twitch Developer Console",
+    linkOnNewLine: true,
+  },
+  twitch_client_secret: {
+    description:
+      "Optional. Use the client secret from the Twitch application configured for IGDB metadata.",
+    href: "https://dev.twitch.tv/console",
+    linkLabel: "Open the Twitch Developer Console",
+    linkOnNewLine: true,
+  },
+  mam_api_key: {
+    description:
+      "Optional. Enter your MyAnonamouse API key or mam_id session cookie. Find it under Preferences › Security › View IP locked session cookie.",
+  },
+  btn_api: {
+    description:
+      "Optional. Enter the BTN API key used to retrieve metadata from BroadcasTheNet.",
+  },
+};
+
 const imageHostApiKeys = {
   imgbb: ["imgbb_api"],
   lensdump: ["lensdump_api"],
@@ -1103,6 +1152,17 @@ const IMAGE_HOST_LABELS = {
   utppm: "UTPPM",
   zipline: "Zipline",
 };
+
+const TRACKER_DESCRIPTION_MODE_OPTIONS = [
+  { value: "", label: "Select an import mode..." },
+  { value: "ids", label: "IDs and metadata only" },
+  { value: "images", label: "IDs, metadata and screenshots" },
+  { value: "text", label: "IDs, metadata and description text" },
+  {
+    value: "text_and_images",
+    label: "IDs, metadata, description text and screenshots",
+  },
+];
 
 const trackerDefaultOverrideKeys = new Set([
   "add_audio_spectrogram",
@@ -1308,19 +1368,37 @@ const NumberInput = ({
   className = "",
   isDarkMode = false,
 }) => {
-  const currentValue =
-    value === null || value === undefined || value === "" ? min : Number(value);
+  const normalizedValue =
+    value === null || value === undefined || value === "" ? min : value;
+  const [draftValue, setDraftValue] = useState(String(normalizedValue));
+  const isEditing = useRef(false);
+  const cancelCommit = useRef(false);
+
+  useEffect(() => {
+    if (!isEditing.current) {
+      setDraftValue(String(normalizedValue));
+    }
+  }, [normalizedValue]);
 
   const handleInputChange = (e) => {
-    const inputValue = e.target.value;
-    if (inputValue === "") {
-      onChange(min);
-    } else {
-      const numValue = Number(inputValue);
-      if (!isNaN(numValue)) {
-        onChange(Math.max(min, Math.min(max, numValue)));
-      }
+    setDraftValue(e.target.value);
+  };
+
+  const commitDraftValue = () => {
+    isEditing.current = false;
+    if (cancelCommit.current) {
+      cancelCommit.current = false;
+      setDraftValue(String(normalizedValue));
+      return;
     }
+    const numValue = Number(draftValue);
+    if (draftValue.trim() === "" || !Number.isFinite(numValue)) {
+      setDraftValue(String(normalizedValue));
+      return;
+    }
+    const nextValue = Math.max(min, Math.min(max, numValue));
+    setDraftValue(String(nextValue));
+    onChange(nextValue);
   };
 
   const inputClass = isDarkMode
@@ -1330,8 +1408,21 @@ const NumberInput = ({
   return (
     <input
       type="number"
-      value={currentValue}
+      value={draftValue}
       onChange={handleInputChange}
+      onFocus={() => {
+        isEditing.current = true;
+        cancelCommit.current = false;
+      }}
+      onBlur={commitDraftValue}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") {
+          event.currentTarget.blur();
+        } else if (event.key === "Escape") {
+          cancelCommit.current = true;
+          event.currentTarget.blur();
+        }
+      }}
       min={min}
       max={max}
       step={step}
@@ -1821,6 +1912,7 @@ function ConfigLeafEditor({
   isDarkMode,
   fullWidth,
   allImageHosts,
+  usedImageHosts,
   torrentClients,
   externalToolStatus,
   onBrowseFolder,
@@ -2328,16 +2420,9 @@ function ConfigLeafEditor({
   if (item.key === "tracker_description_mode") {
     const originalValue =
       item.value === null || item.value === undefined ? "" : String(item.value);
-    const modeOptions = [
-      { value: "", label: "Select an import mode..." },
-      { value: "ids", label: "IDs and metadata only" },
-      { value: "images", label: "IDs, metadata and screenshots" },
-      { value: "text", label: "IDs, metadata and description text" },
-      {
-        value: "text_and_images",
-        label: "IDs, metadata, description text and screenshots",
-      },
-    ];
+    const modeOptions = TRACKER_DESCRIPTION_MODE_OPTIONS.map((option) => ({
+      ...option,
+    }));
     if (
       selectedValue &&
       !modeOptions.some((option) => option.value === selectedValue)
@@ -2582,8 +2667,15 @@ function ConfigLeafEditor({
         >
           <option value=""></option>
           {options.map((host) => (
-            <option key={host} value={host}>
+            <option
+              key={host}
+              value={host}
+              disabled={host !== value && usedImageHosts?.has(host)}
+            >
               {IMAGE_HOST_LABELS[host] || host}
+              {host !== value && usedImageHosts?.has(host)
+                ? " — already selected"
+                : ""}
             </option>
           ))}
         </select>
@@ -2850,6 +2942,8 @@ function ConfigLeafEditor({
         : JSON.stringify(item.value);
   const sensitive = isSensitiveKeyForPath(item.key, pathParts);
   const readOnly = isReadOnlyKeyForPath(item.key, pathParts);
+  const credentialHelp =
+    pathParts[0] === "DEFAULT" ? METADATA_CREDENTIAL_HELP[item.key] : null;
   const canBrowseTorrentFolder =
     pathParts.includes("TORRENT_CLIENTS") &&
     ["torrent_storage_dir", "watch_folder"].includes(item.key) &&
@@ -2887,7 +2981,12 @@ function ConfigLeafEditor({
         <label htmlFor={fieldId} className={labelClass}>
           {displayLabel}
         </label>
-        {helpText && (
+        {credentialHelp?.required && (
+          <span className="ua-config-required-badge border font-semibold">
+            Required
+          </span>
+        )}
+        {helpText && !credentialHelp && (
           <Tooltip content={helpText}>
             <InfoIcon
               className={`w-4 h-4 ${isDarkMode ? "text-gray-400 hover:text-gray-300" : "text-gray-500 hover:text-gray-600"}`}
@@ -2935,6 +3034,24 @@ function ConfigLeafEditor({
           </button>
         )}
       </div>
+      {credentialHelp && (
+        <p className="ua-config-service-description text-xs leading-relaxed">
+          {credentialHelp.description}
+          {credentialHelp.href && credentialHelp.linkLabel && (
+            <React.Fragment>
+              {" "}
+              <a
+                href={credentialHelp.href}
+                target="_blank"
+                rel="noreferrer"
+                className={`ua-config-service-action font-semibold hover:underline ${credentialHelp.linkOnNewLine ? "mt-0.5 block" : ""}`}
+              >
+                {credentialHelp.linkLabel} <span aria-hidden="true">↗</span>
+              </a>
+            </React.Fragment>
+          )}
+        </p>
+      )}
       {externalToolStatus && (
         <ExternalToolStatus status={externalToolStatus} />
       )}
@@ -9110,17 +9227,19 @@ function ConfigApp() {
   }, [sections]);
 
   const usedImageHosts = useMemo(() => {
-    const used = new Set();
+    const selections = new Map();
     const collectFromItems = (items) => {
       for (const item of items || []) {
         if (item.children && item.children.length) {
           collectFromItems(item.children);
         }
-        if (item.key && item.key.startsWith("img_host_") && item.value) {
-          const normalized = String(item.value).trim().toLowerCase();
-          if (normalized) {
-            used.add(normalized);
-          }
+        if (item.key && item.key.startsWith("img_host_")) {
+          selections.set(
+            item.key,
+            String(item.value || "")
+              .trim()
+              .toLowerCase(),
+          );
         }
       }
     };
@@ -9128,8 +9247,19 @@ function ConfigApp() {
     for (const section of sections) {
       collectFromItems(section.items || []);
     }
-    return used;
-  }, [sections]);
+    for (const update of pendingChanges.values()) {
+      const fieldKey = String(update.path?.[update.path.length - 1] || "");
+      if (fieldKey.startsWith("img_host_")) {
+        selections.set(
+          fieldKey,
+          String(update.value || "")
+            .trim()
+            .toLowerCase(),
+        );
+      }
+    }
+    return new Set(Array.from(selections.values()).filter(Boolean));
+  }, [sections, pendingChanges]);
 
   const activeSection = sections.find(
     (section) => section.section.toLowerCase() === activeTab,
@@ -9273,6 +9403,12 @@ function ConfigApp() {
         return "Sensitive value changed";
       }
       if (update.value === "" || update.value === null) return "Set to empty";
+      if (key === "tracker_description_mode") {
+        const selectedMode = TRACKER_DESCRIPTION_MODE_OPTIONS.find(
+          (option) => option.value === String(update.value),
+        );
+        if (selectedMode) return `Set to ${selectedMode.label}`;
+      }
       if (typeof update.value === "boolean") {
         return `Set to ${update.value ? "True" : "False"}`;
       }
@@ -9338,13 +9474,31 @@ function ConfigApp() {
     }
     for (const [trackerName, pathKeys] of availableTrackerChanges) {
       const settingCount = pathKeys.length;
+      const normalizedTrackerName = String(trackerName).toUpperCase();
+      const overrideChange = Array.from(
+        pendingTrackerOverrideModes.entries(),
+      ).find(
+        ([pendingTrackerName]) =>
+          String(pendingTrackerName).toUpperCase() === normalizedTrackerName,
+      );
+      const detailParts = [
+        `${settingCount} setting${settingCount === 1 ? "" : "s"} changed`,
+      ];
+      if (overrideChange) {
+        detailParts.push(
+          `DEFAULT overrides ${overrideChange[1] ? "enabled" : "removed"}`,
+        );
+      }
       summaries.push({
         id: `available-tracker:${trackerName}`,
         kind: "available-tracker",
         trackerName,
         pathKeys,
+        overrideChange: overrideChange
+          ? { trackerName: overrideChange[0], enabled: overrideChange[1] }
+          : null,
         title: `Configure tracker › ${getTrackerDisplayName(trackerName)}`,
-        detail: `${settingCount} setting${settingCount === 1 ? "" : "s"} changed`,
+        detail: detailParts.join("; "),
       });
     }
     for (const [clientName, templateName] of pendingTorrentClients) {
@@ -9389,6 +9543,9 @@ function ConfigApp() {
       });
     }
     for (const [trackerName, enabled] of pendingTrackerOverrideModes) {
+      if (availableTrackerChanges.has(String(trackerName).toUpperCase())) {
+        continue;
+      }
       summaries.push({
         id: `tracker-overrides:${trackerName}`,
         kind: "tracker-overrides",
@@ -9415,6 +9572,19 @@ function ConfigApp() {
       setIsPendingSummaryOpen(false);
     }
   }, [pendingChangeCount]);
+  const discardTrackerOverrideChange = (trackerName, enabled) => {
+    const trackerSection = sections.find(
+      (section) => section.section === "TRACKERS",
+    );
+    const trackerItem = trackerSection?.items?.find(
+      (item) =>
+        String(item.key).toUpperCase() === String(trackerName).toUpperCase(),
+    );
+    const overrideItems = (trackerItem?.children || []).filter((item) =>
+      trackerDefaultOverrideKeys.has(item.key),
+    );
+    toggleTrackerOverrides(trackerName, !enabled, overrideItems);
+  };
   const discardPendingSummary = (summary) => {
     if (summary.kind === "field") {
       setPendingChanges((currentChanges) => {
@@ -9440,6 +9610,12 @@ function ConfigApp() {
           }),
         );
       });
+      if (summary.overrideChange) {
+        discardTrackerOverrideChange(
+          summary.overrideChange.trackerName,
+          summary.overrideChange.enabled,
+        );
+      }
     } else if (summary.kind === "client-add") {
       removePendingTorrentClient(summary.clientName);
     } else if (summary.kind === "client-rename") {
@@ -9449,22 +9625,7 @@ function ConfigApp() {
     } else if (summary.kind === "tracker-remove") {
       undoRemoveTracker(summary.trackerName);
     } else if (summary.kind === "tracker-overrides") {
-      const trackerSection = sections.find(
-        (section) => section.section === "TRACKERS",
-      );
-      const trackerItem = trackerSection?.items?.find(
-        (item) =>
-          String(item.key).toUpperCase() ===
-          String(summary.trackerName).toUpperCase(),
-      );
-      const overrideItems = (trackerItem?.children || []).filter((item) =>
-        trackerDefaultOverrideKeys.has(item.key),
-      );
-      toggleTrackerOverrides(
-        summary.trackerName,
-        !summary.enabled,
-        overrideItems,
-      );
+      discardTrackerOverrideChange(summary.trackerName, summary.enabled);
     }
   };
   const saveDisabled = isSaving || pendingChangeCount === 0;

@@ -2426,6 +2426,17 @@ select {
   color: var(--ua-config-muted);
 }
 
+.ua-config-required-badge {
+  background: color-mix(in srgb, #ef4444 12%, transparent);
+  border-color: color-mix(in srgb, #ef4444 45%, var(--ua-config-border));
+  color: color-mix(in srgb, #ef4444 80%, var(--ua-config-text));
+  font-size: 0.625rem;
+  letter-spacing: 0.045em;
+  line-height: 1;
+  padding: 0.25rem 0.4rem;
+  text-transform: uppercase;
+}
+
 .ua-external-tool-status {
   background: color-mix(in srgb, var(--ua-config-surface) 72%, transparent);
   border-color: var(--ua-config-border);
