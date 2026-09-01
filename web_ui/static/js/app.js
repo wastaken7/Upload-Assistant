@@ -3065,7 +3065,10 @@ function AudionutsUAGUI() {
                     </span>
                     <p className="min-w-0 flex-1">
                       <span className="font-semibold">{summary}</span>{" "}
-                      {ageText}. Verify it before uploading or deselect it.
+                      {ageText}.{" "}
+                      <span className="ua-tracker-status-warning-guidance">
+                        Verify it before uploading or deselect it.
+                      </span>
                     </p>
                   </div>
                   <div className="ua-tracker-status-warning-actions flex shrink-0 items-center gap-3">

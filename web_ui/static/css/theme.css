@@ -560,6 +560,13 @@ button:focus-visible {
   }
 }
 
+@media (max-width: 640px) and (orientation: portrait) {
+  .ua-tracker-status-warning-guidance {
+    display: block;
+    margin-top: 0.2rem;
+  }
+}
+
 /* Dark Tailwind surfaces become a restrained warm-black hierarchy. */
 :where([class~="bg-gray-900"], [class~="bg-gray-950"]) {
   background-color: var(--ua-obsidian) !important;
