@@ -29,7 +29,7 @@ class AmigosShare:
 
     auth_type = "cookies"
     tracker = "AMIGOSSHARE"
-    display_name = "AmigosShare"
+    display_name = "Amigos Share Club"
     source_flag = "ASC"
     banned_groups: tuple[str, ...] = ()
     base_url = "https://cliente.amigos-share.club"

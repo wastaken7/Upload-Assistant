@@ -23,7 +23,7 @@ class HDSpace:
 
     auth_type = "cookies"
     tracker = "HDSPACE"
-    display_name = "HDSpace"
+    display_name = "HD-Space"
     allows_bloated_audio = True
     source_flag = "HD-Space"
     banned_groups = ("",)

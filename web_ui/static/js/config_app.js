@@ -1137,16 +1137,16 @@ const trackerDefaultOverrideKeys = new Set([
 // Mapping from tracker acronyms to full names
 const trackerNameMap = {
   AITHER: "Aither",
-  ALPHARATIO: "Alpharatio",
-  AMIGOSSHARE: "Amigos-Share",
+  ALPHARATIO: "AlphaRatio",
+  AMIGOSSHARE: "Amigos Share Club",
   ANTHELION: "Anthelion",
   ASIANCINEMA: "AsianCinema",
   AVISTAZ: "AvistaZ",
-  BEYONDHD: "Beyond-HD",
+  BEYONDHD: "BeyondHD",
   BITHDTV: "BitHDTV",
   BITPORN: "BitPorn",
   BLUTOPIA: "Blutopia",
-  BJSHARE: "BrasilJapão-Share",
+  BJSHARE: "BJ-Share",
   BRASILTRACKER: "BrasilTracker",
   CAPYBARABR: "CapybaraBR",
   CINEMAZ: "CinemaZ",
@@ -1157,7 +1157,7 @@ const trackerNameMap = {
   DIGITALCORE: "DigitalCore",
   DREADVAULT: "DreadVault",
   DRUNKENSLUG: "DrunkenSlug",
-  EMUWAREZ: "Emuwarez",
+  EMUWAREZ: "eMuwarez",
   FILELIST: "FileList",
   FLOOD: "Flood",
   FUNFILE: "FunFile",
@@ -1172,7 +1172,7 @@ const trackerNameMap = {
   ITATORRENTS: "ItaTorrents",
   IPTORRENTS: "IPTorrents",
   LASTDIGITALUNDERGROUND: "LastDigitalUnderground",
-  LAJIDUI: "Lajidui",
+  LAJIDUI: "lajidui",
   LEMONHD: "LemonHD",
   LATTEAM: "Lat-Team",
   LOCADORA: "Locadora",
@@ -1181,7 +1181,7 @@ const trackerNameMap = {
   LUMINARR: "Luminarr",
   MAKINGOFF: "MakingOff",
   MIDNIGHTSCENE: "MidnightScene",
-  MTEAM: "MTeam",
+  MTEAM: "M-Team",
   NEBULANCE: "Nebulance",
   NORDICQUALITY: "NordicQuality",
   NZBGEEK: "NZBGeek",
@@ -1195,7 +1195,7 @@ const trackerNameMap = {
   PTCAFE: "PTCafe",
   PTERCLUB: "PTerClub",
   PTFANS: "PTFans",
-  PTGTK: "PTGTK",
+  PTGTK: "PT GTK",
   PTSKIT: "PTSKIT",
   PTZONE: "PTZone",
   RACING4EVERYONE: "Racing4Everyone",
@@ -1206,12 +1206,12 @@ const trackerNameMap = {
   RETROMOVIESCLUB: "RetroMoviesClub",
   ROCKETHD: "RocketHD",
   SAMARITANO: "Samaritano",
-  SEEDPOOL: "Seedpool",
+  SEEDPOOL: "seedpool",
   SHAREISLAND: "ShareIsland",
   SKIPTHECOMMERCIALS: "SkipTheCommercials",
   SPEEDAPP: "SpeedApp",
   SWARMAZON: "Swarmazon",
-  THELEACHZONE: "TheLeachZone",
+  THELEACHZONE: "The Leach Zone",
   THEOLDSCHOOL: "TheOldSchool",
   TOTHEGLORY: "ToTheGlory",
   TORRENTHR: "TorrentHR",
@@ -1220,7 +1220,7 @@ const trackerNameMap = {
   TVCHAOSUK: "TVChaosUK",
   ULCX: "ULCX",
   SUIO: "Suio",
-  UTOPIA: "Utopia",
+  UTOPIA: "UTOPIA",
   XINGYUNGEPT: "XingyungePT",
   YUSCENE: "YUSCENE",
   ZENITH: "Zenith",
@@ -7852,6 +7852,13 @@ function ConfigApp() {
         const trackersResponse = await apiFetch(`${API_BASE}/trackers`);
         const trackersData = await trackersResponse.json();
         if (trackersData.success) {
+          for (const tracker of trackersData.trackers || []) {
+            const trackerName = String(tracker.name || "").toUpperCase();
+            const displayName = String(tracker.display_name || "").trim();
+            if (trackerName && displayName) {
+              trackerNameMap[trackerName] = displayName;
+            }
+          }
           setTrackerCatalog({
             defaultTrackers: trackersData.default_trackers || [],
             trackers: trackersData.trackers || [],

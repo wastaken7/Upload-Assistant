@@ -14,7 +14,7 @@ class TheLeachZone(UNIT3D):
     """
 
     tracker = "THELEACHZONE"
-    display_name = "TheLeachZone"
+    display_name = "The Leach Zone"
     allows_bloated_audio = True
     base_url = "https://tlzdigital.com"
     banned_groups = ("",)

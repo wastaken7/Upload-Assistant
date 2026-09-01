@@ -37,7 +37,7 @@ class BJShare:
 
     auth_type = "cookies"
     tracker = "BJSHARE"
-    display_name = "BJShare"
+    display_name = "BJ-Share"
     banned_groups: tuple[str, ...] = ()
     source_flag = "BJ"
     base_url = "https://bj-share.info"

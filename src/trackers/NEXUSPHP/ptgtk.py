@@ -14,7 +14,7 @@ class PTGTK(NEXUSPHP):
     """
 
     banned_groups = ()
-    display_name = "PTGTK"
+    display_name = "PT GTK"
     base_url = "https://pt.gtkpw.xyz"
     source_flag = "[pt.gtkpw.xyz] PT GTK"
     torrent_url = f"{base_url}/details.php?id="

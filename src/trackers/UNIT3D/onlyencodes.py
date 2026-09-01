@@ -17,7 +17,7 @@ class OnlyEncodes(UNIT3D):
     """
 
     tracker = "ONLYENCODES"
-    display_name = "OnlyEncodes"
+    display_name = "OnlyEncodes+"
     allows_bloated_audio = True
     base_url = "https://onlyencodes.cc"
     approved_image_hosts = ("imgbox", "imgbb", "onlyimage", "ptscreens", "passtheimage")
