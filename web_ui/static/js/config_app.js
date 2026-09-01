@@ -1120,7 +1120,7 @@ const formatConfigFieldLabel = (key, pathParts = []) => {
   return formatDisplayLabel(key);
 };
 
-const METADATA_CREDENTIAL_HELP = {
+const INLINE_FIELD_HELP = {
   tmdb_api: {
     required: true,
     description: "Create an API key in your TMDb account settings.",
@@ -1183,6 +1183,16 @@ const imageHostApiKeys = {
   sharex: ["sharex_url", "sharex_api_key"],
   utppm: ["utppm_api"],
 };
+
+const REDUNDANT_IMAGE_HOST_API_HELP_KEYS = new Set(
+  Object.values(imageHostApiKeys)
+    .flat()
+    .filter(
+      (key) =>
+        (key.endsWith("_api") || key.endsWith("_api_key")) &&
+        key !== "midnightscene_api_key",
+    ),
+);
 
 const IMAGE_HOST_LABELS = {
   dalexni: "Dalexni",
@@ -1971,8 +1981,14 @@ function ConfigLeafEditor({
   const displayLabel = formatConfigFieldLabel(item.key, pathParts);
 
   const helpBelongsToSection = path.join("/") === "DEFAULT/ffmpeg_path";
+  const hideRedundantImageHostHelp =
+    pathParts[0] === "DEFAULT" &&
+    REDUNDANT_IMAGE_HOST_API_HELP_KEYS.has(item.key);
   const helpText =
-    !helpBelongsToSection && item.help && item.help.length
+    !helpBelongsToSection &&
+    !hideRedundantImageHostHelp &&
+    item.help &&
+    item.help.length
       ? item.help.join("\n")
       : "";
   const labelClass = isDarkMode
@@ -2991,7 +3007,7 @@ function ConfigLeafEditor({
   const sensitive = isSensitiveKeyForPath(item.key, pathParts);
   const readOnly = isReadOnlyKeyForPath(item.key, pathParts);
   const credentialHelp =
-    pathParts[0] === "DEFAULT" ? METADATA_CREDENTIAL_HELP[item.key] : null;
+    pathParts[0] === "DEFAULT" ? INLINE_FIELD_HELP[item.key] : null;
   const canBrowseTorrentFolder =
     pathParts.includes("TORRENT_CLIENTS") &&
     ["torrent_storage_dir", "watch_folder"].includes(item.key) &&
