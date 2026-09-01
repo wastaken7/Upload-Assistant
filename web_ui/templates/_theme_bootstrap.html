@@ -16,9 +16,7 @@
         ? storedTheme
         : "charcoal";
       root.dataset.uaMode =
-        localStorage.getItem("ua_config_theme") === "light"
-          ? "light"
-          : "dark";
+        localStorage.getItem("ua_config_theme") === "light" ? "light" : "dark";
       root.dataset.uaShape =
         localStorage.getItem("ua_interface_style") === "rounded"
           ? "rounded"

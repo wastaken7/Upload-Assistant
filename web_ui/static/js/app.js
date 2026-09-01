@@ -2898,8 +2898,7 @@ function AudionutsUAGUI() {
           );
     const statusTargets = trackers
       .filter(
-        (tracker) =>
-          tracker.configured || selectedTrackers.has(tracker.name),
+        (tracker) => tracker.configured || selectedTrackers.has(tracker.name),
       )
       .map((tracker) => tracker.name);
     const selectedStatusIssues = trackers.filter((tracker) => {
@@ -3038,12 +3037,8 @@ function AudionutsUAGUI() {
                 statusAge === "Just checked"
                   ? "just now"
                   : statusAge.toLowerCase();
-              const isExpanded = expandedTrackerStatusDetails.has(
-                tracker.name,
-              );
-              const detailId = `tracker-status-details-${String(
-                tracker.name,
-              )
+              const isExpanded = expandedTrackerStatusDetails.has(tracker.name);
+              const detailId = `tracker-status-details-${String(tracker.name)
                 .toLowerCase()
                 .replace(/[^a-z0-9_-]+/g, "-")}`;
               const checkedAt = window.formatUATrackerStatusTimestamp
@@ -3064,8 +3059,8 @@ function AudionutsUAGUI() {
                       ⚠
                     </span>
                     <p className="min-w-0 flex-1">
-                      <span className="font-semibold">{summary}</span>{" "}
-                      {ageText}.{" "}
+                      <span className="font-semibold">{summary}</span> {ageText}
+                      .{" "}
                       <span className="ua-tracker-status-warning-guidance">
                         Verify it before uploading or deselect it.
                       </span>
@@ -3077,9 +3072,7 @@ function AudionutsUAGUI() {
                       className="ua-tracker-status-warning-action"
                       aria-expanded={isExpanded}
                       aria-controls={detailId}
-                      onClick={() =>
-                        toggleTrackerStatusDetails(tracker.name)
-                      }
+                      onClick={() => toggleTrackerStatusDetails(tracker.name)}
                     >
                       {isExpanded ? "Hide details" : "Details"}
                     </button>
@@ -3097,7 +3090,8 @@ function AudionutsUAGUI() {
                       id={detailId}
                       className="ua-tracker-status-warning-details"
                     >
-                      {status?.message || "No additional details are available."}
+                      {status?.message ||
+                        "No additional details are available."}
                       {checkedAt ? ` Checked ${checkedAt}.` : ""}
                     </div>
                   )}

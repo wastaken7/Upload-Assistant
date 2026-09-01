@@ -295,7 +295,9 @@
         throw new Error(payload?.error || "The tracker status check failed.");
       }
       if (!payload?.success || typeof payload.statuses !== "object") {
-        throw new Error("The tracker status check returned an invalid response.");
+        throw new Error(
+          "The tracker status check returned an invalid response.",
+        );
       }
       return payload;
     } catch (error) {
@@ -1933,8 +1935,7 @@
     window.getUATrackerStatusSummary =
       window.getUATrackerStatusSummary || getUATrackerStatusSummary;
     window.formatUATrackerStatusTimestamp =
-      window.formatUATrackerStatusTimestamp ||
-      formatUATrackerStatusTimestamp;
+      window.formatUATrackerStatusTimestamp || formatUATrackerStatusTimestamp;
     window.loadUAUpdateStatus = window.loadUAUpdateStatus || loadUAUpdateStatus;
     window.loadUAChangelog = window.loadUAChangelog || loadUAChangelog;
     window.getUADismissedUpdateVersion =

@@ -53,12 +53,13 @@ Docker deployments normally start the WebUI without positional paths, so `UA_BRO
 
 ### Relevant environment variables
 
-| Variable                | Purpose                                                                                                                |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `UA_BROWSE_ROOTS`       | Comma-separated directories exposed by the File Browser.                                                               |
-| `UA_WEBUI_CORS_ORIGINS` | Comma-separated origins allowed to call `/api/*` from a different origin. It is not needed for normal same-origin use. |
-| `SESSION_SECRET`        | Stable session/encryption secret of at least 32 bytes.                                                                 |
-| `SESSION_SECRET_FILE`   | Path to a readable file containing the stable session secret.                                                          |
+| Variable                       | Purpose                                                                                                                |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| `UA_BROWSE_ROOTS`              | Comma-separated directories exposed by the File Browser.                                                               |
+| `UA_WEBUI_CORS_ORIGINS`        | Comma-separated origins allowed to call `/api/*` from a different origin. It is not needed for normal same-origin use. |
+| `UA_WEBUI_TRUSTED_PROXY_COUNT` | Number of trusted reverse-proxy hops. Leave unset or `0` for direct access; use `1` for one trusted proxy.             |
+| `SESSION_SECRET`               | Stable session/encryption secret of at least 32 bytes.                                                                 |
+| `SESSION_SECRET_FILE`          | Path to a readable file containing the stable session secret.                                                          |
 
 Provide either `SESSION_SECRET` or `SESSION_SECRET_FILE`, not both. If neither is set, the application creates and persists a secret in its configuration directory. Container deployments must persist that directory or secret across recreations.
 
@@ -308,7 +309,7 @@ Resizable desktop sidebar widths do not change the mobile layout.
 
 - Refresh the page and sign in again if requested.
 - Use one consistent hostname or IP address; changing between them creates a different browser origin.
-- If a reverse proxy is used, preserve the original host and scheme so the request `Origin` matches the public WebUI address.
+- If a reverse proxy is used, set `UA_WEBUI_TRUSTED_PROXY_COUNT` to the number of trusted proxy hops and preserve the original host and scheme so the request `Origin` matches the public WebUI address.
 - Clear the site's stored data and sign in again if an old tab retained stale session data.
 
 ### Update checking does not finish or reports an error

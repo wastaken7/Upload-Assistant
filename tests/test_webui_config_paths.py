@@ -45,3 +45,28 @@ def test_load_config_rejects_non_python_file_inside_runtime_data(tmp_path: Path,
     monkeypatch.setattr(server, "STATE_DIR", state_dir)
 
     assert server._load_config_from_file(config_path) is None
+
+
+def test_argument_presets_are_saved_in_user_owned_state(tmp_path: Path, monkeypatch) -> None:
+    state_path = tmp_path / "state" / "data" / "argument_presets.json"
+    legacy_path = tmp_path / "checkout" / "data" / "argument_presets.json"
+    monkeypatch.setattr(server, "ARGUMENT_PRESETS_PATH", state_path)
+    monkeypatch.setattr(server, "LEGACY_ARGUMENT_PRESETS_PATH", legacy_path)
+
+    expected = [{"name": "Movie", "arguments": "--category MOVIE"}]
+    server._save_argument_presets(expected)
+
+    assert state_path.exists()
+    assert not legacy_path.exists()
+    assert server._load_argument_presets() == expected
+
+
+def test_argument_presets_fall_back_to_legacy_checkout_file(tmp_path: Path, monkeypatch) -> None:
+    state_path = tmp_path / "state" / "data" / "argument_presets.json"
+    legacy_path = tmp_path / "checkout" / "data" / "argument_presets.json"
+    legacy_path.parent.mkdir(parents=True)
+    legacy_path.write_text('[{"name": "Legacy", "arguments": "--no-seed"}]\n', encoding="utf-8")
+    monkeypatch.setattr(server, "ARGUMENT_PRESETS_PATH", state_path)
+    monkeypatch.setattr(server, "LEGACY_ARGUMENT_PRESETS_PATH", legacy_path)
+
+    assert server._load_argument_presets() == [{"name": "Legacy", "arguments": "--no-seed"}]

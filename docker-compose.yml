@@ -59,6 +59,10 @@ services:
       # Optional: only needed if you serve the UI from a different origin.
       # - UA_WEBUI_CORS_ORIGINS=https://your-ui-host
 
+      # Optional: trust forwarded host, scheme, and client IP from one
+      # reverse proxy. Leave unset for direct access.
+      # - UA_WEBUI_TRUSTED_PROXY_COUNT=1
+
       # Optional: override the XDG config directory inside the container.
       # Default is /root/.config/upload-assistant (stores session_secret,
       # webui_auth.json).  Only change if you mount a different path.

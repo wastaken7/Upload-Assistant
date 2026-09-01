@@ -594,7 +594,11 @@ const getTrackerCategories = (tracker) => {
     : [];
   const normalized = new Set(
     categories
-      .map((category) => String(category || "").trim().toUpperCase())
+      .map((category) =>
+        String(category || "")
+          .trim()
+          .toUpperCase(),
+      )
       .filter(Boolean),
   );
   const ordered = TRACKER_CATEGORY_OPTIONS.filter((category) =>
@@ -3116,9 +3120,7 @@ function ConfigLeafEditor({
           )}
         </p>
       )}
-      {externalToolStatus && (
-        <ExternalToolStatus status={externalToolStatus} />
-      )}
+      {externalToolStatus && <ExternalToolStatus status={externalToolStatus} />}
     </div>
   );
 }
@@ -4779,14 +4781,10 @@ function TrackerManager({
             <button
               type="button"
               className="ua-config-tracker-default-action rounded-lg border px-3 py-2 text-xs font-semibold"
-              disabled={
-                isCheckingTrackerStatuses || targetNames.length === 0
-              }
+              disabled={isCheckingTrackerStatuses || targetNames.length === 0}
               onClick={() => checkTrackerStatuses(targetNames)}
             >
-              {isCheckingTrackerStatuses
-                ? "Checking…"
-                : "Check tracker status"}
+              {isCheckingTrackerStatuses ? "Checking…" : "Check tracker status"}
             </button>
           </div>
         </div>
@@ -4807,10 +4805,7 @@ function TrackerManager({
               const trackerDisplayName =
                 tracker.display_name || getTrackerDisplayName(name);
               const summary = window.getUATrackerStatusSummary
-                ? window.getUATrackerStatusSummary(
-                    trackerDisplayName,
-                    status,
-                  )
+                ? window.getUATrackerStatusSummary(trackerDisplayName, status)
                 : `${trackerDisplayName} reported an issue`;
               const statusAge = window.formatUATrackerStatusAge
                 ? window.formatUATrackerStatusAge({ [name]: status })
@@ -4841,8 +4836,8 @@ function TrackerManager({
                       ⚠
                     </span>
                     <p className="min-w-0 flex-1">
-                      <span className="font-semibold">{summary}</span>{" "}
-                      {ageText}. Verify it before uploading.
+                      <span className="font-semibold">{summary}</span> {ageText}
+                      . Verify it before uploading.
                     </p>
                   </div>
                   <div className="ua-tracker-status-warning-actions flex shrink-0 items-center gap-3">
@@ -4861,7 +4856,8 @@ function TrackerManager({
                       id={detailId}
                       className="ua-tracker-status-warning-details"
                     >
-                      {status?.message || "No additional details are available."}
+                      {status?.message ||
+                        "No additional details are available."}
                       {checkedAt ? ` Checked ${checkedAt}.` : ""}
                     </div>
                   )}
@@ -5037,8 +5033,7 @@ function TrackerManager({
     destinationFilter === "all"
       ? entries
       : entries.filter(
-          (tracker) =>
-            getTrackerDestinationType(tracker) === destinationFilter,
+          (tracker) => getTrackerDestinationType(tracker) === destinationFilter,
         );
   const categoryEntries =
     categoryFilter === "all"
@@ -5145,7 +5140,10 @@ function TrackerManager({
             </select>
           </div>
           <div className="relative min-w-0 flex-1">
-            <label htmlFor={`tracker-search-${trackerView}`} className="sr-only">
+            <label
+              htmlFor={`tracker-search-${trackerView}`}
+              className="sr-only"
+            >
               Search {trackerView} trackers
             </label>
             <input
@@ -5766,7 +5764,9 @@ function ItemList({
                             allImageHosts={allImageHosts}
                             usedImageHosts={usedImageHosts}
                             torrentClients={torrentClients}
-                            externalToolStatus={externalToolStatuses?.[item.key]}
+                            externalToolStatus={
+                              externalToolStatuses?.[item.key]
+                            }
                             onValueChange={onValueChange}
                           />
                         );
@@ -6115,7 +6115,8 @@ function ItemList({
                         <strong>Managed</strong> — UA-managed copy ready
                       </span>
                       <span>
-                        <strong>Automatic</strong> — UA downloads it when required
+                        <strong>Automatic</strong> — UA downloads it when
+                        required
                       </span>
                     </div>
                   )}

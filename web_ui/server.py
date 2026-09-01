@@ -34,7 +34,7 @@ import psutil
 
 import web_ui.auth as auth_mod
 from src.webui_progress import PROGRESS_STDOUT_PREFIX, ProgressEvent, clear_progress_callback, reset_progress, set_progress_callback
-from src.app_paths import CODE_DIR, STATE_DIR
+from src.app_paths import CODE_DIR, DATA_DIR, STATE_DIR
 from src.external_tools import EXTERNAL_TOOL_KEYS, check_external_tools
 from src.meta import Meta
 from src.version import __version__ as APP_VERSION
@@ -123,6 +123,8 @@ class _GLike(Protocol):
 
 
 class _LimiterLike(Protocol):
+    def exempt(self, obj: Callable[..., object]) -> Callable[..., object]: ...
+
     def limit(
         self,
         limit_value: str,
@@ -203,7 +205,8 @@ with contextlib.suppress(Exception):
 cfg_dir = auth_mod.get_config_dir()
 cfg_dir.mkdir(parents=True, exist_ok=True)
 
-ARGUMENT_PRESETS_PATH = Path(__file__).resolve().parent.parent / "data" / "argument_presets.json"
+ARGUMENT_PRESETS_PATH = DATA_DIR / "argument_presets.json"
+LEGACY_ARGUMENT_PRESETS_PATH = CODE_DIR / "data" / "argument_presets.json"
 MAX_ARGUMENT_PRESETS = 50
 _argument_presets_lock = threading.Lock()
 _description_review_locks: weakref.WeakValueDictionary[str, threading.Lock] = weakref.WeakValueDictionary()
@@ -218,9 +221,12 @@ _tracker_status_check_lock = threading.Lock()
 def _load_argument_presets() -> list[dict[str, str]]:
     """Load the shared Web UI argument presets from the data directory."""
     try:
-        if not ARGUMENT_PRESETS_PATH.exists():
+        read_path = ARGUMENT_PRESETS_PATH
+        if not read_path.exists() and LEGACY_ARGUMENT_PRESETS_PATH.exists():
+            read_path = LEGACY_ARGUMENT_PRESETS_PATH
+        if not read_path.exists():
             return []
-        raw = json.loads(ARGUMENT_PRESETS_PATH.read_text(encoding="utf-8"))
+        raw = json.loads(read_path.read_text(encoding="utf-8"))
         if not isinstance(raw, list):
             return []
         presets: list[dict[str, str]] = []
@@ -357,12 +363,36 @@ def _assert_safe_resolved_path(path: str | Path) -> None:
         raise ValueError("Path outside allowed roots")
 
 
+def _parse_trusted_proxy_count(raw_value: str | None) -> int:
+    """Parse the explicitly trusted number of reverse proxies."""
+    value = (raw_value or "").strip()
+    if not value:
+        return 0
+    try:
+        count = int(value)
+    except ValueError as exc:
+        raise ValueError("UA_WEBUI_TRUSTED_PROXY_COUNT must be an integer from 0 to 10") from exc
+    if count < 0 or count > 10:
+        raise ValueError("UA_WEBUI_TRUSTED_PROXY_COUNT must be an integer from 0 to 10")
+    return count
+
+
+def _apply_proxy_fix(wsgi_app: object, trusted_proxy_count: int) -> object:
+    """Trust forwarded host, scheme, and client IP only when configured."""
+    if trusted_proxy_count == 0:
+        return wsgi_app
+    return ProxyFix(
+        wsgi_app,
+        x_for=trusted_proxy_count,
+        x_proto=trusted_proxy_count,
+        x_host=trusted_proxy_count,
+    )
+
+
 app: Any = Flask(__name__)
-# Ensure Flask sees the proxy headers (Host, X-Forwarded-Proto, X-Forwarded-For)
-# so `request.host_url` and related values reflect the external URL when
-# running behind a reverse proxy (eg. Caddy). Adjust the `x_*` values if
-# there are multiple proxies in front of the app.
-app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=2, x_host=1)
+trusted_proxy_count = _parse_trusted_proxy_count(os.environ.get("UA_WEBUI_TRUSTED_PROXY_COUNT"))
+app.wsgi_app = _apply_proxy_fix(app.wsgi_app, trusted_proxy_count)
+app.config["UA_WEBUI_TRUSTED_PROXY_COUNT"] = trusted_proxy_count
 # Load stable session secret (env/file/SECRET_KEY fallback). Use bytes directly.
 
 session_secret = auth_mod.load_session_secret()
@@ -3647,7 +3677,7 @@ def config_page():
 
 
 @app.route("/api/health")
-@limiter.limit("70 per hour", key_func=get_remote_address)
+@limiter.exempt
 def health():
     """Health check endpoint"""
     return jsonify({"status": "healthy", "success": True, "message": "Upload-Assistant Web UI is running"})
