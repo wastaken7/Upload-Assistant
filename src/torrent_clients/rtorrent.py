@@ -252,7 +252,7 @@ class RtorrentClientMixin:
             fr_file = f"{Path(path).parent.as_posix()}/fr.torrent"
             modified_fr = True
             logger.debug(f"[cyan]Modified fast resume file path because path mapping: {fr_file}")
-        if (meta.category in ("BOOK", "GAME") and len(filelist) > 1 and isdir) or isdir is False:
+        if isdir is False:
             path = Path(path).parent.as_posix()
         logger.debug(f"[cyan]Final path for rTorrent: {path}")
 
