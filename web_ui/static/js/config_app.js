@@ -6084,6 +6084,26 @@ function ItemList({
                     {externalToolStatusError}
                   </div>
                 )}
+                {isExternalToolsSubsection &&
+                  Object.keys(externalToolStatuses || {}).length > 0 && (
+                    <div className="ua-external-tool-status-key mt-3 flex flex-wrap gap-x-3 gap-y-1 text-xs">
+                      <span className="ua-external-tool-status-key-label font-semibold">
+                        Status:
+                      </span>
+                      <span>
+                        <strong>Configured</strong> — custom path
+                      </span>
+                      <span>
+                        <strong>Detected</strong> — found on the host system
+                      </span>
+                      <span>
+                        <strong>Managed</strong> — UA-managed copy ready
+                      </span>
+                      <span>
+                        <strong>Automatic</strong> — UA downloads it when required
+                      </span>
+                    </div>
+                  )}
               </div>
               <div className="ua-config-section-panel p-4">{nested}</div>
             </section>
