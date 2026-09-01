@@ -4337,6 +4337,11 @@ def _configured_cookie_tracker_names(
     return configured
 
 
+def _tracker_destination_type(tracker_class: Any) -> str:
+    """Return the WebUI destination category without changing tracker IDs."""
+    return "usenet" if bool(getattr(tracker_class, "is_usenet", False)) else "torrent"
+
+
 def _tracker_status_from_http_code(status_code: int) -> tuple[str, str]:
     """Map a tracker homepage response to a deliberately advisory state."""
     if status_code == 429:
@@ -4573,6 +4578,7 @@ def get_trackers():
         display_name = getattr(tracker_class, "display_name", tracker_name)
         base_url = getattr(tracker_class, "base_url", "")
         auth_type = str(getattr(tracker_class, "auth_type", "") or "").strip().lower()
+        destination_type = _tracker_destination_type(tracker_class)
         favicon_url = ""
         static_dir = Path(__file__).parent / "static"
         for ext in ["png", "svg", "ico"]:
@@ -4590,6 +4596,7 @@ def get_trackers():
                 "configured": tracker_name.upper() in configured_trackers,
                 "auth_type": auth_type,
                 "cookie_configured": tracker_name.upper() in cookie_trackers,
+                "destination_type": destination_type,
             }
         )
 

@@ -3,6 +3,17 @@ from pathlib import Path
 import web_ui.server as server
 
 
+def test_tracker_destination_type_uses_existing_usenet_marker() -> None:
+    class TorrentTracker:
+        pass
+
+    class UsenetIndexer:
+        is_usenet = True
+
+    assert server._tracker_destination_type(TorrentTracker) == "torrent"
+    assert server._tracker_destination_type(UsenetIndexer) == "usenet"
+
+
 def test_configured_trackers_include_defaults_and_non_default_setup() -> None:
     trackers_section = {
         "default_trackers": "AITHER",

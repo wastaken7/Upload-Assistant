@@ -2707,6 +2707,52 @@ select {
   color: color-mix(in srgb, #ef4444 80%, var(--ua-config-text));
 }
 
+.ua-config-tracker-type-badge {
+  background: color-mix(in srgb, var(--ua-copper) 10%, transparent);
+  border-color: color-mix(
+    in srgb,
+    var(--ua-copper-bright) 38%,
+    var(--ua-config-border)
+  );
+  color: var(--ua-copper-bright);
+}
+
+.ua-config-tracker-type-badge[data-type="usenet"] {
+  background: color-mix(in srgb, #38bdf8 10%, transparent);
+  border-color: color-mix(in srgb, #38bdf8 38%, var(--ua-config-border));
+  color: color-mix(in srgb, #38bdf8 78%, var(--ua-config-text));
+}
+
+.ua-config-tracker-type-filter {
+  background: var(--ua-config-surface);
+  border-color: var(--ua-config-border);
+}
+
+.ua-config-tracker-type-filter-button {
+  color: var(--ua-config-muted);
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.ua-config-tracker-type-filter-button:hover {
+  background: color-mix(
+    in srgb,
+    var(--ua-config-text) 6%,
+    var(--ua-config-surface)
+  );
+  color: var(--ua-config-text);
+}
+
+.ua-config-tracker-type-filter-button[data-active="true"] {
+  background: color-mix(
+    in srgb,
+    var(--ua-copper) 18%,
+    var(--ua-config-surface-raised)
+  );
+  color: var(--ua-copper-bright);
+}
+
 .ua-config-tracker-setup {
   background: var(--ua-config-surface-raised);
   border-color: var(--ua-config-border);
