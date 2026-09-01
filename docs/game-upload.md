@@ -102,9 +102,9 @@ A duplicate is confirmed if:
 
 ## 5. Console Prompting & User Flow
 
-In attended mode, the terminal guides the user to fill in missing fields, verify game versions, and review final details:
+In attended mode, the terminal guides the user to fill in missing fields and review final details:
 
-- **Missing Fields**: If essential fields (`title`, `year`, `platform`, `game_subcategory`, `game_version`) are missing, the console prompts you to supply them before generating the torrent name.
+- **Missing Fields**: If essential fields (`title`, `year`, `platform`, `game_subcategory`) are missing, the console prompts you to supply them before generating the torrent name. The game version is used when detected or supplied with `--game-version`, but is not prompted for or required for unattended uploads.
 - **PC Installation Notes Check**: For PC game uploads, if no installation instructions are provided via description file or custom description link, a yellow warning is shown: `Installation instructions missing. Use -df or -dp to add them.`
 
 ---

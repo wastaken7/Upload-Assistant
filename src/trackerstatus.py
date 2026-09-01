@@ -140,7 +140,7 @@ class TrackerStatusManager:
 
                 # Check for missing required GAME fields in unattended mode
                 elif local_meta.get("category") == "GAME" and local_meta.get("unattended", False):
-                    game_required_fields = ["title", "year", "platform", "game_version"]
+                    game_required_fields = ["title", "year", "platform"]
                     game_missing: list[str] = []
                     for f in game_required_fields:
                         val = local_meta.get(f)
