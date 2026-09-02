@@ -18,7 +18,7 @@ This document summarizes the WebUI HTTP API implemented in `web_ui/server.py`. F
 - Auth: POST requires CSRF header for web session callers; Bearer tokens (API tokens) are accepted for programmatic use and bypass CSRF. Token must be valid.
 - Rate limit: 100 per hour (keyed by \_rate_limit_key_func)
 - POST payload: {"path": "`<file-or-folder>`", "args": "`<cmdline args>`", "session_id": "`<id>`"}
-- Description: start an `upload.py` run (either in a subprocess or in-process). The endpoint returns a Server-Sent Events (SSE) stream — connect using `Accept: text/event-stream` and read events as they arrive. `OPTIONS` responds with 204 for CORS preflight.
+- Description: start an isolated `upload.py` subprocess. The endpoint returns a Server-Sent Events (SSE) stream — connect using `Accept: text/event-stream` and read events as they arrive. `OPTIONS` responds with 204 for CORS preflight.
 - Notes on payload quoting and Windows paths:
   - JSON values must use double quotes. When sending Windows paths from shells that perform quoting/escaping (PowerShell, cmd.exe), backslashes need special handling (escape them or use forward slashes). To avoid brittle quoting, prefer one of the approaches in the examples below.
   - The server attempts tolerant parsing: it accepts JSON, form-encoded bodies, or will attempt conservative normalization of raw bodies to extract `path` and `session_id` if standard JSON parsing fails. However, relying on correct JSON or a file payload is recommended for reliability.
@@ -101,7 +101,7 @@ Notes:
 - Auth: requires either a valid Bearer API token (programmatic clients) OR a logged-in web session. Bearer tokens are allowed without CSRF; session callers must be authenticated. Rate-limited.
 - Rate limit: 200 per hour
 - POST payload: {"session_id": "default", "input": "..."}
-- Description: send interactive input to a running execution session (inproc queue or subprocess stdin)
+- Description: send interactive input to a running execution subprocess through stdin
 - Response: {"success": true} or error JSON
 
 ### /api/kill

@@ -28,12 +28,12 @@ from types import ModuleType
 from pathlib import Path
 from typing import Any, Literal, Protocol, TypedDict, cast
 from collections.abc import Callable
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 
 import psutil
 
 import web_ui.auth as auth_mod
-from src.webui_progress import PROGRESS_STDOUT_PREFIX, ProgressEvent, clear_progress_callback, reset_progress, set_progress_callback
+from src.webui_progress import PROGRESS_STDOUT_PREFIX
 from src.app_paths import CODE_DIR, DATA_DIR, STATE_DIR
 from src.external_tools import EXTERNAL_TOOL_KEYS, check_external_tools
 from src.meta import Meta
@@ -799,8 +799,7 @@ SUPPORTED_DESC_EXTS = {".txt", ".nfo", ".md"}
 # Regex for splitting filenames on common separators (dots, dashes, underscores, spaces)
 _BROWSE_SEARCH_SEP_RE = re.compile(r"[\s.\-_]+")
 
-# Lock to prevent concurrent in-process uploads (avoids cross-session interference)
-inproc_lock = threading.Lock()
+# Lock protecting the active execution registry.
 active_processes_lock = threading.Lock()
 
 # Runtime browse roots (set by upload.py when starting web UI)
@@ -1321,14 +1320,14 @@ def _terminate_process_tree(process: _WebUIProcess, timeout: float = 2.0) -> boo
 
     try:
         root = psutil.Process(process.pid)
-    except psutil.NoSuchProcess, psutil.AccessDenied, OSError:
+    except (psutil.NoSuchProcess, psutil.AccessDenied, OSError):
         return process.poll() is not None
 
     # Snapshot descendants before stopping the controller: once the controller
     # exits, its children may be re-parented and become impossible to identify.
     try:
         processes = root.children(recursive=True)
-    except psutil.NoSuchProcess, psutil.AccessDenied, OSError:
+    except (psutil.NoSuchProcess, psutil.AccessDenied, OSError):
         processes = []
     processes.append(root)
 
@@ -1347,16 +1346,10 @@ def _terminate_process_tree(process: _WebUIProcess, timeout: float = 2.0) -> boo
     return process.poll() is not None and not alive
 
 
-# Local store for consoles we've wrapped to avoid assigning attributes on Console
-_ua_console_store: dict[int, dict[str, Any]] = {}
-
-
 def _debug_process_snapshot(session_id: str | None = None) -> dict[str, object]:
     try:
         snapshot: dict[str, object] = {
             "active_sessions": list(active_processes.keys()),
-            "console_store_keys": list(_ua_console_store.keys()),
-            "inproc_lock_locked": inproc_lock.locked(),
         }
         if session_id and session_id in active_processes:
             info = active_processes.get(session_id, {})
@@ -1466,7 +1459,7 @@ def _make_process_state(path: str, args: str) -> dict[str, object]:
 
 
 def set_execution_preview_target(session_id: str, expected_run_token: str, path: str, meta_uuid: str | None = None) -> None:
-    """Update the active preview target for an in-process Web UI execution."""
+    """Update the active preview target for a Web UI execution."""
     cleaned_session_id = str(session_id or "").strip()
     cleaned_run_token = str(expected_run_token or "").strip()
     cleaned_path = str(path or "").strip()
@@ -2196,7 +2189,7 @@ def _resolve_execution_description_review(session_id: str) -> tuple[Path, Path, 
 
 
 def _description_review_lock(temp_dir: Path) -> threading.Lock:
-    """Return the in-process mutation lock for one execution's description."""
+    """Return the process-local mutation lock for one execution's description."""
     key = str(temp_dir.resolve())
     with _description_review_locks_lock:
         return _description_review_locks.setdefault(key, threading.Lock())
@@ -6063,734 +6056,230 @@ def execute_command():
 
                 yield f"data: {json.dumps({'type': 'system', 'data': f'Executing: {command_str}'})}\n\n"
 
-                # The upload controller must be isolated so Kill can terminate its
-                # external workers as one process tree. Subprocess stdin already
-                # supports the WebUI prompt flow.
-                use_subprocess = True
+                # Run the upload controller in an isolated subprocess so Kill can
+                # terminate its external workers as one process tree. Subprocess
+                # stdin supports the WebUI prompt flow.
+                env = _webui_subprocess_env()
 
-                if not use_subprocess:
-                    # In-process execution path
-                    _cli_ui: Any = importlib.import_module("cli_ui")
+                # Sanity-check the working directory used for the subprocess.
+                # `base_dir` is computed from the application `__file__`, but
+                # perform lightweight validation to satisfy static analysis
+                # tools and ensure we do not pass uncontrolled input here.
+                if "\x00" in str(base_dir) or not str(base_dir):
+                    raise ValueError("Invalid execution directory")
+                if not Path(str(base_dir)).is_absolute():
+                    base_dir = str(Path(str(base_dir)).resolve())
 
-                    src_console: Any = importlib.import_module("src.console")
+                # Extra validation for the constructed command to guard
+                # against command-injection and to make validation explicit
+                # for static analysis tools.
+                try:
+                    # Ensure command is a list of strings
+                    command = _validate_upload_assistant_args(command)
 
-                    console.print("Running in-process (rich-captured) mode", markup=False)
-
-                    # Prepare input queue for prompts
-                    input_queue: queue.Queue[str] = queue.Queue()
-
-                    # Import upload.main on the main thread to avoid thread-unsafe imports
-                    # inside the worker thread. Importing here ensures any module-level
-                    # side-effects run on the request/main thread rather than inside
-                    # the worker thread.
+                    # Re-assert the execution path is safe
                     try:
-                        import upload as _upload
-
-                        upload_main = _upload.main
-                    except Exception as _e:
-                        upload_main = None
-
-                    # Prepare a recording Console to capture rich output
-                    import io
-
-                    rich_console_mod: Any = importlib.import_module("rich.console")
-                    rich_console_class = rich_console_mod.Console
-
-                    # Use an in-memory file for the recorder to avoid duplicating
-                    # output to the real stdout. record=True still records renderables.
-                    record_console = rich_console_class(record=True, force_terminal=True, width=120, file=io.StringIO())
-
-                    # Queue to serialize print actions from the worker thread
-                    render_queue: queue.Queue[tuple[Any, dict[str, Any]]] = queue.Queue()
-                    progress_event_queue: queue.Queue[None] = queue.Queue(maxsize=64)
-                    queued_progress_events: dict[str, dict[str, object]] = {}
-                    progress_queue_lock = threading.Lock()
-
-                    # Cancellation event for cooperative shutdown
-                    cancel_event = threading.Event()
-
-                    # Acquire lock BEFORE any global mutation to prevent concurrent runs
-                    # from corrupting each other's sys.argv and console patches.
-                    try:
-                        acquired = inproc_lock.acquire(timeout=2)
-                    except TypeError:
-                        acquired = inproc_lock.acquire(blocking=False)
-
-                    if not acquired:
-                        console.print(f"Failed to acquire inproc lock for session {session_id}; another inproc run may be active", markup=False)
-                        _discard_session_state(session_id, process_state)
-                        yield f"data: {json.dumps({'type': 'error', 'data': 'Another in-process run is active'})}\n\n"
-                        return
-
-                    if not _session_state_is_current(session_id, process_state):
-                        with contextlib.suppress(Exception):
-                            inproc_lock.release()
-                        _discard_session_state(session_id, process_state)
-                        yield f"data: {json.dumps({'type': 'error', 'data': 'Execution session was replaced'})}\n\n"
-                        return
-
-                    # Monkeypatch the existing shared console to record prints and intercept input
-                    orig_console: Any = src_console.console
-
-                    # Avoid double-wrapping the console if already patched by a previous run
-                    console_key = id(orig_console)
-                    if console_key not in _ua_console_store:
-                        # Store originals so we can restore later
-                        _ua_console_store[console_key] = {
-                            "orig_print": orig_console.print,
-                            "orig_input": getattr(orig_console, "input", None),
-                            "orig_ask_yes_no": None,
-                            "orig_ask_string": None,
-                            "orig_ask_choice": None,
-                        }
-
-                        # Wrap print to duplicate into the recorder
-                        orig_print = orig_console.print
-
-                        def wrapped_print(*p_args: Any, **p_kwargs: Any) -> Any:
-                            # Enqueue print calls to be applied from the SSE thread
-                            with contextlib.suppress(Exception):
-                                render_queue.put((p_args, p_kwargs))
-                            return orig_print(*p_args, **p_kwargs)
-
-                        orig_console.print = cast(Any, wrapped_print)
-
-                        # Intercept console.input to send prompt to client and wait for queue
-                        orig_input = getattr(orig_console, "input", None)
-
-                        def wrapped_input(prompt: str = "") -> str:
-                            # Print the prompt so it appears in the recorded output
-                            with contextlib.suppress(Exception):
-                                wrapped_print(prompt)
-                            # Wait for input while respecting cancellation
-                            _set_process_awaiting_input_if_current(session_id, process_state, True)
-                            while True:
-                                if cancel_event.is_set():
-                                    _set_process_awaiting_input_if_current(session_id, process_state, False)
-                                    raise EOFError()
-                                try:
-                                    result = input_queue.get(timeout=0.5)
-                                    _set_process_awaiting_input_if_current(session_id, process_state, False)
-                                    return result
-                                except queue.Empty:
-                                    continue
-                                except Exception:
-                                    _set_process_awaiting_input_if_current(session_id, process_state, False)
-                                    raise
-
-                        orig_console.input = cast(Any, wrapped_input)
-                    else:
-                        # Already wrapped; retrieve stored originals so restoration works
-                        stored = _ua_console_store.get(console_key, {})
-                        orig_print = stored.get("orig_print", orig_console.print)
-                        orig_input = stored.get("orig_input", getattr(orig_console, "input", None))
-
-                    # Monkeypatch cli_ui.ask_yes_no and ask_string similarly
-                    orig_ask_yes_no = None
-                    orig_ask_string = None
-                    orig_ask_choice = None
-                    try:
-                        orig_ask_yes_no = _cli_ui.ask_yes_no
-
-                        def wrapped_ask_yes_no(*args: Any, default: bool = False, **kwargs: Any) -> bool:
-                            # Support both signatures used across the codebase:
-                            #   ask_yes_no(question, default=...)
-                            #   ask_yes_no(color, question, default=...)
-                            # Extract the question and default value from args/kwargs.
-                            if len(args) >= 2:
-                                question = args[1]
-                            elif len(args) == 1:
-                                question = args[0]
-                            else:
-                                question = kwargs.get("question", "")
-
-                            with contextlib.suppress(Exception):
-                                wrapped_print(str(question))
-                            # Wait for a response or cancellation
-                            _set_process_awaiting_input_if_current(session_id, process_state, True, "yes_no")
-                            while True:
-                                if cancel_event.is_set():
-                                    _set_process_awaiting_input_if_current(session_id, process_state, False)
-                                    raise EOFError()
-                                try:
-                                    resp = input_queue.get(timeout=0.5)
-                                except queue.Empty:
-                                    continue
-                                except Exception:
-                                    _set_process_awaiting_input_if_current(session_id, process_state, False)
-                                    raise
-                                resp = (resp or "").strip().lower()
-                                if not resp:
-                                    _set_process_awaiting_input_if_current(session_id, process_state, False)
-                                    return default
-                                if resp in ("y", "yes"):
-                                    _set_process_awaiting_input_if_current(session_id, process_state, False)
-                                    return True
-                                if resp in ("n", "no"):
-                                    _set_process_awaiting_input_if_current(session_id, process_state, False)
-                                    return False
-                                with contextlib.suppress(Exception):
-                                    wrapped_print("Please answer y or n.")
-                                _set_process_awaiting_input_if_current(session_id, process_state, True, "yes_no")
-
-                        _cli_ui.ask_yes_no = wrapped_ask_yes_no
-                        # Save original ask_yes_no so external cleaners (eg. /api/kill)
-                        # can restore it if the inproc run is terminated early.
-                        with contextlib.suppress(Exception):
-                            if console_key in _ua_console_store:
-                                _ua_console_store[console_key]["orig_ask_yes_no"] = orig_ask_yes_no
-
-                        # ask_string: prompt user for an arbitrary string
-                        try:
-                            orig_ask_string = _cli_ui.ask_string
-
-                            def wrapped_ask_string(*question: Any, **_kwargs: Any) -> str | None:
-                                prompt = " ".join(str(q) for q in question)
-                                with contextlib.suppress(Exception):
-                                    wrapped_print(prompt)
-                                # Wait for input or cancellation
-                                _set_process_awaiting_input_if_current(session_id, process_state, True)
-                                while True:
-                                    if cancel_event.is_set():
-                                        _set_process_awaiting_input_if_current(session_id, process_state, False)
-                                        raise EOFError()
-                                    try:
-                                        result = input_queue.get(timeout=0.5)
-                                        _set_process_awaiting_input_if_current(session_id, process_state, False)
-                                        return result
-                                    except queue.Empty:
-                                        continue
-                                    except Exception:
-                                        _set_process_awaiting_input_if_current(session_id, process_state, False)
-                                        raise
-
-                            _cli_ui.ask_string = wrapped_ask_string
-                            # Save original ask_string for external cleanup
-                            with contextlib.suppress(Exception):
-                                if console_key in _ua_console_store:
-                                    _ua_console_store[console_key]["orig_ask_string"] = orig_ask_string
-                        except Exception:
-                            orig_ask_string = None
-
-                        # ask_choice: prompt user to select one option from a list
-                        try:
-                            orig_ask_choice = _cli_ui.ask_choice
-
-                            def wrapped_ask_choice(question: object, choices: Sequence[object] | None = None, **_kwargs: Any) -> str:
-                                prompt = str(question)
-                                rendered_choices = [str(choice) for choice in (choices or [])]
-                                with contextlib.suppress(Exception):
-                                    wrapped_print(prompt)
-                                    for index, choice_text in enumerate(rendered_choices, start=1):
-                                        wrapped_print(f"{index}. {choice_text}")
-                                _set_process_awaiting_input_if_current(session_id, process_state, True)
-                                while True:
-                                    if cancel_event.is_set():
-                                        _set_process_awaiting_input_if_current(session_id, process_state, False)
-                                        raise EOFError()
-                                    try:
-                                        resp = (input_queue.get(timeout=0.5) or "").strip()
-                                    except queue.Empty:
-                                        continue
-                                    except Exception:
-                                        _set_process_awaiting_input_if_current(session_id, process_state, False)
-                                        raise
-
-                                    if not rendered_choices:
-                                        _set_process_awaiting_input_if_current(session_id, process_state, False)
-                                        return resp
-                                    if resp.isdigit():
-                                        selected_index = int(resp) - 1
-                                        if 0 <= selected_index < len(rendered_choices):
-                                            _set_process_awaiting_input_if_current(session_id, process_state, False)
-                                            return rendered_choices[selected_index]
-                                    for choice_text in rendered_choices:
-                                        if resp.lower() == choice_text.lower():
-                                            _set_process_awaiting_input_if_current(session_id, process_state, False)
-                                            return choice_text
-
-                            _cli_ui.ask_choice = wrapped_ask_choice
-                            with contextlib.suppress(Exception):
-                                if console_key in _ua_console_store:
-                                    _ua_console_store[console_key]["orig_ask_choice"] = orig_ask_choice
-                        except Exception:
-                            orig_ask_choice = None
+                        _assert_safe_resolved_path(command[3] if len(command) > 3 else command[-1])
                     except Exception:
-                        orig_ask_yes_no = None
+                        # Fallback: validated_path is expected at position 3 for subprocess
+                        try:
+                            _assert_safe_resolved_path(validated_path)
+                        except Exception as err:
+                            raise ValueError("Invalid execution path") from err
 
-                    # Prepare sys.argv for upload.py to parse
-                    old_argv = list(sys.argv)
+                    # Ensure the upload_script is the expected script under the repo
                     try:
-                        import shlex
+                        expected_script = os.path.realpath(str(CODE_DIR / "upload.py"))
+                        script_real = os.path.realpath(command[2])
+                        if script_real != expected_script:
+                            raise ValueError("Invalid script path")
+                    except IndexError as err:
+                        raise ValueError("Invalid command structure") from err
 
-                        parsed_args = []
-                        if args:
-                            parsed_args = shlex.split(args)
-                            parsed_args = _validate_upload_assistant_args(parsed_args)
-
-                        sys.argv = [upload_script, validated_path, *parsed_args]
-
-                        # Store in active_processes so /api/input can post into the queue
-                        process_state.update(
-                            {
-                                "mode": "inproc",
-                                "input_queue": input_queue,
-                                "record_console": record_console,
-                                "cancel_event": cancel_event,
-                                "progress_event_queue": progress_event_queue,
-                            }
-                        )
-                        if not _session_state_is_current(session_id, process_state):
-                            raise RuntimeError("Execution session was replaced before in-process startup completed")
-
-                        # Run the upload main loop in a separate thread to avoid blocking SSE generator
-                        def run_upload():
-                            previous_webui_active = os.environ.get("UA_WEBUI_ACTIVE")
-                            os.environ["UA_WEBUI_ACTIVE"] = "1"
-
-                            def emit_progress(event: ProgressEvent) -> None:
-                                event_copy = dict(event)
-                                if not _session_state_is_current(session_id, process_state):
-                                    return
-                                _set_process_progress_if_current(session_id, process_state, event_copy)
-                                with contextlib.suppress(Exception):
-                                    progress_id = str(event_copy.get("id", "")).strip()
-                                    queue_key = progress_id or f"__event__:{event_copy.get('op', 'upsert')}"
-                                    with progress_queue_lock:
-                                        queued_progress_events[queue_key] = event_copy
-                                        while len(queued_progress_events) > 64:
-                                            oldest_key = next(iter(queued_progress_events))
-                                            queued_progress_events.pop(oldest_key, None)
-                                        with contextlib.suppress(queue.Full):
-                                            progress_event_queue.put_nowait(None)
-
-                            try:
-                                # Run the async main() entry point of upload.py
-                                import asyncio
-
-                                # Use the pre-imported upload_main from the outer scope.
-                                # If it wasn't available, attempt a safe import here as fallback.
-                                nonlocal_upload = upload_main
-                                if nonlocal_upload is None:
-                                    try:
-                                        import upload as _upload_fallback
-
-                                        nonlocal_upload = _upload_fallback.main
-                                    except Exception:
-                                        nonlocal_upload = None
-
-                                # Ensure Windows event loop policy when needed
-                                if sys.platform == "win32" and sys.version_info < (3, 14):
-                                    policy_class = getattr(asyncio, "WindowsProactorEventLoopPolicy", None)
-                                    if policy_class is not None:
-                                        with contextlib.suppress(Exception):
-                                            asyncio.set_event_loop_policy(policy_class())
-                                if nonlocal_upload is None:
-                                    raise RuntimeError("upload.main not available for in-process execution")
-                                set_webui_session_id = getattr(sys.modules.get("upload"), "set_webui_session_id", None)
-                                if callable(set_webui_session_id):
-                                    with contextlib.suppress(Exception):
-                                        set_webui_session_id(session_id, str(process_state.get("run_token") or ""))
-                                set_progress_callback(emit_progress)
-                                reset_progress()
-                                asyncio.run(nonlocal_upload())
-                            except Exception as e:
-                                # If the exception is the cooperative cancellation marker,
-                                # print a short, non-alarming message and avoid printing
-                                # the full traceback which can confuse the operator.
-                                try:
-                                    if isinstance(e, EOFError):
-                                        console.print("In-process run cancelled (Ctrl+C)", markup=False)
-                                    else:
-                                        console.print(f"In-process execution error: {e}", markup=False)
-                                        console.print(traceback.format_exc(), markup=False)
-                                except Exception:
-                                    with contextlib.suppress(Exception):
-                                        console.print("In-process run ended", markup=False)
-                            finally:
-                                clear_progress_callback(emit_progress)
-                                if previous_webui_active is None:
-                                    os.environ.pop("UA_WEBUI_ACTIVE", None)
-                                else:
-                                    os.environ["UA_WEBUI_ACTIVE"] = previous_webui_active
-                                # Restore sys.argv in finally block
-                                # Restore patched console
-                                console_key = id(src_console.console)
-                                if console_key in _ua_console_store:
-                                    origs = _ua_console_store[console_key]
-                                    src_console.console.print = origs["orig_print"]
-                                    if "orig_input" in origs and origs["orig_input"] is not None:
-                                        src_console.console.input = origs["orig_input"]
-                                    # Restore cli_ui patched functions if present
-                                    with contextlib.suppress(Exception):
-                                        if "orig_ask_yes_no" in origs and origs["orig_ask_yes_no"] is not None:
-                                            _cli_ui.ask_yes_no = origs["orig_ask_yes_no"]
-                                    with contextlib.suppress(Exception):
-                                        if "orig_ask_string" in origs and origs["orig_ask_string"] is not None:
-                                            _cli_ui.ask_string = origs["orig_ask_string"]
-                                        if "orig_ask_choice" in origs and origs["orig_ask_choice"] is not None:
-                                            _cli_ui.ask_choice = origs["orig_ask_choice"]
-                                    del _ua_console_store[console_key]
-                                with contextlib.suppress(Exception):
-                                    set_webui_session_id = getattr(sys.modules.get("upload"), "set_webui_session_id", None)
-                                    if callable(set_webui_session_id):
-                                        set_webui_session_id(None)
-                                # Release lock to allow next inproc run
-                                inproc_lock.release()
-
-                        worker = threading.Thread(target=run_upload, daemon=True)
-                        worker.start()
-
-                        # Record worker thread for debugging/cleanup
-                        with contextlib.suppress(Exception):
-                            if _session_state_is_current(session_id, process_state):
-                                process_state["worker"] = worker
-
-                        console.print(f"Started inproc worker for session {session_id}: {worker.name}", markup=False)
-
-                        # Stream full HTML snapshots from the recorder while the worker runs.
-                        # To avoid spinning the SSE thread and growing the server task queue
-                        # when the uploader prints heavily, block waiting for print events
-                        # with a short timeout and coalesce multiple prints into a
-                        # single exported snapshot.
-                        last_body = ""
-                        try:
-
-                            def _drain_progress_events() -> Iterator[str]:
-                                while True:
-                                    try:
-                                        progress_event_queue.get_nowait()
-                                    except queue.Empty:
-                                        break
-                                with progress_queue_lock:
-                                    pending_events = list(queued_progress_events.values())
-                                    queued_progress_events.clear()
-                                for progress_event in pending_events:
-                                    yield f"data: {json.dumps({'type': 'progress', 'data': progress_event})}\n\n"
-
-                            while worker.is_alive():
-                                sent_progress = False
-                                for progress_sse in _drain_progress_events():
-                                    sent_progress = True
-                                    yield progress_sse
-                                try:
-                                    # Wait for the next print event (blocks briefly). This
-                                    # prevents the generator from busy-waiting and tying up
-                                    # Waitress worker threads.
-                                    r_args, r_kwargs = render_queue.get(timeout=0.5)
-                                    with contextlib.suppress(Exception):
-                                        record_console.print(*r_args, **r_kwargs)
-
-                                    # Drain any additional queued prints so we can coalesce
-                                    # them into a single exported snapshot.
-                                    while not render_queue.empty():
-                                        try:
-                                            r_args, r_kwargs = render_queue.get_nowait()
-                                        except queue.Empty:
-                                            break
-                                        with contextlib.suppress(Exception):
-                                            record_console.print(*r_args, **r_kwargs)
-
-                                    # Export and yield a full HTML snapshot only when the
-                                    # rendered body has changed.
-                                    html_doc = record_console.export_html(inline_styles=True)
-                                    m = re.search(r"<body[^>]*>(.*?)</body>", html_doc, re.S | re.I)
-                                    body = m.group(1).strip() if m else html_doc
-                                    if body != last_body:
-                                        last_body = body
-                                        yield f"data: {json.dumps({'type': 'html_full', 'data': body})}\n\n"
-                                except queue.Empty:
-                                    if sent_progress:
-                                        continue
-                                    # No print activity within the timeout — send a keepalive
-                                    # to keep the SSE connection alive without busy-waiting.
-                                    yield f"data: {json.dumps({'type': 'keepalive'})}\n\n"
-                                except Exception:
-                                    # Swallow per-iteration errors to keep the stream alive.
-                                    yield f"data: {json.dumps({'type': 'keepalive'})}\n\n"
-
-                            # Worker finished; drain any remaining prints and send final snapshot
-                            while not render_queue.empty():
-                                try:
-                                    r_args, r_kwargs = render_queue.get_nowait()
-                                except queue.Empty:
-                                    break
-                                with contextlib.suppress(Exception):
-                                    record_console.print(*r_args, **r_kwargs)
-
-                            for progress_sse in _drain_progress_events():
-                                yield progress_sse
-
-                            with contextlib.suppress(Exception):
-                                html_doc = record_console.export_html(inline_styles=True)
-                                m = re.search(r"<body[^>]*>(.*?)</body>", html_doc, re.S | re.I)
-                                body = m.group(1).strip() if m else html_doc
-                                if body != last_body:
-                                    yield f"data: {json.dumps({'type': 'html_full', 'data': body})}\n\n"
-                        except Exception:
-                            # Ensure generator continues and yields a final keepalive on error
-                            yield f"data: {json.dumps({'type': 'keepalive'})}\n\n"
-
-                    finally:
-                        # restore patched functions and argv
-                        try:
-                            # Prefer restoring originals from the module-level store
-                            console_key = id(orig_console)
-                            if console_key in _ua_console_store:
-                                stored = _ua_console_store.pop(console_key, {})
-                                with contextlib.suppress(Exception):
-                                    orig_console.print = stored.get("orig_print", orig_console.print)
-                                with contextlib.suppress(Exception):
-                                    orig_in = stored.get("orig_input", None)
-                                    if orig_in is not None:
-                                        orig_console.input = orig_in
-                        except Exception:
-                            # best-effort restore using locals
-                            with contextlib.suppress(Exception):
-                                orig_console.print = orig_print
-                            with contextlib.suppress(Exception):
-                                if orig_input is not None:
-                                    orig_console.input = orig_input
-
-                        with contextlib.suppress(Exception):
-                            if orig_ask_yes_no is not None:
-                                _cli_ui.ask_yes_no = orig_ask_yes_no
-                        with contextlib.suppress(Exception):
-                            if orig_ask_string is not None:
-                                _cli_ui.ask_string = orig_ask_string
-                            if orig_ask_choice is not None:
-                                _cli_ui.ask_choice = orig_ask_choice
-
-                        sys.argv = old_argv
-
-                        # Remove process tracking for this session
-                        with contextlib.suppress(Exception):
-                            _discard_session_state(session_id, process_state)
-
+                    # Disallow shell metacharacters in any argument
+                    forbidden = set(";&|$`><*?~!\n\r\x00")
+                    for a in command:
+                        if any(ch in a for ch in forbidden):
+                            raise ValueError("Invalid characters in command argument")
+                except Exception as err:
+                    console.print(f"Refusing to run unsafe command: {err}", markup=False)
+                    _discard_session_state(session_id, process_state)
+                    yield f"data: {json.dumps({'type': 'error', 'data': 'Unsafe execution request'})}\n\n"
                     return
 
-                else:
-                    env = _webui_subprocess_env()
+                # codeql[py/command-line-injection]
+                process = None
+                # Wrap subprocess handling in try/finally to guarantee cleanup
+                try:
+                    process, process_mode = _spawn_webui_upload_process(command, Path(base_dir), env)
 
-                    # Sanity-check the working directory used for the subprocess.
-                    # `base_dir` is computed from the application `__file__`, but
-                    # perform lightweight validation to satisfy static analysis
-                    # tools and ensure we do not pass uncontrolled input here.
-                    if "\x00" in str(base_dir) or not str(base_dir):
-                        raise ValueError("Invalid execution directory")
-                    if not Path(str(base_dir)).is_absolute():
-                        base_dir = str(Path(str(base_dir)).resolve())
+                    process_state.update(
+                        {
+                            "mode": process_mode,
+                            "process": process,
+                        }
+                    )
+                    if not _session_state_is_current(session_id, process_state):
+                        _terminate_process_tree(process)
+                        raise RuntimeError("Execution session was replaced before subprocess startup completed")
 
-                    # Extra validation for the constructed command to guard
-                    # against command-injection and to make validation explicit
-                    # for static analysis tools.
-                    try:
-                        # Ensure command is a list of strings
-                        command = _validate_upload_assistant_args(command)
+                    output_queue: queue.Queue[tuple[str, str]] = queue.Queue()
 
-                        # Re-assert the execution path is safe
-                        try:
-                            _assert_safe_resolved_path(command[3] if len(command) > 3 else command[-1])
-                        except Exception:
-                            # Fallback: validated_path is expected at position 3 for subprocess
+                    if isinstance(process, _ConPtyProcess):
+                        # A pseudo terminal combines stdout and stderr into one ANSI stream.
+                        def read_stdout():
                             try:
-                                _assert_safe_resolved_path(validated_path)
+                                while True:
+                                    # Keep the same incremental prompt detection semantics as
+                                    # the pipe reader. ConPTY can return a whole prompt plus
+                                    # its trailing input marker in one read.
+                                    for char in process.read(1024):
+                                        output_queue.put(("stdout", char))
+                            except EOFError:
+                                pass
                             except Exception as err:
-                                raise ValueError("Invalid execution path") from err
+                                console.print(f"ConPTY read error: {err}", markup=False)
 
-                        # Ensure the upload_script is the expected script under the repo
-                        try:
-                            expected_script = os.path.realpath(str(CODE_DIR / "upload.py"))
-                            script_real = os.path.realpath(command[2])
-                            if script_real != expected_script:
-                                raise ValueError("Invalid script path")
-                        except IndexError as err:
-                            raise ValueError("Invalid command structure") from err
-
-                        # Disallow shell metacharacters in any argument
-                        forbidden = set(";&|$`><*?~!\n\r\x00")
-                        for a in command:
-                            if any(ch in a for ch in forbidden):
-                                raise ValueError("Invalid characters in command argument")
-                    except Exception as err:
-                        console.print(f"Refusing to run unsafe command: {err}", markup=False)
-                        _discard_session_state(session_id, process_state)
-                        yield f"data: {json.dumps({'type': 'error', 'data': 'Unsafe execution request'})}\n\n"
-                        return
-
-                    # codeql[py/command-line-injection]
-                    process = None
-                    # Wrap subprocess handling in try/finally to guarantee cleanup
-                    try:
-                        process, process_mode = _spawn_webui_upload_process(command, Path(base_dir), env)
-
-                        process_state.update(
-                            {
-                                "mode": process_mode,
-                                "process": process,
-                            }
-                        )
-                        if not _session_state_is_current(session_id, process_state):
-                            _terminate_process_tree(process)
-                            raise RuntimeError("Execution session was replaced before subprocess startup completed")
-
-                        output_queue: queue.Queue[tuple[str, str]] = queue.Queue()
-
-                        if isinstance(process, _ConPtyProcess):
-                            # A pseudo terminal combines stdout and stderr into one ANSI stream.
-                            def read_stdout():
-                                try:
-                                    while True:
-                                        # Keep the same incremental prompt detection semantics as
-                                        # the pipe reader. ConPTY can return a whole prompt plus
-                                        # its trailing input marker in one read.
-                                        for char in process.read(1024):
-                                            output_queue.put(("stdout", char))
-                                except EOFError:
-                                    pass
-                                except Exception as err:
-                                    console.print(f"ConPTY read error: {err}", markup=False)
-
-                            stdout_thread = threading.Thread(target=read_stdout, daemon=True)
-                            stderr_thread = None
-                        else:
-                            # Thread to read stdout - stream raw output with ANSI codes
-                            def read_stdout():
-                                try:
-                                    stdout = getattr(process, "stdout", None)
-                                    if stdout is None:
-                                        return
-                                    while True:
-                                        chunk = stdout.read(1)
-                                        if not chunk:
-                                            break
-                                        output_queue.put(("stdout", chunk))
-                                except Exception as err:
-                                    console.print(f"stdout read error: {err}", markup=False)
-
-                            # Thread to read stderr - stream raw output
-                            def read_stderr():
-                                try:
-                                    stderr = getattr(process, "stderr", None)
-                                    if stderr is None:
-                                        return
-                                    while True:
-                                        chunk = stderr.read(1)
-                                        if not chunk:
-                                            break
-                                        output_queue.put(("stderr", chunk))
-                                except Exception as err:
-                                    console.print(f"stderr read error: {err}", markup=False)
-
-                            stdout_thread = threading.Thread(target=read_stdout, daemon=True)
-                            stderr_thread = threading.Thread(target=read_stderr, daemon=True)
-
-                        stdout_thread.start()
-                        if stderr_thread is not None:
-                            stderr_thread.start()
-
-                        # Record threads and output queue for debugging/cleanup
-                        with contextlib.suppress(Exception):
-                            if _session_state_is_current(session_id, process_state):
-                                process_state["stdout_thread"] = stdout_thread
-                                process_state["stderr_thread"] = stderr_thread
-                                process_state["output_queue"] = output_queue
-
-                        console.print(
-                            f"Started {process_mode} reader threads for session {session_id}: stdout={stdout_thread.name}, stderr={getattr(stderr_thread, 'name', 'merged')}",
-                            markup=False,
-                        )
-
-                        def _read_output(q: queue.Queue[tuple[str, str]]) -> tuple[bool, tuple[str, str] | None]:
+                        stdout_thread = threading.Thread(target=read_stdout, daemon=True)
+                        stderr_thread = None
+                    else:
+                        # Thread to read stdout - stream raw output with ANSI codes
+                        def read_stdout():
                             try:
-                                return True, q.get(timeout=0.1)
-                            except queue.Empty:
-                                return False, None
+                                stdout = getattr(process, "stdout", None)
+                                if stdout is None:
+                                    return
+                                while True:
+                                    chunk = stdout.read(1)
+                                    if not chunk:
+                                        break
+                                    output_queue.put(("stdout", chunk))
+                            except Exception as err:
+                                console.print(f"stdout read error: {err}", markup=False)
 
-                        # Stream output as buffered chunks and always emit HTML fragments
-                        # If we are running the upload as a subprocess, stream ANSI->HTML as before.
-                        buffers: dict[str, str] = {"stdout": "", "stderr": ""}
+                        # Thread to read stderr - stream raw output
+                        def read_stderr():
+                            try:
+                                stderr = getattr(process, "stderr", None)
+                                if stderr is None:
+                                    return
+                                while True:
+                                    chunk = stderr.read(1)
+                                    if not chunk:
+                                        break
+                                    output_queue.put(("stderr", chunk))
+                            except Exception as err:
+                                console.print(f"stderr read error: {err}", markup=False)
 
-                        while process.poll() is None or not output_queue.empty():
-                            has_output, output = _read_output(output_queue)
-                            if has_output and output is not None:
-                                output_type, char = output
-                                if output_type not in buffers:
-                                    buffers[output_type] = ""
-                                buffers[output_type] += char
-                                prompt_type = _subprocess_prompt_type(buffers[output_type])
-                                if prompt_type:
-                                    _set_process_awaiting_input_if_current(session_id, process_state, True, prompt_type)
+                        stdout_thread = threading.Thread(target=read_stdout, daemon=True)
+                        stderr_thread = threading.Thread(target=read_stderr, daemon=True)
 
-                                # Flush on newline or when buffer grows large
-                                if _should_flush_subprocess_output(buffers[output_type], char):
-                                    if not prompt_type:
-                                        _set_process_awaiting_input_if_current(session_id, process_state, False)
-                                    chunk = buffers[output_type]
-                                    buffers[output_type] = ""
+                    stdout_thread.start()
+                    if stderr_thread is not None:
+                        stderr_thread.start()
 
-                                    progress_event = _subprocess_progress_event(chunk)
-                                    if progress_event is not None:
-                                        _set_process_progress_if_current(session_id, process_state, progress_event)
-                                        yield f"data: {json.dumps({'type': 'progress', 'data': progress_event})}\n\n"
-                                        continue
+                    # Record threads and output queue for debugging/cleanup
+                    with contextlib.suppress(Exception):
+                        if _session_state_is_current(session_id, process_state):
+                            process_state["stdout_thread"] = stdout_thread
+                            process_state["stderr_thread"] = stderr_thread
+                            process_state["output_queue"] = output_queue
 
-                                    # Convert to HTML fragment. If helper missing, escape and wrap in <pre>
-                                    try:
-                                        if ansi_to_html:
-                                            html_fragment = ansi_to_html(chunk)
-                                        else:
-                                            import html as _html
+                    console.print(
+                        f"Started {process_mode} reader threads for session {session_id}: stdout={stdout_thread.name}, stderr={getattr(stderr_thread, 'name', 'merged')}",
+                        markup=False,
+                    )
 
-                                            html_fragment = f"<pre>{_html.escape(chunk)}</pre>"
+                    def _read_output(q: queue.Queue[tuple[str, str]]) -> tuple[bool, tuple[str, str] | None]:
+                        try:
+                            return True, q.get(timeout=0.1)
+                        except queue.Empty:
+                            return False, None
 
-                                        yield f"data: {json.dumps({'type': 'html', 'data': html_fragment, 'origin': output_type})}\n\n"
-                                    except Exception as e:
-                                        console.print(f"HTML conversion error: {e}", markup=False)
+                    # Stream output as buffered chunks and always emit HTML fragments
+                    # If we are running the upload as a subprocess, stream ANSI->HTML as before.
+                    buffers: dict[str, str] = {"stdout": "", "stderr": ""}
+
+                    while process.poll() is None or not output_queue.empty():
+                        has_output, output = _read_output(output_queue)
+                        if has_output and output is not None:
+                            output_type, char = output
+                            if output_type not in buffers:
+                                buffers[output_type] = ""
+                            buffers[output_type] += char
+                            prompt_type = _subprocess_prompt_type(buffers[output_type])
+                            if prompt_type:
+                                _set_process_awaiting_input_if_current(session_id, process_state, True, prompt_type)
+
+                            # Flush on newline or when buffer grows large
+                            if _should_flush_subprocess_output(buffers[output_type], char):
+                                if not prompt_type:
+                                    _set_process_awaiting_input_if_current(session_id, process_state, False)
+                                chunk = buffers[output_type]
+                                buffers[output_type] = ""
+
+                                progress_event = _subprocess_progress_event(chunk)
+                                if progress_event is not None:
+                                    _set_process_progress_if_current(session_id, process_state, progress_event)
+                                    yield f"data: {json.dumps({'type': 'progress', 'data': progress_event})}\n\n"
+                                    continue
+
+                                # Convert to HTML fragment. If helper missing, escape and wrap in <pre>
+                                try:
+                                    if ansi_to_html:
+                                        html_fragment = ansi_to_html(chunk)
+                                    else:
                                         import html as _html
 
                                         html_fragment = f"<pre>{_html.escape(chunk)}</pre>"
-                                        yield f"data: {json.dumps({'type': 'html', 'data': html_fragment, 'origin': output_type})}\n\n"
-                            else:
-                                # keepalive to keep the SSE connection alive
-                                yield f"data: {json.dumps({'type': 'keepalive'})}\n\n"
 
-                        # Flush remaining buffers as HTML
-                        for t, remaining in list(buffers.items()):
-                            if remaining:
-                                try:
-                                    if ansi_to_html:
-                                        html_fragment = ansi_to_html(remaining)
-                                    else:
-                                        import html as _html
-
-                                        html_fragment = f"<pre>{_html.escape(remaining)}</pre>"
-
-                                    yield f"data: {json.dumps({'type': 'html', 'data': html_fragment, 'origin': t})}\n\n"
-
+                                    yield f"data: {json.dumps({'type': 'html', 'data': html_fragment, 'origin': output_type})}\n\n"
                                 except Exception as e:
-                                    console.print(f"HTML flush error: {e}", markup=False)
+                                    console.print(f"HTML conversion error: {e}", markup=False)
+                                    import html as _html
+
+                                    html_fragment = f"<pre>{_html.escape(chunk)}</pre>"
+                                    yield f"data: {json.dumps({'type': 'html', 'data': html_fragment, 'origin': output_type})}\n\n"
+                        else:
+                            # keepalive to keep the SSE connection alive
+                            yield f"data: {json.dumps({'type': 'keepalive'})}\n\n"
+
+                    # Flush remaining buffers as HTML
+                    for t, remaining in list(buffers.items()):
+                        if remaining:
+                            try:
+                                if ansi_to_html:
+                                    html_fragment = ansi_to_html(remaining)
+                                else:
                                     import html as _html
 
                                     html_fragment = f"<pre>{_html.escape(remaining)}</pre>"
-                                    yield f"data: {json.dumps({'type': 'html', 'data': html_fragment, 'origin': t})}\n\n"
 
-                        # Wait for process to finish
-                        exit_code = process.wait()
+                                yield f"data: {json.dumps({'type': 'html', 'data': html_fragment, 'origin': t})}\n\n"
 
-                        # Clean up (normal path)
+                            except Exception as e:
+                                console.print(f"HTML flush error: {e}", markup=False)
+                                import html as _html
+
+                                html_fragment = f"<pre>{_html.escape(remaining)}</pre>"
+                                yield f"data: {json.dumps({'type': 'html', 'data': html_fragment, 'origin': t})}\n\n"
+
+                    # Wait for process to finish
+                    exit_code = process.wait()
+
+                    # Clean up (normal path)
+                    _discard_session_state(session_id, process_state)
+
+                    yield f"data: {json.dumps({'type': 'exit', 'code': exit_code})}\n\n"
+                finally:
+                    with contextlib.suppress(Exception):
+                        if process is not None and process.poll() is None:
+                            _terminate_process_tree(process)
+                    if process is not None:
+                        _close_webui_process_io(process)
+                    # Ensure we remove tracking entry if still present
+                    with contextlib.suppress(Exception):
                         _discard_session_state(session_id, process_state)
-
-                        yield f"data: {json.dumps({'type': 'exit', 'code': exit_code})}\n\n"
-                    finally:
-                        with contextlib.suppress(Exception):
-                            if process is not None and process.poll() is None:
-                                _terminate_process_tree(process)
-                        if process is not None:
-                            _close_webui_process_io(process)
-                        # Ensure we remove tracking entry if still present
-                        with contextlib.suppress(Exception):
-                            _discard_session_state(session_id, process_state)
 
             except Exception as e:
                 console.print(f"Execution error for session {session_id}: {e}", markup=False)
@@ -6849,18 +6338,8 @@ def send_input():
         if session_id not in active_processes:
             return jsonify({"error": "No active process", "success": False}), 404
 
-        # If this session is an in-process run, push to its input queue
         try:
             process_info = active_processes[session_id]
-            if process_info.get("mode") == "inproc":
-                raw_q = process_info.get("input_queue")
-                if raw_q is None:
-                    return jsonify({"error": "No input queue", "success": False}), 500
-                q = raw_q
-                _set_process_awaiting_input(session_id, False)
-                q.put(user_input)
-                return jsonify({"success": True})
-
             process = process_info.get("process")
             if process is None:
                 return jsonify({"error": "No process found", "success": False}), 500
@@ -6911,81 +6390,6 @@ def kill_process():
             return jsonify({"error": "No active process", "success": False}), 404
 
         process_info = active_processes[session_id]
-        mode = process_info.get("mode")
-
-        # If this is an in-process run, perform best-effort cleanup of patched
-        # console state and release the inproc lock so future inproc runs can start.
-        if mode == "inproc":
-            # Signal cancellation to the inproc worker and attempt to join it
-            with contextlib.suppress(Exception):
-                cancel_event = process_info.get("cancel_event")
-                if isinstance(cancel_event, threading.Event):
-                    cancel_event.set()
-                worker = process_info.get("worker")
-                if isinstance(worker, threading.Thread):
-                    worker.join(timeout=2)
-
-            # Attempt to restore any patched console/cli state from the
-            # module-level store so future runs have working print/input.
-            with contextlib.suppress(Exception), contextlib.suppress(Exception):
-                # Prefer restoring originals tied to the current src.console
-                try:
-                    _src_console: Any = importlib.import_module("src.console")
-
-                    console_obj: Any = _src_console.console
-                    ck = id(console_obj)
-                    if ck in _ua_console_store:
-                        origs = _ua_console_store.pop(ck)
-                        with contextlib.suppress(Exception):
-                            console_obj.print = origs.get("orig_print", console_obj.print)
-                        with contextlib.suppress(Exception):
-                            orig_in = origs.get("orig_input", None)
-                            if orig_in is not None:
-                                console_obj.input = orig_in
-                        # Restore any cli_ui wrappers if we have originals
-                        with contextlib.suppress(Exception):
-                            _cli_ui: Any = importlib.import_module("cli_ui")
-
-                            with contextlib.suppress(Exception):
-                                if "orig_ask_yes_no" in origs and origs["orig_ask_yes_no"] is not None:
-                                    _cli_ui.ask_yes_no = origs["orig_ask_yes_no"]
-                            with contextlib.suppress(Exception):
-                                if "orig_ask_string" in origs and origs["orig_ask_string"] is not None:
-                                    _cli_ui.ask_string = origs["orig_ask_string"]
-                                if "orig_ask_choice" in origs and origs["orig_ask_choice"] is not None:
-                                    _cli_ui.ask_choice = origs["orig_ask_choice"]
-                except Exception:
-                    # Best-effort: if we can't import src.console, fall back to
-                    # restoring any stored callables into the module-level
-                    # `console` we imported at module import time.
-                    with contextlib.suppress(Exception):
-                        ck = id(console)
-                        if ck in _ua_console_store:
-                            origs = _ua_console_store.pop(ck)
-                            with contextlib.suppress(Exception):
-                                console.print = origs.get("orig_print", console.print)
-                            with contextlib.suppress(Exception):
-                                orig_in = origs.get("orig_input", None)
-                                if orig_in is not None:
-                                    console.input = orig_in
-
-                # If any other entries remain in the store, drop them to avoid
-                # leaking references — they are unlikely to be useful now.
-                _ua_console_store.clear()
-
-            # Release inproc lock if held; best-effort only.
-            with contextlib.suppress(Exception):
-                if inproc_lock.locked():
-                    inproc_lock.release()
-
-            # Remove tracking entry
-            with contextlib.suppress(Exception):
-                active_processes.pop(session_id, None)
-
-            console.print(f"In-process run terminated for session {session_id}", markup=False)
-            return jsonify({"success": True, "message": "In-process run terminated and console state wiped"})
-
-        # Otherwise assume subprocess.Popen case
         # Retrieve subprocess handle
         process = process_info.get("process")
         if process is None:
