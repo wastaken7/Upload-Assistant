@@ -28,7 +28,7 @@ class GreatPosterWall:
 
     auth_type = "other_api"
     tracker = "GREATPOSTERWALL"
-    display_name = "GreatPosterWall"
+    display_name = "Great Poster Wall"
     allows_bloated_audio = True
     source_flag = "GreatPosterWall"
     base_url = "https://greatposterwall.com"

@@ -128,7 +128,7 @@ Sequence Usenet and torrent tracker uploads while limiting contention with qBitt
 | <img src="web_ui/static/img/trackers/filelist.png" width="16" height="16" />               | FileList               | FILELIST               | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/flood.png" width="16" height="16" />                  | Flood                  | FLOOD                  | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/funfile.png" width="16" height="16" />                | FunFile                | FUNFILE                | MOVIE, TV                    |
-| <img src="web_ui/static/img/trackers/greatposterwall.png" width="16" height="16" />        | GreatPosterWall        | GREATPOSTERWALL        | MOVIE                        |
+| <img src="web_ui/static/img/trackers/greatposterwall.png" width="16" height="16" />        | Great Poster Wall      | GREATPOSTERWALL        | MOVIE                        |
 | <img src="web_ui/static/img/trackers/hawkeuno.png" width="16" height="16" />               | hawke-uno              | HAWKEUNO               | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/hdbits.png" width="16" height="16" />                 | HDBits                 | HDBITS                 | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/hdspace.png" width="16" height="16" />                | HD-Space               | HDSPACE                | MOVIE, TV                    |
@@ -156,7 +156,7 @@ Sequence Usenet and torrent tracker uploads while limiting contention with qBitt
 | <img src="web_ui/static/img/trackers/orpheus.png" width="16" height="16" />                | Orpheus                | ORPHEUS                | MUSIC                        |
 | <img src="web_ui/static/img/trackers/passthepopcorn.png" width="16" height="16" />         | PassThePopcorn         | PASSTHEPOPCORN         | MOVIE                        |
 | <img src="web_ui/static/img/trackers/peergarden.png" width="16" height="16" />             | PeerGarden             | PEERGARDEN             | MOVIE, TV, GAME, BOOK, MUSIC |
-| <img src="web_ui/static/img/trackers/polishtorrent.png" width="16" height="16" />          | PolishTorrent          | POLISHTORRENT          | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/polishtorrent.png" width="16" height="16" />          | Polish Torrent         | POLISHTORRENT          | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/portugas.png" width="16" height="16" />               | Portugas               | PORTUGAS               | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/privatehd.png" width="16" height="16" />              | PrivateHD              | PRIVATEHD              | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/ptgtk.png" width="16" height="16" />                  | PT GTK                 | PTGTK                  | MOVIE, TV                    |
@@ -170,7 +170,7 @@ Sequence Usenet and torrent tracker uploads while limiting contention with qBitt
 | <img src="web_ui/static/img/trackers/rastastugan.png" width="16" height="16" />            | Rastastugan            | RASTASTUGAN            | MOVIE, TV, BOOK, GAME, MUSIC |
 | <img src="web_ui/static/img/trackers/reelflix.png" width="16" height="16" />               | ReelFLiX               | REELFLIX               | MOVIE                        |
 | <img src="web_ui/static/img/trackers/retroflix.png" width="16" height="16" />              | RetroFlix              | RETROFLIX              | MOVIE, TV                    |
-| <img src="web_ui/static/img/trackers/retromoviesclub.png" width="16" height="16" />        | RetroMoviesClub        | RETROMOVIESCLUB        | MOVIE                        |
+| <img src="web_ui/static/img/trackers/retromoviesclub.png" width="16" height="16" />        | Retro Movies Club      | RETROMOVIESCLUB        | MOVIE                        |
 | <img src="web_ui/static/img/trackers/rockethd.png" width="16" height="16" />               | RocketHD               | ROCKETHD               | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/samaritano.png" width="16" height="16" />             | Samaritano             | SAMARITANO             | MOVIE, TV, BOOK, GAME        |
 | <img src="web_ui/static/img/trackers/seedpool.png" width="16" height="16" />               | seedpool               | SEEDPOOL               | MOVIE, TV, BOOK, GAME, MUSIC |
@@ -179,12 +179,12 @@ Sequence Usenet and torrent tracker uploads while limiting contention with qBitt
 | <img src="web_ui/static/img/trackers/speedapp.png" width="16" height="16" />               | SpeedApp               | SPEEDAPP               | MOVIE, TV, BOOK, GAME, MUSIC |
 | <img src="web_ui/static/img/trackers/swarmazon.png" width="16" height="16" />              | Swarmazon              | SWARMAZON              | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/theleachzone.png" width="16" height="16" />           | The Leach Zone         | THELEACHZONE           | MOVIE, TV                    |
-| <img src="web_ui/static/img/trackers/theoldschool.png" width="16" height="16" />           | TheOldSchool           | THEOLDSCHOOL           | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/theoldschool.png" width="16" height="16" />           | The Old School         | THEOLDSCHOOL           | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/torrenteros.png" width="16" height="16" />            | Torrenteros            | TORRENTEROS            | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/torrenthr.png" width="16" height="16" />              | TorrentHR              | TORRENTHR              | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/torrentleech.png" width="16" height="16" />           | TorrentLeech           | TORRENTLEECH           | MOVIE, TV, BOOK, GAME, MUSIC |
 | <img src="web_ui/static/img/trackers/totheglory.png" width="16" height="16" />             | ToTheGlory             | TOTHEGLORY             | MOVIE, TV                    |
-| <img src="web_ui/static/img/trackers/tvchaosuk.png" width="16" height="16" />              | TVChaosUK              | TVCHAOSUK              | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/tvchaosuk.png" width="16" height="16" />              | TV Chaos UK            | TVCHAOSUK              | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/xingyungept.png" width="16" height="16" />            | XingyungePT            | XINGYUNGEPT            | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/ulcx.png" width="16" height="16" />                   | ULCX                   | ULCX                   | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/utopia.png" width="16" height="16" />                 | UTOPIA                 | UTOPIA                 | MOVIE, TV                    |

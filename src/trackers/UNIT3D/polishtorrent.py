@@ -14,7 +14,7 @@ class PolishTorrent(UNIT3D):
     """
 
     tracker = "POLISHTORRENT"
-    display_name = "PolishTorrent"
+    display_name = "Polish Torrent"
     allows_bloated_audio = True
     base_url = "https://polishtorrent.top"
     banned_groups = ("ViP", "BiRD", "M@RTiNU$", "inTGrity", "CiNEMAET", "MusicET", "TeamET", "R2D2")
