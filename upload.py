@@ -375,6 +375,7 @@ async def merge_meta(meta: Meta, saved_meta: dict[str, Any]) -> dict[str, Any]:
     overwrite_list = [
         "anon",
         "asin",
+        "audible_url",
         "audiobook_bitrate",
         "audiobook_duration_formatted",
         "audiobook_duration",

@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any, TextIO
 import argcomplete
 
 from src.app_paths import DATA_DIR
+from src.audible import normalize_audible_url
 
 if TYPE_CHECKING:
     from src.meta import Meta
@@ -575,6 +576,14 @@ class Args:
             help="Book/Audiobook ASIN (overrides auto-detected value)",
             type=str,
             dest="book_asin",
+        )
+        parser.add_argument(
+            "--audible-url",
+            nargs=1,
+            required=False,
+            help="Audible product URL; sets the ASIN and overrides the configured Audible marketplace",
+            type=normalize_audible_url,
+            dest="audible_url",
         )
         parser.add_argument(
             "-openlib",
@@ -1302,6 +1311,19 @@ class Args:
         book_asin_arg = meta.book_asin
         if book_asin_arg not in (None, ""):
             meta.asin = str(book_asin_arg).strip()
+
+        audible_url_arg = meta.audible_url
+        if audible_url_arg not in (None, ""):
+            audible_url = normalize_audible_url(str(audible_url_arg))
+            audible_asin = audible_url.rsplit("/", 1)[-1]
+            if meta.asin and str(meta.asin).strip().upper() != audible_asin:
+                from src.console import logger
+
+                logger.error("[red]The ASIN in --audible-url does not match --asin.[/red]")
+                sys.exit(1)
+            meta.audible_url = audible_url
+            meta.asin = audible_asin
+            meta.book_asin = audible_asin
 
         openlibrary_arg = meta.openlibrary
         if openlibrary_arg not in (None, ""):

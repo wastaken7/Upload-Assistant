@@ -98,6 +98,7 @@ You can override auto-detected values using the following command-line flags:
 | `-author`    | `--author`        | Overrides the book author                                                                           |
 | `-isbn`      | `--isbn`          | Overrides the ISBN number                                                                           |
 | `-asin`      | `--asin`          | Overrides the ASIN number                                                                           |
+|              | `--audible-url`   | Audible product URL; sets the ASIN and overrides the configured Audible marketplace                 |
 | `-blang`     | `--book-language` | Overrides the book language (e.g. English, Portuguese)                                              |
 | `-openlib`   | `--openlibrary`   | Specifies the OpenLibrary Work ID (e.g. `OL45883W`). Accepts a full OpenLibrary URL or just the ID. |
 | `-comic`     | `--comic`         | Identifies the book upload as a Comic                                                               |

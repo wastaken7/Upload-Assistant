@@ -52,6 +52,7 @@ class Meta:
     audio_spectrogram: bool | None = None
     dynamic_hdr_plot: bool | None = None
     audio: str = ""
+    audible_url: str = ""
     audiobook_bitrate: int | None = None
     audiobook_duration_formatted: str | None = None
     audiobook_duration: float | None = None
