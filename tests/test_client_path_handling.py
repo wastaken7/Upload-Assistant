@@ -4,7 +4,9 @@ import asyncio
 import os
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
+
+import bencode
 
 from src.clients import Clients
 from src.meta import Meta
@@ -48,6 +50,58 @@ def test_clients_remote_path_map_parses_stringified_path_lists() -> None:
 
 def test_rtorrent_coerce_str_list_parses_stringified_paths() -> None:
     assert coerce_str_list("['/local', '/remote']") == ["/local", "/remote"]
+
+
+def test_rtorrent_keeps_multifile_release_directory_as_base(tmp_path: Path) -> None:
+    for category in ("BOOK", "GAME"):
+        release_dir = tmp_path / category
+        release_dir.mkdir()
+        filelist = [release_dir / "part1.bin", release_dir / "part2.bin"]
+        for file_path in filelist:
+            file_path.write_bytes(b"x")
+
+        torrent_path = tmp_path / f"{category}.torrent"
+        bencode.bwrite(
+            {
+                "announce": "https://tracker.invalid/announce",
+                "info": {
+                    "files": [
+                        {"length": 1, "path": ["part1.bin"]},
+                        {"length": 1, "path": ["part2.bin"]},
+                    ],
+                    "name": category,
+                    "piece length": 1,
+                    "pieces": b"0" * 40,
+                },
+            },
+            str(torrent_path),
+        )
+
+        start_verbose = Mock()
+        rtorrent_server = SimpleNamespace(load=SimpleNamespace(start_verbose=start_verbose))
+        meta = Meta(
+            {
+                "category": category,
+                "filelist": [str(file_path) for file_path in filelist],
+                "path": str(release_dir),
+            }
+        )
+        with (
+            patch("src.torrent_clients.rtorrent.xmlrpc.client.Server", return_value=rtorrent_server),
+            patch("src.torrent_clients.rtorrent.time.sleep"),
+        ):
+            Clients({}).rtorrent(
+                str(release_dir),
+                str(torrent_path),
+                SimpleNamespace(),
+                meta,
+                str(tmp_path),
+                str(tmp_path),
+                {"linking": None, "rtorrent_label": None, "rtorrent_url": "https://rtorrent.invalid"},
+                "TRACKER",
+            )
+
+        assert start_verbose.call_args.args[2] == f"d.directory_base.set={release_dir}"
 
 
 def test_tracker_directory_falls_back_to_tracker_name() -> None:

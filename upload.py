@@ -656,7 +656,7 @@ async def _prompt_game_meta(meta: Meta) -> None:
     torrent name is rebuilt so the confirmation screen and the per-tracker
     uploads reflect the new values.
     """
-    game_required_fields = ["title", "year", "platform", "game_version", "game_subcategory"]
+    game_required_fields = ["title", "year", "platform", "game_subcategory"]
     game_missing: list[str] = []
     for f in game_required_fields:
         val = getattr(meta, f, None)
@@ -701,14 +701,6 @@ async def _prompt_game_meta(meta: Meta) -> None:
                     if value:
                         meta[field] = value
                         name_needs_rebuild = True
-                elif field == "game_version":
-                    value = (CLI_UI.ask_string("Enter game version (e.g., 1.15) (leave blank to skip): ") or "").strip()
-                    if value:
-                        from src.prep_game import normalize_version
-
-                        meta[field] = normalize_version(value)
-                        name_needs_rebuild = True
-
                 elif field == "game_subcategory":
                     subcategory_choices = ["full_game (Full Game)", "full_game_dlc (Full Game + DLC)", "dlc (DLC only)", "update (Update only)"]
                     subcategory_values = {

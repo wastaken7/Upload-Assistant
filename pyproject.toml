@@ -1,6 +1,6 @@
 [project]
 name = "upload-assistant"
-version = "3.9"
+version = "4.0"
 requires-python = ">=3.14"
 description = "A simple tool to take the work out of uploading."
 readme = "README.md"
