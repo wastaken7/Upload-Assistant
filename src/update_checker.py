@@ -374,7 +374,11 @@ def get_changelog_history(
         unreleased = fetch_unreleased_changes(base_version) if base_version else None
         if unreleased is None and base_version:
             unreleased = _unavailable_unreleased_changes(base_version)
-        checked_at = _write_changelog_cache(state_dir, releases, unreleased)
+        checked_at = time.time()
+        try:
+            checked_at = _write_changelog_cache(state_dir, releases, unreleased)
+        except OSError:
+            pass
         return {
             "success": True,
             "source": "github",

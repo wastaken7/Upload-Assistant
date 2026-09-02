@@ -847,6 +847,7 @@
 
       const handleKeyDown = (event) => {
         if (event.key === "Escape") {
+          if (!dialog?.contains(document.activeElement)) return;
           event.preventDefault();
           closeHandlerRef.current?.();
           return;
@@ -1185,9 +1186,18 @@
     const parsedUnreleasedCommits = React.useMemo(
       () =>
         unreleasedCommits.map((commit, index) => {
-          const originalSummary = String(commit.summary || "Untitled commit");
+          const originalSummary =
+            String(commit.summary || "").trim() || "Untitled commit";
           const parsedEntry = parseUAReleaseNotes(`- ${originalSummary}`)
-            .entries[0];
+            .entries[0] || {
+            id: `${index}-change--${originalSummary}`,
+            type: "change",
+            typeLabel: "Change",
+            scope: "",
+            summary: originalSummary,
+            url: "",
+            area: getUAChangelogArea("", originalSummary),
+          };
           return {
             commit,
             entry: {
@@ -1216,7 +1226,7 @@
     );
     const hasVisibleUnreleased = Boolean(
       unreleased &&
-      (activeArea === "all" || visibleUnreleasedCommits.length > 0),
+        (activeArea === "all" || visibleUnreleasedCommits.length > 0),
     );
     const visibleReleases = parsedReleases.filter(
       ({ parsed }) =>

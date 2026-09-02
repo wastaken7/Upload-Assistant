@@ -30,15 +30,7 @@
       href="{{ url_for('static', filename='favicon.ico') }}"
     />
     <script src="https://cdn.tailwindcss.com"></script>
-    <script
-      type="text/javascript"
-      src="{{ url_for('static', filename='js/shared_utils.js') }}"
-    ></script>
-    <script>
-      document.documentElement.dataset.uaMode = window.getUAStoredTheme()
-        ? "dark"
-        : "light";
-    </script>
+    {% include "_theme_bootstrap.html" %}
     <link
       rel="stylesheet"
       href="{{ url_for('static', filename='css/theme.css') }}"

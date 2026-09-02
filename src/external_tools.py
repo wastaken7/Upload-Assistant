@@ -69,7 +69,10 @@ def _is_android() -> bool:
 
 
 def _is_usable_file(path: Path) -> bool:
-    return path.is_file() and (os.name == "nt" or os.access(path, os.X_OK))
+    try:
+        return path.is_file() and (os.name == "nt" or os.access(path, os.X_OK))
+    except (OSError, ValueError):
+        return False
 
 
 def _version_from_marker(marker: Path) -> str:
@@ -186,7 +189,7 @@ def _managed_paths(key: str, state_dir: Path, code_dir: Path) -> list[tuple[Path
         if system == "windows" and machine in {"amd64", "x86_64"}:
             binary = state_dir / "bin" / "MI" / "windows" / "dvd" / "MediaInfo.exe"
             return [(binary, binary.parent / "version_23.04", "23.04")]
-        if system == "linux" and machine in {"amd64", "x86_64", "arm64"}:
+        if system == "linux" and machine in {"amd64", "x86_64", "arm64", "aarch64"}:
             binary = state_dir / "bin" / "MI" / "linux" / "dvd" / "mediainfo"
             return [(binary, binary.parent / "version_23.04", "23.04")]
 
@@ -253,6 +256,9 @@ def _is_automatically_managed(key: str) -> bool:
     if key == "mediainfo_path":
         return bool(_managed_paths(key, Path(), Path()))
     if key == "dvd_mediainfo_path":
+        # The runtime downloader does not yet normalize the Linux aarch64 alias.
+        if system == "linux" and machine == "aarch64":
+            return False
         return bool(_managed_paths(key, Path(), Path()))
     if key in {"bdinfo_path", "mkbrr_path", "dovi_tool_path", "hdr10plus_tool_path"}:
         return bool(_managed_paths(key, Path(), Path()))

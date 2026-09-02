@@ -202,6 +202,34 @@ def test_changelog_history_fetches_and_reuses_cache(tmp_path, monkeypatch) -> No
     assert cached_status["unreleased"] == unreleased
 
 
+def test_changelog_history_returns_fetched_data_when_cache_write_fails(tmp_path, monkeypatch) -> None:
+    releases = [
+        {
+            "version": "v2.0",
+            "title": "Version 2.0",
+            "changelog": "* fix(webui): keep fetched changelog available",
+            "release_url": "https://github.com/wastaken7/Upload-Assistant/releases/tag/v2.0",
+            "published_at": "2026-08-29T00:00:00Z",
+            "prerelease": False,
+        }
+    ]
+    monkeypatch.setattr(update_checker.time, "time", lambda: 100)
+    monkeypatch.setattr(update_checker, "fetch_release_history", lambda: releases)
+    monkeypatch.setattr(update_checker, "fetch_unreleased_changes", lambda _base: None)
+    monkeypatch.setattr(
+        update_checker,
+        "_write_changelog_cache",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("read-only state directory")),
+    )
+
+    status = update_checker.get_changelog_history(state_dir=tmp_path / "state")
+
+    assert status["success"] is True
+    assert status["source"] == "github"
+    assert status["releases"] == releases
+    assert status["checked_at"] == 100
+
+
 def test_changelog_history_falls_back_to_bundled_release(tmp_path, monkeypatch) -> None:
     code_dir = tmp_path / "code"
     (code_dir / "src").mkdir(parents=True)
