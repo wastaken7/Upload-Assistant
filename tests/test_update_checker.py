@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import json
+from unittest.mock import Mock
 
 from src import update_checker
 
@@ -216,14 +217,12 @@ def test_changelog_history_returns_fetched_data_when_cache_write_fails(tmp_path,
     monkeypatch.setattr(update_checker.time, "time", lambda: 100)
     monkeypatch.setattr(update_checker, "fetch_release_history", lambda: releases)
     monkeypatch.setattr(update_checker, "fetch_unreleased_changes", lambda _base: None)
-    monkeypatch.setattr(
-        update_checker,
-        "_write_changelog_cache",
-        lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("read-only state directory")),
-    )
+    cache_writer = Mock(side_effect=OSError("read-only state directory"))
+    monkeypatch.setattr(update_checker, "_write_changelog_cache", cache_writer)
 
     status = update_checker.get_changelog_history(state_dir=tmp_path / "state")
 
+    cache_writer.assert_called_once()
     assert status["success"] is True
     assert status["source"] == "github"
     assert status["releases"] == releases
