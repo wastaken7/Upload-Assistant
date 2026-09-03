@@ -1724,9 +1724,7 @@ function TagListEditor({
         ref={inputRef}
         type="text"
         value={draft}
-        placeholder={
-          entries.length === 0 ? placeholder : addAnotherPlaceholder
-        }
+        placeholder={entries.length === 0 ? placeholder : addAnotherPlaceholder}
         aria-label={`Add ${entryLabel}`}
         className="ua-config-tag-input min-w-32 flex-1 border-0 bg-transparent px-1 py-1 text-sm outline-none"
         onChange={(event) => setDraft(event.target.value)}
@@ -2007,6 +2005,8 @@ function ConfigLeafEditor({
   pathParts,
   isDarkMode,
   fullWidth,
+  inlineBooleanLabel,
+  labelOverride,
   allImageHosts,
   usedImageHosts,
   torrentClients,
@@ -2016,10 +2016,10 @@ function ConfigLeafEditor({
 }) {
   const path = [...pathParts, item.key];
   const fieldId = path.join("--");
-  const displayLabel = formatConfigFieldLabel(item.key, pathParts);
+  const displayLabel =
+    labelOverride || formatConfigFieldLabel(item.key, pathParts);
   const isSuperSeedTrackerField =
-    pathParts.includes("TORRENT_CLIENTS") &&
-    item.key === "super_seed_trackers";
+    pathParts.includes("TORRENT_CLIENTS") && item.key === "super_seed_trackers";
 
   const helpBelongsToSection = path.join("/") === "DEFAULT/ffmpeg_path";
   const helpBelongsToTorrentClientLinkingNote =
@@ -2045,8 +2045,8 @@ function ConfigLeafEditor({
       ? item.help.join("\n")
       : "";
   const labelClass = isDarkMode
-    ? "text-sm font-medium text-gray-200"
-    : "text-sm font-medium text-gray-700";
+    ? `${inlineBooleanLabel ? "text-[15px] font-semibold" : "text-sm font-medium"} text-gray-200`
+    : `${inlineBooleanLabel ? "text-[15px] font-semibold" : "text-sm font-medium"} text-gray-700`;
 
   const inputClass = isDarkMode
     ? "w-full px-3 py-2 border border-gray-700 bg-gray-900 text-gray-100 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
@@ -2338,7 +2338,9 @@ function ConfigLeafEditor({
       <div
         className={
           fullWidth
-            ? "space-y-2"
+            ? inlineBooleanLabel
+              ? "flex flex-wrap items-center gap-3"
+              : "space-y-2"
             : "grid grid-cols-1 items-start gap-3 px-4 py-3 md:grid-cols-12"
         }
       >
@@ -2378,9 +2380,11 @@ function ConfigLeafEditor({
                 className={`ua-config-boolean-knob inline-block h-4 w-4 transform rounded-full transition-transform ${checked ? "translate-x-6" : "translate-x-1"}`}
               />
             </button>
-            <span className={isDarkMode ? "text-gray-200" : "text-gray-700"}>
-              {checked ? "True" : "False"}
-            </span>
+            {!inlineBooleanLabel && (
+              <span className={isDarkMode ? "text-gray-200" : "text-gray-700"}>
+                {checked ? "True" : "False"}
+              </span>
+            )}
           </div>
         </div>
         {!fullWidth && <div className="col-span-1 text-right"></div>}
@@ -2931,6 +2935,7 @@ function ConfigLeafEditor({
             className="ua-config-multiselect flex min-h-10 w-full cursor-pointer items-center justify-between gap-3 rounded-lg border px-3 py-2 text-sm"
             onClick={() => setIsOpen(!isOpen)}
             onKeyDown={(event) => {
+              if (event.target !== event.currentTarget) return;
               if (event.key === "Enter" || event.key === " ") {
                 event.preventDefault();
                 setIsOpen((open) => !open);
@@ -4175,9 +4180,7 @@ function TorrentClientSettings({
   const torrentStorageItem = itemByKey.get("torrent_storage_dir");
   const hasQbitTorrentStorageWarning =
     Array.isArray(torrentStorageItem?.help) &&
-    torrentStorageItem.help.some((line) =>
-      /SQLite Mode/i.test(String(line)),
-    );
+    torrentStorageItem.help.some((line) => /SQLite Mode/i.test(String(line)));
 
   const renderField = (item) => {
     const isWideList = ["super_seed_trackers", "linked_folder"].includes(
@@ -4222,24 +4225,24 @@ function TorrentClientSettings({
                 <span className="font-semibold">
                   Torrent Storage Directory:
                 </span>{" "}
-                Optionally select qBittorrent&apos;s BT_backup directory to speed
-                up existing-torrent validation with qui/API search. Do not
+                Optionally select qBittorrent&apos;s BT_backup directory to
+                speed up existing-torrent validation with qui/API search. Do not
                 configure this when qBittorrent is using SQLite mode.
               </p>
             )}
             {group.id === "linking" && (
               <div className="ua-config-service-description mt-3 space-y-1 text-xs leading-relaxed">
                 <p>
-                  <span className="font-semibold">Linking:</span> Choose Symbolic
-                  Link or Hard Link to create tracker-specific linked content.
-                  Leave it disabled to use the original path.
+                  <span className="font-semibold">Linking:</span> Choose
+                  Symbolic Link or Hard Link to create tracker-specific linked
+                  content. Leave it disabled to use the original path.
                 </p>
                 {linkingValue ? (
                   <React.Fragment>
                     <p>
-                      <span className="font-semibold">Allow Fallback:</span> When
-                      enabled, UA can inject the original path if creating the
-                      link fails.
+                      <span className="font-semibold">Allow Fallback:</span>{" "}
+                      When enabled, UA can inject the original path if creating
+                      the link fails.
                     </p>
                     <p>
                       <span className="font-semibold">Linked Folders:</span>{" "}
@@ -5622,6 +5625,314 @@ function TrackerManager({
   );
 }
 
+function ArrIntegrationSettings({
+  service,
+  items,
+  pathParts,
+  pendingChanges,
+  isDarkMode,
+  allImageHosts,
+  usedImageHosts,
+  torrentClients,
+  onValueChange,
+}) {
+  const prefix = service.toLowerCase();
+  const itemByKey = new Map((items || []).map((item) => [item.key, item]));
+  const useItem = itemByKey.get(`use_${prefix}`);
+  const fieldKeysForIndex = (index) => {
+    const suffix = index === 0 ? "" : `_${index}`;
+    return [`${prefix}_url${suffix}`, `${prefix}_api_key${suffix}`];
+  };
+  const optionalIndexes = [1, 2, 3];
+  const pendingChangeForKey = (key) =>
+    pendingChanges?.get([...pathParts, key].join("/"));
+  const isInitiallyConfigured = (index) =>
+    fieldKeysForIndex(index).some(
+      (key) => itemByKey.get(key)?.source === "config",
+    );
+  const initialVisibleIndexes = () =>
+    optionalIndexes.filter(
+      (index) =>
+        isInitiallyConfigured(index) ||
+        fieldKeysForIndex(index).some((key) => pendingChangeForKey(key)),
+    );
+  const initialPendingRemovalIndexes = () =>
+    optionalIndexes.filter((index) => {
+      if (!isInitiallyConfigured(index)) return false;
+      const changes = fieldKeysForIndex(index)
+        .map(pendingChangeForKey)
+        .filter(Boolean);
+      return (
+        changes.length > 0 &&
+        changes.every(
+          (change) =>
+            change.value === null ||
+            change.value === undefined ||
+            String(change.value).trim() === "",
+        )
+      );
+    });
+  const itemSignature = (items || [])
+    .map((item) => `${item.key}:${item.source}:${JSON.stringify(item.value)}`)
+    .join("|");
+  const [visibleIndexes, setVisibleIndexes] = useState(
+    () => new Set(initialVisibleIndexes()),
+  );
+  const [pendingRemovalIndexes, setPendingRemovalIndexes] = useState(
+    () => new Set(initialPendingRemovalIndexes()),
+  );
+
+  useEffect(() => {
+    setVisibleIndexes(new Set(initialVisibleIndexes()));
+    setPendingRemovalIndexes(new Set(initialPendingRemovalIndexes()));
+  }, [itemSignature]);
+
+  useEffect(() => {
+    const arrPathKeys = new Set(
+      optionalIndexes.flatMap((index) =>
+        fieldKeysForIndex(index).map((key) => [...pathParts, key].join("/")),
+      ),
+    );
+    const resetArrState = (event) => {
+      if (!arrPathKeys.has(String(event.detail?.pathKey))) return;
+      setVisibleIndexes(new Set(initialVisibleIndexes()));
+      setPendingRemovalIndexes(new Set());
+    };
+    window.addEventListener(CONFIG_FIELD_RESET_EVENT, resetArrState);
+    return () =>
+      window.removeEventListener(CONFIG_FIELD_RESET_EVENT, resetArrState);
+  }, [itemSignature, pathParts.join("/")]);
+
+  const originalFieldValue = (item, index) => {
+    if (!item || (index > 0 && item.source !== "config")) return "";
+    return item.value === null || item.value === undefined
+      ? ""
+      : String(item.value);
+  };
+
+  const stageFieldValue = (
+    item,
+    index,
+    value,
+    isRedacted = false,
+    removeKey = false,
+  ) => {
+    if (!item) return;
+    const originalRaw = originalFieldValue(item, index);
+    const sensitive = isSensitiveKeyForPath(item.key, pathParts);
+    const originalValue =
+      sensitive && originalRaw.trim() !== "" ? "<REDACTED>" : originalRaw;
+    onValueChange([...pathParts, item.key], value, {
+      originalValue,
+      isSensitive: sensitive,
+      isRedacted,
+      readOnly: false,
+      removeKey,
+    });
+  };
+
+  const removeInstance = (index) => {
+    for (const key of fieldKeysForIndex(index)) {
+      stageFieldValue(itemByKey.get(key), index, "", false, true);
+    }
+    if (isInitiallyConfigured(index)) {
+      setPendingRemovalIndexes((current) => new Set([...current, index]));
+      return;
+    }
+    setVisibleIndexes((current) => {
+      const next = new Set(current);
+      next.delete(index);
+      return next;
+    });
+  };
+
+  const undoRemoveInstance = (index) => {
+    for (const key of fieldKeysForIndex(index)) {
+      const item = itemByKey.get(key);
+      const originalRaw = originalFieldValue(item, index);
+      const sensitive = isSensitiveKeyForPath(key, pathParts);
+      const hasRedactedValue = sensitive && originalRaw.trim() !== "";
+      stageFieldValue(
+        item,
+        index,
+        hasRedactedValue ? "<REDACTED>" : originalRaw,
+        hasRedactedValue,
+      );
+    }
+    setPendingRemovalIndexes((current) => {
+      const next = new Set(current);
+      next.delete(index);
+      return next;
+    });
+  };
+
+  const addInstance = () => {
+    const nextIndex = optionalIndexes.find(
+      (index) => !visibleIndexes.has(index),
+    );
+    if (nextIndex === undefined) return;
+    setVisibleIndexes((current) => new Set([...current, nextIndex]));
+  };
+
+  const renderField = (item, index, label) => {
+    if (!item) return null;
+    const renderedItem =
+      index > 0 && item.source !== "config"
+        ? { ...item, value: "", example_value: "", help: [] }
+        : { ...item, help: [] };
+    return (
+      <ConfigLeaf
+        key={[...pathParts, item.key].join("/")}
+        item={renderedItem}
+        pathParts={pathParts}
+        depth={0}
+        isDarkMode={isDarkMode}
+        fullWidth={true}
+        labelOverride={label}
+        allImageHosts={allImageHosts}
+        usedImageHosts={usedImageHosts}
+        torrentClients={torrentClients}
+        onValueChange={onValueChange}
+      />
+    );
+  };
+
+  const renderInstance = (index) => {
+    const [urlKey, apiKey] = fieldKeysForIndex(index);
+    const urlItem = itemByKey.get(urlKey);
+    const apiItem = itemByKey.get(apiKey);
+    if (!urlItem || !apiItem) return null;
+    const isPrimary = index === 0;
+    const instanceNumber = index + 1;
+    const isPendingRemoval = pendingRemovalIndexes.has(index);
+
+    return (
+      <div
+        key={`${prefix}-instance-${instanceNumber}`}
+        className="ua-config-state-panel rounded-lg border p-4"
+      >
+        <div className={isPrimary ? "mb-4" : "mb-3"}>
+          <div>
+            <h4 className="text-sm font-semibold">
+              {isPrimary ? "Primary instance" : `Instance ${instanceNumber}`}
+            </h4>
+            {isPrimary && (
+              <p className="ua-config-service-description mt-1 text-xs">
+                Queried first when {service} integration is enabled.
+              </p>
+            )}
+          </div>
+        </div>
+        {isPendingRemoval ? (
+          <div className="ua-config-removal-panel flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between">
+            <span className="text-sm">
+              {service} instance {instanceNumber} will be removed when you save.
+            </span>
+            <button
+              type="button"
+              className="w-full rounded-lg border px-3 py-2 text-sm font-semibold sm:w-auto"
+              onClick={() => undoRemoveInstance(index)}
+            >
+              Undo
+            </button>
+          </div>
+        ) : (
+          <div
+            className={
+              isPrimary
+                ? "grid grid-cols-1 gap-4 lg:grid-cols-2"
+                : "grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
+            }
+          >
+            {renderField(urlItem, index, "URL")}
+            {renderField(apiItem, index, "API Key")}
+            {!isPrimary && (
+              <div className="flex lg:h-full lg:flex-col">
+                <span
+                  className="invisible hidden text-sm font-medium lg:block"
+                  aria-hidden="true"
+                >
+                  Action
+                </span>
+                <div className="flex w-full lg:mt-2 lg:flex-1 lg:items-center">
+                  <button
+                    type="button"
+                    className="w-full rounded-lg border border-red-500/40 px-3 py-2 text-sm font-semibold text-red-500 hover:bg-red-500/10 lg:w-auto"
+                    onClick={() => removeInstance(index)}
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const activeInstanceCount =
+    1 + optionalIndexes.filter((index) => visibleIndexes.has(index)).length;
+  const canAddInstance = activeInstanceCount < 4;
+
+  return (
+    <section className="ua-config-section overflow-hidden rounded-xl border">
+      <div className="ua-config-section-heading border-b px-4 py-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="text-sm font-semibold">{service}</h3>
+          <span className="ua-config-client-type rounded-full px-2 py-0.5 text-xs font-semibold">
+            ARR
+          </span>
+        </div>
+        <p className="ua-config-service-description mt-1 text-xs">
+          Enable {service} to search for {service === "Sonarr" ? "TV" : "movie"}{" "}
+          metadata. Each instance requires a URL and API key. UA tries up to
+          four configured instances in the order shown.
+        </p>
+      </div>
+      <div className="ua-config-section-panel space-y-4 p-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+          {useItem && (
+            <div className="max-w-sm">
+              <ConfigLeaf
+                item={{ ...useItem, help: [] }}
+                pathParts={pathParts}
+                depth={0}
+                isDarkMode={isDarkMode}
+                fullWidth={true}
+                inlineBooleanLabel={true}
+                labelOverride={`Enable ${service}`}
+                allImageHosts={allImageHosts}
+                usedImageHosts={usedImageHosts}
+                torrentClients={torrentClients}
+                onValueChange={onValueChange}
+              />
+            </div>
+          )}
+          <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center">
+            <span className="ua-config-service-description whitespace-nowrap text-xs">
+              {activeInstanceCount} of 4 instances
+            </span>
+            <button
+              type="button"
+              className="ua-config-service-action w-full rounded-lg border px-3 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+              onClick={addInstance}
+              disabled={!canAddInstance}
+              aria-label={`Add ${service} instance`}
+            >
+              + Add Instance
+            </button>
+          </div>
+        </div>
+        {renderInstance(0)}
+        {optionalIndexes
+          .filter((index) => visibleIndexes.has(index))
+          .map(renderInstance)}
+      </div>
+    </section>
+  );
+}
+
 function ItemList({
   items,
   pathParts,
@@ -5763,6 +6074,10 @@ function ItemList({
       "sonarr_api_key",
       "sonarr_url_1",
       "sonarr_api_key_1",
+      "sonarr_url_2",
+      "sonarr_api_key_2",
+      "sonarr_url_3",
+      "sonarr_api_key_3",
     ],
     Radarr: [
       "use_radarr",
@@ -5770,6 +6085,10 @@ function ItemList({
       "radarr_api_key",
       "radarr_url_1",
       "radarr_api_key_1",
+      "radarr_url_2",
+      "radarr_api_key_2",
+      "radarr_url_3",
+      "radarr_api_key_3",
     ],
   };
 
@@ -5947,6 +6266,22 @@ function ItemList({
           {Object.keys(grouped).map((gname) => {
             const itemsInGroup = grouped[gname] || [];
             if (!itemsInGroup.length) return null;
+            if (gname === "Sonarr" || gname === "Radarr") {
+              return (
+                <ArrIntegrationSettings
+                  key={gname}
+                  service={gname}
+                  items={itemsInGroup}
+                  pathParts={pathParts}
+                  pendingChanges={pendingChanges}
+                  isDarkMode={isDarkMode}
+                  allImageHosts={allImageHosts}
+                  usedImageHosts={usedImageHosts}
+                  torrentClients={torrentClients}
+                  onValueChange={onValueChange}
+                />
+              );
+            }
             if (
               isImageHostingSection ||
               isScreenshotCaptureProcessingSection ||
@@ -6048,6 +6383,11 @@ function ItemList({
           depth === 0 &&
           item.subsection === true &&
           normalizeConfigHeading(item.key) === "METADATA CACHING";
+        const isArrIntegrationSubsection =
+          pathParts[0] === "DEFAULT" &&
+          depth === 0 &&
+          item.subsection === true &&
+          normalizeConfigHeading(item.key) === "ARR INTEGRATION";
         const isExternalToolsSubsection =
           pathParts[0] === "DEFAULT" &&
           depth === 0 &&
@@ -6283,6 +6623,7 @@ function ItemList({
             expandedGroups={expandedGroups}
             toggleGroup={toggleGroup}
             torrentClients={torrentClients}
+            pendingChanges={pendingChanges}
             externalToolStatuses={externalToolStatuses}
             externalToolStatusError={externalToolStatusError}
             isCheckingExternalTools={isCheckingExternalTools}
@@ -6292,6 +6633,7 @@ function ItemList({
         );
 
         if (
+          isArrIntegrationSubsection ||
           isImageHostingSubsection ||
           isScreenshotCaptureProcessingSubsection ||
           isScreenshotEnhancementsSubsection
@@ -8569,13 +8911,14 @@ function ConfigApp() {
         next.delete(pathKey);
         return next;
       }
-      if (matchesOriginalValue) {
+      if (matchesOriginalValue && !meta.removeKey) {
         next.delete(pathKey);
       } else {
         next.set(pathKey, {
           path,
           value,
           originalValue: meta.originalValue,
+          removeKey: Boolean(meta.removeKey),
         });
       }
       return next;
@@ -9573,7 +9916,11 @@ function ConfigApp() {
         const response = await apiFetch(`${API_BASE}/config_update`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ path: update.path, value: update.value }),
+          body: JSON.stringify({
+            path: update.path,
+            value: update.value,
+            remove: Boolean(update.removeKey),
+          }),
         });
         const data = await response.json();
         if (!data.success) {
@@ -9771,8 +10118,23 @@ function ConfigApp() {
       : groupedVisibleItems;
 
   const statusClass = "ua-config-status text-sm";
+  const pendingArrInstanceIds = new Set();
+  let pendingFieldChangeCount = 0;
+  for (const update of pendingChanges.values()) {
+    const path = Array.isArray(update.path) ? update.path : [];
+    const match =
+      path[0] === "DEFAULT" && path.length === 2
+        ? String(path[1]).match(/^(sonarr|radarr)_(?:url|api_key)_([1-3])$/)
+        : null;
+    if (match) {
+      pendingArrInstanceIds.add(`${match[1]}:${match[2]}`);
+    } else {
+      pendingFieldChangeCount += 1;
+    }
+  }
   const pendingChangeCount =
-    pendingChanges.size +
+    pendingFieldChangeCount +
+    pendingArrInstanceIds.size +
     pendingTorrentClients.size +
     pendingRenamedTorrentClients.size +
     pendingRemovedTorrentClients.size +
@@ -9787,6 +10149,7 @@ function ConfigApp() {
         .filter(Boolean),
     );
     const availableTrackerChanges = new Map();
+    const arrInstanceChanges = new Map();
     const describeValue = (update) => {
       const path = Array.isArray(update.path) ? update.path : [];
       const key = String(path[path.length - 1] || "");
@@ -9887,10 +10250,7 @@ function ConfigApp() {
         if (removed.length) descriptions.push(`Removed ${removed.join(", ")}`);
         return descriptions.join("; ") || "Client selection changed";
       }
-      if (
-        path[0] === "TORRENT_CLIENTS" &&
-        key === "super_seed_trackers"
-      ) {
+      if (path[0] === "TORRENT_CLIENTS" && key === "super_seed_trackers") {
         const normalizeSuperSeedTrackers = (value) => {
           let parsedValue = value;
           if (typeof parsedValue === "string") {
@@ -9901,7 +10261,11 @@ function ConfigApp() {
             }
           }
           return (Array.isArray(parsedValue) ? parsedValue : [])
-            .map((tracker) => String(tracker ?? "").trim().toUpperCase())
+            .map((tracker) =>
+              String(tracker ?? "")
+                .trim()
+                .toUpperCase(),
+            )
             .filter(Boolean);
         };
         const originalTrackers = normalizeSuperSeedTrackers(
@@ -9978,6 +10342,25 @@ function ConfigApp() {
 
     for (const [pathKey, update] of pendingChanges) {
       const path = Array.isArray(update.path) ? update.path : [];
+      const arrFieldMatch =
+        path[0] === "DEFAULT" && path.length === 2
+          ? String(path[1]).match(/^(sonarr|radarr)_(?:url|api_key)_([1-3])$/)
+          : null;
+      if (arrFieldMatch) {
+        const service = arrFieldMatch[1];
+        const instanceIndex = Number(arrFieldMatch[2]);
+        const instanceKey = `${service}:${instanceIndex}`;
+        const instanceChanges = arrInstanceChanges.get(instanceKey) || {
+          service,
+          instanceIndex,
+          pathKeys: [],
+          updates: [],
+        };
+        instanceChanges.pathKeys.push(pathKey);
+        instanceChanges.updates.push(update);
+        arrInstanceChanges.set(instanceKey, instanceChanges);
+        continue;
+      }
       const trackerName = String(path[1] || "").toUpperCase();
       const isAvailableTrackerChange =
         path[0] === "TRACKERS" &&
@@ -9995,6 +10378,37 @@ function ConfigApp() {
         pathKey,
         title: describePath(update) || "Configuration value",
         detail: describeValue(update),
+      });
+    }
+    for (const instanceChanges of arrInstanceChanges.values()) {
+      const originalConfigured = instanceChanges.updates.some(
+        (update) =>
+          update.originalValue !== null &&
+          update.originalValue !== undefined &&
+          String(update.originalValue).trim() !== "",
+      );
+      const nextConfigured = instanceChanges.updates.some(
+        (update) =>
+          update.value !== null &&
+          update.value !== undefined &&
+          String(update.value).trim() !== "",
+      );
+      const serviceLabel =
+        instanceChanges.service === "sonarr" ? "Sonarr" : "Radarr";
+      const instanceLabel = `${serviceLabel} Instance ${instanceChanges.instanceIndex + 1}`;
+      let detail = `Updated ${instanceLabel}`;
+      if (!originalConfigured && nextConfigured) {
+        detail = `Added ${instanceLabel}`;
+      }
+      if (originalConfigured && !nextConfigured) {
+        detail = `Removed ${instanceLabel}`;
+      }
+      summaries.push({
+        id: `arr-instance:${instanceChanges.service}:${instanceChanges.instanceIndex}`,
+        kind: "arr-instance",
+        pathKeys: instanceChanges.pathKeys,
+        title: `${serviceLabel} › Instance ${instanceChanges.instanceIndex + 1}`,
+        detail,
       });
     }
     for (const [trackerName, pathKeys] of availableTrackerChanges) {
@@ -10122,6 +10536,19 @@ function ConfigApp() {
           detail: { pathKey: summary.pathKey },
         }),
       );
+    } else if (summary.kind === "arr-instance") {
+      setPendingChanges((currentChanges) => {
+        const next = new Map(currentChanges);
+        summary.pathKeys.forEach((pathKey) => next.delete(pathKey));
+        return next;
+      });
+      summary.pathKeys.forEach((pathKey) => {
+        window.dispatchEvent(
+          new CustomEvent(CONFIG_FIELD_RESET_EVENT, {
+            detail: { pathKey },
+          }),
+        );
+      });
     } else if (summary.kind === "available-tracker") {
       setPendingChanges((currentChanges) => {
         const next = new Map(currentChanges);

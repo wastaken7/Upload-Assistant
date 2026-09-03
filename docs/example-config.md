@@ -245,12 +245,14 @@ Implementation notes:
 - `use_sonarr` (bool): Enable Sonarr searching.
 - `sonarr_url` (str): Sonarr base URL.
 - `sonarr_api_key` (str): Sonarr API key.
-- `sonarr_url_1` / `sonarr_api_key_1` (str): Optional second Sonarr instance.
+- `sonarr_url_1` … `sonarr_url_3` / `sonarr_api_key_1` … `sonarr_api_key_3` (str): Up to three optional additional Sonarr instances.
 
 - `use_radarr` (bool): Enable Radarr searching.
 - `radarr_url` (str): Radarr base URL.
 - `radarr_api_key` (str): Radarr API key.
-- `radarr_url_1` / `radarr_api_key_1` (str): Optional second Radarr instance.
+- `radarr_url_1` … `radarr_url_3` / `radarr_api_key_1` … `radarr_api_key_3` (str): Up to three optional additional Radarr instances.
+
+UA queries configured instances in order, starting with the unsuffixed primary instance and then continuing through suffixes `_1`, `_2`, and `_3`. Optional instances are omitted by default and can be added from the WebUI when needed.
 
 ### Torrent creation
 

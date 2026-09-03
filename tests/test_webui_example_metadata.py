@@ -88,7 +88,9 @@ def test_default_client_lists_are_grouped_with_client_selection() -> None:
         "searching_client_list": ["qbittorrent_searching"],
     }
 
-    prepared = server._prepare_default_webui_section(example_section, comments, subsections)
+    prepared = server._prepare_default_webui_section(
+        example_section, comments, subsections
+    )
     items = server._build_config_items(prepared, user_section, comments, subsections, ["DEFAULT"])
     client_selection = next(item for item in items if item["key"] == "CLIENT SELECTION")
 
@@ -103,6 +105,94 @@ def test_default_client_lists_are_grouped_with_client_selection() -> None:
         item["key"] not in {"injecting_client_list", "searching_client_list"}
         for item in items
     )
+
+
+def test_default_arr_fields_expose_all_supported_optional_instances() -> None:
+    example_section = {
+        "use_sonarr": False,
+        "sonarr_url": "http://localhost:8989",
+        "sonarr_api_key": "",
+        "use_radarr": False,
+        "radarr_url": "http://localhost:7878",
+        "radarr_api_key": "",
+    }
+    comments = {}
+    subsections = {
+        f"DEFAULT/{key}": "ARR INTEGRATION" for key in example_section
+    }
+
+    prepared = server._prepare_default_webui_section(example_section, comments, subsections)
+
+    assert list(prepared) == [
+        "use_sonarr",
+        "sonarr_url",
+        "sonarr_api_key",
+        "sonarr_url_1",
+        "sonarr_api_key_1",
+        "sonarr_url_2",
+        "sonarr_api_key_2",
+        "sonarr_url_3",
+        "sonarr_api_key_3",
+        "use_radarr",
+        "radarr_url",
+        "radarr_api_key",
+        "radarr_url_1",
+        "radarr_api_key_1",
+        "radarr_url_2",
+        "radarr_api_key_2",
+        "radarr_url_3",
+        "radarr_api_key_3",
+        "injecting_client_list",
+        "searching_client_list",
+    ]
+    assert prepared["sonarr_url_2"] == ""
+    assert prepared["radarr_api_key_3"] == ""
+    assert comments["DEFAULT/sonarr_url_1"][0] == (
+        "Settings for Sonarr instance 2."
+    )
+    assert subsections["DEFAULT/sonarr_url_3"] == "ARR INTEGRATION"
+    assert comments["DEFAULT/radarr_api_key_2"][0] == (
+        "Settings for Radarr instance 3."
+    )
+
+
+def test_config_update_removes_all_optional_arr_instance_keys(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    code_dir = tmp_path / "code"
+    state_dir = tmp_path / "state"
+    (code_dir / "data").mkdir(parents=True)
+    (state_dir / "data").mkdir(parents=True)
+    (code_dir / "data" / "example_config.py").write_text(
+        "config = {'DEFAULT': {'sonarr_url_1': 'http://second:8989', "
+        "'sonarr_api_key_1': ''}}\n",
+        encoding="utf-8",
+    )
+    config_path = state_dir / "data" / "config.py"
+    config_path.write_text(
+        "config = {'DEFAULT': {'sonarr_url_1': 'http://configured:8989', "
+        "'sonarr_api_key_1': ''}}\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(server, "CODE_DIR", code_dir)
+    monkeypatch.setattr(server, "STATE_DIR", state_dir)
+    monkeypatch.setattr(server, "_is_authenticated", lambda: True)
+    monkeypatch.setattr(server, "_verify_csrf_header", lambda: True)
+    monkeypatch.setattr(server, "_verify_same_origin", lambda: True)
+    monkeypatch.setattr(server, "_write_audit_log", lambda *args, **kwargs: None)
+
+    for key in ("sonarr_url_1", "sonarr_api_key_1"):
+        with server.app.test_request_context(
+            "/api/config_update",
+            method="POST",
+            json={"path": ["DEFAULT", key], "value": "", "remove": True},
+        ):
+            response = server.config_update()
+        assert response.get_json()["success"] is True
+
+    updated_config = server._load_config_from_file(config_path)
+    assert updated_config == {"DEFAULT": {}}
 
 
 def test_torrent_client_template_prefers_primary_qbittorrent_example() -> None:

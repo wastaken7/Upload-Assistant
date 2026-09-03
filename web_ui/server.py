@@ -3030,6 +3030,36 @@ def _prepare_default_webui_section(
             ],
         ),
     )
+    arr_optional_fields: dict[str, tuple[tuple[str, list[str]], ...]] = {
+        "sonarr_api_key": tuple(
+            (
+                field_key,
+                [
+                    f"Settings for Sonarr instance {instance_number}.",
+                    "Optional; instances are queried in numeric order.",
+                ],
+            )
+            for instance_number in (2, 3, 4)
+            for field_key in (
+                f"sonarr_url_{instance_number - 1}",
+                f"sonarr_api_key_{instance_number - 1}",
+            )
+        ),
+        "radarr_api_key": tuple(
+            (
+                field_key,
+                [
+                    f"Settings for Radarr instance {instance_number}.",
+                    "Optional; instances are queried in numeric order.",
+                ],
+            )
+            for instance_number in (2, 3, 4)
+            for field_key in (
+                f"radarr_url_{instance_number - 1}",
+                f"radarr_api_key_{instance_number - 1}",
+            )
+        ),
+    }
 
     prepared: dict[str, Any] = {}
     inserted_client_lists = False
@@ -3041,6 +3071,10 @@ def _prepare_default_webui_section(
                 comments_map.setdefault(f"DEFAULT/{client_key}", help_text)
                 subsection_map[f"DEFAULT/{client_key}"] = "CLIENT SELECTION"
             inserted_client_lists = True
+        for field_key, help_text in arr_optional_fields.get(key, ()):
+            prepared[field_key] = ""
+            comments_map.setdefault(f"DEFAULT/{field_key}", help_text)
+            subsection_map[f"DEFAULT/{field_key}"] = "ARR INTEGRATION"
 
     if not inserted_client_lists:
         for client_key, default_value, help_text in client_list_defaults:
@@ -4803,19 +4837,33 @@ def config_update():
                 _template_name, template = match
                 example_value = _get_nested_value(template, path[2:])
 
-    # Special handling for client lists that don't exist in example config
+    # Special handling for WebUI-managed fields that don't exist in example config.
     key = path[-1] if path else ""
+    is_optional_arr_field = (
+        len(path) == 2
+        and path[0] == "DEFAULT"
+        and re.fullmatch(r"(?:sonarr|radarr)_(?:url|api_key)_[1-3]", key) is not None
+    )
+    force_remove_optional_arr_field = is_optional_arr_field and data.get("remove") is True
     if key in ["injecting_client_list", "searching_client_list"]:
         example_value = []  # Default to empty list
+    elif is_optional_arr_field:
+        example_value = ""
     elif example_value is None:
         return jsonify({"success": False, "error": "Path not found in example config"}), 400
 
     coerced_value = _coerce_config_value(raw_value, example_value)
     new_value_literal = _python_literal(coerced_value)
 
-    # Special handling for client lists that should remain commented unless user provides values
+    # Keep optional WebUI-managed values out of config.py when they are unused.
     key = path[-1] if path else ""
-    if key in ["injecting_client_list", "searching_client_list"] and coerced_value == []:
+    should_remove_empty_value = (
+        key in ["injecting_client_list", "searching_client_list"] and coerced_value == []
+    ) or (
+        is_optional_arr_field
+        and (coerced_value == "" or force_remove_optional_arr_field)
+    )
+    if should_remove_empty_value:
         # Remove the key from config if it exists
         try:
             # Load prior value for audit
