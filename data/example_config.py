@@ -3406,10 +3406,10 @@ config: dict[str, Any] = {
         # See https://github.com/wastaken7/Upload-Assistant/blob/development/docs/configuration.md#torrent-clients
         "qbittorrent": {
             "torrent_client": "qbit",
-            # QUI reverse proxy: https://getqui.com/docs/features/reverse-proxy
-            # Create a Client Proxy API Key in QUI (Settings → Client Proxy Keys), pick the instance, paste the full proxy URL here.
+            # qui reverse proxy: https://getqui.com/docs/features/reverse-proxy
+            # Create a Client Proxy API Key in qui (Settings → Client Proxy Keys), pick the instance, paste the full proxy URL here.
             # Example: "http://localhost:7476/proxy/<your-client-api-key>".
-            # QUI is not used for bandwidth measurements; see docs/upload-order-and-bandwidth-control.md.
+            # qui is not used for bandwidth measurements; see docs/upload-order-and-bandwidth-control.md.
             "qui_proxy_url": "",
             # enable_search to True will automatically try and find a suitable hash to save having to rehash when creating torrents
             "enable_search": True,
@@ -3419,7 +3419,7 @@ config: dict[str, Any] = {
             "qbit_pass": "",
             # API Key authentication (stateless, qBittorrent v5.2.0+). When set, qbit_user and qbit_pass are ignored.
             "qbit_api_key": "",
-            # Optional qBittorrent BT_backup directory. Used together with QUI/API search;
+            # Optional qBittorrent BT_backup directory. Used together with qui/API search;
             # reading .torrent files locally can substantially speed up candidate validation.
             # Use double-backslashes on Windows, e.g. "C:\\Users\\<YOUR_USER>\\AppData\\Local\\qBittorrent\\BT_backup".
             # WARNING: this should not be used when using SQLite Mode for qBittorrent.
@@ -3461,10 +3461,10 @@ config: dict[str, Any] = {
         "qbittorrent_searching": {
             # an example of using a qBitTorrent client just for searching, when using another client for injection
             "torrent_client": "qbit",
-            # QUI reverse proxy: https://getqui.com/docs/features/reverse-proxy
-            # Create a Client Proxy API Key in QUI (Settings → Client Proxy Keys), pick the instance, paste the full proxy URL here.
+            # qui reverse proxy: https://getqui.com/docs/features/reverse-proxy
+            # Create a Client Proxy API Key in qui (Settings → Client Proxy Keys), pick the instance, paste the full proxy URL here.
             # Example: "http://localhost:7476/proxy/<your-client-api-key>".
-            # QUI is not used for bandwidth measurements; see docs/upload-order-and-bandwidth-control.md.
+            # qui is not used for bandwidth measurements; see docs/upload-order-and-bandwidth-control.md.
             "qui_proxy_url": "",
             # enable_search to True will automatically try and find a suitable hash to save having to rehash when creating torrents
             "enable_search": True,

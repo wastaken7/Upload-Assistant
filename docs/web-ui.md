@@ -197,6 +197,10 @@ The editor combines bundled defaults from `data/example_config.py` with override
 
 Under **Configuration → General → Main Settings**, enter a release-group name in **Personal Release Groups** and press Space, Enter, or comma to add it. Each group appears as a compact tag; select its **×** button to remove it. Matching is case-insensitive, and a detected matching group automatically marks the upload as a personal release.
 
+### Super-seed trackers
+
+For a configured qBittorrent client, enter UA tracker acronyms in **Super-Seed Trackers** and press Space, Enter, or comma. UA enables qBittorrent's super-seeding mode after adding a new, non-cross-seed upload to a listed tracker. [Super-seeding](https://www.bittorrent.org/beps/bep_0016.html) is intended for initial seeding servers and is not recommended for general use.
+
 ### Pending changes
 
 Configuration edits are staged in the browser instead of being written immediately.

@@ -989,7 +989,7 @@ const DISPLAY_WORD_LABELS = {
   pesto: "pesto",
   predb: "PreDB",
   ptgen: "PTGen",
-  qui: "QUI",
+  qui: "qui",
   rar: "RAR",
   rpc: "RPC",
   rss: "RSS",
@@ -1048,7 +1048,7 @@ const formatConfigFieldLabel = (key, pathParts = []) => {
   }
   if (pathParts.includes("TORRENT_CLIENTS")) {
     const torrentClientFieldLabels = {
-      qui_proxy_url: "QUI Proxy URL",
+      qui_proxy_url: "qui Proxy URL",
       qbit_url: "qBittorrent URL",
       qbit_port: "qBittorrent Port",
       qbit_user: "qBittorrent Username",
@@ -1188,15 +1188,17 @@ const imageHostApiKeys = {
   utppm: ["utppm_api"],
 };
 
-const REDUNDANT_IMAGE_HOST_API_HELP_KEYS = new Set(
-  Object.values(imageHostApiKeys)
+const REDUNDANT_IMAGE_HOST_API_HELP_KEYS = new Set([
+  ...Object.values(imageHostApiKeys)
     .flat()
     .filter(
       (key) =>
         (key.endsWith("_api") || key.endsWith("_api_key")) &&
         key !== "midnightscene_api_key",
     ),
-);
+  "sharex_url",
+  "zipline_url",
+]);
 
 const IMAGE_HOST_LABELS = {
   dalexni: "Dalexni",
@@ -1616,8 +1618,15 @@ function StringListEditor({
   );
 }
 
-function ReleaseGroupTagEditor({ value, placeholder, onChange }) {
-  const normalizeGroups = (rawValue) => {
+function TagListEditor({
+  value,
+  placeholder,
+  addAnotherPlaceholder,
+  entryLabel,
+  uppercaseNewEntries = false,
+  onChange,
+}) {
+  const normalizeEntries = (rawValue) => {
     const seen = new Set();
     return (Array.isArray(rawValue) ? rawValue : [])
       .map((entry) => String(entry ?? "").trim())
@@ -1628,43 +1637,44 @@ function ReleaseGroupTagEditor({ value, placeholder, onChange }) {
         return true;
       });
   };
-  const [groups, setGroups] = useState(() => normalizeGroups(value));
+  const [entries, setEntries] = useState(() => normalizeEntries(value));
   const [draft, setDraft] = useState("");
   const inputRef = useRef(null);
 
   useEffect(() => {
-    setGroups(normalizeGroups(value));
+    setEntries(normalizeEntries(value));
     setDraft("");
   }, [value]);
 
-  const updateGroups = (nextGroups) => {
-    setGroups(nextGroups);
-    onChange(nextGroups);
+  const updateEntries = (nextEntries) => {
+    setEntries(nextEntries);
+    onChange(nextEntries);
   };
 
   const commitDraft = () => {
     const candidates = draft
       .split(/[\s,]+/)
-      .map((group) => group.trim())
+      .map((entry) => entry.trim())
       .filter(Boolean);
     if (candidates.length === 0) {
       setDraft("");
       return;
     }
-    const seen = new Set(groups.map((group) => group.toLowerCase()));
-    const nextGroups = [...groups];
-    candidates.forEach((group) => {
-      const normalizedGroup = group.toLowerCase();
-      if (seen.has(normalizedGroup)) return;
-      seen.add(normalizedGroup);
-      nextGroups.push(group);
+    const seen = new Set(entries.map((entry) => entry.toLowerCase()));
+    const nextEntries = [...entries];
+    candidates.forEach((candidate) => {
+      const entry = uppercaseNewEntries ? candidate.toUpperCase() : candidate;
+      const normalizedEntry = entry.toLowerCase();
+      if (seen.has(normalizedEntry)) return;
+      seen.add(normalizedEntry);
+      nextEntries.push(entry);
     });
-    if (nextGroups.length !== groups.length) updateGroups(nextGroups);
+    if (nextEntries.length !== entries.length) updateEntries(nextEntries);
     setDraft("");
   };
 
-  const removeGroup = (groupToRemove) => {
-    updateGroups(groups.filter((group) => group !== groupToRemove));
+  const removeEntry = (entryToRemove) => {
+    updateEntries(entries.filter((entry) => entry !== entryToRemove));
   };
 
   return (
@@ -1672,20 +1682,20 @@ function ReleaseGroupTagEditor({ value, placeholder, onChange }) {
       className="ua-config-tag-field flex min-h-10 w-full cursor-text flex-wrap items-center gap-1.5 rounded-lg border px-2 py-1.5"
       onClick={() => inputRef.current?.focus()}
     >
-      {groups.map((group) => (
+      {entries.map((entry) => (
         <span
-          key={group.toLowerCase()}
+          key={entry.toLowerCase()}
           className="ua-config-list-tag inline-flex max-w-full items-center gap-1 rounded-md border px-2 py-1 text-xs font-semibold"
         >
-          <span className="truncate">{group}</span>
+          <span className="truncate">{entry}</span>
           <button
             type="button"
             className="ua-config-list-tag-remove inline-flex h-4 w-4 shrink-0 items-center justify-center rounded"
-            aria-label={`Remove release group ${group}`}
+            aria-label={`Remove ${entryLabel} ${entry}`}
             onMouseDown={(event) => event.preventDefault()}
             onClick={(event) => {
               event.stopPropagation();
-              removeGroup(group);
+              removeEntry(entry);
             }}
           >
             ×
@@ -1696,8 +1706,10 @@ function ReleaseGroupTagEditor({ value, placeholder, onChange }) {
         ref={inputRef}
         type="text"
         value={draft}
-        placeholder={groups.length === 0 ? placeholder : "Add another group"}
-        aria-label="Add a personal release group"
+        placeholder={
+          entries.length === 0 ? placeholder : addAnotherPlaceholder
+        }
+        aria-label={`Add ${entryLabel}`}
         className="ua-config-tag-input min-w-32 flex-1 border-0 bg-transparent px-1 py-1 text-sm outline-none"
         onChange={(event) => setDraft(event.target.value)}
         onBlur={commitDraft}
@@ -1705,9 +1717,13 @@ function ReleaseGroupTagEditor({ value, placeholder, onChange }) {
           if (event.key === "Enter" || event.key === " " || event.key === ",") {
             event.preventDefault();
             commitDraft();
-          } else if (event.key === "Backspace" && !draft && groups.length > 0) {
+          } else if (
+            event.key === "Backspace" &&
+            !draft &&
+            entries.length > 0
+          ) {
             event.preventDefault();
-            removeGroup(groups[groups.length - 1]);
+            removeEntry(entries[entries.length - 1]);
           }
         }}
       />
@@ -1983,14 +1999,30 @@ function ConfigLeafEditor({
   const path = [...pathParts, item.key];
   const fieldId = path.join("--");
   const displayLabel = formatConfigFieldLabel(item.key, pathParts);
+  const isSuperSeedTrackerField =
+    pathParts.includes("TORRENT_CLIENTS") &&
+    item.key === "super_seed_trackers" &&
+    Array.isArray(item.value);
 
   const helpBelongsToSection = path.join("/") === "DEFAULT/ffmpeg_path";
+  const helpBelongsToTorrentClientLinkingNote =
+    pathParts.includes("TORRENT_CLIENTS") &&
+    ["linking", "allow_fallback", "linked_folder"].includes(item.key);
+  const helpBelongsToTorrentStorageNote =
+    pathParts.includes("TORRENT_CLIENTS") &&
+    item.key === "torrent_storage_dir" &&
+    Array.isArray(item.help) &&
+    item.help.some((line) => /SQLite Mode/i.test(String(line)));
   const hideRedundantImageHostHelp =
     pathParts[0] === "DEFAULT" &&
-    REDUNDANT_IMAGE_HOST_API_HELP_KEYS.has(item.key);
+    (REDUNDANT_IMAGE_HOST_API_HELP_KEYS.has(item.key) ||
+      /^img_host_[1-6]$/.test(item.key));
   const helpText =
     !helpBelongsToSection &&
+    !helpBelongsToTorrentClientLinkingNote &&
+    !helpBelongsToTorrentStorageNote &&
     !hideRedundantImageHostHelp &&
+    !isSuperSeedTrackerField &&
     item.help &&
     item.help.length
       ? item.help.join("\n")
@@ -2040,7 +2072,6 @@ function ConfigLeafEditor({
     return key === "linking" && pathParts.includes("TORRENT_CLIENTS");
   };
   const torrentClientListFields = new Set([
-    "super_seed_trackers",
     "linked_folder",
     "local_path",
     "remote_path",
@@ -2176,7 +2207,7 @@ function ConfigLeafEditor({
     setSelected(selections);
   };
 
-  if (isPersonalReleaseGroupField) {
+  if (isPersonalReleaseGroupField || isSuperSeedTrackerField) {
     const originalValue = JSON.stringify(item.value);
     return (
       <div className={fullWidth ? "space-y-2" : "px-4 py-3"}>
@@ -2190,11 +2221,24 @@ function ConfigLeafEditor({
             </Tooltip>
           )}
         </div>
-        <ReleaseGroupTagEditor
+        <TagListEditor
           value={item.value}
-          placeholder="Type a release group and press Enter"
-          onChange={(nextGroups) =>
-            onValueChange(path, JSON.stringify(nextGroups), {
+          placeholder={
+            isSuperSeedTrackerField
+              ? "Type a tracker acronym and press Enter"
+              : "Type a release group and press Enter"
+          }
+          addAnotherPlaceholder={
+            isSuperSeedTrackerField
+              ? "Add another tracker"
+              : "Add another group"
+          }
+          entryLabel={
+            isSuperSeedTrackerField ? "super-seed tracker" : "release group"
+          }
+          uppercaseNewEntries={isSuperSeedTrackerField}
+          onChange={(nextEntries) =>
+            onValueChange(path, JSON.stringify(nextEntries), {
               originalValue,
               isSensitive: false,
               isRedacted: false,
@@ -2202,6 +2246,22 @@ function ConfigLeafEditor({
             })
           }
         />
+        {isSuperSeedTrackerField && (
+          <p className="ua-config-service-description mt-2 text-xs leading-relaxed">
+            Use UA tracker acronyms, such as AITHER. qBittorrent enables
+            super-seeding for new, non-cross-seed uploads to these trackers.
+            Super-seeding is intended for initial seeding servers and is not
+            recommended for general use.{" "}
+            <a
+              href="https://www.bittorrent.org/beps/bep_0016.html"
+              target="_blank"
+              rel="noreferrer"
+              className="ua-config-service-action font-semibold hover:underline"
+            >
+              Learn more <span aria-hidden="true">↗</span>
+            </a>
+          </p>
+        )}
       </div>
     );
   }
@@ -2209,13 +2269,11 @@ function ConfigLeafEditor({
   if (isStringListField) {
     const originalValue = JSON.stringify(item.value);
     const placeholders = {
-      super_seed_trackers: "Tracker acronym, e.g. AITHER",
       linked_folder: "Path to linked content",
       local_path: "Local path",
       remote_path: "Remote or container path",
     };
     const addLabels = {
-      super_seed_trackers: "Add Tracker",
       linked_folder: "Add Linked Folder",
       local_path: "Add Local Path",
       remote_path: "Add Remote Path",
@@ -4037,6 +4095,10 @@ function TorrentClientSettings({
   ];
 
   const groupedKeys = new Set(groupDefinitions.flatMap((group) => group.keys));
+  // Linking-only controls should remain hidden while no linking mode is selected,
+  // rather than falling through into the generic Additional Settings group.
+  groupedKeys.add("allow_fallback");
+  groupedKeys.add("linked_folder");
   groupedKeys.add("local_path");
   groupedKeys.add("remote_path");
   const groups = groupDefinitions
@@ -4058,6 +4120,12 @@ function TorrentClientSettings({
 
   const localPathItem = itemByKey.get("local_path");
   const remotePathItem = itemByKey.get("remote_path");
+  const torrentStorageItem = itemByKey.get("torrent_storage_dir");
+  const hasQbitTorrentStorageWarning =
+    Array.isArray(torrentStorageItem?.help) &&
+    torrentStorageItem.help.some((line) =>
+      /SQLite Mode/i.test(String(line)),
+    );
 
   const renderField = (item) => {
     const isWideList = ["super_seed_trackers", "linked_folder"].includes(
@@ -4097,11 +4165,44 @@ function TorrentClientSettings({
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
               {group.items.map(renderField)}
             </div>
-            {group.id === "linking" && !linkingValue && (
-              <p className="ua-config-service-description mt-3 text-xs">
-                Choose Symbolic Link or Hard Link to configure linked folders
-                and fallback behaviour.
+            {group.id === "storage" && hasQbitTorrentStorageWarning && (
+              <p className="ua-config-service-description mt-3 text-xs leading-relaxed">
+                <span className="font-semibold">
+                  Torrent Storage Directory:
+                </span>{" "}
+                Optionally select qBittorrent&apos;s BT_backup directory to speed
+                up existing-torrent validation with qui/API search. Do not
+                configure this when qBittorrent is using SQLite mode.
               </p>
+            )}
+            {group.id === "linking" && (
+              <div className="ua-config-service-description mt-3 space-y-1 text-xs leading-relaxed">
+                <p>
+                  <span className="font-semibold">Linking:</span> Choose Symbolic
+                  Link or Hard Link to create tracker-specific linked content.
+                  Leave it disabled to use the original path.
+                </p>
+                {linkingValue ? (
+                  <React.Fragment>
+                    <p>
+                      <span className="font-semibold">Allow Fallback:</span> When
+                      enabled, UA can inject the original path if creating the
+                      link fails.
+                    </p>
+                    <p>
+                      <span className="font-semibold">Linked Folders:</span>{" "}
+                      Choose where linked content is created. Hard links must
+                      remain on the same drive or volume, and symbolic links on
+                      Windows may require administrator privileges.
+                    </p>
+                  </React.Fragment>
+                ) : (
+                  <p>
+                    Select a linking mode to configure linked folders and
+                    fallback behaviour.
+                  </p>
+                )}
+              </div>
             )}
           </div>
         </section>
@@ -4113,6 +4214,11 @@ function TorrentClientSettings({
             <h3 className="text-sm font-semibold">Path Mapping</h3>
           </div>
           <div className="p-4">
+            <p className="ua-config-service-description mb-3 text-xs leading-relaxed">
+              Map local filesystem paths to their remote or container paths.
+              Matching is case-sensitive, and Local and Remote entries must
+              remain paired in the same row.
+            </p>
             <PathMappingEditor
               localItem={localPathItem}
               remoteItem={remotePathItem}
@@ -5807,6 +5913,12 @@ function ItemList({
                 >
                   <div className="ua-config-section-heading border-b px-4 py-3">
                     <h3 className="text-sm font-semibold">{gname}</h3>
+                    {isImageHostingSection && gname === "Image Hosts" && (
+                      <p className="ua-config-service-description mt-1 text-xs">
+                        Choose image hosts in priority order. Each provider can
+                        only be selected once; leave unused slots blank.
+                      </p>
+                    )}
                   </div>
                   <div className="ua-config-section-panel p-4">
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
@@ -7916,6 +8028,15 @@ function ConfigApp() {
   const mobileNavGestureRef = useRef(null);
   const suppressMobileNavClickRef = useRef(false);
 
+  useEffect(() => {
+    try {
+      sessionStorage.setItem("ua_active_tab", activeTab);
+      sessionStorage.setItem("ua_active_subtab", activeSubTab);
+    } catch (error) {
+      // Navigation still works when browser storage is unavailable.
+    }
+  }, [activeTab, activeSubTab]);
+
   const visibleUpdateStatus =
     updateStatus?.update_available &&
     updateStatus.latest_version !== dismissedUpdateVersion
@@ -8222,8 +8343,6 @@ function ConfigApp() {
           } else {
             setActiveSubTab("");
           }
-          sessionStorage.removeItem("ua_active_tab");
-          sessionStorage.removeItem("ua_active_subtab");
           didRestoreTab = true;
         }
       } catch (e) {
@@ -9658,6 +9777,40 @@ function ConfigApp() {
         if (added.length) descriptions.push(`Added ${added.join(", ")}`);
         if (removed.length) descriptions.push(`Removed ${removed.join(", ")}`);
         return descriptions.join("; ") || "Personal release groups changed";
+      }
+      if (
+        path[0] === "TORRENT_CLIENTS" &&
+        key === "super_seed_trackers"
+      ) {
+        const normalizeSuperSeedTrackers = (value) => {
+          let parsedValue = value;
+          if (typeof parsedValue === "string") {
+            try {
+              parsedValue = JSON.parse(parsedValue);
+            } catch (error) {
+              parsedValue = parsedValue.split(/[\s,]+/);
+            }
+          }
+          return (Array.isArray(parsedValue) ? parsedValue : [])
+            .map((tracker) => String(tracker ?? "").trim().toUpperCase())
+            .filter(Boolean);
+        };
+        const originalTrackers = normalizeSuperSeedTrackers(
+          update.originalValue,
+        );
+        const nextTrackers = normalizeSuperSeedTrackers(update.value);
+        const originalSet = new Set(originalTrackers);
+        const nextSet = new Set(nextTrackers);
+        const added = nextTrackers.filter(
+          (tracker) => !originalSet.has(tracker),
+        );
+        const removed = originalTrackers.filter(
+          (tracker) => !nextSet.has(tracker),
+        );
+        const descriptions = [];
+        if (added.length) descriptions.push(`Added ${added.join(", ")}`);
+        if (removed.length) descriptions.push(`Removed ${removed.join(", ")}`);
+        return descriptions.join("; ") || "Super-seed trackers changed";
       }
       if (
         isSensitiveKeyForPath(key, parentPath) ||
