@@ -112,12 +112,12 @@ def test_maps_only_supported_gamedox_subcategories():
     assert "game_subcategory" not in trainer  # noqa: S101
 
 
-def test_collection_names_preserve_embedded_commas():
+def test_collection_names_omit_null_values_and_preserve_embedded_commas():
     payload = {
         "group": {
             "name": "Game",
             "specialCollections": {
-                "Designer": [{"Name": "Studio One, Inc."}, {"Name": "Studio One, Inc."}],
+                "Designer": [{"Name": "Studio One, Inc."}, {"Name": None}, {"Name": "Studio One, Inc."}],
             },
         }
     }

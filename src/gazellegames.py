@@ -43,7 +43,7 @@ def _collection_name_list(group: dict[str, Any], collection_type: str) -> list[s
     entries = collections.get(collection_type, [])
     if not isinstance(entries, list):
         return []
-    names = [str(entry.get("Name", "")).strip() for entry in entries if isinstance(entry, dict) and str(entry.get("Name", "")).strip()]
+    names = [str(name).strip() for entry in entries if isinstance(entry, dict) and (name := entry.get("Name")) is not None and str(name).strip()]
     return list(dict.fromkeys(names))
 
 
