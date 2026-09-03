@@ -14,6 +14,7 @@ import aiofiles
 import cli_ui
 from rich.markup import escape
 
+from src.audible import resolve_audible_url
 from src.bdinfo_comparator import compare_bdinfo, has_bdinfo_content
 from src.cleanup import cleanup_manager
 from src.cogs.redaction import Redaction
@@ -586,6 +587,19 @@ class UploadHelper:
             lines.append(("Language", book_language))
             lines.append(("ISBN", isbn))
             lines.append(("ASIN", asin))
+            if asin:
+                try:
+                    audible_url_display = (
+                        resolve_audible_url(
+                            asin,
+                            explicit_url=meta.audible_url,
+                            domain=str(self.default_config.get("audible_domain", "") or ""),
+                        )
+                        or "[yellow][italic]Marketplace missing. Use --audible-url or set DEFAULT.audible_domain (for example, audible.co.uk).[/italic][/yellow]"
+                    )
+                except ValueError:
+                    audible_url_display = "[yellow][italic]Invalid Audible URL or domain. Use --audible-url or set DEFAULT.audible_domain.[/italic][/yellow]"
+                lines.append(("Audible URL", audible_url_display))
             lines.append(("Comic", format_value(comic)))
             lines.append(("Manga", format_value(manga)))
             lines.append(("Magazine", format_value(magazine)))

@@ -124,7 +124,7 @@ For `TV` category items, if `episode_overview` is enabled, it structures and for
 
 #### 7. Book/Audiobook Details
 
-Processes uploads in the `BOOK` category. It compiles fields such as Author, Translator, Narrator, Publisher, ISBN, ASIN, Edition, and Year into a clean list or `[table]`, including audiobook duration and bitrates if applicable.
+Processes uploads in the `BOOK` category. It compiles fields such as Author, Translator, Narrator, Publisher, ISBN, ASIN, Edition, and Year into a clean list or `[table]`, including audiobook duration and bitrates if applicable. ASINs link to the marketplace selected by the `audible_domain` setting (for example, `audible.co.uk` or `audible.com.br`); the setting is empty by default, and `--audible-url` overrides it for an individual upload.
 
 #### 8. Game Specifications
 

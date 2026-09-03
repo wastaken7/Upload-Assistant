@@ -17,6 +17,7 @@ import langcodes
 from jinja2 import Template
 from langcodes.tag_parser import LanguageTagError
 
+from src.audible import resolve_audible_url
 from src.bbcode import BBCODE
 from src.cogs.redaction import PathAwareEncoder
 from src.console import logger
@@ -792,7 +793,18 @@ class DescriptionBuilder:
         if isbn:
             fields.append((str_isbn, isbn))
         if asin:
-            fields.append((str_asin, asin))
+            asin_display = asin
+            try:
+                audible_url = resolve_audible_url(
+                    asin,
+                    explicit_url=meta.audible_url,
+                    domain=self.config.get("DEFAULT", {}).get("audible_domain", ""),
+                )
+                if audible_url:
+                    asin_display = f"[url={audible_url}]{asin}[/url]"
+            except ValueError:
+                pass
+            fields.append((str_asin, asin_display))
         if edition:
             fields.append((str_edition, edition))
         if year:

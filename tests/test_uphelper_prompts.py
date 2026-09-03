@@ -167,3 +167,28 @@ async def test_dupe_filter_resets_season_pack_state_between_trackers() -> None:
     assert meta.season_pack_id is None
     assert meta.season_pack_link is None
     assert meta.season_pack_name == ""
+
+
+@pytest.mark.asyncio
+async def test_book_confirmation_shows_audible_url_that_will_be_used(monkeypatch: pytest.MonkeyPatch) -> None:
+    messages: list[str] = []
+    monkeypatch.setattr("src.uphelper.logger.info", lambda message, **_kwargs: messages.append(message))
+    meta = Meta(category="BOOK", asin="B01N5AX3TQ", unattended=True)
+
+    assert await UploadHelper({"DEFAULT": {"audible_domain": "audible.com.br"}}).get_confirmation(meta) is True
+
+    assert "Audible URL" in messages[0]
+    assert "https://www.audible.com.br/pd/B01N5AX3TQ" in messages[0]
+
+
+@pytest.mark.asyncio
+async def test_book_confirmation_explains_how_to_add_missing_audible_marketplace(monkeypatch: pytest.MonkeyPatch) -> None:
+    messages: list[str] = []
+    monkeypatch.setattr("src.uphelper.logger.info", lambda message, **_kwargs: messages.append(message))
+    meta = Meta(category="BOOK", asin="B01N5AX3TQ", unattended=True)
+
+    assert await UploadHelper({"DEFAULT": {"audible_domain": ""}}).get_confirmation(meta) is True
+
+    assert "Audible URL" in messages[0]
+    assert "--audible-url" in messages[0]
+    assert "DEFAULT.audible_domain" in messages[0]

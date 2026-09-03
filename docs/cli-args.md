@@ -108,6 +108,14 @@ If you pass a `.txt` file as the main positional input path (without specifying 
 
 Note: if a manual TMDb or IMDb id is present in the incoming `meta` before parsing, the parser clears `tmdb_manual`, `tmdb_id`, `tmdb`, `imdb_id`, `imdb` in `meta` so CLI values take precedence cleanly.
 
+### Book and audiobook metadata
+
+- `-asin`, `--asin ASIN`: Override the detected book or audiobook ASIN.
+- `--audible-url URL`: Use an Audible product URL, derive its ASIN, and override the configured `DEFAULT.audible_domain` marketplace for this upload.
+- `-isbn`, `--isbn ISBN`: Override the detected ISBN.
+- `-author`, `--author NAME`: Override the detected author.
+- `-btitle`, `--book-title TITLE`: Override the detected book title.
+
 ### Tags / edition / language
 
 - `-g`, `--tag [GROUP ...]`: Group tag.
