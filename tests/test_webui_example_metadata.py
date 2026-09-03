@@ -52,6 +52,25 @@ def test_current_example_config_exposes_workflow_subsections() -> None:
     assert subsections["USENET/nzb_output_dir"] == "OUTPUT PATHS"
 
 
+def test_current_example_config_exposes_merged_metadata_settings() -> None:
+    example_path = server.CODE_DIR / "data" / "example_config.py"
+    example_config = server._load_config_from_file(example_path)
+
+    assert example_config is not None
+    defaults = example_config["DEFAULT"]
+    assert defaults["ggn_api_key"] == ""
+    assert defaults["audible_domain"] == ""
+    assert defaults["metadata_cache_services"]["gazellegames"] == {
+        "enabled": True,
+        "ttl_hours": 24,
+    }
+
+    _, subsections = server._extract_example_metadata(example_path)
+    assert subsections["DEFAULT/ggn_api_key"] == "METADATA API CREDENTIALS"
+    assert subsections["DEFAULT/audible_domain"] == "GENERAL DESCRIPTION SETTINGS"
+    assert subsections["DEFAULT/metadata_cache_services"] == "METADATA CACHING"
+
+
 def test_default_client_lists_are_grouped_with_client_selection() -> None:
     example_section = {
         "before": True,

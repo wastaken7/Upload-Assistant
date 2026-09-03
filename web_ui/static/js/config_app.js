@@ -653,6 +653,7 @@ const METADATA_CACHE_SERVICE_LABELS = {
   thexem: "TheXEM",
   igdb: "IGDB",
   steam: "Steam",
+  gazellegames: "GazelleGames",
   google_books: "Google Books",
   openlibrary: "OpenLibrary",
   myanonamouse: "MyAnonamouse",
@@ -665,7 +666,7 @@ const METADATA_CACHE_SERVICE_GROUPS = [
     label: "Film, TV & Anime",
     services: ["tmdb", "imdb", "tvdb", "tvmaze", "anilist", "douban", "thexem"],
   },
-  { label: "Games", services: ["igdb", "steam"] },
+  { label: "Games", services: ["igdb", "steam", "gazellegames"] },
   {
     label: "Books, Audiobooks & Comics",
     services: ["google_books", "openlibrary", "myanonamouse"],
@@ -940,6 +941,8 @@ const DISPLAY_LABEL_OVERRIDES = {
   sharex_api_key: "ShareX API Key",
   utppm_api: "UTPPM API Key",
   zipline_api_key: "Zipline API Key",
+  ggn_api_key: "GazelleGames API Key",
+  audible_domain: "Audible Marketplace Domain",
   ffmpeg_path: "FFmpeg",
   ffprobe_path: "FFprobe",
   mediainfo_path: "MediaInfo",
@@ -1132,44 +1135,48 @@ const INLINE_FIELD_HELP = {
     linkLabel: "Get a TMDb API key",
   },
   tvdb_api: {
-    description: "Optional. Sign up for an API key to enable TVDb metadata.",
+    description: "Sign up for an API key to enable TVDb metadata.",
     href: "https://www.thetvdb.com/api-information/signup",
     linkLabel: "Get a TVDb API key",
   },
   tvdb_token: {
     description:
-      "Optional. Generate a token through the TVDb v4 login endpoint; enter only your API key and leave the PIN unchanged.",
+      "Generate a token through the TVDb v4 login endpoint; enter only your API key and leave the PIN unchanged.",
     href: "https://thetvdb.github.io/v4-api/#/Login/post_login",
     linkLabel: "Open the TVDb login documentation",
   },
   google_books_api_key: {
     description:
-      "Optional. Enable the Google Books API and create an API key for book metadata.",
+      "Enable the Google Books API and create an API key for book metadata.",
     href: "https://console.cloud.google.com/apis/library/books.googleapis.com",
     linkLabel: "Open Google Cloud",
     linkOnNewLine: true,
   },
   twitch_client_id: {
     description:
-      "Optional. Create a Twitch application to obtain credentials for IGDB metadata.",
+      "Create a Twitch application to obtain credentials for IGDB metadata.",
     href: "https://dev.twitch.tv/console",
     linkLabel: "Open the Twitch Developer Console",
     linkOnNewLine: true,
   },
   twitch_client_secret: {
     description:
-      "Optional. Use the client secret from the Twitch application configured for IGDB metadata.",
+      "Use the client secret from the Twitch application configured for IGDB metadata.",
     href: "https://dev.twitch.tv/console",
     linkLabel: "Open the Twitch Developer Console",
     linkOnNewLine: true,
   },
   mam_api_key: {
     description:
-      "Optional. Enter your MyAnonamouse API key or mam_id session cookie. Find it under Preferences › Security › View IP locked session cookie.",
+      "Enter your MyAnonamouse API key or mam_id session cookie. Find it under Preferences › Security › View IP locked session cookie.",
+  },
+  ggn_api_key: {
+    description:
+      "Enter a GazelleGames API key with no write permissions to enable game metadata enrichment.",
   },
   btn_api: {
     description:
-      "Optional. Enter the BTN API key used to retrieve metadata from BroadcasTheNet.",
+      "Enter the BTN API key used to retrieve metadata from BroadcasTheNet.",
   },
 };
 
@@ -2853,6 +2860,7 @@ function ConfigLeafEditor({
     );
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef(null);
+    const dropdownId = `${fieldId}--options`;
 
     useEffect(() => {
       setSelected(normalizeClients(item.value));
@@ -2914,31 +2922,40 @@ function ConfigLeafEditor({
         </div>
         <div className={`relative ${isOpen ? "z-30" : ""}`} ref={dropdownRef}>
           <div
-            className={`${inputClass} cursor-pointer flex items-center justify-between`}
+            role="combobox"
+            tabIndex={0}
+            aria-controls={dropdownId}
+            aria-expanded={isOpen}
+            aria-haspopup="listbox"
+            aria-label={displayLabel}
+            className="ua-config-multiselect flex min-h-10 w-full cursor-pointer items-center justify-between gap-3 rounded-lg border px-3 py-2 text-sm"
             onClick={() => setIsOpen(!isOpen)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                setIsOpen((open) => !open);
+              } else if (event.key === "Escape") {
+                setIsOpen(false);
+              }
+            }}
           >
-            <div className="flex flex-wrap gap-1 flex-1">
+            <div className="flex min-w-0 flex-1 flex-wrap gap-1">
               {selected.length === 0 ? (
-                <span
-                  className={isDarkMode ? "text-gray-500" : "text-gray-400"}
-                >
-                  Select clients...
+                <span className="ua-config-service-description">
+                  Select clients…
                 </span>
               ) : (
                 selected.map((client) => (
                   <span
                     key={client}
-                    className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs ${
-                      isDarkMode
-                        ? "bg-purple-600 text-white"
-                        : "bg-purple-100 text-purple-800"
-                    }`}
+                    className="ua-config-list-tag inline-flex max-w-full items-center gap-1 rounded-md border px-2 py-1 text-xs font-semibold"
                   >
-                    {client}
+                    <span className="truncate">{client}</span>
                     <button
                       type="button"
+                      aria-label={`Remove ${client} from ${displayLabel}`}
                       onClick={(e) => removeClient(client, e)}
-                      className={`hover:${isDarkMode ? "text-gray-300" : "text-gray-600"}`}
+                      className="ua-config-list-tag-remove inline-flex h-4 w-4 shrink-0 items-center justify-center rounded"
                     >
                       ×
                     </button>
@@ -2946,44 +2963,44 @@ function ConfigLeafEditor({
                 ))
               )}
             </div>
-            <span
-              className={`transition-transform ${isOpen ? "rotate-180" : "rotate-0"}`}
+            <svg
+              className={`ua-config-accordion-chevron h-4 w-4 shrink-0 transition-transform ${isOpen ? "rotate-180" : "rotate-0"}`}
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
             >
-              ▼
-            </span>
+              <path d="m6 9 6 6 6-6"></path>
+            </svg>
           </div>
           {isOpen && (
             <div
-              className={`absolute z-40 w-full mt-1 border rounded-md shadow-lg max-h-60 overflow-auto ${
-                isDarkMode
-                  ? "bg-gray-900 border-gray-700"
-                  : "bg-white border-gray-300"
-              }`}
+              id={dropdownId}
+              role="listbox"
+              aria-multiselectable="true"
+              className="ua-config-multiselect-menu absolute z-40 mt-1 max-h-60 w-full overflow-auto rounded-lg border shadow-lg"
             >
               {torrentClients.length === 0 ? (
-                <div
-                  className={`px-3 py-2 text-sm ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
-                >
+                <div className="ua-config-service-description px-3 py-2 text-sm">
                   No torrent clients configured
                 </div>
               ) : (
                 torrentClients.map((client) => (
                   <div
                     key={client}
-                    className={`px-3 py-2 cursor-pointer hover:${
-                      isDarkMode ? "bg-gray-800" : "bg-gray-100"
-                    } ${selected.includes(client) ? (isDarkMode ? "bg-purple-900" : "bg-purple-50") : ""}`}
-                    onClick={() => toggleClient(client)}
+                    role="option"
+                    aria-selected={selected.includes(client)}
+                    data-selected={selected.includes(client) ? "true" : "false"}
+                    className="ua-config-multiselect-option cursor-pointer px-3 py-2"
                   >
-                    <label
-                      className={`flex items-center gap-2 text-sm cursor-pointer ${
-                        isDarkMode ? "text-gray-200" : "text-gray-700"
-                      }`}
-                    >
+                    <label className="flex w-full cursor-pointer items-center gap-2 text-sm">
                       <input
                         type="checkbox"
                         checked={selected.includes(client)}
-                        onChange={() => {}} // Handled by parent div
+                        onChange={() => toggleClient(client)}
                         className="ua-theme-checkbox h-4 w-4"
                       />
                       {client}
@@ -3087,10 +3104,13 @@ function ConfigLeafEditor({
   const originalValue =
     sensitive && String(rawValue).trim() !== "" ? "<REDACTED>" : rawValue;
 
-  const [textValue, setTextValue] = useState(rawValue);
+  const [textValue, setTextValue] = useState(
+    sensitive && String(rawValue).trim() !== "" ? "<REDACTED>" : rawValue,
+  );
   const [redacted, setRedacted] = useState(
     sensitive && String(rawValue).trim() !== "",
   );
+  const redactedFocusWasEdited = useRef(false);
 
   useEffect(() => {
     const nextRaw =
@@ -3102,12 +3122,26 @@ function ConfigLeafEditor({
     const isRedacted = sensitive && String(nextRaw).trim() !== "";
     setTextValue(isRedacted ? "<REDACTED>" : nextRaw);
     setRedacted(isRedacted);
+    redactedFocusWasEdited.current = false;
   }, [item.value, sensitive]);
 
   const onFocus = () => {
     if (redacted) {
+      redactedFocusWasEdited.current = false;
       setTextValue("");
       setRedacted(false);
+    }
+  };
+
+  const onBlur = () => {
+    if (
+      sensitive &&
+      originalValue === "<REDACTED>" &&
+      !redactedFocusWasEdited.current &&
+      textValue === ""
+    ) {
+      setTextValue("<REDACTED>");
+      setRedacted(true);
     }
   };
 
@@ -3137,15 +3171,18 @@ function ConfigLeafEditor({
           value={textValue}
           onChange={(e) => {
             const nextValue = e.target.value;
+            redactedFocusWasEdited.current = true;
             setTextValue(nextValue);
+            setRedacted(false);
             onValueChange(path, nextValue, {
               originalValue,
               isSensitive: sensitive,
-              isRedacted: redacted,
+              isRedacted: false,
               readOnly,
             });
           }}
           onFocus={onFocus}
+          onBlur={onBlur}
           disabled={readOnly}
           className={`${inputClass}${readOnly ? " opacity-70 cursor-not-allowed" : ""}`}
         />
@@ -3704,7 +3741,7 @@ function TorrentClientCreator({ templateItems, configuredNames, onAddClient }) {
           className="ua-config-accordion-panel border-t p-4"
           onSubmit={addClient}
         >
-          <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+          <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <label
                 htmlFor="new-torrent-client-name"
@@ -3733,26 +3770,31 @@ function TorrentClientCreator({ templateItems, configuredNames, onAddClient }) {
               >
                 Client Type
               </label>
-              <select
-                id="new-torrent-client-template"
-                value={templateName}
-                onChange={(event) => setTemplateName(event.target.value)}
-                className="ua-config-select w-full rounded-lg border px-3 py-2"
-              >
-                {templateChoices.map((choice) => (
-                  <option key={choice.templateName} value={choice.templateName}>
-                    {choice.label}
-                  </option>
-                ))}
-              </select>
+              <div className="flex flex-col gap-3 md:flex-row md:items-center">
+                <select
+                  id="new-torrent-client-template"
+                  value={templateName}
+                  onChange={(event) => setTemplateName(event.target.value)}
+                  className="ua-config-select min-w-0 flex-1 rounded-lg border px-3 py-2"
+                >
+                  {templateChoices.map((choice) => (
+                    <option
+                      key={choice.templateName}
+                      value={choice.templateName}
+                    >
+                      {choice.label}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="submit"
+                  className="ua-config-save-button w-full rounded-lg px-4 py-2 text-sm font-semibold md:w-auto"
+                  disabled={!validName || nameTaken || !templateName}
+                >
+                  Add Client
+                </button>
+              </div>
             </div>
-            <button
-              type="submit"
-              className="ua-config-save-button rounded-lg px-4 py-2 text-sm font-semibold md:mt-7"
-              disabled={!validName || nameTaken || !templateName}
-            >
-              Add Client
-            </button>
           </div>
           {normalizedName && !validName && (
             <p className="mt-3 text-sm text-red-500">
@@ -6110,9 +6152,22 @@ function ItemList({
           const logoSettings = (item.children || []).filter((child) =>
             logoKeys.has(child.key),
           );
-          const generalDescriptionSettings = (item.children || []).filter(
+          const generalDescriptionItems = (item.children || []).filter(
             (child) => !logoKeys.has(child.key),
           );
+          const generalDescriptionSettings = [
+            ...generalDescriptionItems.filter(
+              (child) => child.key === "episode_overview",
+            ),
+            ...generalDescriptionItems.filter(
+              (child) =>
+                child.key !== "episode_overview" &&
+                child.key !== "audible_domain",
+            ),
+            ...generalDescriptionItems.filter(
+              (child) => child.key === "audible_domain",
+            ),
+          ];
 
           const renderDescriptionSettings = (heading, settings) => (
             <section className="ua-config-section overflow-hidden rounded-xl border">
@@ -8481,6 +8536,12 @@ function ConfigApp() {
 
   const onValueChange = (path, value, meta) => {
     const pathKey = path.join("/");
+    const matchesOriginalValue =
+      value === meta.originalValue ||
+      (Array.isArray(value) &&
+        Array.isArray(meta.originalValue) &&
+        value.length === meta.originalValue.length &&
+        value.every((entry, index) => entry === meta.originalValue[index]));
     if (path[0] === "DEFAULT" && EXTERNAL_TOOL_KEYS.includes(path[1])) {
       setExternalToolStatuses((currentStatuses) => {
         if (!currentStatuses[path[1]]) return currentStatuses;
@@ -8508,7 +8569,7 @@ function ConfigApp() {
         next.delete(pathKey);
         return next;
       }
-      if (value === meta.originalValue) {
+      if (matchesOriginalValue) {
         next.delete(pathKey);
       } else {
         next.set(pathKey, {
@@ -9789,6 +9850,42 @@ function ConfigApp() {
         if (added.length) descriptions.push(`Added ${added.join(", ")}`);
         if (removed.length) descriptions.push(`Removed ${removed.join(", ")}`);
         return descriptions.join("; ") || "Personal release groups changed";
+      }
+      if (
+        path[0] === "DEFAULT" &&
+        ["injecting_client_list", "searching_client_list"].includes(key)
+      ) {
+        const normalizeClients = (value) => {
+          let parsedValue = value;
+          if (typeof parsedValue === "string") {
+            try {
+              parsedValue = JSON.parse(parsedValue);
+            } catch (error) {
+              parsedValue = parsedValue.split(",");
+            }
+          }
+          return (Array.isArray(parsedValue) ? parsedValue : [])
+            .map((client) => String(client ?? "").trim())
+            .filter(Boolean);
+        };
+        const originalClients = normalizeClients(update.originalValue);
+        const nextClients = normalizeClients(update.value);
+        const originalSet = new Set(
+          originalClients.map((client) => client.toLowerCase()),
+        );
+        const nextSet = new Set(
+          nextClients.map((client) => client.toLowerCase()),
+        );
+        const added = nextClients.filter(
+          (client) => !originalSet.has(client.toLowerCase()),
+        );
+        const removed = originalClients.filter(
+          (client) => !nextSet.has(client.toLowerCase()),
+        );
+        const descriptions = [];
+        if (added.length) descriptions.push(`Added ${added.join(", ")}`);
+        if (removed.length) descriptions.push(`Removed ${removed.join(", ")}`);
+        return descriptions.join("; ") || "Client selection changed";
       }
       if (
         path[0] === "TORRENT_CLIENTS" &&

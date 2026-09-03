@@ -2578,6 +2578,28 @@ select {
   color: var(--ua-config-text);
 }
 
+.ua-config-multiselect,
+.ua-config-multiselect-menu {
+  background: var(--ua-config-surface-raised);
+  border-color: var(--ua-config-border);
+  color: var(--ua-config-text);
+}
+
+.ua-config-multiselect:focus-visible {
+  border-color: var(--ua-copper-bright);
+  box-shadow: 0 0 0 1px var(--ua-copper-bright);
+  outline: none;
+}
+
+.ua-config-multiselect-option {
+  color: var(--ua-config-text);
+}
+
+.ua-config-multiselect-option:hover,
+.ua-config-multiselect-option[data-selected="true"] {
+  background: color-mix(in srgb, var(--ua-copper) 14%, transparent);
+}
+
 .ua-config-client-type {
   background: color-mix(in srgb, var(--ua-copper) 16%, transparent);
   color: var(--ua-copper-bright);

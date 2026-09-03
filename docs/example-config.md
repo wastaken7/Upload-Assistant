@@ -61,6 +61,7 @@ Important gotchas:
 ### Metadata APIs
 
 - `tmdb_api` (str, required): TMDb API key. Get it from https://www.themoviedb.org/settings/api
+- `ggn_api_key` (str): Optional read-only GazelleGames API key used to enrich game metadata. It can alternatively be supplied through the `GGN_API_KEY` environment variable.
 - `btn_api` (str): BTN API key (used to fetch BTN details).
 
 ### Image host selection (priority list)
@@ -93,6 +94,7 @@ Detailed documentation on how description layout settings work and affect descri
 - `add_logo` (bool): Add a TMDb logo image at the top of the description.
 - `logo_size` (str): Logo size (example default: `"300"`).
 - `logo_language` (str): ISO 639-1 language code for logo selection (fallback to English).
+- `audible_domain` (str): Optional Audible marketplace domain used to link audiobook ASINs, for example `audible.co.uk`. The per-upload `--audible-url` argument overrides it.
 - `episode_overview` (bool): Add episode overview text to description.
 
 Implementation notes:
