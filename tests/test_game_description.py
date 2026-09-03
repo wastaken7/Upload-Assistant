@@ -1,4 +1,4 @@
-from src.get_desc import DescriptionBuilder
+from src.get_desc import DescriptionBuilder, _safe_game_field
 from src.meta import Meta
 
 
@@ -75,3 +75,9 @@ def test_game_description_ignores_invalid_provider_links():
     assert "javascript:" not in description  # noqa: S101
     assert "Official Website" not in description  # noqa: S101
     assert "5/10" in description  # noqa: S101
+
+
+def test_safe_game_field_strips_html_after_decoding_entities():
+    value = "&lt;img src=x onerror=alert(1)&gt;Safe"
+
+    assert _safe_game_field(value) == "Safe"  # noqa: S101

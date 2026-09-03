@@ -1057,11 +1057,14 @@ async def gather_game_prep(
         return
 
     selected_is_detailed = not selected_from_search
-    if selected_from_search and selected_game.get("id") is not None:
-        detailed_game = await igdb.fetch_game_by_id(str(selected_game["id"]))
-        if detailed_game:
-            selected_game = detailed_game
-            selected_is_detailed = True
+    if selected_from_search:
+        selected_id = selected_game.get("id")
+        detailed_game = await igdb.fetch_game_by_id(str(selected_id)) if selected_id is not None else None
+        if not detailed_game:
+            logger.warning("[yellow]IGDB: Could not load full metadata for the selected game. Skipping IGDB enrichment.[/yellow]")
+            return
+        selected_game = detailed_game
+        selected_is_detailed = True
 
     # Cache selected game details
     if selected_is_detailed:

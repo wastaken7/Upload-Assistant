@@ -70,7 +70,7 @@ def html_to_bbcode(text: str) -> str:
 
 
 def _safe_game_field(value: Any) -> str:
-    text = html.unescape(re.sub(r"<[^>]+>", "", str(value or ""))).strip()
+    text = re.sub(r"<[^>]+>", "", html.unescape(str(value or ""))).strip()
     return " ".join(text.replace("[", "").replace("]", "").split())
 
 

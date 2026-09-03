@@ -112,6 +112,21 @@ def test_maps_only_supported_gamedox_subcategories():
     assert "game_subcategory" not in trainer  # noqa: S101
 
 
+def test_collection_names_preserve_embedded_commas():
+    payload = {
+        "group": {
+            "name": "Game",
+            "specialCollections": {
+                "Designer": [{"Name": "Studio One, Inc."}, {"Name": "Studio One, Inc."}],
+            },
+        }
+    }
+
+    metadata = GazelleGamesManager.normalize_metadata(payload, exact_torrent=False)
+
+    assert metadata["game_designers"] == ["Studio One, Inc."]  # noqa: S101
+
+
 def test_title_only_gazelle_metadata_omits_release_specific_fields():
     payload = {
         "group": {"name": "Game", "gameInfo": {"rating": "16+", "trailer": "https://www.youtube.com/watch?v=abc"}},
@@ -417,8 +432,9 @@ def test_ambiguous_unattended_gazelle_search_falls_back_to_igdb(tmp_path, monkey
         def __init__(self, *_args):
             pass
 
-        async def fetch_game_by_id(self, _game_id):
-            return None
+        async def fetch_game_by_id(self, game_id):
+            assert game_id == "7"  # noqa: S101
+            return {"id": 7, "name": "IGDB Game", "summary": "IGDB overview"}
 
         async def fetch_game_by_steam_id(self, _steam_id):
             return None
@@ -474,6 +490,39 @@ def test_igdb_search_hydrates_selected_game_and_time_to_beat(tmp_path, monkeypat
     assert meta.overview == "Detailed overview"  # noqa: S101
     assert meta.game_modes == ["Single player"]  # noqa: S101
     assert meta.game_time_to_beat == {"hastily": 3600}  # noqa: S101
+
+
+def test_igdb_search_skips_thin_result_when_hydration_fails(tmp_path, monkeypatch):
+    cache_details = AsyncMock()
+    fetch_time = AsyncMock(return_value={})
+
+    class FakeIGDB:
+        def __init__(self, *_args):
+            pass
+
+        async def search_game(self, _title):
+            return [{"id": 7, "name": "Thin Search Result", "platforms": []}]
+
+        async def fetch_game_by_id(self, _game_id):
+            return None
+
+        cache_game_details = cache_details
+        fetch_time_to_beat = fetch_time
+
+    warning = Mock()
+    monkeypatch.setattr("src.prep_game.IGDBAPI", FakeIGDB)
+    monkeypatch.setattr("src.prep_game.logger.warning", warning)
+    meta = Meta(path=str(tmp_path / "Local Game"), filename="Local Game", filelist=[], unattended=True, skip_auto_torrent=True)
+    config = {"DEFAULT": {"twitch_client_id": "id", "twitch_client_secret": "secret"}}
+
+    asyncio.run(gather_game_prep(meta, str(meta.path), str(tmp_path), config))
+
+    assert meta.title == ""  # noqa: S101
+    assert meta.igdb_id == 0  # noqa: S101
+    cache_details.assert_not_awaited()
+    fetch_time.assert_not_awaited()
+    warning.assert_called_once()
+    assert "Could not load full metadata" in warning.call_args.args[0]  # noqa: S101
 
 
 def test_igdb_fills_missing_artwork_without_overwriting_gazelle(tmp_path, monkeypatch):

@@ -33,19 +33,18 @@ def _decoded_url(value: Any) -> str:
 
 
 def _collection_names(group: dict[str, Any], collection_type: str) -> str:
-    collections = group.get("specialCollections")
-    if not isinstance(collections, dict):
-        return ""
-    entries = collections.get(collection_type, [])
-    if not isinstance(entries, list):
-        return ""
-    names = [str(entry.get("Name", "")).strip() for entry in entries if isinstance(entry, dict) and str(entry.get("Name", "")).strip()]
-    return ", ".join(dict.fromkeys(names))
+    return ", ".join(_collection_name_list(group, collection_type))
 
 
 def _collection_name_list(group: dict[str, Any], collection_type: str) -> list[str]:
-    names = _collection_names(group, collection_type)
-    return names.split(", ") if names else []
+    collections = group.get("specialCollections")
+    if not isinstance(collections, dict):
+        return []
+    entries = collections.get(collection_type, [])
+    if not isinstance(entries, list):
+        return []
+    names = [str(entry.get("Name", "")).strip() for entry in entries if isinstance(entry, dict) and str(entry.get("Name", "")).strip()]
+    return list(dict.fromkeys(names))
 
 
 def _clean_release_notes(value: Any) -> str:
