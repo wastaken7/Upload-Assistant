@@ -1627,8 +1627,19 @@ function TagListEditor({
   onChange,
 }) {
   const normalizeEntries = (rawValue) => {
+    let parsedValue = rawValue;
+    if (typeof parsedValue === "string") {
+      try {
+        parsedValue = JSON.parse(parsedValue);
+      } catch (error) {
+        parsedValue = parsedValue.split(/[\s,]+/);
+      }
+      if (typeof parsedValue === "string") {
+        parsedValue = parsedValue.split(/[\s,]+/);
+      }
+    }
     const seen = new Set();
-    return (Array.isArray(rawValue) ? rawValue : [])
+    return (Array.isArray(parsedValue) ? parsedValue : [])
       .map((entry) => String(entry ?? "").trim())
       .filter((entry) => {
         const normalizedEntry = entry.toLowerCase();
@@ -2001,8 +2012,7 @@ function ConfigLeafEditor({
   const displayLabel = formatConfigFieldLabel(item.key, pathParts);
   const isSuperSeedTrackerField =
     pathParts.includes("TORRENT_CLIENTS") &&
-    item.key === "super_seed_trackers" &&
-    Array.isArray(item.value);
+    item.key === "super_seed_trackers";
 
   const helpBelongsToSection = path.join("/") === "DEFAULT/ffmpeg_path";
   const helpBelongsToTorrentClientLinkingNote =
@@ -5008,6 +5018,7 @@ function TrackerManager({
       (trackerItem.children || []).map((item) => [String(item.key), item]),
     );
     const pendingValues = pendingTrackerValues.get(name) || new Map();
+    const optionalSetupKeys = new Set(tracker.optional_setup_keys || []);
     const placeholderPattern =
       /<[^>]+>|\b(?:your|custom|insert|replace|example)\b|\b(?:api[ _-]?user|username|password|passkey)\b/i;
     const isComplete = (item) => {
@@ -5033,6 +5044,7 @@ function TrackerManager({
     const requirements = [];
     const addRequirement = (id, label, keys, options = {}) => {
       const requirementFields = keys
+        .filter((key) => !optionalSetupKeys.has(key))
         .map((key) => fields.get(key))
         .filter(Boolean);
       if (requirementFields.length === 0 && !options.external) return;

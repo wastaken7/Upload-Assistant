@@ -16,7 +16,6 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-
 EXTERNAL_TOOL_KEYS = (
     "ffmpeg_path",
     "ffprobe_path",
@@ -71,7 +70,7 @@ def _is_android() -> bool:
 def _is_usable_file(path: Path) -> bool:
     try:
         return path.is_file() and (os.name == "nt" or os.access(path, os.X_OK))
-    except (OSError, ValueError):
+    except OSError, ValueError:
         return False
 
 
@@ -222,12 +221,17 @@ def _managed_paths(key: str, state_dir: Path, code_dir: Path) -> list[tuple[Path
             (state_dir / "bin" / "mkbrr" / folder / name, state_dir / "bin" / "mkbrr" / folder / "v1.24.0", "1.24.0"),
         ]
 
-    if key in {"dovi_tool_path", "hdr10plus_tool_path"} and system in {"windows", "darwin", "linux"} and machine in {
-        "amd64",
-        "x86_64",
-        "arm64",
-        "aarch64",
-    }:
+    if (
+        key in {"dovi_tool_path", "hdr10plus_tool_path"}
+        and system in {"windows", "darwin", "linux"}
+        and machine
+        in {
+            "amd64",
+            "x86_64",
+            "arm64",
+            "aarch64",
+        }
+    ):
         command = _COMMANDS[key]
         version = "2.3.3" if key == "dovi_tool_path" else "1.7.2"
         binary = state_dir / "bin" / command / system / machine / f"{command}{executable_suffix}"

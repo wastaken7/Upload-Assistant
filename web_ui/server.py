@@ -37,8 +37,10 @@ from src.webui_progress import PROGRESS_STDOUT_PREFIX
 from src.app_paths import CODE_DIR, DATA_DIR, STATE_DIR
 from src.external_tools import EXTERNAL_TOOL_KEYS, check_external_tools
 from src.meta import Meta
-from src.version import __version__ as APP_VERSION
+from src.version import __version__
 from src.update_checker import get_changelog_history, get_update_status
+
+APP_VERSION = __version__
 
 
 def _module_name(*parts: str) -> str:
@@ -238,7 +240,7 @@ def _load_argument_presets() -> list[dict[str, str]]:
             if isinstance(name, str) and isinstance(arguments, str) and name.strip() and arguments.strip():
                 presets.append({"name": name.strip(), "arguments": arguments.strip()})
         return presets[-MAX_ARGUMENT_PRESETS:]
-    except (OSError, TypeError, ValueError):
+    except OSError, TypeError, ValueError:
         return []
 
 
@@ -1128,7 +1130,7 @@ def _verify_remember_token(token: str) -> str | None:
         elif isinstance(expiry_value, str):
             try:
                 expiry = int(expiry_value)
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 return None
         else:
             return None
@@ -1320,14 +1322,14 @@ def _terminate_process_tree(process: _WebUIProcess, timeout: float = 2.0) -> boo
 
     try:
         root = psutil.Process(process.pid)
-    except (psutil.NoSuchProcess, psutil.AccessDenied, OSError):
+    except psutil.NoSuchProcess, psutil.AccessDenied, OSError:
         return process.poll() is not None
 
     # Snapshot descendants before stopping the controller: once the controller
     # exits, its children may be re-parented and become impossible to identify.
     try:
         processes = root.children(recursive=True)
-    except (psutil.NoSuchProcess, psutil.AccessDenied, OSError):
+    except psutil.NoSuchProcess, psutil.AccessDenied, OSError:
         processes = []
     processes.append(root)
 
@@ -2121,7 +2123,7 @@ def _find_execution_preview_cover_file(session_id: str) -> Path | None:
                 candidate.relative_to(release_root)
                 if candidate.is_file() and candidate.suffix.casefold() in {".jpg", ".jpeg", ".png", ".webp"}:
                     return candidate
-            except (OSError, ValueError):
+            except OSError, ValueError:
                 pass
 
     seen: set[str] = set()
@@ -2159,7 +2161,7 @@ def _resolve_execution_review_temp_dir(meta_data: Mapping[str, object]) -> Path 
     try:
         temp_dir = (temp_root / meta_uuid).resolve()
         temp_dir.relative_to(temp_root)
-    except (OSError, ValueError):
+    except OSError, ValueError:
         return None
     if not temp_dir.is_dir():
         return None
@@ -3109,11 +3111,7 @@ def _extract_example_metadata(example_path: Path) -> tuple[dict[str, list[str]],
                 if isinstance(target, ast.Name) and target.id == "config":
                     config_assign = node
                     break
-        elif (
-            isinstance(node, ast.AnnAssign)
-            and isinstance(node.target, ast.Name)
-            and node.target.id == "config"
-        ):
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.target.id == "config":
             config_assign = node
         if config_assign:
             break
@@ -3696,7 +3694,7 @@ def update_status():
     )
     try:
         cache_hours = max(0.0, float(raw_cache_hours))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         cache_hours = 4.0
 
     return jsonify(
@@ -3727,7 +3725,7 @@ def changelog():
     )
     try:
         cache_hours = max(0.0, float(raw_cache_hours))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         cache_hours = 4.0
 
     return jsonify(
@@ -3880,7 +3878,7 @@ def access_log_entries_api():
         n = int(n)
         if n < 1 or n > 200:
             n = 50
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         n = 50
 
     try:
@@ -4046,7 +4044,7 @@ def twofa_disable():
 
     try:
         auth_mod.set_twofa_state(None, [])
-    except (OSError, ValueError, TypeError, auth_mod.EncryptionError, json.JSONDecodeError):
+    except OSError, ValueError, TypeError, auth_mod.EncryptionError, json.JSONDecodeError:
         return jsonify({"error": "Failed to disable 2FA", "success": False}), 500
 
     # Update global variable
@@ -4340,11 +4338,7 @@ def _tracker_setup_value_is_complete(
     example_value = example_tracker_config.get(key)
     normalized_example = example_value.strip() if isinstance(example_value, str) else ""
     placeholder_example = normalized_example.replace("_", " ").replace("-", " ")
-    return not (
-        normalized_example
-        and normalized == normalized_example
-        and _TRACKER_SETUP_PLACEHOLDER_PATTERN.search(placeholder_example)
-    )
+    return not (normalized_example and normalized == normalized_example and _TRACKER_SETUP_PLACEHOLDER_PATTERN.search(placeholder_example))
 
 
 def _tracker_setup_is_complete(
@@ -4353,16 +4347,15 @@ def _tracker_setup_is_complete(
     *,
     cookie_required: bool,
     cookie_configured: bool,
+    optional_setup_keys: set[str] | frozenset[str] = frozenset(),
 ) -> bool:
     """Return whether all detected authentication requirements are complete."""
     if cookie_required and not cookie_configured:
         return False
 
-    required_keys = [key for key in _TRACKER_REQUIRED_SETUP_KEYS if key in example_tracker_config]
+    required_keys = [key for key in _TRACKER_REQUIRED_SETUP_KEYS if key in example_tracker_config and key not in optional_setup_keys]
     if required_keys:
-        return all(
-            _tracker_setup_value_is_complete(key, tracker_config, example_tracker_config) for key in required_keys
-        )
+        return all(_tracker_setup_value_is_complete(key, tracker_config, example_tracker_config) for key in required_keys)
 
     if cookie_required:
         return True
@@ -4398,11 +4391,13 @@ def _configured_tracker_names(
 
         tracker_class = supported_trackers.get(tracker_name)
         cookie_required = str(getattr(tracker_class, "auth_type", "") or "").strip().lower() == "cookies"
+        optional_setup_keys = {str(key) for key in (getattr(tracker_class, "optional_setup_keys", ()) or ())}
         if _tracker_setup_is_complete(
             tracker_config,
             example_tracker_config,
             cookie_required=cookie_required,
             cookie_configured=tracker_name in cookie_tracker_names,
+            optional_setup_keys=optional_setup_keys,
         ):
             configured.add(tracker_name)
 
@@ -4420,7 +4415,7 @@ def _configured_cookie_tracker_names(
     for tracker_name in supported_trackers:
         try:
             has_cookie_file = Path(cookie_file_finder(str(state_dir), tracker_name, user_config)).is_file()
-        except (AttributeError, OSError, TypeError, ValueError):
+        except AttributeError, OSError, TypeError, ValueError:
             has_cookie_file = False
         if has_cookie_file:
             configured.add(tracker_name.upper())
@@ -4440,13 +4435,7 @@ def _tracker_supported_categories(tracker_class: Any) -> list[str]:
         categories = (categories,)
     if not isinstance(categories, (list, tuple, set)):
         return []
-    return list(
-        dict.fromkeys(
-            str(category).strip().upper()
-            for category in categories
-            if str(category).strip()
-        )
-    )
+    return list(dict.fromkeys(str(category).strip().upper() for category in categories if str(category).strip()))
 
 
 def _tracker_status_from_http_code(status_code: int) -> tuple[str, str]:
@@ -4475,15 +4464,17 @@ def _probe_tracker_url(tracker_name: str, base_url: str) -> dict[str, Any]:
     httpx = None
     try:
         httpx = _dynamic_import("httpx")
-        with httpx.Client(
-            follow_redirects=True,
-            timeout=4.0,
-            headers={"User-Agent": f"Upload-Assistant-WebUI/{APP_VERSION}"},
-        ) as client:
+        with (
+            httpx.Client(
+                follow_redirects=True,
+                timeout=4.0,
+                headers={"User-Agent": f"Upload-Assistant-WebUI/{APP_VERSION}"},
+            ) as client,
+            client.stream("GET", base_url) as response,
+        ):
             # Streaming avoids downloading tracker homepages just to confirm
             # that the service can answer an HTTP request.
-            with client.stream("GET", base_url) as response:
-                status_code = int(response.status_code)
+            status_code = int(response.status_code)
         state, message = _tracker_status_from_http_code(status_code)
         result = {
             "name": tracker_name,
@@ -4501,19 +4492,12 @@ def _probe_tracker_url(tracker_name: str, base_url: str) -> dict[str, Any]:
         # Keep network and DNS exception details out of the browser response.
         # A later check can distinguish a transient local-network problem from
         # a tracker outage.
-        is_timeout = bool(
-            httpx is not None
-            and isinstance(error, getattr(httpx, "TimeoutException", ()))
-        )
+        is_timeout = bool(httpx is not None and isinstance(error, getattr(httpx, "TimeoutException", ())))
         return {
             "name": tracker_name,
             "state": "unavailable",
             "reason": "timeout" if is_timeout else "connection",
-            "message": (
-                "The tracker website did not respond before the status check timed out."
-                if is_timeout
-                else "The tracker website could not be reached."
-            ),
+            "message": ("The tracker website did not respond before the status check timed out." if is_timeout else "The tracker website could not be reached."),
             "checked_at": checked_at,
         }
 
@@ -4545,10 +4529,7 @@ def _supported_tracker_status_targets() -> dict[str, str]:
     """Return trusted tracker names and homepage URLs from the class catalogue."""
     from src.trackersetup import tracker_class_map
 
-    return {
-        str(tracker_name).upper(): str(getattr(tracker_class, "base_url", "") or "").strip()
-        for tracker_name, tracker_class in tracker_class_map.items()
-    }
+    return {str(tracker_name).upper(): str(getattr(tracker_class, "base_url", "") or "").strip() for tracker_name, tracker_class in tracker_class_map.items()}
 
 
 @app.route("/api/tracker_status")
@@ -4590,13 +4571,7 @@ def refresh_tracker_status():
     if not isinstance(requested, list):
         return jsonify({"success": False, "error": "Trackers must be provided as a list"}), 400
 
-    tracker_names = list(
-        dict.fromkeys(
-            str(name).strip().upper()
-            for name in requested[:100]
-            if str(name).strip()
-        )
-    )
+    tracker_names = list(dict.fromkeys(str(name).strip().upper() for name in requested[:100] if str(name).strip()))
     unknown = [name for name in tracker_names if name not in supported_targets]
     if unknown:
         return jsonify({"success": False, "error": "One or more trackers are not supported"}), 400
@@ -4607,12 +4582,8 @@ def refresh_tracker_status():
     with _tracker_status_check_lock:
         worker_count = min(_TRACKER_STATUS_MAX_WORKERS, len(tracker_names))
         with concurrent.futures.ThreadPoolExecutor(max_workers=worker_count) as executor:
-            futures = {
-                executor.submit(_probe_tracker_url, name, supported_targets[name]): name
-                for name in tracker_names
-            }
-            for future in concurrent.futures.as_completed(futures):
-                checked_results.append(future.result())
+            futures = {executor.submit(_probe_tracker_url, name, supported_targets[name]): name for name in tracker_names}
+            checked_results.extend(future.result() for future in concurrent.futures.as_completed(futures))
 
         checked_epoch = time.time()
         with _tracker_status_cache_lock:
@@ -4684,6 +4655,7 @@ def get_trackers():
         display_name = getattr(tracker_class, "display_name", tracker_name)
         base_url = getattr(tracker_class, "base_url", "")
         auth_type = str(getattr(tracker_class, "auth_type", "") or "").strip().lower()
+        optional_setup_keys = sorted(str(key) for key in (getattr(tracker_class, "optional_setup_keys", ()) or ()))
         destination_type = _tracker_destination_type(tracker_class)
         supported_categories = _tracker_supported_categories(tracker_class)
         favicon_url = ""
@@ -4702,6 +4674,7 @@ def get_trackers():
                 "favicon": favicon_url,
                 "configured": tracker_name.upper() in configured_trackers,
                 "auth_type": auth_type,
+                "optional_setup_keys": optional_setup_keys,
                 "cookie_configured": tracker_name.upper() in cookie_trackers,
                 "destination_type": destination_type,
                 "supported_categories": supported_categories,
@@ -5054,10 +5027,7 @@ def config_rename_torrent_client():
             if isinstance(current_value, str) and current_value.casefold() == actual_old_name.casefold():
                 next_value = new_name
             elif isinstance(current_value, list):
-                next_value = [
-                    new_name if isinstance(value, str) and value.casefold() == actual_old_name.casefold() else value
-                    for value in current_value
-                ]
+                next_value = [new_name if isinstance(value, str) and value.casefold() == actual_old_name.casefold() else value for value in current_value]
             if next_value != current_value:
                 updated = _replace_config_value_in_source(updated, ["DEFAULT", key], _python_literal(next_value))
                 updated_references.append(key)
@@ -5397,7 +5367,7 @@ def browse_path():
                             "size": size,
                         }
                     )
-                except (PermissionError, OSError):
+                except PermissionError, OSError:
                     continue
 
             console.print(f"Found {len(items)} items in {path}", markup=False)
@@ -5437,7 +5407,7 @@ def browse_search():
         max_results = min(int(request.args.get("max_results", "100")), 500)
         if max_results < 1:
             max_results = 100
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         max_results = 100
 
     if not query:

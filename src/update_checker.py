@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import contextlib
 import json
 import re
 import time
@@ -45,11 +46,13 @@ def read_local_version(version_file: Path) -> str | None:
 
 def fetch_remote_version(url: str = REMOTE_VERSION_URL) -> tuple[str | None, str | None]:
     """Fetch the upstream version module without requiring third-party HTTP packages."""
+    if not _is_https_url(url):
+        return None, None
     try:
-        request = urllib.request.Request(url, headers={"User-Agent": "Upload-Assistant-WebUI"})
-        with urllib.request.urlopen(request, timeout=10) as response:  # nosec B310 - fixed HTTPS URL
+        request = urllib.request.Request(url, headers={"User-Agent": "Upload-Assistant-WebUI"})  # noqa: S310 -- validated HTTPS URL
+        with urllib.request.urlopen(request, timeout=10) as response:  # noqa: S310 -- validated HTTPS URL
             content = response.read().decode("utf-8")
-    except (OSError, UnicodeError, urllib.error.URLError):
+    except OSError, UnicodeError, urllib.error.URLError:
         return None, None
     match = re.search(r'__version__\s*=\s*"([^"]+)"', content)
     return (match.group(1), content) if match else (None, None)
@@ -57,8 +60,10 @@ def fetch_remote_version(url: str = REMOTE_VERSION_URL) -> tuple[str | None, str
 
 def fetch_release_history(url: str = RELEASES_API_URL) -> list[dict[str, object]] | None:
     """Fetch a WebUI-safe subset of the upstream GitHub release history."""
+    if not _is_https_url(url):
+        return None
     try:
-        request = urllib.request.Request(
+        request = urllib.request.Request(  # noqa: S310 -- validated HTTPS URL
             url,
             headers={
                 "Accept": "application/vnd.github+json",
@@ -66,9 +71,9 @@ def fetch_release_history(url: str = RELEASES_API_URL) -> list[dict[str, object]
                 "X-GitHub-Api-Version": "2022-11-28",
             },
         )
-        with urllib.request.urlopen(request, timeout=10) as response:  # nosec B310 - fixed HTTPS URL
+        with urllib.request.urlopen(request, timeout=10) as response:  # noqa: S310 -- validated HTTPS URL
             payload = json.loads(response.read().decode("utf-8"))
-    except (OSError, UnicodeError, ValueError, urllib.error.URLError, json.JSONDecodeError):
+    except OSError, UnicodeError, ValueError, urllib.error.URLError, json.JSONDecodeError:
         return None
 
     if not isinstance(payload, list):
@@ -108,6 +113,15 @@ def _unreleased_compare_url(base_version: str, branch: str = DEVELOPMENT_BRANCH)
     return f"{REPOSITORY_URL}/compare/{base}...{head}"
 
 
+def _is_https_url(url: str) -> bool:
+    """Return whether a caller-provided URL has a usable HTTPS origin."""
+    try:
+        parsed = urllib.parse.urlsplit(url)
+    except ValueError:
+        return False
+    return parsed.scheme == "https" and bool(parsed.hostname)
+
+
 def _unavailable_unreleased_changes(base_version: str) -> dict[str, object]:
     return {
         "available": False,
@@ -133,7 +147,7 @@ def fetch_unreleased_changes(
     encoded_branch = urllib.parse.quote(clean_branch, safe="")
     api_url = f"{COMPARE_API_URL}/{encoded_base}...{encoded_branch}"
     try:
-        request = urllib.request.Request(
+        request = urllib.request.Request(  # noqa: S310 -- URL is built from a fixed HTTPS origin
             api_url,
             headers={
                 "Accept": "application/vnd.github+json",
@@ -141,9 +155,9 @@ def fetch_unreleased_changes(
                 "X-GitHub-Api-Version": "2022-11-28",
             },
         )
-        with urllib.request.urlopen(request, timeout=10) as response:  # nosec B310 - fixed HTTPS URL
+        with urllib.request.urlopen(request, timeout=10) as response:  # noqa: S310 -- fixed HTTPS origin
             payload = json.loads(response.read().decode("utf-8"))
-    except (OSError, UnicodeError, ValueError, urllib.error.URLError, json.JSONDecodeError):
+    except OSError, UnicodeError, ValueError, urllib.error.URLError, json.JSONDecodeError:
         return None
 
     if not isinstance(payload, dict):
@@ -258,7 +272,7 @@ def _read_cache(state_dir: Path, cache_hours: float) -> tuple[str, str, float] |
         if time.time() - checked_at >= cache_hours * 3600:
             return None
         return remote_version, remote_content, float(checked_at)
-    except (OSError, TypeError, ValueError, KeyError, json.JSONDecodeError):
+    except OSError, TypeError, ValueError, KeyError, json.JSONDecodeError:
         return None
 
 
@@ -298,7 +312,7 @@ def _read_changelog_cache(
             return None
         safe_releases = [release for release in releases if isinstance(release, dict)]
         return safe_releases[:MAX_CHANGELOG_RELEASES], unreleased, float(checked_at)
-    except (OSError, TypeError, ValueError, KeyError, json.JSONDecodeError):
+    except OSError, TypeError, ValueError, KeyError, json.JSONDecodeError:
         return None
 
 
@@ -375,10 +389,8 @@ def get_changelog_history(
         if unreleased is None and base_version:
             unreleased = _unavailable_unreleased_changes(base_version)
         checked_at = time.time()
-        try:
+        with contextlib.suppress(OSError):
             checked_at = _write_changelog_cache(state_dir, releases, unreleased)
-        except OSError:
-            pass
         return {
             "success": True,
             "source": "github",
@@ -448,21 +460,15 @@ def get_update_status(
         return status
 
     cache_hours = max(0.0, float(cache_hours))
-    cached = (
-        _read_cache(state_dir, cache_hours)
-        if cache_hours and not force
-        else None
-    )
+    cached = _read_cache(state_dir, cache_hours) if cache_hours and not force else None
     if cached:
         remote_version, remote_content, checked_at = cached
     else:
         remote_version, remote_content = fetch_remote_version()
         checked_at = time.time()
         if remote_version and remote_content:
-            try:
+            with contextlib.suppress(OSError):
                 checked_at = _write_cache(state_dir, remote_version, remote_content)
-            except OSError:
-                pass
 
     if not remote_version or not remote_content:
         status["success"] = False

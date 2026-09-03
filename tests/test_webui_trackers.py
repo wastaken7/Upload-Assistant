@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import web_ui.server as server
+from src.trackers.retroflix import RetroFlix
 
 
 def test_tracker_destination_type_uses_existing_usenet_marker() -> None:
@@ -48,6 +49,56 @@ def test_configured_trackers_require_complete_setup_independently_of_defaults() 
     )
 
     assert configured == {"BLUTOPIA"}
+
+
+def test_tracker_optional_setup_keys_do_not_block_valid_api_credentials() -> None:
+    configured = server._configured_tracker_names(
+        {
+            "RETROFLIX": {
+                "api_key": "configured-key",
+                "announce_url": "https://tracker.example/announce",
+                "username": "",
+                "password": "",
+            }
+        },
+        {
+            "RETROFLIX": {
+                "api_key": "",
+                "announce_url": "",
+                "username": "",
+                "password": "",
+            }
+        },
+        {"RETROFLIX": RetroFlix},
+    )
+
+    assert configured == {"RETROFLIX"}
+
+
+def test_tracker_setup_still_requires_non_optional_account_credentials() -> None:
+    configured = server._configured_tracker_names(
+        {
+            "PASSTHEPOPCORN": {
+                "ApiUser": "api-user",
+                "api_key": "configured-key",
+                "announce_url": "https://please.passthepopcorn.me/passkey/announce",
+                "username": "",
+                "password": "",
+            }
+        },
+        {
+            "PASSTHEPOPCORN": {
+                "ApiUser": "ptp api user",
+                "api_key": "",
+                "announce_url": "",
+                "username": "",
+                "password": "",
+            }
+        },
+        {"PASSTHEPOPCORN": object()},
+    )
+
+    assert configured == set()
 
 
 def test_cookie_trackers_require_cookie_and_template_fields() -> None:

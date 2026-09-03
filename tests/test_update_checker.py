@@ -7,6 +7,18 @@ from unittest.mock import Mock
 from src import update_checker
 
 
+def test_remote_version_rejects_non_https_url(monkeypatch) -> None:
+    monkeypatch.setattr(
+        update_checker.urllib.request,
+        "urlopen",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("Non-HTTPS URLs must not be opened")
+        ),
+    )
+
+    assert update_checker.fetch_remote_version("http://example.com/version.py") == (None, None)
+
+
 def test_fetch_unreleased_changes_returns_safe_latest_first_commits(monkeypatch) -> None:
     payload = {
         "ahead_by": 2,

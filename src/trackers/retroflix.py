@@ -22,6 +22,7 @@ class RetroFlix:
     base_url = "https://retroflix.club"
 
     auth_type = "other_api"
+    optional_setup_keys = frozenset({"username", "password"})
     tracker = "RETROFLIX"
     display_name = "RetroFlix"
     allows_bloated_audio = True
