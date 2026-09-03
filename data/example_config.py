@@ -68,6 +68,9 @@ config: dict[str, Any] = {
         # MyAnonamouse (MAM) API key or session cookie (mam_id). Leave blank to disable.
         # Find it under Preferences > Security > View IP locked session cookie.
         "mam_api_key": "",
+        # GazelleGames API key. Leave blank to disable game metadata enrichment.
+        # Create one in your GazelleGames profile settings with no write permissions required.
+        "ggn_api_key": "",
         # BTN API key used to retrieve metadata from BTN.
         "btn_api": "",
         # --- ARR INTEGRATION ---
@@ -154,6 +157,8 @@ config: dict[str, Any] = {
             "openlibrary": {"enabled": True, "ttl_hours": 720},
             # Data fetched from a MAM account; a shorter duration reflects changes.
             "myanonamouse": {"enabled": True, "ttl_hours": 24},
+            # Private-tracker game metadata can be edited, so keep this relatively fresh.
+            "gazellegames": {"enabled": True, "ttl_hours": 24},
             # Music release metadata; it also uses 30 days because it changes rarely.
             "musicbrainz": {"enabled": True, "ttl_hours": 720},
             "discogs": {"enabled": True, "ttl_hours": 720},

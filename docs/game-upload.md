@@ -1,6 +1,6 @@
 # Game Category Upload Guide
 
-The Upload Assistant supports the `GAME` category, enabling automated metadata gathering from **IGDB** and **Steam**, platform detection, custom duplicate checking, and specialized formatting for various trackers.
+The Upload Assistant supports the `GAME` category, enabling automated metadata gathering from **GazelleGames**, **IGDB**, and **Steam**, platform detection, custom duplicate checking, and specialized formatting for various trackers.
 
 ---
 
@@ -19,30 +19,46 @@ When uploading a game, the assistant automatically parses the target path to loc
 
 To gather rich metadata with minimal manual input, the Upload Assistant implements a hierarchical resolution flow:
 
-$$\text{CLI Overrides} > \text{IGDB ID Search} > \text{Steam ID from NFO} > \text{Cleaned Title Search on IGDB} > \text{CLI Prompting}$$
+$$\text{CLI Overrides} > \text{GazelleGames Exact Torrent} > \text{GazelleGames Title Search} > \text{IGDB/Steam} > \text{CLI Prompting}$$
 
-### A. NFO Parsing for Steam IDs
+### A. GazelleGames API Integration
+
+When a matching torrent in the configured local client has a comment such as `https://gazellegames.net/torrents.php?torrentid=46720`, the assistant uses that exact torrent and game group as the primary metadata source. Without an exact comment, it searches the Games category by the cleaned title. Ambiguous attended searches prompt for a selection; unattended mode accepts only one non-conflicting exact title match.
+
+GazelleGames supplies title, year, platform, synopsis, genre tags and keywords, aliases, age ratings, external review scores, developer, publisher, designers, composers, engines, features, franchises, Steam, the official site, and a trailer. Exact torrent matches can additionally supply version, language, upload subcategory, region, release title/type, special-edition information, scene status, and sanitized release notes. Release notes remain metadata-only and are never copied into descriptions. IGDB and Steam fill missing fields and remain the artwork and screenshot sources because GazelleGames image URLs are not publicly retrievable through the API key.
+
+### B. NFO Parsing for Steam IDs
 
 If not overridden manually, the script scans all `.nfo` files inside the upload directory for a Steam store link (`store.steampowered.com/app/(\d+)`). If found, it queries IGDB directly using the extracted Steam App ID.
 
-### B. IGDB API Integration
+### C. IGDB API Integration
 
 The assistant communicates with the **Twitch/IGDB API** to fetch:
 
 - **Game Title & Release Year**
 - **IGDB Rating & Vote Count**
+- **External Critic Ratings & Age Ratings**
 - **Overview / Storyline**
 - **Genres & Keywords**
+- **Aliases, Franchise / Series, Game Type & Status**
+- **Engines, Themes, Game Modes & Player Perspectives**
+- **Platform-specific Multiplayer Features & Player Limits**
+- **Platform / Region Release Dates & Time-to-Beat Estimates**
 - **Developer & Publisher** (from involved companies)
+- **Official Website & Trailer**
 - **Supported Languages** (including translation/support types)
 - **Cover Image** (downloaded, converted, and saved locally to `POSTER.png`)
 - **IGDB Screenshot Gallery Links** (cached to `image_data.json`)
 
-### C. Steam API Integration
+### D. Steam API Integration
 
 If a Steam App ID is resolved via IGDB or NFO, the assistant fetches additional game details directly from the Steam Store API:
 
 - **System Requirements**: PC minimum and recommended requirements are extracted and stored in `requirements_minimum` and `requirements_recommended`.
+
+### E. Standard Game Description
+
+The generated game description includes non-empty technical details, overview, source-labelled ratings, multiplayer capabilities, time-to-beat estimates, PC requirements, and supported languages. New labels are localized for English and Brazilian Portuguese, and both table-based and plain tracker layouts are supported. Provider links are accepted only when they are valid HTTP(S) URLs.
 
 ---
 
@@ -125,7 +141,7 @@ You can override auto-detected values or pass specific parameters using the foll
 
 ## 7. Configuration Options
 
-To query the IGDB metadata server, Twitch API credentials must be configured. Add the following keys to your `config.py` file:
+Configure either or both metadata providers in `config.py`. GazelleGames can enrich a game without Twitch credentials; IGDB remains the fallback and artwork source.
 
 ```python
 config = {
@@ -133,9 +149,12 @@ config = {
         # Twitch developer credentials (https://dev.twitch.tv/console)
         "twitch_client_id": "YOUR_TWITCH_CLIENT_ID",
         "twitch_client_secret": "YOUR_TWITCH_CLIENT_SECRET",
+        "ggn_api_key": "YOUR_GAZELLEGAMES_API_KEY",
     }
 }
 ```
+
+`GGN_API_KEY` can be used instead of storing the GazelleGames key in the config file.
 
 ---
 
