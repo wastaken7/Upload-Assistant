@@ -17,6 +17,7 @@ import langcodes
 from jinja2 import Template
 from langcodes.tag_parser import LanguageTagError
 
+from src.audible import resolve_audible_url
 from src.bbcode import BBCODE
 from src.cogs.redaction import PathAwareEncoder
 from src.console import logger
@@ -67,6 +68,29 @@ def html_to_bbcode(text: str) -> str:
 
     # Strip any residual HTML tags
     return re.sub(r"<[^>]+>", "", converted_text)
+
+
+def _safe_game_field(value: Any) -> str:
+    text = re.sub(r"<[^>]+>", "", html.unescape(str(value or ""))).strip()
+    return " ".join(text.replace("[", "").replace("]", "").split())
+
+
+def _safe_game_url(value: Any) -> str:
+    url = str(value or "").strip()
+    parsed = urllib.parse.urlparse(url)
+    return url if parsed.scheme in {"http", "https"} and parsed.netloc and not any(char in url for char in "[]\r\n") else ""
+
+
+def _format_game_duration(seconds: Any) -> str:
+    if not isinstance(seconds, int) or seconds <= 0:
+        return ""
+    hours, remainder = divmod(seconds, 3600)
+    minutes = remainder // 60
+    if hours and minutes:
+        return f"{hours}h {minutes}m"
+    if hours:
+        return f"{hours}h"
+    return f"{minutes}m"
 
 
 async def gen_desc(
@@ -792,7 +816,18 @@ class DescriptionBuilder:
         if isbn:
             fields.append((str_isbn, isbn))
         if asin:
-            fields.append((str_asin, asin))
+            asin_display = asin
+            try:
+                audible_url = resolve_audible_url(
+                    asin,
+                    explicit_url=meta.audible_url,
+                    domain=self.config.get("DEFAULT", {}).get("audible_domain", ""),
+                )
+                if audible_url:
+                    asin_display = f"[url={audible_url}]{asin}[/url]"
+            except ValueError:
+                pass
+            fields.append((str_asin, asin_display))
         if edition:
             fields.append((str_edition, edition))
         if year:
@@ -900,34 +935,81 @@ class DescriptionBuilder:
         str_language = game_labels["language"]
         str_support = game_labels["support"]
 
+        def append_rows_section(title: str, rows: list[tuple[str, str]]) -> None:
+            rows = [(label, value) for label, value in rows if value]
+            if not rows:
+                return
+            lines = [f"{header}{title}{header_end}"]
+            if table:
+                table_lines = ["[table]"]
+                table_lines.extend(f"[tr][td][b]{label}[/b][/td][td]{value}[/td][/tr]" for label, value in rows)
+                table_lines.append("[/table]")
+                lines.append("\n".join(table_lines))
+            else:
+                lines.extend(f"[b]{label}[/b] {value}" for label, value in rows)
+            game_parts.append("\n".join(lines))
+
         # 1. Technical Details
         fields: list[tuple[str, str]] = []
         if meta.platform:
-            fields.append((str_platform, meta.platform))
+            fields.append((str_platform, _safe_game_field(meta.platform)))
+        release_date = meta.igdb_first_release_date or meta.year
+        if release_date:
+            fields.append((game_labels["release_date"], _safe_game_field(release_date)))
         if meta.game_version:
-            fields.append((str_version, meta.game_version))
+            fields.append((str_version, _safe_game_field(meta.game_version)))
+        if meta.game_region:
+            fields.append((game_labels["region"], _safe_game_field(meta.game_region)))
+        if meta.game_release_edition:
+            edition = _safe_game_field(meta.game_release_edition)
+            if meta.game_release_edition_year:
+                edition = f"{edition} ({meta.game_release_edition_year})"
+            fields.append((game_labels["edition"], edition))
+        if meta.game_release_type:
+            fields.append((game_labels["release_type"], _safe_game_field(meta.game_release_type)))
+        if meta.game_release_title:
+            fields.append((game_labels["release_title"], _safe_game_field(meta.game_release_title)))
+        if meta.game_release_scene is not None:
+            fields.append((game_labels["scene_release"], game_labels["yes"] if meta.game_release_scene else game_labels["no"]))
+        if meta.game_parent_title:
+            fields.append((game_labels["parent_game"], _safe_game_field(meta.game_parent_title)))
+        if meta.game_type:
+            fields.append((game_labels["game_type"], _safe_game_field(meta.game_type)))
+        if meta.game_status:
+            fields.append((game_labels["status"], _safe_game_field(meta.game_status)))
         if meta.genres:
-            fields.append((str_genre, ", ".join(meta.genres)))
+            fields.append((str_genre, ", ".join(_safe_game_field(value) for value in meta.genres)))
+        if meta.game_age_ratings:
+            fields.append((game_labels["age_rating"], ", ".join(f"{_safe_game_field(source)}: {_safe_game_field(rating)}" for source, rating in meta.game_age_ratings.items())))
+        for label, values in (
+            (game_labels["franchise"], meta.game_franchises),
+            (game_labels["engine"], meta.game_engines),
+            (game_labels["game_modes"], meta.game_modes),
+            (game_labels["perspectives"], meta.game_player_perspectives),
+            (game_labels["themes"], meta.game_themes),
+            (game_labels["features"], meta.game_features),
+        ):
+            if values:
+                fields.append((label, ", ".join(_safe_game_field(value) for value in values)))
         if meta.developer:
-            fields.append((str_developer, meta.developer))
+            fields.append((str_developer, _safe_game_field(meta.developer)))
         if meta.publisher:
-            fields.append((str_publisher, meta.publisher))
-        if meta.steam_url:
-            fields.append(("Steam", f"[url]{meta.steam_url}[/url]"))
+            fields.append((str_publisher, _safe_game_field(meta.publisher)))
+        if meta.game_designers:
+            fields.append((game_labels["designers"], ", ".join(_safe_game_field(value) for value in meta.game_designers)))
+        if meta.game_composers:
+            fields.append((game_labels["composers"], ", ".join(_safe_game_field(value) for value in meta.game_composers)))
+        steam_url = _safe_game_url(meta.steam_url)
+        if steam_url:
+            fields.append(("Steam", f"[url={steam_url}]Steam[/url]"))
+        official_url = _safe_game_url(meta.game_official_url)
+        if official_url:
+            fields.append((game_labels["official_site"], f"[url={official_url}]{game_labels['official_site']}[/url]"))
+        trailer_url = _safe_game_url(meta.youtube)
+        if trailer_url:
+            fields.append((game_labels["trailer"], f"[url={trailer_url}]{game_labels['trailer']}[/url]"))
 
-        if fields:
-            details_lines = []
-            details_lines.append(f"{header}{str_technical_details}{header_end}")
-            if table:
-                table_lines = ["[table]"]
-                for label, val in fields:
-                    table_lines.append(f"[tr][td][b]{label}[/b][/td][td]{val}[/td][/tr]")
-                table_lines.append("[/table]")
-                details_lines.append("\n".join(table_lines))
-            else:
-                for label, val in fields:
-                    details_lines.append(f"[b]{label}[/b] {val}")
-            game_parts.append("\n".join(details_lines))
+        append_rows_section(str_technical_details, fields)
 
         # 2. Overview Section
         overview_text = ""
@@ -945,6 +1027,42 @@ class DescriptionBuilder:
 
         if overview_text:
             game_parts.append(overview_text)
+
+        rating_rows: list[tuple[str, str]] = []
+        if isinstance(meta.game_ratings, dict):
+            for source, rating in meta.game_ratings.items():
+                if not isinstance(rating, dict):
+                    continue
+                score = rating.get("score")
+                maximum = rating.get("max")
+                if isinstance(score, bool) or isinstance(maximum, bool) or not isinstance(score, (int, float)) or not isinstance(maximum, (int, float)) or maximum <= 0:
+                    continue
+                value = f"{score:g}/{maximum:g}"
+                count = rating.get("count")
+                if isinstance(count, int) and count >= 0:
+                    value += f" ({count:,} {game_labels['votes'].lower()})"
+                url = _safe_game_url(rating.get("url"))
+                if url:
+                    value = f"[url={url}]{value}[/url]"
+                rating_rows.append((_safe_game_field(source), value))
+        append_rows_section(game_labels["ratings"], rating_rows)
+
+        multiplayer_rows = []
+        if isinstance(meta.game_multiplayer_modes, dict):
+            multiplayer_rows = [
+                (_safe_game_field(platform), ", ".join(_safe_game_field(capability) for capability in capabilities))
+                for platform, capabilities in meta.game_multiplayer_modes.items()
+                if isinstance(capabilities, list) and capabilities
+            ]
+        append_rows_section(game_labels["multiplayer"], multiplayer_rows)
+
+        time_rows = []
+        if isinstance(meta.game_time_to_beat, dict):
+            time_rows = [
+                (game_labels[label], _format_game_duration(meta.game_time_to_beat.get(key)))
+                for key, label in (("hastily", "main_story"), ("normally", "main_extras"), ("completely", "completionist"))
+            ]
+        append_rows_section(game_labels["time_to_beat"], time_rows)
 
         # 3. System Requirements Section
         req_min = meta.requirements_minimum

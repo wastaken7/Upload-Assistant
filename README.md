@@ -49,7 +49,7 @@ This branch introduces new media categories and automation features not present 
   - **Smart Duplicate Checking**: Custom rules distinguishing formats (e.g., EPUB vs PDF) and audiobooks vs ebooks, with tracker-specific overrides.
 - **Video Game (`GAME` Category)**:
   - **Game Directory Parsing**: Priority scans for executables (`.exe`), disc images (`.iso`), or archives (`.rar`, `.zip`, etc.) in the upload path.
-  - **IGDB & Steam Metadata API**: Queries Twitch/IGDB API for storyline, ratings, involved companies, release year, genre mapping, and downloads cover images. Fetches PC system requirements via Steam Store API.
+  - **GazelleGames, IGDB & Steam Metadata APIs**: Uses exact GazelleGames torrent comments or a guarded title search for game metadata, then fills missing fields and artwork through Twitch/IGDB and Steam.
   - **Platform Detection**: Identifies systems (PC, PS5, Switch, Xbox Series X|S, etc.) and enforces platform-group duplicate checks (so Switch uploads aren't blocked by PC dupes).
   - **Platform-specific Prompts**: Attended prompts for console TV standard (NTSC/PAL) and region codes (USA/EUR/JPN) for trackers like BJSHARE.
 - **Music (`MUSIC` Category)**:
@@ -87,7 +87,7 @@ Sequence Usenet and torrent tracker uploads while limiting contention with qBitt
 
 ### 7. Persistent TTL-Based Metadata Cache
 
-- **Provider-Scoped API Caching**: Disk-cached metadata for TMDb, IMDb, TVDB, TVmaze, OpenLibrary, IGDB, Discogs, and MusicBrainz.
+- **Provider-Scoped API Caching**: Disk-cached metadata for TMDb, IMDb, TVDB, TVmaze, OpenLibrary, IGDB, GazelleGames, Discogs, and MusicBrainz.
 - **Performance & Rate Limit Protection**: Configurable TTL and negative caching reuse fetched metadata across runs, avoiding redundant API calls and preventing rate-limiting bans.
 
 ### 8. Modern Web UI & Real-Time Engine

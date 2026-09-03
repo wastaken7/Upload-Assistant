@@ -52,6 +52,7 @@ class Meta:
     audio_spectrogram: bool | None = None
     dynamic_hdr_plot: bool | None = None
     audio: str = ""
+    audible_url: str = ""
     audiobook_bitrate: int | None = None
     audiobook_duration_formatted: str | None = None
     audiobook_duration: float | None = None
@@ -176,8 +177,32 @@ class Meta:
     freeleech: int = 0
     freeleech_until: int = 0
     game_region: str = ""
+    game_age_ratings: dict[str, str] = field(default_factory=dict)
+    game_aliases: list[str] = field(default_factory=list)
+    game_composers: list[str] = field(default_factory=list)
+    game_designers: list[str] = field(default_factory=list)
+    game_engines: list[str] = field(default_factory=list)
+    game_features: list[str] = field(default_factory=list)
+    game_franchises: list[str] = field(default_factory=list)
+    game_modes: list[str] = field(default_factory=list)
+    game_multiplayer_modes: dict[str, list[str]] = field(default_factory=dict)
+    game_official_url: str = ""
+    game_parent_title: str = ""
+    game_player_perspectives: list[str] = field(default_factory=list)
+    game_ratings: dict[str, dict[str, Any]] = field(default_factory=dict)
+    game_release_dates: list[dict[str, str]] = field(default_factory=list)
+    game_release_edition: str = ""
+    game_release_edition_year: int | None = None
+    game_release_notes: str = ""
+    game_release_scene: bool | None = None
+    game_release_title: str = ""
+    game_release_type: str = ""
     game_subcategory: str = ""
     game_system: str = ""
+    game_status: str = ""
+    game_themes: list[str] = field(default_factory=list)
+    game_time_to_beat: dict[str, int] = field(default_factory=dict)
+    game_type: str = ""
     game_version: str = ""
     genre_ids: int | None = None
     genre: str = ""

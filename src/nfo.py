@@ -40,9 +40,7 @@ def _resolve_service(value: str, services: Mapping[str, str]) -> tuple[str, str]
             return code, max((name for name, candidate_code in services.items() if candidate_code == code), key=len, default=code)
 
     fuzzy_codes = {
-        code
-        for alias, code in aliases
-        if min(len(alias), len(normalized_value)) >= 4 and (alias.startswith(normalized_value) or normalized_value.startswith(alias))
+        code for alias, code in aliases if min(len(alias), len(normalized_value)) >= 4 and (alias.startswith(normalized_value) or normalized_value.startswith(alias))
     }
     if len(fuzzy_codes) == 1:
         code = fuzzy_codes.pop()

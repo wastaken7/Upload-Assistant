@@ -68,6 +68,9 @@ config: dict[str, Any] = {
         # MyAnonamouse (MAM) API key or session cookie (mam_id). Leave blank to disable.
         # Find it under Preferences > Security > View IP locked session cookie.
         "mam_api_key": "",
+        # GazelleGames API key. Leave blank to disable game metadata enrichment.
+        # Create one in your GazelleGames profile settings with no write permissions required.
+        "ggn_api_key": "",
         # BTN API key used to retrieve metadata from BTN.
         "btn_api": "",
         # --- ARR INTEGRATION ---
@@ -154,6 +157,8 @@ config: dict[str, Any] = {
             "openlibrary": {"enabled": True, "ttl_hours": 720},
             # Data fetched from a MAM account; a shorter duration reflects changes.
             "myanonamouse": {"enabled": True, "ttl_hours": 24},
+            # Private-tracker game metadata can be edited, so keep this relatively fresh.
+            "gazellegames": {"enabled": True, "ttl_hours": 24},
             # Music release metadata; it also uses 30 days because it changes rarely.
             "musicbrainz": {"enabled": True, "ttl_hours": 720},
             "discogs": {"enabled": True, "ttl_hours": 720},
@@ -320,6 +325,11 @@ config: dict[str, Any] = {
         # Preferred logo language (ISO 639-1). Defaults to English ("en").
         # Falls back to English when a logo in the preferred language is unavailable.
         "logo_language": "",
+        # Audible marketplace used to link ASINs in descriptions. Leave empty
+        # unless you set your marketplace explicitly.
+        # Examples: audible.com, audible.co.uk, audible.com.br.
+        # --audible-url overrides this value for an individual upload.
+        "audible_domain": "",
         # Screenshot thumbnail width where supported. Default: 350 (for example, [img=350]).
         "thumbnail_size": "350",
         # Number of screenshots per row on sites that use the common description.
