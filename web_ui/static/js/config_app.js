@@ -4462,6 +4462,7 @@ function TrackerManager({
   torrentClients,
   onRemoveTracker,
   onUndoRemoveTracker,
+  onRefreshTrackerCatalog = async () => {},
   onValueChange,
 }) {
   const trackerItems = items || [];
@@ -4502,6 +4503,8 @@ function TrackerManager({
   const [trackerStatusError, setTrackerStatusError] = useState("");
   const [expandedTrackerStatusDetails, setExpandedTrackerStatusDetails] =
     useState(new Set());
+  const [refreshingSetupTracker, setRefreshingSetupTracker] = useState("");
+  const [setupRefreshFeedback, setSetupRefreshFeedback] = useState(null);
 
   useEffect(() => {
     setSelectedDefaults(normalizeTrackers(defaultTrackersItem.value));
@@ -4543,6 +4546,28 @@ function TrackerManager({
       cancelled = true;
     };
   }, []);
+
+  const recheckTrackerSetup = async (trackerName) => {
+    if (refreshingSetupTracker) return;
+    setRefreshingSetupTracker(trackerName);
+    setSetupRefreshFeedback(null);
+    try {
+      await onRefreshTrackerCatalog();
+      setSetupRefreshFeedback({
+        trackerName,
+        type: "success",
+        text: "Setup requirements refreshed.",
+      });
+    } catch (error) {
+      setSetupRefreshFeedback({
+        trackerName,
+        type: "error",
+        text: error?.message || "Unable to refresh setup requirements.",
+      });
+    } finally {
+      setRefreshingSetupTracker("");
+    }
+  };
 
   const fallbackNames = getAvailableTrackers(defaultTrackersItem).map((name) =>
     String(name).toUpperCase(),
@@ -4893,7 +4918,7 @@ function TrackerManager({
       if (
         exampleValue &&
         normalized === exampleValue &&
-        placeholderPattern.test(exampleValue)
+        placeholderPattern.test(exampleValue.replace(/[_-]+/g, " "))
       ) {
         return false;
       }
@@ -5184,6 +5209,9 @@ function TrackerManager({
           statuses.push({ label: "Unsaved", tone: "warning" });
         }
         const setupState = trackerSetupState(tracker, trackerItem);
+        const hasCookieRequirement = setupState.requirements.some(
+          (requirement) => requirement.id === "cookie",
+        );
         const hasStoredOverrides = (trackerItem?.children || []).some(
           (item) =>
             trackerDefaultOverrideKeys.has(item.key) &&
@@ -5312,11 +5340,40 @@ function TrackerManager({
                     {setupState.requirements.some(
                       (requirement) => requirement.note,
                     ) && (
-                      <p className="ua-config-service-description mt-2 text-xs">
-                        {setupState.requirements
-                          .filter((requirement) => requirement.note)
-                          .map((requirement) => requirement.note)
-                          .join(" ")}
+                      <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <p className="ua-config-service-description text-xs">
+                          {setupState.requirements
+                            .filter((requirement) => requirement.note)
+                            .map((requirement) => requirement.note)
+                            .join(" ")}
+                          {hasCookieRequirement
+                            ? " After adding or replacing one, select Recheck."
+                            : ""}
+                        </p>
+                        {hasCookieRequirement && (
+                          <button
+                            type="button"
+                            className="ua-config-service-action shrink-0 rounded-lg border px-3 py-2 text-xs font-semibold disabled:cursor-wait disabled:opacity-60"
+                            disabled={Boolean(refreshingSetupTracker)}
+                            onClick={() => recheckTrackerSetup(name)}
+                          >
+                            {refreshingSetupTracker === name
+                              ? "Rechecking…"
+                              : "Recheck"}
+                          </button>
+                        )}
+                      </div>
+                    )}
+                    {setupRefreshFeedback?.trackerName === name && (
+                      <p
+                        className={`mt-2 text-xs ${
+                          setupRefreshFeedback.type === "error"
+                            ? "text-red-500"
+                            : "ua-config-service-description"
+                        }`}
+                        role="status"
+                      >
+                        {setupRefreshFeedback.text}
                       </p>
                     )}
                   </div>
@@ -5431,6 +5488,7 @@ function ItemList({
   onUndoRemoveTorrentClient,
   onRemoveTracker,
   onUndoRemoveTracker,
+  onRefreshTrackerCatalog,
   clientTestStates,
   externalToolStatuses,
   externalToolStatusError,
@@ -5496,6 +5554,7 @@ function ItemList({
         onToggleTrackerOverrides={onToggleTrackerOverrides}
         onRemoveTracker={onRemoveTracker}
         onUndoRemoveTracker={onUndoRemoveTracker}
+        onRefreshTrackerCatalog={onRefreshTrackerCatalog}
         onValueChange={onValueChange}
       />
     );
@@ -8096,6 +8155,25 @@ function ConfigApp() {
     suppressMobileNavClickRef.current = false;
   };
 
+  const loadTrackerCatalog = async () => {
+    const response = await apiFetch(`${API_BASE}/trackers`);
+    const data = await response.json();
+    if (!data.success) {
+      throw new Error(data.error || "Failed to load tracker catalogue");
+    }
+    for (const tracker of data.trackers || []) {
+      const trackerName = String(tracker.name || "").toUpperCase();
+      const displayName = String(tracker.display_name || "").trim();
+      if (trackerName && displayName) {
+        trackerNameMap[trackerName] = displayName;
+      }
+    }
+    setTrackerCatalog({
+      defaultTrackers: data.default_trackers || [],
+      trackers: data.trackers || [],
+    });
+  };
+
   const loadConfigOptions = async (isRetry = false) => {
     try {
       setStatus({
@@ -8165,21 +8243,7 @@ function ConfigApp() {
       }
 
       try {
-        const trackersResponse = await apiFetch(`${API_BASE}/trackers`);
-        const trackersData = await trackersResponse.json();
-        if (trackersData.success) {
-          for (const tracker of trackersData.trackers || []) {
-            const trackerName = String(tracker.name || "").toUpperCase();
-            const displayName = String(tracker.display_name || "").trim();
-            if (trackerName && displayName) {
-              trackerNameMap[trackerName] = displayName;
-            }
-          }
-          setTrackerCatalog({
-            defaultTrackers: trackersData.default_trackers || [],
-            trackers: trackersData.trackers || [],
-          });
-        }
+        await loadTrackerCatalog();
       } catch (error) {
         console.warn("Failed to load tracker catalogue:", error);
         setTrackerCatalog({ defaultTrackers: [], trackers: [] });
@@ -10211,6 +10275,7 @@ function ConfigApp() {
                           onUndoRemoveTorrentClient={undoRemoveTorrentClient}
                           onRemoveTracker={removeTracker}
                           onUndoRemoveTracker={undoRemoveTracker}
+                          onRefreshTrackerCatalog={loadTrackerCatalog}
                           clientTestStates={clientTestStates}
                           externalToolStatuses={externalToolStatuses}
                           externalToolStatusError={externalToolStatusError}

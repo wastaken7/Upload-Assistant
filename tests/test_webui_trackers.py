@@ -21,13 +21,13 @@ def test_tracker_supported_categories_are_normalized_and_deduplicated() -> None:
     assert server._tracker_supported_categories(Tracker) == ["TV", "MOVIE", "BOOK"]
 
 
-def test_configured_trackers_include_defaults_and_non_default_setup() -> None:
+def test_configured_trackers_require_complete_setup_independently_of_defaults() -> None:
     trackers_section = {
         "default_trackers": "AITHER",
         "AITHER": {"api_key": ""},
         "BLUTOPIA": {"api_key": "configured-key"},
         "FLOOD": {
-            "api_key": "",
+            "api_key": "partially-configured-key",
             "announce_url": "https://flood.st/announce/Custom_Announce_URL",
         },
     }
@@ -44,26 +44,73 @@ def test_configured_trackers_include_defaults_and_non_default_setup() -> None:
     configured = server._configured_tracker_names(
         trackers_section,
         example_trackers,
-        ["AITHER"],
         supported_trackers,
     )
 
-    assert configured == {"AITHER", "BLUTOPIA"}
+    assert configured == {"BLUTOPIA"}
 
 
-def test_configured_trackers_include_cookie_and_legacy_btn_setup() -> None:
+def test_cookie_trackers_require_cookie_and_template_fields() -> None:
+    class CookieTracker:
+        auth_type = "cookies"
+
     supported_trackers = {
-        "BROADCASTHENET": object(),
-        "MAKINGOFF": object(),
+        "CATHODERAYTUBE": CookieTracker,
+        "MAKINGOFF": CookieTracker,
+    }
+    trackers_section = {
+        "CATHODERAYTUBE": {"announce_url": ""},
+        "MAKINGOFF": {},
+    }
+    example_trackers = {
+        "CATHODERAYTUBE": {"announce_url": ""},
+        "MAKINGOFF": {},
+    }
+
+    configured = server._configured_tracker_names(
+        trackers_section,
+        example_trackers,
+        supported_trackers,
+        {"CATHODERAYTUBE", "MAKINGOFF"},
+    )
+
+    assert configured == {"MAKINGOFF"}
+
+    trackers_section["CATHODERAYTUBE"]["announce_url"] = "https://tracker.example/announce"
+    configured = server._configured_tracker_names(
+        trackers_section,
+        example_trackers,
+        supported_trackers,
+        {"CATHODERAYTUBE", "MAKINGOFF"},
+    )
+
+    assert configured == {"CATHODERAYTUBE", "MAKINGOFF"}
+
+
+def test_configured_trackers_support_cookie_and_legacy_btn_setup() -> None:
+    class CookieTracker:
+        auth_type = "cookies"
+
+    supported_trackers = {
+        "BROADCASTHENET": CookieTracker,
+        "MAKINGOFF": CookieTracker,
         "UNSUPPORTED": object(),
     }
 
     configured = server._configured_tracker_names(
-        {},
-        {},
-        [],
+        {
+            "BROADCASTHENET": {
+                "announce_url": "https://tracker.example/announce",
+                "api_key": "",
+            },
+            "MAKINGOFF": {},
+        },
+        {
+            "BROADCASTHENET": {"announce_url": "", "api_key": ""},
+            "MAKINGOFF": {},
+        },
         supported_trackers,
-        {"MAKINGOFF", "NOT_SUPPORTED"},
+        {"BROADCASTHENET", "MAKINGOFF", "NOT_SUPPORTED"},
         {"DEFAULT": {"btn_api": "legacy-key"}},
     )
 
@@ -74,7 +121,6 @@ def test_whitespace_only_legacy_btn_key_is_not_configured() -> None:
     configured = server._configured_tracker_names(
         {},
         {},
-        [],
         {"BROADCASTHENET": object()},
         user_config={"DEFAULT": {"btn_api": "  \t  "}},
     )

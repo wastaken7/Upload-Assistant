@@ -4256,6 +4256,21 @@ _TRACKER_CONFIGURATION_KEYS = frozenset(
     }
 )
 
+_TRACKER_REQUIRED_SETUP_KEYS = (
+    "ApiUser",
+    "api_key",
+    "announce_url",
+    "my_announce_url",
+    "username",
+    "password",
+    "passkey",
+)
+
+_TRACKER_SETUP_PLACEHOLDER_PATTERN = re.compile(
+    r"<[^>]+>|\b(?:your|custom|insert|replace|example)\b|\b(?:api[ _-]?user|username|password|passkey)\b",
+    re.IGNORECASE,
+)
+
 _TRACKER_DEFAULT_OVERRIDE_KEYS = (
     "add_audio_spectrogram",
     "add_bluray_link",
@@ -4306,37 +4321,90 @@ def _has_configured_tracker_value(tracker_config: Mapping[str, Any], example_tra
     return False
 
 
+def _tracker_setup_value_is_complete(
+    key: str,
+    tracker_config: Mapping[str, Any],
+    example_tracker_config: Mapping[str, Any],
+) -> bool:
+    """Return whether a required tracker setup value is usable."""
+    value = tracker_config.get(key)
+    if value is None or value is False:
+        return False
+    if not isinstance(value, str):
+        return True
+
+    normalized = value.strip()
+    if not normalized:
+        return False
+
+    example_value = example_tracker_config.get(key)
+    normalized_example = example_value.strip() if isinstance(example_value, str) else ""
+    placeholder_example = normalized_example.replace("_", " ").replace("-", " ")
+    return not (
+        normalized_example
+        and normalized == normalized_example
+        and _TRACKER_SETUP_PLACEHOLDER_PATTERN.search(placeholder_example)
+    )
+
+
+def _tracker_setup_is_complete(
+    tracker_config: Mapping[str, Any],
+    example_tracker_config: Mapping[str, Any],
+    *,
+    cookie_required: bool,
+    cookie_configured: bool,
+) -> bool:
+    """Return whether all detected authentication requirements are complete."""
+    if cookie_required and not cookie_configured:
+        return False
+
+    required_keys = [key for key in _TRACKER_REQUIRED_SETUP_KEYS if key in example_tracker_config]
+    if required_keys:
+        return all(
+            _tracker_setup_value_is_complete(key, tracker_config, example_tracker_config) for key in required_keys
+        )
+
+    if cookie_required:
+        return True
+    return _has_configured_tracker_value(tracker_config, example_tracker_config)
+
+
 def _configured_tracker_names(
     trackers_section: Mapping[str, Any],
     example_trackers: Mapping[str, Any],
-    default_trackers: Sequence[str],
     supported_trackers: Mapping[str, Any],
     cookie_trackers: set[str] | None = None,
     user_config: Mapping[str, Any] | None = None,
 ) -> set[str]:
-    """Return supported tracker names that have enough setup to show by default."""
+    """Return supported tracker names whose detected setup requirements are complete."""
     supported_names = {str(name).upper() for name in supported_trackers}
-    configured = {str(name).strip().upper() for name in default_trackers if str(name).strip()}
-    configured.update(str(name).upper() for name in (cookie_trackers or set()))
+    configured: set[str] = set()
+    cookie_tracker_names = {str(name).upper() for name in (cookie_trackers or set())}
 
     tracker_configs = {str(name).upper(): value for name, value in trackers_section.items() if isinstance(value, Mapping)}
     example_configs = {str(name).upper(): value for name, value in example_trackers.items() if isinstance(value, Mapping)}
-
-    for tracker_name in supported_names:
-        tracker_config = tracker_configs.get(tracker_name)
-        if tracker_config is None:
-            continue
-        example_tracker_config = example_configs.get(tracker_name, {})
-        if _has_configured_tracker_value(tracker_config, example_tracker_config):
-            configured.add(tracker_name)
 
     # Older configurations stored the BroadcasTheNet API key in DEFAULT.
     default_section = user_config.get("DEFAULT", {}) if user_config else {}
     legacy_btn_api = default_section.get("btn_api") if isinstance(default_section, Mapping) else None
     if isinstance(legacy_btn_api, str):
         legacy_btn_api = legacy_btn_api.strip()
-    if legacy_btn_api:
-        configured.add("BROADCASTHENET")
+
+    for tracker_name in supported_names:
+        tracker_config = dict(tracker_configs.get(tracker_name, {}))
+        example_tracker_config = example_configs.get(tracker_name, {})
+        if tracker_name == "BROADCASTHENET" and legacy_btn_api and not tracker_config.get("api_key"):
+            tracker_config["api_key"] = legacy_btn_api
+
+        tracker_class = supported_trackers.get(tracker_name)
+        cookie_required = str(getattr(tracker_class, "auth_type", "") or "").strip().lower() == "cookies"
+        if _tracker_setup_is_complete(
+            tracker_config,
+            example_tracker_config,
+            cookie_required=cookie_required,
+            cookie_configured=tracker_name in cookie_tracker_names,
+        ):
+            configured.add(tracker_name)
 
     return configured & supported_names
 
@@ -4606,7 +4674,6 @@ def get_trackers():
     configured_trackers = _configured_tracker_names(
         trackers_section,
         example_trackers,
-        default_trackers_list,
         tracker_class_map,
         cookie_trackers,
         user_config,
