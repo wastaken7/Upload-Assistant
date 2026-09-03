@@ -78,19 +78,18 @@ config: dict[str, Any] = {
         "use_sonarr": False,
         "sonarr_url": "http://localhost:8989",
         "sonarr_api_key": "",
-        # Optional second Sonarr instance. Uncomment these entries and repeat
-        # with suffixes _2 and _3 to configure up to four instances in total.
-        # "sonarr_url_1": "http://my-second-instance:8989",
-        # "sonarr_api_key_1": "",
         # Set to True to use Radarr when searching for movies.
         "use_radarr": False,
         "radarr_url": "http://localhost:7878",
         "radarr_api_key": "",
+        # Optional second Sonarr instance. Uncomment these entries and repeat
+        # with suffixes _2 and _3 to configure up to four instances in total.
+        # "sonarr_url_1": "http://my-second-instance:8989",
+        # "sonarr_api_key_1": "",
         # Optional second Radarr instance. Uncomment these entries and repeat
         # with suffixes _2 and _3 to configure up to four instances in total.
         # "radarr_url_1": "http://my-second-instance:7878",
         # "radarr_api_key_1": "",
-
         # --- EXTERNAL TOOL PATHS ---
         # Optional paths to external media tools. Leave blank to use the bundled
         # tool when available, or the corresponding executable on the system PATH.
