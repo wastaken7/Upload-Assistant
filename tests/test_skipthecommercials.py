@@ -35,3 +35,15 @@ def test_skipthecommercials_allows_tv_and_documentary_movies(tracker: SkipTheCom
 )
 def test_skipthecommercials_rejects_non_documentary_movies_and_other_categories(tracker: SkipTheCommercials, meta: Meta) -> None:
     assert asyncio.run(tracker.get_additional_checks(meta)) is False  # noqa: S101
+
+
+@pytest.mark.parametrize(
+    "meta",
+    [
+        Meta(category="TV", combined_genres=["Porn"], unattended=True),
+        Meta(category="TV", keywords=["porn"], unattended=True),
+        Meta(category="MOVIE", combined_genres=["Documentary", "Porn"], unattended=True),
+    ],
+)
+def test_skipthecommercials_rejects_adult_list_metadata(tracker: SkipTheCommercials, meta: Meta) -> None:
+    assert asyncio.run(tracker.get_additional_checks(meta)) is False  # noqa: S101

@@ -70,7 +70,7 @@ class SkipTheCommercials(UNIT3D):
                 logger.info(f"{self.tracker}: [bold red]Only TV and documentary movie uploads are allowed at {self.tracker}.[/bold red]")
             return False
 
-        genres = f"{', '.join(meta.keywords)} {meta.combined_genres}"
+        genres = ", ".join(str(value) for value in [*(meta.keywords or []), *combined_genres])
         adult_keywords = ["xxx", "erotic", "porn", "adult", "orgy", "hentai", "adult animation", "softcore"]
         if any(re.search(rf"(^|,\s*){re.escape(keyword)}(\s*,|$)", genres, re.IGNORECASE) for keyword in adult_keywords):
             if not meta.unattended or (bool(meta.unattended) and meta.unattended_confirm):
