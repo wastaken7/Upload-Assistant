@@ -1770,10 +1770,6 @@ class BJShare:
     def get_adulto(self, meta: Meta) -> str:
         """
         Check for adult classification eligibility.
-
-        Adheres to upload guidelines where:
-        - Movies: Classified as adult only if pornographic.
-        - Anime TV Shows: Classified as adult only if hentai.
         """
         adult_yes = "1"
         adult_no = "2"
