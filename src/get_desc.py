@@ -1530,7 +1530,8 @@ class DescriptionBuilder:
         if ua_signature:
             if not signature:
                 script_signature = meta.ua_signature
-                signature = f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=4]{script_signature}[/size][/url][/right]"
+                if script_signature:
+                    signature = f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=4]{script_signature}[/size][/url][/right]"
             ua_signature_section = signature
         else:
             ua_signature_section = ""
