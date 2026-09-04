@@ -1778,17 +1778,7 @@ class BJShare:
         adult_yes = "1"
         adult_no = "2"
 
-        if meta.adult_media:
-            return adult_yes
-
-        keywords_str = ", ".join(meta.keywords)
-        genres = f"{keywords_str} {meta.combined_genres}"
-        adult_keywords = ["xxx", "erotic", "porn", "adult", "orgy"]
-
-        if meta.anime and "hentai" in genres.lower():
-            return adult_yes
-
-        if any(re.search(rf"(^|,\s*){re.escape(keyword)}(\s*,|$)", genres, re.IGNORECASE) for keyword in adult_keywords):
+        if meta.category == "XXX":
             return adult_yes
 
         return adult_no
