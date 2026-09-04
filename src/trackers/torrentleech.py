@@ -314,8 +314,7 @@ class TorrentLeech:
 
         else:
             if meta.category == "MOVIE":
-                imdb_info = meta.imdb_info
-                data.update({"imdb": imdb_info.get("imdbID", "")})
+                data.update({"imdb": meta.imdb_tt})
 
             if meta.category == "TV":
                 data.update(

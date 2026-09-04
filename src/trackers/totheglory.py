@@ -163,8 +163,8 @@ class ToTheGlory:
             "nodistr": "no",
         }
         url = f"{self.base_url}/takeupload.php"
-        if meta.imdb_id or 0 != 0:
-            data["imdb_c"] = f"tt{meta.imdb}"
+        if meta.imdb_tt:
+            data["imdb_c"] = meta.imdb_tt
 
         # Submit
         if meta.debug:

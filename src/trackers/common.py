@@ -2828,8 +2828,8 @@ class Common:
         try:
             async with httpx.AsyncClient() as client:
                 # get douban url
-                if meta.imdb_id is not None and meta.imdb_id != 0:
-                    data["search"] = f"tt{meta.imdb_id}"
+                if meta.imdb_tt:
+                    data["search"] = meta.imdb_tt
                     ptgen_json = await fetch_ptgen(client, url, data)
 
                     # Check for error and retry if needed

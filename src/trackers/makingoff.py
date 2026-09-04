@@ -1654,8 +1654,8 @@ class MakingOff:
         directors = ", ".join(tmdb_dirs if tmdb_dirs else imdb_dirs)
 
         imdb_url = ""
-        if meta.imdb_id or meta.imdb_info.get("imdb_url"):
-            imdb_url = meta.imdb_info.get("imdb_url") or f"https://www.imdb.com/title/tt{str(meta.imdb_id).zfill(7)}/"
+        if meta.imdb_tt or meta.imdb_info.get("imdb_url"):
+            imdb_url = meta.imdb_info.get("imdb_url") or f"https://www.imdb.com/title/{meta.imdb_tt}/"
 
         homepage_url = ptbr_main.get("homepage") or en_main.get("homepage") or ""
 

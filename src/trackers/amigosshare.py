@@ -791,7 +791,7 @@ class AmigosShare:
             search_url = f"{self.base_url}/torrents-search.php?search={search_query}"
 
         elif meta.category in ("MOVIE", "TV"):
-            imdb = meta.imdb_info.get("imdbID") or f"tt{str(meta.imdb_id).zfill(7)}"
+            imdb = meta.imdb_tt
             if meta.category == "MOVIE":
                 search_url = f"{self.base_url}/busca-filmes.php?search=&imdb={imdb}"
 
@@ -964,7 +964,7 @@ class AmigosShare:
                 return {}
 
         # Primary attempt
-        primary_payload: dict[str, Any] = {"imdb": meta.imdb_info.get("imdbID") or f"tt{str(meta.imdb_id).zfill(7)}", "layout": self.layout}
+        primary_payload: dict[str, Any] = {"imdb": meta.imdb_tt, "layout": self.layout}
         layout_data = await _fetch(primary_payload)
 
         if layout_data:
@@ -996,7 +996,7 @@ class AmigosShare:
 
             if source == "Internet Movie Database":
                 parts.append(
-                    f"\n[url={meta.imdb_info.get('imdb_url', '') or f'https://www.imdb.com/title/{f"tt{str(meta.imdb_id).zfill(7)}"}'}]{img_tag}[/url]\n[b]{value}[/b]\n"
+                    f"\n[url={meta.imdb_info.get('imdb_url', '') or (f'https://www.imdb.com/title/{meta.imdb_tt}' if meta.imdb_tt else '')}]{img_tag}[/url]\n[b]{value}[/b]\n"
                 )
             elif source == "TMDb" and meta.tmdb:
                 parts.append(f"[url=https://www.themoviedb.org/{meta.category.lower()}/{meta.tmdb}]{img_tag}[/url]\n[b]{value}[/b]\n")
@@ -1187,7 +1187,7 @@ class AmigosShare:
                 "codecvideo": await self.get_video_codec(meta),
                 "extencao": await self.get_container(meta),
                 "genre": await self.get_tags(meta),
-                "imdb": meta.imdb_info.get("imdbID") or f"tt{str(meta.imdb_id).zfill(7)}",
+                "imdb": meta.imdb_tt,
                 "lang": "1" if not meta.original_language else self.language_map.get(meta.original_language.lower(), "11"),
                 "largura": resolution["width"],
                 "layout": self.layout,

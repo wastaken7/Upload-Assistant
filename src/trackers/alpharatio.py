@@ -392,8 +392,8 @@ class AlphaRatio:
 
         # adding tags
         tags = ""
-        if meta.imdb_id != 0:
-            tags += f"tt{meta.imdb}, "
+        if meta.imdb_tt:
+            tags += f"{meta.imdb_tt}, "
         if genres:
             tags += f"{genres}, "
 

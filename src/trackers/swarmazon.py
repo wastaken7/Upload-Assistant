@@ -102,7 +102,7 @@ class Swarmazon:
             "name": await self.get_name(meta),
             "category_id": cat_id,
             "type_id": sub_cat_id,
-            "media_ref": f"tt{meta.imdb}",
+            "media_ref": meta.imdb_tt,
             "description": desc,
             "media_info": mi_dump,
         }
@@ -181,16 +181,15 @@ class Swarmazon:
         params: dict[str, str] = {"api_key": api_key}
 
         # Determine search parameters based on metadata
-        imdb_id = meta.imdb_id or 0
         category = meta.category
         title = meta.title
-        if imdb_id == 0:
+        if not meta.imdb_tt:
             if category == "TV":
                 params["filter"] = f"{title}{meta.season}"
             else:
                 params["filter"] = title
         else:
-            params["media_ref"] = f"tt{meta.imdb}"
+            params["media_ref"] = meta.imdb_tt
             if category == "TV":
                 params["filter"] = f"{meta.season}"
             else:
