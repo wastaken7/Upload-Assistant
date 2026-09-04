@@ -306,47 +306,89 @@ button:focus-visible {
   outline: none !important;
 }
 
-/* Accent translation: the old purple/blue utility classes now speak copper. */
-:where([class~="bg-purple-600"], [class~="bg-blue-600"]) {
+/* Shared accent primitives keep interactive controls aligned with the active
+   palette instead of tying them to a hard-coded utility colour. */
+.ua-accent-action {
   background-color: var(--ua-copper) !important;
+  color: #ffffff !important;
+  transition:
+    background-color 150ms ease,
+    color 150ms ease;
 }
 
-:where([class~="hover:bg-purple-700"], [class~="hover:bg-blue-700"]):hover {
+.ua-accent-action:hover:not(:disabled) {
   background-color: var(--ua-copper-bright) !important;
 }
 
-:where([class~="bg-purple-500"], [class~="bg-purple-400"]) {
-  background-color: var(--ua-copper-bright) !important;
-}
-
-:where(
-  [class~="text-purple-600"],
-  [class~="text-purple-500"],
-  [class~="text-blue-400"],
-  [class~="text-blue-600"]
-) {
+.ua-accent-text {
   color: var(--ua-copper-bright) !important;
 }
 
-:where(
-  [class~="text-purple-400"],
-  [class~="text-purple-300"],
-  [class~="text-blue-300"]
-) {
+.ua-accent-link {
+  color: var(--ua-copper-bright) !important;
+  transition: color 150ms ease;
+}
+
+.ua-accent-link:hover:not(:disabled) {
   color: var(--ua-gold) !important;
 }
 
-:where(
-  [class~="border-purple-500"],
-  [class~="border-purple-400"],
-  [class~="focus:border-purple-500"]
-):focus,
-:where([class~="hover:border-purple-500"]):hover {
-  border-color: var(--ua-gold) !important;
+.ua-accent-indicator {
+  background-color: var(--ua-copper-bright) !important;
 }
 
-:where([class~="focus:ring-purple-500"]):focus {
-  --tw-ring-color: var(--ua-gold) !important;
+.ua-accent-hover:hover:not(:disabled) {
+  background-color: var(--ua-copper) !important;
+  color: #ffffff !important;
+}
+
+.ua-accent-dropzone:hover:not(:disabled) {
+  border-color: var(--ua-gold) !important;
+  color: var(--ua-copper-bright) !important;
+}
+
+.ua-accent-chip {
+  background: color-mix(
+    in srgb,
+    var(--ua-copper) 10%,
+    var(--ua-upload-surface, var(--ua-charcoal))
+  ) !important;
+  border-color: color-mix(
+    in srgb,
+    var(--ua-copper-bright) 62%,
+    var(--ua-upload-border, var(--ua-border))
+  ) !important;
+  color: color-mix(
+    in srgb,
+    var(--ua-copper-bright) 72%,
+    var(--ua-upload-text, var(--ua-ink))
+  ) !important;
+}
+
+.ua-accent-tab-active {
+  border-color: var(--ua-gold) !important;
+  color: var(--ua-gold) !important;
+}
+
+.bbcode-preview blockquote {
+  border-color: var(--ua-copper-bright) !important;
+}
+
+/* Compatibility translation for remaining older blue utility classes. */
+:where([class~="bg-blue-600"]) {
+  background-color: var(--ua-copper) !important;
+}
+
+:where([class~="hover:bg-blue-700"]):hover {
+  background-color: var(--ua-copper-bright) !important;
+}
+
+:where([class~="text-blue-400"], [class~="text-blue-600"]) {
+  color: var(--ua-copper-bright) !important;
+}
+
+:where([class~="text-blue-300"]) {
+  color: var(--ua-gold) !important;
 }
 
 .ua-tracker-chip-selected[data-color-mode="dark"] {
@@ -586,11 +628,7 @@ button:focus-visible {
 }
 
 /* Warm panels in the light theme, without changing its information hierarchy. */
-:where(
-  [class~="from-purple-50"],
-  [class~="from-blue-50"],
-  [class~="from-cyan-50"]
-) {
+:where([class~="from-blue-50"], [class~="from-cyan-50"]) {
   --tw-gradient-from: var(--ua-light-panel-start)
     var(--tw-gradient-from-position);
 }
@@ -599,11 +637,7 @@ button:focus-visible {
 }
 
 [data-ua-theme="graphite"]
-  :where(
-    [class~="from-purple-50"],
-    [class~="from-blue-50"],
-    [class~="from-cyan-50"]
-  ) {
+  :where([class~="from-blue-50"], [class~="from-cyan-50"]) {
   --tw-gradient-from: var(--ua-light-panel-start)
     var(--tw-gradient-from-position);
 }

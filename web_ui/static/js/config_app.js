@@ -49,8 +49,7 @@ class ConfigErrorBoundary extends React.Component {
           {
             type: "button",
             onClick: () => window.location.reload(),
-            className:
-              "px-4 py-2 rounded-lg bg-purple-600 text-white hover:bg-purple-700",
+            className: "ua-accent-action px-4 py-2 rounded-lg",
           },
           "Reload page",
         ),
@@ -1473,8 +1472,8 @@ const NumberInput = ({
   };
 
   const inputClass = isDarkMode
-    ? "px-3 py-2 border border-gray-700 bg-gray-900 text-gray-100 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-    : "px-3 py-2 border border-gray-300 bg-white text-gray-800 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent";
+    ? "px-3 py-2 border border-gray-700 bg-gray-900 text-gray-100 rounded-md"
+    : "px-3 py-2 border border-gray-300 bg-white text-gray-800 rounded-md";
 
   return (
     <input
@@ -1520,8 +1519,8 @@ const SelectDropdown = ({
   };
 
   const selectClass = isDarkMode
-    ? "w-full px-3 py-2 border border-gray-700 bg-gray-900 text-gray-100 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-    : "w-full px-3 py-2 border border-gray-300 bg-white text-gray-800 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent";
+    ? "w-full px-3 py-2 border border-gray-700 bg-gray-900 text-gray-100 rounded-md"
+    : "w-full px-3 py-2 border border-gray-300 bg-white text-gray-800 rounded-md";
 
   return (
     <select
@@ -2049,8 +2048,8 @@ function ConfigLeafEditor({
     : `${inlineBooleanLabel ? "text-[15px] font-semibold" : "text-sm font-medium"} text-gray-700`;
 
   const inputClass = isDarkMode
-    ? "w-full px-3 py-2 border border-gray-700 bg-gray-900 text-gray-100 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-    : "w-full px-3 py-2 border border-gray-300 bg-white text-gray-800 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent";
+    ? "w-full px-3 py-2 border border-gray-700 bg-gray-900 text-gray-100 rounded-md"
+    : "w-full px-3 py-2 border border-gray-300 bg-white text-gray-800 rounded-md";
 
   // Check if this is a numeric field that should use NumberInput
   const isNumericField = (key) => {
