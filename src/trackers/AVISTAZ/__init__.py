@@ -611,10 +611,7 @@ class AZTrackerBase:
     async def get_tags(self, meta: Meta) -> list[str]:
         tags: list[str] = []
 
-        genres = meta.keywords
-        if not genres:
-            return tags
-
+        genres = meta.keywords or []
         # cleans spaces and normalizes to lowercase
         phrases = [re.sub(r"\s+", " ", x.strip().lower()) for x in genres if x.strip()]
 
