@@ -3443,9 +3443,11 @@ config: dict[str, Any] = {
             "use_tracker_as_tag": False,
             "qbit_tag": "",
             "qbit_cat": "",
-            # If using cross seeding, add cross seed tag/category here
+            # If using cross-seeding, add its qBittorrent tag/category here.
             "qbit_cross_tag": "",
             "qbit_cross_cat": "",
+            # qBittorrent content layout for all torrents added through this client.
+            # Use "Original", "Subfolder", or "NoSubfolder".
             "content_layout": "Original",
             # Choose symbolic links, hard links, or an empty value to use the original path.
             # This will disable any automatic torrent management if set.

@@ -413,8 +413,8 @@ Typical keys:
 - `super_seed_trackers` (list[str]): Trackers to enable super-seeding on.
 - `use_tracker_as_tag` (bool): Tag torrents with the tracker identifier.
 - `qbit_tag` / `qbit_cat` (str): Tag/category for uploaded torrents.
-- `qbit_cross_tag` / `qbit_cross_cat` (str): Tag/category for cross-seed torrents.
-- `content_layout` (str): Layout hint (example default `"Original"`).
+- `qbit_cross_tag` / `qbit_cross_cat` (str): Tag/category applied when UA adds a cross-seed torrent. When empty, the normal qBittorrent tag/category rules apply.
+- `content_layout` (str): qBittorrent content layout for every torrent added through this client. Use `"Original"`, `"Subfolder"`, or `"NoSubfolder"` (default `"Original"`).
 - `linking` (str): `"symlink"`, `"hardlink"`, or empty to disable.
 - `allow_fallback` (bool): Fallback to original path injection if linking fails.
 - `linked_folder` (list[str]): Destination folder(s) for linked content. This is the top level directory that will contain the linked content.

@@ -2029,6 +2029,12 @@ function ConfigLeafEditor({
     item.key === "torrent_storage_dir" &&
     Array.isArray(item.help) &&
     item.help.some((line) => /SQLite Mode/i.test(String(line)));
+  const helpBelongsToTorrentClientOrganizationNote =
+    pathParts.includes("TORRENT_CLIENTS") &&
+    item.key === "use_tracker_as_tag";
+  const helpBelongsToTorrentClientCrossSeedNote =
+    pathParts.includes("TORRENT_CLIENTS") &&
+    ["qbit_cross_tag", "qbit_cross_cat", "content_layout"].includes(item.key);
   const hideRedundantImageHostHelp =
     pathParts[0] === "DEFAULT" &&
     (REDUNDANT_IMAGE_HOST_API_HELP_KEYS.has(item.key) ||
@@ -2037,6 +2043,8 @@ function ConfigLeafEditor({
     !helpBelongsToSection &&
     !helpBelongsToTorrentClientLinkingNote &&
     !helpBelongsToTorrentStorageNote &&
+    !helpBelongsToTorrentClientOrganizationNote &&
+    !helpBelongsToTorrentClientCrossSeedNote &&
     !hideRedundantImageHostHelp &&
     !isSuperSeedTrackerField &&
     item.help &&
@@ -2086,6 +2094,9 @@ function ConfigLeafEditor({
   // Check if this is a linking field that should use SelectDropdown
   const isLinkingField = (key, pathParts) => {
     return key === "linking" && pathParts.includes("TORRENT_CLIENTS");
+  };
+  const isContentLayoutField = (key, pathParts) => {
+    return key === "content_layout" && pathParts.includes("TORRENT_CLIENTS");
   };
   const torrentClientListFields = new Set([
     "linked_folder",
@@ -2666,6 +2677,48 @@ function ConfigLeafEditor({
             });
           }}
           options={uploadOrderOptions}
+          isDarkMode={isDarkMode}
+        />
+      </div>
+    );
+  }
+
+  if (isContentLayoutField(item.key, pathParts)) {
+    const contentLayoutOptions = [
+      { value: "Original", label: "Original" },
+      { value: "Subfolder", label: "Create Subfolder" },
+      { value: "NoSubfolder", label: "Don't Create Subfolder" },
+    ];
+    if (
+      !contentLayoutOptions.some((option) => option.value === selectedValue)
+    ) {
+      contentLayoutOptions.unshift({
+        value: selectedValue,
+        label: `${selectedValue || "Empty"} (Unsupported)`,
+      });
+    }
+
+    const originalValue =
+      item.value === null || item.value === undefined ? "" : String(item.value);
+
+    return (
+      <div className="space-y-2">
+        <label htmlFor={fieldId} className={labelClass}>
+          {displayLabel}
+        </label>
+        <SelectDropdown
+          id={fieldId}
+          value={selectedValue}
+          onChange={(newValue) => {
+            setSelectedValue(newValue);
+            onValueChange(path, newValue, {
+              originalValue,
+              isSensitive: false,
+              isRedacted: false,
+              readOnly: false,
+            });
+          }}
+          options={contentLayoutOptions}
           isDarkMode={isDarkMode}
         />
       </div>
@@ -4129,12 +4182,14 @@ function TorrentClientSettings({
         "use_tracker_as_tag",
         "qbit_tag",
         "qbit_cat",
-        "qbit_cross_tag",
-        "qbit_cross_cat",
-        "content_layout",
         "rtorrent_label",
         "transmission_label",
       ],
+    },
+    {
+      id: "cross-seed",
+      title: "Cross-Seed Settings",
+      keys: ["qbit_cross_tag", "qbit_cross_cat", "content_layout"],
     },
     {
       id: "linking",
@@ -4228,6 +4283,33 @@ function TorrentClientSettings({
                 speed up existing-torrent validation with qui/API search. Do not
                 configure this when qBittorrent is using SQLite mode.
               </p>
+            )}
+            {group.id === "organization" &&
+              itemByKey.has("use_tracker_as_tag") && (
+                <p className="ua-config-service-description mt-3 text-xs leading-relaxed">
+                  <span className="font-semibold">Use Tracker as Tag:</span>{" "}
+                  When enabled, UA uses the tracker acronym as the qBittorrent
+                  tag unless an explicit upload tag or cross-seed tag takes
+                  precedence.
+                </p>
+              )}
+            {group.id === "cross-seed" && (
+              <div className="ua-config-service-description mt-3 space-y-1 text-xs leading-relaxed">
+                <p>
+                  <span className="font-semibold">
+                    Cross-Seed Tag and Category:
+                  </span>{" "}
+                  Applied when UA adds a torrent as a cross-seed. Leave them
+                  blank to use the normal qBittorrent tag and category rules.
+                </p>
+                <p>
+                  <span className="font-semibold">Content Layout:</span>{" "}
+                  Controls qBittorrent&apos;s content layout for every torrent
+                  added through this client, including regular uploads. Leave
+                  it as Original unless your save-path structure requires a
+                  different layout.
+                </p>
+              </div>
             )}
             {group.id === "linking" && (
               <div className="ua-config-service-description mt-3 space-y-1 text-xs leading-relaxed">
