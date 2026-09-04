@@ -835,6 +835,17 @@ def _clear_imdb_metadata(meta: Meta) -> None:
     meta.imdb_rating = ""
 
 
+def _should_fetch_bluray_info(meta: Meta, get_bluray_info: bool) -> bool:
+    return bool(
+        meta.is_disc in ("BDMV", "DVD")
+        and get_bluray_info
+        and (not meta.distributor or not meta.region)
+        and meta.imdb_id != 0
+        and not meta.edit
+        and not meta.site_check
+    )
+
+
 async def search_metadata(
     prep_instance: Any,
     meta: Meta,
@@ -1404,14 +1415,7 @@ async def finalize_metadata(
     meta.bluray_score = int(float(prep_instance.config["DEFAULT"].get("bluray_score", 100)))
     meta.bluray_single_score = int(float(prep_instance.config["DEFAULT"].get("bluray_single_score", 100)))
     meta.use_bluray_images = prep_instance.config["DEFAULT"].get("use_bluray_images", False)
-    if (
-        meta.is_disc in ("BDMV", "DVD")
-        and get_bluray_info
-        and (meta.distributor is None or meta.region is None)
-        and meta.imdb_id != 0
-        and not meta.edit
-        and not meta.site_check
-    ):
+    if _should_fetch_bluray_info(meta, get_bluray_info):
         releases = await get_bluray_releases(meta)
 
         if releases and meta.is_disc in ("BDMV", "DVD") and meta.use_bluray_images:
