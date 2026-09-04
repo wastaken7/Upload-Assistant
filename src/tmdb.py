@@ -1396,7 +1396,10 @@ async def get_anime(response: dict[str, Any], meta: Meta) -> tuple[int, str, boo
             meta.mal_id,
             meta,
         )
-        alt_name = f"AKA {romaji}"
+        if romaji:
+            alt_name = f"AKA {romaji}"
+        else:
+            demographic = ""
         anime = True
         # mal = AnimeSearch(romaji)
         # mal_id = mal.results[0].mal_id

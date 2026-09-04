@@ -206,7 +206,6 @@ def init_meta(prep_instance: Any, meta: Meta, mode: str) -> tuple[bool, bool, Cl
     meta.subtitle_languages = None
     meta.aither_trumpable = None
     meta.anime = False
-    meta.not_anime = False
     meta.subtitle_files = cast(list[str], [])
     meta.adult_media = False
     meta.pre_release = check_pre_release(meta)
