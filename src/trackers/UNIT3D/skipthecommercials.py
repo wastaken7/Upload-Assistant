@@ -16,7 +16,8 @@ Config = dict[str, Any]
 
 class SkipTheCommercials(UNIT3D):
     """
-    SkipTheCommercials (STC) is a Private Torrent Tracker for TV
+    SkipTheCommercials (STC) is a Private Torrent Tracker for TV and
+    documentary movies.
     """
 
     tracker = "SKIPTHECOMMERCIALS"
@@ -56,9 +57,17 @@ class SkipTheCommercials(UNIT3D):
         return {"type_id": type_id}
 
     async def get_additional_checks(self, meta: Meta) -> bool:
-        if str(meta.category) != "TV":
+        category = str(meta.category).upper()
+        if isinstance(meta.combined_genres, list):
+            combined_genres = meta.combined_genres
+        else:
+            combined_genres = [genre.strip() for genre in str(meta.combined_genres).split(",") if genre.strip()]
+        documentary_metadata = [*(meta.genres or []), *(meta.keywords or []), *combined_genres]
+        is_documentary = any(str(value).strip().lower() in {"documentary", "documentaries"} for value in documentary_metadata)
+
+        if category != "TV" and not (category == "MOVIE" and is_documentary):
             if not meta.unattended:
-                logger.info(f"{self.tracker}: [bold red]Only TV uploads allowed at {self.tracker}.[/bold red]")
+                logger.info(f"{self.tracker}: [bold red]Only TV and documentary movie uploads are allowed at {self.tracker}.[/bold red]")
             return False
 
         genres = f"{', '.join(meta.keywords)} {meta.combined_genres}"
