@@ -1770,25 +1770,11 @@ class BJShare:
     def get_adulto(self, meta: Meta) -> str:
         """
         Check for adult classification eligibility.
-
-        Adheres to upload guidelines where:
-        - Movies: Classified as adult only if pornographic.
-        - Anime TV Shows: Classified as adult only if hentai.
         """
         adult_yes = "1"
         adult_no = "2"
 
-        if meta.adult_media:
-            return adult_yes
-
-        keywords_str = ", ".join(meta.keywords)
-        genres = f"{keywords_str} {meta.combined_genres}"
-        adult_keywords = ["xxx", "erotic", "porn", "adult", "orgy"]
-
-        if meta.anime and "hentai" in genres.lower():
-            return adult_yes
-
-        if any(re.search(rf"(^|,\s*){re.escape(keyword)}(\s*,|$)", genres, re.IGNORECASE) for keyword in adult_keywords):
+        if meta.category == "XXX":
             return adult_yes
 
         return adult_no
@@ -1806,10 +1792,8 @@ class BJShare:
         if BJShare.database_identifier:
             return BJShare.database_identifier
 
-        imdb_info = dict(meta.imdb_info)
-        imdbid = str(imdb_info.get("imdbID", ""))
-        if imdbid:
-            return imdbid
+        if meta.imdb_tt:
+            return meta.imdb_tt
 
         category = (meta.category).upper()
         tmdb_id = meta.tmdb_id

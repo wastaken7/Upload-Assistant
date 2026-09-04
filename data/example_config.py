@@ -366,6 +366,8 @@ config: dict[str, Any] = {
         # Header added above the screenshot section where supported.
         # Can be overridden per tracker by adding the same setting to its configuration.
         "screenshot_header": "[h2]Screenshots[/h2]",
+        # Set to False to keep the screenshot header even when screenshots are the only section.
+        "hide_screenshot_header_if_only_section": True,
         # Header added above screenshots after HDR tone mapping.
         # Can be overridden per tracker by adding the same setting to its configuration.
         "tonemapped_header": "[center]Screenshots have been adapted for SDR viewing, for reference only.[/center]",

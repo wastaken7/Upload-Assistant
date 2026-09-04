@@ -83,8 +83,7 @@ class AZTrackerBase:
         else:
             return False
 
-        imdb_info = meta.imdb_info
-        imdb_id: str = str(imdb_info.get("imdbID", ""))
+        imdb_id: str = meta.imdb_tt
         tmdb_id: str = str(meta.tmdb) if meta.tmdb is not None else ""
         title = meta.title
 
@@ -611,10 +610,7 @@ class AZTrackerBase:
     async def get_tags(self, meta: Meta) -> list[str]:
         tags: list[str] = []
 
-        genres = meta.keywords
-        if not genres:
-            return tags
-
+        genres = meta.keywords or []
         # cleans spaces and normalizes to lowercase
         phrases = [re.sub(r"\s+", " ", x.strip().lower()) for x in genres if x.strip()]
 

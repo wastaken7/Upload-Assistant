@@ -232,8 +232,7 @@ class BrasilTracker:
         is_book = meta.category == "BOOK"
         is_game = meta.category == "GAME"
         if not is_book and not is_game:
-            imdb_info: dict[str, Any] = meta.imdb_info
-            if not imdb_info.get("imdbID") and not meta.anime:
+            if not meta.imdb_tt and not meta.anime:
                 logger.info(f"{self.tracker}: [bold red]Ignorando upload devido à ausência de IMDb.[/bold red]")
                 return False
 
@@ -650,11 +649,7 @@ class BrasilTracker:
         is_book = meta.category == "BOOK"
         is_game = meta.category == "GAME"
 
-        if is_book or is_game:
-            searchstr = meta.title
-        else:
-            imdb_info: dict[str, Any] = meta.imdb_info
-            searchstr = meta.title if meta.anime else imdb_info.get("imdbID")
+        searchstr = meta.title if is_book or is_game or meta.anime else meta.imdb_tt
 
         is_tv_pack = meta.tv_pack
 
@@ -1076,7 +1071,7 @@ class BrasilTracker:
                         {
                             "3d": "Sim" if meta.three_d else "Nao",
                             "adulto": "0",
-                            "imdb_input": meta.imdb_info.get("imdbID", ""),
+                            "imdb_input": meta.imdb_tt,
                             "nota_imdb": str(meta.imdb_info.get("rating", "")),
                             "title_br": brazilian_title,
                         }
