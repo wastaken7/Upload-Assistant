@@ -132,7 +132,7 @@ class DigitalCore:
         return None
 
     async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
-        imdb_id = meta.imdb_info.get("imdbID")
+        imdb_id = meta.imdb_tt
         category_id = self.get_category_id(meta)
 
         search_params = {"search": meta.title}

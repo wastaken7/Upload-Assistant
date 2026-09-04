@@ -393,8 +393,8 @@ class FileList:
                     data = {
                         "mediainfo": await mi_file.read(),
                     }
-                if meta.imdb_id:
-                    data["imdbURL"] = f"tt{meta.imdb_id}"
+                if meta.imdb_tt:
+                    data["imdbURL"] = meta.imdb_tt
                 screen_dir = screenshots_dir(meta.base_dir, meta.uuid)
                 screen_glob = [f.name for f in screen_dir.glob(f"{glob.escape(meta.filename)}-*.png")]
                 files: list[tuple[str, tuple[str, bytes, str]]] = []

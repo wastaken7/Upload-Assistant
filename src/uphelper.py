@@ -666,8 +666,8 @@ class UploadHelper:
 
             if meta.tmdb_id or 0 != 0:
                 lines.append(("TMDB", f"https://www.themoviedb.org/{(meta.category or '').lower()}/{meta.tmdb_id}"))
-            if meta.imdb_id or 0 != 0:
-                lines.append(("IMDB", f"https://www.imdb.com/title/tt{meta.imdb}"))
+            if meta.imdb_tt:
+                lines.append(("IMDB", f"https://www.imdb.com/title/{meta.imdb_tt}"))
             if meta.tvdb_id or 0 != 0:
                 lines.append(("TVDB", f"https://www.thetvdb.com/?id={meta.tvdb_id}&tab=series"))
             if meta.tvmaze_id or 0 != 0:

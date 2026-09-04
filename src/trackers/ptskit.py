@@ -66,7 +66,7 @@ class Ptskit:
 
     async def search_existing(self, meta: Meta) -> list[str] | None:
         search_url = f"{self.base_url}/torrents.php"
-        params: dict[str, Any] = {"incldead": 1, "search": str(meta.imdb_info.get("imdbID", "")), "search_area": 4}
+        params: dict[str, Any] = {"incldead": 1, "search": meta.imdb_tt, "search_area": 4}
         found_items: list[str] = []
 
         response = await self.session.get(search_url, params=params, cookies=self.session.cookies)
