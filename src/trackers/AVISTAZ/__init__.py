@@ -83,8 +83,7 @@ class AZTrackerBase:
         else:
             return False
 
-        imdb_info = meta.imdb_info
-        imdb_id: str = str(imdb_info.get("imdbID", ""))
+        imdb_id: str = meta.imdb_tt
         tmdb_id: str = str(meta.tmdb) if meta.tmdb is not None else ""
         title = meta.title
 

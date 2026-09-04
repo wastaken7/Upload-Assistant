@@ -87,8 +87,7 @@ class PTerClub:
             logger.info(f"{self.tracker}: [bold red]Missing Cookie File. (data/cookies/PTERCLUB.txt)")
             return False
         cookies = await common.parse_cookie_file(cookiefile)
-        imdb_id = meta.imdb_id or 0
-        imdb = f"tt{meta.imdb}" if imdb_id != 0 else ""
+        imdb = meta.imdb_tt
         source = await self.get_type_medium_id(meta)
         search_url = f"{self.base_url}/torrents.php?search={imdb}&incldead=0&search_mode=0&source{source}=1"
 

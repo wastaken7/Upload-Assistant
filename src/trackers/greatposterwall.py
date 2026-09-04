@@ -372,7 +372,7 @@ class GreatPosterWall:
         if not group_id:
             return []
 
-        imdb = dict(meta.imdb_info).get("imdbID", "")
+        imdb = meta.imdb_tt
         if not imdb:
             logger.info(f"{self.tracker}: IMDb ID not found in metadata. Skipping search.")
             return []
@@ -664,7 +664,7 @@ class GreatPosterWall:
 
     async def get_groupid(self, meta: Meta) -> bool:
         GreatPosterWall.group_id = ""
-        search_url = f"{self.base_url}/api.php?api_key={self.api_key}&action=torrent&req=group&imdbID={meta.imdb_info.get('imdbID')}"
+        search_url = f"{self.base_url}/api.php?api_key={self.api_key}&action=torrent&req=group&imdbID={meta.imdb_tt}"
 
         try:
             async with httpx.AsyncClient(timeout=30) as client:
@@ -690,7 +690,7 @@ class GreatPosterWall:
         return False
 
     async def get_additional_data(self, meta: Meta) -> dict[str, Any]:
-        imdb_identifier = str(meta.imdb_info.get("imdbID") or meta.imdb or "").strip()
+        imdb_identifier = str(meta.imdb_tt or meta.imdb or "").strip()
         tmdb_identifier = str(meta.tmdb_id or "").strip()
         if imdb_identifier:
             data_source = "imdb"
@@ -737,7 +737,7 @@ class GreatPosterWall:
         cast_character_map: dict[str, str] = {}
         full_credits: list[dict[str, Any]] = []
 
-        imdb_identifier = str(meta.imdb_info.get("imdbID") or meta.imdb or "").strip()
+        imdb_identifier = str(meta.imdb_tt or meta.imdb or "").strip()
         full_credits_success = False
         if imdb_identifier:
             movie_info_raw = await self._fetch_gpw_movie_info(meta, "imdb", imdb_identifier)

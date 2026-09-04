@@ -160,8 +160,8 @@ class Curupira:
                 params["tvdbid"] = str(meta.tvdb_id)
             elif meta.tmdb_id and str(meta.tmdb_id).isdigit() and int(meta.tmdb_id) > 0:
                 params["tmdbid"] = str(meta.tmdb_id)
-            elif meta.imdb_id and int(meta.imdb_id) > 0:
-                params["imdbid"] = f"tt{meta.imdb}"
+            elif meta.imdb_tt:
+                params["imdbid"] = meta.imdb_tt
             else:
                 params["q"] = self.get_search_query(meta)
 
@@ -171,8 +171,8 @@ class Curupira:
                 params["ep"] = str(meta.episode_int)
         elif category == "MOVIE":
             params["t"] = "movie"
-            if meta.imdb_id and int(meta.imdb_id) > 0:
-                params["imdbid"] = f"tt{meta.imdb}"
+            if meta.imdb_tt:
+                params["imdbid"] = meta.imdb_tt
             elif meta.tmdb_id and str(meta.tmdb_id).isdigit() and int(meta.tmdb_id) > 0:
                 params["tmdbid"] = str(meta.tmdb_id)
             else:

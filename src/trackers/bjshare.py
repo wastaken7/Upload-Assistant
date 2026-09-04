@@ -1792,10 +1792,8 @@ class BJShare:
         if BJShare.database_identifier:
             return BJShare.database_identifier
 
-        imdb_info = dict(meta.imdb_info)
-        imdbid = str(imdb_info.get("imdbID", ""))
-        if imdbid:
-            return imdbid
+        if meta.imdb_tt:
+            return meta.imdb_tt
 
         category = (meta.category).upper()
         tmdb_id = meta.tmdb_id
