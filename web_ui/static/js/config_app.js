@@ -5649,6 +5649,8 @@ function ArrIntegrationSettings({
     fieldKeysForIndex(index).some(
       (key) => itemByKey.get(key)?.source === "config",
     );
+  const committedVisibleIndexes = () =>
+    optionalIndexes.filter(isInitiallyConfigured);
   const initialVisibleIndexes = () =>
     optionalIndexes.filter(
       (index) =>
@@ -5694,7 +5696,7 @@ function ArrIntegrationSettings({
     );
     const resetArrState = (event) => {
       if (!arrPathKeys.has(String(event.detail?.pathKey))) return;
-      setVisibleIndexes(new Set(initialVisibleIndexes()));
+      setVisibleIndexes(new Set(committedVisibleIndexes()));
       setPendingRemovalIndexes(new Set());
     };
     window.addEventListener(CONFIG_FIELD_RESET_EVENT, resetArrState);
@@ -5731,12 +5733,15 @@ function ArrIntegrationSettings({
   };
 
   const removeInstance = (index) => {
-    for (const key of fieldKeysForIndex(index)) {
-      stageFieldValue(itemByKey.get(key), index, "", false, true);
-    }
     if (isInitiallyConfigured(index)) {
+      for (const key of fieldKeysForIndex(index)) {
+        stageFieldValue(itemByKey.get(key), index, "", false, true);
+      }
       setPendingRemovalIndexes((current) => new Set([...current, index]));
       return;
+    }
+    for (const key of fieldKeysForIndex(index)) {
+      stageFieldValue(itemByKey.get(key), index, "");
     }
     setVisibleIndexes((current) => {
       const next = new Set(current);
