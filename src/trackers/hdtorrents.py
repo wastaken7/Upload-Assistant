@@ -23,7 +23,7 @@ class HDTorrents:
 
     auth_type = "cookies"
     tracker = "HDTORRENTS"
-    display_name = "HDTorrents"
+    display_name = "HD-Torrents"
     allows_bloated_audio = True
     source_flag = "hd-torrents.org"
     auth_token: str | None = None

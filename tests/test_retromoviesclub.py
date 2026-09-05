@@ -11,7 +11,7 @@ def _tracker() -> RetroMoviesClub:
 
 def test_retromoviesclub_is_registered_with_full_tracker_name():
     assert tracker_class_map["RETROMOVIESCLUB"] is RetroMoviesClub  # noqa: S101
-    assert RetroMoviesClub.display_name == "RetroMoviesClub"  # noqa: S101
+    assert RetroMoviesClub.display_name == "Retro Movies Club"  # noqa: S101
 
 
 def test_retromoviesclub_filters_non_movie_categories():

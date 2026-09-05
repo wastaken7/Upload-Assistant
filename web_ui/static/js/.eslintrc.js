@@ -13,6 +13,8 @@ module.exports = {
     "react/prop-types": "off",
     // New JSX transform doesn't require React in scope
     "react/react-in-jsx-scope": "off",
+    // React and shared modal components are loaded as browser globals.
+    "react/jsx-no-undef": ["error", { allowGlobals: true }],
   },
   settings: { react: { version: "detect" } },
   globals: {

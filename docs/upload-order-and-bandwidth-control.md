@@ -44,7 +44,7 @@ Bandwidth checks require the `DEFAULT.default_torrent_client` to be a directly a
 },
 ```
 
-The QUI reverse proxy is not used for bandwidth measurements. Direct qBittorrent connection settings are still required when `qui_proxy_url` is configured.
+The qui reverse proxy is not used for bandwidth measurements. Direct qBittorrent connection settings are still required when `qui_proxy_url` is configured.
 
 ## Workflows
 

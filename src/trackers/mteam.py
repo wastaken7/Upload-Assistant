@@ -24,7 +24,7 @@ class MTeam:
 
     auth_type = "other_api"
     tracker = "MTEAM"
-    display_name = "MTeam"
+    display_name = "M-Team"
     allows_bloated_audio = True
     base_url = "https://kp.m-team.cc"
     api_base_url = "https://api.m-team.cc/api"

@@ -14,7 +14,7 @@ class Utopia(UNIT3D):
     """
 
     tracker = "UTOPIA"
-    display_name = "Utopia"
+    display_name = "UTOPIA"
     base_url = "https://utp.to"
     banned_groups = ()
     id_url = f"{base_url}/api/torrents/"

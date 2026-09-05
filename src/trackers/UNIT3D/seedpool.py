@@ -19,7 +19,7 @@ class Seedpool(UNIT3D):
     """
 
     tracker = "SEEDPOOL"
-    display_name = "Seedpool"
+    display_name = "seedpool"
     base_url = "https://seedpool.org"
     banned_groups = ()
     id_url = f"{base_url}/api/torrents/"

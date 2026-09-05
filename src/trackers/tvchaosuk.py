@@ -34,7 +34,7 @@ class TVChaosUK:
 
     auth_type = "other_api"
     tracker = "TVCHAOSUK"
-    display_name = "TVChaosUK"
+    display_name = "TV Chaos UK"
     allows_bloated_audio = True
     source_flag = "TVCHAOS"
     signature = ""

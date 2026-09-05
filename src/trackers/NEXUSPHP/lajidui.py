@@ -14,7 +14,7 @@ class Lajidui(NEXUSPHP):
     """
 
     banned_groups = ()
-    display_name = "Lajidui"
+    display_name = "lajidui"
     base_url = "https://pt.lajidui.top"
     source_flag = "[pt.lajidui.top] lajidui"
     torrent_url = f"{base_url}/details.php?id="

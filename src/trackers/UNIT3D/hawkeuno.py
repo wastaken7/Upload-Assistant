@@ -22,7 +22,7 @@ class HawkeUno(UNIT3D):
     """
 
     tracker = "HAWKEUNO"
-    display_name = "HawkeUno"
+    display_name = "hawke-uno"
     allows_bloated_audio = True
     source_flag = "HUNO"
     base_url = "https://hawke.uno"

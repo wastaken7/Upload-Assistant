@@ -15,7 +15,7 @@ class ReelFlix(UNIT3D):
     """
 
     tracker = "REELFLIX"
-    display_name = "ReelFlix"
+    display_name = "ReelFLiX"
     allows_bloated_audio = True
     base_url = "https://reelflix.cc"
     banned_groups = ()

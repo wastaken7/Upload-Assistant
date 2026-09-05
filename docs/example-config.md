@@ -61,6 +61,7 @@ Important gotchas:
 ### Metadata APIs
 
 - `tmdb_api` (str, required): TMDb API key. Get it from https://www.themoviedb.org/settings/api
+- `ggn_api_key` (str): Optional read-only GazelleGames API key used to enrich game metadata. It can alternatively be supplied through the `GGN_API_KEY` environment variable.
 - `btn_api` (str): BTN API key (used to fetch BTN details).
 
 ### Image host selection (priority list)
@@ -93,6 +94,7 @@ Detailed documentation on how description layout settings work and affect descri
 - `add_logo` (bool): Add a TMDb logo image at the top of the description.
 - `logo_size` (str): Logo size (example default: `"300"`).
 - `logo_language` (str): ISO 639-1 language code for logo selection (fallback to English).
+- `audible_domain` (str): Optional Audible marketplace domain used to link audiobook ASINs, for example `audible.co.uk`. The per-upload `--audible-url` argument overrides it.
 - `episode_overview` (bool): Add episode overview text to description.
 
 Implementation notes:
@@ -243,12 +245,14 @@ Implementation notes:
 - `use_sonarr` (bool): Enable Sonarr searching.
 - `sonarr_url` (str): Sonarr base URL.
 - `sonarr_api_key` (str): Sonarr API key.
-- `sonarr_url_1` / `sonarr_api_key_1` (str): Optional second Sonarr instance.
+- `sonarr_url_1` … `sonarr_url_3` / `sonarr_api_key_1` … `sonarr_api_key_3` (str): Up to three optional additional Sonarr instances.
 
 - `use_radarr` (bool): Enable Radarr searching.
 - `radarr_url` (str): Radarr base URL.
 - `radarr_api_key` (str): Radarr API key.
-- `radarr_url_1` / `radarr_api_key_1` (str): Optional second Radarr instance.
+- `radarr_url_1` … `radarr_url_3` / `radarr_api_key_1` … `radarr_api_key_3` (str): Up to three optional additional Radarr instances.
+
+UA queries configured instances in order, starting with the unsuffixed primary instance and then continuing through suffixes `_1`, `_2`, and `_3`. Optional instances are omitted by default and can be added from the WebUI when needed.
 
 ### Torrent creation
 
@@ -401,7 +405,7 @@ Security note: these settings can allow the app (and the Web UI) to interact wit
 
 Typical keys:
 
-- `qui_proxy_url` (str): Optional. [QUI reverse proxy](https://getqui.com/docs/features/reverse-proxy) URL for qBittorrent. Create a **Client Proxy API Key** in QUI (**Settings → Client Proxy Keys**): name the client (e.g. "Upload Assistant"), choose the qBittorrent instance, then copy the generated proxy URL. Use the **full** URL, e.g. `http://localhost:7476/proxy/<client-api-key>`. The instance is fixed by the key you create.
+- `qui_proxy_url` (str): Optional. [qui reverse proxy](https://getqui.com/docs/features/reverse-proxy) URL for qBittorrent. Create a **Client Proxy API Key** in qui (**Settings → Client Proxy Keys**): name the client (e.g. "Upload Assistant"), choose the qBittorrent instance, then copy the generated proxy URL. Use the **full** URL, e.g. `http://localhost:7476/proxy/<client-api-key>`. The instance is fixed by the key you create.
 - `enable_search` (bool): Search client for existing torrents to reuse hashes. NOTE: independant of auto_torrent_searching
 - `qbit_url` / `qbit_port` (str): Web UI host/port.
 - `qbit_user` / `qbit_pass` (str): Credentials.
@@ -409,8 +413,8 @@ Typical keys:
 - `super_seed_trackers` (list[str]): Trackers to enable super-seeding on.
 - `use_tracker_as_tag` (bool): Tag torrents with the tracker identifier.
 - `qbit_tag` / `qbit_cat` (str): Tag/category for uploaded torrents.
-- `qbit_cross_tag` / `qbit_cross_cat` (str): Tag/category for cross-seed torrents.
-- `content_layout` (str): Layout hint (example default `"Original"`).
+- `qbit_cross_tag` / `qbit_cross_cat` (str): Tag/category applied when UA adds a cross-seed torrent. When empty, the normal qBittorrent tag/category rules apply.
+- `content_layout` (str): qBittorrent content layout for every torrent added through this client. Use `"Original"`, `"Subfolder"`, or `"NoSubfolder"` (default `"Original"`).
 - `linking` (str): `"symlink"`, `"hardlink"`, or empty to disable.
 - `allow_fallback` (bool): Fallback to original path injection if linking fails.
 - `linked_folder` (list[str]): Destination folder(s) for linked content. This is the top level directory that will contain the linked content.

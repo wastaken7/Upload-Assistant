@@ -15,7 +15,7 @@ class TheOldSchool(UNIT3D):
     """
 
     tracker = "THEOLDSCHOOL"
-    display_name = "TheOldSchool"
+    display_name = "The Old School"
     source_flag = "TheOldSchool"
     base_url = "https://theoldschool.cc"
     banned_groups = (

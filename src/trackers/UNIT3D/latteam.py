@@ -15,7 +15,7 @@ class LatTeam(UNIT3D):
     """
 
     tracker = "LATTEAM"
-    display_name = "LatTeam"
+    display_name = "Lat-Team"
     base_url = "https://lat-team.com"
     banned_groups = ("EVO",)
     id_url = f"{base_url}/api/torrents/"

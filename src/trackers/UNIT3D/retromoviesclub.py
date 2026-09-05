@@ -14,7 +14,7 @@ class RetroMoviesClub(UNIT3D):
     """Retro Movies Club (RMC) tracker adapter."""
 
     tracker = "RETROMOVIESCLUB"
-    display_name = "RetroMoviesClub"
+    display_name = "Retro Movies Club"
     base_url = "https://retro-movies.club"
     banned_groups = (
         "[Oj]",

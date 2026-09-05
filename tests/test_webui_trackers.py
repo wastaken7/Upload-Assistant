@@ -1,15 +1,34 @@
 from pathlib import Path
 
 import web_ui.server as server
+from src.trackers.retroflix import RetroFlix
 
 
-def test_configured_trackers_include_defaults_and_non_default_setup() -> None:
+def test_tracker_destination_type_uses_existing_usenet_marker() -> None:
+    class TorrentTracker:
+        pass
+
+    class UsenetIndexer:
+        is_usenet = True
+
+    assert server._tracker_destination_type(TorrentTracker) == "torrent"
+    assert server._tracker_destination_type(UsenetIndexer) == "usenet"
+
+
+def test_tracker_supported_categories_are_normalized_and_deduplicated() -> None:
+    class Tracker:
+        supported_categories = ("TV", "movie", " TV ", "BOOK")
+
+    assert server._tracker_supported_categories(Tracker) == ["TV", "MOVIE", "BOOK"]
+
+
+def test_configured_trackers_require_complete_setup_independently_of_defaults() -> None:
     trackers_section = {
         "default_trackers": "AITHER",
         "AITHER": {"api_key": ""},
         "BLUTOPIA": {"api_key": "configured-key"},
         "FLOOD": {
-            "api_key": "",
+            "api_key": "partially-configured-key",
             "announce_url": "https://flood.st/announce/Custom_Announce_URL",
         },
     }
@@ -26,26 +45,123 @@ def test_configured_trackers_include_defaults_and_non_default_setup() -> None:
     configured = server._configured_tracker_names(
         trackers_section,
         example_trackers,
-        ["AITHER"],
         supported_trackers,
     )
 
-    assert configured == {"AITHER", "BLUTOPIA"}
+    assert configured == {"BLUTOPIA"}
 
 
-def test_configured_trackers_include_cookie_and_legacy_btn_setup() -> None:
+def test_tracker_optional_setup_keys_do_not_block_valid_api_credentials() -> None:
+    configured = server._configured_tracker_names(
+        {
+            "RETROFLIX": {
+                "api_key": "configured-key",
+                "announce_url": "https://tracker.example/announce",
+                "username": "",
+                "password": "",
+            }
+        },
+        {
+            "RETROFLIX": {
+                "api_key": "",
+                "announce_url": "",
+                "username": "",
+                "password": "",
+            }
+        },
+        {"RETROFLIX": RetroFlix},
+    )
+
+    assert configured == {"RETROFLIX"}
+
+
+def test_tracker_setup_still_requires_non_optional_account_credentials() -> None:
+    configured = server._configured_tracker_names(
+        {
+            "PASSTHEPOPCORN": {
+                "ApiUser": "api-user",
+                "api_key": "configured-key",
+                "announce_url": "https://please.passthepopcorn.me/passkey/announce",
+                "username": "",
+                "password": "",
+            }
+        },
+        {
+            "PASSTHEPOPCORN": {
+                "ApiUser": "ptp api user",
+                "api_key": "",
+                "announce_url": "",
+                "username": "",
+                "password": "",
+            }
+        },
+        {"PASSTHEPOPCORN": object()},
+    )
+
+    assert configured == set()
+
+
+def test_cookie_trackers_require_cookie_and_template_fields() -> None:
+    class CookieTracker:
+        auth_type = "cookies"
+
     supported_trackers = {
-        "BROADCASTHENET": object(),
-        "MAKINGOFF": object(),
+        "CATHODERAYTUBE": CookieTracker,
+        "MAKINGOFF": CookieTracker,
+    }
+    trackers_section = {
+        "CATHODERAYTUBE": {"announce_url": ""},
+        "MAKINGOFF": {},
+    }
+    example_trackers = {
+        "CATHODERAYTUBE": {"announce_url": ""},
+        "MAKINGOFF": {},
+    }
+
+    configured = server._configured_tracker_names(
+        trackers_section,
+        example_trackers,
+        supported_trackers,
+        {"CATHODERAYTUBE", "MAKINGOFF"},
+    )
+
+    assert configured == {"MAKINGOFF"}
+
+    trackers_section["CATHODERAYTUBE"]["announce_url"] = "https://tracker.example/announce"
+    configured = server._configured_tracker_names(
+        trackers_section,
+        example_trackers,
+        supported_trackers,
+        {"CATHODERAYTUBE", "MAKINGOFF"},
+    )
+
+    assert configured == {"CATHODERAYTUBE", "MAKINGOFF"}
+
+
+def test_configured_trackers_support_cookie_and_legacy_btn_setup() -> None:
+    class CookieTracker:
+        auth_type = "cookies"
+
+    supported_trackers = {
+        "BROADCASTHENET": CookieTracker,
+        "MAKINGOFF": CookieTracker,
         "UNSUPPORTED": object(),
     }
 
     configured = server._configured_tracker_names(
-        {},
-        {},
-        [],
+        {
+            "BROADCASTHENET": {
+                "announce_url": "https://tracker.example/announce",
+                "api_key": "",
+            },
+            "MAKINGOFF": {},
+        },
+        {
+            "BROADCASTHENET": {"announce_url": "", "api_key": ""},
+            "MAKINGOFF": {},
+        },
         supported_trackers,
-        {"MAKINGOFF", "NOT_SUPPORTED"},
+        {"BROADCASTHENET", "MAKINGOFF", "NOT_SUPPORTED"},
         {"DEFAULT": {"btn_api": "legacy-key"}},
     )
 
@@ -56,7 +172,6 @@ def test_whitespace_only_legacy_btn_key_is_not_configured() -> None:
     configured = server._configured_tracker_names(
         {},
         {},
-        [],
         {"BROADCASTHENET": object()},
         user_config={"DEFAULT": {"btn_api": "  \t  "}},
     )
@@ -86,3 +201,71 @@ def test_cookie_discovery_continues_after_one_lookup_failure(tmp_path: Path) -> 
 
     assert lookups == ["BROKEN", "MAKINGOFF", "LATER"]
     assert configured == {"MAKINGOFF"}
+
+
+def test_tracker_status_http_classification_is_advisory() -> None:
+    assert server._tracker_status_from_http_code(200)[0] == "available"
+    assert server._tracker_status_from_http_code(403)[0] == "available"
+    assert server._tracker_status_from_http_code(429)[0] == "issue"
+    assert server._tracker_status_from_http_code(503)[0] == "issue"
+
+
+def test_tracker_status_probe_identifies_timeouts(monkeypatch) -> None:
+    class FakeTimeoutError(Exception):
+        pass
+
+    class FakeHttpx:
+        TimeoutException = FakeTimeoutError
+
+        @staticmethod
+        def Client(**_kwargs):
+            raise FakeTimeoutError
+
+    monkeypatch.setattr(server, "_dynamic_import", lambda _name: FakeHttpx)
+
+    result = server._probe_tracker_url("AITHER", "https://aither.cc")
+
+    assert result["state"] == "unavailable"
+    assert result["reason"] == "timeout"
+    assert "timed out" in result["message"]
+
+
+def test_tracker_status_cache_marks_expired_results_stale(monkeypatch) -> None:
+    monkeypatch.setattr(server.time, "time", lambda: 2_000.0)
+    with server._tracker_status_cache_lock:
+        server._tracker_status_cache.clear()
+        server._tracker_status_cache["AITHER"] = {
+            "name": "AITHER",
+            "state": "available",
+            "message": "The tracker website responded.",
+            "checked_at": "2026-08-31T12:00:00+00:00",
+            "_checked_epoch": 2_000.0 - server._TRACKER_STATUS_CACHE_SECONDS - 1,
+        }
+
+    payload = server._tracker_status_cache_payload(["AITHER", "BLUTOPIA"])
+
+    assert payload["AITHER"]["stale"] is True
+    assert "_checked_epoch" not in payload["AITHER"]
+    assert payload["BLUTOPIA"]["state"] == "not_checked"
+
+    with server._tracker_status_cache_lock:
+        server._tracker_status_cache.clear()
+
+
+def test_refresh_tracker_status_rejects_unknown_tracker(monkeypatch) -> None:
+    monkeypatch.setattr(server, "_is_authenticated", lambda: True)
+    monkeypatch.setattr(server, "_verify_csrf_header", lambda: True)
+    monkeypatch.setattr(server, "_verify_same_origin", lambda: True)
+    monkeypatch.setattr(
+        server,
+        "_supported_tracker_status_targets",
+        lambda: {"AITHER": "https://aither.cc"},
+    )
+
+    response = server.app.test_client().post(
+        "/api/tracker_status",
+        json={"trackers": ["NOT-A-TRACKER"]},
+    )
+
+    assert response.status_code == 400
+    assert response.get_json()["success"] is False
