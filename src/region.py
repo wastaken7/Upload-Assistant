@@ -2102,6 +2102,7 @@ async def get_service(
         "CW": "CW",
         "CWS": "CWS",
         "CWSeed": "CWS",
+        "CWTV": "CW",
         "Daisuki": "DSKI",
         "DARKROOM": "DARKROOM",
         "DAZN": "DAZN",
