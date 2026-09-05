@@ -46,11 +46,81 @@ class SeasonEpisodeManager:
     def __init__(self, config: dict[str, Any]) -> None:
         self.tmdb_manager = TmdbManager(config)
 
+    async def _parse_standard_season_episode(self, video: str, meta: Meta, filelist: list[str]) -> tuple[int, int, str, str]:
+        is_daily = False
+        season_int = 1
+        episode_int = 0
+        season = "S01"
+        episode = ""
+
+        try:
+            daily_match = re.search(r"\d{4}[-\.]\d{2}[-\.]\d{2}", video)
+            if (meta.manual_date or daily_match) and not meta.manual_season:
+                if meta.manual_date is None and daily_match is not None:
+                    meta.manual_date = daily_match.group().replace(".", "-")
+                is_daily = True
+                guess_data = _guessit_data(video)
+                guess_date_raw = meta.manual_date or guess_data.get("date")
+                guess_date = str(guess_date_raw) if guess_date_raw else ""
+                tmdb_id_value = _safe_int(meta.tmdb_id, 0)
+                season_int, episode_int = await self.tmdb_manager.daily_to_tmdb_season_episode(tmdb_id_value, guess_date)
+
+                season = f"S{str(season_int).zfill(2)}"
+                episode = f"E{str(episode_int).zfill(2)}"
+                meta.daily_episode_title = meta.manual_date or ""
+            else:
+                try:
+                    guess_year = str(_guessit_data(video).get("year") or "")
+                except Exception:
+                    guess_year = ""
+                try:
+                    guess_data = _guessit_data(video)
+                    season_guess = str(guess_data.get("season") or "")
+                    if season_guess == guess_year:
+                        if f"s{season_guess}" in video.lower():
+                            season_int = int(season_guess)
+                            season = "S" + str(season_int).zfill(2)
+                        else:
+                            season_int = 1
+                            season = "S01"
+                    else:
+                        season_int = int(guess_data.get("season") or 1)
+                        season = "S" + str(season_int).zfill(2)
+                except Exception:
+                    logger.info("[bold yellow]There was an error guessing the season number. Guessing S01. Use [bold green]--season #[/bold green] to correct if needed")
+                    season_int = 1
+                    season = "S01"
+        except Exception:
+            console.print_exception()
+            season_int = 1
+            season = "S01"
+
+        try:
+            if not is_daily:
+                if len(filelist) == 1:
+                    guess_data = _guessit_data(video)
+                    episodes = guess_data.get("episode")
+                    if isinstance(episodes, list):
+                        episode = "".join(f"E{str(item).zfill(2)}" for item in episodes)
+                        episode_int = _safe_int(episodes[0], 0) if episodes else 0
+                    else:
+                        episode_int = _safe_int(episodes, 0)
+                        episode = "E" + str(episode_int).zfill(2) if episodes is not None else ""
+                else:
+                    episode = ""
+                    episode_int = 0
+                    meta.tv_pack = True
+        except Exception:
+            episode = ""
+            episode_int = 0
+            meta.tv_pack = True
+
+        return season_int, episode_int, season, episode
+
     async def get_season_episode(self, video: str, meta: Meta) -> Meta:
         if meta.category == "TV":
             filelist = cast(list[str], meta.filelist)
             meta.tv_pack = False
-            is_daily = False
             season_int = 1
             episode_int = 0
             season = "S01"
@@ -59,81 +129,7 @@ class SeasonEpisodeManager:
             eng_title = ""
             anilist_episodes = 0
             if not meta.anime:
-                try:
-                    daily_match = re.search(r"\d{4}[-\.]\d{2}[-\.]\d{2}", video)
-                    if (meta.manual_date or daily_match) and not meta.manual_season:
-                        # Handle daily episodes
-                        # The user either provided the --daily argument or a date was found in the filename
-
-                        if meta.manual_date is None and daily_match is not None:
-                            meta.manual_date = daily_match.group().replace(".", "-")
-                        is_daily = True
-                        guess_data = _guessit_data(video)
-                        guess_date_raw = meta.manual_date or guess_data.get("date")
-                        guess_date = str(guess_date_raw) if guess_date_raw else ""
-                        tmdb_id_value = _safe_int(meta.tmdb_id, 0)
-                        season_int, episode_int = await self.tmdb_manager.daily_to_tmdb_season_episode(tmdb_id_value, guess_date)
-
-                        season = f"S{str(season_int).zfill(2)}"
-                        episode = f"E{str(episode_int).zfill(2)}"
-                        # For daily shows, pass the supplied date as the episode title
-                        # Season and episode will be stripped later to conform with standard daily episode naming format
-                        meta.daily_episode_title = meta.manual_date or ""
-
-                    else:
-                        try:
-                            guess_year = str(_guessit_data(video).get("year") or "")
-                        except Exception:
-                            guess_year = ""
-                        try:
-                            guess_data = _guessit_data(video)
-                            season_guess = str(guess_data.get("season") or "")
-                            if season_guess == guess_year:
-                                if f"s{season_guess}" in video.lower():
-                                    season_int = int(season_guess)
-                                    season = "S" + str(season_int).zfill(2)
-                                else:
-                                    season_int = 1
-                                    season = "S01"
-                            else:
-                                season_int = int(guess_data.get("season") or 1)
-                                season = "S" + str(season_int).zfill(2)
-                        except Exception:
-                            logger.info(
-                                "[bold yellow]There was an error guessing the season number. Guessing S01. Use [bold green]--season #[/bold green] to correct if needed"
-                            )
-                            season_int = 1
-                            season = "S01"
-
-                except Exception:
-                    console.print_exception()
-                    season_int = 1
-                    season = "S01"
-
-                try:
-                    if is_daily is not True:
-                        episodes = ""
-                        if len(filelist) == 1:
-                            guess_data = _guessit_data(video)
-                            episodes = guess_data.get("episode")
-                            if isinstance(episodes, list):
-                                episode = ""
-                                episodes_list = episodes
-                                for item in episodes_list:
-                                    ep = str(item).zfill(2)
-                                    episode += f"E{ep}"
-                                episode_int = _safe_int(episodes_list[0], 0) if episodes_list else 0
-                            else:
-                                episode_int = _safe_int(episodes, 0)
-                                episode = "E" + str(episode_int).zfill(2) if episodes is not None else ""
-                        else:
-                            episode = ""
-                            episode_int = 0
-                            meta.tv_pack = True
-                except Exception:
-                    episode = ""
-                    episode_int = 0
-                    meta.tv_pack = True
+                season_int, episode_int, season, episode = await self._parse_standard_season_episode(video, meta, filelist)
 
             else:
                 # If Anime
@@ -281,12 +277,10 @@ class SeasonEpisodeManager:
                             logger.info(f"[bold yellow]If [green]{season}[/green] is incorrect, use --season to correct")
                             await asyncio.sleep(3)
                 else:
-                    logger.info("[bold red]Error determining if TV show is anime or not[/bold red]")
-                    logger.info("[bold yellow]Set manual season and episode[/bold yellow]")
-                    season_int = 1
-                    season = "S01"
-                    episode_int = 1
-                    episode = "E01"
+                    logger.info("[yellow]No matching AniList entry found; using standard season and episode parsing[/yellow]")
+                    if not romaji and not eng_title:
+                        meta.demographic = ""
+                    season_int, episode_int, season, episode = await self._parse_standard_season_episode(video, meta, filelist)
 
             if meta.manual_season is None:
                 meta.season = season
