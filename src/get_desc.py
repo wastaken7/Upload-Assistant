@@ -28,7 +28,7 @@ from src.mediainfo import MediaInfo
 from src.meta import Meta
 from src.screenshot_manifest import files as manifest_files
 from src.takescreens import TakeScreensManager
-from src.tracker_images import get_tracker_image_collection
+from src.tracker_images import get_tracker_image_collection, has_tracker_image_collection
 from src.trackers.common import Common
 from src.uploadscreens import UploadScreensManager
 
@@ -1319,12 +1319,11 @@ class DescriptionBuilder:
             image_list = []
         if approved_image_hosts is None:
             approved_image_hosts = []
-        if image_list:
-            images = image_list
-            multi_screens = 0
-        else:
-            images = meta.image_list
-            multi_screens = self._get_int_config("multiScreens", 2)
+        # get_tracker_image_collection falls back to meta.image_list, so only a real override
+        # replaces the base screenshots. It never disables per-file pack screenshots: those
+        # upload through allowed_hosts, so a tracker's host policy is honoured either way.
+        images = image_list if image_list and has_tracker_image_collection(meta, self.tracker, "screenshots") else meta.image_list
+        multi_screens = self._get_int_config("multiScreens", 2)
         if meta.sorted_filelist:
             multi_screens = 0
 
