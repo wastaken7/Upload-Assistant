@@ -425,7 +425,7 @@ config: dict[str, Any] = {
         # --- AUDIO SPECTROGRAMS AND HDR PLOTS ---
         # Audio spectrograms
         # Set to True to add audio spectrograms to the description.
-        "add_audio_spectrogram": True,
+        "add_audio_spectrogram": False,
         # Set to True to generate spectrograms for all audio streams.
         "process_all_audio_spectrogram": False,
         # Seconds from the beginning of each selected stream to analyse.
