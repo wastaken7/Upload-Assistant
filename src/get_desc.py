@@ -1319,13 +1319,11 @@ class DescriptionBuilder:
             image_list = []
         if approved_image_hosts is None:
             approved_image_hosts = []
-        # get_tracker_image_collection falls back to meta.image_list; only a real override zeroes multi_screens.
-        if image_list and has_tracker_image_collection(meta, self.tracker, "screenshots"):
-            images = image_list
-            multi_screens = 0
-        else:
-            images = meta.image_list
-            multi_screens = self._get_int_config("multiScreens", 2)
+        # get_tracker_image_collection falls back to meta.image_list, so only a real override
+        # replaces the base screenshots. It never disables per-file pack screenshots: those
+        # upload through allowed_hosts, so a tracker's host policy is honoured either way.
+        images = image_list if image_list and has_tracker_image_collection(meta, self.tracker, "screenshots") else meta.image_list
+        multi_screens = self._get_int_config("multiScreens", 2)
         if meta.sorted_filelist:
             multi_screens = 0
 

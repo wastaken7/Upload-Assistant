@@ -6,7 +6,7 @@ from src.meta import Meta
 from src.tracker_images import set_tracker_image_collection
 
 
-def test_pack_multi_screens_only_zeroed_by_tracker_override() -> None:
+def test_pack_multi_screens_survive_tracker_override() -> None:
     async def run() -> None:
         tracker = "TEST"
         builder = DescriptionBuilder(tracker, {"DEFAULT": {"multiScreens": 4}, "TRACKERS": {tracker: {}}})
@@ -45,6 +45,6 @@ def test_pack_multi_screens_only_zeroed_by_tracker_override() -> None:
         set_tracker_image_collection(meta, tracker, "screenshots", override_images)
         await builder.general_description_generator(meta, **disabled_sections)
 
-        assert calls == [(release_images, 4), (override_images, 0)]
+        assert calls == [(release_images, 4), (override_images, 4)]
 
     asyncio.run(run())
