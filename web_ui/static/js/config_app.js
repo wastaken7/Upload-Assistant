@@ -640,6 +640,7 @@ const DEFAULT_WORKFLOW_GROUPS = [
     label: "Upload Workflow",
     headings: [
       "TRACKER SEARCH AND IMPORT",
+      "PROWLARR CREDENTIAL FALLBACK",
       "TRACKER CHECKS AND UPLOAD",
       "TORRENT CREATION",
       "POST-UPLOAD",
@@ -775,6 +776,7 @@ const CONFIG_HEADING_LABELS = {
   "METADATA CACHING": "Metadata Caching",
   "MUSIC METADATA": "Music Metadata",
   "TRACKER SEARCH AND IMPORT": "Tracker Search and Import",
+  "PROWLARR CREDENTIAL FALLBACK": "Prowlarr Credential Fallback",
   "IMAGE HOSTING": "Image Hosting",
   "SCREENSHOT CAPTURE AND PROCESSING": "Screenshot Capture and Processing",
   "SCREENSHOT ENHANCEMENTS": "Screenshot Enhancements",
@@ -802,6 +804,8 @@ const CONFIG_HEADING_LABELS = {
 const CONFIG_HEADING_DESCRIPTIONS = {
   "EXTERNAL TOOL PATHS":
     "Optional executable overrides. Leave fields blank to use automatically managed tools or executables on the system PATH. Check Tools detects their availability without downloading or installing anything.",
+  "PROWLARR CREDENTIAL FALLBACK":
+    "Use enabled Prowlarr indexers as a live fallback for missing tracker API keys and cookies. Values remain in memory and local credentials take precedence.",
 };
 
 const EXTERNAL_TOOL_KEYS = [
@@ -831,6 +835,7 @@ const getConfigHeadingDescription = (value) =>
 
 const UPLOAD_WORKFLOW_HEADING_ORDER = [
   "TRACKER SEARCH AND IMPORT",
+  "PROWLARR CREDENTIAL FALLBACK",
   "TRACKER CHECKS",
   "TORRENT CREATION",
   "UPLOAD BEHAVIOUR",
@@ -1270,6 +1275,14 @@ const INLINE_FIELD_HELP = {
   btn_api: {
     description:
       "Enter the BTN API key used to retrieve metadata from BroadcasTheNet.",
+  },
+  prowlarr_url: {
+    description:
+      "Enter the Prowlarr base URL. The connection is used only when both fields are set.",
+  },
+  prowlarr_api_key: {
+    description:
+      "Used to read enabled indexer credentials at the start of each run. Retrieved values are never saved by UA.",
   },
 };
 
@@ -5825,6 +5838,11 @@ function TrackerManager({
     const trackerStatusText = window.getUATrackerStatusText
       ? window.getUATrackerStatusText(trackerStatus)
       : "Not checked";
+    const visibleStatuses =
+      tracker.credential_source === "prowlarr" &&
+      !statuses.some((status) => status.label === "Prowlarr")
+        ? [...statuses, { label: "Prowlarr", tone: "accent" }]
+        : statuses;
     return (
       <span className="flex min-w-0 items-center gap-3">
         <span className="ua-config-tracker-icon flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg border">
@@ -5856,9 +5874,9 @@ function TrackerManager({
                 title={trackerStatusText}
               />
             )}
-            {statuses.length > 0 && (
+            {visibleStatuses.length > 0 && (
               <span className="flex flex-wrap gap-1.5">
-                {statuses.map((status) =>
+                {visibleStatuses.map((status) =>
                   trackerStatusBadge(status.label, status.tone),
                 )}
               </span>
@@ -6931,6 +6949,8 @@ function ItemList({
   externalToolStatusError,
   isCheckingExternalTools,
   onCheckExternalTools,
+  onTestProwlarr,
+  prowlarrTestState,
   onBrowseFolder,
   onValueChange,
 }) {
@@ -7368,6 +7388,11 @@ function ItemList({
           depth === 0 &&
           item.subsection === true &&
           normalizeConfigHeading(item.key) === "EXTERNAL TOOL PATHS";
+        const isProwlarrSubsection =
+          pathParts[0] === "DEFAULT" &&
+          depth === 0 &&
+          item.subsection === true &&
+          normalizeConfigHeading(item.key) === "PROWLARR CREDENTIAL FALLBACK";
         const isImageHostingSubsection =
           pathParts[0] === "DEFAULT" &&
           depth === 0 &&
@@ -7657,6 +7682,18 @@ function ItemList({
                       {isCheckingExternalTools ? "Checking…" : "Check tools"}
                     </button>
                   )}
+                  {isProwlarrSubsection && (
+                    <button
+                      type="button"
+                      className="ua-config-service-action shrink-0 rounded-lg border px-3 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+                      disabled={prowlarrTestState?.status === "loading"}
+                      onClick={onTestProwlarr}
+                    >
+                      {prowlarrTestState?.status === "loading"
+                        ? "Testing…"
+                        : "Test Connection"}
+                    </button>
+                  )}
                 </div>
                 {isExternalToolsSubsection && externalToolStatusError && (
                   <div
@@ -7687,6 +7724,19 @@ function ItemList({
                       </span>
                     </div>
                   )}
+                {isProwlarrSubsection && prowlarrTestState?.message && (
+                  <div
+                    className={
+                      "mt-3 rounded-lg border px-3 py-2 text-xs " +
+                      (prowlarrTestState.status === "success"
+                        ? "border-green-500/40 text-green-500"
+                        : "border-red-500/40 text-red-500")
+                    }
+                    role="status"
+                  >
+                    {prowlarrTestState.message}
+                  </div>
+                )}
               </div>
               <div className="ua-config-section-panel p-4">{nested}</div>
             </section>
@@ -9426,6 +9476,7 @@ function ConfigApp() {
   const [folderPicker, setFolderPicker] = useState(null);
   const [renameClientSource, setRenameClientSource] = useState("");
   const [clientTestStates, setClientTestStates] = useState(new Map());
+  const [prowlarrTestState, setProwlarrTestState] = useState(null);
   const [externalToolStatuses, setExternalToolStatuses] = useState({});
   const [externalToolStatusError, setExternalToolStatusError] = useState("");
   const [isCheckingExternalTools, setIsCheckingExternalTools] = useState(false);
@@ -9726,6 +9777,7 @@ function ConfigApp() {
       setPendingTrackerOverrideModes(new Map());
       setTrackerOverrideEditors(new Set());
       setClientTestStates(new Map());
+      setProwlarrTestState(null);
       setRenameClientSource("");
       setConfigWarning(data.config_warning || "");
       setStatus({ text: "", type: "info" });
@@ -10443,6 +10495,43 @@ function ConfigApp() {
           message: error.message || "Connection failed",
         });
         return next;
+      });
+    }
+  };
+
+  const testProwlarr = async () => {
+    const url = String(getEffectiveDefaultValue("prowlarr_url") || "").trim();
+    const apiKey = String(
+      getEffectiveDefaultValue("prowlarr_api_key") || "",
+    ).trim();
+    if (!url || !apiKey) {
+      setProwlarrTestState({
+        status: "error",
+        message: "Enter both the Prowlarr URL and API key.",
+      });
+      return;
+    }
+    setProwlarrTestState({
+      status: "loading",
+      message: "Testing connection…",
+    });
+    try {
+      const response = await apiFetch(`${API_BASE}/config_test_prowlarr`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url, api_key: apiKey }),
+      });
+      const data = await response.json();
+      setProwlarrTestState({
+        status: data.success ? "success" : "error",
+        message: data.success
+          ? data.message || "Connection successful"
+          : data.error || "Connection failed",
+      });
+    } catch (error) {
+      setProwlarrTestState({
+        status: "error",
+        message: error.message || "Connection failed",
       });
     }
   };
@@ -12015,6 +12104,8 @@ function ConfigApp() {
                           externalToolStatusError={externalToolStatusError}
                           isCheckingExternalTools={isCheckingExternalTools}
                           onCheckExternalTools={checkExternalTools}
+                          onTestProwlarr={testProwlarr}
+                          prowlarrTestState={prowlarrTestState}
                           onBrowseFolder={browseForFolder}
                           onValueChange={onValueChange}
                         />

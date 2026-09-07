@@ -213,6 +213,12 @@ config: dict[str, Any] = {
         # Set to True to also search PreDB for a matching scene release.
         # PreDB can be inconsistent or time out, but it may find releases absent from SRRDB.
         "check_predb": False,
+        # --- PROWLARR CREDENTIAL FALLBACK ---
+        # Optional Prowlarr base URL and API key. When both are set, Upload
+        # Assistant fills missing supported tracker API keys and cookies in
+        # memory at the start of each run. Local credentials always take precedence.
+        "prowlarr_url": "",
+        "prowlarr_api_key": "",
         # --- IMAGE HOSTING ---
         # Order of image hosts, with the primary host first and backups after it.
         # Available image hosts: dalexni, imgbb, imgbox, lensdump, lostimg, midnightscene, onlyimage, passtheimage, pixhost, ptscreens, seedpool_cdn, sharex, utppm, zipline
