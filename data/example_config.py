@@ -386,15 +386,16 @@ config: dict[str, Any] = {
         # case-insensitively, with or without their leading hyphen.
         # Per-tracker tag_overrides take precedence over these DEFAULT overrides.
         "tag_overrides": {
-            "MyAwesomeGroupTag": {
-                "custom_description_header": "[center]MyAwesomeGroupTag release[/center]",
-                "screenshot_header": "[h2]MyAwesomeGroupTag Screenshots[/h2]",
-                "disc_menu_header": "[h2]MyAwesomeGroupTag Disc Menu Screenshots[/h2]",
-                "audio_spectrogram_header": "[h2]MyAwesomeGroupTag Audio Spectrogram[/h2]",
-                "dynamic_hdr_plot_header": "[h2]MyAwesomeGroupTag Dynamic HDR Metadata[/h2]",
-                "tonemapped_header": "[center]MyAwesomeGroupTag SDR reference screenshots[/center]",
-                "custom_signature": "[center]MyAwesomeGroupTag signature[/center]",
-            },
+            # Uncomment and rename this example group to configure your own overrides.
+            # "MyAwesomeGroupTag": {
+            #     "custom_description_header": "[center]MyAwesomeGroupTag release[/center]",
+            #     "screenshot_header": "[h2]MyAwesomeGroupTag Screenshots[/h2]",
+            #     "disc_menu_header": "[h2]MyAwesomeGroupTag Disc Menu Screenshots[/h2]",
+            #     "audio_spectrogram_header": "[h2]MyAwesomeGroupTag Audio Spectrogram[/h2]",
+            #     "dynamic_hdr_plot_header": "[h2]MyAwesomeGroupTag Dynamic HDR Metadata[/h2]",
+            #     "tonemapped_header": "[center]MyAwesomeGroupTag SDR reference screenshots[/center]",
+            #     "custom_signature": "[center]MyAwesomeGroupTag signature[/center]",
+            # },
         },
         # --- BLU-RAY SETTINGS ---
         # Set to True to use the largest Blu-ray playlist without a selection prompt.

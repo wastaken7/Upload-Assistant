@@ -1016,6 +1016,7 @@ const isSensitiveKeyForPath = (key, pathParts) =>
 const isReadOnlyKeyForPath = (key, pathParts) =>
   pathParts.includes("TORRENT_CLIENTS") && key === "torrent_client";
 const DISPLAY_LABEL_OVERRIDES = {
+  tag_overrides: "Release Group Overrides",
   hide_screenshot_header_if_only_section: "Hide Standalone Screenshot Header",
   multiScreens: "Multiple Screenshots",
   charLimit: "Character Limit",
@@ -3962,23 +3963,143 @@ function MetadataCacheServices({
   );
 }
 
+/** Keep disabled text across settings pages until the editing session is reset. */
+const ReleaseGroupDraftContext = React.createContext(null);
+
+/** Read stored or staged overrides without substituting example groups. */
+const parseReleaseGroupOverrides = (value) => {
+  try {
+    const groups =
+      typeof value === "string" ? JSON.parse(value) : (value ?? {});
+    return groups &&
+      typeof groups === "object" &&
+      !Array.isArray(groups) &&
+      Object.values(groups).every(
+        (fields) =>
+          fields && typeof fields === "object" && !Array.isArray(fields),
+      )
+      ? groups
+      : null;
+  } catch {
+    return null;
+  }
+};
+
+/** Compare mappings consistently when edits restore the original configuration. */
+const serializeReleaseGroupOverrides = (groups) =>
+  JSON.stringify(
+    Object.fromEntries(
+      Object.keys(groups)
+        .sort()
+        .map((name) => [
+          name,
+          Object.fromEntries(
+            Object.keys(groups[name])
+              .sort()
+              .map((key) => [key, groups[name][key]]),
+          ),
+        ]),
+    ),
+  );
+
 function ReleaseGroupOverrides({
   item,
   pathParts,
-  depth,
-  isDarkMode,
-  allImageHosts,
-  usedImageHosts,
-  expandedGroups,
-  toggleGroup,
-  torrentClients,
+  pendingValue,
   onValueChange,
 }) {
-  const groupKey = [...pathParts, item.key].join("/");
-  const isOpen = expandedGroups.has(groupKey);
-  const releaseGroups = item.children || [];
-  const helpText = (item.help || []).join(" ");
-  const groupLabel = releaseGroups.length === 1 ? "group" : "groups";
+  const draftCache = React.useContext(ReleaseGroupDraftContext);
+  const [isOpen, setIsOpen] = useState(false);
+  const [openNames, setOpenNames] = useState(new Set());
+  const [newName, setNewName] = useState("");
+  const [renameTarget, setRenameTarget] = useState(null);
+  const [renameName, setRenameName] = useState("");
+  const [error, setError] = useState("");
+  const originalGroups = parseReleaseGroupOverrides(item.value);
+  const groups = parseReleaseGroupOverrides(pendingValue ?? item.value);
+  const fields = item.override_fields || [];
+  const path = [...pathParts, item.key];
+  const pathKey = path.join("/");
+  const fieldPrefix = path.join("--");
+  const groupNames = Object.keys(groups || {});
+
+  const setFieldEnabled = (name, key, enabled) => {
+    const nextValues = { ...groups[name] };
+    if (enabled) {
+      nextValues[key] =
+        draftCache.current.get(pathKey)?.get(name)?.get(key) ?? "";
+    } else {
+      // Remember disabled text only for this editing session, outside the saved map.
+      const scopeDrafts = draftCache.current.get(pathKey) || new Map();
+      const groupDrafts = scopeDrafts.get(name) || new Map();
+      groupDrafts.set(key, nextValues[key]);
+      scopeDrafts.set(name, groupDrafts);
+      draftCache.current.set(pathKey, scopeDrafts);
+      delete nextValues[key];
+    }
+    updateGroups({ ...groups, [name]: nextValues });
+  };
+
+  const updateGroups = (nextGroups) =>
+    onValueChange(path, serializeReleaseGroupOverrides(nextGroups), {
+      originalValue: serializeReleaseGroupOverrides(originalGroups),
+      isSensitive: false,
+      isRedacted: false,
+      readOnly: false,
+    });
+
+  const validateName = (name, currentName = null) => {
+    const normalize = (value) => value.trim().replace(/^-+/, "").toLowerCase();
+    if (!normalize(name) || [...name].some((char) => char.charCodeAt(0) < 32)) {
+      return "Enter a release group name.";
+    }
+    if (
+      groupNames.some(
+        (existing) =>
+          existing !== currentName && normalize(existing) === normalize(name),
+      )
+    ) {
+      return "That release group already exists. Case and leading hyphens are ignored.";
+    }
+    return "";
+  };
+
+  const addGroup = () => {
+    setRenameTarget(null);
+    const name = newName.trim();
+    const message = validateName(name);
+    setError(message);
+    if (message) return;
+    updateGroups({ ...groups, [name]: {} });
+    setOpenNames((current) => new Set([...current, name]));
+    setNewName("");
+  };
+
+  const renameGroup = () => {
+    const name = renameName.trim();
+    const message = validateName(name, renameTarget);
+    setError(message);
+    if (message) return;
+    const scopeDrafts = draftCache.current.get(pathKey);
+    if (scopeDrafts?.has(renameTarget)) {
+      const groupDrafts = scopeDrafts.get(renameTarget);
+      scopeDrafts.delete(renameTarget);
+      scopeDrafts.set(name, groupDrafts);
+    }
+    updateGroups(
+      Object.fromEntries(
+        Object.entries(groups).map(([key, values]) => [
+          key === renameTarget ? name : key,
+          values,
+        ]),
+      ),
+    );
+    setOpenNames(
+      (current) =>
+        new Set([...current].map((key) => (key === renameTarget ? name : key))),
+    );
+    setRenameTarget(null);
+  };
 
   return (
     <section
@@ -3987,7 +4108,7 @@ function ReleaseGroupOverrides({
     >
       <button
         type="button"
-        onClick={() => toggleGroup(groupKey)}
+        onClick={() => setIsOpen((open) => !open)}
         className="ua-config-accordion-trigger flex w-full items-center justify-between gap-4 px-4 py-3 text-left"
         aria-expanded={isOpen}
       >
@@ -3995,117 +4116,286 @@ function ReleaseGroupOverrides({
           <span className="block text-sm font-semibold">
             Release Group Overrides
           </span>
-          {helpText && (
-            <span className="ua-config-service-description mt-1 block text-xs font-normal">
-              {helpText}
-            </span>
-          )}
+          <span className="ua-config-service-description mt-1 block text-xs font-normal">
+            {pathParts[0] === "TRACKERS"
+              ? "Override description text for release groups on this tracker."
+              : "Override description text for specific release groups."}
+          </span>
         </span>
-        <span className="flex shrink-0 items-center gap-3">
-          <span className="ua-config-service-action hidden text-xs font-medium sm:inline">
-            {isOpen
-              ? `Hide ${groupLabel}`
-              : `Show ${releaseGroups.length} ${groupLabel}`}
-          </span>
-          <span
-            className="ua-config-accordion-chevron transition-transform"
-            style={{
-              transform: isOpen ? "rotate(90deg)" : "rotate(0deg)",
-            }}
-            aria-hidden="true"
-          >
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="m9 18 6-6-6-6"></path>
-            </svg>
-          </span>
+        <span className="ua-config-service-action shrink-0 text-xs font-medium">
+          {isOpen
+            ? "Hide"
+            : `Show ${groupNames.length} ${groupNames.length === 1 ? "group" : "groups"}`}
         </span>
       </button>
-
       {isOpen && (
-        <div className="ua-config-accordion-panel space-y-3 border-t p-4">
-          {releaseGroups.map((releaseGroup) => {
-            const releaseGroupKey = [
-              ...pathParts,
-              item.key,
-              releaseGroup.key,
-            ].join("/");
-            const isReleaseGroupOpen = expandedGroups.has(releaseGroupKey);
-            const fields = releaseGroup.children || [];
-            return (
-              <div
-                key={releaseGroupKey}
-                className="ua-config-accordion overflow-hidden rounded-lg border"
-                data-open={isReleaseGroupOpen ? "true" : "false"}
-              >
-                <button
-                  type="button"
-                  onClick={() => toggleGroup(releaseGroupKey)}
-                  className="ua-config-accordion-trigger flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
-                  aria-expanded={isReleaseGroupOpen}
-                >
-                  <span className="min-w-0">
-                    <span className="block truncate text-sm font-semibold">
-                      {releaseGroup.key}
-                    </span>
-                    <span className="ua-config-service-description mt-1 block text-xs font-normal">
-                      {fields.length} description overrides
-                    </span>
-                  </span>
-                  <span
-                    className="ua-config-accordion-chevron shrink-0 transition-transform"
-                    style={{
-                      transform: isReleaseGroupOpen
-                        ? "rotate(90deg)"
-                        : "rotate(0deg)",
-                    }}
-                    aria-hidden="true"
+        <div className="ua-config-accordion-panel space-y-4 border-t p-4">
+          {!originalGroups || !groups ? (
+            <p role="alert" className="text-sm text-red-500">
+              The existing release group configuration is not a dictionary of
+              groups. Correct it in config.py before editing here.
+            </p>
+          ) : (
+            <>
+              <p className="ua-config-service-description text-xs leading-relaxed">
+                For matching release groups, these overrides take priority over
+                ordinary tracker and global settings. Tracker-specific group
+                overrides take priority over global group overrides.
+              </p>
+              <p className="ua-config-service-description text-xs leading-relaxed">
+                Names are matched without case or leading hyphens. Tick a field
+                to enable its override. Disabled fields inherit their usual
+                text; an enabled field left empty uses blank text.
+              </p>
+              {groupNames.length === 0 && (
+                <p className="ua-config-service-description text-sm">
+                  No release group overrides configured.
+                </p>
+              )}
+              {groupNames.map((name) => {
+                const values = groups[name];
+                const isGroupOpen = openNames.has(name);
+                const activeCount = Object.values(values).filter(
+                  (value) => value !== null,
+                ).length;
+                const additionalKeys = Object.keys(values).filter(
+                  (key) => !fields.some((field) => field.key === key),
+                );
+                return (
+                  <div
+                    key={name}
+                    className="ua-config-accordion overflow-hidden rounded-lg border"
+                    data-open={isGroupOpen ? "true" : "false"}
                   >
-                    <svg
-                      width="18"
-                      height="18"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="m9 18 6-6-6-6"></path>
-                    </svg>
-                  </span>
-                </button>
-                {isReleaseGroupOpen && (
-                  <div className="ua-config-accordion-panel border-t p-4">
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-                      {fields.map((field) => (
-                        <ConfigLeaf
-                          key={`${releaseGroupKey}/${field.key}`}
-                          item={field}
-                          pathParts={[...pathParts, item.key, releaseGroup.key]}
-                          depth={depth + 2}
-                          isDarkMode={isDarkMode}
-                          fullWidth={true}
-                          allImageHosts={allImageHosts}
-                          usedImageHosts={usedImageHosts}
-                          torrentClients={torrentClients}
-                          onValueChange={onValueChange}
-                        />
-                      ))}
+                    <div className="ua-config-accordion-trigger flex flex-wrap items-center gap-2 px-3 py-2">
+                      <button
+                        type="button"
+                        aria-expanded={isGroupOpen}
+                        aria-label={`Edit overrides for ${name}`}
+                        className="flex min-w-0 flex-1 items-center gap-2 py-1 text-left"
+                        onClick={() =>
+                          setOpenNames((current) => {
+                            const next = new Set(current);
+                            if (next.has(name)) next.delete(name);
+                            else next.add(name);
+                            return next;
+                          })
+                        }
+                      >
+                        <svg
+                          className="ua-config-accordion-chevron shrink-0 transition-transform"
+                          style={{
+                            transform: isGroupOpen
+                              ? "rotate(90deg)"
+                              : "rotate(0deg)",
+                          }}
+                          width="18"
+                          height="18"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden="true"
+                        >
+                          <path d="m9 18 6-6-6-6" />
+                        </svg>
+                        <span className="min-w-0">
+                          <span className="block break-words text-sm font-semibold">
+                            {name}
+                          </span>
+                          <span className="ua-config-service-description block text-xs">
+                            {activeCount}{" "}
+                            {activeCount === 1 ? "override" : "overrides"}
+                          </span>
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`Rename group ${name}`}
+                        className="ua-config-service-action rounded-md border px-2.5 py-1.5 text-xs font-semibold"
+                        onClick={() => {
+                          setRenameTarget(name);
+                          setRenameName(name);
+                          setError("");
+                        }}
+                      >
+                        Rename
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`Remove group ${name}`}
+                        className="rounded-md border border-red-500/40 px-2.5 py-1.5 text-xs font-semibold text-red-500 hover:bg-red-500/10"
+                        onClick={() => {
+                          draftCache.current.get(pathKey)?.delete(name);
+                          updateGroups(
+                            Object.fromEntries(
+                              Object.entries(groups).filter(
+                                ([key]) => key !== name,
+                              ),
+                            ),
+                          );
+                          if (renameTarget === name) setRenameTarget(null);
+                          setError("");
+                        }}
+                      >
+                        Remove
+                      </button>
                     </div>
+                    {renameTarget === name && (
+                      <form
+                        className="flex flex-wrap items-end gap-2 border-t p-3"
+                        onSubmit={(event) => {
+                          event.preventDefault();
+                          renameGroup();
+                        }}
+                      >
+                        <label className="w-full text-xs font-medium sm:min-w-0 sm:flex-1">
+                          New name for {name}
+                          <input
+                            value={renameName}
+                            onChange={(event) =>
+                              setRenameName(event.target.value)
+                            }
+                            className="ua-config-input mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                          />
+                        </label>
+                        <button
+                          type="submit"
+                          className="ua-config-service-action rounded-md border px-3 py-2 text-xs font-semibold"
+                        >
+                          Apply name
+                        </button>
+                        <button
+                          type="button"
+                          className="ua-config-service-action rounded-md border px-3 py-2 text-xs"
+                          onClick={() => {
+                            setRenameTarget(null);
+                            setError("");
+                          }}
+                        >
+                          Cancel
+                        </button>
+                        {error && (
+                          <p
+                            role="alert"
+                            className="w-full text-sm text-red-500"
+                          >
+                            {error}
+                          </p>
+                        )}
+                      </form>
+                    )}
+                    {isGroupOpen && (
+                      <div className="ua-config-accordion-panel space-y-3 border-t p-4">
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+                          {fields.map((field) => {
+                            const label = formatConfigFieldLabel(
+                              field.key,
+                              path,
+                            );
+                            const enabled =
+                              Object.hasOwn(values, field.key) &&
+                              values[field.key] !== null;
+                            const textId = `${fieldPrefix}--${encodeURIComponent(name)}--${field.key}`;
+                            return (
+                              <div
+                                key={field.key}
+                                className="flex min-w-0 flex-col gap-2"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <label className="flex min-w-0 cursor-pointer items-center gap-2 text-sm font-medium">
+                                    <input
+                                      type="checkbox"
+                                      checked={enabled}
+                                      aria-label={`Override ${label} for ${name}`}
+                                      className="ua-theme-checkbox h-4 w-4 shrink-0"
+                                      onChange={(event) =>
+                                        setFieldEnabled(
+                                          name,
+                                          field.key,
+                                          event.target.checked,
+                                        )
+                                      }
+                                    />
+                                    <span>{label}</span>
+                                  </label>
+                                  {field.help?.length > 0 && (
+                                    <Tooltip content={field.help.join("\n")}>
+                                      <InfoIcon className="ua-config-service-description h-4 w-4 shrink-0" />
+                                    </Tooltip>
+                                  )}
+                                </div>
+                                <input
+                                  id={textId}
+                                  type="text"
+                                  aria-label={`${label} for ${name}`}
+                                  disabled={!enabled}
+                                  value={
+                                    enabled
+                                      ? values[field.key]
+                                      : (draftCache.current
+                                          .get(pathKey)
+                                          ?.get(name)
+                                          ?.get(field.key) ?? "")
+                                  }
+                                  className="ua-config-input mt-auto w-full rounded-md border px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                                  onChange={(event) =>
+                                    updateGroups({
+                                      ...groups,
+                                      [name]: {
+                                        ...values,
+                                        [field.key]: event.target.value,
+                                      },
+                                    })
+                                  }
+                                />
+                              </div>
+                            );
+                          })}
+                        </div>
+                        {additionalKeys.length > 0 && (
+                          <p className="ua-config-service-description text-xs">
+                            Additional existing fields are preserved:{" "}
+                            {additionalKeys.join(", ")}.
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            );
-          })}
+                );
+              })}
+              <form
+                className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-end"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  addGroup();
+                }}
+              >
+                <label className="min-w-0 flex-1 text-sm font-medium">
+                  Release group name
+                  <input
+                    value={newName}
+                    onChange={(event) => setNewName(event.target.value)}
+                    placeholder="e.g. MyGroup"
+                    className="ua-config-input mt-1 w-full rounded-md border px-3 py-2"
+                  />
+                </label>
+                <button
+                  type="submit"
+                  className="ua-config-service-action rounded-md border px-3 py-2 text-sm font-semibold"
+                >
+                  Add group
+                </button>
+              </form>
+              {error && renameTarget === null && (
+                <p role="alert" className="text-sm text-red-500">
+                  {error}
+                </p>
+              )}
+            </>
+          )}
         </div>
       )}
     </section>
@@ -4924,9 +5214,15 @@ function TrackerSettings({
   torrentClients,
   overridesEnabled = false,
   onToggleOverrides = () => {},
+  pendingChanges,
   onValueChange,
 }) {
-  const editableItems = items || [];
+  const releaseGroupOverrides = (items || []).find(
+    (item) => item.key === "tag_overrides",
+  );
+  const editableItems = (items || []).filter(
+    (item) => item.key !== "tag_overrides",
+  );
   const itemByKey = new Map(editableItems.map((item) => [item.key, item]));
   const overrideItems = editableItems.filter((item) =>
     trackerDefaultOverrideKeys.has(item.key),
@@ -5082,6 +5378,18 @@ function TrackerSettings({
           </div>
         </section>
       ))}
+      {releaseGroupOverrides && (
+        <ReleaseGroupOverrides
+          item={releaseGroupOverrides}
+          pathParts={pathParts}
+          pendingValue={
+            pendingChanges?.get(
+              [...pathParts, releaseGroupOverrides.key].join("/"),
+            )?.value
+          }
+          onValueChange={onValueChange}
+        />
+      )}
       {overrideItems.length > 0 && (
         <section className="ua-config-client-settings-group overflow-hidden rounded-lg border">
           <div className="ua-config-section-heading flex flex-col gap-3 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
@@ -5092,6 +5400,10 @@ function TrackerSettings({
               <p className="ua-config-service-description mt-1 text-xs">
                 Enable only when this tracker should use different description,
                 screenshot, or injection settings from DEFAULT.
+              </p>
+              <p className="ua-config-service-description mt-1 text-xs">
+                Matching release group overrides still take priority for
+                description text.
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-3">
@@ -6207,6 +6519,7 @@ function TrackerManager({
                     allImageHosts={allImageHosts}
                     usedImageHosts={usedImageHosts}
                     torrentClients={torrentClients}
+                    pendingChanges={pendingChanges}
                     overridesEnabled={overridesEnabled}
                     onToggleOverrides={(enabled, overrideItems) =>
                       onToggleTrackerOverrides(name, enabled, overrideItems)
@@ -7262,13 +7575,11 @@ function ItemList({
                 <ReleaseGroupOverrides
                   item={releaseGroupOverrides}
                   pathParts={pathParts}
-                  depth={depth}
-                  isDarkMode={isDarkMode}
-                  allImageHosts={allImageHosts}
-                  usedImageHosts={usedImageHosts}
-                  expandedGroups={expandedGroups}
-                  toggleGroup={toggleGroup}
-                  torrentClients={torrentClients}
+                  pendingValue={
+                    pendingChanges?.get(
+                      [...pathParts, releaseGroupOverrides.key].join("/"),
+                    )?.value
+                  }
                   onValueChange={onValueChange}
                 />
               )}
@@ -9053,6 +9364,16 @@ function ConfigApp() {
   );
   const [expandedGroups, setExpandedGroups] = useState(new Set());
   const [pendingChanges, setPendingChanges] = useState(new Map());
+  const releaseGroupDrafts = useRef(new Map());
+
+  useEffect(() => {
+    const resetDrafts = (event) => {
+      releaseGroupDrafts.current.delete(String(event.detail?.pathKey || ""));
+    };
+    window.addEventListener(CONFIG_FIELD_RESET_EVENT, resetDrafts);
+    return () =>
+      window.removeEventListener(CONFIG_FIELD_RESET_EVENT, resetDrafts);
+  }, []);
   const [pendingTorrentClients, setPendingTorrentClients] = useState(new Map());
   const [pendingRemovedTorrentClients, setPendingRemovedTorrentClients] =
     useState(new Set());
@@ -9392,6 +9713,7 @@ function ConfigApp() {
         throw new Error(data.error || "Failed to load config options");
       }
       const newSections = data.sections || [];
+      releaseGroupDrafts.current.clear();
       const fallbackSection =
         newSections.find((section) => section.section === "DEFAULT") ||
         newSections[0];
@@ -9541,6 +9863,8 @@ function ConfigApp() {
     } else {
       setPendingChanges(new Map());
     }
+
+    releaseGroupDrafts.current.clear();
 
     fieldPathsToReset.forEach((pathKey) => {
       window.dispatchEvent(
@@ -10830,6 +11154,41 @@ function ConfigApp() {
       const path = Array.isArray(update.path) ? update.path : [];
       const key = String(path[path.length - 1] || "");
       const parentPath = path.slice(0, -1);
+      if (
+        key === "tag_overrides" &&
+        ((path[0] === "DEFAULT" && path.length === 2) ||
+          (path[0] === "TRACKERS" && path.length === 3))
+      ) {
+        const originalGroups = parseReleaseGroupOverrides(update.originalValue);
+        const nextGroups = parseReleaseGroupOverrides(update.value);
+        if (!originalGroups || !nextGroups)
+          return "Release group overrides changed";
+        const added = Object.keys(nextGroups).filter(
+          (name) => !Object.prototype.hasOwnProperty.call(originalGroups, name),
+        );
+        const removed = Object.keys(originalGroups).filter(
+          (name) => !Object.prototype.hasOwnProperty.call(nextGroups, name),
+        );
+        const updated = Object.keys(nextGroups).filter(
+          (name) =>
+            Object.prototype.hasOwnProperty.call(originalGroups, name) &&
+            serializeReleaseGroupOverrides({ [name]: originalGroups[name] }) !==
+              serializeReleaseGroupOverrides({ [name]: nextGroups[name] }),
+        );
+        return (
+          [
+            ["Added", added],
+            ["Removed", removed],
+            ["Updated", updated],
+          ]
+            .filter(([, names]) => names.length)
+            .map(
+              ([action, names]) =>
+                `${action} ${names.length === 1 ? "group" : "groups"} ${names.join(", ")}`,
+            )
+            .join("; ") || "Release group overrides changed"
+        );
+      }
       if (path[0] === "TRACKERS" && key === "default_trackers") {
         const normalizeTrackers = (value) =>
           String(value || "")
@@ -11105,6 +11464,10 @@ function ConfigApp() {
       const detailParts = [
         `${settingCount} setting${settingCount === 1 ? "" : "s"} changed`,
       ];
+      const groupUpdate = pathKeys
+        .map((pathKey) => pendingChanges.get(pathKey))
+        .find((update) => update.path[2] === "tag_overrides");
+      if (groupUpdate) detailParts.push(describeValue(groupUpdate));
       if (overrideChange) {
         detailParts.push(
           `DEFAULT overrides ${overrideChange[1] ? "enabled" : "removed"}`,
@@ -11300,7 +11663,7 @@ function ConfigApp() {
     }
   };
 
-  return (
+  const configPage = (
     <div
       className={
         "ua-config-page min-h-screen " +
@@ -11677,6 +12040,12 @@ function ConfigApp() {
         </div>
       </div>
     </div>
+  );
+
+  return (
+    <ReleaseGroupDraftContext.Provider value={releaseGroupDrafts}>
+      {configPage}
+    </ReleaseGroupDraftContext.Provider>
   );
 }
 
