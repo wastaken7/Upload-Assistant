@@ -226,7 +226,7 @@ Implementation notes:
 
 ### UX / safety toggles
 
-- `sfx_on_prompt` (bool): Play a bell sound effect when asking for confirmation.
+- `sfx_on_prompt` (bool, default `True`): Play a bell before release confirmation. CLI runs use the terminal bell; WebUI runs play the sound in the browser after clicking Execute. Allow site audio and keep the tab unmuted. Fully unattended runs skip the sound along with confirmation.
 - `embed_links` (bool): Set true to embed terminal links using terminal hyperlinks (OSC 8). Set false to display the full raw URLs. `embed_dupe_links` remains supported temporarily as a deprecated alias.
 - `tracker_pass_checks` (str): Minimum number of trackers that must pass checks to continue upload.
 - `use_largest_playlist` (bool): Always use the largest Blu-ray playlist without prompting.

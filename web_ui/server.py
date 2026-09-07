@@ -34,6 +34,7 @@ import psutil
 
 import web_ui.auth as auth_mod
 from src.webui_progress import PROGRESS_STDOUT_PREFIX
+from src.prompt_sound import PROMPT_SOUND_STDOUT_MARKER
 from src.app_paths import CODE_DIR, DATA_DIR, STATE_DIR
 from src.external_tools import EXTERNAL_TOOL_KEYS, check_external_tools
 from src.meta import Meta
@@ -1632,6 +1633,7 @@ def _webui_subprocess_env() -> dict[str, str]:
     env.pop("NO_COLOR", None)
     env["UA_WEBUI_FORCE_COLOR"] = "1"
     env["UA_WEBUI_PROGRESS_STDOUT"] = "1"
+    env["UA_WEBUI_PROMPT_SOUND_STDOUT"] = "1"
     return env
 
 
@@ -6355,6 +6357,10 @@ def execute_command():
 
                             # Flush on newline or when buffer grows large
                             if _should_flush_subprocess_output(buffers[output_type], char):
+                                if buffers[output_type].strip() == PROMPT_SOUND_STDOUT_MARKER:
+                                    buffers[output_type] = ""
+                                    yield f"data: {json.dumps({'type': 'prompt_sound'})}\n\n"
+                                    continue
                                 if not prompt_type:
                                     _set_process_awaiting_input_if_current(session_id, process_state, False)
                                 chunk = buffers[output_type]
