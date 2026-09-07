@@ -1631,6 +1631,415 @@ const SelectDropdown = ({
   );
 };
 
+// ISO 639-1 options from pycountry 24.6.1, including English display names.
+const LOGO_LANGUAGE_OPTIONS = [
+  { value: "", label: "Default (English)" },
+  { value: "ab", label: "Abkhazian (ab)" },
+  { value: "aa", label: "Afar (aa)" },
+  { value: "af", label: "Afrikaans (af)" },
+  { value: "ak", label: "Akan (ak)" },
+  { value: "sq", label: "Albanian (sq)" },
+  { value: "am", label: "Amharic (am)" },
+  { value: "ar", label: "Arabic (ar)" },
+  { value: "an", label: "Aragonese (an)" },
+  { value: "hy", label: "Armenian (hy)" },
+  { value: "as", label: "Assamese (as)" },
+  { value: "av", label: "Avaric (av)" },
+  { value: "ae", label: "Avestan (ae)" },
+  { value: "ay", label: "Aymara (ay)" },
+  { value: "az", label: "Azerbaijani (az)" },
+  { value: "bm", label: "Bambara (bm)" },
+  { value: "ba", label: "Bashkir (ba)" },
+  { value: "eu", label: "Basque (eu)" },
+  { value: "be", label: "Belarusian (be)" },
+  { value: "bn", label: "Bangla (bn)" },
+  { value: "bi", label: "Bislama (bi)" },
+  { value: "bs", label: "Bosnian (bs)" },
+  { value: "br", label: "Breton (br)" },
+  { value: "bg", label: "Bulgarian (bg)" },
+  { value: "my", label: "Burmese (my)" },
+  { value: "ca", label: "Catalan (ca)" },
+  { value: "ch", label: "Chamorro (ch)" },
+  { value: "ce", label: "Chechen (ce)" },
+  { value: "zh", label: "Chinese (zh)" },
+  { value: "cu", label: "Church Slavic (cu)" },
+  { value: "cv", label: "Chuvash (cv)" },
+  { value: "kw", label: "Cornish (kw)" },
+  { value: "co", label: "Corsican (co)" },
+  { value: "cr", label: "Cree (cr)" },
+  { value: "hr", label: "Croatian (hr)" },
+  { value: "cs", label: "Czech (cs)" },
+  { value: "da", label: "Danish (da)" },
+  { value: "dv", label: "Dhivehi (dv)" },
+  { value: "nl", label: "Dutch (nl)" },
+  { value: "dz", label: "Dzongkha (dz)" },
+  { value: "en", label: "English (en)" },
+  { value: "eo", label: "Esperanto (eo)" },
+  { value: "et", label: "Estonian (et)" },
+  { value: "ee", label: "Ewe (ee)" },
+  { value: "fo", label: "Faroese (fo)" },
+  { value: "fj", label: "Fijian (fj)" },
+  { value: "fi", label: "Finnish (fi)" },
+  { value: "fr", label: "French (fr)" },
+  { value: "ff", label: "Fulah (ff)" },
+  { value: "gl", label: "Galician (gl)" },
+  { value: "lg", label: "Ganda (lg)" },
+  { value: "ka", label: "Georgian (ka)" },
+  { value: "de", label: "German (de)" },
+  { value: "gn", label: "Guarani (gn)" },
+  { value: "gu", label: "Gujarati (gu)" },
+  { value: "ht", label: "Haitian (ht)" },
+  { value: "ha", label: "Hausa (ha)" },
+  { value: "he", label: "Hebrew (he)" },
+  { value: "hz", label: "Herero (hz)" },
+  { value: "hi", label: "Hindi (hi)" },
+  { value: "ho", label: "Hiri Motu (ho)" },
+  { value: "hu", label: "Hungarian (hu)" },
+  { value: "is", label: "Icelandic (is)" },
+  { value: "io", label: "Ido (io)" },
+  { value: "ig", label: "Igbo (ig)" },
+  { value: "id", label: "Indonesian (id)" },
+  {
+    value: "ia",
+    label: "Interlingua (International Auxiliary Language Association) (ia)",
+  },
+  { value: "ie", label: "Interlingue (ie)" },
+  { value: "iu", label: "Inuktitut (iu)" },
+  { value: "ik", label: "Inupiaq (ik)" },
+  { value: "ga", label: "Irish (ga)" },
+  { value: "it", label: "Italian (it)" },
+  { value: "ja", label: "Japanese (ja)" },
+  { value: "jv", label: "Javanese (jv)" },
+  { value: "kl", label: "Kalaallisut (kl)" },
+  { value: "kn", label: "Kannada (kn)" },
+  { value: "kr", label: "Kanuri (kr)" },
+  { value: "ks", label: "Kashmiri (ks)" },
+  { value: "kk", label: "Kazakh (kk)" },
+  { value: "km", label: "Khmer (km)" },
+  { value: "ki", label: "Kikuyu (ki)" },
+  { value: "rw", label: "Kinyarwanda (rw)" },
+  { value: "ky", label: "Kirghiz (ky)" },
+  { value: "kv", label: "Komi (kv)" },
+  { value: "kg", label: "Kongo (kg)" },
+  { value: "ko", label: "Korean (ko)" },
+  { value: "kj", label: "Kuanyama (kj)" },
+  { value: "ku", label: "Kurdish (ku)" },
+  { value: "lo", label: "Lao (lo)" },
+  { value: "la", label: "Latin (la)" },
+  { value: "lv", label: "Latvian (lv)" },
+  { value: "li", label: "Limburgan (li)" },
+  { value: "ln", label: "Lingala (ln)" },
+  { value: "lt", label: "Lithuanian (lt)" },
+  { value: "lu", label: "Luba-Katanga (lu)" },
+  { value: "lb", label: "Luxembourgish (lb)" },
+  { value: "mk", label: "Macedonian (mk)" },
+  { value: "mg", label: "Malagasy (mg)" },
+  { value: "ms", label: "Malay (macrolanguage) (ms)" },
+  { value: "ml", label: "Malayalam (ml)" },
+  { value: "mt", label: "Maltese (mt)" },
+  { value: "gv", label: "Manx (gv)" },
+  { value: "mi", label: "Maori (mi)" },
+  { value: "mr", label: "Marathi (mr)" },
+  { value: "mh", label: "Marshallese (mh)" },
+  { value: "el", label: "Modern Greek (1453-) (el)" },
+  { value: "mn", label: "Mongolian (mn)" },
+  { value: "na", label: "Nauru (na)" },
+  { value: "nv", label: "Navajo (nv)" },
+  { value: "ng", label: "Ndonga (ng)" },
+  { value: "ne", label: "Nepali (macrolanguage) (ne)" },
+  { value: "nd", label: "North Ndebele (nd)" },
+  { value: "se", label: "Northern Sami (se)" },
+  { value: "no", label: "Norwegian (no)" },
+  { value: "nb", label: "Norwegian Bokmål (nb)" },
+  { value: "nn", label: "Norwegian Nynorsk (nn)" },
+  { value: "ny", label: "Nyanja (ny)" },
+  { value: "oc", label: "Occitan (post 1500) (oc)" },
+  { value: "oj", label: "Ojibwa (oj)" },
+  { value: "or", label: "Oriya (macrolanguage) (or)" },
+  { value: "om", label: "Oromo (om)" },
+  { value: "os", label: "Ossetian (os)" },
+  { value: "pi", label: "Pali (pi)" },
+  { value: "pa", label: "Panjabi (pa)" },
+  { value: "fa", label: "Persian (fa)" },
+  { value: "pl", label: "Polish (pl)" },
+  { value: "pt", label: "Portuguese (pt)" },
+  { value: "ps", label: "Pushto (ps)" },
+  { value: "qu", label: "Quechua (qu)" },
+  { value: "ro", label: "Romanian (ro)" },
+  { value: "rm", label: "Romansh (rm)" },
+  { value: "rn", label: "Rundi (rn)" },
+  { value: "ru", label: "Russian (ru)" },
+  { value: "sm", label: "Samoan (sm)" },
+  { value: "sg", label: "Sango (sg)" },
+  { value: "sa", label: "Sanskrit (sa)" },
+  { value: "sc", label: "Sardinian (sc)" },
+  { value: "gd", label: "Scottish Gaelic (gd)" },
+  { value: "sr", label: "Serbian (sr)" },
+  { value: "sh", label: "Serbo-Croatian (sh)" },
+  { value: "sn", label: "Shona (sn)" },
+  { value: "ii", label: "Sichuan Yi (ii)" },
+  { value: "sd", label: "Sindhi (sd)" },
+  { value: "si", label: "Sinhala (si)" },
+  { value: "sk", label: "Slovak (sk)" },
+  { value: "sl", label: "Slovenian (sl)" },
+  { value: "so", label: "Somali (so)" },
+  { value: "nr", label: "South Ndebele (nr)" },
+  { value: "st", label: "Southern Sotho (st)" },
+  { value: "es", label: "Spanish (es)" },
+  { value: "su", label: "Sundanese (su)" },
+  { value: "sw", label: "Swahili (macrolanguage) (sw)" },
+  { value: "ss", label: "Swati (ss)" },
+  { value: "sv", label: "Swedish (sv)" },
+  { value: "tl", label: "Tagalog (tl)" },
+  { value: "ty", label: "Tahitian (ty)" },
+  { value: "tg", label: "Tajik (tg)" },
+  { value: "ta", label: "Tamil (ta)" },
+  { value: "tt", label: "Tatar (tt)" },
+  { value: "te", label: "Telugu (te)" },
+  { value: "th", label: "Thai (th)" },
+  { value: "bo", label: "Tibetan (bo)" },
+  { value: "ti", label: "Tigrinya (ti)" },
+  { value: "to", label: "Tonga (Tonga Islands) (to)" },
+  { value: "ts", label: "Tsonga (ts)" },
+  { value: "tn", label: "Tswana (tn)" },
+  { value: "tr", label: "Turkish (tr)" },
+  { value: "tk", label: "Turkmen (tk)" },
+  { value: "tw", label: "Twi (tw)" },
+  { value: "ug", label: "Uighur (ug)" },
+  { value: "uk", label: "Ukrainian (uk)" },
+  { value: "ur", label: "Urdu (ur)" },
+  { value: "uz", label: "Uzbek (uz)" },
+  { value: "ve", label: "Venda (ve)" },
+  { value: "vi", label: "Vietnamese (vi)" },
+  { value: "vo", label: "Volapük (vo)" },
+  { value: "wa", label: "Walloon (wa)" },
+  { value: "cy", label: "Welsh (cy)" },
+  { value: "fy", label: "Western Frisian (fy)" },
+  { value: "wo", label: "Wolof (wo)" },
+  { value: "xh", label: "Xhosa (xh)" },
+  { value: "yi", label: "Yiddish (yi)" },
+  { value: "yo", label: "Yoruba (yo)" },
+  { value: "za", label: "Zhuang (za)" },
+  { value: "zu", label: "Zulu (zu)" },
+];
+
+/** Search language names and codes without changing the value until selection. */
+function LogoLanguageSelect({ id, value, onChange }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [menuPosition, setMenuPosition] = useState(null);
+  const inputRef = useRef(null);
+  const optionsRef = useRef(null);
+  const currentValue = value == null ? "" : String(value);
+  const options = LOGO_LANGUAGE_OPTIONS.some(
+    (option) => option.value === currentValue,
+  )
+    ? LOGO_LANGUAGE_OPTIONS
+    : [
+        ...LOGO_LANGUAGE_OPTIONS,
+        { value: currentValue, label: `Existing value: ${currentValue}` },
+      ];
+  const selectedLabel = options.find(
+    (option) => option.value === currentValue,
+  ).label;
+  const search = query.trim().toLowerCase();
+  const filteredOptions = options
+    .filter((option) => option.label.toLowerCase().includes(search))
+    .sort((a, b) => Number(b.value === search) - Number(a.value === search));
+  const listId = `${id}--options`;
+  const menuIsPositioned = menuPosition !== null;
+
+  React.useLayoutEffect(() => {
+    if (!isOpen) return undefined;
+    const positionMenu = () => {
+      const bounds = inputRef.current.getBoundingClientRect();
+      const viewportHeight = document.documentElement.clientHeight;
+      const spaceBelow = viewportHeight - bounds.bottom - 8;
+      const spaceAbove = bounds.top - 8;
+      const above = spaceBelow < Math.min(240, spaceAbove);
+      setMenuPosition({
+        left: bounds.left,
+        width: bounds.width,
+        maxHeight: Math.min(240, Math.max(0, above ? spaceAbove : spaceBelow)),
+        ...(above
+          ? { bottom: viewportHeight - bounds.top + 4 }
+          : { top: bounds.bottom + 4 }),
+      });
+    };
+    positionMenu();
+    window.addEventListener("resize", positionMenu);
+    document.addEventListener("scroll", positionMenu, true);
+    return () => {
+      window.removeEventListener("resize", positionMenu);
+      document.removeEventListener("scroll", positionMenu, true);
+    };
+  }, [isOpen]);
+
+  React.useLayoutEffect(() => {
+    if (!isOpen) return undefined;
+    const frame = window.requestAnimationFrame(() => {
+      const option = optionsRef.current?.children[activeIndex];
+      const menu = optionsRef.current?.parentElement;
+      if (!option || !menu) return;
+      const top = option.offsetTop;
+      const bottom = top + option.offsetHeight;
+      if (top < menu.scrollTop) {
+        menu.scrollTop = top;
+      } else if (bottom > menu.scrollTop + menu.clientHeight) {
+        menu.scrollTop = bottom - menu.clientHeight;
+      }
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [isOpen, activeIndex, query, menuIsPositioned]);
+
+  const openOptions = () => {
+    setQuery("");
+    setActiveIndex(
+      Math.max(
+        0,
+        options.findIndex((option) => option.value === currentValue),
+      ),
+    );
+    setIsOpen(true);
+  };
+
+  const chooseOption = (option) => {
+    onChange(option.value);
+    setIsOpen(false);
+    setQuery("");
+  };
+
+  return (
+    <div className={`relative ${isOpen ? "z-30" : ""}`}>
+      <div className="relative">
+        <input
+          ref={inputRef}
+          id={id}
+          type="text"
+          role="combobox"
+          autoComplete="off"
+          spellCheck={false}
+          aria-autocomplete="list"
+          aria-expanded={isOpen}
+          aria-controls={isOpen ? listId : undefined}
+          aria-activedescendant={
+            isOpen && filteredOptions[activeIndex]
+              ? `${listId}--${activeIndex}`
+              : undefined
+          }
+          value={isOpen ? query : selectedLabel}
+          placeholder="Search languages or codes…"
+          className="ua-config-input w-full rounded-md border py-2 pl-3 pr-10"
+          onFocus={openOptions}
+          onClick={() => {
+            if (!isOpen) openOptions();
+          }}
+          onBlur={() => setIsOpen(false)}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setActiveIndex(0);
+            setIsOpen(true);
+          }}
+          onKeyDown={(event) => {
+            if (event.nativeEvent.isComposing) return;
+            if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+              event.preventDefault();
+              if (!isOpen) {
+                openOptions();
+              } else {
+                setActiveIndex((index) =>
+                  Math.max(
+                    0,
+                    Math.min(
+                      filteredOptions.length - 1,
+                      index + (event.key === "ArrowDown" ? 1 : -1),
+                    ),
+                  ),
+                );
+              }
+            } else if (event.key === "Enter" && isOpen) {
+              event.preventDefault();
+              if (filteredOptions[activeIndex]) {
+                chooseOption(filteredOptions[activeIndex]);
+              }
+            } else if (event.key === "Escape" && isOpen) {
+              event.preventDefault();
+              event.stopPropagation();
+              setIsOpen(false);
+            }
+          }}
+        />
+        <button
+          type="button"
+          tabIndex={-1}
+          aria-label={isOpen ? "Close logo languages" : "Show logo languages"}
+          className="ua-config-service-action absolute inset-y-0 right-0 flex w-10 items-center justify-center"
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => {
+            if (isOpen) {
+              setIsOpen(false);
+            } else {
+              inputRef.current?.focus();
+              openOptions();
+            }
+          }}
+        >
+          <svg
+            className="h-4 w-4"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            aria-hidden="true"
+          >
+            <path d={isOpen ? "m6 15 6-6 6 6" : "m6 9 6 6 6-6"} />
+          </svg>
+        </button>
+      </div>
+      {isOpen &&
+        menuPosition &&
+        ReactDOM.createPortal(
+          <div
+            style={menuPosition}
+            className="ua-config-multiselect-menu fixed z-50 overflow-auto rounded-lg border shadow-lg"
+          >
+            <div
+              id={listId}
+              ref={optionsRef}
+              role="listbox"
+              aria-label="Logo languages"
+            >
+              {filteredOptions.map((option, index) => (
+                <div
+                  key={option.value}
+                  id={`${listId}--${index}`}
+                  role="option"
+                  aria-selected={index === activeIndex}
+                  data-selected={index === activeIndex ? "true" : "false"}
+                  className="ua-config-multiselect-option cursor-pointer break-words px-3 py-2 text-sm"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => chooseOption(option)}
+                >
+                  {option.label}
+                </div>
+              ))}
+            </div>
+            {filteredOptions.length === 0 && (
+              <p
+                role="status"
+                className="ua-config-service-description px-3 py-2 text-sm"
+              >
+                No matching languages
+              </p>
+            )}
+          </div>,
+          inputRef.current.closest(".ua-config-page"),
+        )}
+    </div>
+  );
+}
+
 function StringListEditor({
   value,
   placeholder,
@@ -2330,6 +2739,39 @@ function ConfigLeafEditor({
     }
     setSelected(selections);
   };
+
+  if (item.key === "logo_language" && pathParts[0] === "DEFAULT") {
+    const originalValue = item.value == null ? "" : String(item.value);
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <label htmlFor={fieldId} className={labelClass}>
+            {displayLabel}
+          </label>
+          {helpText && (
+            <Tooltip content={helpText}>
+              <InfoIcon
+                className={`h-4 w-4 ${isDarkMode ? "text-gray-400 hover:text-gray-300" : "text-gray-500 hover:text-gray-600"}`}
+              />
+            </Tooltip>
+          )}
+        </div>
+        <LogoLanguageSelect
+          id={fieldId}
+          value={selectedValue}
+          onChange={(nextValue) => {
+            setSelectedValue(nextValue);
+            onValueChange(path, nextValue, {
+              originalValue,
+              isSensitive: false,
+              isRedacted: false,
+              readOnly: false,
+            });
+          }}
+        />
+      </div>
+    );
+  }
 
   if (isPersonalReleaseGroupField || isSuperSeedTrackerField) {
     const originalValue = JSON.stringify(item.value);
@@ -10524,6 +10966,12 @@ function ConfigApp() {
         /(cookie|token|secret|passkey)/i.test(key)
       ) {
         return "Sensitive value changed";
+      }
+      if (path[0] === "DEFAULT" && key === "logo_language") {
+        const selectedLanguage = LOGO_LANGUAGE_OPTIONS.find(
+          (option) => option.value === update.value,
+        );
+        if (selectedLanguage) return `Set to ${selectedLanguage.label}`;
       }
       if (update.value === "" || update.value === null) return "Set to empty";
       if (key === "tracker_description_mode") {
