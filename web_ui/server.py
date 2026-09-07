@@ -2303,6 +2303,7 @@ class ConfigItem(TypedDict, total=False):
     children: list[ConfigItem]
     help: list[str]
     subsection: str | bool
+    override_fields: list[ConfigItem]
 
 
 class ConfigSection(TypedDict, total=False):
@@ -2929,6 +2930,43 @@ def _remove_config_key_in_source(source: str, key_path: list[str]) -> str:
     return source  # Should not reach here
 
 
+_RELEASE_GROUP_OVERRIDE_FIELDS = (
+    "custom_description_header",
+    "screenshot_header",
+    "disc_menu_header",
+    "audio_spectrogram_header",
+    "dynamic_hdr_plot_header",
+    "tonemapped_header",
+    "custom_signature",
+)
+
+
+def _is_release_group_override_path(path: list[str]) -> bool:
+    """Identify the complete DEFAULT or tracker-specific release-group mapping."""
+    return path == ["DEFAULT", "tag_overrides"] or (
+        len(path) == 3 and path[0] == "TRACKERS" and path[2] == "tag_overrides"
+    )
+
+
+def _validate_release_group_overrides(value: object) -> None:
+    """Reject malformed maps and names that collide under description matching."""
+    if not isinstance(value, dict):
+        raise ValueError("Release group overrides must be a dictionary.")
+    seen: set[str] = set()
+    for name, fields in value.items():
+        if not isinstance(name, str) or not name.strip().lstrip("-") or any(ord(char) < 32 for char in name):
+            raise ValueError("Each release group needs a non-empty name without control characters.")
+        normalized_name = name.strip().lstrip("-").casefold()
+        if normalized_name in seen:
+            raise ValueError(f"Duplicate release group: {name}. Names are matched without case or leading hyphens.")
+        seen.add(normalized_name)
+        if not isinstance(fields, dict):
+            raise ValueError(f"Overrides for {name} must be a dictionary.")
+        for field, text in fields.items():
+            if not isinstance(field, str) or not field or (text is not None and not isinstance(text, str)):
+                raise ValueError(f"Overrides for {name} must contain text fields or null values.")
+
+
 def _build_config_items(
     example_section: dict[str, Any],
     user_section: dict[str, Any],
@@ -2942,6 +2980,8 @@ def _build_config_items(
     merged_keys: list[str] = [str(key) for key in example_section]
     if user_section:
         merged_keys.extend([str(key) for key in user_section if key not in example_section])
+    if len(path) == 2 and path[0] == "TRACKERS" and "tag_overrides" not in merged_keys:
+        merged_keys.append("tag_overrides")
 
     current_subsection: str | None = None
     subsection_items: list[ConfigItem] = []
@@ -2969,12 +3009,26 @@ def _build_config_items(
         if subsection_label != current_subsection:
             flush_subsection()
             current_subsection = subsection_label
-        if isinstance(example_value, Mapping) or isinstance(user_value, Mapping):
+        if _is_release_group_override_path(key_path):
+            # Example group names are documentation, not inherited user entries.
+            item: ConfigItem = {
+                "key": key,
+                "value": _json_safe(user_value if key in user_dict else {}),
+                "example_value": {},
+                "source": "config" if key in user_dict else "example",
+                "children": [],
+                "help": help_text or comments_map.get("DEFAULT/tag_overrides", []),
+                "override_fields": [
+                    {"key": field, "help": comments_map.get(f"DEFAULT/{field}", [])}
+                    for field in _RELEASE_GROUP_OVERRIDE_FIELDS
+                ],
+            }
+        elif isinstance(example_value, Mapping) or isinstance(user_value, Mapping):
             example_value = _as_dict(example_value) or {}
             user_value = _as_dict(user_value) or {}
             children = _build_config_items(example_value, user_value, comments_map, subsection_map, key_path)
             source: Literal["config", "example"] = "config" if key in user_dict else "example"
-            item: ConfigItem = {
+            item = {
                 "key": key,
                 "source": source,
                 "children": children,
@@ -4845,7 +4899,12 @@ def config_update():
         and re.fullmatch(r"(?:sonarr|radarr)_(?:url|api_key)_[1-3]", key) is not None
     )
     force_remove_optional_arr_field = is_optional_arr_field and data.get("remove") is True
-    if key in ["injecting_client_list", "searching_client_list"]:
+    is_release_group_override = _is_release_group_override_path(path)
+    if is_release_group_override:
+        if not isinstance(_get_nested_value(example_config, path[:-1]), Mapping):
+            return jsonify({"success": False, "error": "Unknown release group override scope"}), 400
+        example_value = {}
+    elif key in ["injecting_client_list", "searching_client_list"]:
         example_value = []  # Default to empty list
     elif is_optional_arr_field:
         example_value = ""
@@ -4853,6 +4912,11 @@ def config_update():
         return jsonify({"success": False, "error": "Path not found in example config"}), 400
 
     coerced_value = _coerce_config_value(raw_value, example_value)
+    if is_release_group_override:
+        try:
+            _validate_release_group_overrides(coerced_value)
+        except ValueError as error:
+            return jsonify({"success": False, "error": str(error)}), 400
     new_value_literal = _python_literal(coerced_value)
 
     # Keep optional WebUI-managed values out of config.py when they are unused.
