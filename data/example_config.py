@@ -10,7 +10,8 @@ config: dict[str, Any] = {
         "verbose_notification": False,
         # Number of hours to reuse a successful update check. Set to 0 to check every run.
         "update_notification_cache_hours": 4,
-        # Set to True to play a bell sound when prompting for confirmation.
+        # Set to True to play a bell sound before release confirmation (CLI and WebUI).
+        # WebUI sound plays in the browser; allow site audio and keep the tab unmuted.
         "sfx_on_prompt": True,
         # Set to True to apply argument overrides from data/templates/user-args.json.
         "user_overrides": False,

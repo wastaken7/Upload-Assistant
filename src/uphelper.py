@@ -21,6 +21,7 @@ from src.cogs.redaction import Redaction
 from src.config_helpers import format_terminal_link
 from src.console import logger, prompt_in_thread
 from src.meta import Meta
+from src.prompt_sound import play_prompt_sound
 from src.trackersetup import tracker_class_map
 
 _dupe_prompt_lock_held = contextvars.ContextVar("dupe_prompt_lock_held", default=False)
@@ -727,9 +728,8 @@ class UploadHelper:
             if meta.debug is True:
                 logger.info("[bold yellow]Unattended mode is enabled, skipping confirmation.[/bold yellow]")
             return True
-        ring_the_bell = "\a" if bool(self.default_config.get("sfx_on_prompt", True)) else ""
-        if ring_the_bell:
-            logger.info(ring_the_bell)
+        if bool(self.default_config.get("sfx_on_prompt", True)):
+            play_prompt_sound()
 
         if meta.is_disc:
             meta.keep_folder = False

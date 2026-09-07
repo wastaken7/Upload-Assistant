@@ -8,6 +8,7 @@ import pytest
 
 import web_ui.server as server
 from src.console import ansi_to_html
+from src.prompt_sound import PROMPT_SOUND_STDOUT_MARKER
 
 pytestmark = pytest.mark.skipif(sys.platform != "win32", reason="ConPTY is Windows-only")
 
@@ -42,6 +43,30 @@ def test_conpty_preserves_ansi_and_accepts_webui_input() -> None:
         server._write_webui_process_input(process, "yes")
         output += _read_until(process, "ANSWER=True")
         assert "ANSWER=True" in output
+        assert process.wait(timeout=5) == 0
+    finally:
+        if process.poll() is None:
+            server._terminate_process_tree(process)
+        server._close_webui_process_io(process)
+
+
+def test_conpty_preserves_prompt_sound_record() -> None:
+    command = [
+        sys.executable,
+        "-u",
+        "-c",
+        "from src.prompt_sound import play_prompt_sound; print('Before', end='', flush=True); play_prompt_sound(); answer = input('Continue:'); print(f'ANSWER={answer}')",
+    ]
+    process, mode = server._spawn_webui_upload_process(command, server.CODE_DIR, server._webui_subprocess_env())
+
+    try:
+        output = _read_until(process, "Continue:")
+        assert mode == "conpty"
+        assert sum(line.strip() == PROMPT_SOUND_STDOUT_MARKER for line in output.splitlines()) == 1
+        assert "\a" not in output
+        server._write_webui_process_input(process, "yes")
+        output += _read_until(process, "ANSWER=yes")
+        assert "ANSWER=yes" in output
         assert process.wait(timeout=5) == 0
     finally:
         if process.poll() is None:

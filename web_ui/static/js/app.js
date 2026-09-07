@@ -4822,6 +4822,8 @@ function AudionutsUAGUI() {
             }
           } else if (data.type === "progress") {
             applyProgressEvent(data.data || {});
+          } else if (data.type === "prompt_sound") {
+            window.uaPromptSound?.play();
           } else if (data.type === "exit") {
             if (!(localController && localController.signal.aborted)) {
               appendSystemMessage("");
@@ -4881,6 +4883,8 @@ function AudionutsUAGUI() {
   };
 
   const executeCommand = async () => {
+    // Run before any await, including queue creation, to retain user activation.
+    window.uaPromptSound?.unlock();
     if (selectedPaths.length > 1) {
       setIsExecuting(true);
       const rootContainer = richOutputRef.current;
