@@ -2411,8 +2411,9 @@ async def get_service(
         video_name = video_name.replace("DTS-HD.MA.", "").replace("DTS-HD MA ", "")
     title_guess = guessit_fn(video, {"excludes": ["country", "language"]})
     title_guess_title = str(title_guess.get("title", ""))
+    title_guess_episode_title = str(title_guess.get("episode_title", ""))
     for key, value in services.items():
-        if ((" " + key + " ") in video_name and key not in title_guess_title) or key == service:
+        if ((" " + key + " ") in video_name and key not in title_guess_title and key not in title_guess_episode_title) or key == service:
             service = value
     service_longname: str = service
     for key, value in services.items():
