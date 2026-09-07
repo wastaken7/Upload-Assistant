@@ -33,11 +33,15 @@ def test_dreadvault_dvl_cli_alias_is_canonicalized_before_tracker_checks():
 
 
 def test_dreadvault_bans_the_published_groups():
-    # Published on the site's rules page 2026-08-24; DreadVault exposes no
+    # Published on the site's rules page 2026-08-24, extended 2026-09-06; DreadVault exposes no
     # /api/bannedReleaseGroups endpoint, so this list is maintained by hand.
     assert set(DreadVault.banned_groups) == {  # noqa: S101
+        "AOC",
+        "AOS",
         "BONE",
         "EVO",
+        "FGT",
+        "LAMA",
         "NeoNoir",
         "PSA",
         "RARBG",
