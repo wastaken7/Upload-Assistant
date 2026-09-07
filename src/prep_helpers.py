@@ -836,12 +836,7 @@ def _clear_imdb_metadata(meta: Meta) -> None:
 
 def _should_fetch_bluray_info(meta: Meta, get_bluray_info: bool) -> bool:
     return bool(
-        meta.is_disc in ("BDMV", "DVD")
-        and get_bluray_info
-        and (not meta.distributor or not meta.region)
-        and meta.imdb_id != 0
-        and not meta.edit
-        and not meta.site_check
+        meta.is_disc in ("BDMV", "DVD") and get_bluray_info and (not meta.distributor or not meta.region) and meta.imdb_id != 0 and not meta.edit and not meta.site_check
     )
 
 
