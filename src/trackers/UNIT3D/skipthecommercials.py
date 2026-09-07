@@ -58,10 +58,7 @@ class SkipTheCommercials(UNIT3D):
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         category = str(meta.category).upper()
-        if isinstance(meta.combined_genres, list):
-            combined_genres = meta.combined_genres
-        else:
-            combined_genres = [genre.strip() for genre in str(meta.combined_genres).split(",") if genre.strip()]
+        combined_genres = meta.combined_genres if isinstance(meta.combined_genres, list) else [genre.strip() for genre in str(meta.combined_genres).split(",") if genre.strip()]
         documentary_metadata = [*(meta.genres or []), *(meta.keywords or []), *combined_genres]
         is_documentary = any(str(value).strip().lower() in {"documentary", "documentaries"} for value in documentary_metadata)
 

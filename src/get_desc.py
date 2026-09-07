@@ -2091,9 +2091,6 @@ class DescriptionBuilder:
                         desc_parts.append(f"[center][spoiler={filename}]{formatted_bbcode}[/spoiler][/center]\n")
                         char_count += len(f"[center][spoiler={filename}]{formatted_bbcode}[/spoiler][/center]\n")
                     else:
-                        if i == 0 and images and screenheader is not None:
-                            desc_parts.append(screenheader + "\n")
-                            char_count += len(screenheader + "\n")
                         desc_parts.append(f"[center]{filename}\n[/center]\n")
                         char_count += len(f"[center]{filename}\n[/center]\n")
 

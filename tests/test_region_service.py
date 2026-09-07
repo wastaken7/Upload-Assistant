@@ -9,6 +9,8 @@ from src.region import get_service
     ("service_tag", "expected"),
     [
         ("AMZN", ("AMZN", "Amazon")),
+        ("IQ", ("iQIYI", "iQIYI")),
+        ("iQIYI", ("iQIYI", "iQIYI")),
         ("MY5", ("MY5", "MY5")),
         ("NF", ("NF", "Netflix")),
     ],

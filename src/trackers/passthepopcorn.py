@@ -843,6 +843,7 @@ class PassThePopcorn:
         desc = desc.replace("[list]", "").replace("[/list]", "")
         desc = desc.replace("[ul]", "").replace("[/ul]", "")
         desc = desc.replace("[ol]", "").replace("[/ol]", "")
+        desc = re.sub(r"\[(?:font(?:=[^\]]*)?|/font)\]", "", desc, flags=re.IGNORECASE)
         return re.sub(r"\[img=[^\]]+\]", "[img]", desc)
 
     async def edit_desc(self, meta: Meta) -> None:

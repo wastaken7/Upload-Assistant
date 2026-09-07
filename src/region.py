@@ -2196,6 +2196,7 @@ async def get_service(
         "iflix": "IFX",
         "Investigation Discovery": "ID",
         "iP": "iP",
+        "IQ": "iQIYI",
         "iQIYI": "iQIYI",
         "iT": "iT",
         "Itaú Cultural Play": "ICP",

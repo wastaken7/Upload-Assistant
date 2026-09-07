@@ -1226,7 +1226,7 @@
     );
     const hasVisibleUnreleased = Boolean(
       unreleased &&
-        (activeArea === "all" || visibleUnreleasedCommits.length > 0),
+      (activeArea === "all" || visibleUnreleasedCommits.length > 0),
     );
     const visibleReleases = parsedReleases.filter(
       ({ parsed }) =>
