@@ -102,10 +102,93 @@ const InfoIcon = ({ className = "" }) => {
   );
 };
 
+// Reflow wrapped config comments while retaining paragraphs, lists and URLs.
+const formatConfigHelpText = (lines) =>
+  lines
+    .reduce((text, line, index) => {
+      const trimmed = String(line).trim();
+      if (!trimmed) return `${text.trimEnd()}\n\n`;
+      const startsBlock = /^(?:[-*•]\s|\d+[.)]\s|https?:\/\/|Examples?:)/i.test(
+        trimmed,
+      );
+      const followsExample = /^Examples?:/i.test(
+        String(lines[index - 1] || "").trim(),
+      );
+      const separator =
+        !text || text.endsWith("\n")
+          ? ""
+          : startsBlock || followsExample
+            ? "\n"
+            : " ";
+      return text + separator + trimmed;
+    }, "")
+    .trim();
+
+const CONFIG_HELP_SECTION_HEADINGS = {
+  console_show_time: "Console logging configuration",
+  write_log: "File logging configuration",
+  debug: "Debug configuration",
+  console_debug_show_time: "Debug console logging configuration",
+  metadata_cache_enabled: "Public metadata cache",
+  frame_overlay: "Screenshot overlays",
+  add_audio_spectrogram: "Audio spectrograms",
+};
+
+const DESCRIPTION_HELP_OVERRIDES = {
+  add_logo: "Add a TMDb show or movie logo to the top of the description.",
+  hide_screenshot_header_if_only_section:
+    "Hide the screenshot header when screenshots are the only section in the description.",
+};
+
+const getConfigHelpText = (item, pathParts) => {
+  if (
+    ["DEFAULT", "TRACKERS"].includes(pathParts[0]) &&
+    Object.hasOwn(DESCRIPTION_HELP_OVERRIDES, item.key)
+  ) {
+    return DESCRIPTION_HELP_OVERRIDES[item.key];
+  }
+  const sectionHeading =
+    pathParts[0] === "DEFAULT"
+      ? CONFIG_HELP_SECTION_HEADINGS[item.key]
+      : undefined;
+  const lines = (item.help || []).filter(
+    (line) => String(line).trim() !== sectionHeading,
+  );
+  const text = formatConfigHelpText(lines);
+  return pathParts[0] === "DEFAULT" && item.key === "midnightscene_api_key"
+    ? text.replace(/\s*Never share or commit this token\./, "")
+    : text;
+};
+
+const TRACKER_HELP_NOTE_KEYS = new Set(["announce_url", "link_dir_name"]);
+
+const renderAnnounceUrlHelpText = (text) =>
+  text.split(/(See:\s+https?:\/\/\S+)/i).map((part, index) => {
+    const reference = part.match(/^See:\s+(https?:\/\/\S+)$/i);
+    if (!reference) return part.trim();
+    const href = reference[1];
+    return (
+      <span key={index} className="block">
+        See:{" "}
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="ua-config-service-action font-semibold hover:underline"
+        >
+          {href.endsWith("#how-to-export-cookies")
+            ? "How to export cookies"
+            : href}{" "}
+          <span aria-hidden="true">↗</span>
+        </a>
+      </span>
+    );
+  });
+
 // Tooltip component
 const Tooltip = ({ children, content, className = "" }) => {
   const [isVisible, setIsVisible] = useState(false);
-  const [position, setPosition] = useState({ top: 0, left: 0 });
+  const [position, setPosition] = useState({ top: 0, left: 0, arrowLeft: 0 });
   const triggerRef = useRef(null);
   const tooltipRef = useRef(null);
 
@@ -121,7 +204,7 @@ const Tooltip = ({ children, content, className = "" }) => {
     if (isVisible && triggerRef.current && tooltipRef.current) {
       const triggerRect = triggerRef.current.getBoundingClientRect();
       const tooltipRect = tooltipRef.current.getBoundingClientRect();
-      const viewportWidth = window.innerWidth;
+      const viewportWidth = document.documentElement.clientWidth;
 
       let top = triggerRect.top - tooltipRect.height - 8;
       let left =
@@ -138,7 +221,14 @@ const Tooltip = ({ children, content, className = "" }) => {
         left = viewportWidth - tooltipRect.width - 8;
       }
 
-      setPosition({ top, left });
+      const arrowLeft = Math.max(
+        8,
+        Math.min(
+          triggerRect.left + triggerRect.width / 2 - left,
+          tooltipRect.width - 8,
+        ),
+      );
+      setPosition({ top, left, arrowLeft });
     }
   }, [isVisible]);
 
@@ -175,10 +265,12 @@ const Tooltip = ({ children, content, className = "" }) => {
         {
           ref: tooltipRef,
           className:
-            "fixed z-50 px-3 py-2 text-sm text-white bg-gray-900 rounded-md shadow-lg pointer-events-none max-w-xs break-words",
+            "fixed z-50 px-3 py-2 text-sm leading-relaxed text-white bg-gray-900 rounded-md shadow-lg pointer-events-none break-words",
           style: {
             top: `${position.top}px`,
             left: `${position.left}px`,
+            width: "max-content",
+            maxWidth: "min(28rem, calc(100% - 1rem))",
             whiteSpace: "pre-wrap",
           },
         },
@@ -191,7 +283,7 @@ const Tooltip = ({ children, content, className = "" }) => {
               (triggerRef.current?.getBoundingClientRect().top || 0)
                 ? "-4px"
                 : "100%",
-            left: "50%",
+            left: `${position.arrowLeft}px`,
             marginLeft: "-4px",
           },
         }),
@@ -924,6 +1016,7 @@ const isSensitiveKeyForPath = (key, pathParts) =>
 const isReadOnlyKeyForPath = (key, pathParts) =>
   pathParts.includes("TORRENT_CLIENTS") && key === "torrent_client";
 const DISPLAY_LABEL_OVERRIDES = {
+  hide_screenshot_header_if_only_section: "Hide Standalone Screenshot Header",
   multiScreens: "Multiple Screenshots",
   charLimit: "Character Limit",
   fileLimit: "File Limit",
@@ -2006,6 +2099,7 @@ function ConfigLeafEditor({
   fullWidth,
   inlineBooleanLabel,
   labelOverride,
+  hideHelp = false,
   allImageHosts,
   usedImageHosts,
   torrentClients,
@@ -2020,18 +2114,21 @@ function ConfigLeafEditor({
   const isSuperSeedTrackerField =
     pathParts.includes("TORRENT_CLIENTS") && item.key === "super_seed_trackers";
 
-  const helpBelongsToSection = path.join("/") === "DEFAULT/ffmpeg_path";
+  const helpBelongsToSection =
+    pathParts[0] === "DEFAULT" &&
+    ["ffmpeg_path", "upload_order"].includes(item.key);
   const helpBelongsToTorrentClientLinkingNote =
     pathParts.includes("TORRENT_CLIENTS") &&
     ["linking", "allow_fallback", "linked_folder"].includes(item.key);
+  const helpBelongsToTorrentClientSearchNote =
+    pathParts.includes("TORRENT_CLIENTS") && item.key === "enable_search";
   const helpBelongsToTorrentStorageNote =
     pathParts.includes("TORRENT_CLIENTS") &&
     item.key === "torrent_storage_dir" &&
     Array.isArray(item.help) &&
     item.help.some((line) => /SQLite Mode/i.test(String(line)));
   const helpBelongsToTorrentClientOrganizationNote =
-    pathParts.includes("TORRENT_CLIENTS") &&
-    item.key === "use_tracker_as_tag";
+    pathParts.includes("TORRENT_CLIENTS") && item.key === "use_tracker_as_tag";
   const helpBelongsToTorrentClientCrossSeedNote =
     pathParts.includes("TORRENT_CLIENTS") &&
     ["qbit_cross_tag", "qbit_cross_cat", "content_layout"].includes(item.key);
@@ -2040,16 +2137,16 @@ function ConfigLeafEditor({
     (REDUNDANT_IMAGE_HOST_API_HELP_KEYS.has(item.key) ||
       /^img_host_[1-6]$/.test(item.key));
   const helpText =
+    !hideHelp &&
     !helpBelongsToSection &&
     !helpBelongsToTorrentClientLinkingNote &&
+    !helpBelongsToTorrentClientSearchNote &&
     !helpBelongsToTorrentStorageNote &&
     !helpBelongsToTorrentClientOrganizationNote &&
     !helpBelongsToTorrentClientCrossSeedNote &&
     !hideRedundantImageHostHelp &&
-    !isSuperSeedTrackerField &&
-    item.help &&
-    item.help.length
-      ? item.help.join("\n")
+    !isSuperSeedTrackerField
+      ? getConfigHelpText(item, pathParts)
       : "";
   const labelClass = isDarkMode
     ? `${inlineBooleanLabel ? "text-[15px] font-semibold" : "text-sm font-medium"} text-gray-200`
@@ -4274,6 +4371,13 @@ function TorrentClientSettings({
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
               {group.items.map(renderField)}
             </div>
+            {group.id === "storage" && itemByKey.has("enable_search") && (
+              <p className="ua-config-service-description mt-3 text-xs leading-relaxed">
+                <span className="font-semibold">Enable Search:</span> Search
+                this client for an existing torrent that matches your files so
+                its hash can be reused, avoiding unnecessary rehashing.
+              </p>
+            )}
             {group.id === "storage" && hasQbitTorrentStorageWarning && (
               <p className="ua-config-service-description mt-3 text-xs leading-relaxed">
                 <span className="font-semibold">
@@ -4305,8 +4409,8 @@ function TorrentClientSettings({
                 <p>
                   <span className="font-semibold">Content Layout:</span>{" "}
                   Controls qBittorrent&apos;s content layout for every torrent
-                  added through this client, including regular uploads. Leave
-                  it as Original unless your save-path structure requires a
+                  added through this client, including regular uploads. Leave it
+                  as Original unless your save-path structure requires a
                   different layout.
                 </p>
               </div>
@@ -4498,20 +4602,41 @@ function TrackerSettings({
           <div className="ua-config-section-heading border-b px-4 py-2.5">
             <h3 className="text-sm font-semibold">{group.title}</h3>
           </div>
-          <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-2 xl:grid-cols-3">
-            {group.items.map((item) => (
-              <ConfigLeaf
-                key={item.key}
-                item={item}
-                pathParts={pathParts}
-                isDarkMode={isDarkMode}
-                fullWidth={true}
-                allImageHosts={allImageHosts}
-                usedImageHosts={usedImageHosts}
-                torrentClients={torrentClients}
-                onValueChange={onValueChange}
-              />
-            ))}
+          <div className="p-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {group.items.map((item) => (
+                <ConfigLeaf
+                  key={item.key}
+                  item={item}
+                  pathParts={pathParts}
+                  isDarkMode={isDarkMode}
+                  fullWidth={true}
+                  hideHelp={TRACKER_HELP_NOTE_KEYS.has(item.key)}
+                  allImageHosts={allImageHosts}
+                  usedImageHosts={usedImageHosts}
+                  torrentClients={torrentClients}
+                  onValueChange={onValueChange}
+                />
+              ))}
+            </div>
+            {group.items
+              .filter((item) => TRACKER_HELP_NOTE_KEYS.has(item.key))
+              .map((item) => {
+                const helpText = getConfigHelpText(item, pathParts);
+                return helpText ? (
+                  <p
+                    key={item.key}
+                    className="ua-config-service-description mt-3 whitespace-pre-wrap break-words text-xs leading-relaxed"
+                  >
+                    <span className="font-semibold">
+                      {formatConfigFieldLabel(item.key, pathParts)}:
+                    </span>{" "}
+                    {item.key === "announce_url"
+                      ? renderAnnounceUrlHelpText(helpText)
+                      : helpText}
+                  </p>
+                ) : null;
+              })}
           </div>
         </section>
       ))}
@@ -6142,12 +6267,6 @@ function ItemList({
       "ffmpeg_warmup",
     ],
     "Screenshot Overlays": ["frame_overlay", "overlay_text_size"],
-    "Blu-ray & DVD": [
-      "use_largest_playlist",
-      "get_bluray_info",
-      "bluray_score",
-      "bluray_single_score",
-    ],
     Headers: [
       "custom_description_header",
       "tonemapped_header",
@@ -6258,6 +6377,21 @@ function ItemList({
 
   return (
     <div className="space-y-6">
+      {pathParts[0] === "DEFAULT" &&
+        regularItems.some((item) => item.key === "upload_order") && (
+          <p className="ua-config-service-description text-xs leading-relaxed">
+            For upload workflows and qBittorrent requirements, see the{" "}
+            <a
+              href="https://github.com/wastaken7/Upload-Assistant/blob/development/docs/upload-order-and-bandwidth-control.md"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="ua-config-service-action font-semibold hover:underline"
+            >
+              upload order and bandwidth control guide ↗
+            </a>
+            .
+          </p>
+        )}
       {isTorrentClientsRoot && (
         <React.Fragment>
           {clientSelectionItem && (
@@ -6599,6 +6733,20 @@ function ItemList({
             <section className="ua-config-section overflow-hidden rounded-xl border">
               <div className="ua-config-section-heading border-b px-4 py-3">
                 <h2 className="text-sm font-semibold">{heading}</h2>
+                {heading === "General Description Settings" && (
+                  <p className="ua-config-service-description mt-1 text-xs leading-relaxed">
+                    Learn how these settings affect your descriptions in the{" "}
+                    <a
+                      href="https://github.com/wastaken7/Upload-Assistant/blob/development/docs/description-builder.md"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="ua-config-service-action font-semibold hover:underline"
+                    >
+                      description builder guide ↗
+                    </a>
+                    .
+                  </p>
+                )}
               </div>
               <div className="ua-config-section-panel p-4">
                 <ItemList
