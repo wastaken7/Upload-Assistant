@@ -5,7 +5,16 @@
 
 [![Python Version](https://img.shields.io/badge/Python-3.14%2B-blue?logo=python&logoColor=white)](https://www.python.org/) [![License](https://img.shields.io/badge/License-UAPL%20v1.0-orange)](LICENSE) [![Ruff](https://img.shields.io/badge/Ruff-000000?logo=ruff&logoColor=white)](https://github.com/astral-sh/ruff) [![Pyright](https://img.shields.io/badge/Pyright-strict-brightgreen)](https://github.com/microsoft/pyright) [![code style: prettier](https://img.shields.io/badge/code%20style-prettier-ff69b4.svg)](https://prettier.io) [![Docker Image CI](https://github.com/wastaken7/Upload-Assistant/actions/workflows/docker-image.yml/badge.svg)](https://github.com/wastaken7/Upload-Assistant/actions/workflows/docker-image.yml)
 
+---
+
+<img width="1920" height="946" alt="image" src="https://github.com/user-attachments/assets/aaea8cec-28fd-42fb-ab73-d11c16f4832e" />
+
+---
+
+<img width="1920" height="946" alt="image" src="https://github.com/user-attachments/assets/9704ab62-3bec-4e12-9223-3c0331505687" />
 </div>
+
+---
 
 > [!IMPORTANT]
 > **This is a modified version of the Upload Assistant project and is not affiliated with or endorsed by Audionut.**
