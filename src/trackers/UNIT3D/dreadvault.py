@@ -22,8 +22,12 @@ class DreadVault(UNIT3D):
     allows_bloated_audio = True
     base_url = "https://dreadvault.org"
     banned_groups = (
+        "AOC",
+        "AOS",
         "BONE",
         "EVO",
+        "FGT",
+        "LAMA",
         "NeoNoir",
         "PSA",
         "RARBG",
