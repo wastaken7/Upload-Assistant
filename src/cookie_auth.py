@@ -228,7 +228,7 @@ class CookieValidator:
         self.config = config
         self.common = Common(config)
 
-    async def load_session_cookies(self, meta: Meta, tracker: str) -> http.cookiejar.MozillaCookieJar | None:
+    async def load_session_cookies(self, meta: Meta, tracker: str) -> http.cookiejar.CookieJar | None:
         cookie_file = find_cookie_file(meta.base_dir, tracker, self.config)
         cookie_jar = http.cookiejar.MozillaCookieJar(cookie_file)
 
@@ -239,6 +239,13 @@ class CookieValidator:
             logger.info(f"{tracker}: Please ensure the cookie file is in the correct format (Netscape).")
             return None
         except FileNotFoundError:
+            tracker_config = self.config.get("TRACKERS", {}).get(tracker, {})
+            if isinstance(tracker_config, dict):
+                from src.prowlarr import prowlarr_cookie_jar
+
+                if prowlarr_jar := prowlarr_cookie_jar(tracker_config):
+                    return prowlarr_jar
+
             # Attempt automatic login for ALPHARATIO tracker
             if tracker == "ALPHARATIO":
                 logger.info(f"{tracker}: [yellow]Cookie file not found. Attempting automatic login...[/yellow]")
@@ -263,10 +270,12 @@ class CookieValidator:
 
         return cookie_jar
 
-    async def save_session_cookies(self, tracker: str, cookie_jar: http.cookiejar.MozillaCookieJar | None) -> None:
+    async def save_session_cookies(self, tracker: str, cookie_jar: http.cookiejar.CookieJar | None) -> None:
         """Save updated cookies after a successful validation."""
         if not cookie_jar:
             logger.info(f"{tracker}: Cookie jar not initialized, cannot save cookies.")
+            return
+        if not isinstance(cookie_jar, http.cookiejar.MozillaCookieJar):
             return
 
         try:

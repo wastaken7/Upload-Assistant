@@ -4647,15 +4647,6 @@ def get_trackers():
     config_path = base_dir / "data" / "config.py"
     user_config = _load_config_from_file(config_path) or {}
 
-    trackers_section_raw = user_config.get("TRACKERS", {})
-    trackers_section = cast(dict[str, Any], trackers_section_raw) if isinstance(trackers_section_raw, Mapping) else {}
-    default_trackers_val = trackers_section.get("default_trackers", "")
-    default_trackers_list = []
-    if isinstance(default_trackers_val, str):
-        default_trackers_list = [t.strip().upper() for t in default_trackers_val.split(",") if t.strip()]
-    elif isinstance(default_trackers_val, list):
-        default_trackers_list = [str(t).strip().upper() for t in default_trackers_val if str(t).strip()]
-
     # Load tracker_class_map from src.trackersetup
     try:
         from src.trackersetup import tracker_class_map
@@ -4666,6 +4657,34 @@ def get_trackers():
     example_trackers_raw = example_config.get("TRACKERS", {})
     example_trackers = cast(dict[str, Any], example_trackers_raw) if isinstance(example_trackers_raw, Mapping) else {}
 
+    from src.prowlarr import ProwlarrError, apply_prowlarr_credentials, configured_prowlarr, fetch_prowlarr_credentials
+
+    prowlarr_sources: set[str] = set()
+    prowlarr_cookie_trackers: set[str] = set()
+    try:
+        if prowlarr_connection := configured_prowlarr(user_config):
+            prowlarr_report = fetch_prowlarr_credentials(
+                prowlarr_connection[0],
+                prowlarr_connection[1],
+                set(tracker_class_map),
+            )
+            prowlarr_sources = apply_prowlarr_credentials(user_config, prowlarr_report)
+            prowlarr_cookie_trackers = {name for name, credential in prowlarr_report.credentials.items() if credential.cookie}
+    except ProwlarrError:
+        # The tracker catalogue remains usable with local configuration when
+        # the optional Prowlarr instance is unavailable.
+        prowlarr_sources = set()
+        prowlarr_cookie_trackers = set()
+
+    trackers_section_raw = user_config.get("TRACKERS", {})
+    trackers_section = cast(dict[str, Any], trackers_section_raw) if isinstance(trackers_section_raw, Mapping) else {}
+    default_trackers_val = trackers_section.get("default_trackers", "")
+    default_trackers_list = []
+    if isinstance(default_trackers_val, str):
+        default_trackers_list = [t.strip().upper() for t in default_trackers_val.split(",") if t.strip()]
+    elif isinstance(default_trackers_val, list):
+        default_trackers_list = [str(t).strip().upper() for t in default_trackers_val if str(t).strip()]
+
     cookie_trackers: set[str] = set()
     try:
         from src.cookie_auth import find_cookie_file
@@ -4675,6 +4694,9 @@ def get_trackers():
         cookie_trackers = set()
     else:
         cookie_trackers = _configured_cookie_tracker_names(tracker_class_map, user_config, STATE_DIR, find_cookie_file)
+
+    prowlarr_sources -= cookie_trackers
+    cookie_trackers |= prowlarr_cookie_trackers
 
     configured_trackers = _configured_tracker_names(
         trackers_section,
@@ -4707,6 +4729,7 @@ def get_trackers():
                 "base_url": base_url,
                 "favicon": favicon_url,
                 "configured": tracker_name.upper() in configured_trackers,
+                "credential_source": ("prowlarr" if tracker_name.upper() in prowlarr_sources else "local" if tracker_name.upper() in configured_trackers else None),
                 "auth_type": auth_type,
                 "optional_setup_keys": optional_setup_keys,
                 "cookie_configured": tracker_name.upper() in cookie_trackers,
@@ -4718,6 +4741,49 @@ def get_trackers():
     trackers_data.sort(key=lambda x: x["display_name"].lower())
 
     return jsonify({"success": True, "default_trackers": default_trackers_list, "trackers": trackers_data})
+
+
+@app.route("/api/config_test_prowlarr", methods=["POST"])
+@limiter.limit("30 per hour", key_func=_rate_limit_key_func)
+def config_test_prowlarr():
+    """Test draft Prowlarr settings and return credential-free metadata."""
+    if not _is_authenticated():
+        return jsonify({"success": False, "error": "Authentication required (web session)"}), 401
+    if not _verify_csrf_header() or not _verify_same_origin():
+        return jsonify({"success": False, "error": "CSRF/Origin validation failed"}), 403
+
+    data = _request_json_dict()
+    base_url = str(data.get("url") or "").strip()
+    api_key = str(data.get("api_key") or "").strip()
+    if not base_url or not api_key:
+        return jsonify({"success": False, "error": "Prowlarr URL and API key are required"}), 400
+
+    from src.prowlarr import ProwlarrError, fetch_prowlarr_credentials
+    from src.trackersetup import tracker_class_map
+
+    try:
+        report = fetch_prowlarr_credentials(base_url, api_key, set(tracker_class_map), include_status=True)
+    except ProwlarrError as error:
+        return jsonify({"success": False, "error": str(error)}), 400
+    except Exception:
+        return jsonify({"success": False, "error": "Unable to test the Prowlarr connection"}), 500
+
+    api_key_trackers = sorted(name for name, credential in report.credentials.items() if credential.api_key)
+    cookie_trackers = sorted(name for name, credential in report.credentials.items() if credential.cookie)
+    return jsonify(
+        {
+            "success": True,
+            "message": f"Connected to Prowlarr {report.version or '(version unavailable)'}. Found credentials for {len(report.credentials)} supported tracker(s).",
+            "version": report.version,
+            "enabled_indexers": report.enabled_indexers,
+            "matched_indexers": report.matched_indexers,
+            "credential_trackers": sorted(report.credentials),
+            "api_key_trackers": api_key_trackers,
+            "cookie_trackers": cookie_trackers,
+            "masked_credentials": report.masked_credentials,
+            "unsupported_indexers": report.unsupported_indexers,
+        }
+    )
 
 
 @app.route("/api/config_set_tracker_overrides", methods=["POST"])

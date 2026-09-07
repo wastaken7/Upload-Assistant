@@ -2277,6 +2277,21 @@ async def do_the_thing(base_dir: str) -> None:
     except Exception as exc:
         logger.warning(f"[yellow]Warning: could not reload config from disk: {exc}[/yellow]")
 
+    from src.prowlarr import ProwlarrError, apply_prowlarr_credentials, configured_prowlarr, fetch_prowlarr_credentials
+
+    if prowlarr_connection := configured_prowlarr(config):
+        try:
+            report = await asyncio.to_thread(
+                fetch_prowlarr_credentials,
+                prowlarr_connection[0],
+                prowlarr_connection[1],
+                set(tracker_class_map),
+            )
+            applied = apply_prowlarr_credentials(config, report)
+            logger.debug(f"[green]Prowlarr supplied fallback credentials for {len(applied)} tracker(s).[/green]")
+        except ProwlarrError as exc:
+            logger.warning(f"[yellow]Prowlarr credential fallback unavailable: {exc}[/yellow]")
+
     await asyncio.sleep(0.1)  # Ensure it's not racing
 
     tmp_dir = Path(base_dir) / "tmp"
