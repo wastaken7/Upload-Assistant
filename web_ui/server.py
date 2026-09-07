@@ -4839,11 +4839,7 @@ def config_update():
 
     # Special handling for WebUI-managed fields that don't exist in example config.
     key = path[-1] if path else ""
-    is_optional_arr_field = (
-        len(path) == 2
-        and path[0] == "DEFAULT"
-        and re.fullmatch(r"(?:sonarr|radarr)_(?:url|api_key)_[1-3]", key) is not None
-    )
+    is_optional_arr_field = len(path) == 2 and path[0] == "DEFAULT" and re.fullmatch(r"(?:sonarr|radarr)_(?:url|api_key)_[1-3]", key) is not None
     force_remove_optional_arr_field = is_optional_arr_field and data.get("remove") is True
     if key in ["injecting_client_list", "searching_client_list"]:
         example_value = []  # Default to empty list
@@ -4857,11 +4853,8 @@ def config_update():
 
     # Keep optional WebUI-managed values out of config.py when they are unused.
     key = path[-1] if path else ""
-    should_remove_empty_value = (
-        key in ["injecting_client_list", "searching_client_list"] and coerced_value == []
-    ) or (
-        is_optional_arr_field
-        and (coerced_value == "" or force_remove_optional_arr_field)
+    should_remove_empty_value = (key in ["injecting_client_list", "searching_client_list"] and coerced_value == []) or (
+        is_optional_arr_field and (coerced_value == "" or force_remove_optional_arr_field)
     )
     if should_remove_empty_value:
         # Remove the key from config if it exists
