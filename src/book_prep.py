@@ -696,19 +696,28 @@ async def gather_book_prep(
             meta.keywords = map_audiobook_keywords(meta.keywords)
 
     if meta.audiobook:
-        meta.title = normalize_audiobook_title(meta.title, meta.book_series)
+        meta.title = normalize_audiobook_title(meta.title, meta.book_series, meta.book_series_index)
 
     detect_newspaper(meta)
     sanitize_book_language(meta)
     sanitize_book_author(meta)
 
 
-def normalize_audiobook_title(title: str, series: str) -> str:
-    """Remove a repeated series name from the beginning or end of an audiobook title."""
+def normalize_audiobook_title(title: str, series: str, series_index: str = "") -> str:
+    """Remove repeated series metadata from an audiobook title."""
     title = title.strip()
     series = series.strip()
     if not series:
         return title
+    series_index = series_index.strip()
+    if series_index:
+        repeated_volume = re.search(
+            rf"\s*:\s*{re.escape(series)}\s*[-\u2013\u2014]\s*vol(?:ume)?\.?\s*{re.escape(series_index)}\s*$",
+            title,
+            re.IGNORECASE,
+        )
+        if repeated_volume:
+            return title[: repeated_volume.start()].rstrip()
     if len(title) > len(series):
         if title.casefold().endswith(series.casefold()):
             return title[: -len(series)].rstrip(" :-\u2013\u2014")
