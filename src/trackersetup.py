@@ -14,6 +14,7 @@ import cli_ui
 import httpx
 
 from data.example_config import config as example_config
+from src.api_key_expiry import observe_tracker_response, warn_api_key_expiry
 from src.cleanup import cleanup_manager
 from src.console import logger
 from src.meta import Meta
@@ -249,6 +250,12 @@ class TrackerSetup:
         for tracker in removed_trackers:
             logger.warning(f"Warning: Tracker '{tracker}' is not recognized and will be ignored.", extra={"markup": False})
 
+        for tracker in valid_trackers:
+            tracker_class = tracker_class_map.get(tracker)
+            api_key = str(self.config.get("TRACKERS", {}).get(tracker, {}).get("api_key") or "").strip()
+            if api_key and tracker_class:
+                warn_api_key_expiry(tracker, api_key, getattr(tracker_class, "base_url", ""), meta.base_dir)
+
         return valid_trackers
 
     async def get_banned_groups(self, meta: Meta, tracker: str) -> str | None:
@@ -288,6 +295,8 @@ class TrackerSetup:
                         # Add query parameters for pagination.
                         params = {"cursor": next_cursor, "per_page": 100} if next_cursor else {"per_page": 100}
                     response = await client.get(url=banned_url, headers=headers, params=params)
+                    if auth_mode == "bearer":
+                        observe_tracker_response(self.config, meta, tracker, response)
 
                     if response.status_code == 200:
                         response_json = response.json()
@@ -576,6 +585,7 @@ class TrackerSetup:
                     # Add query parameters for pagination
                     params: JsonDict = {"cursor": next_cursor, "per_page": 100} if next_cursor else {"per_page": 100}
                     response = await client.get(url=claims_url, headers=headers, params=params)
+                    observe_tracker_response(self.config, meta, tracker, response)
 
                     if response.status_code == 200:
                         response_json = response.json()
@@ -697,6 +707,7 @@ class TrackerSetup:
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.get(url=url, headers=headers, params=params)
+                observe_tracker_response(self.config, meta, tracker, response)
                 if response.status_code == 200:
                     data = response.json()
                     if not isinstance(data, dict):
@@ -1379,6 +1390,7 @@ class TrackerSetup:
             try:
                 async with httpx.AsyncClient(timeout=10.0) as client:
                     response = await client.post(url=create_url, headers=headers, json=payload)
+                    observe_tracker_response(self.config, meta, tracker, response)
                     if response.status_code in (200, 201):
                         logger.info(f"[bold green]Successfully created trump report on {tracker}[/bold green]")
                         return True

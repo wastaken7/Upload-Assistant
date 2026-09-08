@@ -4763,6 +4763,8 @@ def get_trackers():
     )
 
     trackers_data = []
+    from src.api_key_expiry import get_api_key_expiry
+
     for tracker_name, tracker_class in tracker_class_map.items():
         display_name = getattr(tracker_class, "display_name", tracker_name)
         base_url = getattr(tracker_class, "base_url", "")
@@ -4770,6 +4772,9 @@ def get_trackers():
         optional_setup_keys = sorted(str(key) for key in (getattr(tracker_class, "optional_setup_keys", ()) or ()))
         destination_type = _tracker_destination_type(tracker_class)
         supported_categories = _tracker_supported_categories(tracker_class)
+        expiry_supported = bool(getattr(tracker_class, "api_key_expiry_supported", False))
+        tracker_config = trackers_section.get(tracker_name, {})
+        api_key = str(tracker_config.get("api_key") or "").strip() if isinstance(tracker_config, dict) else ""
         favicon_url = ""
         static_dir = Path(__file__).parent / "static"
         for ext in ["png", "svg", "ico"]:
@@ -4786,6 +4791,8 @@ def get_trackers():
                 "favicon": favicon_url,
                 "configured": tracker_name.upper() in configured_trackers,
                 "credential_source": ("prowlarr" if tracker_name.upper() in prowlarr_sources else "local" if tracker_name.upper() in configured_trackers else None),
+                "api_key_expiry_supported": expiry_supported,
+                "api_key_expiry": get_api_key_expiry(tracker_name, api_key, base_url, STATE_DIR) if expiry_supported else None,
                 "auth_type": auth_type,
                 "optional_setup_keys": optional_setup_keys,
                 "cookie_configured": tracker_name.upper() in cookie_trackers,
@@ -4797,6 +4804,89 @@ def get_trackers():
     trackers_data.sort(key=lambda x: x["display_name"].lower())
 
     return jsonify({"success": True, "default_trackers": default_trackers_list, "trackers": trackers_data})
+
+
+@app.route("/api/tracker_api_key_status", methods=["POST"])
+@limiter.limit("120 per hour", key_func=_rate_limit_key_func)
+def tracker_api_key_status():
+    """Read cached expiry or explicitly check a saved/draft tracker API key."""
+    if not _is_authenticated():
+        return jsonify({"success": False, "error": "Authentication required (web session)"}), 401
+    if not _verify_csrf_header() or not _verify_same_origin():
+        return jsonify({"success": False, "error": "CSRF/Origin validation failed"}), 403
+
+    import httpx
+
+    from src.api_key_expiry import get_api_key_expiry, record_api_key_expiry
+    from src.prowlarr import ProwlarrError, configured_prowlarr, fetch_prowlarr_credentials
+    from src.trackersetup import tracker_class_map
+
+    data = _request_json_dict()
+    tracker = str(data.get("tracker") or "").strip().upper()
+    tracker_class = tracker_class_map.get(tracker)
+    if not tracker_class or not getattr(tracker_class, "api_key_expiry_supported", False):
+        return jsonify({"success": False, "error": "API key expiry checks are not supported for this tracker"}), 400
+    config = _load_config_from_file(STATE_DIR / "data" / "config.py") or {}
+    api_key = data.get("api_key", config.get("TRACKERS", {}).get(tracker, {}).get("api_key", ""))
+    if not isinstance(api_key, str) or "\r" in api_key or "\n" in api_key:
+        return jsonify({"success": False, "error": "Enter a valid API key"}), 400
+    api_key = api_key.strip()
+    source = "local"
+    refresh = data.get("refresh") is True
+    if not api_key and refresh:
+        try:
+            if connection := configured_prowlarr(config):
+                report = fetch_prowlarr_credentials(*connection, {tracker})
+                credential = report.credentials.get(tracker)
+                api_key = credential.api_key if credential else ""
+                source = "prowlarr"
+        except ProwlarrError as error:
+            return jsonify({"success": False, "error": str(error)}), 400
+    base_url = tracker_class.base_url
+    if not refresh:
+        return jsonify({"success": True, "expiry": get_api_key_expiry(tracker, api_key, base_url, STATE_DIR)})
+    if not api_key:
+        return jsonify({"success": False, "error": "Enter an API key or configure a Prowlarr credential source"}), 400
+
+    # Use the existing search endpoint/permissions, not /user's additional
+    # account-information permission. The destination comes from UA's tracker
+    # definition; draft config cannot redirect a credential to another host.
+    try:
+        with httpx.Client(timeout=10.0, follow_redirects=False) as client:
+            response = client.get(
+                tracker_class.search_url,
+                headers={"Authorization": f"Bearer {api_key}", "Accept": "application/json"},
+                params={"perPage": 1},
+            )
+            response.raise_for_status()
+            payload = response.json()
+        if not isinstance(payload, dict) or payload.get("success") is False:
+            return jsonify({"success": False, "error": "The tracker returned an unsuccessful API response"}), 400
+        observed = record_api_key_expiry(tracker, api_key, base_url, response, STATE_DIR, payload=payload)
+    except httpx.HTTPStatusError as error:
+        code = error.response.status_code
+        message = (
+            "The tracker rejected the API key. It may be invalid, revoked or expired."
+            if code == 401
+            else "The tracker denied the API request. Check the key's search/download permissions and account access."
+            if code == 403
+            else f"The tracker returned HTTP {code}. Try again later."
+        )
+        return jsonify({"success": False, "error": message}), 400
+    except httpx.RequestError:
+        return jsonify({"success": False, "error": "The tracker could not be reached. Try again later."}), 400
+    except ValueError:
+        return jsonify({"success": False, "error": "The tracker did not return a valid JSON API response"}), 400
+
+    expiry = observed or get_api_key_expiry(tracker, api_key, base_url, STATE_DIR)
+    return jsonify(
+        {
+            "success": True,
+            "expiry": expiry,
+            "credential_source": source,
+            "message": "API key accepted." if observed else "API key accepted, but expiry was not reported. Any date shown is the last observed expiry.",
+        }
+    )
 
 
 @app.route("/api/config_test_prowlarr", methods=["POST"])
