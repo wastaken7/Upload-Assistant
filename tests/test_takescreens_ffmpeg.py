@@ -2,6 +2,7 @@
 # ruff: noqa: S101
 
 import asyncio
+import json
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -183,3 +184,56 @@ async def test_capture_screenshot_applies_selected_libplacebo_tonemapping(monkey
 
     assert result == (0, str(output))
     assert any("libplacebo=tonemapping=hable" in argument for argument in commands[0])
+
+
+@pytest.mark.asyncio
+async def test_dvd_screenshots_uses_complete_title_set(monkeypatch, tmp_path):
+    disc_path = tmp_path / "VIDEO_TS"
+    disc_path.mkdir()
+    main_set = ["01_0.VOB", "01_1.VOB", "01_2.VOB", "01_3.VOB"]
+    durations = {"01_1.VOB": 1200.0, "01_2.VOB": 1200.0, "01_3.VOB": 600.0}
+    captured: list[tuple[int, str, str]] = []
+
+    def parse_stub(path, output=None, **_kwargs):
+        if output == "JSON":
+            duration = durations[Path(path).name.removeprefix("VTS_")]
+            return json.dumps({"media": {"track": [{"Duration": duration, "Width": 720, "Height": 480}]}})
+        return SimpleNamespace(
+            tracks=[SimpleNamespace(track_type="Video", duration="3000000", pixel_aspect_ratio="1", display_aspect_ratio="1.5", width="720", height="480", frame_rate="24")]
+        )
+
+    async def valid_times_stub(_times, num_screens, length, _frame_rate, _meta, retake=False):
+        assert num_screens == 2
+        assert length == 3000.0
+        assert retake is False
+        return ["100", "1500", "2700"]
+
+    async def capture_stub(task):
+        index, source, image, seek_time, *_rest = task
+        Path(image).write_bytes(b"x" * 120001)
+        captured.append((index, source, seek_time))
+        return index, image
+
+    monkeypatch.setattr(takescreens.MediaInfo, "parse", parse_stub)
+    monkeypatch.setattr(takescreens, "valid_ss_time", valid_times_stub)
+    monkeypatch.setattr(takescreens, "capture_dvd_screenshot", capture_stub)
+    monkeypatch.setattr(takescreens, "register_screenshots", lambda *_args: [])
+    monkeypatch.setattr(takescreens, "screenshot_par_scale_factors", lambda *_args: (1.0, 1.0))
+
+    meta = Meta(
+        base_dir=str(tmp_path),
+        uuid="dvd-test",
+        screens=2,
+        discs=[{"name": "DVD", "path": str(disc_path), "main_set": main_set}],
+        image_list=[],
+        retake=False,
+        frame_overlay=False,
+        tv_pack=False,
+        debug=False,
+        ffdebug=False,
+    )
+    await takescreens.dvd_screenshots(meta, 0, cleanup_after_capture=False)
+
+    expected_source = "concat:" + "|".join(str(disc_path / f"VTS_{vob}") for vob in main_set[1:])
+    assert [source for _index, source, _time in captured] == [expected_source] * 3
+    assert [time for _index, _source, time in captured] == ["100", "1500", "2700"]

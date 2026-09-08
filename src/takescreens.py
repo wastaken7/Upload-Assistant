@@ -893,40 +893,25 @@ async def dvd_screenshots(
             frame_rate = float(track.frame_rate)
     w_sar, h_sar = screenshot_par_scale_factors(width, height, par, dar)
 
-    async def _is_vob_good(n: int, loops: int, _num_screens: int) -> tuple[float, int]:
-        max_loops = 6
-        fallback_duration = 300
-        valid_tracks: list[dict[str, Any]] = []
-
-        while loops < max_loops:
-            try:
-                vob_mi = MediaInfo.parse(f"{meta.discs[disc_num]['path']}/VTS_{main_set[n]}", output="JSON")
-                vob_mi = json.loads(vob_mi)
-
-                for track in vob_mi.get("media", {}).get("track", []):
-                    duration = float(track.get("Duration", 0))
-                    width = track.get("Width")
-                    height = track.get("Height")
-
-                    if duration > 1 and width and height:  # Minimum 1-second track
-                        valid_tracks.append({"duration": duration, "track_index": n})
-
-                if valid_tracks:
-                    # Sort by duration, take longest track
-                    longest_track: dict[str, Any] = max(valid_tracks, key=lambda x: x["duration"])
-                    return longest_track["duration"], longest_track["track_index"]
-
-            except Exception as e:
-                logger.error(f"[red]Error parsing VOB {n}: {e}")
-
-            n = (n + 1) % len(main_set)
-            loops += 1
-
-        return fallback_duration, 0
-
-    main_set = meta.discs[disc_num]["main_set"][1:] if len(meta.discs[disc_num]["main_set"]) > 1 else meta.discs[disc_num]["main_set"]
-    voblength, vob_index = await _is_vob_good(0, 0, num_screens)
-    capture_vob = main_set[vob_index]
+    main_set = meta.discs[disc_num]["main_set"]
+    content_vobs = [vob for vob in main_set if not vob.upper().endswith("_0.VOB")] or main_set
+    title_vobs = [str(Path(meta.discs[disc_num]["path"]) / f"VTS_{vob}") for vob in content_vobs]
+    input_file = title_vobs[0] if len(title_vobs) == 1 else f"concat:{'|'.join(title_vobs)}"
+    voblength = 0.0
+    for title_vob in title_vobs:
+        try:
+            vob_mi = json.loads(MediaInfo.parse(title_vob, output="JSON"))
+            video_durations = [
+                float(track.get("Duration", 0))
+                for track in vob_mi.get("media", {}).get("track", [])
+                if track.get("Width") and track.get("Height") and float(track.get("Duration", 0)) > 1
+            ]
+            if video_durations:
+                voblength += max(video_durations)
+        except Exception as e:
+            logger.error(f"[red]Error parsing VOB {title_vob}: {e}")
+    if not voblength:
+        voblength = 300
     ss_times = await valid_ss_time([], num_screens, voblength, frame_rate, meta, retake=retry_cap)
     capture_tasks: list[Awaitable[tuple[int, str | None]]] = []
     existing_images_count = 0
@@ -934,7 +919,6 @@ async def dvd_screenshots(
 
     for i in range(num_screens + 1):
         image = str(screenshot_dir / f"{sanitized_disc_name}-{i}.png")
-        input_file = f"{meta.discs[disc_num]['path']}/VTS_{capture_vob}"
         if Path(image).exists() and not meta.retake:
             existing_images_count += 1
             existing_image_paths.append(image)
@@ -949,7 +933,6 @@ async def dvd_screenshots(
 
     for i in range(num_screens + 1):
         image = str(screenshot_dir / f"{sanitized_disc_name}-{i}.png")
-        input_file = f"{meta.discs[disc_num]['path']}/VTS_{capture_vob}"
         image_paths.append(image)
         input_files.append(input_file)
 
@@ -1013,7 +996,6 @@ async def dvd_screenshots(
                 logger.info(f"[yellow]Retaking screenshot for: {image} (Attempt {attempt}/{retry_attempts})[/yellow]")
 
                 index = int(image.rsplit("-", 1)[-1].split(".")[0])
-                input_file = f"{meta.discs[disc_num]['path']}/VTS_{capture_vob}"
                 adjusted_time = random.uniform(0, voblength)  # nosec B311 - Random screenshot timing, not cryptographic  # noqa: S311
 
                 if Path(image).exists():  # Prevent unnecessary deletion error
@@ -1073,18 +1055,19 @@ async def capture_dvd_screenshot(task: tuple[int, str, str, str, Meta, float, fl
 
     try:
         loglevel = "verbose" if meta.ffdebug else "quiet"
-        media_info = MediaInfo.parse(input_file)
         video_duration: float | None = None
-        tracks: list[Any] = []
-        tracks.extend(cast(list[Any], getattr(media_info, "tracks", [])))
-        for track in tracks:
-            if track.track_type == "Video":
-                try:
-                    if track.duration is not None:
-                        video_duration = float(track.duration)
-                except TypeError, ValueError:
-                    video_duration = None
-                break
+        if not input_file.startswith("concat:"):
+            media_info = MediaInfo.parse(input_file)
+            tracks: list[Any] = []
+            tracks.extend(cast(list[Any], getattr(media_info, "tracks", [])))
+            for track in tracks:
+                if track.track_type == "Video":
+                    try:
+                        if track.duration is not None:
+                            video_duration = float(track.duration) / 1000
+                    except TypeError, ValueError:
+                        video_duration = None
+                    break
 
         if video_duration and seek_time > video_duration:
             seek_time = max(0, video_duration - 1)
