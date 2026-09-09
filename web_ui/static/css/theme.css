@@ -1920,6 +1920,111 @@ html.ua-upload-document #root {
   color: var(--ua-muted);
 }
 
+.ua-api-key-alert-button,
+.ua-api-key-alert-link {
+  --ua-key-alert-color: #b45309;
+}
+
+:is(.ua-mode-dark, [data-mode="dark"]) .ua-api-key-alert-button,
+:is(.ua-mode-dark, [data-mode="dark"]) .ua-api-key-alert-link {
+  --ua-key-alert-color: #fbbf24;
+}
+
+.ua-api-key-alert-button[data-severity="expired"],
+.ua-api-key-alert-link[data-severity="expired"] {
+  --ua-key-alert-color: #b91c1c;
+}
+
+:is(.ua-mode-dark, [data-mode="dark"])
+  .ua-api-key-alert-button[data-severity="expired"],
+:is(.ua-mode-dark, [data-mode="dark"])
+  .ua-api-key-alert-link[data-severity="expired"] {
+  --ua-key-alert-color: #f87171;
+}
+
+.ua-api-key-alert-button.ua-api-key-alert-button {
+  color: var(--ua-key-alert-color) !important;
+  border-color: color-mix(in srgb, var(--ua-key-alert-color) 35%, transparent);
+  background: color-mix(in srgb, var(--ua-key-alert-color) 9%, transparent);
+}
+
+.ua-api-key-alert-button:not(.ua-app-rail-button) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+}
+
+.ua-api-key-alert-icon {
+  position: relative;
+  display: inline-flex;
+}
+
+.ua-api-key-alert-count {
+  position: absolute;
+  top: -0.45rem;
+  right: -0.65rem;
+  min-width: 1rem;
+  padding: 0.1rem 0.2rem;
+  border-radius: 999px;
+  background: var(--ua-key-alert-color);
+  color: #fff;
+  font-size: 0.6rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+:is(.ua-mode-dark, [data-mode="dark"]) .ua-api-key-alert-count {
+  color: #171717;
+}
+
+.ua-api-key-alert-popover {
+  position: fixed;
+  left: 5.5rem;
+  bottom: 1rem;
+  z-index: 70;
+  width: min(24rem, calc(100vw - 6.5rem));
+  max-height: min(70dvh, 32rem);
+  overflow-y: auto;
+}
+
+.ua-config-page .ua-api-key-alert-popover {
+  background: var(--ua-config-surface-raised);
+}
+
+.ua-upload-page .ua-api-key-alert-popover {
+  background: var(--ua-upload-surface-raised);
+}
+
+.ua-api-key-alert-popover[data-placement="sidebar"],
+.ua-api-key-alert-popover[data-placement="header"] {
+  left: 1rem;
+  width: calc(100vw - 2rem);
+}
+
+.ua-api-key-alert-link {
+  border-color: color-mix(in srgb, var(--ua-key-alert-color) 35%, transparent);
+}
+
+.ua-api-key-alert-link:hover,
+.ua-api-key-alert-link:focus-visible {
+  background: color-mix(in srgb, var(--ua-key-alert-color) 9%, transparent);
+}
+
+.ua-api-key-expiry-tone {
+  color: var(--ua-key-alert-color);
+}
+
+.ua-config-api-key-controls {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.ua-config-api-key-controls input {
+  min-width: 0;
+  flex: 1;
+}
+
 .ua-upload-page .ua-app-rail-popover-label {
   color: var(--ua-upload-muted);
 }

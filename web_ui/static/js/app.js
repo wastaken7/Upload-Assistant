@@ -1183,6 +1183,7 @@ const WorkspaceSwitcher = ({
 };
 
 const ApplicationRail = ({
+  trackers,
   activeWorkspace,
   appBase,
   appearanceControl,
@@ -1246,6 +1247,7 @@ const ApplicationRail = ({
       <div className="min-h-4 flex-1"></div>
 
       <div className="ua-app-rail-footer grid shrink-0 gap-1 border-t p-2">
+        <window.UAApiKeyAlerts trackers={trackers} appBase={appBase} />
         <button
           type="button"
           className={`ua-app-rail-button rounded-lg ${updateStatus?.update_available ? "ua-update-rail-button" : ""}`}
@@ -6272,6 +6274,11 @@ function AudionutsUAGUI() {
               compact
             />
             <div className="ml-2 flex shrink-0 items-center gap-1">
+              <window.UAApiKeyAlerts
+                trackers={trackers}
+                appBase={APP_BASE}
+                placement="header"
+              />
               {renderUpdateButton()}
               {renderHelpButton()}
               {renderThemePalette()}
@@ -6997,6 +7004,7 @@ function AudionutsUAGUI() {
       )}
 
       <ApplicationRail
+        trackers={trackers}
         activeWorkspace="upload"
         appBase={APP_BASE}
         appearanceControl={renderRailAppearance()}

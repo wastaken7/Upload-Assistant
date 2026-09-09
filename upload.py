@@ -2256,6 +2256,9 @@ def load_heavy_globals() -> None:
 
 
 async def do_the_thing(base_dir: str) -> None:
+    from src.api_key_expiry import reset_api_key_expiry_warnings
+
+    reset_api_key_expiry_warnings()
     load_heavy_globals()
     # Reload config from disk so that changes made via the WebUI config
     # editor (or manual file edits between runs) are picked up.  The
