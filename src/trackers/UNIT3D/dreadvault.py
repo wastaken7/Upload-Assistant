@@ -5,6 +5,7 @@ from typing import Any, cast
 import cli_ui
 
 from src.console import logger
+from src.languages import languages_manager
 from src.meta import Meta
 from src.trackers.common import Common
 from src.trackers.UNIT3D import UNIT3D
@@ -50,6 +51,58 @@ class DreadVault(UNIT3D):
         super().__init__(config, tracker_name="DREADVAULT")
         self.config: Config = config
         self.common = Common(config)
+
+    async def get_name(self, meta: Meta) -> dict[str, str]:
+        dreadvault_name: str = meta.name
+        resolution: str = meta.resolution
+        video_codec: str = meta.video_codec
+        video_encode: str = meta.video_encode
+        name_type: str = meta.type or ""
+        source: str = meta.source or ""
+        alt_title = meta.aka if not meta.no_aka else ""
+
+        year = str(meta.year) if meta.year is not None else ""
+        if meta.category == "TV":
+            year = str(meta.year) if (meta.year is not None and meta.search_year != "") else ""
+        manual_year_value = str(meta.manual_year)
+        if manual_year_value and int(manual_year_value) > 0:
+            year = manual_year_value
+        if meta.no_year:
+            year = ""
+
+        if not meta.language_checked:
+            await languages_manager.process_desc_language(meta, tracker=self.tracker)
+        audio_languages: list[str] = [] if not meta.audio_languages else meta.audio_languages
+        if audio_languages and not await languages_manager.has_english_language(audio_languages):
+            foreign_lang = audio_languages[0].upper()
+            if name_type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD"):
+                if year:
+                    dreadvault_name = dreadvault_name.replace(year, f"{year} {foreign_lang}", 1)
+            elif meta.is_disc != "BDMV":
+                dreadvault_name = dreadvault_name.replace(meta.resolution, f"{foreign_lang} {meta.resolution}", 1)
+
+        if name_type == "DVDRIP":
+            source = "DVDRip"
+            dreadvault_name = dreadvault_name.replace(f"{meta.source} ", "", 1)
+            dreadvault_name = dreadvault_name.replace(f"{meta.video_encode}", "", 1)
+            dreadvault_name = dreadvault_name.replace(f"{source}", f"{resolution} {source}", 1)
+            dreadvault_name = dreadvault_name.replace((meta.audio), f"{meta.audio}{video_encode}", 1)
+
+        elif meta.is_disc == "DVD":
+            region_and_source = " ".join(part for part in (meta.region, source) if part)
+            disc_details = " ".join(part for part in (resolution, meta.region, source) if part)
+            if region_and_source:
+                dreadvault_name = dreadvault_name.replace(region_and_source, disc_details, 1)
+            dreadvault_name = dreadvault_name.replace((meta.audio), f"{video_codec} {meta.audio}", 1)
+
+        elif name_type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD"):
+            dreadvault_name = dreadvault_name.replace(meta.source or "", f"{resolution} {meta.source}", 1)
+            dreadvault_name = dreadvault_name.replace((meta.audio), f"{video_codec} {meta.audio}", 1)
+
+        if alt_title and year:
+            dreadvault_name = dreadvault_name.replace(f"{year} {alt_title}", f"{alt_title} {year}", 1)
+
+        return {"name": dreadvault_name}
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         combined_genres_value = meta.combined_genres
