@@ -130,7 +130,7 @@ class ULCX(UNIT3D):
         if meta.type == "ENCODE":
             height = meta.video_height or 0
             width = meta.video_width or 0
-            if height and width and not (height >= 720 and width >= 1280):
+            if (height and height < 720) or (width and width < 1280):
                 logger.info(f"{self.tracker}: [bold red]Encodes resolution must be at least 1280x720. Standard definition encodes are forbidden.[/bold red]")
                 return False
 
