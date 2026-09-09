@@ -176,7 +176,7 @@ Common options:
   -serv, --service           Streaming service
   --no-aka                   Remove AKA from title
   -daily, --daily            Air date of a daily type episode (YYYY-MM-DD)
-  -c, --category             Category (movie, tv, fanres, ebook)
+  -c, --category             Category (movie, tv, fanres, book, game, music, xxx)
   -t, --type                 Type (disc, remux, encode, webdl, etc.)
   --source                   Source (Blu-ray, BluRay, DVD, WEBDL, etc.)
   -comps, --comparison       Use comparison images from a folder (input folder path): see -comps_index
@@ -225,7 +225,15 @@ class Args:
             return completer
 
         category_completer = make_dict_completer(
-            {"movie": "Movie", "tv": "TV Show", "fanres": "Fan Restoration", "book": "E-Book or Audiobook", "game": "Video Game", "music": "Music Release"}
+            {
+                "movie": "Movie",
+                "tv": "TV Show",
+                "fanres": "Fan Restoration",
+                "book": "E-Book or Audiobook",
+                "game": "Video Game",
+                "music": "Music Release",
+                "xxx": "Adult Video",
+            }
         )
 
         music_media_completer = make_dict_completer(
@@ -408,8 +416,8 @@ class Args:
             "--category",
             nargs=1,
             required=False,
-            help="Category [movie, tv, fanres, book, game, music]",
-            choices=["movie", "tv", "fanres", "book", "game", "music"],
+            help="Category [movie, tv, fanres, book, game, music, xxx]",
+            choices=["movie", "tv", "fanres", "book", "game", "music", "xxx"],
             dest="manual_category",
         )
         action_c.completer = category_completer
@@ -486,7 +494,14 @@ class Args:
         imdb_group = parser.add_mutually_exclusive_group()
         imdb_group.add_argument("-imdb", "--imdb", nargs=1, required=False, help="IMDb ID", type=str, dest="imdb_manual")
         imdb_group.add_argument("--no-imdb", action="store_true", required=False, help="Do not search for or use IMDb metadata")
-        parser.add_argument("--cast", nargs=1, required=False, help="Comma-separated cast override (takes priority over API metadata)", type=str, dest="manual_cast")
+        parser.add_argument(
+            "--cast",
+            nargs=1,
+            required=False,
+            help="Comma-separated cast or XXX performer override (takes priority over detected metadata)",
+            type=str,
+            dest="manual_cast",
+        )
         parser.add_argument("-mal", "--mal", nargs=1, required=False, help="MAL ID", type=str, dest="mal_manual")
         parser.add_argument("-tvmaze", "--tvmaze", nargs=1, required=False, help="TVMAZE ID", type=str, dest="tvmaze_manual")
         parser.add_argument("-tvdb", "--tvdb", nargs=1, required=False, help="TVDB ID", type=str, dest="tvdb_manual")
@@ -520,7 +535,7 @@ class Args:
         parser.add_argument("--no-dub", dest="no_dub", action="store_true", required=False, help="Remove Dubbed from title")
         parser.add_argument("--no-dual", dest="no_dual", action="store_true", required=False, help="Remove Dual-Audio from title")
         parser.add_argument("--no-tag", dest="no_tag", action="store_true", required=False, help="Remove Group Tag from title")
-        parser.add_argument("--name", nargs=1, required=False, help="Override the generated release name", type=str, dest="manual_name")
+        parser.add_argument("--name", nargs=1, required=False, help="Override the generated release name (including XXX titles)", type=str, dest="manual_name")
         parser.add_argument("--no-edition", dest="no_edition", action="store_true", required=False, help="Remove Edition from title")
         parser.add_argument("--dual-audio", dest="dual_audio", action="store_true", required=False, help="Add Dual-Audio to the title")
         parser.add_argument("-ol", "--original-language", dest="manual_language", nargs=1, required=False, help="Set original audio language")
@@ -599,7 +614,7 @@ class Args:
             "--publisher",
             nargs="*",
             required=False,
-            help="Book/Audiobook publisher (overrides auto-detected value)",
+            help="Book/Audiobook publisher or XXX studio (overrides auto-detected value)",
             type=str,
             dest="book_publisher",
         )

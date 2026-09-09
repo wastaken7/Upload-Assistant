@@ -90,7 +90,7 @@ If you pass a `.txt` file as the main positional input path (without specifying 
 
 ### Category / type / source / resolution
 
-- `-c`, `--category {movie,tv,fanres}`: Override the category.
+- `-c`, `--category {movie,tv,fanres,book,game,music,xxx}`: Override the category.
 - `-t`, `--type {disc,remux,encode,webdl,web-dl,webrip,hdtv,dvdrip}`: Override release type.
   - Stored as uppercase with `-` removed (e.g. `web-dl` → `WEBDL`).
 - `--source {Blu-ray,BluRay,DVD,DVD5,DVD9,HDDVD,WEB,HDTV,UHDTV,LaserDisc,DCP}`: Override the source string.
@@ -118,6 +118,9 @@ Note: if a manual TMDb or IMDb id is present in the incoming `meta` before parsi
 
 ### Tags / edition / language
 
+- `--name RELEASE_NAME`: Override the generated release name, including XXX release titles.
+- `--cast NAME[,NAME...]`: Override cast or XXX performers with a comma-separated list. This takes priority over detected metadata.
+- `-pub`, `--publisher NAME`: Override the book/audiobook publisher or XXX studio.
 - `-g`, `--tag [GROUP ...]`: Group tag.
   - Stored with a leading dash, e.g. `-g NTb` → `-NTb`.
 - `-serv`, `--service [SERVICE ...]`: Streaming service.
