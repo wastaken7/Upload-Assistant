@@ -100,7 +100,12 @@ class DreadVault(UNIT3D):
                 if year:
                     dreadvault_name = dreadvault_name.replace(year, f"{year} {foreign_lang}", 1)
             elif meta.is_disc != "BDMV":
-                dreadvault_name = dreadvault_name.replace(meta.resolution, f"{foreign_lang} {meta.resolution}", 1)
+                # get_name drops the resolution token when it is OTHER, so meta.resolution is not
+                # always in the name; the source sits in the next slot along and anchors it there.
+                for anchor in (meta.resolution, source):
+                    if anchor and anchor in dreadvault_name:
+                        dreadvault_name = dreadvault_name.replace(anchor, f"{foreign_lang} {anchor}", 1)
+                        break
 
         if alt_title and year:
             dreadvault_name = dreadvault_name.replace(f"{year} {alt_title}", f"{alt_title} {year}", 1)
