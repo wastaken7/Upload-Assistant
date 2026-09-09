@@ -436,7 +436,7 @@ class DarkPeers(UNIT3D):
 
         # DP prohibits retags.  When the preparation stage identified a scene
         # release, submit its recorded release name rather than rebuilding it.
-        dp_name = str(meta.scene_name or meta.name or "")
+        dp_name = str(meta.name or "")
 
         if meta.category == "TV":
             dp_name = await self._tv_name(meta, dp_name)
