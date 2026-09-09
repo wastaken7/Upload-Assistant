@@ -90,7 +90,7 @@ def test_concurrent_observations_do_not_lose_other_trackers(tmp_path):
 
 def test_cli_warns_once_per_run_and_only_for_selected_trackers(tmp_path, monkeypatch):
     messages = []
-    monkeypatch.setattr(expiry.logger, "warning", lambda message, **kwargs: messages.append(message))
+    monkeypatch.setattr(expiry.logger, "warning", lambda message, **_kwargs: messages.append(message))
     expiry.reset_api_key_expiry_warnings()
     config = {"TRACKERS": {"LST": {"api_key": "secret-key"}, "AITHER": {"api_key": "other-key"}}}
     meta = Meta(base_dir=str(tmp_path), trackers=["LST"])
@@ -110,7 +110,7 @@ def test_cli_warns_once_per_run_and_only_for_selected_trackers(tmp_path, monkeyp
 
 def test_cli_expired_warning_and_silent_unknown_or_no_expiry(tmp_path, monkeypatch):
     messages = []
-    monkeypatch.setattr(expiry.logger, "warning", lambda message, **kwargs: messages.append(message))
+    monkeypatch.setattr(expiry.logger, "warning", lambda message, **_kwargs: messages.append(message))
     expiry.reset_api_key_expiry_warnings()
     for state in ["unknown", "no_expiry", "valid"]:
         expiry.warn_api_key_expiry("LST", "key", LST.base_url, tmp_path, status={"state": state})
@@ -126,7 +126,7 @@ def web(monkeypatch, tmp_path):
     monkeypatch.setattr(server, "_is_authenticated", lambda: True)
     monkeypatch.setattr(server, "_verify_csrf_header", lambda: True)
     monkeypatch.setattr(server, "_verify_same_origin", lambda: True)
-    monkeypatch.setattr(server, "_load_config_from_file", lambda path: {"TRACKERS": {"LST": {"api_key": "saved-key"}}})
+    monkeypatch.setattr(server, "_load_config_from_file", lambda _path: {"TRACKERS": {"LST": {"api_key": "saved-key"}}})
     return server.app.test_client()
 
 
@@ -168,7 +168,7 @@ def test_web_check_uses_draft_key_fixed_search_endpoint_and_does_not_save_config
 
 @pytest.fixture(params=[None, [], {"LST": None}, {"LST": []}], ids=["null-section", "list-section", "null-tracker", "list-tracker"])
 def malformed_tracker_config(request, monkeypatch):
-    monkeypatch.setattr(server, "_load_config_from_file", lambda path: {"TRACKERS": request.param})
+    monkeypatch.setattr(server, "_load_config_from_file", lambda _path: {"TRACKERS": request.param})
 
 
 def test_web_check_uses_draft_key_with_malformed_saved_config(web, malformed_tracker_config, monkeypatch):
@@ -209,8 +209,8 @@ def test_web_check_rejects_explicit_null_key_without_using_saved_key(web, monkey
 
 
 def test_web_check_uses_prowlarr_only_for_missing_key(web, monkeypatch):
-    monkeypatch.setattr(server, "_load_config_from_file", lambda path: {"DEFAULT": {"prowlarr_url": "https://prowlarr.test", "prowlarr_api_key": "prowlarr-secret"}})
-    monkeypatch.setattr(prowlarr, "fetch_prowlarr_credentials", lambda *args: prowlarr.ProwlarrCredentialReport(credentials={"LST": prowlarr.ProwlarrCredential(api_key="remote-secret")}))
+    monkeypatch.setattr(server, "_load_config_from_file", lambda _path: {"DEFAULT": {"prowlarr_url": "https://prowlarr.test", "prowlarr_api_key": "prowlarr-secret"}})
+    monkeypatch.setattr(prowlarr, "fetch_prowlarr_credentials", lambda *_args: prowlarr.ProwlarrCredentialReport(credentials={"LST": prowlarr.ProwlarrCredential(api_key="remote-secret")}))
     calls = fake_client(monkeypatch, response("2027-08-22T00:00:00Z"))
     result = web.post("/api/tracker_api_key_status", json={"tracker": "LST", "api_key": "", "refresh": True})
     assert result.json["credential_source"] == "prowlarr"
