@@ -166,6 +166,48 @@ def test_web_check_uses_draft_key_fixed_search_endpoint_and_does_not_save_config
     assert len(calls) == 1
 
 
+@pytest.fixture(params=[None, [], {"LST": None}, {"LST": []}], ids=["null-section", "list-section", "null-tracker", "list-tracker"])
+def malformed_tracker_config(request, monkeypatch):
+    monkeypatch.setattr(server, "_load_config_from_file", lambda path: {"TRACKERS": request.param})
+
+
+def test_web_check_uses_draft_key_with_malformed_saved_config(web, malformed_tracker_config, monkeypatch):
+    calls = fake_client(monkeypatch, response("2027-08-22T00:00:00Z"))
+    result = web.post("/api/tracker_api_key_status", json={"tracker": "LST", "api_key": "draft-secret", "refresh": True})
+    assert result.status_code == 200
+    assert result.json["success"] is True
+    assert result.json["expiry"]["expires_at"] == "2027-08-22T00:00:00+00:00"
+    assert calls[0][1]["headers"]["Authorization"] == "Bearer draft-secret"
+
+
+@pytest.mark.parametrize("refresh", [False, True])
+def test_web_check_without_key_handles_malformed_saved_config(web, malformed_tracker_config, monkeypatch, refresh):
+    calls = fake_client(monkeypatch, response("2027-08-22T00:00:00Z"))
+    result = web.post("/api/tracker_api_key_status", json={"tracker": "LST", "refresh": refresh})
+    if refresh:
+        assert result.status_code == 400
+        assert result.json["error"] == "Enter an API key or configure a Prowlarr credential source"
+    else:
+        assert result.status_code == 200
+        assert result.json["expiry"]["state"] == "unknown"
+    assert not calls
+
+
+def test_web_check_uses_saved_key_when_draft_is_omitted(web, monkeypatch):
+    calls = fake_client(monkeypatch, response("2027-08-22T00:00:00Z"))
+    result = web.post("/api/tracker_api_key_status", json={"tracker": "LST", "refresh": True})
+    assert result.status_code == 200
+    assert calls[0][1]["headers"]["Authorization"] == "Bearer saved-key"
+
+
+def test_web_check_rejects_explicit_null_key_without_using_saved_key(web, monkeypatch):
+    calls = fake_client(monkeypatch, response("2027-08-22T00:00:00Z"))
+    result = web.post("/api/tracker_api_key_status", json={"tracker": "LST", "api_key": None, "refresh": True})
+    assert result.status_code == 400
+    assert result.json["error"] == "Enter a valid API key"
+    assert not calls
+
+
 def test_web_check_uses_prowlarr_only_for_missing_key(web, monkeypatch):
     monkeypatch.setattr(server, "_load_config_from_file", lambda path: {"DEFAULT": {"prowlarr_url": "https://prowlarr.test", "prowlarr_api_key": "prowlarr-secret"}})
     monkeypatch.setattr(prowlarr, "fetch_prowlarr_credentials", lambda *args: prowlarr.ProwlarrCredentialReport(credentials={"LST": prowlarr.ProwlarrCredential(api_key="remote-secret")}))

@@ -4827,7 +4827,12 @@ def tracker_api_key_status():
     if not tracker_class or not getattr(tracker_class, "api_key_expiry_supported", False):
         return jsonify({"success": False, "error": "API key expiry checks are not supported for this tracker"}), 400
     config = _load_config_from_file(STATE_DIR / "data" / "config.py") or {}
-    api_key = data.get("api_key", config.get("TRACKERS", {}).get(tracker, {}).get("api_key", ""))
+    if "api_key" in data:
+        api_key = data["api_key"]
+    else:
+        trackers_config = config.get("TRACKERS")
+        tracker_config = trackers_config.get(tracker) if isinstance(trackers_config, Mapping) else None
+        api_key = tracker_config.get("api_key", "") if isinstance(tracker_config, Mapping) else ""
     if not isinstance(api_key, str) or "\r" in api_key or "\n" in api_key:
         return jsonify({"success": False, "error": "Enter a valid API key"}), 400
     api_key = api_key.strip()
