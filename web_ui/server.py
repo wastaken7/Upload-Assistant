@@ -2945,9 +2945,7 @@ _RELEASE_GROUP_OVERRIDE_FIELDS = (
 
 def _is_release_group_override_path(path: list[str]) -> bool:
     """Identify the complete DEFAULT or tracker-specific release-group mapping."""
-    return path == ["DEFAULT", "tag_overrides"] or (
-        len(path) == 3 and path[0] == "TRACKERS" and path[2] == "tag_overrides"
-    )
+    return path == ["DEFAULT", "tag_overrides"] or (len(path) == 3 and path[0] == "TRACKERS" and path[2] == "tag_overrides")
 
 
 def _validate_release_group_overrides(value: object) -> None:
@@ -3020,10 +3018,7 @@ def _build_config_items(
                 "source": "config" if key in user_dict else "example",
                 "children": [],
                 "help": help_text or comments_map.get("DEFAULT/tag_overrides", []),
-                "override_fields": [
-                    {"key": field, "help": comments_map.get(f"DEFAULT/{field}", [])}
-                    for field in _RELEASE_GROUP_OVERRIDE_FIELDS
-                ],
+                "override_fields": [{"key": field, "help": comments_map.get(f"DEFAULT/{field}", [])} for field in _RELEASE_GROUP_OVERRIDE_FIELDS],
             }
         elif isinstance(example_value, Mapping) or isinstance(user_value, Mapping):
             example_value = _as_dict(example_value) or {}
