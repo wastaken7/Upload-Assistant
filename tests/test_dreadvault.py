@@ -204,6 +204,45 @@ def test_dreadvault_omits_language_marker_when_audio_includes_english():
     assert name == "Example Movie 2001 1080p BluRay DD 5.1 x264-GRP"  # noqa: S101
 
 
+def test_dreadvault_adds_foreign_audio_language_to_a_dvdrip():
+    # The DVDRip template carries no resolution of its own, so a language pass that ran before the
+    # DVDRip branch had nothing to anchor to and dropped the marker (kainoa 2026-09-09).
+    meta = Meta(
+        name="Suicide Dolls 1999 NTSC DVD x264 DVDRip DD 2.0-GVXXI",
+        type="DVDRIP",
+        source="NTSC DVD",
+        resolution="480p",
+        audio="DD 2.0",
+        video_encode=" x264",
+        audio_languages=["Japanese"],
+        language_checked=True,
+    )
+
+    name = asyncio.run(_tracker().get_name(meta))["name"]
+
+    assert name == "Suicide Dolls 1999 JAPANESE 480p DVDRip DD 2.0 x264-GVXXI"  # noqa: S101
+
+
+def test_dreadvault_adds_foreign_audio_language_to_a_dvd_full_disc():
+    meta = Meta(
+        name="Hausu 1977 USA NTSC DVD DVD9 LPCM 2.0",
+        year=1977,
+        type="DISC",
+        is_disc="DVD",
+        source="NTSC DVD",
+        resolution="480p",
+        region="USA",
+        video_codec="MPEG-2",
+        audio="LPCM 2.0",
+        audio_languages=["Japanese"],
+        language_checked=True,
+    )
+
+    name = asyncio.run(_tracker().get_name(meta))["name"]
+
+    assert name.startswith("Hausu 1977 JAPANESE 480p USA NTSC DVD")  # noqa: S101
+
+
 def test_dreadvault_adds_foreign_audio_language_after_year_for_dvd_remux():
     meta = Meta(
         name="Example Movie 2001 PAL DVD REMUX DD 5.1-GRP",

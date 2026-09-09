@@ -70,17 +70,6 @@ class DreadVault(UNIT3D):
         if meta.no_year:
             year = ""
 
-        if not meta.language_checked:
-            await languages_manager.process_desc_language(meta, tracker=self.tracker)
-        audio_languages: list[str] = [] if not meta.audio_languages else meta.audio_languages
-        if audio_languages and not await languages_manager.has_english_language(audio_languages):
-            foreign_lang = audio_languages[0].upper()
-            if name_type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD"):
-                if year:
-                    dreadvault_name = dreadvault_name.replace(year, f"{year} {foreign_lang}", 1)
-            elif meta.is_disc != "BDMV":
-                dreadvault_name = dreadvault_name.replace(meta.resolution, f"{foreign_lang} {meta.resolution}", 1)
-
         if name_type == "DVDRIP":
             source = "DVDRip"
             dreadvault_name = dreadvault_name.replace(f"{meta.source} ", "", 1)
@@ -98,6 +87,20 @@ class DreadVault(UNIT3D):
         elif name_type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD"):
             dreadvault_name = dreadvault_name.replace(meta.source or "", f"{resolution} {meta.source}", 1)
             dreadvault_name = dreadvault_name.replace((meta.audio), f"{video_codec} {meta.audio}", 1)
+
+        # The marker goes immediately before the resolution, so it has to run AFTER the branches
+        # below: the DVDRip and DVD-disc templates carry no resolution of their own, and those
+        # branches are what insert it. Running first silently dropped the marker on both.
+        if not meta.language_checked:
+            await languages_manager.process_desc_language(meta, tracker=self.tracker)
+        audio_languages: list[str] = [] if not meta.audio_languages else meta.audio_languages
+        if audio_languages and not await languages_manager.has_english_language(audio_languages):
+            foreign_lang = audio_languages[0].upper()
+            if name_type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD"):
+                if year:
+                    dreadvault_name = dreadvault_name.replace(year, f"{year} {foreign_lang}", 1)
+            elif meta.is_disc != "BDMV":
+                dreadvault_name = dreadvault_name.replace(meta.resolution, f"{foreign_lang} {meta.resolution}", 1)
 
         if alt_title and year:
             dreadvault_name = dreadvault_name.replace(f"{year} {alt_title}", f"{alt_title} {year}", 1)
