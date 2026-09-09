@@ -1516,6 +1516,220 @@ def _string_list_preview_values(value: object) -> list[str]:
     return results
 
 
+def _format_preview_size(value: object) -> str:
+    """Return a compact binary size for a positive byte count."""
+    try:
+        size = int(value)
+    except TypeError, ValueError:
+        return ""
+    if size <= 0:
+        return ""
+    units = ("B", "KiB", "MiB", "GiB", "TiB")
+    amount = float(size)
+    for unit in units:
+        if amount < 1024 or unit == units[-1]:
+            precision = 0 if unit == "B" else 1
+            return f"{amount:.{precision}f} {unit}"
+        amount /= 1024
+    return ""
+
+
+def _preview_mapping_values(value: object) -> str:
+    if not isinstance(value, Mapping):
+        return ""
+    return ", ".join(
+        f"{_stringify_preview_value(key)}: {_stringify_preview_value(item)}" for key, item in value.items() if _stringify_preview_value(key) and _stringify_preview_value(item)
+    )
+
+
+def _preview_detail_item(key: str, label: str, value: object) -> dict[str, str] | None:
+    if isinstance(value, Mapping):
+        text = _preview_mapping_values(value)
+    elif isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+        text = ", ".join(_string_list_preview_values(value))
+    else:
+        text = _stringify_preview_value(value)
+    if not text:
+        return None
+    return {"key": key, "label": label, "value": text}
+
+
+def _preview_detail_section(key: str, label: str, rows: Sequence[tuple[str, str, object]]) -> dict[str, object] | None:
+    items = [item for item_key, item_label, value in rows if (item := _preview_detail_item(item_key, item_label, value))]
+    if not items:
+        return None
+    return {"key": key, "label": label, "items": items}
+
+
+def _extract_preview_detail_sections(meta_data: Mapping[str, object], music: Mapping[str, object]) -> list[dict[str, object]]:
+    """Build ordered, display-safe detail groups for the execution preview."""
+    category = _stringify_preview_value(meta_data.get("category")).upper()
+    filelist = meta_data.get("filelist")
+    file_count = len(filelist) if isinstance(filelist, Sequence) and not isinstance(filelist, (str, bytes, bytearray)) else 0
+    video_codec = _stringify_preview_value(meta_data.get("video_codec")) or _stringify_preview_value(meta_data.get("video_encode"))
+
+    sections: list[dict[str, object]] = []
+    media_section = _preview_detail_section(
+        "media",
+        "Media",
+        (
+            ("type", "Type", meta_data.get("type")),
+            ("source", "Source", meta_data.get("source")),
+            ("resolution", "Resolution", meta_data.get("resolution")),
+            ("container", "Container", meta_data.get("container")),
+            ("video_codec", "Video", video_codec),
+            ("audio", "Audio", meta_data.get("audio")),
+            ("audio_languages", "Audio Languages", meta_data.get("audio_languages")),
+            ("subtitle_languages", "Subtitles", meta_data.get("subtitle_languages")),
+            ("size", "Size", _format_preview_size(meta_data.get("source_size"))),
+            ("files", "Files", file_count or ""),
+        ),
+    )
+    if media_section:
+        sections.append(media_section)
+
+    if category == "MOVIE":
+        category_section = _preview_detail_section(
+            "movie",
+            "Movie Details",
+            (
+                ("release_date", "Release Date", meta_data.get("release_date")),
+                ("edition", "Edition", meta_data.get("edition")),
+                ("directors", "Director", meta_data.get("directors")),
+                ("studios", "Studio", meta_data.get("studios")),
+                ("cast", "Cast", meta_data.get("cast")),
+                ("original_language", "Original Language", meta_data.get("original_language")),
+                ("country", "Country", meta_data.get("origin_country") or meta_data.get("origin_country_code")),
+            ),
+        )
+    elif category == "TV":
+        episode = _stringify_preview_value(meta_data.get("episode_title")) or _stringify_preview_value(meta_data.get("episode_name"))
+        episode_code = "".join(
+            value for value in (_stringify_preview_value(meta_data.get("season")), _stringify_preview_value(meta_data.get("episode"))) if value not in {"", "0"}
+        )
+        episode_display = " — ".join(value for value in (episode_code, episode) if value)
+        tv_pack_raw = _stringify_preview_value(meta_data.get("tv_pack")).lower()
+        package = "Season Pack" if tv_pack_raw not in ("", "0", "false", "none", "null") else "Single Episode"
+        category_section = _preview_detail_section(
+            "tv",
+            "TV Details",
+            (
+                ("episode", "Episode", episode_display),
+                ("package", "Package", package),
+                ("season_name", "Season", meta_data.get("season_name") or meta_data.get("tvdb_season_name")),
+                ("air_date", "Air Date", meta_data.get("episode_airdate")),
+                ("service", "Service", meta_data.get("service_longname")),
+                ("networks", "Network", meta_data.get("networks")),
+            ),
+        )
+    elif category == "BOOK":
+        series = _stringify_preview_value(meta_data.get("book_series"))
+        series_index = _stringify_preview_value(meta_data.get("book_series_index"))
+        series_display = f"{series} #{series_index}" if series and series_index else series
+        bitrate = _stringify_preview_value(meta_data.get("audiobook_bitrate"))
+        if bitrate.isdigit():
+            bitrate = f"{bitrate} kbps"
+        category_section = _preview_detail_section(
+            "book",
+            "Book Details",
+            (
+                ("author", "Author", meta_data.get("author") or meta_data.get("book_author")),
+                ("narrator", "Narrator", meta_data.get("narrator")),
+                ("translator", "Translator", meta_data.get("book_translator")),
+                ("series", "Series", series_display),
+                ("publisher", "Publisher", meta_data.get("publisher") or meta_data.get("book_publisher")),
+                ("language", "Language", meta_data.get("book_language")),
+                ("isbn", "ISBN", meta_data.get("isbn") or meta_data.get("book_isbn")),
+                ("asin", "ASIN", meta_data.get("asin") or meta_data.get("book_asin")),
+                ("format", "Format", "Audiobook" if bool(meta_data.get("audiobook")) else "Book"),
+                ("duration", "Duration", meta_data.get("audiobook_duration_formatted")),
+                ("bitrate", "Bitrate", bitrate),
+            ),
+        )
+    elif category == "MUSIC":
+
+        def music_value(name: str, source_name: str = "") -> str:
+            value = _stringify_preview_value(music.get(name))
+            source = _stringify_preview_value(music.get(source_name)) if source_name else ""
+            return f"{value} ({source})" if value and source else value
+
+        track_count = _stringify_preview_value(music.get("track_count"))
+        disc_count = _stringify_preview_value(music.get("disc_count"))
+        tracks_discs = f"{track_count or '?'} / {disc_count or '1'}" if track_count or disc_count else ""
+        release = " • ".join(
+            value
+            for value in (
+                _stringify_preview_value(music.get("release_year")),
+                _stringify_preview_value(music.get("retail_date")),
+                _stringify_preview_value(music.get("release_label")),
+                _stringify_preview_value(music.get("release_catalogue_number")),
+            )
+            if value
+        )
+        edition = " • ".join(value for value in (_stringify_preview_value(music.get("edition")), _stringify_preview_value(music.get("edition_year"))) if value)
+        category_section = _preview_detail_section(
+            "music",
+            "Music Details",
+            (
+                ("artist", "Artist", music_value("artist", "artist_source")),
+                ("album", "Album", music_value("album", "album_source")),
+                ("original_year", "Original Year", music_value("original_year", "year_source")),
+                ("release_type", "Release Type", music_value("release_type", "release_type_source")),
+                ("media", "Media", music_value("media", "media_source")),
+                ("technical", "Technical", music.get("technical")),
+                ("tracks_discs", "Tracks / Discs", tracks_discs),
+                ("release", "This Release", release),
+                ("edition", "Edition", edition),
+                ("auxiliary", "Auxiliary Files", music.get("auxiliary")),
+                ("conflicts", "Metadata Conflicts", music.get("conflicts")),
+            ),
+        )
+    elif category == "GAME":
+        edition = " • ".join(
+            value
+            for value in (
+                _stringify_preview_value(meta_data.get("game_release_edition")),
+                _stringify_preview_value(meta_data.get("game_release_edition_year")),
+            )
+            if value
+        )
+        category_section = _preview_detail_section(
+            "game",
+            "Game Details",
+            (
+                ("platform", "Platform", meta_data.get("platform")),
+                ("release_type", "Release Type", meta_data.get("game_subcategory") or meta_data.get("game_release_type")),
+                ("version", "Version", meta_data.get("game_version")),
+                ("edition", "Edition", edition),
+                ("developer", "Developer", meta_data.get("developer")),
+                ("publisher", "Publisher", meta_data.get("publisher")),
+                ("region", "Region", meta_data.get("game_region")),
+                ("system", "System", meta_data.get("game_system")),
+                ("release_date", "Release Date", meta_data.get("igdb_first_release_date")),
+                ("engines", "Engine", meta_data.get("game_engines")),
+                ("modes", "Modes", meta_data.get("game_modes")),
+                ("age_ratings", "Age Rating", meta_data.get("game_age_ratings")),
+            ),
+        )
+    elif category == "XXX":
+        category_section = _preview_detail_section(
+            "xxx",
+            "Release Details",
+            (
+                ("publisher", "Studio / Publisher", meta_data.get("publisher")),
+                ("studios", "Studio", meta_data.get("studios")),
+                ("release_date", "Release Date", meta_data.get("release_date")),
+                ("performers", "Performers", meta_data.get("cast")),
+            ),
+        )
+    else:
+        category_section = None
+
+    if category_section:
+        sections.append(category_section)
+    return sections
+
+
 def _book_cover_from_meta(meta_data: Mapping[str, object], preview_session_id: str) -> str:
     covers_value = meta_data.get("covers")
     if isinstance(covers_value, Sequence) and not isinstance(covers_value, (str, bytes, bytearray)):
@@ -1695,6 +1909,8 @@ def _extract_metadata_sources(meta_data: Mapping[str, object]) -> list[MetadataS
         or _stringify_preview_value(meta_data.get("openlibrary_book_id"))
     )
     isbn_value = _stringify_preview_value(meta_data.get("isbn"))
+    asin_value = _stringify_preview_value(meta_data.get("asin")) or _stringify_preview_value(meta_data.get("book_asin"))
+    audible_url = _stringify_preview_value(meta_data.get("audible_url"))
 
     sources: list[MetadataSource] = []
     seen_keys: set[str] = set()
@@ -1802,6 +2018,16 @@ def _extract_metadata_sources(meta_data: Mapping[str, object]) -> list[MetadataS
             "google_books",
             "Google Books",
             isbn_value,
+        )
+
+    if category == "BOOK" and asin_value:
+        _append_metadata_source(
+            sources,
+            seen_keys,
+            "audible",
+            "Audible",
+            asin_value,
+            audible_url if _is_http_url(audible_url) else "",
         )
 
     if category == "MUSIC":
@@ -1965,6 +2191,7 @@ def _extract_execution_preview(meta_data: Mapping[str, object], fallback_path: s
     if not poster_url and tmdb_poster:
         poster_url = tmdb_poster if tmdb_poster.startswith("http") else f"https://image.tmdb.org/t/p/w500{tmdb_poster}"
     music = _music_preview_from_meta(meta_data)
+    detail_sections = _extract_preview_detail_sections(meta_data, music)
     genres = _string_list_preview_values(meta_data.get("genres")) or list(music.get("genres", []))
     networks = _string_list_preview_values(meta_data.get("networks"))
     audiobook_bitrate = _stringify_preview_value(meta_data.get("audiobook_bitrate"))
@@ -2016,6 +2243,7 @@ def _extract_execution_preview(meta_data: Mapping[str, object], fallback_path: s
         "game_system": _stringify_preview_value(meta_data.get("game_system")),
         "developer": _stringify_preview_value(meta_data.get("developer")),
         "music": music,
+        "detail_sections": detail_sections,
         "awaiting_input": False,
         "input_type": None,
     }
@@ -2093,6 +2321,7 @@ def _find_execution_preview(session_id: str) -> ExecutionPreview | None:
         "game_system": "",
         "developer": "",
         "music": {},
+        "detail_sections": [],
         "awaiting_input": bool(process_info.get("awaiting_input")),
         "input_type": process_info.get("input_type"),
         "progress": _progress_items_for_process(process_info),
@@ -2234,6 +2463,18 @@ class MetadataSource(TypedDict, total=False):
     url: str
 
 
+class PreviewDetailItem(TypedDict):
+    key: str
+    label: str
+    value: str
+
+
+class PreviewDetailSection(TypedDict):
+    key: str
+    label: str
+    items: list[PreviewDetailItem]
+
+
 class ProgressItem(TypedDict, total=False):
     id: str
     label: str
@@ -2292,6 +2533,7 @@ class ExecutionPreview(TypedDict, total=False):
     game_system: str
     developer: str
     music: dict[str, object]
+    detail_sections: list[PreviewDetailSection]
     awaiting_input: bool
     input_type: str | None
     progress: list[ProgressItem]

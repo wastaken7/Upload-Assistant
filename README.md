@@ -66,6 +66,10 @@ This branch introduces new media categories and automation features not present 
   - **Discogs & MusicBrainz APIs**: Optionally queries external APIs (Discogs via release/master ID or URL, and MusicBrainz) for metadata enrichment.
   - **Artwork & Cover Extraction**: Automatically searches for local cover images or extracts embedded artwork from FLAC/MP3/M4A tags to upload to image hosts.
   - **Preflight & Rule Validation**: Enforces mechanical validation for audio formats, sample/bit rates, track counts, and hybrid setups before uploading.
+- **Adult Video (`XXX` Category)**:
+  - **Automatic Detection & Metadata**: Recognizes supported adult-platform release names, extracts common title, studio, and date fields, and builds descriptive keywords.
+  - **Contact Sheets & Artwork**: Generates one configurable contact sheet per video and creates a fallback cover from the source when artwork is not supplied.
+  - **Workflow Guide**: See the dedicated [XXX category upload guide](docs/xxx-upload.md) for naming, overrides, WebUI usage, and supported destinations.
 
 ### 2. Audio Stream Spectrogram Generation
 
