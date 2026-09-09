@@ -173,6 +173,37 @@ def test_dreadvault_adds_foreign_audio_language_before_encode_resolution():
     assert name == "Example Movie 2001 JAPANESE 1080p BluRay DD 5.1 x264-GRP"  # noqa: S101
 
 
+def test_dreadvault_adds_foreign_audio_language_before_source_when_resolution_is_other():
+    meta = Meta(
+        name="Example Movie 2001 BluRay DD 5.1 x264-GRP",
+        type="ENCODE",
+        source="BluRay",
+        resolution="OTHER",
+        audio_languages=["Japanese"],
+        language_checked=True,
+    )
+
+    name = asyncio.run(_tracker().get_name(meta))["name"]
+
+    assert name == "Example Movie 2001 JAPANESE BluRay DD 5.1 x264-GRP"  # noqa: S101
+
+
+def test_dreadvault_never_prepends_foreign_audio_language_when_resolution_is_empty():
+    meta = Meta(
+        name="Example Movie 2001 BluRay DD 5.1 x264-GRP",
+        type="ENCODE",
+        source="BluRay",
+        resolution="",
+        audio_languages=["Japanese"],
+        language_checked=True,
+    )
+
+    name = asyncio.run(_tracker().get_name(meta))["name"]
+
+    assert not name.startswith("JAPANESE ")  # noqa: S101
+    assert "JAPANESE BluRay" in name or "JAPANESE" not in name  # noqa: S101
+
+
 def test_dreadvault_omits_foreign_audio_language_from_bdmv_disc():
     meta = Meta(
         name="Example Movie 2001 1080p BluRay AVC DD 5.1-GRP",
