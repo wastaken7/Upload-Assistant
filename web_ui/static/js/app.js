@@ -2400,6 +2400,10 @@ function AudionutsUAGUI() {
   const fileBrowserSearchTimer = useRef(null);
   const fileBrowserSearchQuery = useRef("");
 
+  // Preserve the desktop file browser scroll position while the
+  // browser is temporarily unmounted or rerendered.
+  const fileBrowserScrollTopRef = useRef(0);
+
   // Folder loading states
   const [loadingFolders, setLoadingFolders] = useState(new Set());
 
@@ -7128,6 +7132,16 @@ function AudionutsUAGUI() {
                 </div>
                 {renderSelectAllBar()}
                 <div
+                  ref={(node) => {
+                    if (!node) return;
+                    requestAnimationFrame(() => {
+                      node.scrollTop = fileBrowserScrollTopRef.current;
+                    });
+                  }}
+                  onScroll={(event) => {
+                    fileBrowserScrollTopRef.current =
+                      event.currentTarget.scrollTop;
+                  }}
                   className={`${hasDescFile && !descBrowserCollapsed ? "flex-1 max-h-[50%]" : "flex-1"} overflow-y-auto`}
                 >
                   {fileBrowserSearch ? (
