@@ -114,14 +114,14 @@ def test_dreadvault_formats_dvdrip_with_resolution_and_encode_after_audio():
         type="DVDRIP",
         source="PAL DVD",
         resolution="480p",
-        video_encode="x264",
+        video_encode=" x264",
         audio="DD 2.0",
         language_checked=True,
     )
 
     name = asyncio.run(_tracker().get_name(meta))["name"]
 
-    assert "480p DVDRip" in name and name.index("DD 2.0") < name.index("x264")  # noqa: S101
+    assert name == "Example Movie 2001 480p DVDRip DD 2.0 x264-GRP"  # noqa: S101
 
 
 def test_dreadvault_formats_dvd_disc_with_resolution_codec_region_and_source():
