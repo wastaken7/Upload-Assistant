@@ -2544,6 +2544,7 @@ function ConfigLeafEditor({
   onBrowseFolder,
   onValueChange,
   inputAction,
+  labelStatus,
 }) {
   const path = [...pathParts, item.key];
   const fieldId = path.join("--");
@@ -3772,22 +3773,25 @@ function ConfigLeafEditor({
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center gap-2">
-        <label htmlFor={fieldId} className={labelClass}>
-          {displayLabel}
-        </label>
-        {credentialHelp?.required && (
-          <span className="ua-config-required-badge border font-semibold">
-            Required
-          </span>
-        )}
-        {helpText && !credentialHelp && (
-          <Tooltip content={helpText}>
-            <InfoIcon
-              className={`w-4 h-4 ${isDarkMode ? "text-gray-400 hover:text-gray-300" : "text-gray-500 hover:text-gray-600"}`}
-            />
-          </Tooltip>
-        )}
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <div className="flex items-center gap-2">
+          <label htmlFor={fieldId} className={labelClass}>
+            {displayLabel}
+          </label>
+          {credentialHelp?.required && (
+            <span className="ua-config-required-badge border font-semibold">
+              Required
+            </span>
+          )}
+          {helpText && !credentialHelp && (
+            <Tooltip content={helpText}>
+              <InfoIcon
+                className={`w-4 h-4 ${isDarkMode ? "text-gray-400 hover:text-gray-300" : "text-gray-500 hover:text-gray-600"}`}
+              />
+            </Tooltip>
+          )}
+        </div>
+        {labelStatus}
       </div>
       <div
         className={
@@ -5351,24 +5355,24 @@ function ApiKeyExpiryStatus({
           )}
           {checking ? "Checking…" : "Check"}
         </button>,
+        <div
+          className={`ml-auto min-w-0 max-w-full text-xs ${tone}`}
+          role="status"
+          aria-label="API key status"
+        >
+          <Tooltip content={details}>
+            <span
+              tabIndex={0}
+              aria-label={details}
+              className="border-b border-dotted border-current"
+            >
+              {isDraft && "Draft · "}
+              {feedback && !feedback.error && "✓ Accepted · "}
+              {apiKeyExpiryLabel(expiry, true)}
+            </span>
+          </Tooltip>
+        </div>,
       )}
-      <div
-        className={`text-xs ${tone}`}
-        role="status"
-        aria-label="API key status"
-      >
-        <Tooltip content={details}>
-          <span
-            tabIndex={0}
-            aria-label={details}
-            className="inline-flex flex-wrap items-center gap-x-1 border-b border-dotted border-current"
-          >
-            {isDraft && "Draft · "}
-            {feedback && !feedback.error && "✓ Accepted · "}
-            {apiKeyExpiryLabel(expiry, true)}
-          </span>
-        </Tooltip>
-      </div>
       {feedback?.error && (
         <p className="text-xs text-red-500" role="alert">
           {feedback.message}
@@ -5519,7 +5523,7 @@ function TrackerSettings({
           <div className="p-4">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
               {group.items.map((item) => {
-                const renderField = (inputAction) => (
+                const renderField = (inputAction, labelStatus) => (
                   <ConfigLeaf
                     item={item}
                     pathParts={pathParts}
@@ -5531,6 +5535,7 @@ function TrackerSettings({
                     torrentClients={torrentClients}
                     onValueChange={onValueChange}
                     inputAction={inputAction}
+                    labelStatus={labelStatus}
                   />
                 );
                 return (
