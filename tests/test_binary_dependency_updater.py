@@ -1,4 +1,5 @@
 # ruff: noqa: S101
+import ast
 import hashlib
 import inspect
 import sys
@@ -14,6 +15,8 @@ from bin.get_bdinfo_docker import BDINFO_VERSION
 from bin.get_mkbrr import MkbrrBinaryManager
 from bin.get_nyuu import NyuuBinaryManager
 from scripts import update_binary_dependency as updater
+
+WORKFLOW_PATH = Path(__file__).parents[1] / ".github" / "workflows" / "update-binary-dependencies.yml"
 
 
 def _release(version: str, names: tuple[str, ...], *, digest: str | None = None) -> dict[str, object]:
@@ -32,6 +35,20 @@ def test_every_managed_dependency_has_a_repository_and_current_checksums() -> No
     assert DEPENDENCY_VERSIONS.keys() == DEPENDENCY_REPOSITORIES.keys() == updater.DEPENDENCY_SPECS.keys()
     for dependency, version in DEPENDENCY_VERSIONS.items():
         assert set(updater.DEPENDENCY_SPECS[dependency].assets(version)) <= SHA256_BY_ASSET.keys()
+    assert all(len(checksum) == 64 and set(checksum) <= set("0123456789abcdef") for checksum in SHA256_BY_ASSET.values())
+
+
+def test_every_managed_dependency_has_an_independent_pin_file() -> None:
+    assert updater.PIN_PATHS.keys() == updater.DEPENDENCY_SPECS.keys()
+    assert len(set(updater.PIN_PATHS.values())) == len(updater.DEPENDENCY_SPECS)
+
+
+def test_workflow_stages_only_independent_pin_files() -> None:
+    workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+    add_paths = workflow.split("          add-paths: |\n", 1)[1]
+    assert "bin/binary_dependency_pins/" in add_paths
+    assert "bin/binary_dependencies.py" not in add_paths
+    assert "bin/download_integrity.py" not in add_paths
 
 
 def test_asset_names_apply_upstream_version_formats() -> None:
@@ -149,48 +166,36 @@ def test_asset_checksum_rejects_malformed_digest() -> None:
 
 
 def test_current_version_is_a_no_op(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    versions = tmp_path / "versions.py"
-    checksums = tmp_path / "checksums.py"
-    versions.write_text("unchanged", encoding="utf-8")
-    checksums.write_text("unchanged", encoding="utf-8")
-    monkeypatch.setattr(updater, "VERSIONS_PATH", versions)
-    monkeypatch.setattr(updater, "CHECKSUMS_PATH", checksums)
+    pin = tmp_path / "ffmpeg.py"
+    pin.write_text("unchanged", encoding="utf-8")
+    monkeypatch.setitem(updater.PIN_PATHS, "ffmpeg", pin)
     monkeypatch.setattr(updater, "fetch_latest", lambda _dependency: (DEPENDENCY_VERSIONS["ffmpeg"], {}))
 
     assert updater.update_dependency("ffmpeg") == (False, DEPENDENCY_VERSIONS["ffmpeg"])
-    assert versions.read_text(encoding="utf-8") == "unchanged"
-    assert checksums.read_text(encoding="utf-8") == "unchanged"
+    assert pin.read_text(encoding="utf-8") == "unchanged"
 
 
 def test_update_replaces_version_and_complete_checksum_set(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    versions = tmp_path / "binary_dependencies.py"
-    checksums = tmp_path / "download_integrity.py"
-    versions.write_text(f'DEPENDENCY_VERSIONS = {{\n    "ffmpeg": "{DEPENDENCY_VERSIONS["ffmpeg"]}",\n}}\n', encoding="utf-8")
-    checksums.write_text(
-        f'SHA256_BY_ASSET = {{\n    "ffmpeg-{DEPENDENCY_VERSIONS["ffmpeg"]}-essentials_build.zip": "{"d" * 64}",\n    "keep": "{"e" * 64}",\n}}\n\n\ndef verify_downloaded_asset',
-        encoding="utf-8",
-    )
+    pin = tmp_path / "ffmpeg.py"
+    pin.write_text("old pin", encoding="utf-8")
     new_asset = "ffmpeg-10.0-essentials_build.zip"
     digest = "c" * 64
-    monkeypatch.setattr(updater, "VERSIONS_PATH", versions)
-    monkeypatch.setattr(updater, "CHECKSUMS_PATH", checksums)
+    monkeypatch.setitem(updater.PIN_PATHS, "ffmpeg", pin)
     monkeypatch.setattr(updater, "fetch_latest", lambda _dependency: ("10.0", {new_asset: {"name": new_asset, "digest": f"sha256:{digest}"}}))
 
     assert updater.update_dependency("ffmpeg") == (True, "10.0")
-    assert '"ffmpeg": "10.0"' in versions.read_text(encoding="utf-8")
-    checksum_content = checksums.read_text(encoding="utf-8")
-    assert new_asset in checksum_content
-    assert f"ffmpeg-{DEPENDENCY_VERSIONS['ffmpeg']}-essentials_build.zip" not in checksum_content
-    assert f'"keep": "{"e" * 64}"' in checksum_content
+    pin_content = pin.read_text(encoding="utf-8")
+    assert 'VERSION = "10.0"' in pin_content
+    assert f'REPOSITORY = "{DEPENDENCY_REPOSITORIES["ffmpeg"]}"' in pin_content
+    assert f'"{new_asset}": "{digest}"' in pin_content
+    assert "old pin" not in pin_content
+    ast.parse(pin_content)
 
 
 def test_validation_failure_does_not_write_files(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    versions = tmp_path / "versions.py"
-    checksums = tmp_path / "checksums.py"
-    versions.write_text("versions", encoding="utf-8")
-    checksums.write_text("checksums", encoding="utf-8")
-    monkeypatch.setattr(updater, "VERSIONS_PATH", versions)
-    monkeypatch.setattr(updater, "CHECKSUMS_PATH", checksums)
+    pin = tmp_path / "ffmpeg.py"
+    pin.write_text("unchanged", encoding="utf-8")
+    monkeypatch.setitem(updater.PIN_PATHS, "ffmpeg", pin)
 
     def fail(_dependency: str) -> tuple[str, dict[str, dict[str, object]]]:
         raise RuntimeError("missing required assets")
@@ -198,8 +203,7 @@ def test_validation_failure_does_not_write_files(tmp_path: Path, monkeypatch: py
     monkeypatch.setattr(updater, "fetch_latest", fail)
     with pytest.raises(RuntimeError, match="missing required assets"):
         updater.update_dependency("ffmpeg")
-    assert versions.read_text(encoding="utf-8") == "versions"
-    assert checksums.read_text(encoding="utf-8") == "checksums"
+    assert pin.read_text(encoding="utf-8") == "unchanged"
 
 
 def test_download_sha256_streams_content(monkeypatch: pytest.MonkeyPatch) -> None:

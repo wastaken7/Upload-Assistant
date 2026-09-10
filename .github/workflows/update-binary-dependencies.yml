@@ -62,5 +62,4 @@ jobs:
 
             This pull request was generated automatically.
           add-paths: |
-            bin/binary_dependencies.py
-            bin/download_integrity.py
+            bin/binary_dependency_pins/

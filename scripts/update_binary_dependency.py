@@ -12,14 +12,13 @@ import urllib.request
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from urllib.parse import quote, urlparse
 
 from bin.binary_dependencies import DEPENDENCY_REPOSITORIES, DEPENDENCY_VERSIONS
+from bin.binary_dependency_pins import PINS
 
-ROOT = Path(__file__).resolve().parents[1]
-VERSIONS_PATH = ROOT / "bin" / "binary_dependencies.py"
-CHECKSUMS_PATH = ROOT / "bin" / "download_integrity.py"
+PIN_PATHS = {dependency: pin.path for dependency, pin in PINS.items()}
 
 
 @dataclass(frozen=True)
@@ -106,10 +105,10 @@ DEPENDENCY_SPECS = {
 def _request_json(url: str) -> dict[str, Any]:
     request = urllib.request.Request(url, headers=_request_headers())  # noqa: S310 - fixed GitHub API URL
     with urllib.request.urlopen(request, timeout=60) as response:  # noqa: S310 - fixed GitHub API URL
-        payload = json.load(response)
+        payload: object = json.load(response)
     if not isinstance(payload, dict):
         raise RuntimeError("GitHub returned malformed release metadata")
-    return payload
+    return cast(dict[str, Any], payload)
 
 
 def _request_headers(*, authenticated: bool = True) -> dict[str, str]:
@@ -144,20 +143,19 @@ def fetch_latest(dependency: str) -> tuple[str, dict[str, dict[str, Any]]]:
     repository = DEPENDENCY_REPOSITORIES[dependency]
     release = _request_json(f"https://api.github.com/repos/{repository}/releases/latest")
     version = release.get("tag_name")
-    if (
-        not isinstance(version, str)
-        or not version
-        or "\n" in version
-        or "\r" in version
-        or release.get("draft") is not False
-        or release.get("prerelease") is not False
-    ):
+    if not isinstance(version, str) or not version or "\n" in version or "\r" in version or release.get("draft") is not False or release.get("prerelease") is not False:
         raise RuntimeError(f"{repository} did not return a valid stable release")
 
-    assets = release.get("assets")
-    if not isinstance(assets, list):
+    assets_payload: object = release.get("assets")
+    if not isinstance(assets_payload, list):
         raise RuntimeError(f"{repository} returned malformed release assets")
-    assets_by_name = {asset.get("name"): asset for asset in assets if isinstance(asset, dict) and isinstance(asset.get("name"), str)}
+    assets_by_name: dict[str, dict[str, Any]] = {}
+    for raw_asset in cast(list[object], assets_payload):
+        if not isinstance(raw_asset, dict):
+            continue
+        asset = cast(dict[str, Any], raw_asset)
+        if isinstance(name := asset.get("name"), str):
+            assets_by_name[name] = asset
     required = DEPENDENCY_SPECS[dependency].assets(version)
     missing = sorted(set(required) - assets_by_name.keys())
     if missing:
@@ -165,38 +163,15 @@ def fetch_latest(dependency: str) -> tuple[str, dict[str, dict[str, Any]]]:
     return version, {name: assets_by_name[name] for name in required}
 
 
-def _replace_version(content: str, dependency: str, old_version: str, new_version: str) -> str:
-    old_line = f'    "{dependency}": "{old_version}",'
-    new_line = f'    "{dependency}": "{new_version}",'
-    if content.count(old_line) != 1:
-        raise RuntimeError(f"Could not uniquely locate the {dependency} version pin")
-    return content.replace(old_line, new_line)
-
-
-def _replace_checksums(content: str, old_assets: tuple[str, ...], checksums: dict[str, str]) -> str:
-    start_marker = "SHA256_BY_ASSET = {\n"
-    end_marker = "}\n\n\ndef verify_downloaded_asset"
-    if content.count(start_marker) != 1 or content.count(end_marker) != 1:
-        raise RuntimeError("Could not locate the checksum table")
-    before, remainder = content.split(start_marker, 1)
-    old_table, after = remainder.split(end_marker, 1)
-    old_asset_set = set(old_assets)
-    retained_lines: list[str] = []
-    insertion_index: int | None = None
-    for line in old_table.splitlines(keepends=True):
-        match = re.fullmatch(r'    "([^"]+)": "[0-9a-f]+",\n?', line)
-        if match is None:
-            raise RuntimeError("The checksum table is malformed")
-        if match.group(1) in old_asset_set:
-            if insertion_index is None:
-                insertion_index = len(retained_lines)
-            continue
-        retained_lines.append(line)
-    if insertion_index is None:
-        raise RuntimeError("Could not locate the dependency's current checksum pins")
-    new_lines = [f'    "{name}": "{checksums[name]}",\n' for name in sorted(checksums, key=str.casefold)]
-    retained_lines[insertion_index:insertion_index] = new_lines
-    return f"{before}{start_marker}{''.join(retained_lines)}{end_marker}{after}"
+def _render_pin(dependency: str, version: str, checksums: dict[str, str]) -> str:
+    repository = DEPENDENCY_REPOSITORIES[dependency]
+    checksum_lines = "".join(f"    {json.dumps(name)}: {json.dumps(checksums[name])},\n" for name in sorted(checksums, key=str.casefold))
+    return (
+        f'"""Release and integrity pins for {dependency}."""\n\n'
+        f"VERSION = {json.dumps(version)}\n"
+        f"REPOSITORY = {json.dumps(repository)}\n"
+        f"SHA256_BY_ASSET = {{\n{checksum_lines}}}\n"
+    )
 
 
 def update_dependency(dependency: str) -> tuple[bool, str]:
@@ -206,16 +181,12 @@ def update_dependency(dependency: str) -> tuple[bool, str]:
         return False, latest_version
 
     checksums = {name: _asset_sha256(asset) for name, asset in assets.items()}
-    versions_content = VERSIONS_PATH.read_text(encoding="utf-8")
-    checksums_content = CHECKSUMS_PATH.read_text(encoding="utf-8")
-    updated_versions = _replace_version(versions_content, dependency, current_version, latest_version)
-    updated_checksums = _replace_checksums(checksums_content, DEPENDENCY_SPECS[dependency].assets(current_version), checksums)
+    pin_path = PIN_PATHS[dependency]
+    previous_content = pin_path.read_text(encoding="utf-8")
     try:
-        VERSIONS_PATH.write_text(updated_versions, encoding="utf-8")
-        CHECKSUMS_PATH.write_text(updated_checksums, encoding="utf-8")
+        pin_path.write_text(_render_pin(dependency, latest_version, checksums), encoding="utf-8")
     except Exception:
-        VERSIONS_PATH.write_text(versions_content, encoding="utf-8")
-        CHECKSUMS_PATH.write_text(checksums_content, encoding="utf-8")
+        pin_path.write_text(previous_content, encoding="utf-8")
         raise
     return True, latest_version
 
@@ -224,22 +195,17 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("dependency", choices=sorted(DEPENDENCY_SPECS))
     args = parser.parse_args()
-    previous_version = DEPENDENCY_VERSIONS[args.dependency]
-    changed, version = update_dependency(args.dependency)
-    result = {"changed": changed, "dependency": args.dependency, "version": version}
+    dependency = cast(str, args.dependency)
+    previous_version = DEPENDENCY_VERSIONS[dependency]
+    changed, version = update_dependency(dependency)
+    result: dict[str, str | bool] = {"changed": changed, "dependency": dependency, "version": version}
     print(json.dumps(result))
     if output_path := os.environ.get("GITHUB_OUTPUT"):
-        repository = DEPENDENCY_REPOSITORIES[args.dependency]
+        repository = DEPENDENCY_REPOSITORIES[dependency]
         release_url = f"https://github.com/{repository}/releases/tag/{quote(version, safe='')}"
-        asset_count = len(DEPENDENCY_SPECS[args.dependency].assets(version))
+        asset_count = len(DEPENDENCY_SPECS[dependency].assets(version))
         with Path(output_path).open("a", encoding="utf-8") as output:
-            output.write(
-                f"changed={str(changed).lower()}\n"
-                f"previous_version={previous_version}\n"
-                f"version={version}\n"
-                f"release_url={release_url}\n"
-                f"asset_count={asset_count}\n"
-            )
+            output.write(f"changed={str(changed).lower()}\nprevious_version={previous_version}\nversion={version}\nrelease_url={release_url}\nasset_count={asset_count}\n")
 
 
 if __name__ == "__main__":
