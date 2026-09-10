@@ -1,7 +1,7 @@
 """Pinned versions and upstream repositories for managed binary dependencies."""
 
 DEPENDENCY_VERSIONS = {
-    "7zip": "26.01",
+    "7zip": "26.03",
     "bdinfo": "v0.4.0",
     "dovi_tool": "2.3.3",
     "ffmpeg": "9.0.1",
