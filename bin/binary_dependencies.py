@@ -3,7 +3,7 @@
 DEPENDENCY_VERSIONS = {
     "7zip": "26.01",
     "bdinfo": "v0.4.0",
-    "dovi_tool": "2.3.3",
+    "dovi_tool": "2.3.4",
     "ffmpeg": "9.0.1",
     "hdr10plus_tool": "1.7.2",
     "mkbrr": "v1.24.0",
