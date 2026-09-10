@@ -8,6 +8,7 @@ from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 import httpx
+import pytest
 
 from src.args import Args
 from src.get_desc import DescriptionBuilder
@@ -480,9 +481,43 @@ def test_orpheus_uses_concrete_release_year_for_required_edition_year():
 
     payload = Orpheus({"TRACKERS": {"ORPHEUS": {}}}).build_upload_payload(Meta(category="MUSIC"), release)
 
-    assert payload["remaster"] == 1
+    assert payload["remaster"] == 0
     assert payload["remaster_year"] == "2026"
     assert not release.get("edition_year")
+
+
+def test_orpheus_rejects_mixed_audio_formats_when_building_payload():
+    release = MusicRelease(root=".")
+    release.tracks.extend(
+        [
+            AudioTrack(path="track.flac", relative_path="track.flac", format="FLAC", codec="FLAC"),
+            AudioTrack(path="track.mp3", relative_path="track.mp3", format="MP3", codec="MP3"),
+        ]
+    )
+    release.set_field("media", "WEB", MetadataSource.FILE_TAG, 1.0)
+
+    with pytest.raises(ValueError, match="exactly one audio format"):
+        Orpheus({"TRACKERS": {"ORPHEUS": {}}}).build_upload_payload(Meta(category="MUSIC"), release)
+
+
+def test_orpheus_marks_explicit_edition_metadata_as_remaster():
+    release = MusicRelease(root=".")
+    release.tracks.append(AudioTrack(path="track.flac", relative_path="track.flac", format="FLAC", codec="FLAC"))
+    for field, value in {
+        "artist": "Artist",
+        "artists": ["Artist"],
+        "album": "Album",
+        "year": "2020",
+        "media": "WEB",
+        "release_type": "Album",
+        "edition_year": "2024",
+    }.items():
+        release.set_field(field, value, MetadataSource.FILE_TAG, 1.0)
+
+    payload = Orpheus({"TRACKERS": {"ORPHEUS": {}}}).build_upload_payload(Meta(category="MUSIC"), release)
+
+    assert payload["remaster"] == 1
+    assert payload["remaster_year"] == "2024"
 
 
 def test_orpheus_request_match_is_title_artist_and_initial_year_aware():
