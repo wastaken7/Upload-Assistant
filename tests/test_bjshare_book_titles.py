@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 
-from src.trackers.bjshare import BJShare
+from src.trackers.GAZELLE.bjshare import BJShare
 from src.trackers.common import Common
 
 

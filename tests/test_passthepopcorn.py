@@ -1,4 +1,4 @@
-from src.trackers.passthepopcorn import PassThePopcorn
+from src.trackers.GAZELLE.passthepopcorn import PassThePopcorn
 
 
 def test_convert_bbcode_removes_unsupported_font_tags() -> None:

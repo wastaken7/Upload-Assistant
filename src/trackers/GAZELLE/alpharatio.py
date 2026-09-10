@@ -22,7 +22,7 @@ from src.trackers.common import Common
 
 class AlphaRatio:
     """
-    AR Private Torrent Tracker
+    AlphaRatio(AR) is a Private Torrent Tracker for 0DAY / GENERAL
     """
 
     auth_type = "cookies"

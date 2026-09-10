@@ -20,7 +20,7 @@ from src.manualpackage import ManualPackageManager
 from src.meta import Meta
 from src.qbitwait import Wait
 from src.rehostimages import check_tracker_image_hosts, has_restricted_image_hosts, select_common_image_host
-from src.trackers.passthepopcorn import PassThePopcorn
+from src.trackers.GAZELLE.passthepopcorn import PassThePopcorn
 from src.trackersetup import TrackerSetup
 
 type StatusDict = dict[str, Any]
