@@ -13,7 +13,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 
 from bin.binary_dependencies import DEPENDENCY_REPOSITORIES, DEPENDENCY_VERSIONS
 
@@ -144,7 +144,14 @@ def fetch_latest(dependency: str) -> tuple[str, dict[str, dict[str, Any]]]:
     repository = DEPENDENCY_REPOSITORIES[dependency]
     release = _request_json(f"https://api.github.com/repos/{repository}/releases/latest")
     version = release.get("tag_name")
-    if not isinstance(version, str) or not version or release.get("draft") is not False or release.get("prerelease") is not False:
+    if (
+        not isinstance(version, str)
+        or not version
+        or "\n" in version
+        or "\r" in version
+        or release.get("draft") is not False
+        or release.get("prerelease") is not False
+    ):
         raise RuntimeError(f"{repository} did not return a valid stable release")
 
     assets = release.get("assets")
@@ -217,12 +224,22 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("dependency", choices=sorted(DEPENDENCY_SPECS))
     args = parser.parse_args()
+    previous_version = DEPENDENCY_VERSIONS[args.dependency]
     changed, version = update_dependency(args.dependency)
     result = {"changed": changed, "dependency": args.dependency, "version": version}
     print(json.dumps(result))
     if output_path := os.environ.get("GITHUB_OUTPUT"):
+        repository = DEPENDENCY_REPOSITORIES[args.dependency]
+        release_url = f"https://github.com/{repository}/releases/tag/{quote(version, safe='')}"
+        asset_count = len(DEPENDENCY_SPECS[args.dependency].assets(version))
         with Path(output_path).open("a", encoding="utf-8") as output:
-            output.write(f"changed={str(changed).lower()}\nversion={version}\n")
+            output.write(
+                f"changed={str(changed).lower()}\n"
+                f"previous_version={previous_version}\n"
+                f"version={version}\n"
+                f"release_url={release_url}\n"
+                f"asset_count={asset_count}\n"
+            )
 
 
 if __name__ == "__main__":

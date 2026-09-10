@@ -43,10 +43,6 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: python -m scripts.update_binary_dependency "${{ matrix.dependency }}"
 
-      - name: Prepare empty pull request body
-        if: steps.update.outputs.changed == 'true'
-        run: touch "$RUNNER_TEMP/empty-pr-body.md"
-
       - name: Create or refresh pull request
         if: steps.update.outputs.changed == 'true'
         uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676 # v7
@@ -57,7 +53,14 @@ jobs:
           delete-branch: true
           commit-message: "chore(deps): update ${{ matrix.dependency }} to ${{ steps.update.outputs.version }}"
           title: "chore(deps): update ${{ matrix.dependency }} to ${{ steps.update.outputs.version }}"
-          body-path: ${{ runner.temp }}/empty-pr-body.md
+          body: |
+            Automated update of **${{ matrix.dependency }}** from `${{ steps.update.outputs.previous_version }}` to `${{ steps.update.outputs.version }}`.
+
+            - [Upstream release](${{ steps.update.outputs.release_url }})
+            - Required release assets verified: ${{ steps.update.outputs.asset_count }}
+            - SHA-256 integrity pins refreshed
+
+            This pull request was generated automatically.
           add-paths: |
             bin/binary_dependencies.py
             bin/download_integrity.py

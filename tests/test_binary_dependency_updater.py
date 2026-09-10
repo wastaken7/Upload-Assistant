@@ -1,15 +1,16 @@
 # ruff: noqa: S101
 import hashlib
 import inspect
+import sys
 from pathlib import Path
 
 import pytest
 
 from bin.binary_dependencies import DEPENDENCY_REPOSITORIES, DEPENDENCY_VERSIONS
 from bin.download_integrity import SHA256_BY_ASSET
+from bin.get_7z import SevenZipBinaryManager
 from bin.get_bdinfo import BDInfoBinaryManager
 from bin.get_bdinfo_docker import BDINFO_VERSION
-from bin.get_7z import SevenZipBinaryManager
 from bin.get_mkbrr import MkbrrBinaryManager
 from bin.get_nyuu import NyuuBinaryManager
 from scripts import update_binary_dependency as updater
@@ -105,6 +106,7 @@ def test_fetch_latest_accepts_a_complete_stable_release(monkeypatch: pytest.Monk
         {"tag_name": "", "draft": False, "prerelease": False, "assets": []},
         {"tag_name": "v2", "draft": True, "prerelease": False, "assets": []},
         {"tag_name": "v2", "draft": False, "prerelease": True, "assets": []},
+        {"tag_name": "v2\nchanged=true", "draft": False, "prerelease": False, "assets": []},
         {"tag_name": "v2", "draft": False, "prerelease": False, "assets": "invalid"},
     ],
 )
@@ -220,3 +222,20 @@ def test_download_sha256_streams_content(monkeypatch: pytest.MonkeyPatch) -> Non
     monkeypatch.setattr(updater.urllib.request, "urlopen", lambda *_args, **_kwargs: Response(content))
 
     assert updater._download_sha256("https://github.com/example/asset") == hashlib.sha256(content).hexdigest()
+
+
+def test_main_writes_pull_request_metadata_to_github_output(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    output_path = tmp_path / "github-output"
+    monkeypatch.setenv("GITHUB_OUTPUT", str(output_path))
+    monkeypatch.setattr(sys, "argv", ["update_binary_dependency.py", "ffmpeg"])
+    monkeypatch.setattr(updater, "update_dependency", lambda _dependency: (True, "10.0/test"))
+
+    updater.main()
+
+    assert output_path.read_text(encoding="utf-8") == (
+        "changed=true\n"
+        f"previous_version={DEPENDENCY_VERSIONS['ffmpeg']}\n"
+        "version=10.0/test\n"
+        f"release_url=https://github.com/{DEPENDENCY_REPOSITORIES['ffmpeg']}/releases/tag/10.0%2Ftest\n"
+        "asset_count=1\n"
+    )
