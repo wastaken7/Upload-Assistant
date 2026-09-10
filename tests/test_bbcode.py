@@ -28,6 +28,25 @@ def test_tracker_specific_formats_only_clamps_gazelle_descriptions() -> None:
     assert builder.tracker_specific_formats("HDTORRENTS", "[size=16]Text[/size]") == "[size=16]Text[/size]"
 
 
+def test_tracker_specific_formats_removes_image_resize_for_nexusphp_trackers() -> None:
+    builder = object.__new__(DescriptionBuilder)
+    description = "[img=450]https://example.test/image.jpg[/img]"
+
+    for tracker in (
+        "1PTBA",
+        "LAJIDUI",
+        "LEMONHD",
+        "LONGPT",
+        "PTCAFE",
+        "PTFANS",
+        "PTGTK",
+        "PTZONE",
+        "RAILGUNPT",
+        "XINGYUNGEPT",
+    ):
+        assert builder.tracker_specific_formats(tracker, description) == "[img]https://example.test/image.jpg[/img]"
+
+
 def test_clean_unit3d_description_removes_line_wrapped_align_center_signature() -> None:
     description = """Release notes
 [align=center]
