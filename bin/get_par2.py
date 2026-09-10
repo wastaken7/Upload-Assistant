@@ -36,7 +36,7 @@ class Par2BinaryManager:
         machine = platform.machine().lower()
         logger.debug(f"[blue]PAR2: Detected system: {system}, architecture: {machine}[/blue]")
 
-        # Strip 'v' from version for URLs if needed, but the tag is v1.4.0, while filenames have 1.4.0
+        # Release tags include "v", while asset filenames use the numeric version.
         v_num = version.lstrip("v")
 
         platform_map: dict[str, dict[str, dict[str, str]]] = {

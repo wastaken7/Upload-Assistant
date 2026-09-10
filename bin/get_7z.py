@@ -34,6 +34,7 @@ class SevenZipBinaryManager:
     async def ensure_7z_binary(base_dir: str | Path, version: str = DEPENDENCY_VERSIONS["7zip"]) -> str:
         system = platform.system().lower()
         machine = platform.machine().lower()
+        asset_version = version.replace(".", "")
         logger.debug(f"[blue]7-Zip: Detected system: {system}, architecture: {machine}[/blue]")
 
         platform_map: dict[str, dict[str, dict[str, str]]] = {
@@ -44,18 +45,18 @@ class SevenZipBinaryManager:
                 "arm64": {"file": "7zr.exe", "folder": "windows/arm64"},
             },
             "darwin": {
-                "arm64": {"file": "7z2601-mac.tar.xz", "folder": "macos/arm64"},
-                "x86_64": {"file": "7z2601-mac.tar.xz", "folder": "macos/x86_64"},
-                "amd64": {"file": "7z2601-mac.tar.xz", "folder": "macos/x86_64"},
+                "arm64": {"file": f"7z{asset_version}-mac.tar.xz", "folder": "macos/arm64"},
+                "x86_64": {"file": f"7z{asset_version}-mac.tar.xz", "folder": "macos/x86_64"},
+                "amd64": {"file": f"7z{asset_version}-mac.tar.xz", "folder": "macos/x86_64"},
             },
             "linux": {
-                "x86_64": {"file": "7z2601-linux-x64.tar.xz", "folder": "linux/amd64"},
-                "amd64": {"file": "7z2601-linux-x64.tar.xz", "folder": "linux/amd64"},
-                "arm64": {"file": "7z2601-linux-arm64.tar.xz", "folder": "linux/arm64"},
-                "aarch64": {"file": "7z2601-linux-arm64.tar.xz", "folder": "linux/arm64"},
-                "arm": {"file": "7z2601-linux-arm.tar.xz", "folder": "linux/arm"},
-                "armv7l": {"file": "7z2601-linux-arm.tar.xz", "folder": "linux/arm"},
-                "armv6l": {"file": "7z2601-linux-arm.tar.xz", "folder": "linux/arm"},
+                "x86_64": {"file": f"7z{asset_version}-linux-x64.tar.xz", "folder": "linux/amd64"},
+                "amd64": {"file": f"7z{asset_version}-linux-x64.tar.xz", "folder": "linux/amd64"},
+                "arm64": {"file": f"7z{asset_version}-linux-arm64.tar.xz", "folder": "linux/arm64"},
+                "aarch64": {"file": f"7z{asset_version}-linux-arm64.tar.xz", "folder": "linux/arm64"},
+                "arm": {"file": f"7z{asset_version}-linux-arm.tar.xz", "folder": "linux/arm"},
+                "armv7l": {"file": f"7z{asset_version}-linux-arm.tar.xz", "folder": "linux/arm"},
+                "armv6l": {"file": f"7z{asset_version}-linux-arm.tar.xz", "folder": "linux/arm"},
             },
         }
 

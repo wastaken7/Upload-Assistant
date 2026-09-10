@@ -9,7 +9,9 @@ from bin.binary_dependencies import DEPENDENCY_REPOSITORIES, DEPENDENCY_VERSIONS
 from bin.download_integrity import SHA256_BY_ASSET
 from bin.get_bdinfo import BDInfoBinaryManager
 from bin.get_bdinfo_docker import BDINFO_VERSION
+from bin.get_7z import SevenZipBinaryManager
 from bin.get_mkbrr import MkbrrBinaryManager
+from bin.get_nyuu import NyuuBinaryManager
 from scripts import update_binary_dependency as updater
 
 
@@ -43,6 +45,48 @@ def test_runtime_and_docker_paths_share_version_pins() -> None:
     assert BDINFO_VERSION == DEPENDENCY_VERSIONS["bdinfo"]
     assert inspect.signature(MkbrrBinaryManager.ensure_mkbrr_binary).parameters["version"].default == DEPENDENCY_VERSIONS["mkbrr"]
     assert inspect.signature(MkbrrBinaryManager.download_mkbrr_for_docker).parameters["version"].default == DEPENDENCY_VERSIONS["mkbrr"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("manager", "module", "version", "expected_asset"),
+    [
+        (SevenZipBinaryManager.ensure_7z_binary, "bin.get_7z", "30.04", "7z3004-linux-arm64.tar.xz"),
+        (NyuuBinaryManager.ensure_nyuu_binary, "bin.get_nyuu", "v9.8.7", "nyuu-v9.8.7-linux-amd64.tar.xz"),
+    ],
+)
+async def test_runtime_download_urls_derive_asset_names_from_version(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    manager: object,
+    module: str,
+    version: str,
+    expected_asset: str,
+) -> None:
+    urls: list[str] = []
+
+    class StopDownload(Exception):
+        pass
+
+    class Client:
+        async def __aenter__(self):  # type: ignore[no-untyped-def]
+            return self
+
+        async def __aexit__(self, *_args):  # type: ignore[no-untyped-def]
+            return None
+
+        def stream(self, _method: str, url: str, **_kwargs):  # type: ignore[no-untyped-def]
+            urls.append(url)
+            raise StopDownload("StopDownload")
+
+    machine = "arm64" if manager == SevenZipBinaryManager.ensure_7z_binary else "x86_64"
+    monkeypatch.setattr(f"{module}.platform.system", lambda: "Linux")
+    monkeypatch.setattr(f"{module}.platform.machine", lambda: machine)
+    monkeypatch.setattr(f"{module}.httpx.AsyncClient", lambda **_kwargs: Client())
+
+    with pytest.raises(Exception, match="StopDownload"):
+        await manager(tmp_path, version=version)  # type: ignore[operator]
+    assert urls[0].endswith(f"/{version}/{expected_asset}")
 
 
 def test_fetch_latest_accepts_a_complete_stable_release(monkeypatch: pytest.MonkeyPatch) -> None:
