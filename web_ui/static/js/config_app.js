@@ -5545,57 +5545,59 @@ function TrackerDefaultOverrides({
       className="ua-config-accordion overflow-hidden rounded-xl border"
       data-open={isOpen ? "true" : "false"}
     >
-      <div className="ua-config-accordion-trigger flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center">
-        <button
-          type="button"
-          onClick={() => setIsOpen((open) => !open)}
-          className="flex min-w-0 flex-1 items-center justify-between gap-4 text-left"
-          aria-expanded={isOpen}
-        >
-          <span className="min-w-0">
-            <span className="block text-sm font-semibold">
-              Tracker-Specific DEFAULT Overrides
-            </span>
-            <span className="ua-config-service-description mt-1 block text-xs font-normal">
-              {activeCount > 0
-                ? `${activeCount} ${activeCount === 1 ? "field overrides" : "fields override"} DEFAULT. All others inherit.`
-                : "All fields inherit DEFAULT settings."}
-            </span>
+      <button
+        type="button"
+        onClick={() => setIsOpen((open) => !open)}
+        className="ua-config-accordion-trigger flex w-full items-center justify-between gap-4 px-4 py-3 text-left"
+        aria-expanded={isOpen}
+      >
+        <span className="min-w-0">
+          <span className="block text-sm font-semibold">
+            Tracker-Specific DEFAULT Overrides
           </span>
-          <span className="ua-config-service-action shrink-0 text-xs font-medium">
-            {isOpen ? "Hide" : "Show"}
+          <span className="ua-config-service-description mt-1 block text-xs font-normal">
+            {activeCount > 0
+              ? `${activeCount} ${activeCount === 1 ? "field overrides" : "fields override"} DEFAULT. All others inherit.`
+              : "All fields inherit DEFAULT settings."}
           </span>
-        </button>
-        <div className="flex shrink-0 items-center justify-end gap-2">
-          <button
-            type="button"
-            className="ua-config-service-action rounded-md border px-2.5 py-1.5 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50"
-            aria-label={`Enable all DEFAULT overrides for ${pathParts[1]}`}
-            disabled={activeCount === items.length}
-            onClick={() => items.forEach((item) => setFieldEnabled(item, true))}
-          >
-            Enable all
-          </button>
-          <button
-            type="button"
-            className="ua-config-service-action rounded-md border px-2.5 py-1.5 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50"
-            aria-label={`Disable all DEFAULT overrides for ${pathParts[1]}`}
-            disabled={activeCount === 0}
-            onClick={() =>
-              items.forEach((item) => setFieldEnabled(item, false))
-            }
-          >
-            Disable all
-          </button>
-        </div>
-      </div>
+        </span>
+        <span className="ua-config-service-action shrink-0 text-xs font-medium">
+          {isOpen ? "Hide" : "Show"}
+        </span>
+      </button>
       {isOpen && (
         <div className="ua-config-accordion-panel space-y-5 border-t p-4">
-          <p className="ua-config-service-description text-xs leading-relaxed">
-            Tick a field to override DEFAULT for this tracker. Untick it to
-            restore inheritance when you save. Matching release group overrides
-            still take priority for description text.
-          </p>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <p className="ua-config-service-description min-w-0 flex-1 text-xs leading-relaxed">
+              Tick a field to override DEFAULT for this tracker. Untick it to
+              restore inheritance when you save. Matching release group
+              overrides still take priority for description text.
+            </p>
+            <div className="flex shrink-0 items-center justify-end gap-2">
+              <button
+                type="button"
+                className="ua-config-service-action rounded-md border px-2.5 py-1.5 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+                aria-label={`Enable all DEFAULT overrides for ${pathParts[1]}`}
+                disabled={activeCount === items.length}
+                onClick={() =>
+                  items.forEach((item) => setFieldEnabled(item, true))
+                }
+              >
+                Enable all
+              </button>
+              <button
+                type="button"
+                className="ua-config-service-action rounded-md border px-2.5 py-1.5 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+                aria-label={`Disable all DEFAULT overrides for ${pathParts[1]}`}
+                disabled={activeCount === 0}
+                onClick={() =>
+                  items.forEach((item) => setFieldEnabled(item, false))
+                }
+              >
+                Disable all
+              </button>
+            </div>
+          </div>
           {groups.map((group) => {
             const groupItems = group.keys
               .map((key) => itemByKey.get(key))
