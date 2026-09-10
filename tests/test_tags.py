@@ -52,3 +52,12 @@ async def test_release_group_after_dts_hd_audio_is_preserved():
     tag = await get_tag(filename, Meta(category="MOVIE", uuid=filename))
 
     assert tag == "-GROUP"
+
+
+@pytest.mark.asyncio
+async def test_long_release_group_is_preserved_without_scene_detection():
+    filename = "The.Movie.2011.1080p.WEB-DL.DD2.0.H.264-10GaugeSlugBlaster.mkv"
+
+    tag = await get_tag(filename, Meta(category="MOVIE", uuid=filename))
+
+    assert tag == "-10GaugeSlugBlaster"

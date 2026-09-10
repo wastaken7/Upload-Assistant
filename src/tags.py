@@ -112,11 +112,8 @@ async def get_tag(video: str, meta: Meta, season_pack_check: bool = False) -> st
                             if merged and (merged in title_norm or merged in author_norm):
                                 release_group = None
 
-            if release_group:
-                if "Z0N3" in release_group:
-                    release_group = release_group.replace("Z0N3", "D-Z0N3")
-                if not meta.scene and len(release_group) > 12:
-                    release_group = None
+            if release_group and "Z0N3" in release_group:
+                release_group = release_group.replace("Z0N3", "D-Z0N3")
             logger.debug(f"Non-anime regex match: {release_group}")
 
     # If regex patterns didn't work, fall back to guessit
