@@ -14,7 +14,7 @@ from src.imdb import imdb_manager
 from src.meta import Meta
 from src.metadata_searching import get_douban_id
 from src.trackers.AVISTAZ.routing import AvistaZNetworkRouter
-from src.trackers.passthepopcorn import PassThePopcorn
+from src.trackers.GAZELLE.passthepopcorn import PassThePopcorn
 from src.trackersetup import TrackerSetup, tracker_class_map
 from src.uphelper import UploadHelper
 

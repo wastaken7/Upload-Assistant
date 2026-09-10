@@ -844,7 +844,8 @@ class PassThePopcorn:
         desc = desc.replace("[ul]", "").replace("[/ul]", "")
         desc = desc.replace("[ol]", "").replace("[/ol]", "")
         desc = re.sub(r"\[(?:font(?:=[^\]]*)?|/font)\]", "", desc, flags=re.IGNORECASE)
-        return re.sub(r"\[img=[^\]]+\]", "[img]", desc)
+        desc = re.sub(r"\[img=[^\]]+\]", "[img]", desc)
+        return BBCODE().clamp_size_tags(desc)
 
     async def edit_desc(self, meta: Meta) -> None:
         from src.description_review import get_base_description

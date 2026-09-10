@@ -146,7 +146,7 @@ While an upload is active, the workspace changes from setup controls to live run
 - The page header shows the current state and selected path.
 - **Execution Output** streams the Upload Assistant console.
 - **Binary Progress** reports progress from external tools when available.
-- **Now Processing** shows the current media poster, identifiers, technical details, overview, and source path when metadata is available.
+- **Now Processing** uses a poster-first live summary with provider identifiers, technical release details, overview, and category-specific metadata for movies, TV, books, music, games, and adult releases.
 - **Kill** terminates the active run.
 
 ### Generated screenshots

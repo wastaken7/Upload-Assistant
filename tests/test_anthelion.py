@@ -4,7 +4,8 @@ from types import SimpleNamespace
 
 import httpx
 
-from src.trackers.anthelion import Anthelion
+from src.meta import Meta
+from src.trackers.GAZELLE.anthelion import Anthelion
 
 
 class _Response:
@@ -82,7 +83,7 @@ def _tracker(monkeypatch) -> Anthelion:
     monkeypatch.setattr(tracker, "get_tags", lambda _meta: asyncio.sleep(0, result=[]))
     monkeypatch.setattr(tracker, "get_release_group", lambda _meta: asyncio.sleep(0, result=""))
     monkeypatch.setattr(tracker, "edit_desc", lambda _meta: asyncio.sleep(0, result="description"))
-    monkeypatch.setattr("src.trackers.anthelion.httpx.AsyncClient", _Client)
+    monkeypatch.setattr("src.trackers.GAZELLE.anthelion.httpx.AsyncClient", _Client)
     return tracker
 
 
@@ -112,3 +113,46 @@ def test_anthelion_imdb_tags_are_not_marked_as_manual() -> None:
 
     assert asyncio.run(tracker.get_tags(meta)) == ["action"]  # noqa: S101
     assert meta.ant_user_tags is False  # noqa: S101
+
+
+def test_anthelion_normalizes_and_filters_tmdb_genres() -> None:
+    meta = SimpleNamespace(genres=["Science Fiction", "Action", "Not A Tracker Tag"], imdb_info={}, ant_user_tags=True)
+    tracker = object.__new__(Anthelion)
+    tracker.tracker = "ANTHELION"
+
+    assert asyncio.run(tracker.get_tags(meta)) == ["sci.fi", "action"]  # noqa: S101
+    assert meta.ant_user_tags is False  # noqa: S101
+
+
+def test_anthelion_duplicate_search_uses_discovered_imdb_id(monkeypatch) -> None:
+    class SearchResponse:
+        @staticmethod
+        def raise_for_status() -> None:
+            return None
+
+        @staticmethod
+        def json():
+            return {"item": []}
+
+    class SearchClient:
+        params = None
+
+        def __init__(self, **_kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_args):
+            return None
+
+        async def get(self, **kwargs):
+            type(self).params = kwargs["params"]
+            return SearchResponse()
+
+    monkeypatch.setattr("src.trackers.GAZELLE.anthelion.httpx.AsyncClient", SearchClient)
+    tracker = Anthelion({"TRACKERS": {"ANTHELION": {"api_key": "secret"}}})
+    meta = Meta(tmdb=None, imdb_id=7654321, imdb="stale", resolution="1080p")
+
+    assert asyncio.run(tracker.search_existing(meta)) == []  # noqa: S101
+    assert SearchClient.params["imdbid"] == "7654321"  # noqa: S101

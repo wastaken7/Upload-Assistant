@@ -472,6 +472,8 @@ class Orpheus:
         if not media:
             raise ValueError("Orpheus media/source must be provided; the analyzer will not guess it.")
         image_url = self._cover_url(meta)
+        if len(release.formats) != 1:
+            raise ValueError("Orpheus uploads must contain exactly one audio format.")
         format_name = next(iter(release.formats))
         bitrate, other_bitrate, vbr = self._encoding(release, format_name)
         year = str(release.get("year", ""))
@@ -485,7 +487,7 @@ class Orpheus:
         # release/edition distinction intact and only derive this tracker form
         # value at the adapter boundary.
         edition_year = self._edition_year_for_upload(release)
-        is_remaster = bool(edition_year or release.get("edition"))
+        is_remaster = bool(release.get("edition") or release.get("edition_year") or edition_label or edition_catalogue)
         payload: dict[str, str | list[str] | list[int] | int] = {
             "album_desc": self._album_description(release),
             "artists[]": artists,
