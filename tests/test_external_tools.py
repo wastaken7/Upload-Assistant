@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from bin.binary_dependencies import DEPENDENCY_VERSIONS
 from src import external_tools
 
 
@@ -41,6 +42,21 @@ def test_regular_mediainfo_is_reported_as_automatic_before_download(tmp_path: Pa
 
     assert statuses["mediainfo_path"]["state"] == "automatic"
     assert "26.05" in statuses["mediainfo_path"]["message"]
+
+
+def test_managed_tool_status_uses_centralized_versions(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(external_tools, "_host", lambda: ("windows", "x86_64"))
+    monkeypatch.setitem(DEPENDENCY_VERSIONS, "ffmpeg", "10.2")
+    monkeypatch.setitem(DEPENDENCY_VERSIONS, "bdinfo", "v3.4.5")
+
+    ffmpeg = external_tools._managed_paths("ffmpeg_path", tmp_path, tmp_path)[0]
+    bdinfo = external_tools._managed_paths("bdinfo_path", tmp_path, tmp_path)[0]
+
+    assert ffmpeg[1] == ffmpeg[0].parent / "version_10.2"
+    assert ffmpeg[2] == "10.2"
+    assert bdinfo[1] == bdinfo[0].parent / "v3.4.5"
+    assert bdinfo[2] == "3.4.5"
+    assert "10.2" in external_tools._automatic_message("ffmpeg_path")
 
 
 def test_managed_dvd_mediainfo_uses_separate_legacy_version(tmp_path: Path, monkeypatch) -> None:

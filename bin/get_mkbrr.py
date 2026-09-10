@@ -11,6 +11,7 @@ from typing import ClassVar
 import aiofiles
 import httpx
 
+from bin.binary_dependencies import DEPENDENCY_VERSIONS
 from bin.download_integrity import verify_downloaded_asset
 
 try:
@@ -77,7 +78,7 @@ class MkbrrBinaryManager:
         return shutil.which("mkbrr")
 
     @staticmethod
-    async def ensure_mkbrr_binary(base_dir: str | Path, version: str) -> str:
+    async def ensure_mkbrr_binary(base_dir: str | Path, version: str = DEPENDENCY_VERSIONS["mkbrr"]) -> str:
         existing_binary = MkbrrBinaryManager.find_existing_binary(base_dir, version)
         if existing_binary:
             return existing_binary
@@ -235,7 +236,7 @@ class MkbrrBinaryManager:
             raise Exception(f"Failed to extract mkbrr binary: {e}") from e
 
     @staticmethod
-    def download_mkbrr_for_docker(base_dir: str | Path = ".", version: str = "v1.18.0") -> str:
+    def download_mkbrr_for_docker(base_dir: str | Path = ".", version: str = DEPENDENCY_VERSIONS["mkbrr"]) -> str:
         """Download mkbrr binary for Docker/Linux - synchronous version."""
         system = platform.system().lower()
         machine = platform.machine().lower()

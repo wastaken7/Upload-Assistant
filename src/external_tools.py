@@ -16,6 +16,8 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+from bin.binary_dependencies import DEPENDENCY_VERSIONS
+
 EXTERNAL_TOOL_KEYS = (
     "ffmpeg_path",
     "ffprobe_path",
@@ -165,7 +167,8 @@ def _managed_paths(key: str, state_dir: Path, code_dir: Path) -> list[tuple[Path
 
     if key == "ffmpeg_path" and system == "windows":
         binary = state_dir / "bin" / "ffmpeg" / "windows" / "x64" / "ffmpeg.exe"
-        return [(binary, binary.parent / "version_9.0.1", "9.0.1")]
+        version = DEPENDENCY_VERSIONS["ffmpeg"]
+        return [(binary, binary.parent / f"version_{version}", version)]
 
     if key == "mediainfo_path" and not _is_android():
         folder = ""
@@ -208,17 +211,19 @@ def _managed_paths(key: str, state_dir: Path, code_dir: Path) -> list[tuple[Path
     folder = platform_folders.get(system, {}).get(machine, "")
     if key == "bdinfo_path" and folder:
         binary = state_dir / "bin" / "bdinfo" / folder / f"bdinfo{executable_suffix}"
-        return [(binary, binary.parent / "v0.4.0", "0.4.0")]
+        version = DEPENDENCY_VERSIONS["bdinfo"]
+        return [(binary, binary.parent / version, version.removeprefix("v"))]
 
     if key == "mkbrr_path" and folder:
         name = f"mkbrr{executable_suffix}"
+        version = DEPENDENCY_VERSIONS["mkbrr"]
         return [
             (code_dir / "bin" / name, None, ""),
             (code_dir / "bin" / "mkbrr" / name, None, ""),
             (code_dir / "bin" / "mkbrr" / folder / name, None, ""),
             (state_dir / "bin" / name, None, ""),
             (state_dir / "bin" / "mkbrr" / name, None, ""),
-            (state_dir / "bin" / "mkbrr" / folder / name, state_dir / "bin" / "mkbrr" / folder / "v1.24.0", "1.24.0"),
+            (state_dir / "bin" / "mkbrr" / folder / name, state_dir / "bin" / "mkbrr" / folder / version, version.removeprefix("v")),
         ]
 
     if (
@@ -233,7 +238,7 @@ def _managed_paths(key: str, state_dir: Path, code_dir: Path) -> list[tuple[Path
         }
     ):
         command = _COMMANDS[key]
-        version = "2.3.3" if key == "dovi_tool_path" else "1.7.2"
+        version = DEPENDENCY_VERSIONS["dovi_tool" if key == "dovi_tool_path" else "hdr10plus_tool"]
         binary = state_dir / "bin" / command / system / machine / f"{command}{executable_suffix}"
         return [(binary, binary.parent / version, version)]
 
@@ -242,7 +247,7 @@ def _managed_paths(key: str, state_dir: Path, code_dir: Path) -> list[tuple[Path
 
 def _automatic_message(key: str) -> str:
     messages = {
-        "ffmpeg_path": "Upload Assistant will download FFmpeg 9.0.1 automatically before an upload on Windows.",
+        "ffmpeg_path": f"Upload Assistant will download FFmpeg {DEPENDENCY_VERSIONS['ffmpeg']} automatically before an upload on Windows.",
         "mediainfo_path": "Upload Assistant will download MediaInfo CLI 26.05 automatically before an upload.",
         "dvd_mediainfo_path": "Upload Assistant will download the separate MediaInfo 23.04 build automatically when a DVD is processed.",
         "bdinfo_path": "Upload Assistant will download BDInfo automatically when a Blu-ray disc is processed.",

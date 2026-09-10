@@ -11,6 +11,7 @@ from pathlib import Path
 import aiofiles
 import httpx
 
+from bin.binary_dependencies import DEPENDENCY_VERSIONS
 from bin.download_integrity import verify_downloaded_asset
 from src.console import logger
 
@@ -18,8 +19,8 @@ from src.console import logger
 class FfmpegBinaryManager:
     """Download the verified Windows FFmpeg build into the runtime ``bin`` cache."""
 
-    VERSION = "9.0.1"
-    ASSET_NAME = "ffmpeg-9.0.1-essentials_build.zip"
+    VERSION = DEPENDENCY_VERSIONS["ffmpeg"]
+    ASSET_NAME = f"ffmpeg-{VERSION}-essentials_build.zip"
     DOWNLOAD_URL = f"https://github.com/GyanD/codexffmpeg/releases/download/{VERSION}/{ASSET_NAME}"
 
     @classmethod

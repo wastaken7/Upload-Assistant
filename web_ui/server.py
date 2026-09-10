@@ -5329,9 +5329,11 @@ def config_update():
     # Remove unchecked tracker overrides so subsequent DEFAULT changes are inherited.
     # Also keep optional WebUI-managed values out of config.py when they are unused.
     key = path[-1] if path else ""
-    should_remove_empty_value = (key in ["injecting_client_list", "searching_client_list"] and coerced_value == []) or (
-        is_optional_arr_field and (coerced_value == "" or force_remove_optional_arr_field)
-    ) or force_remove_tracker_override
+    should_remove_empty_value = (
+        (key in ["injecting_client_list", "searching_client_list"] and coerced_value == [])
+        or (is_optional_arr_field and (coerced_value == "" or force_remove_optional_arr_field))
+        or force_remove_tracker_override
+    )
     if should_remove_empty_value:
         # Remove the key from config if it exists
         try:
