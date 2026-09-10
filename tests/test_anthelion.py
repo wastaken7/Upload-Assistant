@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import httpx
 
-from src.trackers.anthelion import Anthelion
+from src.trackers.GAZELLE.anthelion import Anthelion
 
 
 class _Response:
@@ -82,7 +82,7 @@ def _tracker(monkeypatch) -> Anthelion:
     monkeypatch.setattr(tracker, "get_tags", lambda _meta: asyncio.sleep(0, result=[]))
     monkeypatch.setattr(tracker, "get_release_group", lambda _meta: asyncio.sleep(0, result=""))
     monkeypatch.setattr(tracker, "edit_desc", lambda _meta: asyncio.sleep(0, result="description"))
-    monkeypatch.setattr("src.trackers.anthelion.httpx.AsyncClient", _Client)
+    monkeypatch.setattr("src.trackers.GAZELLE.anthelion.httpx.AsyncClient", _Client)
     return tracker
 
 

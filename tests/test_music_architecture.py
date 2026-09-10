@@ -17,7 +17,7 @@ from src.music.models import AudioTrack, MetadataSource, MusicRelease
 from src.music.prep import _apply_music_cli_overrides, _discogs_ids, _find_discogs_release, _music_override_year, enrich_music_from_orpheus
 from src.music.sources import DiscogsEnricher, MusicBrainzEnricher, _music_cache_path, _write_music_cache
 from src.prep import Prep
-from src.trackers.orpheus import Orpheus
+from src.trackers.GAZELLE.orpheus import Orpheus
 from src.uphelper import _music_confirmation_lines
 from web_ui.server import _extract_execution_preview
 

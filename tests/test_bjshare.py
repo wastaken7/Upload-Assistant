@@ -6,7 +6,7 @@ from bs4 import BeautifulSoup
 from PIL import Image
 
 from src.meta import Meta
-from src.trackers.bjshare import BJShare
+from src.trackers.GAZELLE.bjshare import BJShare
 
 
 class FakeResponse:

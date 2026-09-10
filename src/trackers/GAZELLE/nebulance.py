@@ -19,7 +19,7 @@ Config = dict[str, Any]
 
 class Nebulance:
     """
-    NBL Private Torrent Tracker
+    Nebulance (NBL) is a ratioless Private Torrent Tracker for TV
     """
 
     auth_type = "other_api"

@@ -88,9 +88,9 @@ from src.takescreens import TakeScreensManager, download_artwork_from_meta
 from src.temp_paths import artwork_dir, music_release_snapshot_path, screenshots_dir
 from src.torrentcreate import TorrentCreator
 from src.trackerhandle import process_trackers
-from src.trackers.alpharatio import AlphaRatio
 from src.trackers.common import Common
-from src.trackers.passthepopcorn import PassThePopcorn
+from src.trackers.GAZELLE.alpharatio import AlphaRatio
+from src.trackers.GAZELLE.passthepopcorn import PassThePopcorn
 from src.trackersetup import TrackerSetup, api_trackers, http_trackers, other_api_trackers, tracker_class_map
 from src.trackerstatus import TrackerStatusManager
 from src.tvdb import close_tvdb
