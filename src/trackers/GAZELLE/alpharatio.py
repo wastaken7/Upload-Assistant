@@ -12,6 +12,7 @@ import cli_ui
 import httpx
 from bs4 import BeautifulSoup
 
+from src.bbcode import BBCODE
 from src.console import logger, prompt_in_thread
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.exceptions import *  # noqa F403
@@ -213,7 +214,7 @@ class AlphaRatio:
                 description += "\n\n" + subheading + "Notes" + heading_end + "\n" + base
 
         async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt", "w", encoding="utf8") as descfile:
-            await descfile.write(description)
+            await descfile.write(BBCODE().clamp_size_tags(description))
         return
 
     async def get_language_tag(self, meta: Meta) -> str:

@@ -2221,6 +2221,9 @@ class DescriptionBuilder:
 
     def tracker_specific_formats(self, tracker: str, description: str) -> str:
         bbcode = BBCODE()
+        if tracker in {"ANTHELION", "BJSHARE", "BRASILTRACKER", "GREATPOSTERWALL"}:
+            description = bbcode.clamp_size_tags(description)
+
         if tracker == "BRASILTRACKER":
             description = bbcode.remove_img_resize(description)
             description = bbcode.remove_list(description)
