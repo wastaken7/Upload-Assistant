@@ -141,6 +141,32 @@ async def test_client_search_skips_invalid_hash_and_uses_next_client(setup_relea
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("trackers", "piece_size", "pieces", "max_piece_size", "expected"),
+    [
+        (["HDBITS"], 16 * MIB, 12001, None, True),
+        (["OTHER"], 16 * MIB, 12001, None, False),
+        (["HDBITS", "OTHER"], 16 * MIB, 12001, None, False),
+        (["OTHER", "HDBITS"], 16 * MIB, 12000, None, False),
+        (["HDBITS", "OTHER"], 16 * MIB, 11999, None, True),
+        (["HDBITS", "OTHER"], 16 * MIB, 12001, 0, True),
+        (["OTHER"], 2 * MIB, 4001, None, True),
+        (["HDBITS", "OTHER"], 2 * MIB, 4001, None, False),
+        ("HDBITS", 16 * MIB, 12001, None, True),
+        ("HDBITS,OTHER", 16 * MIB, 12001, None, False),
+    ],
+)
+async def test_mixed_tracker_reuse_preserves_generic_and_hdbits_limits(setup_release, trackers, piece_size, pieces, max_piece_size, expected):
+    directory, meta, config = setup_release
+    path = directory / "candidate.torrent"
+    torrent = write_torrent(path, piece_size, pieces * piece_size)
+    meta.trackers = trackers
+    meta.max_piece_size = max_piece_size
+    valid, _ = await Clients(config).is_valid_torrent(meta, str(path), torrent.infohash, "qbit", {})
+    assert valid is expected
+
+
+@pytest.mark.asyncio
 async def test_mkbrr_gets_recommended_size_even_with_tracker_url(setup_release, monkeypatch):
     directory, meta, config = setup_release
     with Path(meta.path).open("wb") as media:

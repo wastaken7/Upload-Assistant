@@ -627,7 +627,10 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                         valid = not wrong_file and hdbits_pieces_allowed(piece_size, reuse_torrent.pieces, reuse_torrent.size)
                         if not valid:
                             logger.debug("[bold red]Torrent does not meet HDBits piece limits or file requirements")
-                    elif reuse_torrent.pieces >= 5000 and reuse_torrent.piece_size < 4294304 and (max_piece_size is None or max_piece_size >= 4):
+                        trackers = meta.trackers.split(",") if isinstance(meta.trackers, str) else meta.trackers
+                        if not valid or all(tracker == "HDBITS" for tracker in trackers):
+                            return valid, torrent_path
+                    if reuse_torrent.pieces >= 5000 and reuse_torrent.piece_size < 4294304 and (max_piece_size is None or max_piece_size >= 4):
                         logger.debug("[bold red]Torrent needs to have less than 5000 pieces with a 4 MiB piece size")
                         valid = False
                     elif (
