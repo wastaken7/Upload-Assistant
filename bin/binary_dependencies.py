@@ -9,7 +9,7 @@ DEPENDENCY_VERSIONS = {
     "mkbrr": "v1.24.0",
     "nyuu": "v0.4.2",
     "par2": "v1.4.0",
-    "pesto": "pesto-v0.6.0",
+    "pesto": "pesto-v0.10.3",
 }
 
 DEPENDENCY_REPOSITORIES = {
