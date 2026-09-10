@@ -98,6 +98,7 @@ class GreatPosterWall:
         "pixhost.to": "pixhost",
         "imgbox.com": "imgbox",
         "img.pterclub.com": "pterclub",
+        "s3.pterclub.com": "pterclub",
         "yes.ilikeshots.club": "ilikeshots",
     }
     supported_categories = ("MOVIE",)
@@ -792,12 +793,19 @@ class GreatPosterWall:
             raw_stars = imdb_info.get("stars", [])
             raw_stars_id = imdb_info.get("stars_id", [])
 
-            directors = [x.strip() for x in raw_directors if isinstance(x, str) and x.strip()]
-            directors_id = [x.strip() for x in raw_directors_id if isinstance(x, str) and re.match(r"^nm\d+$", x.strip())]
-            writers = [x.strip() for x in raw_writers if isinstance(x, str) and x.strip()]
-            writers_id = [x.strip() for x in raw_writers_id if isinstance(x, str) and re.match(r"^nm\d+$", x.strip())]
-            stars = [x.strip() for x in raw_stars if isinstance(x, str) and x.strip()]
-            stars_id = [x.strip() for x in raw_stars_id if isinstance(x, str) and re.match(r"^nm\d+$", x.strip())]
+            def valid_credit_pairs(raw_names: Any, raw_ids: Any) -> tuple[list[str], list[str]]:
+                if not isinstance(raw_names, list) or not isinstance(raw_ids, list):
+                    return [], []
+                pairs = [
+                    (name.strip(), person_id.strip())
+                    for name, person_id in zip(raw_names, raw_ids, strict=False)
+                    if isinstance(name, str) and name.strip() and isinstance(person_id, str) and re.match(r"^nm\d+$", person_id.strip())
+                ]
+                return [name for name, _ in pairs], [person_id for _, person_id in pairs]
+
+            directors, directors_id = valid_credit_pairs(raw_directors, raw_directors_id)
+            writers, writers_id = valid_credit_pairs(raw_writers, raw_writers_id)
+            stars, stars_id = valid_credit_pairs(raw_stars, raw_stars_id)
 
         first_director_id = directors_id[0].strip() if isinstance(directors_id, list) and directors_id else ""
         first_director_name = directors[0].strip() if isinstance(directors, list) and directors else ""
@@ -943,6 +951,9 @@ class GreatPosterWall:
             except (ValueError, KeyError, TypeError, IndexError) as e:
                 logger.debug(f"{self.tracker}: Failed to process response payload on {self.tracker}: {escape(str(e))}", exc_info=True)
                 continue
+            except (httpx.HTTPStatusError, httpx.RequestError) as e:
+                logger.debug(f"{self.tracker}: Request to {url} failed: {escape(str(e))}", exc_info=True)
+                continue
 
         return best_response
 
@@ -1022,8 +1033,8 @@ class GreatPosterWall:
         if "DV" in hdr:
             flags["dolby_vision"] = "on"
 
-            if "HDR" in hdr:
-                flags["hdr10plus" if "HDR10+" in hdr else "hdr10"] = "on"
+        if "HDR" in hdr:
+            flags["hdr10plus" if "HDR10+" in hdr else "hdr10"] = "on"
 
         return flags
 
