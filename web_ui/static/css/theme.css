@@ -1209,6 +1209,174 @@ html.ua-upload-document #root {
   border-color: var(--ua-upload-border) !important;
 }
 
+.ua-processing-preview {
+  color: var(--ua-upload-text);
+}
+
+.ua-processing-card {
+  background: var(--ua-upload-surface);
+}
+
+.ua-processing-artwork {
+  background:
+    radial-gradient(circle at 50% 35%, var(--ua-atmosphere), transparent 68%),
+    color-mix(in srgb, var(--ua-upload-bg) 86%, #000000);
+  border-bottom: 1px solid var(--ua-upload-border);
+  isolation: isolate;
+}
+
+.ua-processing-artwork::after {
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.28), transparent 34%);
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+  z-index: -1;
+}
+
+.ua-processing-poster {
+  border-radius: 0.45rem;
+  box-shadow:
+    0 20px 45px rgba(0, 0, 0, 0.35),
+    0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.ua-processing-live,
+.ua-processing-cover-action {
+  backdrop-filter: blur(12px);
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.2);
+  z-index: 2;
+}
+
+.ua-processing-live {
+  background: rgba(12, 10, 9, 0.76);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+}
+
+.ua-processing-live-dot {
+  animation: ua-processing-pulse 1.8s ease-in-out infinite;
+  background: var(--ua-gold);
+  border-radius: 9999px;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ua-gold) 18%, transparent);
+  height: 0.45rem;
+  width: 0.45rem;
+}
+
+.ua-processing-placeholder-icon {
+  align-items: center;
+  background: color-mix(
+    in srgb,
+    var(--ua-copper) 12%,
+    var(--ua-upload-surface)
+  );
+  border: 1px solid var(--ua-upload-border);
+  border-radius: 9999px;
+  color: var(--ua-copper-bright);
+  display: inline-flex;
+  height: 3.25rem;
+  justify-content: center;
+  width: 3.25rem;
+}
+
+.ua-processing-placeholder-icon > :first-child {
+  height: 1.5rem;
+  width: 1.5rem;
+}
+
+.ua-processing-eyebrow {
+  color: var(--ua-copper-bright);
+}
+
+.ua-processing-title {
+  color: var(--ua-upload-text);
+}
+
+.ua-processing-muted,
+.ua-processing-source {
+  color: var(--ua-upload-muted);
+}
+
+.ua-processing-section {
+  border-top: 1px solid var(--ua-upload-border);
+  padding-top: 0.9rem;
+}
+
+.ua-processing-section-title {
+  color: var(--ua-upload-muted);
+  font-size: 0.68rem;
+  font-weight: 750;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.ua-processing-detail-list {
+  margin-top: 0.4rem;
+}
+
+.ua-processing-detail-row {
+  align-items: start;
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: minmax(5.5rem, 0.8fr) minmax(0, 1.2fr);
+  padding: 0.38rem 0;
+}
+
+.ua-processing-detail-row dt {
+  color: var(--ua-upload-muted);
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+
+.ua-processing-detail-row dd {
+  color: var(--ua-upload-text);
+  font-size: 0.78rem;
+  line-height: 1.4;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.ua-processing-overview {
+  color: color-mix(in srgb, var(--ua-upload-text) 88%, var(--ua-upload-muted));
+  margin-top: 0.45rem;
+}
+
+.ua-processing-warning {
+  background: color-mix(in srgb, #f59e0b 10%, var(--ua-upload-surface));
+  border-color: color-mix(in srgb, #f59e0b 42%, var(--ua-upload-border));
+  color: color-mix(in srgb, #f59e0b 55%, var(--ua-upload-text));
+}
+
+.ua-processing-source {
+  border-color: var(--ua-upload-border);
+}
+
+.ua-processing-provider-section a:focus-visible,
+.ua-processing-cover-action:focus-visible {
+  outline: 2px solid var(--ua-gold);
+  outline-offset: 2px;
+}
+
+@keyframes ua-processing-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.58;
+    transform: scale(0.82);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ua-processing-live-dot {
+    animation: none;
+  }
+}
+
 .ua-upload-output-panel {
   background: var(--ua-upload-bg) !important;
   border-color: var(--ua-upload-border) !important;
@@ -1918,6 +2086,111 @@ html.ua-upload-document #root {
 
 .ua-app-rail-popover-label {
   color: var(--ua-muted);
+}
+
+.ua-api-key-alert-button,
+.ua-api-key-alert-link {
+  --ua-key-alert-color: #b45309;
+}
+
+:is(.ua-mode-dark, [data-mode="dark"]) .ua-api-key-alert-button,
+:is(.ua-mode-dark, [data-mode="dark"]) .ua-api-key-alert-link {
+  --ua-key-alert-color: #fbbf24;
+}
+
+.ua-api-key-alert-button[data-severity="expired"],
+.ua-api-key-alert-link[data-severity="expired"] {
+  --ua-key-alert-color: #b91c1c;
+}
+
+:is(.ua-mode-dark, [data-mode="dark"])
+  .ua-api-key-alert-button[data-severity="expired"],
+:is(.ua-mode-dark, [data-mode="dark"])
+  .ua-api-key-alert-link[data-severity="expired"] {
+  --ua-key-alert-color: #f87171;
+}
+
+.ua-api-key-alert-button.ua-api-key-alert-button {
+  color: var(--ua-key-alert-color) !important;
+  border-color: color-mix(in srgb, var(--ua-key-alert-color) 35%, transparent);
+  background: color-mix(in srgb, var(--ua-key-alert-color) 9%, transparent);
+}
+
+.ua-api-key-alert-button:not(.ua-app-rail-button) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+}
+
+.ua-api-key-alert-icon {
+  position: relative;
+  display: inline-flex;
+}
+
+.ua-api-key-alert-count {
+  position: absolute;
+  top: -0.45rem;
+  right: -0.65rem;
+  min-width: 1rem;
+  padding: 0.1rem 0.2rem;
+  border-radius: 999px;
+  background: var(--ua-key-alert-color);
+  color: #fff;
+  font-size: 0.6rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+:is(.ua-mode-dark, [data-mode="dark"]) .ua-api-key-alert-count {
+  color: #171717;
+}
+
+.ua-api-key-alert-popover {
+  position: fixed;
+  left: 5.5rem;
+  bottom: 1rem;
+  z-index: 70;
+  width: min(24rem, calc(100vw - 6.5rem));
+  max-height: min(70dvh, 32rem);
+  overflow-y: auto;
+}
+
+.ua-config-page .ua-api-key-alert-popover {
+  background: var(--ua-config-surface-raised);
+}
+
+.ua-upload-page .ua-api-key-alert-popover {
+  background: var(--ua-upload-surface-raised);
+}
+
+.ua-api-key-alert-popover[data-placement="sidebar"],
+.ua-api-key-alert-popover[data-placement="header"] {
+  left: 1rem;
+  width: calc(100vw - 2rem);
+}
+
+.ua-api-key-alert-link {
+  border-color: color-mix(in srgb, var(--ua-key-alert-color) 35%, transparent);
+}
+
+.ua-api-key-alert-link:hover,
+.ua-api-key-alert-link:focus-visible {
+  background: color-mix(in srgb, var(--ua-key-alert-color) 9%, transparent);
+}
+
+.ua-api-key-expiry-tone {
+  color: var(--ua-key-alert-color);
+}
+
+.ua-config-api-key-controls {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.ua-config-api-key-controls input {
+  min-width: 0;
+  flex: 1;
 }
 
 .ua-upload-page .ua-app-rail-popover-label {

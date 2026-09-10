@@ -336,6 +336,16 @@ const argumentCategories = [
         description: "Override detected category",
       },
       {
+        label: "--cast",
+        placeholder: "NAME1,NAME2",
+        description: "Override cast or XXX performers",
+      },
+      {
+        label: "--publisher",
+        placeholder: "NAME",
+        description: "Override book publisher or XXX studio",
+      },
+      {
         label: "--type",
         placeholder: "REMUX",
         description: "Override detected type",
@@ -497,6 +507,11 @@ const argumentCategories = [
     title: "Title Shaping",
     args: [
       { label: "--year", placeholder: "YYYY", description: "Override year" },
+      {
+        label: "--name",
+        placeholder: "RELEASE_NAME",
+        description: "Override the generated release name",
+      },
       { label: "--no-season", description: "Remove season" },
       { label: "--no-year", description: "Remove year" },
       { label: "--no-aka", description: "Remove AKA" },
@@ -633,11 +648,6 @@ const argumentCategories = [
         label: "--openlibrary",
         placeholder: "ID",
         description: "OpenLibrary id",
-      },
-      {
-        label: "--publisher",
-        placeholder: "NAME",
-        description: "Book publisher",
       },
     ],
   },
@@ -1183,6 +1193,7 @@ const WorkspaceSwitcher = ({
 };
 
 const ApplicationRail = ({
+  trackers,
   activeWorkspace,
   appBase,
   appearanceControl,
@@ -1246,6 +1257,7 @@ const ApplicationRail = ({
       <div className="min-h-4 flex-1"></div>
 
       <div className="ua-app-rail-footer grid shrink-0 gap-1 border-t p-2">
+        <window.UAApiKeyAlerts trackers={trackers} appBase={appBase} />
         <button
           type="button"
           className={`ua-app-rail-button rounded-lg ${updateStatus?.update_available ? "ua-update-rail-button" : ""}`}
@@ -1517,6 +1529,8 @@ const BookIcon = () => <WebUiIcon name="book" />;
 
 const DiscIcon = () => <WebUiIcon name="music" />;
 
+const PepperIcon = () => <WebUiIcon name="pepper" />;
+
 const mediaIconForCategory = (category) => {
   switch (String(category || "").toUpperCase()) {
     case "MOVIE":
@@ -1529,6 +1543,8 @@ const mediaIconForCategory = (category) => {
       return <BookIcon />;
     case "MUSIC":
       return <DiscIcon />;
+    case "XXX":
+      return <PepperIcon />;
     default:
       return <FileIcon />;
   }
@@ -1767,6 +1783,10 @@ const metadataProviderStyles = {
     light: "border-orange-300 bg-transparent text-orange-900",
     dark: "border-orange-900/80 bg-transparent text-orange-100",
   },
+  audible: {
+    light: "border-[#F7991C] bg-transparent text-[#9A4F00]",
+    dark: "border-[#F7991C]/75 bg-transparent text-[#FFD6A3]",
+  },
   musicbrainz: {
     light: "border-[#BA478F] bg-transparent text-[#7D205D]",
     dark: "border-[#BA478F]/75 bg-transparent text-[#F4C7E4]",
@@ -1782,8 +1802,11 @@ const metadataProviderStyles = {
 };
 
 const getMetadataProviderStyle = (key, isDarkMode) => {
+  const normalizedKey = String(key || "").startsWith("discogs_")
+    ? "discogs"
+    : key;
   const providerStyle =
-    metadataProviderStyles[key] || metadataProviderStyles.default;
+    metadataProviderStyles[normalizedKey] || metadataProviderStyles.default;
   return isDarkMode ? providerStyle.dark : providerStyle.light;
 };
 
@@ -1806,6 +1829,10 @@ const metadataProviderIcons = {
     src: "/static/img/providers/openlibrary.svg",
     alt: "Open Library",
   },
+  audible: {
+    src: "/static/img/providers/audible.svg",
+    alt: "Audible",
+  },
   musicbrainz: {
     src: "/static/img/providers/musicbrainz.ico",
     alt: "MusicBrainz",
@@ -1816,7 +1843,10 @@ const metadataProviderIcons = {
 };
 
 const renderMetadataProviderIcon = (key, isDarkMode) => {
-  const iconAsset = metadataProviderIcons[key];
+  const normalizedKey = String(key || "").startsWith("discogs_")
+    ? "discogs"
+    : key;
+  const iconAsset = metadataProviderIcons[normalizedKey];
   if (iconAsset) {
     const iconSrc =
       !isDarkMode && iconAsset.lightSrc ? iconAsset.lightSrc : iconAsset.src;
@@ -1825,7 +1855,7 @@ const renderMetadataProviderIcon = (key, isDarkMode) => {
         src={iconSrc}
         alt={iconAsset.alt}
         className={`block h-3.5 w-auto max-w-[3.75rem] object-contain ${
-          key === "discogs" && !isDarkMode ? "invert" : ""
+          normalizedKey === "discogs" && !isDarkMode ? "invert" : ""
         }`}
       />
     );
@@ -2399,6 +2429,10 @@ function AudionutsUAGUI() {
     useState(false);
   const fileBrowserSearchTimer = useRef(null);
   const fileBrowserSearchQuery = useRef("");
+
+  // Preserve the desktop file browser scroll position while the
+  // browser is temporarily unmounted or rerendered.
+  const fileBrowserScrollTopRef = useRef(0);
 
   // Folder loading states
   const [loadingFolders, setLoadingFolders] = useState(new Set());
@@ -5751,19 +5785,21 @@ function AudionutsUAGUI() {
 
   const renderExecutionPreviewPanel = (compact = false) => {
     const media = executionPreview;
-    const category = media?.category || "";
-    const previewTitle =
+    const category = String(media?.category || "").toUpperCase();
+    const baseTitle =
       media?.title ||
       media?.name ||
       media?.filename ||
       "Detecting media metadata...";
-    const subtitleParts = [media?.original_title, media?.year].filter(Boolean);
-    const infoBadges = [
-      media?.category,
-      media?.media_type,
-      media?.source,
-      media?.resolution,
-    ].filter(Boolean);
+    const previewTitle = media?.year
+      ? `${baseTitle} (${media.year})`
+      : baseTitle;
+    const originalTitle = String(media?.original_title || "").trim();
+    const showOriginalTitle =
+      originalTitle &&
+      originalTitle.localeCompare(baseTitle, undefined, {
+        sensitivity: "accent",
+      }) !== 0;
     const metadataSources = Array.isArray(media?.metadata_sources)
       ? media.metadata_sources.filter((source) => source && source.value)
       : [];
@@ -5787,229 +5823,59 @@ function AudionutsUAGUI() {
     const genres = Array.isArray(media?.genres)
       ? media.genres.filter(Boolean).slice(0, 4)
       : [];
-    const networks = Array.isArray(media?.networks)
-      ? media.networks.filter(Boolean).slice(0, 3)
-      : [];
     const panelPadding = compact ? "p-3" : "p-4";
     const titleSize = compact ? "text-base" : "text-lg";
     const posterHeight = compact ? "h-64" : "h-80";
-    const episodeLabel =
-      media?.episode_title ||
-      media?.episode_name ||
-      [media?.season, media?.episode].filter(Boolean).join(" ");
     const overviewText =
       category === "TV"
         ? media?.episode_overview || media?.overview
         : media?.overview;
     const music = media?.music || {};
+    const detailSections = Array.isArray(media?.detail_sections)
+      ? media.detail_sections.filter(
+          (section) =>
+            section && Array.isArray(section.items) && section.items.length > 0,
+        )
+      : [];
 
-    const detailRows = (rows) => rows.filter((row) => row.value);
-    const renderDetailGrid = (title, rows) => {
-      const visibleRows = detailRows(rows);
-      if (visibleRows.length === 0) return null;
+    const renderPreviewSection = (section) => (
+      <section key={section.key} className="ua-processing-section">
+        <h4 className="ua-processing-section-title">{section.label}</h4>
+        <dl className="ua-processing-detail-list">
+          {section.items.map((item) => (
+            <div key={item.key} className="ua-processing-detail-row">
+              <dt>{item.label}</dt>
+              <dd>{item.value}</dd>
+            </div>
+          ))}
+        </dl>
+      </section>
+    );
 
-      return (
-        <div
-          className={`rounded-xl p-3 ${isDarkMode ? "bg-gray-800 border border-gray-700" : "bg-gray-50 border border-gray-200"}`}
-        >
-          <p
-            className={`text-xs font-semibold uppercase tracking-wide mb-2 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
-          >
-            {title}
-          </p>
-          <div className="grid grid-cols-1 gap-2">
-            {visibleRows.map((row) => (
-              <div
-                key={row.label}
-                className="flex items-start justify-between gap-3"
-              >
-                <span
-                  className={`text-xs font-semibold ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
-                >
-                  {row.label}
-                </span>
-                <span
-                  className={`text-xs text-right ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}
-                >
-                  {row.value}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      );
-    };
-
-    const tvRows = detailRows([
-      { label: "Episode", value: episodeLabel },
-      {
-        label: "Format",
-        value:
-          typeof media?.tv_pack === "boolean"
-            ? media.tv_pack
-              ? "Season Pack"
-              : "Single Episode"
-            : "",
-      },
-      { label: "Service", value: media?.service },
-      { label: "Network", value: networks.join(", ") },
-      { label: "Audio", value: media?.audio },
-    ]);
-    const movieRows = detailRows([
-      { label: "Audio", value: media?.audio },
-      { label: "Service", value: media?.service },
-      { label: "Network", value: networks.join(", ") },
-    ]);
-    const bookRows = detailRows([
-      { label: "Author", value: media?.author },
-      { label: "Narrator", value: media?.narrator },
-      { label: "Language", value: media?.book_language },
-      { label: "Publisher", value: media?.publisher },
-      { label: "Duration", value: media?.audiobook_duration },
-      { label: "Bitrate", value: media?.audiobook_bitrate },
-      {
-        label: "Series",
-        value: media?.book_series
-          ? [
-              media.book_series,
-              media?.book_series_index ? `#${media.book_series_index}` : "",
-            ]
-              .filter(Boolean)
-              .join(" ")
-          : "",
-      },
-      {
-        label: "Format",
-        value:
-          typeof media?.audiobook === "boolean"
-            ? media.audiobook
-              ? "Audiobook"
-              : "Book"
-            : "",
-      },
-    ]);
-    const gameRows = detailRows([
-      { label: "Platform", value: media?.platform },
-      { label: "Version", value: media?.game_version },
-      { label: "Release Type", value: media?.game_subcategory },
-      { label: "Developer", value: media?.developer },
-      { label: "Publisher", value: media?.publisher },
-      { label: "Region", value: media?.game_region },
-      { label: "System", value: media?.game_system },
-    ]);
-    const musicRows = detailRows([
-      {
-        label: "Artist",
-        value: music?.artist
-          ? `${music.artist}${music.artist_source ? ` (${music.artist_source})` : ""}`
-          : "",
-      },
-      {
-        label: "Album",
-        value: music?.album
-          ? `${music.album}${music.album_source ? ` (${music.album_source})` : ""}`
-          : "",
-      },
-      {
-        label: "Original Year",
-        value: music?.original_year
-          ? `${music.original_year}${music.year_source ? ` (${music.year_source})` : ""}`
-          : "",
-      },
-      {
-        label: "Release Type",
-        value: music?.release_type
-          ? `${music.release_type}${music.release_type_source ? ` (${music.release_type_source})` : ""}`
-          : "",
-      },
-      {
-        label: "Media",
-        value: music?.media
-          ? `${music.media}${music.media_source ? ` (${music.media_source})` : ""}`
-          : "",
-      },
-      { label: "Audio", value: music?.technical || media?.audio },
-      {
-        label: "Tracks / Discs",
-        value:
-          music?.track_count || music?.disc_count
-            ? `${music.track_count || "?"} / ${music.disc_count || "1"}`
-            : "",
-      },
-      {
-        label: "This Release",
-        value: [
-          music?.release_year,
-          music?.retail_date,
-          music?.release_label,
-          music?.release_catalogue_number,
-        ]
-          .filter(Boolean)
-          .join(" • "),
-      },
-      {
-        label: "Edition",
-        value: [music?.edition, music?.edition_year]
-          .filter(Boolean)
-          .join(" • "),
-      },
-    ]);
-    const musicCheckRows = detailRows([
-      {
-        label: "Auxiliary Files",
-        value: Array.isArray(music?.auxiliary)
-          ? music.auxiliary.join(", ")
-          : "",
-      },
-      {
-        label: "Metadata Conflicts",
-        value: Array.isArray(music?.conflicts)
-          ? music.conflicts.join(", ")
-          : "",
-      },
-    ]);
-    let categorySection = null;
-    if (category === "TV")
-      categorySection = renderDetailGrid("TV Details", tvRows);
-    else if (category === "BOOK")
-      categorySection = renderDetailGrid("Book Details", bookRows);
-    else if (category === "GAME")
-      categorySection = renderDetailGrid("Game Details", gameRows);
-    else if (category === "MUSIC")
-      categorySection = renderDetailGrid("Music Details", musicRows);
-    else categorySection = renderDetailGrid("Movie Details", movieRows);
+    const renderedDetailSections = detailSections.map(renderPreviewSection);
 
     return (
-      <div className="flex flex-col h-full">
-        <div
-          className={`ua-upload-panel-header ${panelPadding} border-b flex-shrink-0`}
-        >
-          <h2
-            className={`${titleSize} font-bold ${isDarkMode ? "text-white" : "text-gray-800"} flex items-center gap-2`}
-          >
-            Now Processing
-          </h2>
-          <p
-            className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}
-          >
-            The sidebar is showing live media metadata while the upload runs.
-          </p>
-        </div>
-
-        <div className={`flex-1 overflow-y-auto ${panelPadding} space-y-4`}>
-          <div
-            className={`rounded-2xl overflow-hidden border ${isDarkMode ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-white"} shadow-sm`}
-          >
+      <div className="ua-processing-preview flex h-full flex-col">
+        <div className="flex-1 overflow-y-auto">
+          <div className="ua-processing-card min-h-full overflow-hidden">
             {media?.poster_url ? (
               <div
-                className={`w-full ${posterHeight} flex items-center justify-center gap-3 p-3 ${isDarkMode ? "bg-gray-950" : "bg-stone-100"}`}
+                className={`ua-processing-artwork relative flex w-full items-center justify-center ${posterHeight}`}
               >
-                <div className="min-w-0 h-full flex-1 flex items-center justify-center">
+                <div className="flex h-full min-w-0 flex-1 items-center justify-center p-3">
                   <img
                     src={media.poster_url}
                     alt={previewTitle}
-                    className="max-w-full max-h-full object-contain"
+                    className="ua-processing-poster max-h-full max-w-full object-contain"
                   />
+                </div>
+                <div
+                  className="ua-processing-live absolute left-3 top-3 inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.1em]"
+                  role="status"
+                  aria-live="polite"
+                >
+                  <span className="ua-processing-live-dot" aria-hidden="true" />
+                  Processing{category ? ` ${category}` : ""}
                 </div>
                 {category === "XXX" &&
                   String(media.poster_url).startsWith(
@@ -6024,7 +5890,7 @@ function AudionutsUAGUI() {
                           ? "Generating a new XXX cover"
                           : "Generate a new XXX cover"
                       }
-                      className="ua-accent-action flex-shrink-0 inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold disabled:cursor-wait disabled:opacity-60"
+                      className="ua-processing-cover-action ua-accent-action absolute right-3 top-3 inline-flex flex-shrink-0 items-center gap-1.5 rounded-full p-2.5 text-xs font-semibold disabled:cursor-wait disabled:opacity-60"
                       title="Generate another cover from a different video frame"
                     >
                       <span aria-hidden="true">
@@ -6039,88 +5905,98 @@ function AudionutsUAGUI() {
               </div>
             ) : (
               <div
-                className={`w-full ${posterHeight} flex flex-col items-center justify-center gap-2 ${isDarkMode ? "bg-gray-800 text-gray-400" : "bg-gray-100 text-gray-500"}`}
+                className={`ua-processing-artwork relative flex w-full ${posterHeight} flex-col items-center justify-center gap-3`}
               >
-                <span className="text-sm">Poster not available yet</span>
+                <div
+                  className="ua-processing-live absolute left-3 top-3 inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.1em]"
+                  role="status"
+                  aria-live="polite"
+                >
+                  <span className="ua-processing-live-dot" aria-hidden="true" />
+                  Processing{category ? ` ${category}` : ""}
+                </div>
+                <span
+                  className="ua-processing-placeholder-icon"
+                  aria-hidden="true"
+                >
+                  {mediaIconForCategory(category)}
+                </span>
+                <span className="ua-processing-muted text-sm">
+                  {media?.status === "waiting"
+                    ? "Reading media metadata…"
+                    : "Artwork not available"}
+                </span>
               </div>
             )}
 
-            <div className={`${panelPadding} space-y-3`}>
+            <div className={`${panelPadding} space-y-4`}>
               <div>
+                <div className="ua-processing-eyebrow mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.12em]">
+                  {mediaIconForCategory(category)}
+                  <span>{category || "Media"}</span>
+                </div>
                 <h3
-                  className={`${titleSize} font-bold leading-tight ${isDarkMode ? "text-white" : "text-gray-900"}`}
+                  className={`ua-processing-title ${titleSize} font-bold leading-tight`}
                 >
                   {previewTitle}
                 </h3>
-                {subtitleParts.length > 0 && (
-                  <p
-                    className={`text-sm mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}
-                  >
-                    {subtitleParts.join(" • ")}
+                {showOriginalTitle && (
+                  <p className="ua-processing-muted mt-1 text-sm">
+                    Original title: {originalTitle}
                   </p>
                 )}
               </div>
 
-              {infoBadges.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {infoBadges.map((badge) => (
-                    <span
-                      key={badge}
-                      className={`px-2.5 py-1 rounded-full text-xs font-semibold ${isDarkMode ? "bg-gray-800 text-gray-200 border border-gray-700" : "bg-orange-50 text-orange-700 border border-orange-200"}`}
-                    >
-                      {badge}
-                    </span>
-                  ))}
-                </div>
-              )}
-
               {previewProviders.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {previewProviders.map((source) => {
-                    const providerClass = getMetadataProviderStyle(
-                      source.key,
-                      isDarkMode,
-                    );
-                    const content = (
-                      <>
-                        <span className="inline-flex items-center justify-center min-w-[2.6rem] px-2 h-6 rounded-full">
-                          {renderMetadataProviderIcon(source.key, isDarkMode)}
-                        </span>
-                        <span className="min-w-0">
-                          <span className="block text-[11px] font-semibold font-mono truncate">
-                            {source.value}
+                <section className="ua-processing-provider-section">
+                  <h4 className="sr-only">Metadata providers</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {previewProviders.map((source) => {
+                      const providerClass = getMetadataProviderStyle(
+                        source.key,
+                        isDarkMode,
+                      );
+                      const content = (
+                        <>
+                          <span className="inline-flex items-center justify-center min-w-[2.6rem] px-2 h-6 rounded-full">
+                            {renderMetadataProviderIcon(source.key, isDarkMode)}
                           </span>
-                        </span>
-                      </>
-                    );
-                    const sharedClassName = `inline-flex items-center gap-1.5 max-w-full rounded-full border px-2.5 py-1 transition-colors ${providerClass}`;
+                          <span className="min-w-0">
+                            <span className="block text-[11px] font-semibold font-mono truncate">
+                              {source.value}
+                            </span>
+                          </span>
+                        </>
+                      );
+                      const sharedClassName = `inline-flex items-center gap-1.5 max-w-full rounded-full border px-2.5 py-1 transition-colors ${providerClass}`;
 
-                    if (source.url) {
+                      if (source.url) {
+                        return (
+                          <a
+                            key={`${source.key}-${source.value}`}
+                            href={source.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className={`${sharedClassName} hover:brightness-105`}
+                            title={`${source.label || source.key}: ${source.value}`}
+                          >
+                            {content}
+                          </a>
+                        );
+                      }
+
                       return (
-                        <a
+                        <div
                           key={`${source.key}-${source.value}`}
-                          href={source.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className={`${sharedClassName} hover:brightness-105`}
+                          className={sharedClassName}
                           title={`${source.label || source.key}: ${source.value}`}
                         >
                           {content}
-                        </a>
+                        </div>
                       );
-                    }
-
-                    return (
-                      <div
-                        key={`${source.key}-${source.value}`}
-                        className={sharedClassName}
-                        title={`${source.label || source.key}: ${source.value}`}
-                      >
-                        {content}
-                      </div>
-                    );
-                  })}
-                </div>
+                    })}
+                  </div>
+                </section>
               )}
 
               {genres.length > 0 && (
@@ -6136,17 +6012,28 @@ function AudionutsUAGUI() {
                 </div>
               )}
 
-              {categorySection}
+              {(overviewText || media?.status === "waiting") && (
+                <section className="ua-processing-section">
+                  <h4 className="ua-processing-section-title">
+                    {category === "MUSIC"
+                      ? "Release Notes"
+                      : category === "TV" && media?.episode_overview
+                        ? "Episode Overview"
+                        : "Overview"}
+                  </h4>
+                  <p className="ua-processing-overview text-sm leading-6">
+                    {overviewText ||
+                      "Upload Assistant is analyzing this item. Metadata will appear as soon as the first snapshot is ready."}
+                  </p>
+                </section>
+              )}
 
-              {category === "MUSIC" &&
-                renderDetailGrid("Release Checks", musicCheckRows)}
+              {renderedDetailSections}
 
               {category === "MUSIC" &&
                 Array.isArray(music?.warnings) &&
                 music.warnings.length > 0 && (
-                  <div
-                    className={`rounded-xl p-3 border ${isDarkMode ? "bg-amber-950/30 border-amber-900 text-amber-100" : "bg-amber-50 border-amber-200 text-amber-900"}`}
-                  >
+                  <section className="ua-processing-warning rounded-xl border p-3">
                     <p className="text-xs font-semibold uppercase tracking-wide mb-2">
                       Music Validation
                     </p>
@@ -6155,47 +6042,19 @@ function AudionutsUAGUI() {
                         <li key={`${warning}-${index}`}>• {warning}</li>
                       ))}
                     </ul>
-                  </div>
+                  </section>
                 )}
 
-              <div
-                className={`rounded-xl p-3 ${isDarkMode ? "bg-gray-800 border border-gray-700" : "bg-gray-50 border border-gray-200"}`}
-              >
-                <p
-                  className={`text-xs font-semibold uppercase tracking-wide mb-2 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
-                >
-                  {category === "MUSIC"
-                    ? "Release Notes"
-                    : category === "TV" && media?.episode_overview
-                      ? "Episode Overview"
-                      : "Overview"}
-                </p>
-                <p
-                  className={`text-sm leading-6 ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}
-                >
-                  {overviewText ||
-                    (media?.status === "waiting"
-                      ? "Metadata will appear here as soon as Upload-Assistant writes the first meta snapshot."
-                      : category === "MUSIC"
-                        ? "No release notes were supplied. Review the music details and validation above before continuing."
-                        : "No overview available for this item.")}
-                </p>
-              </div>
-
-              <div
-                className={`rounded-xl p-3 ${isDarkMode ? "bg-gray-800 border border-gray-700" : "bg-gray-50 border border-gray-200"}`}
-              >
-                <p
-                  className={`text-xs font-semibold uppercase tracking-wide mb-2 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
-                >
-                  Source Path
-                </p>
-                <p
-                  className={`text-xs break-all font-mono ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}
-                >
-                  {media?.path || selectedPath}
-                </p>
-              </div>
+              {(media?.path || selectedPath) && (
+                <footer className="ua-processing-source border-t pt-3">
+                  <p className="ua-processing-section-title mb-1">
+                    Source Path
+                  </p>
+                  <p className="break-all font-mono text-xs">
+                    {media?.path || selectedPath}
+                  </p>
+                </footer>
+              )}
             </div>
           </div>
         </div>
@@ -6268,6 +6127,11 @@ function AudionutsUAGUI() {
               compact
             />
             <div className="ml-2 flex shrink-0 items-center gap-1">
+              <window.UAApiKeyAlerts
+                trackers={trackers}
+                appBase={APP_BASE}
+                placement="header"
+              />
               {renderUpdateButton()}
               {renderHelpButton()}
               {renderThemePalette()}
@@ -6993,6 +6857,7 @@ function AudionutsUAGUI() {
       )}
 
       <ApplicationRail
+        trackers={trackers}
         activeWorkspace="upload"
         appBase={APP_BASE}
         appearanceControl={renderRailAppearance()}
@@ -7128,6 +6993,16 @@ function AudionutsUAGUI() {
                 </div>
                 {renderSelectAllBar()}
                 <div
+                  ref={(node) => {
+                    if (!node) return;
+                    requestAnimationFrame(() => {
+                      node.scrollTop = fileBrowserScrollTopRef.current;
+                    });
+                  }}
+                  onScroll={(event) => {
+                    fileBrowserScrollTopRef.current =
+                      event.currentTarget.scrollTop;
+                  }}
                   className={`${hasDescFile && !descBrowserCollapsed ? "flex-1 max-h-[50%]" : "flex-1"} overflow-y-auto`}
                 >
                   {fileBrowserSearch ? (

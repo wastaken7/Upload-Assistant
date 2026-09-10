@@ -22,6 +22,7 @@ from langcodes import tag_parser
 from torf import Torrent
 from unidecode import unidecode
 
+from src.api_key_expiry import observe_tracker_response
 from src.bbcode import BBCODE
 from src.console import console, logger, prompt_in_thread
 from src.exportmi import export_info
@@ -2591,6 +2592,7 @@ class Common:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.get(url=url, params=params, headers=headers)
                 json_response = response.json()
+                observe_tracker_response(self.config, meta, tracker, response, json_response)
         except (httpx.RequestError, httpx.TimeoutException) as e:
             logger.info(f"[yellow]Request error in unit3d_region_distributor: {e}[/yellow]")
             return
@@ -2670,6 +2672,7 @@ class Common:
                     logger.info(f"Searching for information on [bold cyan]{tracker}[/bold cyan]")
                 response = await client.get(url=url, params=params, headers=headers)
                 json_response = response.json()
+                observe_tracker_response(self.config, meta, tracker, response, json_response)
         except (httpx.RequestError, httpx.TimeoutException) as e:
             logger.info(f"[yellow]Request error in unit3d_torrent_info: {e}[/yellow]")
             return None, None, None, None, None, None, None, [], None

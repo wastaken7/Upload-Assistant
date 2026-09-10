@@ -2,7 +2,7 @@ from types import SimpleNamespace
 
 from src.clients import Clients
 from src.meta import Meta
-from src.trackers.orpheus import Orpheus
+from src.trackers.GAZELLE.orpheus import Orpheus
 
 
 def test_recognizes_brasiltracker_host_without_loading_tracker_classes():

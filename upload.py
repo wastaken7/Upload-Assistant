@@ -88,9 +88,9 @@ from src.takescreens import TakeScreensManager, download_artwork_from_meta
 from src.temp_paths import artwork_dir, music_release_snapshot_path, screenshots_dir
 from src.torrentcreate import TorrentCreator
 from src.trackerhandle import process_trackers
-from src.trackers.alpharatio import AlphaRatio
 from src.trackers.common import Common
-from src.trackers.passthepopcorn import PassThePopcorn
+from src.trackers.GAZELLE.alpharatio import AlphaRatio
+from src.trackers.GAZELLE.passthepopcorn import PassThePopcorn
 from src.trackersetup import TrackerSetup, api_trackers, http_trackers, other_api_trackers, tracker_class_map
 from src.trackerstatus import TrackerStatusManager
 from src.tvdb import close_tvdb
@@ -2256,6 +2256,9 @@ def load_heavy_globals() -> None:
 
 
 async def do_the_thing(base_dir: str) -> None:
+    from src.api_key_expiry import reset_api_key_expiry_warnings
+
+    reset_api_key_expiry_warnings()
     load_heavy_globals()
     # Reload config from disk so that changes made via the WebUI config
     # editor (or manual file edits between runs) are picked up.  The

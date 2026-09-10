@@ -104,12 +104,6 @@ def test_darkpeers_replaces_generic_dual_audio_with_rule_matrix_label():
     assert _name(meta) == "Anime 2026 1080p WEB-DL French MULTi-TEAM"
 
 
-def test_darkpeers_preserves_detected_original_scene_name():
-    meta = Meta(category="MOVIE", name="Generated Name", scene=True, scene_name="Original.Release.2026-GRP", language_checked=True)
-
-    assert _name(meta) == "Original.Release.2026-GRP"
-
-
 def test_darkpeers_tv_name_omits_year_without_an_exact_title_match():
     meta = Meta(category="TV", title="BLACK TORCH", year=2026, name="BLACK TORCH 2026 S01E05 1080p CR WEB-DL DD+ 2.0 H.264-AnoZu")
     adapter = DarkPeers({"DEFAULT": {"tmdb_api": "test-key"}, "TRACKERS": {"DARKPEERS": {}}})

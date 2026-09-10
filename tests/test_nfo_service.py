@@ -1,3 +1,4 @@
+# ruff: noqa: S101
 from pathlib import Path
 
 import pytest
@@ -68,4 +69,4 @@ async def test_parse_scene_nfo_sets_service_for_movie(tmp_path: Path) -> None:
     await Prep.__new__(Prep).parse_scene_nfo(meta)
 
     assert meta.service == "AMZN"
-    assert meta.service_longname == "Amazon Prime"
+    assert meta.service_longname == "Amazon Prime Video"

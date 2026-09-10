@@ -376,7 +376,7 @@ async def enrich_music_from_orpheus(meta: Meta, config: dict[str, Any]) -> bool:
     if meta.category != "MUSIC" or not identifier.isdigit() or not isinstance(meta.music_release, dict):
         return False
 
-    from src.trackers.orpheus import Orpheus
+    from src.trackers.GAZELLE.orpheus import Orpheus
 
     orpheus = Orpheus(config)
     result = await orpheus.get_torrent(identifier, meta)

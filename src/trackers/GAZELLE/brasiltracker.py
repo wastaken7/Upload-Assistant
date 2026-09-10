@@ -210,7 +210,7 @@ class BrasilTracker:
             ebook_format_map = {"azw3": "AZW3", "mobi": "MOBI", "pdf": "PDF", "epub": "ePub", "kfx": "KFX"}
             return ebook_format_map.get(container_lower, "")
 
-        if container_str in ["avi", "m2ts", "m4v", "mkv", "mp4", "ts", "vob", "wmv", "mkv"]:
+        if container_lower in {"avi", "m2ts", "m4v", "mkv", "mp4", "ts", "vob", "wmv"}:
             return container_str.upper()
 
         return "Outro"

@@ -2145,11 +2145,6 @@ class DescriptionBuilder:
 
             # If screens_per_row is set, use that to determine how many screenshots should be on each row. Otherwise, use 2 as default
             screens_per_row = self._get_int_config("screens_per_row", 2)
-            if self.tracker == "HAWKEUNO":
-                width = self._get_int_config("thumbnail_size", 350)
-                # Adjust screens_per_row to keep total width below 1100
-                while screens_per_row * width > 1100 and screens_per_row > 1:
-                    screens_per_row -= 1
         except Exception:
             screens_per_row = 2
         return screens_per_row
@@ -2226,6 +2221,9 @@ class DescriptionBuilder:
 
     def tracker_specific_formats(self, tracker: str, description: str) -> str:
         bbcode = BBCODE()
+        if tracker in {"ANTHELION", "BJSHARE", "BRASILTRACKER", "GREATPOSTERWALL"}:
+            description = bbcode.clamp_size_tags(description)
+
         if tracker == "BRASILTRACKER":
             description = bbcode.remove_img_resize(description)
             description = bbcode.remove_list(description)

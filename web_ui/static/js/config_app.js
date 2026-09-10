@@ -1,5 +1,7 @@
 const { useEffect, useMemo, useRef, useState } = React;
 const useModalFocus = window.useUAModalFocus;
+const { state: apiKeyExpiryState, label: apiKeyExpiryLabel } =
+  window.UAApiKeyExpiry;
 
 const CONFIG_FIELD_RESET_EVENT = "ua-config-field-reset";
 const CONFIG_COMPACT_LAYOUT_BREAKPOINT = 768;
@@ -254,6 +256,11 @@ const Tooltip = ({ children, content, className = "" }) => {
         ref: triggerRef,
         onMouseEnter: showTooltip,
         onMouseLeave: hideTooltip,
+        onFocus: showTooltip,
+        onBlur: hideTooltip,
+        onKeyDown: (event) => {
+          if (event.key === "Escape") hideTooltip();
+        },
         onClick: toggleTooltip,
         className: `cursor-help ${className}`,
       },
@@ -414,6 +421,8 @@ const RailLogoutIcon = () => (
 );
 
 function ConfigApplicationRail({
+  trackers,
+  onOpenTracker,
   isMobileLayout,
   colorTheme,
   onColorThemeChange,
@@ -485,6 +494,11 @@ function ConfigApplicationRail({
       <div className="min-h-4 flex-1"></div>
 
       <div className="ua-app-rail-footer grid shrink-0 gap-1 border-t p-2">
+        <window.UAApiKeyAlerts
+          trackers={trackers}
+          appBase={APP_BASE}
+          onOpenTracker={onOpenTracker}
+        />
         <button
           type="button"
           className={`ua-app-rail-button rounded-lg ${updateStatus?.update_available ? "ua-update-rail-button" : ""}`}
@@ -2529,6 +2543,8 @@ function ConfigLeafEditor({
   externalToolStatus,
   onBrowseFolder,
   onValueChange,
+  inputAction,
+  labelStatus,
 }) {
   const path = [...pathParts, item.key];
   const fieldId = path.join("--");
@@ -3757,24 +3773,33 @@ function ConfigLeafEditor({
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center gap-2">
-        <label htmlFor={fieldId} className={labelClass}>
-          {displayLabel}
-        </label>
-        {credentialHelp?.required && (
-          <span className="ua-config-required-badge border font-semibold">
-            Required
-          </span>
-        )}
-        {helpText && !credentialHelp && (
-          <Tooltip content={helpText}>
-            <InfoIcon
-              className={`w-4 h-4 ${isDarkMode ? "text-gray-400 hover:text-gray-300" : "text-gray-500 hover:text-gray-600"}`}
-            />
-          </Tooltip>
-        )}
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <div className="flex items-center gap-2">
+          <label htmlFor={fieldId} className={labelClass}>
+            {displayLabel}
+          </label>
+          {credentialHelp?.required && (
+            <span className="ua-config-required-badge border font-semibold">
+              Required
+            </span>
+          )}
+          {helpText && !credentialHelp && (
+            <Tooltip content={helpText}>
+              <InfoIcon
+                className={`w-4 h-4 ${isDarkMode ? "text-gray-400 hover:text-gray-300" : "text-gray-500 hover:text-gray-600"}`}
+              />
+            </Tooltip>
+          )}
+        </div>
+        {labelStatus}
       </div>
-      <div className="flex flex-col gap-2 sm:flex-row">
+      <div
+        className={
+          inputAction
+            ? "ua-config-api-key-controls"
+            : "flex flex-col gap-2 sm:flex-row"
+        }
+      >
         <input
           id={fieldId}
           type="text"
@@ -3796,6 +3821,7 @@ function ConfigLeafEditor({
           disabled={readOnly}
           className={`${inputClass}${readOnly ? " opacity-70 cursor-not-allowed" : ""}`}
         />
+        {inputAction}
         {canBrowseTorrentFolder && (
           <button
             type="button"
@@ -5218,6 +5244,144 @@ function TorrentClientSettings({
   );
 }
 
+function ApiKeyExpiryStatus({
+  tracker,
+  apiKey,
+  isDraft,
+  expiry,
+  onStatus,
+  renderField,
+}) {
+  window.UAApiKeyExpiry.useClock();
+  const [feedback, setFeedback] = useState(null);
+  const [checking, setChecking] = useState(false);
+  const requestRef = useRef(null);
+  useEffect(() => {
+    setFeedback(null);
+    setChecking(false);
+    return () => requestRef.current?.abort();
+  }, [apiKey, isDraft]);
+
+  const check = async () => {
+    requestRef.current?.abort();
+    const controller = new AbortController();
+    requestRef.current = controller;
+    setChecking(true);
+    setFeedback(null);
+    try {
+      const response = await apiFetch(`${API_BASE}/tracker_api_key_status`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
+        body: JSON.stringify({
+          tracker: tracker.name,
+          api_key: apiKey,
+          refresh: true,
+        }),
+      });
+      const data = await response.json();
+      if (controller.signal.aborted) return;
+      if (!response.ok || !data.success)
+        throw new Error(data.error || "API key check failed.");
+      onStatus(data.expiry);
+      setFeedback({ message: data.message, error: false });
+    } catch (error) {
+      if (!controller.signal.aborted)
+        setFeedback({
+          message: error.message || "API key check failed.",
+          error: true,
+        });
+    } finally {
+      if (!controller.signal.aborted) setChecking(false);
+    }
+  };
+  const state = apiKeyExpiryState(expiry);
+  const tone =
+    state === "expired"
+      ? "text-red-500"
+      : state === "expiring"
+        ? "text-amber-500"
+        : "ua-config-service-description";
+  const details = [
+    apiKeyExpiryLabel(expiry),
+    expiry?.checked_at &&
+      `Last checked ${new Date(expiry.checked_at).toLocaleString()}`,
+    feedback?.message,
+    isDraft &&
+      "Checking uses your draft key. Save Config to use it for uploads.",
+    !apiKey &&
+      "Checks the key supplied by your saved Prowlarr connection, if available.",
+  ]
+    .filter(Boolean)
+    .join("\n");
+  return (
+    <div className="space-y-2">
+      {renderField(
+        <button
+          type="button"
+          className="ua-config-service-action flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50"
+          disabled={checking}
+          aria-label={checking ? "Checking API key" : "Check API key"}
+          title={
+            isDraft
+              ? "Check draft API key"
+              : !apiKey
+                ? "Check Prowlarr API key"
+                : "Check API key"
+          }
+          onClick={check}
+        >
+          {checking && (
+            <svg
+              className="h-3 w-3 animate-spin"
+              viewBox="0 0 24 24"
+              fill="none"
+              aria-hidden="true"
+            >
+              <circle
+                cx="12"
+                cy="12"
+                r="9"
+                stroke="currentColor"
+                strokeWidth="3"
+                opacity="0.3"
+              />
+              <path
+                d="M12 3a9 9 0 0 1 9 9"
+                stroke="currentColor"
+                strokeWidth="3"
+              />
+            </svg>
+          )}
+          {checking ? "Checking…" : "Check"}
+        </button>,
+        <div
+          className={`ml-auto min-w-0 max-w-full text-xs ${tone}`}
+          role="status"
+          aria-label="API key status"
+        >
+          <Tooltip content={details}>
+            <span
+              tabIndex={0}
+              aria-label={details}
+              className="border-b border-dotted border-current"
+            >
+              {isDraft && "Draft · "}
+              {feedback && !feedback.error && "✓ Accepted · "}
+              {apiKeyExpiryLabel(expiry, true)}
+            </span>
+          </Tooltip>
+        </div>,
+      )}
+      {feedback?.error && (
+        <p className="text-xs text-red-500" role="alert">
+          {feedback.message}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function TrackerSettings({
   items,
   pathParts,
@@ -5228,6 +5392,9 @@ function TrackerSettings({
   overridesEnabled = false,
   onToggleOverrides = () => {},
   pendingChanges,
+  tracker,
+  apiKeyExpiry,
+  onApiKeyStatus,
   onValueChange,
 }) {
   const releaseGroupOverrides = (items || []).find(
@@ -5355,20 +5522,48 @@ function TrackerSettings({
           </div>
           <div className="p-4">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {group.items.map((item) => (
-                <ConfigLeaf
-                  key={item.key}
-                  item={item}
-                  pathParts={pathParts}
-                  isDarkMode={isDarkMode}
-                  fullWidth={true}
-                  hideHelp={TRACKER_HELP_NOTE_KEYS.has(item.key)}
-                  allImageHosts={allImageHosts}
-                  usedImageHosts={usedImageHosts}
-                  torrentClients={torrentClients}
-                  onValueChange={onValueChange}
-                />
-              ))}
+              {group.items.map((item) => {
+                const renderField = (inputAction, labelStatus) => (
+                  <ConfigLeaf
+                    item={item}
+                    pathParts={pathParts}
+                    isDarkMode={isDarkMode}
+                    fullWidth={true}
+                    hideHelp={TRACKER_HELP_NOTE_KEYS.has(item.key)}
+                    allImageHosts={allImageHosts}
+                    usedImageHosts={usedImageHosts}
+                    torrentClients={torrentClients}
+                    onValueChange={onValueChange}
+                    inputAction={inputAction}
+                    labelStatus={labelStatus}
+                  />
+                );
+                return (
+                  <div key={item.key} className="min-w-0">
+                    {item.key === "api_key" &&
+                    tracker?.api_key_expiry_supported ? (
+                      <ApiKeyExpiryStatus
+                        renderField={renderField}
+                        tracker={tracker}
+                        apiKey={String(
+                          pendingChanges?.get(
+                            [...pathParts, "api_key"].join("/"),
+                          )?.value ??
+                            item.value ??
+                            "",
+                        ).trim()}
+                        isDraft={pendingChanges?.has(
+                          [...pathParts, "api_key"].join("/"),
+                        )}
+                        expiry={apiKeyExpiry}
+                        onStatus={onApiKeyStatus}
+                      />
+                    ) : (
+                      renderField()
+                    )}
+                  </div>
+                );
+              })}
             </div>
             {group.items
               .filter((item) => TRACKER_HELP_NOTE_KEYS.has(item.key))
@@ -5579,6 +5774,8 @@ function DescriptionImagesSection({
 }
 
 function TrackerManager({
+  requestedTracker,
+  onSavedApiKeyStatus,
   items,
   defaultTrackersItem,
   trackerView,
@@ -5639,6 +5836,60 @@ function TrackerManager({
     useState(new Set());
   const [refreshingSetupTracker, setRefreshingSetupTracker] = useState("");
   const [setupRefreshFeedback, setSetupRefreshFeedback] = useState(null);
+  const [apiKeyChecks, setApiKeyChecks] = useState({});
+  useEffect(() => setApiKeyChecks({}), [trackerCatalog]);
+  const focusedRequest = useRef(null);
+  useEffect(() => {
+    if (!requestedTracker) return;
+    setTrackerQuery("");
+    setDestinationFilter("all");
+    setCategoryFilter("all");
+  }, [requestedTracker]);
+  useEffect(() => {
+    if (!requestedTracker || focusedRequest.current === requestedTracker)
+      return;
+    const frame = window.requestAnimationFrame(() => {
+      const card = document.getElementById(
+        `tracker-settings-${requestedTracker.name}`,
+      );
+      if (!card) return;
+      const field = document.getElementById(
+        `TRACKERS--${requestedTracker.name}--api_key`,
+      );
+      (field || card).scrollIntoView({ block: "center" });
+      // Focusing the field itself would reveal/clear its redacted placeholder.
+      (field?.nextElementSibling || card.querySelector("button"))?.focus({
+        preventScroll: true,
+      });
+      focusedRequest.current = requestedTracker;
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [
+    requestedTracker,
+    trackerView,
+    trackerCatalog,
+    expandedGroups,
+    trackerQuery,
+    destinationFilter,
+    categoryFilter,
+  ]);
+
+  const trackerApiKey = (tracker) => {
+    const name = String(tracker.name).toUpperCase();
+    const saved = trackerItemByName
+      .get(name)
+      ?.children?.find((item) => item.key === "api_key")?.value;
+    return String(
+      pendingTrackerValues.get(name)?.get("api_key") ?? saved ?? "",
+    ).trim();
+  };
+  const trackerExpiry = (tracker) => {
+    const name = String(tracker.name).toUpperCase();
+    const check = apiKeyChecks[name];
+    if (check?.apiKey === trackerApiKey(tracker)) return check.expiry;
+    if (pendingTrackerValues.get(name)?.has("api_key")) return null;
+    return tracker.api_key_expiry;
+  };
 
   useEffect(() => {
     setSelectedDefaults(normalizeTrackers(defaultTrackersItem.value));
@@ -5842,7 +6093,18 @@ function TrackerManager({
       tracker.credential_source === "prowlarr" &&
       !statuses.some((status) => status.label === "Prowlarr")
         ? [...statuses, { label: "Prowlarr", tone: "accent" }]
-        : statuses;
+        : [...statuses];
+    const expiry = trackerExpiry(tracker);
+    const expiryState = apiKeyExpiryState(expiry);
+    if (expiryState === "expired" || expiryState === "expiring") {
+      visibleStatuses.push({
+        label:
+          expiryState === "expired"
+            ? "API key expired"
+            : "API key expires soon",
+        tone: expiryState === "expired" ? "danger" : "warning",
+      });
+    }
     return (
       <span className="flex min-w-0 items-center gap-3">
         <span className="ua-config-tracker-icon flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg border">
@@ -6363,6 +6625,7 @@ function TrackerManager({
         return (
           <section
             key={name}
+            id={`tracker-settings-${name}`}
             className="ua-config-accordion overflow-hidden rounded-xl border"
             data-open={isOpen ? "true" : "false"}
             data-removing={isRemoving ? "true" : "false"}
@@ -6538,6 +6801,17 @@ function TrackerManager({
                     usedImageHosts={usedImageHosts}
                     torrentClients={torrentClients}
                     pendingChanges={pendingChanges}
+                    tracker={tracker}
+                    apiKeyExpiry={trackerExpiry(tracker)}
+                    onApiKeyStatus={(expiry) => {
+                      setApiKeyChecks((current) => ({
+                        ...current,
+                        [name]: { apiKey: trackerApiKey(tracker), expiry },
+                      }));
+                      if (!pendingTrackerValues.get(name)?.has("api_key")) {
+                        onSavedApiKeyStatus?.(name, expiry);
+                      }
+                    }}
                     overridesEnabled={overridesEnabled}
                     onToggleOverrides={(enabled, overrideItems) =>
                       onToggleTrackerOverrides(name, enabled, overrideItems)
@@ -6918,6 +7192,8 @@ function ArrIntegrationSettings({
 }
 
 function ItemList({
+  requestedTracker,
+  onSavedApiKeyStatus,
   items,
   pathParts,
   depth,
@@ -6994,6 +7270,8 @@ function ItemList({
   if (isTrackerConfig && defaultTrackersItem) {
     return (
       <TrackerManager
+        requestedTracker={requestedTracker}
+        onSavedApiKeyStatus={onSavedApiKeyStatus}
         items={subsections}
         defaultTrackersItem={defaultTrackersItem}
         trackerView={trackerView || "default"}
@@ -9030,6 +9308,8 @@ function AccessLogTab({ isDarkMode }) {
 }
 
 function ConfigSidebar({
+  trackers,
+  onOpenTracker,
   isMobileLayout,
   sections,
   activeTab,
@@ -9333,6 +9613,12 @@ function ConfigSidebar({
         )}
 
         <div className="mt-3 grid gap-2">
+          <window.UAApiKeyAlerts
+            trackers={trackers}
+            appBase={APP_BASE}
+            onOpenTracker={onOpenTracker}
+            placement="sidebar"
+          />
           <button
             type="button"
             className={`ua-config-sidebar-action rounded-lg px-3 py-2 text-sm font-semibold ${updateStatus?.update_available ? "ua-update-sidebar-action" : ""}`}
@@ -9472,6 +9758,10 @@ function ConfigApp() {
     defaultTrackers: [],
     trackers: [],
   });
+  const [requestedTracker, setRequestedTracker] = useState(null);
+  const trackerDeepLink = useRef(
+    new URLSearchParams(window.location.search).get("tracker"),
+  );
   const folderPickerResolveRef = useRef(null);
   const [folderPicker, setFolderPicker] = useState(null);
   const [renameClientSource, setRenameClientSource] = useState("");
@@ -9634,9 +9924,30 @@ function ConfigApp() {
   };
 
   const navigateTo = (tab, subTab = "") => {
+    setRequestedTracker(null);
     setActiveTab(tab);
     setActiveSubTab(subTab);
     setIsMobileNavOpen(false);
+  };
+
+  const openTrackerSettings = (name) => {
+    const normalized = String(name).toUpperCase();
+    navigateTo("trackers", "configured");
+    setExpandedGroups(
+      (current) => new Set([...current, `TRACKERS/${normalized}`]),
+    );
+    setRequestedTracker({ name: normalized });
+  };
+
+  const updateSavedApiKeyStatus = (name, expiry) => {
+    setTrackerCatalog((current) => ({
+      ...current,
+      trackers: current.trackers.map((tracker) =>
+        tracker.name.toUpperCase() === name
+          ? { ...tracker, api_key_expiry: expiry }
+          : tracker,
+      ),
+    }));
   };
 
   useEffect(() => {
@@ -9880,6 +10191,21 @@ function ConfigApp() {
             }
           }
         }
+      }
+      if (trackerDeepLink.current) {
+        const name = trackerDeepLink.current.toUpperCase();
+        trackerDeepLink.current = null;
+        const trackerSection = newSections.find(
+          (section) => section.section === "TRACKERS",
+        );
+        if (
+          trackerSection?.items?.some((item) => item.key.toUpperCase() === name)
+        ) {
+          openTrackerSettings(name);
+        }
+        const url = new URL(window.location.href);
+        url.searchParams.delete("tracker");
+        window.history.replaceState(window.history.state, "", url);
       }
       return true;
     } catch (error) {
@@ -11807,6 +12133,8 @@ function ConfigApp() {
 
       <div className="min-h-screen">
         <ConfigApplicationRail
+          trackers={trackerCatalog.trackers}
+          onOpenTracker={openTrackerSettings}
           isMobileLayout={isMobileLayout}
           colorTheme={colorTheme}
           onColorThemeChange={handleColorThemeChange}
@@ -11838,6 +12166,8 @@ function ConfigApp() {
           onPointerCancel={cancelMobileNavGesture}
         >
           <ConfigSidebar
+            trackers={trackerCatalog.trackers}
+            onOpenTracker={openTrackerSettings}
             isMobileLayout={isMobileLayout}
             sections={sections}
             activeTab={activeTab}
@@ -12065,6 +12395,8 @@ function ConfigApp() {
                     {activeSection && (
                       <React.Fragment>
                         <ItemList
+                          requestedTracker={requestedTracker}
+                          onSavedApiKeyStatus={updateSavedApiKeyStatus}
                           items={visibleItems}
                           pathParts={[activeSection.section]}
                           depth={0}

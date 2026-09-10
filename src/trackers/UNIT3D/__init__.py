@@ -9,6 +9,7 @@ from typing import Any
 import aiofiles
 import httpx
 
+from src.api_key_expiry import record_api_key_expiry, warn_api_key_expiry
 from src.artwork import is_valid_image_bytes
 from src.cogs.redaction import Redaction
 from src.console import logger
@@ -22,6 +23,7 @@ type ParamsList = list[tuple[str, QueryValue]]
 
 class UNIT3D:
     auth_type = "unit3d_api"
+    api_key_expiry_supported = True
     supported_categories: tuple[str, ...] = ("TV", "MOVIE")
     tracker: str = ""
     banned_groups: tuple[str, ...] = ()
@@ -47,6 +49,11 @@ class UNIT3D:
     async def get_additional_checks(self, meta: Meta) -> bool:
         _meta = meta
         return True
+
+    def observe_api_key_expiry(self, meta: Meta, response: httpx.Response, payload: object) -> None:
+        status = record_api_key_expiry(self.tracker, self.api_key, self.base_url, response, meta.base_dir, payload=payload)
+        if status is not None and self.tracker in (meta.trackers or []):
+            warn_api_key_expiry(self.tracker, self.api_key, self.base_url, meta.base_dir, status=status)
 
     async def get_search_urls(self, meta: Meta, request_params: ParamsList) -> list[tuple[str, ParamsList, bool]]:
         _ = meta
@@ -127,6 +134,7 @@ class UNIT3D:
 
                 if response.status_code == 200:
                     data = response.json()
+                    self.observe_api_key_expiry(meta, response, data)
                     for each in data.get("data", []):
                         if check_pending:
                             entry_tmdb = str(each.get("tmdb_id") or "")
@@ -536,6 +544,7 @@ class UNIT3D:
                         response.raise_for_status()
 
                         response_data = response.json()
+                        self.observe_api_key_expiry(meta, response, response_data)
 
                         # Verify API success before proceeding
                         if not response_data.get("success"):

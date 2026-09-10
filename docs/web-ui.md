@@ -146,7 +146,7 @@ While an upload is active, the workspace changes from setup controls to live run
 - The page header shows the current state and selected path.
 - **Execution Output** streams the Upload Assistant console.
 - **Binary Progress** reports progress from external tools when available.
-- **Now Processing** shows the current media poster, identifiers, technical details, overview, and source path when metadata is available.
+- **Now Processing** uses a poster-first live summary with provider identifiers, technical release details, overview, and category-specific metadata for movies, TV, books, music, games, and adult releases.
 - **Kill** terminates the active run.
 
 ### Generated screenshots
@@ -192,6 +192,18 @@ Configuration is arranged by task rather than mirroring the raw Python dictionar
 Hover or focus an information icon beside a setting to read its description. The [configuration reference](example-config.md) remains the authoritative detailed reference for defaults and implementation notes.
 
 The editor combines bundled defaults from `data/example_config.py` with overrides from the user-state `data/config.py`. If no usable `config.py` exists, the interface displays the example defaults and warns that they have not yet been saved. Successful configuration writes are recorded in `data/config_audit.log`; sensitive values are redacted from that audit trail.
+
+### Tracker API key expiry
+
+UNIT3D tracker cards display **API key expires soon** within 14 days of the last reported expiry, or **API key expired** after that date. The API key field has a **Check** button beside it and a compact status beside its heading, wrapping below the heading when space is limited. Hover, focus or tap that status for the exact expiry date and last-checked time. Checking makes a small authenticated search request with the entered key; it does not save pending configuration changes. If the field is empty, the check can use the tracker's key from the saved Prowlarr connection.
+
+An **API keys** indicator appears in the application rail when configured keys need attention: amber for approaching expiry, red if any have expired. Open it to see affected trackers and jump directly to their Config fields. On phones, the indicator appears in Config navigation and the Upload header. It uses the loaded tracker catalogue and makes no additional tracker requests. Checking a saved key updates the Config indicator immediately; checking an unsaved replacement leaves the saved key's warning in place. Reload the page to pick up observations made elsewhere.
+
+UA also learns expiry dates from normal UNIT3D searches, uploads and shared tracker metadata/check requests. Both the CLI and WebUI upload console warn once per selected tracker/key per run. Cached dates are checked when trackers are selected, and new observations can warn during the run. Warnings are advisory and do not block uploads or replace normal authentication checks.
+
+Expiry metadata is stored in `data/api_key_expiry.sqlite3` under the user-state directory. Records contain a hash identifying the tracker, site and key, plus expiry and observation times; the API key itself is not stored there. Changing the key makes the old record inapplicable. These dates are observations, not a guarantee that a key has not subsequently been revoked.
+
+UA reads the ISO 8601 `X-Api-Key-Expires-At` response header and can also interpret an explicit `api_key.expires_at` value in a JSON response. LST documents that omitting the header on an authenticated response means no expiry. On other trackers, an omitted header means expiry is unknown; explicit JSON `null` means no expiry. Authentication errors, invalid dates and failed requests do not erase an earlier observation. Unknown and non-expiring keys do not generate warnings.
 
 ### Personal release groups
 

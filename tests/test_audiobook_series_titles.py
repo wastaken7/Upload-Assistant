@@ -18,6 +18,17 @@ def test_normalize_audiobook_title_removes_repeated_series_prefix():
     assert normalize_audiobook_title("Os Contos de Hans Christian Andersen: O bobo", "Os Contos de Hans Christian Andersen") == "O bobo"  # noqa: S101
 
 
+def test_normalize_audiobook_title_removes_repeated_series_volume_suffix():
+    assert (  # noqa: S101
+        normalize_audiobook_title(
+            "3. Fato Típico, Dolo e Culpa - Conceito de Crime: Direito Penal - Vol. 7",
+            "Direito Penal",
+            "7",
+        )
+        == "3. Fato Típico, Dolo e Culpa - Conceito de Crime"
+    )
+
+
 def test_extract_audiobook_series_without_comma():
     assert extract_audiobook_series_from_title("Crescendo: Hush, hush Livro 2") == ("Crescendo", "Hush, hush", "2")  # noqa: S101
 
