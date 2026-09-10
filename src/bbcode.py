@@ -608,6 +608,14 @@ class BBCODE:
         """
         return re.sub(r"\[img(?:[^\]]*)\]", "[img]", desc, flags=re.IGNORECASE)
 
+    def clamp_size_tags(self, desc: str, max_size: int = 10) -> str:
+        """Clamp integer BBCode size tags without changing other markup."""
+
+        def clamp(match: re.Match[str]) -> str:
+            return match.group(0) if int(match.group(1)) <= max_size else f"[size={max_size}]"
+
+        return re.sub(r"\[size=(\d+)\]", clamp, desc, flags=re.IGNORECASE)
+
     def remove_extra_lines(self, desc: str) -> str:
         """
         Removes more than 2 consecutive newlines
