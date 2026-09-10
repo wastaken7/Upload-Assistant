@@ -8,7 +8,7 @@ DEPENDENCY_VERSIONS = {
     "hdr10plus_tool": "1.7.2",
     "mkbrr": "v1.24.0",
     "nyuu": "v0.4.2",
-    "par2": "v1.4.0",
+    "par2": "v1.5.0",
     "pesto": "pesto-v0.6.0",
 }
 
