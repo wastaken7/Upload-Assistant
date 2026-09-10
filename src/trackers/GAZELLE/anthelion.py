@@ -149,43 +149,46 @@ class Anthelion:
         meta.ant_user_tags = False
         no_tags = False
         tags: list[str] = []
+        allowed_tags = {
+            "action",
+            "adventure",
+            "animation",
+            "comedy",
+            "crime",
+            "documentary",
+            "drama",
+            "family",
+            "fantasy",
+            "history",
+            "horror",
+            "music",
+            "mystery",
+            "romance",
+            "sci.fi",
+            "thriller",
+            "war",
+            "western",
+        }
+
+        def normalize_genres(genres: str | list[str]) -> list[str]:
+            values = [genres] if isinstance(genres, str) else genres
+            normalized: list[str] = []
+            for genre in values:
+                tag = genre.replace(" ", ".").lower()
+                if tag == "science.fiction":
+                    tag = "sci.fi"
+                if tag in allowed_tags:
+                    normalized.append(tag)
+            return normalized
+
         if meta.genres:
             genres = meta.genres
-            # Handle both string and list formats
-            if isinstance(genres, str):
-                tags.append(genres.replace(" ", ".").lower())
-            else:
-                tags.extend(genre.replace(" ", ".").lower() for genre in genres)
+            tags.extend(normalize_genres(genres))
         else:
             no_tags = True
         if no_tags and meta.imdb_info:
             imdb_genres = meta.imdb_info.get("genres", [])
-            # Handle both string and list formats
-            if isinstance(imdb_genres, str):
-                tags.append(imdb_genres.replace(" ", ".").lower())
-            else:
-                tags.extend(genre.replace(" ", ".").lower() for genre in imdb_genres)
-            allowed_tags = {
-                "action",
-                "adventure",
-                "animation",
-                "comedy",
-                "crime",
-                "documentary",
-                "drama",
-                "family",
-                "fantasy",
-                "history",
-                "horror",
-                "music",
-                "mystery",
-                "romance",
-                "sci.fi",
-                "thriller",
-                "war",
-                "western",
-            }
-            tags = [tag for tag in tags if tag.lower() in allowed_tags]
+            tags.extend(normalize_genres(imdb_genres))
 
             if tags:
                 logger.info(f"{self.tracker}: [green]Using IMDb genres for tagging: {', '.join(tags)}")
@@ -479,7 +482,7 @@ class Anthelion:
         if meta.tmdb:
             params["tmdbid"] = str(meta.tmdb)
         elif meta.imdb_id:
-            params["imdbid"] = str(meta.imdb)
+            params["imdbid"] = str(meta.imdb_id)
 
         headers = {
             "X-API-Key": self.api_key,
