@@ -32,6 +32,20 @@ from src.tracker_images import get_tracker_image_collection, has_tracker_image_c
 from src.trackers.common import Common
 from src.uploadscreens import UploadScreensManager
 
+NEXUSPHP_TRACKERS = {
+    "1PTBA",
+    "LAJIDUI",
+    "LEMONHD",
+    "LONGPT",
+    "PTCAFE",
+    "PTFANS",
+    "PTGTK",
+    "PTZONE",
+    "RAILGUNPT",
+    "XINGYUNGEPT",
+    "NEXUSPHP",
+}
+
 
 def html_to_bbcode(text: str) -> str:
     """Convert HTML tags to BBCode format."""
@@ -2190,20 +2204,7 @@ class DescriptionBuilder:
         if not thumb_size:
             thumb_size = self._get_int_config("thumbnail_size", 350)
 
-        nexusphp_trackers = {
-            "1PTBA",
-            "LAJIDUI",
-            "LEMONHD",
-            "LONGPT",
-            "PTCAFE",
-            "PTFANS",
-            "PTGTK",
-            "PTZONE",
-            "RAILGUNPT",
-            "XINGYUNGEPT",
-            "NEXUSPHP",
-        }
-        if self.tracker in nexusphp_trackers:
+        if self.tracker in NEXUSPHP_TRACKERS:
             return f"[img]{raw_url}[/img]"
         if self.tracker == "HDTORRENTS":
             return f"<a href='{raw_url}'><img src='{img_url}' height=137></a> "
@@ -2221,6 +2222,9 @@ class DescriptionBuilder:
 
     def tracker_specific_formats(self, tracker: str, description: str) -> str:
         bbcode = BBCODE()
+        if tracker in NEXUSPHP_TRACKERS:
+            description = bbcode.remove_img_resize(description)
+
         if tracker in {"ANTHELION", "BJSHARE", "BRASILTRACKER", "GREATPOSTERWALL"}:
             description = bbcode.clamp_size_tags(description)
 
