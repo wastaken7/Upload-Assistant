@@ -16,7 +16,7 @@ from src.console import logger
 from src.meta import Meta
 from src.torrent_clients import DelugeClientMixin, QbittorrentClientMixin, RtorrentClientMixin, TransmissionClientMixin
 from src.torrent_clients.path_utils import coerce_str_list, is_path_under
-from src.torrentcreate import SUBTITLE_EXTENSIONS
+from src.torrentcreate import SUBTITLE_EXTENSIONS, hdbits_pieces_allowed
 
 # Secure XML-RPC client using defusedxml to prevent XML attacks
 defusedxml.xmlrpc.monkey_patch()
@@ -623,7 +623,11 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
 
                     # Piece size and count validations
                     max_piece_size = meta.max_piece_size
-                    if reuse_torrent.pieces >= 5000 and reuse_torrent.piece_size < 4294304 and (max_piece_size is None or max_piece_size >= 4):
+                    if "HDBITS" in meta.trackers:
+                        valid = not wrong_file and hdbits_pieces_allowed(piece_size, reuse_torrent.pieces, reuse_torrent.size)
+                        if not valid:
+                            logger.debug("[bold red]Torrent does not meet HDBits piece limits or file requirements")
+                    elif reuse_torrent.pieces >= 5000 and reuse_torrent.piece_size < 4294304 and (max_piece_size is None or max_piece_size >= 4):
                         logger.debug("[bold red]Torrent needs to have less than 5000 pieces with a 4 MiB piece size")
                         valid = False
                     elif (

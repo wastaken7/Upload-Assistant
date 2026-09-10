@@ -32,6 +32,26 @@ PIECE_SIZE_MAX = 134_217_728  # 128 MiB
 SUBTITLE_EXTENSIONS = (".srt", ".sub", ".vtt", ".ssa", ".ass", ".idx")
 
 
+def hdbits_pieces_allowed(piece_size: int, pieces: int, total_size: int) -> bool:
+    if piece_size <= 0 or piece_size & (piece_size - 1) or pieces <= 0:
+        return False
+    if piece_size <= 2 * 1024**2:
+        return pieces <= 4000
+    if piece_size in (4 * 1024**2, 8 * 1024**2):
+        return pieces <= 30000
+    return piece_size == 16 * 1024**2 or (piece_size == 32 * 1024**2 and total_size > 1024**4)
+
+
+def hdbits_piece_size(total_size: int) -> int:
+    """Choose a compliant size for new hashes; never use this to reject reuse."""
+    if total_size > 8 * 1024**3:
+        return 16 * 1024**2
+    piece_size = 32768
+    while not hdbits_pieces_allowed(piece_size, max(1, (total_size + piece_size - 1) // piece_size), total_size):
+        piece_size *= 2
+    return piece_size
+
+
 def calculate_piece_size(
     total_size: int,
     min_size: int,
@@ -114,6 +134,9 @@ class TorrentCreator:
         meta: Meta,
         piece_size: int | None = None,
     ) -> int:
+        if "HDBITS" in meta.trackers:
+            return hdbits_piece_size(total_size)
+
         # Set max_size
         if piece_size:
             try:
@@ -280,6 +303,18 @@ class TorrentCreator:
                     exclude = ["*.*", "*sample.mkv", "!sample*.*"] if not meta.is_disc else []
                     include = ["*.mkv", "*.mp4", "*.ts"] if not meta.is_disc else []
 
+                # Calculate initial size
+                def calculate_size() -> int:
+                    size = 0
+                    if Path(path).is_file():
+                        size = Path(path).stat().st_size
+                    elif Path(path).is_dir():
+                        for root, _dirs, files in os.walk(path):
+                            size += sum((Path(root) / f).stat().st_size for f in files if (Path(root) / f).is_file())
+                    return size
+
+                initial_size = await asyncio.to_thread(calculate_size)
+
                 # If using mkbrr, run the external application
                 if meta.mkbrr:
                     try:
@@ -305,7 +340,10 @@ class TorrentCreator:
                         if meta.randomized >= 1:
                             cmd.extend(["-e"])
 
-                        if piece_size and not tracker_url:
+                        if "HDBITS" in meta.trackers:
+                            power = max(16, hdbits_piece_size(initial_size).bit_length() - 1)
+                            cmd.extend(["-l", str(power)])
+                        elif piece_size and not tracker_url:
                             try:
                                 max_size_bytes = piece_size * 1024 * 1024
 
@@ -427,18 +465,6 @@ class TorrentCreator:
                         logger.info("[yellow]Falling back to CustomTorrent method")
                         meta.mkbrr = False
                 overall_start_time = time.time()
-
-                # Calculate initial size
-                def calculate_size() -> int:
-                    size = 0
-                    if Path(path).is_file():
-                        size = Path(path).stat().st_size
-                    elif Path(path).is_dir():
-                        for root, _dirs, files in os.walk(path):
-                            size += sum((Path(root) / f).stat().st_size for f in files if (Path(root) / f).is_file())
-                    return size
-
-                initial_size = await asyncio.to_thread(calculate_size)
 
                 piece_size = cls.calculate_piece_size(initial_size, 32768, 134217728, meta, piece_size=piece_size)
 

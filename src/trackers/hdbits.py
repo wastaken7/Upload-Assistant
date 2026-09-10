@@ -2,6 +2,7 @@
 import asyncio
 import json
 import re
+import shutil
 from pathlib import Path
 from typing import Any, cast
 from urllib.parse import quote, urlparse
@@ -9,16 +10,18 @@ from urllib.parse import quote, urlparse
 import aiofiles
 import httpx
 from rich.markup import escape
+from torf import Torrent
 from unidecode import unidecode
 
 from src.bbcode import BBCODE
+from src.clients import Clients
 from src.cogs.redaction import Redaction
 from src.console import console, logger
 from src.description_review import get_base_description
 from src.exceptions import *  # noqa F403
 from src.meta import Meta
 from src.temp_paths import screenshots_dir
-from src.torrentcreate import TorrentCreator
+from src.torrentcreate import TorrentCreator, hdbits_pieces_allowed
 from src.trackers.common import Common
 
 Config = dict[str, Any]
@@ -255,28 +258,39 @@ class HDBits:
         async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt", encoding="utf-8") as desc_file:
             hdb_desc = await desc_file.read()
 
-        base_piece_mb = meta.base_torrent_piece_mb or 0
         torrent_file_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}].torrent"
+        tracker_config = self.config.get("TRACKERS", {}).get(self.tracker, {})
+        torrent_dir = Path(meta.base_dir) / "tmp" / meta.uuid
+        base_name = await common.get_torrent_filename(meta, tracker_config)
+        base_torrent = Torrent.read(torrent_dir / f"{base_name}.torrent")
+        torrent_name = base_name
+        if not hdbits_pieces_allowed(base_torrent.piece_size, base_torrent.pieces, base_torrent.size):
+            search_meta = meta.copy()
+            search_meta.trackers = [self.tracker]
+            if base_name != "BASE_SUBS":
+                search_meta.subtitle_files = []
+            clients = Clients(self.config)
+            candidate_path = await clients.find_existing_torrent(search_meta)
+            if candidate_path and search_meta.subtitle_files and not clients._torrent_includes_all_local_subtitles(candidate_path, search_meta):
+                candidate_path = None
 
-        # Check if the piece size exceeds 16 MiB and regenerate the torrent if needed
-        if base_piece_mb > 16 and not meta.nohash:
-            logger.info(f"{self.tracker}: [red]Piece size is OVER 16M and does not work on {self.tracker}. Generating a new .torrent")
-            hdb_config = self.config.get("TRACKERS", {}).get("HDBITS", {})
-            hdb_config_dict = cast(dict[str, Any], hdb_config) if isinstance(hdb_config, dict) else {}
-            tracker_url = str(hdb_config_dict.get("announce_url", "https://fake.tracker")).strip()
-            piece_size = 16
-            torrent_create = f"[{self.tracker}]"
-            try:
-                cooldown = int(self.config.get("DEFAULT", {}).get("rehash_cooldown", 0) or 0)
-            except ValueError, TypeError:
-                cooldown = 0
-            if cooldown > 0:
-                await asyncio.sleep(cooldown)  # Small cooldown before rehashing
+            torrent_name = f"[{self.tracker}]"
+            if candidate_path:
+                await asyncio.to_thread(shutil.copyfile, candidate_path, torrent_dir / f"{torrent_name}.torrent")
+            else:
+                logger.info("HDBITS: [yellow]No torrent meeting the piece limits found. Generating a new .torrent")
+                try:
+                    cooldown = int(self.config.get("DEFAULT", {}).get("rehash_cooldown", 0) or 0)
+                except ValueError, TypeError:
+                    cooldown = 0
+                if cooldown > 0:
+                    await asyncio.sleep(cooldown)
+                if base_name == "BASE_SUBS":
+                    torrent_name += "_BASE_SUBS"
+                tracker_url = str(tracker_config.get("announce_url") or "https://fake.tracker").strip()
+                await TorrentCreator.create_torrent(search_meta, str(meta.path), torrent_name, tracker_url=tracker_url)
 
-            await TorrentCreator.create_torrent(meta, str(meta.path), torrent_create, tracker_url=tracker_url, piece_size=piece_size)
-            await common.create_torrent_for_upload(meta, self.tracker, self.source_flag, torrent_filename=torrent_create)
-        else:
-            await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
+        await common.create_torrent_for_upload(meta, self.tracker, self.source_flag, torrent_filename=torrent_name)
 
         # Proceed with the upload process
         async with aiofiles.open(torrent_file_path, "rb") as torrent_file:
