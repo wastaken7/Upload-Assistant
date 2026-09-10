@@ -4071,9 +4071,12 @@ function ReleaseGroupOverrides({
   item,
   pathParts,
   pendingValue,
+  trackerItems,
+  pendingChanges,
   onValueChange,
 }) {
   const draftCache = React.useContext(OverrideDraftContext);
+  const defaults = React.useContext(TrackerDefaultValuesContext);
   const [isOpen, setIsOpen] = useState(false);
   const [openNames, setOpenNames] = useState(new Set());
   const [newName, setNewName] = useState("");
@@ -4087,12 +4090,24 @@ function ReleaseGroupOverrides({
   const pathKey = path.join("/");
   const fieldPrefix = path.join("--");
   const groupNames = Object.keys(groups || {});
+  const globalGroups = parseReleaseGroupOverrides(defaults.tag_overrides);
+  const inheritedField = (name, key) =>
+    window.UAReleaseGroupInheritance.resolve({
+      name,
+      key,
+      pathParts,
+      defaults,
+      globalGroups,
+      trackerItems,
+      pendingChanges,
+    });
 
   const setFieldEnabled = (name, key, enabled) => {
     const nextValues = { ...groups[name] };
     if (enabled) {
       nextValues[key] =
-        draftCache.current.get(pathKey)?.get(name)?.get(key) ?? "";
+        draftCache.current.get(pathKey)?.get(name)?.get(key) ??
+        inheritedField(name, key).value;
     } else {
       // Remember disabled text only for this editing session, outside the saved map.
       const scopeDrafts = draftCache.current.get(pathKey) || new Map();
@@ -4114,7 +4129,7 @@ function ReleaseGroupOverrides({
     });
 
   const validateName = (name, currentName = null) => {
-    const normalize = (value) => value.trim().replace(/^-+/, "").toLowerCase();
+    const normalize = window.UAReleaseGroupInheritance.normalizeName;
     if (!normalize(name) || [...name].some((char) => char.charCodeAt(0) < 32)) {
       return "Enter a release group name.";
     }
@@ -4212,6 +4227,13 @@ function ReleaseGroupOverrides({
                 to enable its override. Disabled fields inherit their usual
                 text; an enabled field left empty uses blank text.
               </p>
+              {pathParts[0] !== "TRACKERS" && (
+                <p className="ua-config-service-description text-xs leading-relaxed">
+                  Inherited text varies by tracker. New overrides start with
+                  DEFAULT text; tracker-specific release-group overrides still
+                  take priority.
+                </p>
+              )}
               {groupNames.length === 0 && (
                 <p className="ua-config-service-description text-sm">
                   No release group overrides configured.
@@ -4364,6 +4386,7 @@ function ReleaseGroupOverrides({
                               Object.hasOwn(values, field.key) &&
                               values[field.key] !== null;
                             const textId = `${fieldPrefix}--${encodeURIComponent(name)}--${field.key}`;
+                            const inherited = inheritedField(name, field.key);
                             return (
                               <div
                                 key={field.key}
@@ -4396,14 +4419,15 @@ function ReleaseGroupOverrides({
                                   id={textId}
                                   type="text"
                                   aria-label={`${label} for ${name}`}
+                                  aria-describedby={`${textId}--source`}
                                   disabled={!enabled}
                                   value={
                                     enabled
                                       ? values[field.key]
-                                      : (draftCache.current
-                                          .get(pathKey)
-                                          ?.get(name)
-                                          ?.get(field.key) ?? "")
+                                      : inherited.preview
+                                  }
+                                  placeholder={
+                                    enabled ? "" : inherited.placeholder
                                   }
                                   className="ua-config-input mt-auto w-full rounded-md border px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
                                   onChange={(event) =>
@@ -4416,6 +4440,14 @@ function ReleaseGroupOverrides({
                                     })
                                   }
                                 />
+                                <span
+                                  id={`${textId}--source`}
+                                  className="ua-config-service-description text-xs"
+                                >
+                                  {enabled
+                                    ? inherited.overrideLabel
+                                    : inherited.inheritedLabel}
+                                </span>
                               </div>
                             );
                           })}
@@ -5571,7 +5603,7 @@ function TrackerDefaultOverrides({
             if (!groupItems.length) return null;
             return (
               <section key={group.title} className="space-y-3">
-                <h4 className="ua-config-section-heading border-b pb-2 text-xs font-semibold">
+                <h4 className="ua-config-section-heading border-b py-1 text-xs font-semibold">
                   {group.title}
                 </h4>
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
@@ -5846,24 +5878,26 @@ function TrackerSettings({
           </div>
         </section>
       ))}
-      {releaseGroupOverrides && (
-        <ReleaseGroupOverrides
-          item={releaseGroupOverrides}
-          pathParts={pathParts}
-          pendingValue={
-            pendingChanges?.get(
-              [...pathParts, releaseGroupOverrides.key].join("/"),
-            )?.value
-          }
-          onValueChange={onValueChange}
-        />
-      )}
       {overrideItems.length > 0 && (
         <TrackerDefaultOverrides
           items={overrideItems}
           pathParts={pathParts}
           isDarkMode={isDarkMode}
           pendingChanges={pendingChanges}
+          onValueChange={onValueChange}
+        />
+      )}
+      {releaseGroupOverrides && (
+        <ReleaseGroupOverrides
+          item={releaseGroupOverrides}
+          pathParts={pathParts}
+          trackerItems={editableItems}
+          pendingChanges={pendingChanges}
+          pendingValue={
+            pendingChanges?.get(
+              [...pathParts, releaseGroupOverrides.key].join("/"),
+            )?.value
+          }
           onValueChange={onValueChange}
         />
       )}
@@ -10577,7 +10611,7 @@ function ConfigApp() {
 
   const findConfigItem = (items, targetKey) => {
     for (const item of items || []) {
-      if (item.key === targetKey && !item.children) return item;
+      if (item.key === targetKey && !item.children?.length) return item;
       const nested = findConfigItem(item.children, targetKey);
       if (nested) return nested;
     }
@@ -12482,7 +12516,7 @@ function ConfigApp() {
     <OverrideDraftContext.Provider value={overrideDrafts}>
       <TrackerDefaultValuesContext.Provider
         value={Object.fromEntries(
-          [...trackerDefaultOverrideKeys].map((key) => [
+          [...trackerDefaultOverrideKeys, "tag_overrides"].map((key) => [
             key,
             getEffectiveDefaultValue(key),
           ]),
