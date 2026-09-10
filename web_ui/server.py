@@ -5295,6 +5295,17 @@ def config_update():
     key = path[-1] if path else ""
     is_optional_arr_field = len(path) == 2 and path[0] == "DEFAULT" and re.fullmatch(r"(?:sonarr|radarr)_(?:url|api_key)_[1-3]", key) is not None
     force_remove_optional_arr_field = is_optional_arr_field and data.get("remove") is True
+    is_tracker_default_override = len(path) == 3 and path[0] == "TRACKERS" and key in _TRACKER_DEFAULT_OVERRIDE_KEYS
+    force_remove_tracker_override = is_tracker_default_override and data.get("remove") is True
+    if is_tracker_default_override and example_value is None and isinstance(_get_nested_value(example_config, path[:2]), Mapping):
+        # Existing overrides may outlive a field's entry in the tracker template.
+        # Keep those displayed fields editable/removable without adding new ones.
+        saved_config = _load_config_from_file(config_path) or {}
+        saved_tracker = _as_dict(_get_nested_value(saved_config, path[:2])) or {}
+        if key in saved_tracker:
+            example_value = _get_nested_value(example_config, ["DEFAULT", key])
+            if example_value is None:
+                example_value = saved_tracker[key] if saved_tracker[key] is not None else ""
     is_release_group_override = _is_release_group_override_path(path)
     if is_release_group_override:
         if not isinstance(_get_nested_value(example_config, path[:-1]), Mapping):
@@ -5315,11 +5326,12 @@ def config_update():
             return jsonify({"success": False, "error": str(error)}), 400
     new_value_literal = _python_literal(coerced_value)
 
-    # Keep optional WebUI-managed values out of config.py when they are unused.
+    # Remove unchecked tracker overrides so subsequent DEFAULT changes are inherited.
+    # Also keep optional WebUI-managed values out of config.py when they are unused.
     key = path[-1] if path else ""
     should_remove_empty_value = (key in ["injecting_client_list", "searching_client_list"] and coerced_value == []) or (
         is_optional_arr_field and (coerced_value == "" or force_remove_optional_arr_field)
-    )
+    ) or force_remove_tracker_override
     if should_remove_empty_value:
         # Remove the key from config if it exists
         try:

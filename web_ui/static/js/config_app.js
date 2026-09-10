@@ -1551,6 +1551,8 @@ const statusClassFor = (type, isDarkMode) => {
 
 // NumberInput component - styled number input using browser's built-in controls
 const NumberInput = ({
+  id,
+  inputLabel,
   value,
   onChange,
   min = 0,
@@ -1599,6 +1601,8 @@ const NumberInput = ({
   return (
     <input
       type="number"
+      id={id}
+      aria-label={inputLabel}
       value={draftValue}
       onChange={handleInputChange}
       onFocus={() => {
@@ -2537,6 +2541,7 @@ function ConfigLeafEditor({
   inlineBooleanLabel,
   labelOverride,
   hideHelp = false,
+  hideLabel = false,
   allImageHosts,
   usedImageHosts,
   torrentClients,
@@ -2923,7 +2928,11 @@ function ConfigLeafEditor({
             : "grid grid-cols-1 items-start gap-3 px-4 py-3 md:grid-cols-12"
         }
       >
-        <div className={fullWidth ? "" : "col-span-1 md:col-span-4"}>
+        <div
+          className={
+            hideLabel ? "sr-only" : fullWidth ? "" : "col-span-1 md:col-span-4"
+          }
+        >
           <div className="flex items-center gap-2">
             <div className={labelClass}>{displayLabel}</div>
             {helpText && (
@@ -3038,7 +3047,11 @@ function ConfigLeafEditor({
             : "grid grid-cols-1 items-start gap-3 px-4 py-3 md:grid-cols-12"
         }
       >
-        <div className={fullWidth ? "" : "col-span-1 md:col-span-4"}>
+        <div
+          className={
+            hideLabel ? "sr-only" : fullWidth ? "" : "col-span-1 md:col-span-4"
+          }
+        >
           <div className="flex items-center gap-2">
             <div className={labelClass}>{displayLabel}</div>
             {helpText && (
@@ -3052,6 +3065,8 @@ function ConfigLeafEditor({
         </div>
         <div className={fullWidth ? "" : "col-span-1 md:col-span-7"}>
           <NumberInput
+            id={fieldId}
+            inputLabel={displayLabel}
             value={numericValue}
             onChange={(newValue) => {
               setNumericValue(newValue);
@@ -3311,7 +3326,11 @@ function ConfigLeafEditor({
             : "grid grid-cols-1 items-start gap-3 px-4 py-3 md:grid-cols-12"
         }
       >
-        <div className={fullWidth ? "" : "col-span-1 md:col-span-4"}>
+        <div
+          className={
+            hideLabel ? "sr-only" : fullWidth ? "" : "col-span-1 md:col-span-4"
+          }
+        >
           <div className="flex items-center gap-2">
             <div className={labelClass}>{displayLabel}</div>
             {helpText && (
@@ -3773,7 +3792,13 @@ function ConfigLeafEditor({
 
   return (
     <div className="space-y-2">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+      <div
+        className={
+          hideLabel
+            ? "sr-only"
+            : "flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1"
+        }
+      >
         <div className="flex items-center gap-2">
           <label htmlFor={fieldId} className={labelClass}>
             {displayLabel}
@@ -4002,8 +4027,9 @@ function MetadataCacheServices({
   );
 }
 
-/** Keep disabled text across settings pages until the editing session is reset. */
-const ReleaseGroupDraftContext = React.createContext(null);
+/** Keep disabled override drafts across settings pages until the editing session is reset. */
+const OverrideDraftContext = React.createContext(null);
+const TrackerDefaultValuesContext = React.createContext({});
 
 /** Read stored or staged overrides without substituting example groups. */
 const parseReleaseGroupOverrides = (value) => {
@@ -4045,9 +4071,12 @@ function ReleaseGroupOverrides({
   item,
   pathParts,
   pendingValue,
+  trackerItems,
+  pendingChanges,
   onValueChange,
 }) {
-  const draftCache = React.useContext(ReleaseGroupDraftContext);
+  const draftCache = React.useContext(OverrideDraftContext);
+  const defaults = React.useContext(TrackerDefaultValuesContext);
   const [isOpen, setIsOpen] = useState(false);
   const [openNames, setOpenNames] = useState(new Set());
   const [newName, setNewName] = useState("");
@@ -4061,12 +4090,24 @@ function ReleaseGroupOverrides({
   const pathKey = path.join("/");
   const fieldPrefix = path.join("--");
   const groupNames = Object.keys(groups || {});
+  const globalGroups = parseReleaseGroupOverrides(defaults.tag_overrides);
+  const inheritedField = (name, key) =>
+    window.UAReleaseGroupInheritance.resolve({
+      name,
+      key,
+      pathParts,
+      defaults,
+      globalGroups,
+      trackerItems,
+      pendingChanges,
+    });
 
   const setFieldEnabled = (name, key, enabled) => {
     const nextValues = { ...groups[name] };
     if (enabled) {
       nextValues[key] =
-        draftCache.current.get(pathKey)?.get(name)?.get(key) ?? "";
+        draftCache.current.get(pathKey)?.get(name)?.get(key) ??
+        inheritedField(name, key).value;
     } else {
       // Remember disabled text only for this editing session, outside the saved map.
       const scopeDrafts = draftCache.current.get(pathKey) || new Map();
@@ -4088,7 +4129,7 @@ function ReleaseGroupOverrides({
     });
 
   const validateName = (name, currentName = null) => {
-    const normalize = (value) => value.trim().replace(/^-+/, "").toLowerCase();
+    const normalize = window.UAReleaseGroupInheritance.normalizeName;
     if (!normalize(name) || [...name].some((char) => char.charCodeAt(0) < 32)) {
       return "Enter a release group name.";
     }
@@ -4186,6 +4227,13 @@ function ReleaseGroupOverrides({
                 to enable its override. Disabled fields inherit their usual
                 text; an enabled field left empty uses blank text.
               </p>
+              {pathParts[0] !== "TRACKERS" && (
+                <p className="ua-config-service-description text-xs leading-relaxed">
+                  Inherited text varies by tracker. New overrides start with
+                  DEFAULT text; tracker-specific release-group overrides still
+                  take priority.
+                </p>
+              )}
               {groupNames.length === 0 && (
                 <p className="ua-config-service-description text-sm">
                   No release group overrides configured.
@@ -4338,6 +4386,7 @@ function ReleaseGroupOverrides({
                               Object.hasOwn(values, field.key) &&
                               values[field.key] !== null;
                             const textId = `${fieldPrefix}--${encodeURIComponent(name)}--${field.key}`;
+                            const inherited = inheritedField(name, field.key);
                             return (
                               <div
                                 key={field.key}
@@ -4370,14 +4419,15 @@ function ReleaseGroupOverrides({
                                   id={textId}
                                   type="text"
                                   aria-label={`${label} for ${name}`}
+                                  aria-describedby={`${textId}--source`}
                                   disabled={!enabled}
                                   value={
                                     enabled
                                       ? values[field.key]
-                                      : (draftCache.current
-                                          .get(pathKey)
-                                          ?.get(name)
-                                          ?.get(field.key) ?? "")
+                                      : inherited.preview
+                                  }
+                                  placeholder={
+                                    enabled ? "" : inherited.placeholder
                                   }
                                   className="ua-config-input mt-auto w-full rounded-md border px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
                                   onChange={(event) =>
@@ -4390,6 +4440,14 @@ function ReleaseGroupOverrides({
                                     })
                                   }
                                 />
+                                <span
+                                  id={`${textId}--source`}
+                                  className="ua-config-service-description text-xs"
+                                >
+                                  {enabled
+                                    ? inherited.overrideLabel
+                                    : inherited.inheritedLabel}
+                                </span>
                               </div>
                             );
                           })}
@@ -5382,6 +5440,244 @@ function ApiKeyExpiryStatus({
   );
 }
 
+function TrackerDefaultOverrides({
+  items,
+  pathParts,
+  isDarkMode,
+  pendingChanges,
+  onValueChange,
+}) {
+  const drafts = React.useContext(OverrideDraftContext);
+  const defaults = React.useContext(TrackerDefaultValuesContext);
+  const [isOpen, setIsOpen] = useState(false);
+  const fieldState = (item) => {
+    const path = [...pathParts, item.key];
+    const pathKey = path.join("/");
+    const pending = pendingChanges?.get(pathKey);
+    const stored = item.source === "config";
+    return {
+      path,
+      pathKey,
+      stored,
+      enabled: pending ? !pending.removeKey : stored,
+      value: pending && !pending.removeKey ? pending.value : item.value,
+      inherited: defaults[item.key] ?? item.example_value ?? "",
+    };
+  };
+  const activeCount = items.filter((item) => fieldState(item).enabled).length;
+  const groups = [
+    {
+      title: "Images & Screenshots",
+      keys: [
+        "add_logo",
+        "logo_size",
+        "thumbnail_size",
+        "screens_per_row",
+        "multiScreens",
+        "pack_thumb_size",
+        "add_bluray_link",
+        "use_bluray_images",
+        "bluray_image_size",
+        "add_audio_spectrogram",
+        "add_dynamic_hdr_plot",
+      ],
+    },
+    {
+      title: "Description Text",
+      keys: [
+        "episode_overview",
+        "custom_description_header",
+        "screenshot_header",
+        "disc_menu_header",
+        "audio_spectrogram_header",
+        "dynamic_hdr_plot_header",
+        "tonemapped_header",
+        "custom_signature",
+        "custom_header",
+        "custom_footer",
+        "mediainfo_header",
+        "user_description",
+      ],
+    },
+    {
+      title: "Limits & Injection",
+      keys: ["charLimit", "fileLimit", "processLimit", "inject_delay"],
+    },
+  ];
+  const itemByKey = new Map(items.map((item) => [item.key, item]));
+  const updateField = (item, value, removeKey = false) => {
+    const state = fieldState(item);
+    onValueChange(state.path, value, {
+      originalValue: state.stored ? item.value : undefined,
+      removeKey,
+      isSensitive: false,
+      isRedacted: false,
+      readOnly: false,
+    });
+  };
+  const coerceFieldValue = (item, value) => {
+    const valueType = typeof (item.example_value ?? item.value);
+    return valueType === "boolean"
+      ? value === true || value === "true" || value === "True"
+      : valueType === "number"
+        ? Number(value)
+        : value;
+  };
+  const setFieldEnabled = (item, enabled) => {
+    const state = fieldState(item);
+    if (state.enabled === enabled) return;
+    if (enabled) {
+      updateField(
+        item,
+        coerceFieldValue(
+          item,
+          drafts.current.get(state.pathKey) ?? state.inherited,
+        ),
+      );
+    } else {
+      drafts.current.set(state.pathKey, state.value);
+      updateField(item, state.stored ? item.value : undefined, state.stored);
+    }
+  };
+
+  return (
+    <section
+      className="ua-config-accordion overflow-hidden rounded-xl border"
+      data-open={isOpen ? "true" : "false"}
+    >
+      <button
+        type="button"
+        onClick={() => setIsOpen((open) => !open)}
+        className="ua-config-accordion-trigger flex w-full items-center justify-between gap-4 px-4 py-3 text-left"
+        aria-expanded={isOpen}
+      >
+        <span className="min-w-0">
+          <span className="block text-sm font-semibold">
+            Tracker-Specific DEFAULT Overrides
+          </span>
+          <span className="ua-config-service-description mt-1 block text-xs font-normal">
+            {activeCount > 0
+              ? `${activeCount} ${activeCount === 1 ? "field overrides" : "fields override"} DEFAULT. All others inherit.`
+              : "All fields inherit DEFAULT settings."}
+          </span>
+        </span>
+        <span className="ua-config-service-action shrink-0 text-xs font-medium">
+          {isOpen ? "Hide" : "Show"}
+        </span>
+      </button>
+      {isOpen && (
+        <div className="ua-config-accordion-panel space-y-5 border-t p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <p className="ua-config-service-description min-w-0 flex-1 text-xs leading-relaxed">
+              Tick a field to override DEFAULT for this tracker. Untick it to
+              restore inheritance when you save. Matching release group
+              overrides still take priority for description text.
+            </p>
+            <div className="flex shrink-0 items-center justify-end gap-2">
+              <button
+                type="button"
+                className="ua-config-service-action rounded-md border px-2.5 py-1.5 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+                aria-label={`Enable all DEFAULT overrides for ${pathParts[1]}`}
+                disabled={activeCount === items.length}
+                onClick={() =>
+                  items.forEach((item) => setFieldEnabled(item, true))
+                }
+              >
+                Enable all
+              </button>
+              <button
+                type="button"
+                className="ua-config-service-action rounded-md border px-2.5 py-1.5 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+                aria-label={`Disable all DEFAULT overrides for ${pathParts[1]}`}
+                disabled={activeCount === 0}
+                onClick={() =>
+                  items.forEach((item) => setFieldEnabled(item, false))
+                }
+              >
+                Disable all
+              </button>
+            </div>
+          </div>
+          {groups.map((group) => {
+            const groupItems = group.keys
+              .map((key) => itemByKey.get(key))
+              .filter(Boolean);
+            if (!groupItems.length) return null;
+            return (
+              <section key={group.title} className="space-y-3">
+                <h4 className="ua-config-section-heading border-b py-1 text-xs font-semibold">
+                  {group.title}
+                </h4>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+                  {groupItems.map((item) => {
+                    const state = fieldState(item);
+                    const label = formatConfigFieldLabel(item.key, pathParts);
+                    const helpText = getConfigHelpText(item, pathParts);
+                    const displayValue = state.enabled
+                      ? state.value
+                      : state.inherited;
+                    // Pending numeric edits arrive as strings from ConfigLeaf.
+                    // Retain the field type so booleans keep their toggle control.
+                    const coerceValue = (value) =>
+                      coerceFieldValue(item, value);
+                    return (
+                      <div
+                        key={item.key}
+                        className="flex min-w-0 flex-col gap-2"
+                      >
+                        <div className="flex items-center gap-2">
+                          <label className="flex min-w-0 cursor-pointer items-center gap-2 text-sm font-medium">
+                            <input
+                              type="checkbox"
+                              checked={state.enabled}
+                              aria-label={`Override ${label} for ${pathParts[1]}`}
+                              className="ua-theme-checkbox h-4 w-4 shrink-0"
+                              onChange={(event) =>
+                                setFieldEnabled(item, event.target.checked)
+                              }
+                            />
+                            <span>{label}</span>
+                          </label>
+                          {helpText && (
+                            <Tooltip content={helpText}>
+                              <InfoIcon className="ua-config-service-description h-4 w-4 shrink-0" />
+                            </Tooltip>
+                          )}
+                        </div>
+                        <fieldset
+                          disabled={!state.enabled}
+                          className={`min-w-0 ${state.enabled ? "" : "opacity-50"}`}
+                        >
+                          <ConfigLeaf
+                            item={{ ...item, value: coerceValue(displayValue) }}
+                            pathParts={pathParts}
+                            isDarkMode={isDarkMode}
+                            fullWidth={true}
+                            hideLabel={true}
+                            hideHelp={true}
+                            onValueChange={(_path, value) =>
+                              updateField(item, coerceValue(value))
+                            }
+                          />
+                        </fieldset>
+                        <span className="ua-config-service-description text-xs">
+                          {state.enabled
+                            ? "Overrides DEFAULT"
+                            : "Inherits DEFAULT"}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function TrackerSettings({
   items,
   pathParts,
@@ -5389,8 +5685,6 @@ function TrackerSettings({
   allImageHosts,
   usedImageHosts,
   torrentClients,
-  overridesEnabled = false,
-  onToggleOverrides = () => {},
   pendingChanges,
   tracker,
   apiKeyExpiry,
@@ -5521,7 +5815,7 @@ function TrackerSettings({
             <h3 className="text-sm font-semibold">{group.title}</h3>
           </div>
           <div className="p-4">
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
               {group.items.map((item) => {
                 const renderField = (inputAction, labelStatus) => (
                   <ConfigLeaf
@@ -5586,10 +5880,21 @@ function TrackerSettings({
           </div>
         </section>
       ))}
+      {overrideItems.length > 0 && (
+        <TrackerDefaultOverrides
+          items={overrideItems}
+          pathParts={pathParts}
+          isDarkMode={isDarkMode}
+          pendingChanges={pendingChanges}
+          onValueChange={onValueChange}
+        />
+      )}
       {releaseGroupOverrides && (
         <ReleaseGroupOverrides
           item={releaseGroupOverrides}
           pathParts={pathParts}
+          trackerItems={editableItems}
+          pendingChanges={pendingChanges}
           pendingValue={
             pendingChanges?.get(
               [...pathParts, releaseGroupOverrides.key].join("/"),
@@ -5597,72 +5902,6 @@ function TrackerSettings({
           }
           onValueChange={onValueChange}
         />
-      )}
-      {overrideItems.length > 0 && (
-        <section className="ua-config-client-settings-group overflow-hidden rounded-lg border">
-          <div className="ua-config-section-heading flex flex-col gap-3 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h3 className="text-sm font-semibold">
-                Tracker-Specific DEFAULT Overrides
-              </h3>
-              <p className="ua-config-service-description mt-1 text-xs">
-                Enable only when this tracker should use different description,
-                screenshot, or injection settings from DEFAULT.
-              </p>
-              <p className="ua-config-service-description mt-1 text-xs">
-                Matching release group overrides still take priority for
-                description text.
-              </p>
-            </div>
-            <div className="flex shrink-0 items-center gap-3">
-              <button
-                type="button"
-                onClick={() =>
-                  onToggleOverrides(!overridesEnabled, overrideItems)
-                }
-                aria-pressed={overridesEnabled}
-                aria-label={`Tracker-specific overrides: ${overridesEnabled ? "Enabled" : "Disabled"}`}
-                className="ua-config-boolean-toggle relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
-                data-enabled={overridesEnabled ? "true" : "false"}
-              >
-                <span
-                  className={`ua-config-boolean-knob inline-block h-4 w-4 transform rounded-full transition-transform ${overridesEnabled ? "translate-x-6" : "translate-x-1"}`}
-                />
-              </button>
-              <span className="text-sm font-medium">
-                {overridesEnabled ? "Enabled" : "Disabled"}
-              </span>
-            </div>
-          </div>
-          {overridesEnabled ? (
-            <div>
-              <div className="ua-config-state-panel m-4 rounded-lg border p-4 text-sm">
-                These values will override the matching DEFAULT settings for
-                this tracker. Disable this section to remove them and restore
-                DEFAULT inheritance.
-              </div>
-              <div className="grid grid-cols-1 gap-4 border-t p-4 md:grid-cols-2 xl:grid-cols-3">
-                {overrideItems.map((item) => (
-                  <ConfigLeaf
-                    key={item.key}
-                    item={item}
-                    pathParts={pathParts}
-                    isDarkMode={isDarkMode}
-                    fullWidth={true}
-                    allImageHosts={allImageHosts}
-                    usedImageHosts={usedImageHosts}
-                    torrentClients={torrentClients}
-                    onValueChange={onValueChange}
-                  />
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div className="ua-config-state-panel m-4 rounded-lg border p-4 text-sm">
-              This tracker currently inherits the matching DEFAULT settings.
-            </div>
-          )}
-        </section>
       )}
     </div>
   );
@@ -5781,9 +6020,6 @@ function TrackerManager({
   trackerView,
   trackerCatalog,
   pendingChanges = new Map(),
-  pendingTrackerOverrideModes = new Map(),
-  trackerOverrideEditors = new Set(),
-  onToggleTrackerOverrides = () => {},
   pathParts,
   isDarkMode,
   allImageHosts,
@@ -6600,10 +6836,7 @@ function TrackerManager({
         const isDefault = selectedDefaults.includes(name);
         const isDefaultPending = isDefault !== originalDefaultSet.has(name);
         const isRemoving = trackerItem?.source === "removing";
-        const isUnsaved =
-          pendingTrackerValues.has(name) ||
-          pendingTrackerOverrideModes.has(name) ||
-          isDefaultPending;
+        const isUnsaved = pendingTrackerValues.has(name) || isDefaultPending;
         const statuses = [];
         if (isDefault) statuses.push({ label: "Default", tone: "accent" });
         if (isRemoving) {
@@ -6615,13 +6848,6 @@ function TrackerManager({
         const hasCookieRequirement = setupState.requirements.some(
           (requirement) => requirement.id === "cookie",
         );
-        const hasStoredOverrides = (trackerItem?.children || []).some(
-          (item) =>
-            trackerDefaultOverrideKeys.has(item.key) &&
-            item.source === "config",
-        );
-        const overridesEnabled =
-          hasStoredOverrides || trackerOverrideEditors.has(name);
         return (
           <section
             key={name}
@@ -6812,10 +7038,6 @@ function TrackerManager({
                         onSavedApiKeyStatus?.(name, expiry);
                       }
                     }}
-                    overridesEnabled={overridesEnabled}
-                    onToggleOverrides={(enabled, overrideItems) =>
-                      onToggleTrackerOverrides(name, enabled, overrideItems)
-                    }
                     onValueChange={onValueChange}
                   />
                 ) : (
@@ -7208,9 +7430,6 @@ function ItemList({
   trackerView,
   trackerCatalog,
   pendingChanges,
-  pendingTrackerOverrideModes,
-  trackerOverrideEditors,
-  onToggleTrackerOverrides,
   onAddTorrentClient,
   onRemovePendingTorrentClient,
   onRenameTorrentClient,
@@ -7277,7 +7496,6 @@ function ItemList({
         trackerView={trackerView || "default"}
         trackerCatalog={trackerCatalog}
         pendingChanges={pendingChanges}
-        pendingTrackerOverrideModes={pendingTrackerOverrideModes}
         pathParts={pathParts}
         isDarkMode={isDarkMode}
         allImageHosts={allImageHosts}
@@ -7285,8 +7503,6 @@ function ItemList({
         expandedGroups={expandedGroups}
         toggleGroup={toggleGroup}
         torrentClients={torrentClients}
-        trackerOverrideEditors={trackerOverrideEditors}
-        onToggleTrackerOverrides={onToggleTrackerOverrides}
         onRemoveTracker={onRemoveTracker}
         onUndoRemoveTracker={onUndoRemoveTracker}
         onRefreshTrackerCatalog={onRefreshTrackerCatalog}
@@ -9700,11 +9916,11 @@ function ConfigApp() {
   );
   const [expandedGroups, setExpandedGroups] = useState(new Set());
   const [pendingChanges, setPendingChanges] = useState(new Map());
-  const releaseGroupDrafts = useRef(new Map());
+  const overrideDrafts = useRef(new Map());
 
   useEffect(() => {
     const resetDrafts = (event) => {
-      releaseGroupDrafts.current.delete(String(event.detail?.pathKey || ""));
+      overrideDrafts.current.delete(String(event.detail?.pathKey || ""));
     };
     window.addEventListener(CONFIG_FIELD_RESET_EVENT, resetDrafts);
     return () =>
@@ -9716,11 +9932,6 @@ function ConfigApp() {
   const [pendingRenamedTorrentClients, setPendingRenamedTorrentClients] =
     useState(new Map());
   const [pendingRemovedTrackers, setPendingRemovedTrackers] = useState(
-    new Set(),
-  );
-  const [pendingTrackerOverrideModes, setPendingTrackerOverrideModes] =
-    useState(new Map());
-  const [trackerOverrideEditors, setTrackerOverrideEditors] = useState(
     new Set(),
   );
   const [isSaving, setIsSaving] = useState(false);
@@ -10075,7 +10286,7 @@ function ConfigApp() {
         throw new Error(data.error || "Failed to load config options");
       }
       const newSections = data.sections || [];
-      releaseGroupDrafts.current.clear();
+      overrideDrafts.current.clear();
       const fallbackSection =
         newSections.find((section) => section.section === "DEFAULT") ||
         newSections[0];
@@ -10085,8 +10296,6 @@ function ConfigApp() {
       setPendingRemovedTorrentClients(new Set());
       setPendingRenamedTorrentClients(new Map());
       setPendingRemovedTrackers(new Set());
-      setPendingTrackerOverrideModes(new Map());
-      setTrackerOverrideEditors(new Set());
       setClientTestStates(new Map());
       setProwlarrTestState(null);
       setRenameClientSource("");
@@ -10231,8 +10440,7 @@ function ConfigApp() {
       pendingTorrentClients.size > 0 ||
       pendingRenamedTorrentClients.size > 0 ||
       pendingRemovedTorrentClients.size > 0 ||
-      pendingRemovedTrackers.size > 0 ||
-      pendingTrackerOverrideModes.size > 0;
+      pendingRemovedTrackers.size > 0;
     setIsPendingSummaryOpen(false);
 
     if (requiresStructuralReload) {
@@ -10242,7 +10450,7 @@ function ConfigApp() {
       setPendingChanges(new Map());
     }
 
-    releaseGroupDrafts.current.clear();
+    overrideDrafts.current.clear();
 
     fieldPathsToReset.forEach((pathKey) => {
       window.dispatchEvent(
@@ -10405,7 +10613,7 @@ function ConfigApp() {
 
   const findConfigItem = (items, targetKey) => {
     for (const item of items || []) {
-      if (item.key === targetKey && !item.children) return item;
+      if (item.key === targetKey && !item.children?.length) return item;
       const nested = findConfigItem(item.children, targetKey);
       if (nested) return nested;
     }
@@ -10972,84 +11180,6 @@ function ConfigApp() {
     });
   };
 
-  const toggleTrackerOverrides = (trackerName, enabled, overrideItems) => {
-    const normalizedName = String(trackerName).toUpperCase();
-    const originalEnabled = (overrideItems || []).some(
-      (item) => item.source === "config" || item.previousSource === "config",
-    );
-
-    setTrackerOverrideEditors((currentEditors) => {
-      const next = new Set(currentEditors);
-      if (enabled) {
-        next.add(normalizedName);
-      } else {
-        next.delete(normalizedName);
-      }
-      return next;
-    });
-    setPendingTrackerOverrideModes((currentModes) => {
-      const next = new Map(currentModes);
-      if (enabled === originalEnabled) {
-        next.delete(normalizedName);
-      } else {
-        next.set(normalizedName, enabled);
-      }
-      return next;
-    });
-    setSections((currentSections) =>
-      currentSections.map((section) =>
-        section.section === "TRACKERS"
-          ? {
-              ...section,
-              items: section.items.map((trackerItem) =>
-                String(trackerItem.key).toUpperCase() === normalizedName
-                  ? {
-                      ...trackerItem,
-                      children: (trackerItem.children || []).map((item) => {
-                        if (!trackerDefaultOverrideKeys.has(item.key)) {
-                          return item;
-                        }
-                        if (enabled && item.source === "override-removing") {
-                          return {
-                            ...item,
-                            source: item.previousSource || "config",
-                            previousSource: null,
-                          };
-                        }
-                        if (!enabled && item.source === "config") {
-                          return {
-                            ...item,
-                            previousSource: item.source,
-                            source: "override-removing",
-                          };
-                        }
-                        return item;
-                      }),
-                    }
-                  : trackerItem,
-              ),
-            }
-          : section,
-      ),
-    );
-    if (!enabled) {
-      setPendingChanges((currentChanges) => {
-        const next = new Map(currentChanges);
-        for (const item of overrideItems || []) {
-          next.delete(["TRACKERS", trackerName, item.key].join("/"));
-        }
-        return next;
-      });
-    }
-    setStatusWithClear(
-      enabled
-        ? `${trackerName} will use tracker-specific overrides after you save.`
-        : `${trackerName} will inherit these settings from DEFAULT after you save.`,
-      "info",
-      3500,
-    );
-  };
-
   const removeTracker = (trackerName, wasDefault = false) => {
     const normalizedName = String(trackerName).toUpperCase();
     setSections((currentSections) =>
@@ -11074,16 +11204,6 @@ function ConfigApp() {
     setPendingRemovedTrackers((currentTrackers) => {
       const next = new Set(currentTrackers);
       next.add(normalizedName);
-      return next;
-    });
-    setPendingTrackerOverrideModes((currentModes) => {
-      const next = new Map(currentModes);
-      next.delete(normalizedName);
-      return next;
-    });
-    setTrackerOverrideEditors((currentEditors) => {
-      const next = new Set(currentEditors);
-      next.delete(normalizedName);
       return next;
     });
     setPendingChanges((currentChanges) => {
@@ -11180,8 +11300,7 @@ function ConfigApp() {
       pendingTorrentClients.size +
       pendingRenamedTorrentClients.size +
       pendingRemovedTorrentClients.size +
-      pendingRemovedTrackers.size +
-      pendingTrackerOverrideModes.size;
+      pendingRemovedTrackers.size;
     if (pendingChangeCount === 0) {
       setStatusWithClear("No changes to save.", "warn", 1500);
       return;
@@ -11304,25 +11423,6 @@ function ConfigApp() {
         const dataCreate = await respCreate.json();
         if (!dataCreate.success) {
           throw new Error(dataCreate.error || "Failed to create subsection");
-        }
-      }
-
-      // Apply group-level tracker overrides after any missing tracker block has
-      // been created, then save individual field edits over the copied values.
-      for (const [trackerName, enabled] of pendingTrackerOverrideModes) {
-        const response = await apiFetch(
-          `${API_BASE}/config_set_tracker_overrides`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ tracker: trackerName, enabled }),
-          },
-        );
-        const data = await response.json();
-        if (!data.success) {
-          throw new Error(
-            data.error || "Failed to update tracker-specific overrides",
-          );
         }
       }
 
@@ -11553,8 +11653,7 @@ function ConfigApp() {
     pendingTorrentClients.size +
     pendingRenamedTorrentClients.size +
     pendingRemovedTorrentClients.size +
-    pendingRemovedTrackers.size +
-    pendingTrackerOverrideModes.size;
+    pendingRemovedTrackers.size;
   const pendingChangeSummaries = useMemo(() => {
     const summaries = [];
     const availableTrackerNames = new Set(
@@ -11569,6 +11668,13 @@ function ConfigApp() {
       const path = Array.isArray(update.path) ? update.path : [];
       const key = String(path[path.length - 1] || "");
       const parentPath = path.slice(0, -1);
+      if (
+        path[0] === "TRACKERS" &&
+        trackerDefaultOverrideKeys.has(key) &&
+        update.removeKey
+      ) {
+        return "Inherit from DEFAULT";
+      }
       if (
         key === "tag_overrides" &&
         ((path[0] === "DEFAULT" && path.length === 2) ||
@@ -11869,13 +11975,6 @@ function ConfigApp() {
     }
     for (const [trackerName, pathKeys] of availableTrackerChanges) {
       const settingCount = pathKeys.length;
-      const normalizedTrackerName = String(trackerName).toUpperCase();
-      const overrideChange = Array.from(
-        pendingTrackerOverrideModes.entries(),
-      ).find(
-        ([pendingTrackerName]) =>
-          String(pendingTrackerName).toUpperCase() === normalizedTrackerName,
-      );
       const detailParts = [
         `${settingCount} setting${settingCount === 1 ? "" : "s"} changed`,
       ];
@@ -11883,19 +11982,11 @@ function ConfigApp() {
         .map((pathKey) => pendingChanges.get(pathKey))
         .find((update) => update.path[2] === "tag_overrides");
       if (groupUpdate) detailParts.push(describeValue(groupUpdate));
-      if (overrideChange) {
-        detailParts.push(
-          `DEFAULT overrides ${overrideChange[1] ? "enabled" : "removed"}`,
-        );
-      }
       summaries.push({
         id: `available-tracker:${trackerName}`,
         kind: "available-tracker",
         trackerName,
         pathKeys,
-        overrideChange: overrideChange
-          ? { trackerName: overrideChange[0], enabled: overrideChange[1] }
-          : null,
         title: `Configure tracker › ${getTrackerDisplayName(trackerName)}`,
         detail: detailParts.join("; "),
       });
@@ -11941,21 +12032,6 @@ function ConfigApp() {
         detail: getTrackerDisplayName(String(trackerName)),
       });
     }
-    for (const [trackerName, enabled] of pendingTrackerOverrideModes) {
-      if (availableTrackerChanges.has(String(trackerName).toUpperCase())) {
-        continue;
-      }
-      summaries.push({
-        id: `tracker-overrides:${trackerName}`,
-        kind: "tracker-overrides",
-        trackerName,
-        enabled,
-        title: "Tracker-specific DEFAULT overrides",
-        detail: `${getTrackerDisplayName(String(trackerName))}: ${
-          enabled ? "Enable" : "Remove"
-        }`,
-      });
-    }
     return summaries;
   }, [
     pendingChanges,
@@ -11963,7 +12039,6 @@ function ConfigApp() {
     pendingRemovedTrackers,
     pendingRenamedTorrentClients,
     pendingTorrentClients,
-    pendingTrackerOverrideModes,
     trackerCatalog,
   ]);
   useEffect(() => {
@@ -11971,19 +12046,6 @@ function ConfigApp() {
       setIsPendingSummaryOpen(false);
     }
   }, [pendingChangeCount]);
-  const discardTrackerOverrideChange = (trackerName, enabled) => {
-    const trackerSection = sections.find(
-      (section) => section.section === "TRACKERS",
-    );
-    const trackerItem = trackerSection?.items?.find(
-      (item) =>
-        String(item.key).toUpperCase() === String(trackerName).toUpperCase(),
-    );
-    const overrideItems = (trackerItem?.children || []).filter((item) =>
-      trackerDefaultOverrideKeys.has(item.key),
-    );
-    toggleTrackerOverrides(trackerName, !enabled, overrideItems);
-  };
   const discardPendingSummary = (summary) => {
     if (summary.kind === "field") {
       setPendingChanges((currentChanges) => {
@@ -12022,12 +12084,6 @@ function ConfigApp() {
           }),
         );
       });
-      if (summary.overrideChange) {
-        discardTrackerOverrideChange(
-          summary.overrideChange.trackerName,
-          summary.overrideChange.enabled,
-        );
-      }
     } else if (summary.kind === "client-add") {
       removePendingTorrentClient(summary.clientName);
     } else if (summary.kind === "client-rename") {
@@ -12036,8 +12092,6 @@ function ConfigApp() {
       undoRemoveTorrentClient(summary.clientName);
     } else if (summary.kind === "tracker-remove") {
       undoRemoveTracker(summary.trackerName);
-    } else if (summary.kind === "tracker-overrides") {
-      discardTrackerOverrideChange(summary.trackerName, summary.enabled);
     }
   };
   const saveDisabled = isSaving || pendingChangeCount === 0;
@@ -12415,11 +12469,6 @@ function ConfigApp() {
                           }
                           trackerCatalog={trackerCatalog}
                           pendingChanges={pendingChanges}
-                          pendingTrackerOverrideModes={
-                            pendingTrackerOverrideModes
-                          }
-                          trackerOverrideEditors={trackerOverrideEditors}
-                          onToggleTrackerOverrides={toggleTrackerOverrides}
                           onAddTorrentClient={addPendingTorrentClient}
                           onRemovePendingTorrentClient={
                             removePendingTorrentClient
@@ -12466,9 +12515,18 @@ function ConfigApp() {
   );
 
   return (
-    <ReleaseGroupDraftContext.Provider value={releaseGroupDrafts}>
-      {configPage}
-    </ReleaseGroupDraftContext.Provider>
+    <OverrideDraftContext.Provider value={overrideDrafts}>
+      <TrackerDefaultValuesContext.Provider
+        value={Object.fromEntries(
+          [...trackerDefaultOverrideKeys, "tag_overrides"].map((key) => [
+            key,
+            getEffectiveDefaultValue(key),
+          ]),
+        )}
+      >
+        {configPage}
+      </TrackerDefaultValuesContext.Provider>
+    </OverrideDraftContext.Provider>
   );
 }
 
