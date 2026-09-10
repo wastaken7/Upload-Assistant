@@ -9,6 +9,7 @@ from pathlib import Path
 import aiofiles
 import httpx
 
+from bin.binary_dependencies import DEPENDENCY_VERSIONS
 from bin.download_integrity import verify_downloaded_asset
 
 try:
@@ -30,7 +31,7 @@ class SevenZipBinaryManager:
     """Download 7-Zip binaries for the host architecture."""
 
     @staticmethod
-    async def ensure_7z_binary(base_dir: str | Path, version: str = "26.01") -> str:
+    async def ensure_7z_binary(base_dir: str | Path, version: str = DEPENDENCY_VERSIONS["7zip"]) -> str:
         system = platform.system().lower()
         machine = platform.machine().lower()
         logger.debug(f"[blue]7-Zip: Detected system: {system}, architecture: {machine}[/blue]")

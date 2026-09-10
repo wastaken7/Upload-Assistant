@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from bin import get_dynamic_hdr_tools
+from bin.download_integrity import SHA256_BY_ASSET
 from src.dynamic_hdr_plot import _formats, _generate_plot, _source_files, dynamic_hdr_plot_enabled
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
@@ -68,10 +69,10 @@ def test_existing_versioned_binary_does_not_download(tmp_path: Path, monkeypatch
 def test_downloaded_asset_checksum_is_verified(monkeypatch) -> None:  # type: ignore[no-untyped-def]
     asset = "test-asset"
     content = b"known-good"
-    monkeypatch.setitem(get_dynamic_hdr_tools.ASSET_SHA256, asset, hashlib.sha256(content).hexdigest())
+    monkeypatch.setitem(SHA256_BY_ASSET, asset, hashlib.sha256(content).hexdigest())
 
     get_dynamic_hdr_tools._verify_checksum(asset, content)
-    with pytest.raises(RuntimeError, match="Checksum mismatch"):
+    with pytest.raises(RuntimeError, match="SHA-256 checksum mismatch"):
         get_dynamic_hdr_tools._verify_checksum(asset, b"tampered")
 
 

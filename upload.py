@@ -3150,7 +3150,7 @@ async def get_mkbrr_path(base_dir: str | None = None) -> str | None:
         if bundled_mkbrr := MkbrrBinaryManager.find_existing_binary(CODE_DIR):
             return bundled_mkbrr
         resolved_base_dir = base_dir or str(STATE_DIR)
-        mkbrr_path = await MkbrrBinaryManager.ensure_mkbrr_binary(resolved_base_dir, version="v1.24.0")
+        mkbrr_path = await MkbrrBinaryManager.ensure_mkbrr_binary(resolved_base_dir)
         return mkbrr_path if mkbrr_path else None
     except Exception as e:
         logger.error(f"[red]Error setting up mkbrr binary: {e}[/red]")

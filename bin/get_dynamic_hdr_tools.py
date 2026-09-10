@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import platform
 import shutil
 import stat
@@ -13,24 +12,13 @@ from pathlib import Path
 
 import httpx
 
+from bin.binary_dependencies import DEPENDENCY_VERSIONS
+from bin.download_integrity import verify_downloaded_content
 from src.console import logger
 
 TOOLS = {
-    "dovi": {"command": "dovi_tool", "repository": "quietvoid/dovi_tool", "version": "2.3.3"},
-    "hdr10plus": {"command": "hdr10plus_tool", "repository": "quietvoid/hdr10plus_tool", "version": "1.7.2"},
-}
-
-ASSET_SHA256 = {
-    "dovi_tool-2.3.3-aarch64-pc-windows-msvc.zip": "559ed634ef0b956ab89ed965b4920371bb228983f105d99fafeb372a8190c872",
-    "dovi_tool-2.3.3-aarch64-unknown-linux-musl.tar.gz": "daf538c275f4e702219ce8eb61db28382193ac9d0126e1ef4185a88303af4485",
-    "dovi_tool-2.3.3-universal-macOS.zip": "b113c83fed2d8d7ed9e43f0428d02fa0d0030e20965fc24a3cd4d48597d88685",
-    "dovi_tool-2.3.3-x86_64-pc-windows-msvc.zip": "37ae198f2a535c910befad39fc09c21cded76bf3ef2d5459d542e58c2c158311",
-    "dovi_tool-2.3.3-x86_64-unknown-linux-musl.tar.gz": "5dae82cb2becd3b9fd726127f936a8d32635e60746d16238fdfded12aa05988c",
-    "hdr10plus_tool-1.7.2-aarch64-pc-windows-msvc.zip": "0cc1cd6ae9fb1115e5dc3d1f6daed47c486410ad5731f60a298e5d78fe995d6b",
-    "hdr10plus_tool-1.7.2-aarch64-unknown-linux-musl.tar.gz": "5fb90607cd94296640f1fc2355207b8107b67baac96d37481423d08a9fce437d",
-    "hdr10plus_tool-1.7.2-universal-macOS.zip": "d76977ed2ea90f8d6bce9035e37ea9dbffcead4725ceb1acf455c25d8658ff28",
-    "hdr10plus_tool-1.7.2-x86_64-pc-windows-msvc.zip": "82b2d560073941b14c6511a431f429e33e134e5caefb60d7e8f6f6e6da8e16ba",
-    "hdr10plus_tool-1.7.2-x86_64-unknown-linux-musl.tar.gz": "06385f37a639d61ba21d4be3150c863846933bc3b58110e094d8fc8f1c2249f2",
+    "dovi": {"command": "dovi_tool", "repository": "quietvoid/dovi_tool", "version": DEPENDENCY_VERSIONS["dovi_tool"]},
+    "hdr10plus": {"command": "hdr10plus_tool", "repository": "quietvoid/hdr10plus_tool", "version": DEPENDENCY_VERSIONS["hdr10plus_tool"]},
 }
 
 
@@ -50,11 +38,7 @@ def _asset_name(tool: str) -> tuple[str, str]:
 
 def _verify_checksum(asset: str, content: bytes) -> None:
     """Reject release assets whose content differs from the pinned digest."""
-    expected_checksum = ASSET_SHA256.get(asset)
-    if expected_checksum is None:
-        raise RuntimeError(f"Missing checksum for {asset}")
-    if hashlib.sha256(content).hexdigest() != expected_checksum:
-        raise RuntimeError(f"Checksum mismatch for {asset}")
+    verify_downloaded_content(content, asset)
 
 
 def _safe_extract(archive: Path, destination: Path) -> None:

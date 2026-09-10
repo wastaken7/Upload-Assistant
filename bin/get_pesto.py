@@ -8,6 +8,7 @@ from pathlib import Path
 import aiofiles
 import httpx
 
+from bin.binary_dependencies import DEPENDENCY_VERSIONS
 from bin.download_integrity import verify_downloaded_asset
 
 try:
@@ -29,7 +30,7 @@ class PestoBinaryManager:
     """Download Pesto binaries for the host architecture."""
 
     @staticmethod
-    async def ensure_pesto_binary(base_dir: str | Path, version: str = "pesto-v0.6.0") -> str:
+    async def ensure_pesto_binary(base_dir: str | Path, version: str = DEPENDENCY_VERSIONS["pesto"]) -> str:
         system = platform.system().lower()
         machine = platform.machine().lower()
         logger.debug(f"[blue]Pesto: Detected system: {system}, architecture: {machine}[/blue]")
