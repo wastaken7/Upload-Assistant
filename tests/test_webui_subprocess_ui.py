@@ -44,6 +44,82 @@ def test_webui_child_reports_structured_progress() -> None:
     assert event["current"] == 9.0
 
 
+def test_nyuu_webui_progress_does_not_render_terminal_progress() -> None:
+    script = """
+import asyncio
+import sys
+
+from src.usenetcreate import run_nyuu_with_progress
+
+child = "print('Uploading 100 article(s)'); print('Article posting progress: 10 read, 10 posted, 5 checked')"
+asyncio.run(run_nyuu_with_progress([sys.executable, '-u', '-c', child]))
+"""
+    result = subprocess.run(  # noqa: S603 - command and script are test-controlled
+        [sys.executable, "-u", "-c", script],
+        text=True,
+        capture_output=True,
+        env=server._webui_subprocess_env(),
+        check=True,
+    )
+
+    output_lines = [line for line in result.stdout.splitlines() if line]
+    events = [server._subprocess_progress_event(line) for line in output_lines]
+
+    assert all(event is not None for event in events)
+    assert [event["current"] for event in events if event is not None] == [0.0, 7.5, 100.0]
+
+
+def test_pesto_webui_progress_does_not_render_terminal_progress() -> None:
+    script = """
+import asyncio
+import sys
+
+from src.usenetcreate import run_pesto_with_progress
+
+child = '''import json
+print(json.dumps({"type": "segment_done", "progress_pct": 25, "total_segments": 100, "segment_done": 25}))'''
+asyncio.run(run_pesto_with_progress([sys.executable, '-u', '-c', child]))
+"""
+    result = subprocess.run(  # noqa: S603 - command and script are test-controlled
+        [sys.executable, "-u", "-c", script],
+        text=True,
+        capture_output=True,
+        env=server._webui_subprocess_env(),
+        check=True,
+    )
+
+    output_lines = [line for line in result.stdout.splitlines() if line]
+    events = [server._subprocess_progress_event(line) for line in output_lines]
+
+    assert all(event is not None for event in events)
+    assert [event["current"] for event in events if event is not None] == [0.0, 25.0, 100.0]
+
+
+def test_bdinfo_webui_progress_does_not_render_terminal_progress() -> None:
+    script = """
+import asyncio
+import sys
+
+from src.discparse import DiscParse
+
+child = "import sys; sys.stderr.write('Stream scan: 25% (1 GiB / 4 GiB, files 1/4, read 100 MiB/s, ETA 3s)\\\\n')"
+asyncio.run(DiscParse({})._run_bdinfo_with_progress([sys.executable, '-u', '-c', child], 'bdinfo-scan'))
+"""
+    result = subprocess.run(  # noqa: S603 - command and script are test-controlled
+        [sys.executable, "-u", "-c", script],
+        text=True,
+        capture_output=True,
+        env=server._webui_subprocess_env(),
+        check=True,
+    )
+
+    output_lines = [line for line in result.stdout.splitlines() if line]
+    events = [server._subprocess_progress_event(line) for line in output_lines]
+
+    assert all(event is not None for event in events)
+    assert [event["current"] for event in events if event is not None] == [0.0, 25.0, 100.0]
+
+
 def test_long_progress_record_waits_for_newline() -> None:
     partial = f"{server.PROGRESS_STDOUT_PREFIX}{'x' * 600}"
 

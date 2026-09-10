@@ -455,6 +455,7 @@ async def run_nyuu_with_progress(cmd: list[str], cwd: str | None = None) -> None
             TaskProgressColumn(),
             console=console,
             transient=False,
+            disable=has_progress_callback(),
         ) as progress:
             while True:
                 line_bytes = await process.stdout.readline()
@@ -586,6 +587,7 @@ async def run_pesto_with_progress(cmd: list[str], cwd: str | None = None) -> Non
             TaskProgressColumn(),
             console=console,
             transient=False,
+            disable=has_progress_callback(),
         ) as progress:
             while True:
                 line_bytes = await process.stdout.readline()
