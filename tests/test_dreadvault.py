@@ -124,6 +124,22 @@ def test_dreadvault_formats_dvdrip_with_resolution_and_encode_after_audio():
     assert name == "Example Movie 2001 480p DVDRip DD 2.0 x264-GRP"  # noqa: S101
 
 
+def test_dreadvault_formats_hi10p_dvdrip_with_encode_after_audio():
+    meta = Meta(
+        name="Example Movie 2001 PAL DVD Hi10P x264 DVDRip DD 2.0-GRP",
+        type="DVDRIP",
+        source="PAL DVD",
+        resolution="480p",
+        video_encode="Hi10P x264",
+        audio="DD 2.0",
+        language_checked=True,
+    )
+
+    name = asyncio.run(_tracker().get_name(meta))["name"]
+
+    assert name == "Example Movie 2001 480p DVDRip DD 2.0 Hi10P x264-GRP"  # noqa: S101
+
+
 def test_dreadvault_formats_dvd_disc_with_resolution_codec_region_and_source():
     meta = Meta(
         name="Example Movie 2001 R1 NTSC DVD DVD9 DD 5.1-GRP",
@@ -188,20 +204,20 @@ def test_dreadvault_adds_foreign_audio_language_before_source_when_resolution_is
     assert name == "Example Movie 2001 JAPANESE BluRay DD 5.1 x264-GRP"  # noqa: S101
 
 
-def test_dreadvault_never_prepends_foreign_audio_language_when_resolution_is_empty():
+def test_dreadvault_adds_foreign_audio_language_before_service_when_resolution_is_other():
     meta = Meta(
-        name="Example Movie 2001 BluRay DD 5.1 x264-GRP",
-        type="ENCODE",
-        source="BluRay",
-        resolution="",
+        name="Example Movie 2001 AMZN WEB-DL DD 5.1 H.264-GRP",
+        type="WEBDL",
+        source="Web",
+        resolution="OTHER",
+        service="AMZN",
         audio_languages=["Japanese"],
         language_checked=True,
     )
 
     name = asyncio.run(_tracker().get_name(meta))["name"]
 
-    assert not name.startswith("JAPANESE ")  # noqa: S101
-    assert "JAPANESE BluRay" in name or "JAPANESE" not in name  # noqa: S101
+    assert name == "Example Movie 2001 JAPANESE AMZN WEB-DL DD 5.1 H.264-GRP"  # noqa: S101
 
 
 def test_dreadvault_omits_foreign_audio_language_from_bdmv_disc():
@@ -292,6 +308,24 @@ def test_dreadvault_adds_foreign_audio_language_after_year_for_dvd_remux():
     assert name == "Example Movie 2001 JAPANESE 576p PAL DVD REMUX MPEG-2 DD 5.1-GRP"  # noqa: S101
 
 
+def test_dreadvault_adds_foreign_audio_language_before_resolution_for_yearless_dvd_remux():
+    meta = Meta(
+        name="Example Movie PAL DVD REMUX DD 2.0-GRP",
+        no_year=True,
+        type="REMUX",
+        source="PAL DVD",
+        resolution="576p",
+        video_codec="MPEG-2",
+        audio="DD 2.0",
+        audio_languages=["Japanese"],
+        language_checked=True,
+    )
+
+    name = asyncio.run(_tracker().get_name(meta))["name"]
+
+    assert name == "Example Movie JAPANESE 576p PAL DVD REMUX MPEG-2 DD 2.0-GRP"  # noqa: S101
+
+
 def test_dreadvault_never_adds_trump_suffix_for_exact_match():
     meta = Meta(
         name="Example Movie 2001 1080p BluRay DD 5.1 x264-GRP",
@@ -317,3 +351,24 @@ def test_dreadvault_moves_tv_aka_before_year():
     name = asyncio.run(_tracker().get_name(meta))["name"]
 
     assert name == "Example Show AKA Alternate Show 2024 S01 1080p WEB-DL"  # noqa: S101
+
+
+def test_dreadvault_moves_tv_aka_before_year_with_foreign_audio_language():
+    meta = Meta(
+        category="TV",
+        year=2024,
+        search_year=2024,
+        name="Example Show 2024 AKA Alt Show S01 PAL DVD REMUX DD 2.0-GRP",
+        aka="AKA Alt Show",
+        type="REMUX",
+        source="PAL DVD",
+        resolution="576p",
+        video_codec="MPEG-2",
+        audio="DD 2.0",
+        audio_languages=["Japanese"],
+        language_checked=True,
+    )
+
+    name = asyncio.run(_tracker().get_name(meta))["name"]
+
+    assert name == "Example Show AKA Alt Show 2024 JAPANESE S01 576p PAL DVD REMUX MPEG-2 DD 2.0-GRP"  # noqa: S101

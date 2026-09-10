@@ -72,10 +72,11 @@ class DreadVault(UNIT3D):
 
         if name_type == "DVDRIP":
             source = "DVDRip"
+            encode_token = video_encode.strip()
             dreadvault_name = dreadvault_name.replace(f"{meta.source} ", "", 1)
-            dreadvault_name = dreadvault_name.replace(f"{meta.video_encode}", "", 1)
+            dreadvault_name = dreadvault_name.replace(f" {encode_token}", "", 1)
             dreadvault_name = dreadvault_name.replace(f"{source}", f"{resolution} {source}", 1)
-            dreadvault_name = dreadvault_name.replace((meta.audio), f"{meta.audio}{video_encode}", 1)
+            dreadvault_name = dreadvault_name.replace((meta.audio), f"{meta.audio} {encode_token}", 1)
 
         elif meta.is_disc == "DVD":
             region_and_source = " ".join(part for part in (meta.region, source) if part)
@@ -88,27 +89,27 @@ class DreadVault(UNIT3D):
             dreadvault_name = dreadvault_name.replace(meta.source or "", f"{resolution} {meta.source}", 1)
             dreadvault_name = dreadvault_name.replace((meta.audio), f"{video_codec} {meta.audio}", 1)
 
+        if alt_title and year:
+            dreadvault_name = dreadvault_name.replace(f"{year} {alt_title}", f"{alt_title} {year}", 1)
+
         # The marker goes immediately before the resolution, so it has to run AFTER the branches
-        # below: the DVDRip and DVD-disc templates carry no resolution of their own, and those
+        # above: the DVDRip and DVD-disc templates carry no resolution of their own, and those
         # branches are what insert it. Running first silently dropped the marker on both.
         if not meta.language_checked:
             await languages_manager.process_desc_language(meta, tracker=self.tracker)
         audio_languages: list[str] = [] if not meta.audio_languages else meta.audio_languages
         if audio_languages and not await languages_manager.has_english_language(audio_languages):
             foreign_lang = audio_languages[0].upper()
-            if name_type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD"):
-                if year:
-                    dreadvault_name = dreadvault_name.replace(year, f"{year} {foreign_lang}", 1)
+            dvd_remux = name_type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD")
+            if dvd_remux and year:
+                dreadvault_name = dreadvault_name.replace(year, f"{year} {foreign_lang}", 1)
             elif meta.is_disc != "BDMV":
-                # get_name drops the resolution token when it is OTHER, so meta.resolution is not
-                # always in the name; the source sits in the next slot along and anchors it there.
-                for anchor in (meta.resolution, source):
+                # get_name drops the resolution token when it is OTHER; the next slot anchors the marker:
+                # the service on a web release, the source everywhere else.
+                for anchor in (meta.resolution, str(meta.service), source):
                     if anchor and anchor in dreadvault_name:
                         dreadvault_name = dreadvault_name.replace(anchor, f"{foreign_lang} {anchor}", 1)
                         break
-
-        if alt_title and year:
-            dreadvault_name = dreadvault_name.replace(f"{year} {alt_title}", f"{alt_title} {year}", 1)
 
         return {"name": dreadvault_name}
 
