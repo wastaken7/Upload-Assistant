@@ -6,7 +6,7 @@ DEPENDENCY_VERSIONS = {
     "dovi_tool": "2.3.3",
     "ffmpeg": "9.0.1",
     "hdr10plus_tool": "1.7.2",
-    "mkbrr": "v1.24.0",
+    "mkbrr": "v1.25.1",
     "nyuu": "v0.4.2",
     "par2": "v1.4.0",
     "pesto": "pesto-v0.6.0",
