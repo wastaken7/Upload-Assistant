@@ -300,10 +300,11 @@ config: dict[str, Any] = {
         "desat": "10.0",
         # Screenshot overlays
         # Layout examples and manual setup: docs/screenshot-overlays.md
-        # Enable screenshot labels without changing the individual selections below.
+        # Show enabled screenshot labels without changing the individual selections below.
+        # Enable at least one label below to display overlay text.
         # Enabling overlays uses FFmpeg tone mapping instead of libplacebo.
         "frame_overlay": False,
-        # Overlay text size, scaled with resolution.
+        # Overlay text size (1-100), scaled with resolution. VapourSynth rounds to whole font-scale steps.
         "overlay_text_size": "18",
         # Keep labels at the top, aligned to "left" or "right".
         "overlay_position": "left",

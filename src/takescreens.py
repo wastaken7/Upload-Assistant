@@ -513,6 +513,9 @@ async def disc_screenshots(
             except ValueError:
                 logger.error("[red]Error: Unable to parse frame rate from bdinfo['video'][0]['fps']")
 
+    if frame_rate is not None:
+        meta.frame_rate = frame_rate
+
     file_path = file_path
 
     keyframe = "nokey" if "VC-1" in bdinfo["video"][0]["codec"] or bdinfo["video"][0]["hdr_dv"] != "" else "none"
@@ -847,6 +850,7 @@ async def dvd_screenshots(
             width = float(track.width)
             height = float(track.height)
             frame_rate = float(track.frame_rate)
+    meta.frame_rate = frame_rate
     w_sar, h_sar = screenshot_par_scale_factors(width, height, par, dar)
 
     main_set = meta.discs[disc_num]["main_set"]

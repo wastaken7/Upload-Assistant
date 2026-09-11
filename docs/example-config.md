@@ -112,7 +112,7 @@ Implementation notes:
 - `screens_per_row` (str): Screenshots per row in description (only for some trackers).
 - `frame_overlay` (bool, default `False`): Master switch for screenshot labels. Individual selections are kept when explicitly configured.
 - `overlay_frame_number`, `overlay_frame_type`, `overlay_timestamp`, `overlay_tonemapped` (bool, default `False`): Choose each label independently. The Tonemapped label appears only when tone mapping occurred.
-- `overlay_text_size` (str, default `"18"`): FFmpeg overlay text size (scales with resolution).
+- `overlay_text_size` (str or int, default `"18"`): Overlay text size from `1` to `100`, scaled with resolution. VapourSynth rounds to whole font-scale steps.
 - `overlay_position` (str, default `"left"`): Place labels at the top-left (`"left"`) or top-right (`"right"`).
 - `overlay_layout` (str, default `"stacked"`): Use separate lines (`"stacked"`) or a compact row separated by bullets (`"single_line"`).
 - `scale_screenshots_for_par` (bool): When `False` (the default), preserve MediaInfo's coded dimensions. Set to `True` only to apply pixel-aspect-ratio correction for non-square-pixel sources; this can change a PNG from `1920x1040` to `1924x1040`.

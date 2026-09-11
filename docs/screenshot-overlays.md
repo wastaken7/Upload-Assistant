@@ -55,7 +55,7 @@ To match the stacked example, change `overlay_layout` to `"stacked"` and `overla
 | Setting                | New-config default | What it controls                                                                                         |
 | ---------------------- | ------------------ | -------------------------------------------------------------------------------------------------------- |
 | `frame_overlay`        | `False`            | Master switch. Set to `False` to hide all labels while keeping their individual selections.              |
-| `overlay_text_size`    | `"18"`             | FFmpeg text size, scaled with screenshot resolution.                                                     |
+| `overlay_text_size`    | `"18"`             | Text size from `1` to `100`, scaled with screenshot resolution. VapourSynth uses whole font-scale steps. |
 | `overlay_position`     | `"left"`           | `"left"` for top-left or `"right"` for top-right.                                                        |
 | `overlay_layout`       | `"stacked"`        | `"stacked"` for separate lines or `"single_line"` for a compact row.                                     |
 | `overlay_frame_number` | `False`            | Frame number; FFmpeg estimates this from the capture time and frame rate.                                |
@@ -73,7 +73,7 @@ When editing manually, add the four individual label settings explicitly, as in 
 
 ## Capture behavior
 
-- The images above show FFmpeg output. VapourSynth uses the same label selections, layouts and corner choices, but its built-in font has a different appearance and does not use `overlay_text_size`.
+- The images above show FFmpeg output. VapourSynth uses the same label selections, layouts, corner choices and text-size setting, but its built-in bitmap font scales in whole-number steps. Small size adjustments may produce no visible change. For example, at 1080p, `"18"` uses its native 16-pixel-high font and `"36"` uses a 32-pixel-high font.
 - With FFmpeg capture, active overlays use its existing tone-mapping path instead of libplacebo. Choosing the Tonemapped label does not change the `tone_map` setting.
 - Existing upload restrictions still apply: overlays are suppressed for uploads to AvistaZ, CinemaZ and PrivateHD.
 - Changes affect newly captured screenshots. Reused images keep any text already present in them. Restart a running CLI process after editing the config, then capture new screenshots to see the result.

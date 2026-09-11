@@ -42,6 +42,15 @@ def overlays_active(defaults: Mapping[str, Any]) -> bool:
     return overlay_enabled(defaults) and any(overlay_options(defaults).values())
 
 
+def overlay_text_size(defaults: Mapping[str, Any]) -> int:
+    """Return the bounded text size shared by FFmpeg and VapourSynth."""
+    try:
+        text_size = int(defaults.get("overlay_text_size", 18))
+    except (OverflowError, TypeError, ValueError):
+        text_size = 18
+    return max(1, min(text_size, 100))
+
+
 def format_timestamp(seconds: float) -> str:
     """Format an elapsed video time with millisecond precision."""
     milliseconds = max(0, round(seconds * 1000))
@@ -90,11 +99,7 @@ def overlay_filters(defaults: Mapping[str, Any], meta: Any, seek_time: str | flo
     baseline = 576 if dvd else 1080
     resolution = "".join(char for char in (meta.resolution or str(baseline)) if char.isdigit())
     scale = int(resolution or baseline) / baseline
-    try:
-        text_size = int(defaults.get("overlay_text_size", 18))
-    except (TypeError, ValueError):
-        text_size = 18
-    font_size = max(1, round(max(1, min(text_size, 100)) * scale))
+    font_size = max(1, round(overlay_text_size(defaults) * scale))
     border_width = max(1, round(2 * scale))
     padding = max(1, round(10 * scale))
     spacing = max(1, round(font_size * 1.1))

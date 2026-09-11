@@ -24,9 +24,13 @@ zresize: Any = awsmfunc.zresize
 # core.std.LoadPlugin(path="/usr/local/lib/vapoursynth/libimwri.so")
 
 
-def custom_frame_info(clip: Any, options: dict[str, bool], tonemapped: bool = False, *, layout: str = "stacked", position: str = "left") -> Any:
+def custom_frame_info(clip: Any, options: dict[str, bool], tonemapped: bool = False, *, layout: str = "stacked", position: str = "left", text_size: int = 18) -> Any:
     """Apply the selected labels to each VapourSynth frame."""
     from src.screenshot_overlays import format_timestamp, overlay_lines
+
+    # Text uses an 8x16 bitmap font and supports only integer scale factors.
+    # Approximate the resolution-scaled FFmpeg size, with one native glyph as the minimum.
+    font_scale = max(1, round(text_size * clip.height / 1080 / 16))
 
     def frame_props(n: int, f: Any, clip: Any) -> Any:
         frame_type = f.props.get("_PictType", "Unknown")
@@ -36,7 +40,7 @@ def custom_frame_info(clip: Any, options: dict[str, bool], tonemapped: bool = Fa
         lines = overlay_lines(options, n, str(frame_type), timestamp, tonemapped, layout=layout)
         # The built-in bitmap font expects Windows-1252, including the bullet.
         text = "\n".join(lines).encode("cp1252", errors="replace")
-        return core.text.Text(clip, text, alignment=9 if position == "right" else 7) if lines else clip
+        return core.text.Text(clip, text, alignment=9 if position == "right" else 7, scale=font_scale) if lines else clip
 
     return core.std.FrameEval(clip, partial(frame_props, clip=clip), prop_src=clip)
 
@@ -153,19 +157,20 @@ def vs_screengn(
         if encode and enc is not None:
             enc = DynamicTonemap(enc, src_fmt=False, libplacebo=True, adjust_gamma=True)
 
-    from src.screenshot_overlays import overlay_options, overlays_active
+    from src.screenshot_overlays import overlay_options, overlay_text_size, overlays_active
 
     options = overlay_options(config) if overlays_enabled and overlays_active(config) else {}
     layout = str(config.get("overlay_layout", "stacked"))
     position = str(config.get("overlay_position", "left"))
+    text_size = overlay_text_size(config)
     if any(options.values()):
-        src = custom_frame_info(src, options, tonemapped, layout=layout, position=position)
+        src = custom_frame_info(src, options, tonemapped, layout=layout, position=position, text_size=text_size)
 
     # Generate screenshots
     ScreenGen(src, dir, "a")
     if encode and enc is not None:
         if any(options.values()):
-            enc = custom_frame_info(enc, options, tonemapped, layout=layout, position=position)
+            enc = custom_frame_info(enc, options, tonemapped, layout=layout, position=position, text_size=text_size)
         ScreenGen(enc, dir, "b")
 
     # Optimize images

@@ -3034,7 +3034,7 @@ function ConfigLeafEditor({
         case "min_successful_image_uploads":
           return { min: 1, max: 10, step: 1 };
         case "overlay_text_size":
-          return { min: 10, max: 50, step: 1 };
+          return { min: 1, max: 100, step: 1 };
         case "logo_size":
           return { min: 100, max: 1000, step: 50 };
         case "bluray_image_size":
@@ -7489,7 +7489,11 @@ function ScreenshotOverlaySettings({
         depth={0}
         isDarkMode={isDarkMode}
         onValueChange={(path, value, meta) =>
-          onValueChange(path, value, { ...meta, originalValue: item.value })
+          onValueChange(path, value, {
+            ...meta,
+            originalValue:
+              typeof item.value === "number" ? String(item.value) : item.value,
+          })
         }
       />
     ) : null;
