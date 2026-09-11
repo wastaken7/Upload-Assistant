@@ -133,7 +133,7 @@ class QbittorrentClientMixin:
 
                     torrents = [TorrentInfo(torrent_properties)]
                 except Exception as e:
-                    logger.info(f"[yellow]Failed to get properties: {e}")
+                    logger.debug(f"[yellow]Failed to get properties: {e}")
                     return meta
         except TimeoutError:
             logger.info("[bold red]Getting torrents list timed out after retries")
