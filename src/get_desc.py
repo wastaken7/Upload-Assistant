@@ -1419,6 +1419,8 @@ class DescriptionBuilder:
         if bluray:
             release_url, cover_images = await self.get_bluray_section(meta)
             if release_url:
+                if self.tracker not in ("TORRENTLEECH", "IMMORTALSEED"):
+                    release_url = f"[url]{release_url}[/url]"
                 desc_parts.append(f"[center]{release_url}[/center]")
             if cover_images:
                 desc_parts.append(f"[center]{cover_images}[/center]\n")
