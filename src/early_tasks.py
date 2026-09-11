@@ -108,10 +108,10 @@ async def create_base_torrents_early(meta: Meta, client: Clients) -> None:
                 base_creation_started = time.perf_counter()
                 created_path = await TorrentCreator.create_base_from_existing_torrent(reuse_torrent, meta.base_dir, meta.uuid)
                 logger.debug(f"[cyan]Early base torrent creation completed in {time.perf_counter() - base_creation_started:.2f}s: {created_path or 'no file created'}[/cyan]")
-            else:
-                logger.debug("[cyan]No reusable client torrent found; creating BASE torrent while metadata and screenshots are processed.[/cyan]")
-                await TorrentCreator.create_torrent(meta, Path(cast(str, meta.path)), "BASE")
-        if needs_subs:
+        if manifest.default_path("base") is None:
+            logger.debug("[cyan]No reusable base torrent found; creating BASE while metadata and screenshots are processed.[/cyan]")
+            await TorrentCreator.create_torrent(meta, Path(cast(str, meta.path)), "BASE")
+        if meta.subtitle_files and manifest.default_path("base_subs") is None:
             await TorrentCreator.create_torrent(meta, Path(cast(str, meta.path)), "BASE_SUBS")
         logger.debug(f"[cyan]Early torrent task completed in {time.perf_counter() - task_started:.2f}s[/cyan]")
     except asyncio.CancelledError:

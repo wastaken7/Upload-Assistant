@@ -130,3 +130,42 @@ def test_early_torrent_task_creates_missing_subtitle_variant(monkeypatch, tmp_pa
         assert outputs == ["BASE_SUBS"]
 
     asyncio.run(exercise())
+
+
+def test_early_torrent_task_refreshes_layouts_after_reuse(monkeypatch, tmp_path) -> None:
+    async def exercise() -> None:
+        layouts = {"base": None, "base_subs": None}
+        outputs = []
+        reusable = tmp_path / "reusable.torrent"
+        reusable.touch()
+
+        def default_path(_self, layout="base"):
+            return layouts[layout]
+
+        async def register_reuse(_path, _base_dir, _uuid):
+            layouts["base_subs"] = reusable
+            return str(reusable)
+
+        async def create_torrent(_meta, _path, output, **_kwargs):
+            outputs.append(output)
+
+        async def find_reuse(_meta):
+            return str(reusable)
+
+        monkeypatch.setattr(early_tasks.TorrentManifest, "default_path", default_path)
+        monkeypatch.setattr(early_tasks.TorrentCreator, "create_base_from_existing_torrent", register_reuse)
+        monkeypatch.setattr(early_tasks.TorrentCreator, "create_torrent", create_torrent)
+        meta = Meta(
+            base_dir=str(tmp_path),
+            uuid="release",
+            path=str(tmp_path / "release.mkv"),
+            subtitle_files=[str(tmp_path / "release.srt")],
+            trackers=["TEST"],
+        )
+        client = SimpleNamespace(find_existing_torrent=find_reuse)
+
+        await early_tasks.create_base_torrents_early(meta, client)
+
+        assert outputs == ["BASE"]
+
+    asyncio.run(exercise())
