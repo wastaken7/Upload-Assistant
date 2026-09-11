@@ -7,6 +7,9 @@ from torf import Torrent
 
 from src.clients import Clients
 from src.meta import Meta
+from src.torrent_manifest import TorrentManifest
+from src.torrent_policy import HDBITS_POLICY
+from src.torrent_provision import provision_tracker_torrents
 from src.torrentcreate import TorrentCreator, hdbits_pieces_allowed
 from src.trackers.hdbits import HDBits
 
@@ -74,11 +77,11 @@ def setup_release(tmp_path, monkeypatch):
 @pytest.mark.parametrize(("piece_size", "size"), [(2 * MIB, 4000 * 2 * MIB), (4 * MIB, 30000 * 4 * MIB), (8 * MIB, 30000 * 8 * MIB), (32 * MIB, TIB + 1)])
 async def test_upload_reuses_allowed_base_without_search_or_hash(setup_release, monkeypatch, piece_size, size):
     directory, meta, config = setup_release
-    original = write_torrent(directory / "BASE.torrent", piece_size, size)
-    search = AsyncMock(side_effect=AssertionError("must not search"))
-    create = AsyncMock(side_effect=AssertionError("must not rehash"))
-    monkeypatch.setattr(Clients, "find_existing_torrent", search)
-    monkeypatch.setattr(TorrentCreator, "create_torrent", create)
+    source = directory / "candidate.torrent"
+    original = write_torrent(source, piece_size, size)
+    manifest = TorrentManifest(meta.base_dir, meta.uuid)
+    manifest.register(source, "base", "client:test")
+    assert manifest.select("HDBITS", "base", HDBITS_POLICY) is not None
     assert await HDBits(config).upload(meta) is True
     result = Torrent.read(directory / "[HDBITS].torrent")
     assert result.piece_size == piece_size
@@ -86,41 +89,53 @@ async def test_upload_reuses_allowed_base_without_search_or_hash(setup_release, 
 
 
 @pytest.mark.asyncio
-async def test_upload_finds_alternative_before_rehash(setup_release, tmp_path, monkeypatch):
+async def test_provision_selects_registered_alternative_before_rehash(setup_release, tmp_path, monkeypatch):
     directory, meta, config = setup_release
     size = 10 * GIB
-    write_torrent(directory / "BASE.torrent", 2 * MIB, size)
+    invalid = directory / "invalid.torrent"
+    write_torrent(invalid, 2 * MIB, size)
     alternative = tmp_path / "alternative.torrent"
     write_torrent(alternative, 4 * MIB, size)
-    search = AsyncMock(return_value=str(alternative))
-    monkeypatch.setattr(Clients, "find_existing_torrent", search)
+    manifest = TorrentManifest(meta.base_dir, meta.uuid)
+    manifest.register(invalid, "base", "client:first")
+    manifest.register(alternative, "base", "client:second")
     monkeypatch.setattr(TorrentCreator, "create_torrent", AsyncMock(side_effect=AssertionError("must not rehash")))
-    assert await HDBits(config).upload(meta) is True
-    assert Torrent.read(directory / "[HDBITS].torrent").piece_size == 4 * MIB
-    search.assert_awaited_once()
-    assert Torrent.read(directory / "BASE.torrent").piece_size == 2 * MIB
+    assert await provision_tracker_torrents(meta, config, ["HDBITS"], {"HDBITS": HDBits}) == set()
+    assert Torrent.read(manifest.selected_path("HDBITS")).piece_size == 4 * MIB
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("nohash", [False, True])
-async def test_upload_forces_rehash_only_after_failed_search(setup_release, monkeypatch, nohash):
+async def test_provision_hashes_only_after_registered_variants_fail(setup_release, monkeypatch):
     directory, meta, config = setup_release
-    meta.nohash = nohash
     size = 10 * GIB
-    write_torrent(directory / "BASE.torrent", 2 * MIB, size)
-    search = AsyncMock(return_value=None)
-    monkeypatch.setattr(Clients, "find_existing_torrent", search)
+    invalid = directory / "invalid.torrent"
+    write_torrent(invalid, 2 * MIB, size)
+    manifest = TorrentManifest(meta.base_dir, meta.uuid)
+    manifest.register(invalid, "base", "client:first")
 
     async def create(hash_meta, path, output, **kwargs):
-        search.assert_awaited_once()
         assert hash_meta.trackers == ["HDBITS"]
-        write_torrent(directory / f"{output}.torrent", 16 * MIB, size)
+        generated = directory / "generated.torrent"
+        write_torrent(generated, 16 * MIB, size)
+        manifest.register(generated, "base", "generated")
 
     hashing = AsyncMock(side_effect=create)
     monkeypatch.setattr(TorrentCreator, "create_torrent", hashing)
-    assert await HDBits(config).upload(meta) is True
+    assert await provision_tracker_torrents(meta, config, ["HDBITS"], {"HDBITS": HDBits}) == set()
     hashing.assert_awaited_once()
-    assert Torrent.read(directory / "[HDBITS].torrent").piece_size == 16 * MIB
+    assert Torrent.read(manifest.selected_path("HDBITS")).piece_size == 16 * MIB
+
+
+@pytest.mark.asyncio
+async def test_nohash_blocks_tracker_when_no_compliant_variant_exists(setup_release, monkeypatch):
+    directory, meta, config = setup_release
+    meta.nohash = True
+    invalid = directory / "invalid.torrent"
+    write_torrent(invalid, 2 * MIB, 10 * GIB)
+    TorrentManifest(meta.base_dir, meta.uuid).register(invalid, "base", "client:first")
+    monkeypatch.setattr(TorrentCreator, "create_torrent", AsyncMock(side_effect=AssertionError("must not hash")))
+    assert await provision_tracker_torrents(meta, config, ["HDBITS"], {"HDBITS": HDBits}) == {"HDBITS"}
+    assert meta.tracker_status["HDBITS"]["upload"] is False
 
 
 @pytest.mark.asyncio
@@ -135,8 +150,9 @@ async def test_client_search_skips_invalid_hash_and_uses_next_client(setup_relea
     write_torrent(second / "abc.torrent", 4 * MIB, size)
     config["DEFAULT"].update(default_torrent_client="first", searching_client_list=["first", "second"])
     config["TORRENT_CLIENTS"] = {name: {"torrent_client": "qbit", "torrent_storage_dir": str(path)} for name, path in [("first", first), ("second", second)]}
-    assert await Clients(config).find_existing_torrent(meta) == str(second / "abc.torrent")
-    assert meta.reuse_torrent_client == "second"
+    paths = await Clients(config).find_existing_torrents(meta)
+    assert len(paths) == 1
+    assert Torrent.read(paths[0]).piece_size == 4 * MIB
     assert (first / "abc.torrent").exists()
 
 
@@ -177,7 +193,7 @@ async def test_mkbrr_gets_recommended_size_even_with_tracker_url(setup_release, 
 
     def process(command, **kwargs):
         commands.append(command)
-        write_torrent(directory / "BASE.torrent", 16 * MIB, 8 * GIB + 1)
+        write_torrent(Path(command[command.index("-o") + 1]), 16 * MIB, 8 * GIB + 1)
         return SimpleNamespace(stdout=[], wait=lambda: 0)
 
     monkeypatch.setattr("src.torrentcreate.subprocess.Popen", process)

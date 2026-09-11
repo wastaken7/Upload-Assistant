@@ -10,6 +10,7 @@ from typing import Any, cast
 from src.clients import Clients
 from src.console import CliProgressGate, logger, suppress_cli_progress
 from src.meta import Meta
+from src.torrent_manifest import TorrentManifest
 from src.torrentcreate import TorrentCreator
 from src.trackersetup import tracker_class_map
 from src.webui_progress import has_progress_callback
@@ -85,10 +86,11 @@ async def create_base_torrents_early(meta: Meta, client: Clients) -> None:
         logger.debug("[cyan]Skipping early torrent creation due to hashing or tracker settings.[/cyan]")
         return
 
-    torrent_path = Path(meta.base_dir) / "tmp" / meta.uuid / "BASE.torrent"
-    subs_torrent_path = Path(meta.base_dir) / "tmp" / meta.uuid / "BASE_SUBS.torrent"
-    if torrent_path.exists():
-        logger.debug(f"[cyan]Skipping early torrent creation; BASE already exists at {torrent_path}[/cyan]")
+    manifest = TorrentManifest(meta.base_dir, meta.uuid)
+    torrent_path = manifest.default_path("base")
+    subs_torrent_path = manifest.default_path("base_subs")
+    if torrent_path is not None:
+        logger.debug(f"[cyan]Skipping early torrent creation; a base is already registered at {torrent_path}[/cyan]")
         return
 
     try:
@@ -107,7 +109,7 @@ async def create_base_torrents_early(meta: Meta, client: Clients) -> None:
         else:
             logger.debug("[cyan]No reusable client torrent found; creating BASE torrent while metadata and screenshots are processed.[/cyan]")
             await TorrentCreator.create_torrent(meta, Path(cast(str, meta.path)), "BASE")
-        if meta.subtitle_files and not subs_torrent_path.exists():
+        if meta.subtitle_files and subs_torrent_path is None:
             await TorrentCreator.create_torrent(meta, Path(cast(str, meta.path)), "BASE_SUBS")
         logger.debug(f"[cyan]Early torrent task completed in {time.perf_counter() - task_started:.2f}s[/cyan]")
     except asyncio.CancelledError:

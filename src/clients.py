@@ -16,7 +16,9 @@ from src.console import logger
 from src.meta import Meta
 from src.torrent_clients import DelugeClientMixin, QbittorrentClientMixin, RtorrentClientMixin, TransmissionClientMixin
 from src.torrent_clients.path_utils import coerce_str_list, is_path_under
-from src.torrentcreate import SUBTITLE_EXTENSIONS, hdbits_pieces_allowed
+from src.torrent_manifest import TorrentManifest
+from src.torrent_policy import HDBITS_POLICY, TorrentStats, generic_reuse_allowed
+from src.torrentcreate import SUBTITLE_EXTENSIONS
 
 # Secure XML-RPC client using defusedxml to prevent XML attacks
 defusedxml.xmlrpc.monkey_patch()
@@ -243,7 +245,60 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                     logger.info(f"[cyan]Waiting {inject_delay} seconds before adding to client '{client_name}'[/cyan]")
             await asyncio.sleep(inject_delay)
 
+    async def find_existing_torrents(self, meta: Meta) -> list[str]:
+        """Collect and register reusable variants from every configured search client."""
+        if meta.get("skip_auto_torrent", False):
+            return []
+        requested = meta.client
+        if isinstance(requested, str) and requested != "none":
+            client_names = [requested]
+        else:
+            configured = self.config["DEFAULT"].get("searching_client_list", [])
+            client_names = [str(name) for name in configured if str(name) and str(name) != "none"] if isinstance(configured, list) else []
+            default = str(self.config["DEFAULT"].get("default_torrent_client", "none"))
+            if not client_names and default != "none":
+                client_names = [default]
+
+        manifest = TorrentManifest(meta.base_dir, meta.uuid)
+        paths: list[str] = []
+        original_client = meta.client
+        try:
+            for client_name in client_names:
+                meta.client = client_name
+                candidate = await self._find_existing_torrent(meta)
+                if candidate is None:
+                    continue
+                torrent = Torrent.read(candidate)
+                has_subs = any(Path(str(file)).suffix.casefold() in SUBTITLE_EXTENSIONS for file in torrent.files)
+                entry = manifest.register(candidate, "base_subs" if has_subs else "base", f"client:{client_name}")
+                managed = str(manifest.entry_path(entry))
+                if managed not in paths:
+                    paths.append(managed)
+                candidate_path = Path(candidate)
+                client_staging = Path(meta.base_dir) / "tmp" / meta.uuid / "torrents" / ".client"
+                if client_staging.resolve() in candidate_path.resolve().parents:
+                    candidate_path.unlink(missing_ok=True)
+        finally:
+            meta.client = original_client
+        return paths
+
     async def find_existing_torrent(self, meta: Meta) -> str | None:
+        """Return the preferred registered variant for compatibility with callers."""
+        paths = await self.find_existing_torrents(meta)
+        if not paths:
+            return None
+        manifest = TorrentManifest(meta.base_dir, meta.uuid)
+        entries = [entry for path in paths if (entry := manifest.entry_for_path(path)) is not None]
+        if meta.subtitle_files and any(entry.layout == "base_subs" for entry in entries):
+            entries = [entry for entry in entries if entry.layout == "base_subs"]
+        if self.config["DEFAULT"].get("prefer_max_16_torrent", False):
+            entries.sort(key=lambda entry: entry.piece_size)
+        chosen = entries[0]
+        if chosen.origin.startswith("client:"):
+            meta.reuse_torrent_client = chosen.origin.removeprefix("client:")
+        return str(manifest.entry_path(chosen))
+
+    async def _find_existing_torrent(self, meta: Meta) -> str | None:
         """Find a reusable torrent matching the prepared metadata."""
         if meta.get("skip_auto_torrent", False):
             return None
@@ -344,7 +399,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
             if hash_value:
                 hash_value_str = str(hash_value)
                 # If no torrent_storage_dir defined, use saved torrent from qbit
-                extracted_torrent_dir = Path(meta.base_dir) / "tmp" / meta.uuid
+                extracted_torrent_dir = Path(meta.base_dir) / "tmp" / meta.uuid / "torrents" / ".client"
 
                 if torrent_storage_dir:
                     torrent_path = Path(torrent_storage_dir) / f"{hash_value_str}.torrent"
@@ -439,7 +494,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                 if qbt_session:
                     await qbt_session.aclose()
             if found_hash:
-                extracted_torrent_dir = Path(meta.base_dir) / "tmp" / meta.uuid
+                extracted_torrent_dir = Path(meta.base_dir) / "tmp" / meta.uuid / "torrents" / ".client"
 
                 if torrent_storage_dir:
                     found_torrent_path = Path(torrent_storage_dir) / f"{found_hash}.torrent"
@@ -621,31 +676,17 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                         f"Checking piece size, count and size: pieces={reuse_torrent.pieces}, piece_size={piece_in_mib} MiB, .torrent size={torrent_file_size_kib} KiB"
                     )
 
-                    # Piece size and count validations
-                    max_piece_size = meta.max_piece_size
+                    # Centralized piece-count, piece-size and metainfo-size validation.
+                    stats = TorrentStats(piece_size, reuse_torrent.pieces, reuse_torrent.size, Path(torrent_path).stat().st_size)
                     if "HDBITS" in meta.trackers:
-                        valid = not wrong_file and hdbits_pieces_allowed(piece_size, reuse_torrent.pieces, reuse_torrent.size)
+                        valid = not wrong_file and HDBITS_POLICY.accepts(stats)
                         if not valid:
                             logger.debug("[bold red]Torrent does not meet HDBits piece limits or file requirements")
                         trackers = meta.trackers.split(",") if isinstance(meta.trackers, str) else meta.trackers
                         if not valid or all(tracker == "HDBITS" for tracker in trackers):
                             return valid, torrent_path
-                    if reuse_torrent.pieces >= 5000 and reuse_torrent.piece_size < 4294304 and (max_piece_size is None or max_piece_size >= 4):
-                        logger.debug("[bold red]Torrent needs to have less than 5000 pieces with a 4 MiB piece size")
-                        valid = False
-                    elif (
-                        reuse_torrent.pieces >= 8000 and reuse_torrent.piece_size < 8488608 and (max_piece_size is None or max_piece_size >= 8) and not meta.prefer_small_pieces
-                    ):
-                        logger.debug("[bold red]Torrent needs to have less than 8000 pieces with a 8 MiB piece size")
-                        valid = False
-                    elif "max_piece_size" not in meta and reuse_torrent.pieces >= 12000:
-                        logger.debug("[bold red]Torrent needs to have less than 12000 pieces to be valid")
-                        valid = False
-                    elif reuse_torrent.piece_size < 32768:
-                        logger.debug("[bold red]Piece size too small to reuse")
-                        valid = False
-                    elif "max_piece_size" not in meta and torrent_file_size_kib > 250:
-                        logger.debug("[bold red]Torrent file size exceeds 250 KiB")
+                    if not generic_reuse_allowed(stats, meta):
+                        logger.debug("[bold red]Torrent does not meet the generic reuse policy")
                         valid = False
                     elif wrong_file:
                         logger.debug("[bold red]Provided .torrent has files that were not expected")

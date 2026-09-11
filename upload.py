@@ -86,6 +86,7 @@ from src.queuemanage import QueueManager
 from src.rehostimages import check_tracker_image_hosts
 from src.takescreens import TakeScreensManager, download_artwork_from_meta
 from src.temp_paths import artwork_dir, music_release_snapshot_path, screenshots_dir
+from src.torrent_manifest import TorrentManifest
 from src.torrentcreate import TorrentCreator
 from src.trackerhandle import process_trackers
 from src.trackers.common import Common
@@ -1973,8 +1974,7 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
             await progress_task
 
     has_local_subs = bool(meta.subtitle_files)
-    torrent_path = str(Path(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/BASE.torrent").resolve())
-    subs_torrent_path = str(Path(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/BASE_SUBS.torrent").resolve())
+    torrent_manifest = TorrentManifest(meta.base_dir, meta.uuid)
 
     try:
         await asyncio.gather(early_base_torrent_task, early_usenet_prepare_task)
@@ -1992,7 +1992,7 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
 
     is_usenet_only = _is_usenet_only(meta)
     if not is_usenet_only:
-        if meta.rehash is False and not Path(torrent_path).exists() and not meta.base_torrent_created and not meta.we_checked_them_all:
+        if meta.rehash is False and torrent_manifest.default_path("base") is None and not meta.base_torrent_created and not meta.we_checked_them_all:
             if not reuse_torrent or not Path(reuse_torrent).exists():
                 reuse_torrent = await client.find_existing_torrent(meta)
             if reuse_torrent is not None:
@@ -2000,28 +2000,29 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
 
         # 2. Re-create base torrents if rehash is True
         if meta.rehash is True and meta.nohash is False:
-            await TORRENT_CREATOR.create_torrent(meta, Path(cast(str, meta.path)), "BASE")
+            await TORRENT_CREATOR.create_torrent(meta, Path(cast(str, meta.path)), "BASE", make_default=True)
             if has_local_subs:
-                await TORRENT_CREATOR.create_torrent(meta, Path(cast(str, meta.path)), "BASE_SUBS")
+                await TORRENT_CREATOR.create_torrent(meta, Path(cast(str, meta.path)), "BASE_SUBS", make_default=True)
 
         # 3. Otherwise generate if missing
         else:
             if (
-                not Path(torrent_path).exists()
+                torrent_manifest.default_path("base") is None
                 and base_reuse_torrent
                 and Path(base_reuse_torrent).exists()
                 and (not has_local_subs or client._torrent_has_no_subtitles(base_reuse_torrent))
             ):
                 await TORRENT_CREATOR.create_base_from_existing_torrent(base_reuse_torrent, meta.base_dir, meta.uuid)
-            if not Path(torrent_path).exists() and meta.nohash is False:
+            if torrent_manifest.default_path("base") is None and meta.nohash is False:
                 await TORRENT_CREATOR.create_torrent(meta, Path(cast(str, meta.path)), "BASE")
-            if has_local_subs and not Path(subs_torrent_path).exists() and meta.nohash is False:
+            if has_local_subs and torrent_manifest.default_path("base_subs") is None and meta.nohash is False:
                 await TORRENT_CREATOR.create_torrent(meta, Path(cast(str, meta.path)), "BASE_SUBS")
 
     if meta.nohash:
         meta.client = "none"
 
-    if Path(torrent_path).exists():
+    torrent_path = torrent_manifest.default_path("base")
+    if torrent_path is not None:
         raw_trackers = meta.trackers
         trackers_list = [raw_trackers] if isinstance(raw_trackers, str) else [t for t in raw_trackers if t.strip()]
         trackers_normalized = [t.strip().upper() for t in trackers_list]

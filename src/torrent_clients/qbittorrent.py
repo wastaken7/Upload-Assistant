@@ -151,7 +151,7 @@ class QbittorrentClientMixin:
         if not meta.uuid:
             meta.uuid = folder_id
 
-        extracted_torrent_dir = str(Path(meta.base_dir) / "tmp" / meta.uuid)
+        extracted_torrent_dir = str(Path(meta.base_dir) / "tmp" / meta.uuid / "torrents" / ".client")
         Path(extracted_torrent_dir).mkdir(parents=True, exist_ok=True)
 
         for torrent in torrents:
@@ -405,7 +405,7 @@ class QbittorrentClientMixin:
         logger.debug("[green]Searching qBittorrent for an existing .torrent")
 
         torrent_storage_dir = client.get("torrent_storage_dir")
-        extracted_torrent_dir = str(Path(meta.base_dir) / "tmp" / meta.uuid)
+        extracted_torrent_dir = str(Path(meta.base_dir) / "tmp" / meta.uuid / "torrents" / ".client")
 
         if not extracted_torrent_dir or extracted_torrent_dir.strip() == "tmp/":
             logger.info("[bold red]Invalid extracted torrent directory path. Check `meta.base_dir` and `meta.uuid`.")
@@ -1624,7 +1624,7 @@ class QbittorrentClientMixin:
         if not meta.base_torrent_created:
             torrent_storage_dir = client_config.get("torrent_storage_dir")
 
-            extracted_torrent_dir = str(Path(meta.base_dir) / "tmp" / meta.uuid)
+            extracted_torrent_dir = str(Path(meta.base_dir) / "tmp" / meta.uuid / "torrents" / ".client")
             Path(extracted_torrent_dir).mkdir(parents=True, exist_ok=True)
 
             # Set up piece size preference logic
