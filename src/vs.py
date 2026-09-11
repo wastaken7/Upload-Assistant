@@ -24,14 +24,20 @@ zresize: Any = awsmfunc.zresize
 # core.std.LoadPlugin(path="/usr/local/lib/vapoursynth/libimwri.so")
 
 
-def custom_frame_info(clip: Any, _text: str) -> Any:
-    def frame_props(n: int, f: Any, clip: Any) -> Any:
-        # Modify the frame properties extraction here to avoid the decode issue
-        info = f"Frame {n} of {clip.num_frames}\nPicture type: {f.props['_PictType']}"
-        # Adding the frame information as text to the clip
-        return core.text.Text(clip, info)
+def custom_frame_info(clip: Any, options: dict[str, bool], tonemapped: bool = False, *, layout: str = "stacked", position: str = "left") -> Any:
+    """Apply the selected labels to each VapourSynth frame."""
+    from src.screenshot_overlays import format_timestamp, overlay_lines
 
-    # Apply frame_props to each frame
+    def frame_props(n: int, f: Any, clip: Any) -> Any:
+        frame_type = f.props.get("_PictType", "Unknown")
+        if isinstance(frame_type, bytes):
+            frame_type = frame_type.decode("ascii", errors="replace")
+        timestamp = format_timestamp(n * clip.fps_den / clip.fps_num)
+        lines = overlay_lines(options, n, str(frame_type), timestamp, tonemapped, layout=layout)
+        # The built-in bitmap font expects Windows-1252, including the bullet.
+        text = "\n".join(lines).encode("cp1252", errors="replace")
+        return core.text.Text(clip, text, alignment=9 if position == "right" else 7) if lines else clip
+
     return core.std.FrameEval(clip, partial(frame_props, clip=clip), prop_src=clip)
 
 
@@ -61,7 +67,9 @@ def optimize_images(image: str | Path, config: dict[str, Any]) -> None:
     return
 
 
-def vs_screengn(source: str, encode: str | None = None, num: int = 5, dir: str = ".", config: dict[str, Any] | None = None) -> None:
+def vs_screengn(
+    source: str, encode: str | None = None, num: int = 5, dir: str = ".", config: dict[str, Any] | None = None, overlays_enabled: bool = True
+) -> None:
     if config is None:
         config = {"optimize_images": True}  # Default configuration
 
@@ -145,14 +153,19 @@ def vs_screengn(source: str, encode: str | None = None, num: int = 5, dir: str =
         if encode and enc is not None:
             enc = DynamicTonemap(enc, src_fmt=False, libplacebo=True, adjust_gamma=True)
 
-    # Use the custom FrameInfo function
-    if tonemapped:
-        src = custom_frame_info(src, "Tonemapped")
+    from src.screenshot_overlays import overlay_options, overlays_active
+
+    options = overlay_options(config) if overlays_enabled and overlays_active(config) else {}
+    layout = str(config.get("overlay_layout", "stacked"))
+    position = str(config.get("overlay_position", "left"))
+    if any(options.values()):
+        src = custom_frame_info(src, options, tonemapped, layout=layout, position=position)
 
     # Generate screenshots
     ScreenGen(src, dir, "a")
     if encode and enc is not None:
-        enc = custom_frame_info(enc, "Encode (Tonemapped)")
+        if any(options.values()):
+            enc = custom_frame_info(enc, options, tonemapped, layout=layout, position=position)
         ScreenGen(enc, dir, "b")
 
     # Optimize images

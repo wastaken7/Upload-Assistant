@@ -32,6 +32,7 @@ from src.meta import Meta
 from src.screenshot_manifest import clear_group as clear_screenshot_group
 from src.screenshot_manifest import files as manifest_files
 from src.screenshot_manifest import register as register_screenshots
+from src.screenshot_overlays import overlay_filters, overlay_fontfile, overlay_options
 from src.temp_paths import artwork_dir, screenshots_dir
 from src.webui_progress import complete_progress, publish_progress
 
@@ -87,12 +88,7 @@ def xxx_single_file_screens() -> int:
 
 
 def _xxx_contact_sheet_fontfile() -> str | None:
-    candidates = (
-        Path(os.environ.get("WINDIR", r"C:\Windows")) / "Fonts" / "arial.ttf",
-        Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
-        Path("/Library/Fonts/Arial.ttf"),
-    )
-    return next((str(path) for path in candidates if path.is_file()), None)
+    return overlay_fontfile()
 
 
 def _xxx_contact_sheet_title_filter(stream: Any, title: str, include_title: bool, fontfile: str | None) -> Any:
@@ -541,7 +537,7 @@ async def disc_screenshots(
 
     ss_times = await valid_ss_time([], num_screens, length, frame_rate or 24.0, meta, retake=force_screenshots)
 
-    if meta.frame_overlay:
+    if meta.frame_overlay and any(overlay_options(default_config)[key] for key in ("overlay_frame_number", "overlay_frame_type")):
         logger.info("[yellow]Getting frame information for overlays...")
         # Build list of (original_index, task) to preserve index correspondence
         frame_info_tasks_with_idx = [
@@ -570,7 +566,7 @@ async def disc_screenshots(
         from src.vs import vs_screengn
 
         before = {path.resolve() for path in screenshot_dir.glob("*.png")}
-        vs_screengn(source=file_path, encode=None, num=num_screens, dir=f"{screenshot_dir}/")
+        vs_screengn(source=file_path, encode=None, num=num_screens, dir=f"{screenshot_dir}/", config=default_config, overlays_enabled=meta.frame_overlay)
         for image_path in screenshot_dir.glob("*.png"):
             if image_path.resolve() in before:
                 continue
@@ -760,47 +756,7 @@ async def capture_disc_task(index: int, file: str, ss_time: str, image_path: str
         if hdr_tonemap:
             vf_filters.extend(["zscale=transfer=linear", f"tonemap=tonemap={algorithm}:desat={desat}", "zscale=transfer=bt709", "format=rgb24"])
 
-        if meta.frame_overlay:
-            # Get frame info from pre-collected data if available
-            frame_info = meta.frame_info_map.get(ss_time, {})
-
-            frame_rate = meta.frame_rate if meta.frame_rate is not None else 24.0
-            frame_number = int(float(ss_time) * frame_rate)
-
-            # If we have PTS time from frame info, use it to calculate a more accurate frame number
-            if "pts_time" in frame_info:
-                # Only use PTS time for frame number calculation if it makes sense
-                # (sometimes seeking can give us a frame from the beginning instead of where we want)
-                pts_time = frame_info.get("pts_time", 0)
-                if pts_time > 1.0 and abs(pts_time - ss_time) < 10:
-                    frame_number = int(pts_time * frame_rate)
-
-            frame_type = frame_info.get("frame_type", "Unknown")
-
-            text_size = int(default_config.get("overlay_text_size", 18))
-            # Get the resolution and convert it to integer
-            resol = int("".join(filter(str.isdigit, (meta.resolution if meta.resolution is not None else "1080p"))))
-            font_size = round(text_size * resol / 1080)
-            border_width = round(2 * resol / 1080)
-            x_all = round(10 * resol / 1080)
-
-            # Scale vertical spacing based on font size
-            line_spacing = round(font_size * 1.1)
-            y_number = x_all
-            y_type = y_number + line_spacing
-            y_hdr = y_type + line_spacing
-
-            # Frame number
-            vf_filters.append(
-                f"drawtext=text='Frame Number\\: {frame_number}':fontcolor=white:fontsize={font_size}:x={x_all}:y={y_number}:borderw={border_width}:bordercolor=black"
-            )
-
-            # Frame type
-            vf_filters.append(f"drawtext=text='Frame Type\\: {frame_type}':fontcolor=white:fontsize={font_size}:x={x_all}:y={y_type}:borderw={border_width}:bordercolor=black")
-
-            # HDR status
-            if hdr_tonemap:
-                vf_filters.append(f"drawtext=text='Tonemapped HDR':fontcolor=white:fontsize={font_size}:x={x_all}:y={y_hdr}:borderw={border_width}:bordercolor=black")
+        vf_filters.extend(overlay_filters(default_config, meta, ss_time, hdr_tonemap))
 
         # Build command
         # Always ensure at least format filter is present for PNG compression to work
@@ -936,7 +892,7 @@ async def dvd_screenshots(
         image_paths.append(image)
         input_files.append(input_file)
 
-    if meta.frame_overlay:
+    if meta.frame_overlay and any(overlay_options(default_config)[key] for key in ("overlay_frame_number", "overlay_frame_type")):
         logger.debug("[yellow]Getting frame information for overlays...")
         frame_info_tasks = [get_frame_info(input_files[i], ss_times[i], meta) for i in range(num_screens + 1) if not Path(image_paths[i]).exists() or meta.retake]
 
@@ -1079,42 +1035,7 @@ async def capture_dvd_screenshot(task: tuple[int, str, str, str, Meta, float, fl
             scaled_h = round_to_even(height * h_sar)
             vf_filters.append(f"scale={scaled_w}:{scaled_h}")
 
-        if meta.frame_overlay:
-            # Get frame info from pre-collected data if available
-            frame_info = meta.frame_info_map.get(str(seek_time), {})
-
-            frame_rate = meta.frame_rate if meta.frame_rate is not None else 24.0
-            frame_number = int(seek_time * frame_rate)
-
-            # If we have PTS time from frame info, use it to calculate a more accurate frame number
-            if "pts_time" in frame_info:
-                # Only use PTS time for frame number calculation if it makes sense
-                # (sometimes seeking can give us a frame from the beginning instead of where we want)
-                pts_time = frame_info.get("pts_time", 0)
-                if pts_time > 1.0 and abs(pts_time - seek_time) < 10:
-                    frame_number = int(pts_time * frame_rate)
-
-            frame_type = frame_info.get("frame_type", "Unknown")
-
-            text_size = int(default_config.get("overlay_text_size", 18))
-            # Get the resolution and convert it to integer
-            resol = int("".join(filter(str.isdigit, (meta.resolution if meta.resolution is not None else "576p"))))
-            font_size = round(text_size * resol / 576)
-            border_width = round(2 * resol / 576)
-            x_all = round(10 * resol / 576)
-
-            # Scale vertical spacing based on font size
-            line_spacing = round(font_size * 1.1)
-            y_number = x_all
-            y_type = y_number + line_spacing
-
-            # Frame number
-            vf_filters.append(
-                f"drawtext=text='Frame Number\\: {frame_number}':fontcolor=white:fontsize={font_size}:x={x_all}:y={y_number}:borderw={border_width}:bordercolor=black"
-            )
-
-            # Frame type
-            vf_filters.append(f"drawtext=text='Frame Type\\: {frame_type}':fontcolor=white:fontsize={font_size}:x={x_all}:y={y_type}:borderw={border_width}:bordercolor=black")
+        vf_filters.extend(overlay_filters(default_config, meta, seek_time, False, dvd=True))
 
         # Build command
         # Always ensure at least format filter is present for PNG compression to work
@@ -1941,7 +1862,7 @@ async def screenshots(
     if not ss_times:
         ss_times = await valid_ss_time([], num_capture, length, frame_rate, meta, retake=force_screenshots)
 
-    if meta.frame_overlay:
+    if meta.frame_overlay and any(overlay_options(default_config)[key] for key in ("overlay_frame_number", "overlay_frame_type")):
         logger.debug("[yellow]Getting frame information for overlays...")
         # Build list of (original_index, task) to preserve index correspondence
         frame_info_tasks_with_idx = [
@@ -2409,47 +2330,7 @@ async def capture_screenshot(args: tuple[int, str, float, str, float, float, flo
                 ]
             )
 
-        if meta.frame_overlay:
-            # Get frame info from pre-collected data if available
-            frame_info = meta.frame_info_map.get(str(ss_time), {})
-
-            frame_rate = meta.frame_rate if meta.frame_rate is not None else 24.0
-            frame_number = int(ss_time * frame_rate)
-
-            # If we have PTS time from frame info, use it to calculate a more accurate frame number
-            if "pts_time" in frame_info:
-                # Only use PTS time for frame number calculation if it makes sense
-                # (sometimes seeking can give us a frame from the beginning instead of where we want)
-                pts_time = frame_info.get("pts_time", 0)
-                if pts_time > 1.0 and abs(pts_time - ss_time) < 10:
-                    frame_number = int(pts_time * frame_rate)
-
-            frame_type = frame_info.get("frame_type", "Unknown")
-
-            text_size = int(default_config.get("overlay_text_size", 18))
-            # Get the resolution and convert it to integer
-            resol = int("".join(filter(str.isdigit, (meta.resolution if meta.resolution is not None else "1080p"))))
-            font_size = round(text_size * resol / 1080)
-            border_width = round(2 * resol / 1080)
-            x_all = round(10 * resol / 1080)
-
-            # Scale vertical spacing based on font size
-            line_spacing = round(font_size * 1.1)
-            y_number = x_all
-            y_type = y_number + line_spacing
-            y_hdr = y_type + line_spacing
-
-            # Frame number
-            vf_filters.append(
-                f"drawtext=text='Frame Number\\: {frame_number}':fontcolor=white:fontsize={font_size}:x={x_all}:y={y_number}:borderw={border_width}:bordercolor=black"
-            )
-
-            # Frame type
-            vf_filters.append(f"drawtext=text='Frame Type\\: {frame_type}':fontcolor=white:fontsize={font_size}:x={x_all}:y={y_type}:borderw={border_width}:bordercolor=black")
-
-            # HDR status
-            if hdr_tonemap:
-                vf_filters.append(f"drawtext=text='Tonemapped HDR':fontcolor=white:fontsize={font_size}:x={x_all}:y={y_hdr}:borderw={border_width}:bordercolor=black")
+        vf_filters.extend(overlay_filters(default_config, meta, ss_time, hdr_tonemap))
 
         # Build command
         # Always ensure at least format filter is present for PNG compression to work

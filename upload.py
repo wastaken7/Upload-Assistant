@@ -1454,7 +1454,9 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
         videopath = meta.discs[0].get("largest_evo", "")
     logger.debug(f"Processing {filename} for upload.....")
 
-    meta.frame_overlay = config["DEFAULT"].get("frame_overlay", False)
+    from src.screenshot_overlays import overlays_active
+
+    meta.frame_overlay = overlays_active(config["DEFAULT"])
     tracker_status_map = cast(dict[str, dict[str, Any]], meta.tracker_status)
     for tracker in ["AVISTAZ", "CINEMAZ", "PRIVATEHD"]:
         upload_status = tracker_status_map.get(tracker, {}).get("upload", False)

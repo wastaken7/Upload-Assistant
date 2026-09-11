@@ -175,7 +175,9 @@ def init_meta(prep_instance: Any, meta: Meta, mode: str) -> tuple[bool, bool, Cl
     # Screenshot capture starts during prep, before the upload stage. Populate
     # the overlay setting here so that the early capture sees the configured
     # value instead of Meta's default.
-    meta.frame_overlay = default_config.get("frame_overlay", False)
+    from src.screenshot_overlays import overlays_active
+
+    meta.frame_overlay = overlays_active(default_config)
     meta.skip_auto_torrent = (
         meta.skip_auto_torrent or default_config.get("skip_auto_torrent", False) or (meta.personalrelease and default_config.get("skip_auto_torrent_personalrelease", False))
     )
