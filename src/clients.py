@@ -264,20 +264,26 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
         original_client = meta.client
         try:
             for client_name in client_names:
-                meta.client = client_name
-                candidate = await self._find_existing_torrent(meta)
-                if candidate is None:
+                if client_name not in self.config["TORRENT_CLIENTS"]:
+                    logger.info(f"[yellow]Client '{client_name}' not found in TORRENT_CLIENTS config, skipping...")
                     continue
-                torrent = Torrent.read(candidate)
-                has_subs = any(Path(str(file)).suffix.casefold() in SUBTITLE_EXTENSIONS for file in torrent.files)
-                entry = manifest.register(candidate, "base_subs" if has_subs else "base", f"client:{client_name}")
-                managed = str(manifest.entry_path(entry))
-                if managed not in paths:
-                    paths.append(managed)
-                candidate_path = Path(candidate)
-                client_staging = Path(meta.base_dir) / "tmp" / meta.uuid / "torrents" / ".client"
-                if client_staging.resolve() in candidate_path.resolve().parents:
-                    candidate_path.unlink(missing_ok=True)
+                meta.client = client_name
+                result = await self._search_single_client_for_torrent(meta, client_name, False, False, None, True)
+                candidates = result if isinstance(result, list) else [result] if isinstance(result, str) else []
+                for candidate in candidates:
+                    if meta.subtitle_files and not self._torrent_includes_all_local_subtitles(candidate, meta) and not self._torrent_has_no_subtitles(candidate):
+                        continue
+                    torrent = Torrent.read(candidate)
+                    has_subs = any(Path(str(file)).suffix.casefold() in SUBTITLE_EXTENSIONS for file in torrent.files)
+                    entry = manifest.register(candidate, "base_subs" if has_subs else "base", f"client:{client_name}")
+                    managed = str(manifest.entry_path(entry))
+                    if managed not in paths:
+                        paths.append(managed)
+                    meta.reuse_torrent_client = client_name
+                    candidate_path = Path(candidate)
+                    client_staging = Path(meta.base_dir) / "tmp" / meta.uuid / "torrents" / ".client"
+                    if client_staging.resolve() in candidate_path.resolve().parents:
+                        candidate_path.unlink(missing_ok=True)
         finally:
             meta.client = original_client
         return paths
@@ -383,8 +389,14 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
         return None
 
     async def _search_single_client_for_torrent(
-        self, meta: Meta, client_name: str, prefer_small_pieces: bool, piece_limit: bool, best_match: dict[str, Any] | None
-    ) -> dict[str, Any] | str | None:
+        self,
+        meta: Meta,
+        client_name: str,
+        prefer_small_pieces: bool,
+        piece_limit: bool,
+        best_match: dict[str, Any] | None,
+        collect_all: bool = False,
+    ) -> list[str] | dict[str, Any] | str | None:
         """Search a single client for an existing torrent by hash or via API search (qbit only)."""
 
         client = self.config["TORRENT_CLIENTS"][client_name]
@@ -392,6 +404,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
         torrent_storage_dir = client.get("torrent_storage_dir")
         qbt_client: qbittorrentapi.Client | None = None
         proxy_url: str | None = None
+        candidates: list[str] = []
 
         # Iterate through pre-specified hashes
         for hash_key in ["torrenthash", "ext_torrenthash"]:
@@ -459,7 +472,10 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                 valid, resolved_path = await self.is_valid_torrent(meta, torrent_path, hash_value_str, torrent_client, client)
 
                 if valid:
-                    return resolved_path
+                    if not collect_all:
+                        return resolved_path
+                    if resolved_path not in candidates:
+                        candidates.append(resolved_path)
 
         # Search the client if no pre-specified hash matches
         if torrent_client == "qbit" and client.get("enable_search"):
@@ -473,7 +489,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                 else:
                     qbt_client = await self.init_qbittorrent_client(client)
 
-                found_hash = await self.search_qbit_for_torrent(meta, client, qbt_client, qbt_session, proxy_url)
+                found = await self.search_qbit_for_torrent(meta, client, qbt_client, qbt_session, proxy_url, collect_all=collect_all)
 
                 # Clean up session if we created one
                 if qbt_session:
@@ -481,7 +497,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
 
             except KeyboardInterrupt:
                 logger.info("[bold red]Search cancelled by user")
-                found_hash = None
+                found = [] if collect_all else None
                 if qbt_session:
                     await qbt_session.aclose()
             except TimeoutError:
@@ -490,10 +506,11 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                 raise
             except Exception as e:
                 logger.info(f"[bold red]Error searching qBittorrent: {e}")
-                found_hash = None
+                found = [] if collect_all else None
                 if qbt_session:
                     await qbt_session.aclose()
-            if found_hash:
+            found_hashes = found if isinstance(found, list) else [found] if isinstance(found, str) else []
+            for found_hash in found_hashes:
                 extracted_torrent_dir = Path(meta.base_dir) / "tmp" / meta.uuid / "torrents" / ".client"
 
                 if torrent_storage_dir:
@@ -562,6 +579,10 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                     logger.info("[cyan]DEBUG: Skipping validation because found_hash is None[/cyan]")
 
                 if valid:
+                    if collect_all:
+                        if resolved_path not in candidates:
+                            candidates.append(resolved_path)
+                        continue
                     torrent = Torrent.read(resolved_path)
                     piece_size = torrent.piece_size
                     piece_in_mib = piece_size / 1024 / 1024
@@ -579,6 +600,8 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                         best_match = {"torrenthash": found_hash, "torrent_path": resolved_path, "piece_size": piece_size}
                         logger.info(f"[yellow]Storing valid torrent from client search as best match: [bold yellow]{found_hash}")
 
+        if collect_all:
+            return candidates
         return best_match
 
     async def is_valid_torrent(self, meta: Meta, torrent_path: str, torrenthash: str, torrent_client: str, _client: dict[str, Any]) -> tuple[bool, str]:
