@@ -1,6 +1,5 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import re
-from pathlib import Path
 from typing import Any
 
 import aiofiles
@@ -12,6 +11,7 @@ from src.console import logger
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
+from src.torrent_manifest import TorrentManifest
 
 Config = dict[str, Any]
 
@@ -407,8 +407,8 @@ class IPTorrents:
         return re.sub(r"\s{2,}", " ", name)
 
     async def get_is_freeleech(self, meta: Meta):
-        torrent_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/BASE.torrent"
-        if not Path(torrent_path).exists():
+        torrent_path = TorrentManifest(meta.base_dir, meta.uuid).default_path()
+        if torrent_path is None:
             return False
 
         try:

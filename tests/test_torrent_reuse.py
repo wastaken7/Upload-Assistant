@@ -1,9 +1,12 @@
 from types import SimpleNamespace
 
 import pytest
+from torf import Torrent
 
 from src.clients import Clients
 from src.meta import Meta
+from src.torrent_manifest import TorrentManifest
+from src.torrent_policy import MIB, TorrentPolicy
 from src.torrentcreate import TorrentCreator
 
 
@@ -36,7 +39,7 @@ async def test_base_subs_contains_external_subtitle_with_custom_torrent(tmp_path
 
     from torf import Torrent
 
-    torrent = Torrent.read(tmp_path / "tmp" / meta.uuid / "BASE_SUBS.torrent")
+    torrent = Torrent.read(TorrentManifest(meta.base_dir, meta.uuid).default_path("base_subs"))
     assert sorted(path.name for path in torrent.files) == sorted([video.name, subtitle.name])  # noqa: S101
 
 
@@ -71,7 +74,7 @@ async def test_base_subs_excludes_unselected_subtitles(tmp_path):
 
     from torf import Torrent
 
-    torrent = Torrent.read(tmp_path / "tmp" / meta.uuid / "BASE_SUBS.torrent")
+    torrent = Torrent.read(TorrentManifest(meta.base_dir, meta.uuid).default_path("base_subs"))
     assert sorted(path.name for path in torrent.files) == sorted([video.name, selected_subtitle.name])  # noqa: S101
 
 
@@ -132,7 +135,7 @@ async def test_client_search_prefers_torrent_with_all_local_subtitles(tmp_path, 
     }
     meta = Meta({"client": "none", "subtitle_files": [str(subtitle)]})
 
-    found = await Clients(config).find_existing_torrent(meta)
+    found = await Clients(config)._find_existing_torrent(meta)
 
     assert found == str(with_subtitles)  # noqa: S101
     assert meta.reuse_torrent_client == "second"  # noqa: S101
@@ -189,8 +192,106 @@ async def test_client_search_keeps_best_piece_size_video_only_fallback(tmp_path,
     }
     meta = Meta({"client": "none", "subtitle_files": [str(selected_subtitle)]})
 
-    assert await Clients(config).find_existing_torrent(meta) == str(small_piece_torrent)  # noqa: S101
+    assert await Clients(config)._find_existing_torrent(meta) == str(small_piece_torrent)  # noqa: S101
+
+
+@pytest.mark.asyncio
+async def test_client_search_registers_variants_from_multiple_clients(tmp_path):
+    media = tmp_path / "release.mkv"
+    media.touch()
+    client_dirs = [tmp_path / "first", tmp_path / "second"]
+    for directory, piece_size in zip(client_dirs, (1024 * 1024, 2 * 1024 * 1024), strict=True):
+        directory.mkdir()
+        torrent = Torrent()
+        torrent.metainfo["info"] = {
+            "name": media.name,
+            "length": 8 * 1024 * 1024,
+            "piece length": piece_size,
+            "pieces": b"x" * (20 * (8 * 1024 * 1024 // piece_size)),
+        }
+        torrent.write(directory / "abc.torrent")
+    config = {
+        "DEFAULT": {"default_torrent_client": "first", "searching_client_list": ["first", "second"], "prefer_max_16_torrent": False},
+        "TRACKERS": {},
+        "TORRENT_CLIENTS": {name: {"torrent_client": "qbit", "torrent_storage_dir": str(directory)} for name, directory in zip(("first", "second"), client_dirs, strict=True)},
+    }
+    meta = Meta(base_dir=str(tmp_path), uuid="release", path=str(media), filelist=[str(media)], trackers=["OTHER"], client="none")
+    meta.torrenthash = "abc"
+
+    paths = await Clients(config).find_existing_torrents(meta)
+
+    assert len(paths) == 2  # noqa: S101
+    assert {entry.piece_size for entry in TorrentManifest(meta.base_dir, meta.uuid).entries()} == {1024 * 1024, 2 * 1024 * 1024}  # noqa: S101
     assert meta.reuse_torrent_client == "second"  # noqa: S101
+
+
+@pytest.mark.asyncio
+async def test_client_search_registers_all_variants_from_one_client(tmp_path, monkeypatch):
+    media = tmp_path / "release.mkv"
+    media.touch()
+    candidates = []
+    for piece_size in (8 * MIB, 16 * MIB):
+        torrent = Torrent()
+        torrent.metainfo["info"] = {
+            "name": media.name,
+            "length": 64 * MIB,
+            "piece length": piece_size,
+            "pieces": b"x" * (20 * (64 * MIB // piece_size)),
+        }
+        candidate = tmp_path / f"{piece_size}.torrent"
+        torrent.write(candidate)
+        candidates.append(str(candidate))
+
+    async def fake_search(_self, _meta, _client_name, _prefer_small, _piece_limit, _best_match, collect_all=False):
+        assert collect_all  # noqa: S101
+        return candidates
+
+    monkeypatch.setattr(Clients, "_search_single_client_for_torrent", fake_search)
+    config = {
+        "DEFAULT": {"default_torrent_client": "qbit", "searching_client_list": ["qbit"]},
+        "TORRENT_CLIENTS": {"qbit": {"torrent_client": "qbit"}},
+    }
+    meta = Meta(base_dir=str(tmp_path), uuid="release", path=str(media), filelist=[str(media)], client="none")
+
+    paths = await Clients(config).find_existing_torrents(meta)
+
+    manifest = TorrentManifest(meta.base_dir, meta.uuid)
+    assert len(paths) == 2  # noqa: S101
+    assert {entry.piece_size for entry in manifest.entries()} == {8 * MIB, 16 * MIB}  # noqa: S101
+    eight = manifest.select("EIGHT", "base", TorrentPolicy(validator=lambda stats: stats.piece_size == 8 * MIB))
+    sixteen = manifest.select("SIXTEEN", "base", TorrentPolicy(validator=lambda stats: stats.piece_size == 16 * MIB))
+    assert eight is not None and eight.piece_size == 8 * MIB  # noqa: S101
+    assert sixteen is not None and sixteen.piece_size == 16 * MIB  # noqa: S101
+
+
+@pytest.mark.asyncio
+async def test_qbit_search_returns_all_valid_matches_when_collecting(tmp_path, monkeypatch):
+    storage = tmp_path / "storage"
+    storage.mkdir()
+    hashes = ["eight", "sixteen"]
+    for torrent_hash in hashes:
+        (storage / f"{torrent_hash}.torrent").touch()
+
+    qbt_client = SimpleNamespace(
+        torrents_info=lambda: [
+            SimpleNamespace(hash=torrent_hash, name="release", save_path=str(tmp_path), content_path=str(tmp_path / "release.mkv"), tracker="", trackers=[], comment="metadata")
+            for torrent_hash in hashes
+        ]
+    )
+    config = {"DEFAULT": {}, "TORRENT_CLIENTS": {}}
+    clients = Clients(config)
+    monkeypatch.setattr(clients, "_matches_qbit_content_path", lambda _torrent, _meta: True)
+
+    async def valid_torrent(_meta, path, _torrent_hash, _client_type, _client):
+        return True, str(path)
+
+    monkeypatch.setattr(clients, "is_valid_torrent", valid_torrent)
+    meta = Meta(base_dir=str(tmp_path), uuid="release", path=str(tmp_path / "release.mkv"), subtitle_files=[], debug=False)
+    client = {"torrent_storage_dir": str(storage)}
+
+    found = await clients.search_qbit_for_torrent(meta, client, qbt_client=qbt_client, collect_all=True)
+
+    assert found == hashes  # noqa: S101
 
 
 @pytest.mark.asyncio

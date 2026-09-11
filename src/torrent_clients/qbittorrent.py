@@ -133,7 +133,7 @@ class QbittorrentClientMixin:
 
                     torrents = [TorrentInfo(torrent_properties)]
                 except Exception as e:
-                    logger.info(f"[yellow]Failed to get properties: {e}")
+                    logger.debug(f"[yellow]Failed to get properties: {e}")
                     return meta
         except TimeoutError:
             logger.info("[bold red]Getting torrents list timed out after retries")
@@ -151,7 +151,7 @@ class QbittorrentClientMixin:
         if not meta.uuid:
             meta.uuid = folder_id
 
-        extracted_torrent_dir = str(Path(meta.base_dir) / "tmp" / meta.uuid)
+        extracted_torrent_dir = str(Path(meta.base_dir) / "tmp" / meta.uuid / "torrents" / ".client")
         Path(extracted_torrent_dir).mkdir(parents=True, exist_ok=True)
 
         for torrent in torrents:
@@ -401,11 +401,13 @@ class QbittorrentClientMixin:
         qbt_client: qbittorrentapi.Client | None = None,
         qbt_session: httpx.AsyncClient | None = None,
         proxy_url: str | None = None,
-    ) -> str | None:
+        *,
+        collect_all: bool = False,
+    ) -> list[str] | str | None:
         logger.debug("[green]Searching qBittorrent for an existing .torrent")
 
         torrent_storage_dir = client.get("torrent_storage_dir")
-        extracted_torrent_dir = str(Path(meta.base_dir) / "tmp" / meta.uuid)
+        extracted_torrent_dir = str(Path(meta.base_dir) / "tmp" / meta.uuid / "torrents" / ".client")
 
         if not extracted_torrent_dir or extracted_torrent_dir.strip() == "tmp/":
             logger.info("[bold red]Invalid extracted torrent directory path. Check `meta.base_dir` and `meta.uuid`.")
@@ -583,6 +585,7 @@ class QbittorrentClientMixin:
             # **Step 2: Extract and Save .torrent Files**
             processed_hashes: set[str] = set()
             video_only_fallback: str | None = None
+            valid_hashes: list[str] = []
             torrent_hash: str | None = None
             for matching_torrent in matching_torrents:
                 try:
@@ -658,18 +661,26 @@ class QbittorrentClientMixin:
                 if valid:
                     if meta.subtitle_files and not self._torrent_includes_all_local_subtitles(str(torrent_file_path), meta):
                         if self._torrent_has_no_subtitles(str(torrent_file_path)):
-                            video_only_fallback = torrent_hash
-                            meta.base_reuse_torrent_path = str(torrent_path or torrent_file_path)
-                            logger.debug(f"[yellow]Keeping video-only torrent as fallback: {torrent_hash}")
+                            if collect_all:
+                                valid_hashes.append(torrent_hash)
+                            else:
+                                video_only_fallback = torrent_hash
+                                meta.base_reuse_torrent_path = str(torrent_path or torrent_file_path)
+                                logger.debug(f"[yellow]Keeping video-only torrent as fallback: {torrent_hash}")
                         else:
                             logger.debug(f"[yellow]Skipping partial-subtitle torrent as fallback: {torrent_hash}")
+                        continue
+                    if collect_all:
+                        valid_hashes.append(torrent_hash)
                         continue
                     logger.debug(f"[green]Returning first valid torrent: {torrent_hash}")
                     return torrent_hash
                 logger.debug(f"[bold red]{torrent_hash} failed validation")
                 torrent_file_path.unlink()
 
-            if video_only_fallback:
+            if collect_all:
+                result = valid_hashes
+            elif video_only_fallback:
                 logger.info(f"[yellow]No matching torrent with all local subtitles found; using video-only fallback: {video_only_fallback}")
                 result = video_only_fallback
             else:
@@ -1624,7 +1635,7 @@ class QbittorrentClientMixin:
         if not meta.base_torrent_created:
             torrent_storage_dir = client_config.get("torrent_storage_dir")
 
-            extracted_torrent_dir = str(Path(meta.base_dir) / "tmp" / meta.uuid)
+            extracted_torrent_dir = str(Path(meta.base_dir) / "tmp" / meta.uuid / "torrents" / ".client")
             Path(extracted_torrent_dir).mkdir(parents=True, exist_ok=True)
 
             # Set up piece size preference logic

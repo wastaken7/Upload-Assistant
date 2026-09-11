@@ -513,8 +513,9 @@ class UNIT3D:
 
     async def upload(self, meta: Meta) -> bool:
         data = await self.get_data(meta)
-        torrent_filename = await self.common.get_torrent_filename(meta, self.tracker_config)
-        torrent_file_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/{torrent_filename}.torrent"
+        torrent_file_path = await self.common.get_base_torrent_path(meta, self.tracker, self.tracker_config)
+        if torrent_file_path is None:
+            raise FileNotFoundError("No selected base torrent is available")
         async with aiofiles.open(torrent_file_path, "rb") as f:
             torrent_bytes = await f.read()
         files = {"torrent": ("torrent.torrent", torrent_bytes, "application/x-bittorrent")}

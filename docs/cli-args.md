@@ -218,6 +218,13 @@ Thise will use the specified hash to get tracker ids from qBitTorrent or rTorren
 - `-rh`, `--rehash`: Rehash `.torrent` even if it was not needed.
 - `-mkbrr`, `--mkbrr`: Use mkbrr for torrent hashing.
 - `-entropy`, `--entropy N`: Use entropy in created torrents (32 or 64 bits).
+
+Reusable base torrents are recorded in `tmp/<release-id>/torrent_manifest.json`
+and stored by piece size under `tmp/<release-id>/torrents/<piece-size-bytes>/`.
+Tracker-ready `[TRACKER].torrent` files remain in the release directory. When
+`--nohash` is used, a tracker is skipped if no stored base satisfies its torrent
+policy.
+
 - `-rt`, `--randomized N`: Create N extra torrents with random infohash (default `0`).
 - `--infohash HASH`: V1 info hash to use as the base.
 - `-frc`, `--force-recheck`: (qBittorrent only with auto torrent searching) Force recheck torrent before uploading. NOTE: will find the best seeded torrent file from a supported site, for the related content, and force a recheck before uploading.
