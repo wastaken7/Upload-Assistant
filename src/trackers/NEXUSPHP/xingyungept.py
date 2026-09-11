@@ -161,7 +161,7 @@ class XingyungePT(NEXUSPHP):
             return 8
         if "lpcm" in audio_codec or "pcm" in audio_codec:
             return 9
-        if "ddp" in audio_codec or "eac3" in audio_codec or "e-ac-3" in audio_codec:
+        if "dd+" in audio_codec or "eac3" in audio_codec or "e-ac-3" in audio_codec:
             return 11
         if "dd" in audio_codec or "ac3" in audio_codec or "ac-3" in audio_codec:
             return 10

@@ -178,7 +178,7 @@ class LongPT(NEXUSPHP):
             return 8
         if "atmos" in audio_codec:
             return 9
-        if "ddp" in audio_codec:
+        if "dd+" in audio_codec:
             return 10
 
         return 11
@@ -201,7 +201,7 @@ class LongPT(NEXUSPHP):
         chinese_audio = 5
         chinese_subtitle = 6
         diy = 4
-        english_audio = 9
+        english_subs = 9
         hdr = 7
         reposting_prohibited = 1
 
@@ -209,7 +209,7 @@ class LongPT(NEXUSPHP):
         subtitle_tracks = meta.subtitle_languages or []
         mhdr = meta.hdr
 
-        checkboxes = []
+        checkboxes: list[str] = []
 
         if meta.exclusive:
             checkboxes.append(str(reposting_prohibited))
@@ -217,8 +217,8 @@ class LongPT(NEXUSPHP):
         if "Chinese" in audio_tracks or "Mandarin" in audio_tracks:
             checkboxes.append(str(chinese_audio))
 
-        if "English" in audio_tracks:
-            checkboxes.append(str(english_audio))
+        if "English" in subtitle_tracks:
+            checkboxes.append(str(english_subs))
 
         if "Chinese" in subtitle_tracks or "Mandarin" in subtitle_tracks:
             checkboxes.append(str(chinese_subtitle))

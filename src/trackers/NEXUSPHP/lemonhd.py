@@ -148,7 +148,7 @@ class LemonHD(NEXUSPHP):
             return 3
         if "dts" in audio_codec:
             return 5
-        if "ddp" in audio_codec or "eac3" in audio_codec or "e-ac-3" in audio_codec:
+        if "dd+" in audio_codec or "eac3" in audio_codec or "e-ac-3" in audio_codec:
             return 7
         if "dd" in audio_codec or "ac3" in audio_codec or "ac-3" in audio_codec:
             return 6
