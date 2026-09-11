@@ -161,7 +161,7 @@ class PTZone(NEXUSPHP):
             return 5
         if "aac" in audio_codec:
             return 6
-        if "ddp" in audio_codec or "eac3" in audio_codec or "e-ac-3" in audio_codec:
+        if "dd+" in audio_codec or "eac3" in audio_codec or "e-ac-3" in audio_codec:
             return 12
         if "dd" in audio_codec or "ac3" in audio_codec or "ac-3" in audio_codec:
             return 11
