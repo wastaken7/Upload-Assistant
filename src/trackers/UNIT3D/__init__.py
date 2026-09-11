@@ -16,6 +16,7 @@ from src.console import logger
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
 from src.trackers.common import Common
+from src.trackers.naming import add_incomplete_pack_marker
 
 type QueryValue = str | int | float | bool | None
 type ParamsList = list[tuple[str, QueryValue]]
@@ -183,7 +184,7 @@ class UNIT3D:
         return dupes
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
-        return {"name": meta.name}
+        return {"name": add_incomplete_pack_marker(meta.name, meta, self.tracker)}
 
     async def get_description(self, meta: Meta) -> Any:
         return {

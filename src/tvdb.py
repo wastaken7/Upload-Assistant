@@ -137,7 +137,7 @@ class TVDB:
                 logger.error(f"[red]TVDB login failed: {e}[/red]")
                 return False
 
-    async def _request(self, method: str, endpoint: str, **kwargs) -> Any:
+    async def _request(self, method: str, endpoint: str, *, include_links: bool = False, **kwargs) -> Any:
         if not self.token:
             success = await self.login()
             if not success:
@@ -156,7 +156,7 @@ class TVDB:
             payload = resp.json()
             if not isinstance(payload, dict) or "data" not in payload:
                 raise ValueError("TVDB response did not contain data")
-            return payload["data"]
+            return payload if include_links else payload["data"]
         except Exception as e:
             logger.debug(f"[red]TVDB API request failed: {e}[/red]")
             raise
@@ -184,13 +184,13 @@ class TVDB:
             raise TypeError("TVDB extended series response data was not a dictionary")
         return res
 
-    async def get_series_episodes(self, id: int, season_type="default", page=0, lang=None, **kwargs) -> dict[str, Any]:
+    async def get_series_episodes(self, id: int, season_type="default", page=0, lang=None, *, include_links: bool = False, **kwargs) -> dict[str, Any]:
         url = f"/series/{id}/episodes/{season_type}"
         if lang:
             url += f"/{lang}"
         params = {"page": page}
         params.update(kwargs)
-        res = await self._request("GET", url, params=params)
+        res = await self._request("GET", url, params=params, include_links=include_links)
         if not isinstance(res, dict):
             raise TypeError("TVDB series episodes response data was not a dictionary")
         return res
@@ -270,6 +270,43 @@ def _get_tvdb_or_warn(config: dict[str, Any] | None = None) -> TVDB | None:
 class TvdbData:
     def __init__(self, config: Any) -> None:
         self.config = config
+
+    async def get_season_episode_numbers(self, series_id: int, season: int) -> list[int] | None:
+        """Fetch a fresh, fully paginated season in TVDB's default episode order.
+
+        Do not use the legacy series cache: it can be stale or contain only the
+        pages retrieved before a request failed. None means verification failed.
+        """
+        client = _get_tvdb_or_warn(self.config)
+        if client is None:
+            return None
+
+        numbers: set[int] = set()
+        try:
+            for page in range(100):
+                payload = await client.get_series_episodes(series_id, season=season, page=page, include_links=True)
+                data = payload.get("data")
+                links = payload.get("links")
+                if not isinstance(data, dict) or not isinstance(data.get("episodes"), list) or not isinstance(links, dict) or "next" not in links:
+                    raise ValueError("TVDB season response is missing episodes or pagination information")
+                episodes = data["episodes"]
+                for episode in episodes:
+                    if not isinstance(episode, dict):
+                        raise ValueError("Invalid TVDB episode record")
+                    episode_season = _coerce_int(episode.get("seasonNumber"))
+                    number = _coerce_int(episode.get("number"))
+                    if episode_season is None or number is None:
+                        raise ValueError("TVDB episode is missing its season or episode number")
+                    if episode_season == season and number > 0:
+                        numbers.add(number)
+                if links["next"] is None:
+                    return sorted(numbers) or None
+                if not episodes:
+                    raise ValueError("TVDB returned an empty page with more pages remaining")
+            raise ValueError("TVDB season pagination limit reached")
+        except Exception as error:
+            logger.debug(f"[yellow]Could not verify TVDB season {season}: {error}[/yellow]")
+            return None
 
     async def search_tvdb_series(
         self,

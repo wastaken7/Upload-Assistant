@@ -12,6 +12,7 @@ from src.console import logger
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
+from src.trackers.naming import add_incomplete_pack_marker
 
 Config = dict[str, Any]
 
@@ -295,4 +296,4 @@ class HDSpace:
         )
 
     async def get_name(self, meta: Meta) -> str:
-        return meta.name
+        return add_incomplete_pack_marker(meta.name, meta, self.tracker)

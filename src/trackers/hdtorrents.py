@@ -12,6 +12,7 @@ from src.console import logger
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
+from src.trackers.naming import add_incomplete_pack_marker
 
 Config = dict[str, Any]
 
@@ -138,7 +139,7 @@ class HDTorrents:
 
         hdt_name = " ".join(hdt_name.split())
         hdt_name = re.sub(r"[^0-9a-zA-ZÀ-ÿ. &+'\-\[\]]+", "", hdt_name)
-        return hdt_name.replace(":", "").replace("..", " ").replace("  ", " ")
+        return add_incomplete_pack_marker(hdt_name.replace(":", "").replace("..", " ").replace("  ", " "), meta, self.tracker)
 
     async def edit_desc(self, meta: Meta) -> str:
         builder = DescriptionBuilder(self.tracker, self.config)

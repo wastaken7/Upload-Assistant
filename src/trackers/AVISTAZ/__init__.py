@@ -22,6 +22,7 @@ from src.languages import languages_manager
 from src.meta import Meta
 from src.temp_paths import screenshots_dir
 from src.trackers.common import Common
+from src.trackers.naming import add_incomplete_pack_marker
 
 Config = dict[str, Any]
 
@@ -883,7 +884,7 @@ class AZTrackerBase:
                 codec_suffix = f" {video_codec}" if video_codec else ""
                 upload_name = upload_name.replace(audio, f"{audio}{codec_suffix}")
 
-        return re.sub(r"\s{2,}", " ", upload_name)
+        return add_incomplete_pack_marker(re.sub(r"\s{2,}", " ", upload_name), meta, self.tracker)
 
     def get_rip_type(self, meta: Meta, display_name: bool = False) -> str:
         # Translation from meta keywords to site display labels

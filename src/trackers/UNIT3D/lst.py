@@ -6,6 +6,7 @@ from src.console import logger
 from src.meta import Meta
 from src.music.sources import DiscogsEnricher
 from src.trackers.common import Common
+from src.trackers.naming import add_incomplete_pack_marker
 from src.trackers.UNIT3D import UNIT3D
 
 Config = dict[str, Any]
@@ -212,7 +213,7 @@ class LST(UNIT3D):
         if meta.trump_reason == "exact_match":
             lst_name = lst_name + " - TRUMP"
 
-        return {"name": lst_name}
+        return {"name": add_incomplete_pack_marker(lst_name, meta, self.tracker)}
 
     @staticmethod
     def _with_tag(parts: list[str], tag: str | None) -> str:

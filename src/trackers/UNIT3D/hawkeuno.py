@@ -13,6 +13,7 @@ from src.languages import languages_manager
 from src.meta import Meta
 from src.rehostimages import ImageHostPolicy, RehostImagesManager
 from src.trackers.common import Common
+from src.trackers.naming import add_incomplete_pack_marker
 from src.trackers.UNIT3D import UNIT3D
 
 
@@ -247,6 +248,9 @@ class HawkeUno(UNIT3D):
         if internal == 1:
             data["internal"] = 1
 
+        if meta.tv_pack and meta.season_pack_incomplete:
+            data.update(await self.get_name(meta))
+
         data["edition"] = meta.edition
         if meta.repack:
             data["release_tag"] = meta.repack
@@ -282,7 +286,7 @@ class HawkeUno(UNIT3D):
         await self.common.create_torrent_for_upload(meta, self.tracker, self.source_flag, announce_url=self.announce_url)
         torrent_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}].torrent"
         async with aiofiles.open(torrent_path, "rb") as f:
-            files["torrent"] = (f"{meta.clean_name}.torrent", await f.read(), "application/x-bittorrent")
+            files["torrent"] = (f"{add_incomplete_pack_marker(meta.clean_name, meta, self.tracker)}.torrent", await f.read(), "application/x-bittorrent")
 
         desc_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt"
         async with aiofiles.open(desc_path, "rb") as f:

@@ -12,6 +12,7 @@ from src.console import logger
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
+from src.trackers.naming import add_incomplete_pack_marker
 
 Config = dict[str, Any]
 
@@ -404,7 +405,7 @@ class IPTorrents:
         if meta.scene and "[NO RAR]" not in name.upper():
             name += " [NO RAR]"
 
-        return re.sub(r"\s{2,}", " ", name)
+        return add_incomplete_pack_marker(re.sub(r"\s{2,}", " ", name), meta, self.tracker)
 
     async def get_is_freeleech(self, meta: Meta):
         torrent_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/BASE.torrent"
@@ -430,7 +431,7 @@ class IPTorrents:
 
     async def get_data(self, meta: Meta) -> dict[str, str | int]:
         data: dict[str, str | int] = {
-            "name": meta.name,
+            "name": add_incomplete_pack_marker(meta.name, meta, self.tracker),
             "descr": await self.generate_description(meta),
             "type": self.get_category_id(meta),
         }
@@ -475,7 +476,7 @@ class IPTorrents:
     async def edit_post_upload(self, meta: Meta):
         torrent_id = meta.tracker_status[self.tracker]["torrent_id"]
         data: dict[str, str | int] = {
-            "name": meta.name,
+            "name": add_incomplete_pack_marker(meta.name, meta, self.tracker),
             "descr": await self.generate_description(meta),
             "type": self.get_category_id(meta),
             "imdb_id": str(meta.tmdb_id),

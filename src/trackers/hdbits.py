@@ -20,6 +20,7 @@ from src.meta import Meta
 from src.temp_paths import screenshots_dir
 from src.torrentcreate import TorrentCreator
 from src.trackers.common import Common
+from src.trackers.naming import add_incomplete_pack_marker
 
 Config = dict[str, Any]
 
@@ -233,7 +234,7 @@ class HDBits:
         hdb_name = hdb_name.replace("DTS-HD HRA", "DTS-HD HR")
         hdb_name = " ".join(hdb_name.split())
         hdb_name = re.sub(r"[^0-9a-zA-ZÀ-ÿ. :&+'\-\[\]]+", "", hdb_name)
-        return hdb_name.replace(" .", ".").replace("..", ".")
+        return add_incomplete_pack_marker(hdb_name.replace(" .", ".").replace("..", "."), meta, self.tracker)
 
     async def upload(self, meta: Meta) -> bool | None:
         common = Common(config=self.config)
