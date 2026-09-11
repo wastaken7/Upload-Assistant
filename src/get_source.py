@@ -103,6 +103,8 @@ async def get_source(type: str, video: str, path: str, is_disc: str, meta: Meta,
             finally:
                 if type == "REMUX":
                     system = f"{system} DVD".strip()
+                elif type == "ENCODE":
+                    type = "DVDRIP"
                 source = system
         if source in ("Web", "WEB") and type == "ENCODE":
             type = "WEBRIP"

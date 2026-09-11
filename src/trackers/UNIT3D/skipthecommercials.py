@@ -49,7 +49,7 @@ class SkipTheCommercials(UNIT3D):
     ) -> dict[str, str]:
         _ = (type, reverse, mapping_only)
         type_value = str(meta.type)
-        type_id = {"DISC": "1", "REMUX": "2", "WEBDL": "4", "WEBRIP": "5", "HDTV": "6", "ENCODE": "3"}.get(type_value, "0")
+        type_id = {"DISC": "1", "REMUX": "2", "WEBDL": "4", "WEBRIP": "5", "HDTV": "6", "ENCODE": "3", "DVDRIP": "3"}.get(type_value, "0")
         if meta.tv_pack:
             is_web = type_value in ["WEBDL", "WEBRIP"]
             type_id = ("17" if not is_web else "14") if meta.sd else ("18" if not is_web else "13")

@@ -35,7 +35,7 @@ class Portugas(UNIT3D):
 
     async def get_type_id(self, meta: Meta, type: str | None = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         _ = (type, reverse, mapping_only)
-        type_id = {"DISC": "1", "REMUX": "2", "WEBDL": "4", "WEBRIP": "39", "HDTV": "6", "ENCODE": "3"}.get(str(meta.type), "0")
+        type_id = {"DISC": "1", "REMUX": "2", "WEBDL": "4", "WEBRIP": "39", "HDTV": "6", "ENCODE": "3", "DVDRIP": "3"}.get(str(meta.type), "0")
         return {"type_id": type_id}
 
     async def get_resolution_id(self, meta: Meta, resolution: str | None = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:

@@ -151,7 +151,7 @@ class NameManager:
                 name = f"{title} {alt_title} {year} {edition} {repack} {resolution} {source} {audio} {video_encode}"
                 potential_missing = []
             elif type == "DVDRIP":
-                name = f"{title} {alt_title} {year} {source} {video_encode} DVDRip {audio}"
+                name = f"{title} {alt_title} {year} {edition} {repack} {source} {video_encode} DVDRip {audio}"
                 potential_missing = []
         elif meta.category == "TV":  # TV SPECIFIC
             if type == "DISC":  # Disk
@@ -185,7 +185,7 @@ class NameManager:
                 name = f"{title} {year} {alt_title} {season}{episode} {episode_title} {part} {edition} {repack} {resolution} {source} {audio} {video_encode}"
                 potential_missing = []
             elif type == "DVDRIP":
-                name = f"{title} {year} {alt_title} {season} {source} DVDRip {audio} {video_encode}"
+                name = f"{title} {year} {alt_title} {season}{episode} {episode_title} {part} {edition} {repack} {source} DVDRip {audio} {video_encode}"
                 potential_missing = []
         elif meta.category == "BOOK":
             name = self.extract_book_name(meta)

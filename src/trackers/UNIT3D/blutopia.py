@@ -259,7 +259,7 @@ class Blutopia(UNIT3D):
         reverse: bool = False,
         mapping_only: bool = False,
     ) -> dict[str, str]:
-        type_id = {"DISC": "1", "REMUX": "3", "WEBDL": "4", "WEBRIP": "5", "HDTV": "6", "ENCODE": "12"}
+        type_id = {"DISC": "1", "REMUX": "3", "WEBDL": "4", "WEBRIP": "5", "HDTV": "6", "ENCODE": "12", "DVDRIP": "12"}
 
         if mapping_only:
             return type_id
