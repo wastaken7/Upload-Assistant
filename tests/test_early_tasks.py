@@ -1,9 +1,11 @@
 # ruff: noqa: S101
 
 import asyncio
+from types import SimpleNamespace
 
 from src import early_tasks
 from src.console import progress_display, suppress_cli_progress
+from src.meta import Meta
 from src.webui_progress import PROGRESS_STDOUT_PREFIX, clear_progress_callback, publish_progress, set_progress_callback
 
 
@@ -97,3 +99,34 @@ def test_webui_subprocess_progress_uses_structured_stdout(monkeypatch, capsys) -
     output = capsys.readouterr().out
     assert output.strip().startswith(PROGRESS_STDOUT_PREFIX)
     assert '"id":"hash"' in output
+
+
+def test_early_torrent_task_creates_missing_subtitle_variant(monkeypatch, tmp_path) -> None:
+    async def exercise() -> None:
+        outputs = []
+
+        def default_path(_self, layout="base"):
+            return tmp_path / "base.torrent" if layout == "base" else None
+
+        async def create_torrent(_meta, _path, output, **_kwargs):
+            outputs.append(output)
+
+        async def unexpected_search(_meta):
+            raise AssertionError("existing base must not trigger client search")
+
+        monkeypatch.setattr(early_tasks.TorrentManifest, "default_path", default_path)
+        monkeypatch.setattr(early_tasks.TorrentCreator, "create_torrent", create_torrent)
+        meta = Meta(
+            base_dir=str(tmp_path),
+            uuid="release",
+            path=str(tmp_path / "release.mkv"),
+            subtitle_files=[str(tmp_path / "release.srt")],
+            trackers=["TEST"],
+        )
+        client = SimpleNamespace(find_existing_torrent=unexpected_search)
+
+        await early_tasks.create_base_torrents_early(meta, client)
+
+        assert outputs == ["BASE_SUBS"]
+
+    asyncio.run(exercise())

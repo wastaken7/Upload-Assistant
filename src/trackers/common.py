@@ -279,7 +279,9 @@ class Common:
         tracker_cfg = self.config.get("TRACKERS", {}).get(tracker, {})
         if torrent_filename == "BASE":
             base_path = await self.get_base_torrent_path(meta, tracker, tracker_cfg)
-            path = str(base_path) if base_path is not None else ""
+            if base_path is None:
+                raise FileNotFoundError(f"{tracker}: no selected base torrent is available in the manifest")
+            path = str(base_path)
         else:
             path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/{torrent_filename}.torrent"
         if await self.path_exists(path):

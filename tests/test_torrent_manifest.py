@@ -8,6 +8,8 @@ from torf import Torrent
 from src.torrent_manifest import TorrentEntry, TorrentManifest
 from src.torrent_policy import ANTHELION_POLICY, PASSTHEPOPCORN_POLICY, MIB, TorrentPolicy, TorrentStats
 from src.torrent_provision import provision_tracker_torrents
+from src.torrentcreate import TorrentCreator
+from src.trackers.common import Common
 from src.trackers.GAZELLE.anthelion import Anthelion
 from src.trackers.GAZELLE.passthepopcorn import PassThePopcorn
 from src.trackers.hdbits import HDBits
@@ -159,3 +161,45 @@ async def test_nohash_blocks_tracker_without_compliant_variant(tmp_path):
 
     assert blocked == {"PASSTHEPOPCORN"}
     assert meta.tracker_status["PASSTHEPOPCORN"]["upload"] is False
+
+
+@pytest.mark.asyncio
+async def test_provision_contains_failures_and_reports_accurate_reasons(tmp_path, monkeypatch):
+    from src.meta import Meta
+
+    media = tmp_path / "release.mkv"
+    media.touch()
+    policy = TorrentPolicy(required_piece_size=4 * MIB)
+    tracker_class_map = {tracker: type(tracker, (), {"torrent_policy": policy}) for tracker in ("FAIL", "REJECT", "GOOD")}
+    meta = Meta(base_dir=str(tmp_path), uuid="release", path=str(media), filelist=[str(media)], trackers=list(tracker_class_map))
+    meta.tracker_status = {tracker: {"upload": True} for tracker in tracker_class_map}
+    manifest = TorrentManifest(meta.base_dir, meta.uuid)
+
+    async def create_torrent(hash_meta, _path, _output, **_kwargs):
+        tracker = hash_meta.trackers[0]
+        if tracker == "FAIL":
+            raise OSError("disk unavailable")
+        if tracker == "GOOD":
+            generated = tmp_path / "good.torrent"
+            write_torrent(generated)
+            manifest.register(generated, "base", "generated")
+
+    monkeypatch.setattr(TorrentCreator, "create_torrent", create_torrent)
+
+    blocked = await provision_tracker_torrents(meta, {"TRACKERS": {}}, list(tracker_class_map), tracker_class_map)
+
+    assert blocked == {"FAIL", "REJECT"}
+    assert meta.tracker_status["FAIL"]["status_message"] == "Skipped: torrent provisioning failed: disk unavailable"
+    assert meta.tracker_status["REJECT"]["status_message"] == "Skipped: generated torrent does not satisfy the tracker policy"
+    assert meta.tracker_status["GOOD"]["upload"] is True
+    assert manifest.selected_path("GOOD") is not None
+
+
+@pytest.mark.asyncio
+async def test_create_torrent_for_upload_rejects_missing_manifest_base(tmp_path):
+    from src.meta import Meta
+
+    meta = Meta(base_dir=str(tmp_path), uuid="release")
+
+    with pytest.raises(FileNotFoundError, match="TEST: no selected base torrent"):
+        await Common({"TRACKERS": {"TEST": {}}}).create_torrent_for_upload(meta, "TEST", "TEST")
