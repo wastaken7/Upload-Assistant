@@ -456,6 +456,21 @@ class BroadcasTheNet:
         name = str(meta.get("scene_name") or meta.name or meta.basename_no_ext or "")
         name = re.sub(r"(?i)\.(avi|mkv|mp4|ts|m4v|m2ts|wmv|mpeg|mpg|vob)$", "", name)
         name = self._clean_name(name)
+        if not meta.scene_name:
+            aka = self._clean_name(str(meta.aka or ""))
+            if aka:
+                name = re.sub(rf"(?i)(?:^|\.){re.escape(aka)}(?=\.|$)", ".", name, count=1)
+
+            hdr = self._clean_name(str(meta.hdr or ""))
+            resolution = self._clean_name(str(meta.resolution or ""))
+            if hdr and resolution:
+                hdr_pattern = rf"(?i)(?:^|\.){re.escape(hdr)}(?=\.|$)"
+                resolution_pattern = rf"(?i)(?:^|\.){re.escape(resolution)}(?=\.|$)"
+                if re.search(hdr_pattern, name) and re.search(resolution_pattern, name):
+                    name = re.sub(hdr_pattern, ".", name, count=1)
+                    name = re.sub(resolution_pattern, f".{hdr}.{resolution}", name, count=1)
+
+            name = re.sub(r"\.{2,}", ".", name).strip(".")
         if str(meta.resolution).lower() in {"sd", "480i", "480p", "576i", "576p"}:
             name = re.sub(r"(?i)(?:^|\.)(?:sd|\d{3,4}[pi])(?=\.|$)", ".", name)
             name = re.sub(r"\.{2,}", ".", name).strip(".")
