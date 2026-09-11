@@ -4750,6 +4750,14 @@ def _configured_cookie_tracker_names(
     return configured
 
 
+def _tracker_codebase(tracker_class: Any) -> str | None:
+    """Expose known tracker families without guessing from ungrouped modules."""
+    module_parts = str(getattr(tracker_class, "__module__", "")).split(".")
+    if len(module_parts) < 4 or module_parts[:2] != ["src", "trackers"]:
+        return None
+    return {"UNIT3D": "UNIT3D", "GAZELLE": "Gazelle", "NEXUSPHP": "NexusPHP", "AVISTAZ": "AvistaZ"}.get(module_parts[2])
+
+
 def _tracker_destination_type(tracker_class: Any) -> str:
     """Return the WebUI destination category without changing tracker IDs."""
     return "usenet" if bool(getattr(tracker_class, "is_usenet", False)) else "torrent"
@@ -5024,6 +5032,7 @@ def get_trackers():
             {
                 "name": tracker_name,
                 "display_name": display_name,
+                "codebase": _tracker_codebase(tracker_class),
                 "base_url": base_url,
                 "favicon": favicon_url,
                 "configured": tracker_name.upper() in configured_trackers,
