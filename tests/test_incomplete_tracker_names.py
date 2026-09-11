@@ -18,10 +18,10 @@ TRACKERS = (
 def make_meta(**overrides):
     fields = dict(
         category="TV", tv_pack=True, season_pack_incomplete=True, season="S03", season_int=3,
-        title="Car S.O.S.", name="Car S.O.S. S03 1080p DSNP WEB-DL DDP 5.1 H.264-Group",
-        clean_name="Car.S.O.S.S03.1080p.DSNP.WEB-DL.DDP.5.1.H.264-Group",
+        title="Example Show", name="Example Show S03 1080p DSNP WEB-DL DDP 5.1 H.264-TESTGROUP",
+        clean_name="Example.Show.S03.1080p.DSNP.WEB-DL.DDP.5.1.H.264-TESTGROUP",
         type="WEBDL", source="Web", resolution="1080p", video_codec="H.264", video_encode="H.264",
-        audio="DDP 5.1", tag="-Group", service="DSNP", language_checked=True,
+        audio="DDP 5.1", tag="-TESTGROUP", service="DSNP", language_checked=True,
     )
     fields.update(overrides)
     return Meta(**fields)

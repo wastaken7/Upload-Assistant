@@ -15,7 +15,7 @@ from src.trackers.UNIT3D.rockethd import RocketHD
 def _meta(episodes, **kwargs):
     return Meta(
         category="TV", tv_pack=True, season="S03", season_int=3,
-        filelist=[f"Car.S.O.S.S03E{episode:02d}.NORDiC.1080p.DSNP.WEB-DL.H.264-Group.mkv" for episode in episodes],
+        filelist=[f"Example.Show.S03E{episode:02d}.NORDiC.1080p.DSNP.WEB-DL.H.264-TESTGROUP.mkv" for episode in episodes],
         **kwargs,
     )
 
@@ -24,7 +24,7 @@ def _meta(episodes, **kwargs):
 def manager(monkeypatch):
     result = SeasonEpisodeManager({"DEFAULT": {"tmdb_api": "test-key"}})
     result.tvdb_handler.get_season_episode_numbers = AsyncMock(return_value=list(range(1, 11)))
-    monkeypatch.setattr(getseasonep, "get_tag", AsyncMock(return_value="-Group"))
+    monkeypatch.setattr(getseasonep, "get_tag", AsyncMock(return_value="-TESTGROUP"))
     return result
 
 
@@ -42,9 +42,9 @@ def test_local_numbering_requires_episode_one_and_continuity(manager, episodes, 
     manager.tvdb_handler.get_season_episode_numbers.assert_not_awaited()
 
 
-def test_original_car_sos_pack_reports_missing_first_episode(manager):
+def test_pack_with_season_nfo_reports_missing_first_episode(manager):
     meta = _meta(range(2, 11), tvdb_id=123)
-    meta.filelist.append("Car.S.O.S.S03.NORDiC.1080p.DSNP.WEB-DL.H.264-Group.nfo")
+    meta.filelist.append("Example.Show.S03.NORDiC.1080p.DSNP.WEB-DL.H.264-TESTGROUP.nfo")
     result = asyncio.run(manager.check_season_pack_detail(meta))
     assert result["complete"] is False
     assert result["missing_episodes"] == [(3, 1)]
@@ -66,7 +66,7 @@ def test_duplicate_files_do_not_hide_missing_episode(manager):
 
 def test_multi_episode_file_counts_both_episodes(manager):
     meta = _meta(range(3, 11), tvdb_id=123)
-    meta.filelist.append("Car.S.O.S.S03E01E02.mkv")
+    meta.filelist.append("Example.Show.S03E01E02.mkv")
     result = asyncio.run(manager.check_season_pack_detail(meta))
     assert result["complete"] is True
     assert result["tvdb_episode_counts"] == {3: (10, 10)}
@@ -168,7 +168,7 @@ def test_non_pack_does_not_fetch_tvdb(manager):
 @pytest.mark.parametrize("release_type", ["WEBDL", "WEBRIP", "ENCODE", "HDTV", "REMUX", "DISC", "DVDRIP"])
 def test_confirmed_marker_is_added_only_to_supporting_tracker(manager, monkeypatch, release_type):
     monkeypatch.setattr(getseasonep, "prompt_in_thread", AsyncMock(return_value="y"))
-    meta = _meta([2], title="Car S.O.S.", type=release_type, resolution="1080p", language_checked=True, name="Car S.O.S. S03 1080p WEB-DL")
+    meta = _meta([2], title="Example Show", type=release_type, resolution="1080p", language_checked=True, name="Example Show S03 1080p WEB-DL")
     asyncio.run(manager.check_season_pack_completeness(meta))
     tracker = RocketHD({"TRACKERS": {"ROCKETHD": {}}})
     name = asyncio.run(tracker.get_name(meta))["name"]
@@ -181,7 +181,7 @@ def test_confirmed_marker_is_added_only_to_supporting_tracker(manager, monkeypat
 
 def test_rejected_mismatch_does_not_mark_rockethd(manager, monkeypatch):
     monkeypatch.setattr(getseasonep, "prompt_in_thread", AsyncMock(return_value="n"))
-    meta = _meta([2], title="Car S.O.S.", type="WEBDL", language_checked=True)
+    meta = _meta([2], title="Example Show", type="WEBDL", language_checked=True)
     asyncio.run(manager.check_season_pack_completeness(meta))
     tracker = RocketHD({"TRACKERS": {"ROCKETHD": {}}})
     assert "INCOMPLETE" not in asyncio.run(tracker.get_name(meta))["name"]
@@ -206,7 +206,7 @@ def test_completeness_runs_after_final_tvdb_lookup(monkeypatch):
     )
     meta = _meta([2], not_anime=True, tvdb_id=0, tvmaze_id=123)
     with pytest.raises(StopAfterCheck):
-        asyncio.run(prep_helpers.finalize_metadata(prep, meta, "", {}, None, "Car S.O.S.", "", ""))
+        asyncio.run(prep_helpers.finalize_metadata(prep, meta, "", {}, None, "Example Show", "", ""))
     prep.metadata_searching_manager.get_tv_data.assert_awaited_once()
 
 

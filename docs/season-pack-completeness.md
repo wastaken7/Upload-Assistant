@@ -26,7 +26,7 @@ The confirmed marker is supported by **RocketHD, LST, Aither, HDBits, ULCX,
 hawke-uno, YUSCENE, OldToonsWorld, OnlyEncodes, PrivateHD, CinemaZ, AvistaZ,
 HD-Torrents, Rastastugan, DarkPeers, IPTorrents, HD-Space, and TorrentLeech**.
 For example:
-`Car S.O.S. S03 INCOMPLETE 1080p DSNP WEB-DL ...`.
+`Example Show S03 INCOMPLETE 1080p DSNP WEB-DL ...`.
 Other tracker titles retain their existing naming rules. The season metadata
 remains `S03`, so the marker does not affect API season fields or episode searches.
 The marker also appears in IPTorrents post-upload title edits and in hawke-uno's
