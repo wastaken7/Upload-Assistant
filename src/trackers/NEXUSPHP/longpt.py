@@ -156,6 +156,8 @@ class LongPT(NEXUSPHP):
             return 13
         if "lpcm" in audio_codec:
             return 14
+        if "dd+" in audio_codec:
+            return 10
         if "dd" in audio_codec:
             return 15
         if "alac" in audio_codec:
@@ -178,9 +180,6 @@ class LongPT(NEXUSPHP):
             return 8
         if "atmos" in audio_codec:
             return 9
-        if "dd+" in audio_codec:
-            return 10
-
         return 11
 
     def get_group_tag(self, meta: Meta) -> int:
