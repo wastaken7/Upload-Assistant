@@ -6916,9 +6916,22 @@ function TrackerManager({
             </div>
             {isOpen && (
               <div className="ua-config-accordion-panel border-t p-4">
-                <p className="ua-config-service-description mb-4 text-xs">
-                  Tracker code: <code className="font-semibold">{name}</code>
-                </p>
+                <div className="ua-config-service-description mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+                  <span>
+                    Tracker code: <code className="font-semibold">{name}</code>
+                  </span>
+                  {tracker.codebase && (
+                    <span className="inline-flex items-center gap-2">
+                      <span aria-hidden="true">·</span>
+                      <span>
+                        Codebase:{" "}
+                        <span className="font-semibold">
+                          {tracker.codebase}
+                        </span>
+                      </span>
+                    </span>
+                  )}
+                </div>
                 {trackerView === "available" && (
                   <div className="ua-config-state-panel mb-4 rounded-lg border p-4 text-sm">
                     Enter the required authentication details and choose Save
