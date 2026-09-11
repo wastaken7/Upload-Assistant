@@ -67,9 +67,9 @@ The master switch and at least one applicable label must be enabled for text to 
 
 ## Existing configurations
 
-An older config with only `"frame_overlay": True` keeps frame number, frame type and the conditional Tonemapped label enabled. Timestamp stays off. Explicit individual label settings take precedence over these legacy defaults.
+An older config with `"frame_overlay": True` and none of the individual label settings keeps frame number, frame type and the conditional Tonemapped label enabled. Timestamp stays off. Explicit individual label settings take precedence over these legacy defaults; for example, `"overlay_frame_type": False` hides the frame type even when the master is enabled.
 
-When editing manually, set the individual switches explicitly before changing the master so their selections stay the same when you enable it again. The WebUI saves these selections automatically when you change the master.
+When editing manually, add the four individual label settings explicitly, as in the example above, to keep their selections independent of the master switch. In the WebUI, changing the master and clicking **Save Config** also stores any missing individual label settings using their previous selections. Changing a toggle alone does not save the config.
 
 ## Capture behavior
 
