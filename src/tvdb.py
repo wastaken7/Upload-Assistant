@@ -287,7 +287,7 @@ class TvdbData:
                 payload = await client.get_series_episodes(series_id, season=season, page=page, include_links=True)
                 data = payload.get("data")
                 links = payload.get("links")
-                if not isinstance(data, dict) or not isinstance(data.get("episodes"), list) or not isinstance(links, dict) or "next" not in links:
+                if not isinstance(data, dict) or not isinstance(data.get("episodes"), list) or not isinstance(links, dict):
                     raise ValueError("TVDB season response is missing episodes or pagination information")
                 episodes = data["episodes"]
                 for episode in episodes:
@@ -299,7 +299,7 @@ class TvdbData:
                         raise ValueError("TVDB episode is missing its season or episode number")
                     if episode_season == season and number > 0:
                         numbers.add(number)
-                if links["next"] is None:
+                if links.get("next") is None:
                     return sorted(numbers) or None
                 if not episodes:
                     raise ValueError("TVDB returned an empty page with more pages remaining")

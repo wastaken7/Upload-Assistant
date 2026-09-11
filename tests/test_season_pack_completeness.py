@@ -109,7 +109,7 @@ def test_user_decides_whether_to_mark_pack(manager, monkeypatch, response, marke
     prompt.assert_awaited_once()
 
 
-@pytest.mark.parametrize("response", ["q", "", "invalid"])
+@pytest.mark.parametrize("response", ["q", "", None, " \t ", "invalid"])
 def test_quit_or_default_aborts(manager, monkeypatch, response):
     monkeypatch.setattr(getseasonep, "prompt_in_thread", AsyncMock(return_value=response))
     with pytest.raises(SystemExit):
@@ -231,7 +231,7 @@ def test_extra_only_pack_warns_about_specials_without_offering_marker(manager, m
         prompt.assert_not_awaited()
 
 
-@pytest.mark.parametrize("answer", ["n", "no", "q", "", "invalid"])
+@pytest.mark.parametrize("answer", ["n", "no", "q", "", None, " \t ", "invalid"])
 def test_extra_only_pack_can_be_aborted(manager, monkeypatch, answer):
     monkeypatch.setattr(getseasonep, "prompt_in_thread", AsyncMock(return_value=answer))
     meta = _meta(range(1, 12), tvdb_id=123)
@@ -247,3 +247,15 @@ def test_pack_with_missing_and_extra_episodes_still_offers_incomplete_confirmati
     asyncio.run(manager.check_season_pack_completeness(meta))
     assert "Is this pack really incomplete?" in prompt.call_args.args[1]
     assert meta.season_pack_incomplete is True
+
+
+@pytest.mark.parametrize("answer", [None, "", " \t "])
+def test_empty_filelist_prompt_aborts_without_crashing(manager, monkeypatch, answer):
+    prompt = AsyncMock(return_value=answer)
+    monkeypatch.setattr(getseasonep, "prompt_in_thread", prompt)
+    meta = _meta(range(2, 22))
+    with pytest.raises(SystemExit) as error:
+        asyncio.run(manager.check_season_pack_completeness(meta))
+    assert error.value.code == 1
+    assert meta.season_pack_incomplete is False
+    prompt.assert_awaited_once()

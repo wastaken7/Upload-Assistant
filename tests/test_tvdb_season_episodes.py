@@ -99,3 +99,13 @@ def test_existing_episode_api_still_returns_data_only(monkeypatch):
             await client.aclose()
 
     asyncio.run(run())
+
+
+@pytest.mark.parametrize("multipage", [False, True])
+def test_season_lookup_accepts_final_page_without_next_link(monkeypatch, multipage):
+    last_page = _payload([2, 3])
+    last_page["links"] = {"self": "?page=1" if multipage else "?page=0"}
+    responses = [_payload([1, 2], "?page=1"), last_page] if multipage else [last_page]
+    result, requests = _fetch(monkeypatch, responses)
+    assert result == ([1, 2, 3] if multipage else [2, 3])
+    assert len(requests) == len(responses)

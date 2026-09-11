@@ -357,7 +357,7 @@ class SeasonEpisodeManager:
                         cli_ui.ask_string,
                         f"{remaining_files} more files: show (n)ext {batch_size}, (a)ll, (c)ontinue to confirmation, or (q)uit? (n/a/c/Q): ",
                     )
-                    response = response.strip().lower()
+                    response = (response or "").strip().lower()
                     if response in ("n", "a"):
                         end = min(files_shown + batch_size, len(filelist)) if response == "n" else len(filelist)
                         for i, file in enumerate(filelist[files_shown:end], start=files_shown + 1):
@@ -375,7 +375,7 @@ class SeasonEpisodeManager:
                     else "Continue with these extra episodes (possible specials or different numbering)? (y/N): "
                 )
                 response = await prompt_in_thread(cli_ui.ask_string, question)
-                response = response.strip().lower()
+                response = (response or "").strip().lower()
                 if response in ("y", "yes"):
                     meta.season_pack_incomplete = bool(missing_list)
                 elif not missing_list or response not in ("n", "no"):
