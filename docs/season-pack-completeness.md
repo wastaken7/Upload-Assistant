@@ -10,12 +10,17 @@ such as S03E01E02 count as two episodes.
 TVDB verification uses its [default season order](https://github.com/thetvdb/v4-api/blob/main/README.md)
 and includes all numbered episodes listed for the season. Different release
 numbering, split seasons, anime absolute numbering, and episodes listed before
-release can cause a mismatch. UA shows the missing or unexpected episode numbers
-and asks whether the pack is really incomplete:
+release can cause a mismatch. UA shows the missing or unexpected episode numbers.
+When episodes are missing, it asks whether the pack is really incomplete:
 
 - **y**: Continue and add `INCOMPLETE` after the season number on supported trackers.
 - **n**: Treat the mismatch as a false alarm and continue without adding the marker.
 - **q**, an empty answer, or another answer: Abort.
+
+When there are only extra episodes, UA warns that the pack may contain special
+episodes or use different numbering. It asks whether to continue (`y`/`yes`) or
+abort (any other answer), without offering or adding `INCOMPLETE`. If episodes
+are missing as well as extra, the missing-episode confirmation above still applies.
 
 The confirmed marker is supported by **RocketHD, LST, Aither, HDBits, ULCX,
 hawke-uno, YUSCENE, OldToonsWorld, OnlyEncodes, PrivateHD, CinemaZ, AvistaZ,

@@ -329,10 +329,12 @@ class SeasonEpisodeManager:
 
         if not completeness["complete"]:
             unattended = meta.unattended and not meta.unattended_confirm
-            logger.warning("[red]Warning: Season pack may be incomplete or use different episode numbering!")
             missing_list = [f"S{s:02d}E{e:02d}" for s, e in completeness["missing_episodes"]]
             if missing_list:
+                logger.warning("[red]Warning: Season pack may be incomplete or use different episode numbering!")
                 logger.info(f"[yellow]Missing episodes: {', '.join(missing_list)}")
+            else:
+                logger.warning("[yellow]Warning: Season pack contains extra episodes not listed by TVDB. It may contain special episodes or use different numbering.")
             unexpected_list = [f"S{s:02d}E{e:02d}" for s, e in completeness.get("unexpected_episodes", [])]
             if unexpected_list:
                 logger.info(f"[yellow]Episodes not listed by TVDB: {', '.join(unexpected_list)}")
@@ -344,7 +346,10 @@ class SeasonEpisodeManager:
                 logger.info(f"[cyan]  {i + 1:2d}. {Path(file).name}")
             files_shown = min(batch_size, len(filelist))
             if unattended:
-                logger.info("[yellow]Unattended mode: continuing without confirmation; no INCOMPLETE marker was added.")
+                if missing_list:
+                    logger.info("[yellow]Unattended mode: continuing without confirmation; no INCOMPLETE marker was added.")
+                else:
+                    logger.info("[yellow]Unattended mode: continuing despite unexpected episode numbers (no confirmation).")
             else:
                 while files_shown < len(filelist):
                     remaining_files = len(filelist) - files_shown
@@ -364,14 +369,16 @@ class SeasonEpisodeManager:
                         logger.info("[red]Aborting torrent creation")
                         sys.exit(1)
 
-                response = await prompt_in_thread(
-                    cli_ui.ask_string,
-                    "Is this pack really incomplete? (y = mark INCOMPLETE on supported trackers and continue, n = complete and continue, q = quit) (y/n/Q): ",
+                question = (
+                    "Is this pack really incomplete? (y = mark INCOMPLETE on supported trackers and continue, n = complete and continue, q = quit) (y/n/Q): "
+                    if missing_list
+                    else "Continue with these extra episodes (possible specials or different numbering)? (y/N): "
                 )
+                response = await prompt_in_thread(cli_ui.ask_string, question)
                 response = response.strip().lower()
                 if response in ("y", "yes"):
-                    meta.season_pack_incomplete = True
-                elif response not in ("n", "no"):
+                    meta.season_pack_incomplete = bool(missing_list)
+                elif not missing_list or response not in ("n", "no"):
                     logger.info("[red]Aborting torrent creation")
                     sys.exit(1)
         else:

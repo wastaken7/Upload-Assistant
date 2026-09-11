@@ -208,3 +208,42 @@ def test_completeness_runs_after_final_tvdb_lookup(monkeypatch):
     with pytest.raises(StopAfterCheck):
         asyncio.run(prep_helpers.finalize_metadata(prep, meta, "", {}, None, "Car S.O.S.", "", ""))
     prep.metadata_searching_manager.get_tv_data.assert_awaited_once()
+
+
+@pytest.mark.parametrize("unattended,confirm", [(False, False), (True, False), (True, True)])
+def test_extra_only_pack_warns_about_specials_without_offering_marker(manager, monkeypatch, unattended, confirm):
+    prompt = AsyncMock(return_value="y")
+    monkeypatch.setattr(getseasonep, "prompt_in_thread", prompt)
+    warnings = []
+    monkeypatch.setattr(getseasonep.logger, "warning", warnings.append)
+    meta = _meta(range(1, 12), tvdb_id=123, unattended=unattended, unattended_confirm=confirm, season_pack_incomplete=True)
+
+    asyncio.run(manager.check_season_pack_completeness(meta))
+
+    assert meta.season_pack_incomplete is False
+    assert any("special episodes" in warning and "different numbering" in warning for warning in warnings)
+    assert all("incomplete" not in warning.lower() for warning in warnings)
+    if not unattended or confirm:
+        prompt.assert_awaited_once()
+        assert "Continue with these extra episodes" in prompt.call_args.args[1]
+        assert "incomplete" not in prompt.call_args.args[1].lower()
+    else:
+        prompt.assert_not_awaited()
+
+
+@pytest.mark.parametrize("answer", ["n", "no", "q", "", "invalid"])
+def test_extra_only_pack_can_be_aborted(manager, monkeypatch, answer):
+    monkeypatch.setattr(getseasonep, "prompt_in_thread", AsyncMock(return_value=answer))
+    meta = _meta(range(1, 12), tvdb_id=123)
+    with pytest.raises(SystemExit):
+        asyncio.run(manager.check_season_pack_completeness(meta))
+    assert meta.season_pack_incomplete is False
+
+
+def test_pack_with_missing_and_extra_episodes_still_offers_incomplete_confirmation(manager, monkeypatch):
+    prompt = AsyncMock(return_value="y")
+    monkeypatch.setattr(getseasonep, "prompt_in_thread", prompt)
+    meta = _meta([1, *range(3, 13)], tvdb_id=123)
+    asyncio.run(manager.check_season_pack_completeness(meta))
+    assert "Is this pack really incomplete?" in prompt.call_args.args[1]
+    assert meta.season_pack_incomplete is True
