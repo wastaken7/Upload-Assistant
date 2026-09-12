@@ -12,6 +12,7 @@ from src.cookie_auth import CookieValidator
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
 from src.trackers.common import Common
+from src.trackers.naming import add_incomplete_pack_marker
 
 Config = dict[str, Any]
 
@@ -210,7 +211,7 @@ class TorrentLeech:
 
     async def get_name(self, meta: Meta) -> str:
         tl_name = meta.name.replace(meta.aka, "")
-        return re.sub(r"\s{2,}", " ", tl_name)
+        return add_incomplete_pack_marker(re.sub(r"\s{2,}", " ", tl_name), meta, self.tracker)
 
     async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
         results: list[dict[str, Any]] = []

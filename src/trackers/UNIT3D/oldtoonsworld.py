@@ -7,6 +7,7 @@ import cli_ui
 from src.console import logger
 from src.meta import Meta
 from src.trackers.common import Common
+from src.trackers.naming import add_incomplete_pack_marker
 from src.trackers.UNIT3D import UNIT3D
 
 Config = dict[str, Any]
@@ -209,7 +210,7 @@ class OldToonsWorld(UNIT3D):
                 title = meta.title
                 otw_name = otw_name.replace(title, f"{title} {year}", 1)
 
-        return {"name": otw_name}
+        return {"name": add_incomplete_pack_marker(otw_name, meta, self.tracker)}
 
     async def get_additional_data(self, meta: Meta) -> dict[str, Any]:
         data: dict[str, Any] = {

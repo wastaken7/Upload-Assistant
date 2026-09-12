@@ -1285,9 +1285,6 @@ async def finalize_metadata(
     if not meta.not_anime and meta.category == "TV":
         meta = await prep_instance.season_episode_manager.get_season_episode(video, meta)
 
-    if meta.category == "TV" and meta.tv_pack:
-        await prep_instance.season_episode_manager.check_season_pack_completeness(meta)
-
     # lets check for tv movies
     meta.tv_movie = False
     if meta.imdb_id != 0:
@@ -1354,6 +1351,10 @@ async def finalize_metadata(
 
         # all your episode data belongs to us
         meta = await prep_instance.metadata_searching_manager.get_tv_data(meta)
+
+        # Completeness needs the final TVDB ID from the metadata lookup above.
+        if meta.category == "TV" and meta.tv_pack:
+            await prep_instance.season_episode_manager.check_season_pack_completeness(meta)
 
         if meta.tvdb_imdb_id and not meta.no_imdb:
             imdb = meta.tvdb_imdb_id.replace("tt", "")

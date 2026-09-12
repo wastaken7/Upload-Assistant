@@ -222,7 +222,7 @@ class RocketHD(UNIT3D):
         # extract tags from basename for potential later use
         basename_up = self.get_basename(meta).upper()
         internal = "iNTERNAL" if "INTERNAL" in basename_up else ""
-        incomplete = "INCOMPLETE" if "INCOMPLETE" in basename_up else ""
+        incomplete = "INCOMPLETE" if (meta.tv_pack and meta.season_pack_incomplete) or "INCOMPLETE" in basename_up else ""
 
         # Clean audio: remove Dual-Audio and trailing language codes
         audio = meta.audio
@@ -278,9 +278,7 @@ class RocketHD(UNIT3D):
         if effective_type == "DISC":
             region = meta.region
             dvd_size = meta.dvd_size
-            name = (
-                f"{title} {year} {season}{episode} {three_d} {edition} {repack} {resolution} COMPLETE {region} {uhd} {source} {dvd_size} {audio} {hdr} {video_codec} {internal}"
-            )
+            name = f"{title} {year} {season}{episode} {incomplete} {three_d} {edition} {repack} {resolution} COMPLETE {region} {uhd} {source} {dvd_size} {audio} {hdr} {video_codec} {internal}"
         elif effective_type == "REMUX":
             name = f"{title} {year} {season}{episode} {incomplete} {three_d} {edition} {hybrid} {audio_lang_str} {repack} {resolution} {uhd} {source} REMUX {audio} {hdr} {video_codec} {internal}"
         elif effective_type in ("DVDRIP", "BRRIP"):

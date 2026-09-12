@@ -5,6 +5,7 @@ from src.console import logger
 from src.languages import languages_manager
 from src.meta import Meta
 from src.trackers.common import Common
+from src.trackers.naming import add_incomplete_pack_marker
 from src.trackers.UNIT3D import UNIT3D
 
 
@@ -160,4 +161,4 @@ class Aither(UNIT3D):
         if alt_title and year:
             aither_name = aither_name.replace(f"{year} {alt_title}", f"{alt_title} {year}", 1)
 
-        return {"name": aither_name}
+        return {"name": add_incomplete_pack_marker(aither_name, meta, self.tracker)}

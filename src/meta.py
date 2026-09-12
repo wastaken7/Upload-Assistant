@@ -427,6 +427,7 @@ class Meta:
     season_pack_contains_episode: bool | None = None
     season_pack_exists: bool = False
     season_pack_id: int | str | None = None
+    season_pack_incomplete: bool = False
     season_pack_link: str | None = None
     season_pack_name: str = ""
     season: int | str | None = 0

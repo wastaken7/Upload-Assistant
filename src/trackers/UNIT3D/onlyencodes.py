@@ -6,6 +6,7 @@ from src.languages import languages_manager
 from src.meta import Meta
 from src.rehostimages import ImageHostPolicy, RehostImagesManager
 from src.trackers.common import Common
+from src.trackers.naming import add_incomplete_pack_marker
 from src.trackers.UNIT3D import UNIT3D
 
 Config = dict[str, Any]
@@ -250,7 +251,7 @@ class OnlyEncodes(UNIT3D):
                 oe_name = re.sub(f"-{invalid_tag}", "", oe_name, flags=re.IGNORECASE)
             oe_name = f"{oe_name}-NOGRP"
 
-        return {"name": oe_name}
+        return {"name": add_incomplete_pack_marker(oe_name, meta, self.tracker)}
 
     async def get_type_id(self, meta: Meta, type: str | None = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         video_codec = meta.video_codec if meta.video_codec is not None else "N/A"
