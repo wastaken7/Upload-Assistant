@@ -81,11 +81,30 @@ def test_tracker_specific_formats_removes_image_resize_for_nexusphp_trackers() -
         "PTCAFE",
         "PTFANS",
         "PTGTK",
+        "PTSKIT",
         "PTZONE",
         "RAILGUNPT",
         "XINGYUNGEPT",
     ):
         assert builder.tracker_specific_formats(tracker, description) == "[img]https://example.test/image.jpg[/img]"
+
+
+def test_tracker_specific_formats_cleans_ptskit_descriptions() -> None:
+    builder = object.__new__(DescriptionBuilder)
+    description = """[hide]Details[/hide]
+[img=450]https://example.test/image.jpg[/img]
+[comparison=Source A, Source B]
+https://example.test/a.jpg
+https://example.test/b.jpg
+[/comparison]"""
+
+    formatted = builder.tracker_specific_formats("PTSKIT", description)
+
+    assert "[hide]" not in formatted
+    assert "[img=450]" not in formatted
+    assert "[img]https://example.test/image.jpg[/img]" in formatted
+    assert "[comparison=" not in formatted
+    assert "[center]Source A | Source B" in formatted
 
 
 def test_clean_unit3d_description_removes_line_wrapped_align_center_signature() -> None:

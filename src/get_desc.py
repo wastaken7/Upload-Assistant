@@ -2392,7 +2392,7 @@ class DescriptionBuilder:
             description = bbcode.remove_spoiler(description)
             description = bbcode.remove_list(description)
 
-        if tracker in {"LAJIDUI", "LEMONHD", "LONGPT", "1PTBA", "PTCAFE", "PTFANS", "PTGTK", "PTZONE", "RAILGUNPT", "XINGYUNGEPT"}:
+        if tracker in {"LAJIDUI", "LEMONHD", "LONGPT", "1PTBA", "PTCAFE", "PTFANS", "PTGTK", "PTSKIT", "PTZONE", "RAILGUNPT", "XINGYUNGEPT"}:
             description = description.replace("[user]", "").replace("[/user]", "")
             description = description.replace("[align=left]", "").replace("[/align]", "")
             description = description.replace("[right]", "").replace("[/right]", "")
