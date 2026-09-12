@@ -57,6 +57,13 @@ DEFAULT_KEY_TYPES: dict[str, tuple[type, ...]] = {
     "max_menu_screens": (str, int),
     "thumbnail_size": (str, int),
     "frame_overlay": (bool,),
+    "overlay_text_size": (str, int),
+    "overlay_frame_number": (bool,),
+    "overlay_frame_type": (bool,),
+    "overlay_timestamp": (bool,),
+    "overlay_tonemapped": (bool,),
+    "overlay_position": (str,),
+    "overlay_layout": (str,),
     "tone_map": (bool,),
     "auto_dvd_menus": (bool,),
     "scale_screenshots_for_par": (bool,),
@@ -566,6 +573,19 @@ def _validate_default_section(default: dict[str, Any]) -> tuple[list[str], list[
                 section="DEFAULT",
             )
         )
+
+    for key, choices in {"overlay_position": ("left", "right"), "overlay_layout": ("stacked", "single_line")}.items():
+        if key in default and default[key] not in choices:
+            warnings.append(ConfigValidationWarning(f"Must be one of: {', '.join(choices)}", key=key, section="DEFAULT"))
+
+    if "overlay_text_size" in default:
+        try:
+            text_size = int(str(default["overlay_text_size"]))
+        except ValueError:
+            warnings.append(ConfigValidationWarning("Must be an integer from 1 to 100", key="overlay_text_size", section="DEFAULT"))
+        else:
+            if not 1 <= text_size <= 100:
+                warnings.append(ConfigValidationWarning("Value must be between 1 and 100", key="overlay_text_size", section="DEFAULT"))
 
     # Validate image hosts
     for i in range(1, 10):

@@ -3219,9 +3219,17 @@ def _build_config_items(
     items: list[ConfigItem] = []
     user_dict: dict[str, Any] = _as_dict(user_section) or {}
 
+    if path == ["DEFAULT"]:
+        from src.screenshot_overlays import OVERLAY_KEYS, overlay_enabled, overlay_options
+
+        # Resolve old combined settings and individual-only configurations using
+        # the same rules as capture. Reading settings never rewrites the config.
+        if "frame_overlay" in user_dict or any(key in user_dict for key in OVERLAY_KEYS):
+            user_dict = {**user_dict, **overlay_options(user_dict), "frame_overlay": overlay_enabled(user_dict)}
+
     merged_keys: list[str] = [str(key) for key in example_section]
-    if user_section:
-        merged_keys.extend([str(key) for key in user_section if key not in example_section])
+    if user_dict:
+        merged_keys.extend([str(key) for key in user_dict if key not in example_section])
     if len(path) == 2 and path[0] == "TRACKERS" and "tag_overrides" not in merged_keys:
         merged_keys.append("tag_overrides")
 
@@ -5328,6 +5336,9 @@ def config_update():
         return jsonify({"success": False, "error": "Path not found in example config"}), 400
 
     coerced_value = _coerce_config_value(raw_value, example_value)
+    overlay_choices = {"overlay_position": {"left", "right"}, "overlay_layout": {"stacked", "single_line"}}
+    if path[:1] == ["DEFAULT"] and len(path) == 2 and key in overlay_choices and (not isinstance(coerced_value, str) or coerced_value not in overlay_choices[key]):
+        return jsonify({"success": False, "error": f"Invalid {key} value"}), 400
     if is_release_group_override:
         try:
             _validate_release_group_overrides(coerced_value)
@@ -5371,6 +5382,20 @@ def config_update():
         prior_value = _get_nested_value(prior_config, path)
 
         source = config_path.read_text(encoding="utf-8")
+        if len(path) == 2 and path[0] == "DEFAULT":
+            from src.screenshot_overlays import OVERLAY_KEYS, overlay_enabled, overlay_options
+
+            prior_defaults = _as_dict(prior_config.get("DEFAULT")) or {}
+            if key == "frame_overlay":
+                # Freeze legacy label preferences before changing the master so
+                # switching off and back on restores exactly the same selections.
+                for overlay_key, selected in overlay_options(prior_defaults).items():
+                    if overlay_key not in prior_defaults:
+                        source = _replace_config_value_in_source(source, ["DEFAULT", overlay_key], _python_literal(selected))
+            elif key in OVERLAY_KEYS and "frame_overlay" not in prior_defaults:
+                # Editing labels must preserve the master state shown in the UI,
+                # including configs that have never saved an explicit master.
+                source = _replace_config_value_in_source(source, ["DEFAULT", "frame_overlay"], _python_literal(overlay_enabled(prior_defaults)))
         updated_source = _replace_config_value_in_source(source, path, new_value_literal)
         config_path.write_text(updated_source, encoding="utf-8")
         # Audit record for update

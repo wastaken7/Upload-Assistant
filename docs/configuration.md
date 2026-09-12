@@ -18,6 +18,8 @@
 - Default number of screenshots per upload: `screens` **REQUIRED**
   - Recommended value = 6
 
+- Screenshot labels: see the [screenshot overlay guide](screenshot-overlays.md) for stacked and single-line examples, left/right placement and manual config settings.
+
 - Default torrent client: `default_torrent_client` **REQUIRED**
   - The "NAME" of the torrent client you'd like to use by default.
   - Values for this will be set in the Torrent Clients section below.
