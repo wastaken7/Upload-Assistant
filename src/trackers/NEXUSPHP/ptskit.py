@@ -56,7 +56,11 @@ class Ptskit(NEXUSPHP):
         params: dict[str, Any] = {"incldead": 1, "search": meta.imdb_tt, "search_area": 4}
         found_items: list[dict[str, str]] = []
 
-        response = await self.session.get(search_url, params=params, cookies=self.session.cookies)
+        cookies = await self.cookie_validator.load_session_cookies(meta, self.tracker)
+        if cookies:
+            self.session.cookies.update(cookies)
+
+        response = await self.session.get(search_url, params=params)
         if "login.php" in str(response.url) or "login.php" in response.text:
             await self.cookie_validator.handle_validation_failure(meta, self.tracker, response.text)
             meta.skipping = f"{self.tracker}"
