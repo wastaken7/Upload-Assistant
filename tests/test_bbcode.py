@@ -21,11 +21,52 @@ def test_clamp_size_tags_preserves_malformed_or_non_integer_values() -> None:
     assert BBCODE().clamp_size_tags(description) == description
 
 
+def test_convert_named_colors_to_hex() -> None:
+    description = "[color=SkyBlue]Text[/color] [color=red]Red[/color]"
+
+    assert BBCODE().convert_named_colors(description) == "[color=#87ceeb]Text[/color] [color=#ff0000]Red[/color]"
+
+
+def test_convert_named_colors_preserves_hex_and_unknown_values() -> None:
+    description = "[color=#123456]Hex[/color] [color=not-a-color]Unknown[/color]"
+
+    assert BBCODE().convert_named_colors(description) == description
+
+
+def test_convert_hex_colors_to_named() -> None:
+    description = "[color=#87CEEB]Text[/color] [color=#f00]Red[/color]"
+
+    assert BBCODE().convert_hex_colors_to_named(description) == "[color=skyblue]Text[/color] [color=red]Red[/color]"
+
+
+def test_convert_hex_colors_to_named_preserves_unknown_values() -> None:
+    description = "[color=#123456]Unknown[/color] [color=skyblue]Named[/color]"
+
+    assert BBCODE().convert_hex_colors_to_named(description) == description
+
+
 def test_tracker_specific_formats_only_clamps_gazelle_descriptions() -> None:
     builder = object.__new__(DescriptionBuilder)
 
     assert builder.tracker_specific_formats("ANTHELION", "[size=16]Text[/size]") == "[size=10]Text[/size]"
     assert builder.tracker_specific_formats("HDTORRENTS", "[size=16]Text[/size]") == "[size=16]Text[/size]"
+
+
+def test_tracker_specific_formats_converts_colors_for_gazelle_trackers() -> None:
+    builder = object.__new__(DescriptionBuilder)
+    description = "[color=skyblue]Text[/color]"
+
+    for tracker in ("ANTHELION", "BJSHARE", "BRASILTRACKER", "GREATPOSTERWALL"):
+        assert builder.tracker_specific_formats(tracker, description) == "[color=#87ceeb]Text[/color]"
+
+    assert builder.tracker_specific_formats("HDTORRENTS", description) == description
+
+
+def test_tracker_specific_formats_converts_colors_for_hdspace() -> None:
+    builder = object.__new__(DescriptionBuilder)
+    description = "[color=#87ceeb]Text[/color]"
+
+    assert builder.tracker_specific_formats("HDSPACE", description) == "[color=skyblue]Text[/color]"
 
 
 def test_tracker_specific_formats_removes_image_resize_for_nexusphp_trackers() -> None:
@@ -40,11 +81,30 @@ def test_tracker_specific_formats_removes_image_resize_for_nexusphp_trackers() -
         "PTCAFE",
         "PTFANS",
         "PTGTK",
+        "PTSKIT",
         "PTZONE",
         "RAILGUNPT",
         "XINGYUNGEPT",
     ):
         assert builder.tracker_specific_formats(tracker, description) == "[img]https://example.test/image.jpg[/img]"
+
+
+def test_tracker_specific_formats_cleans_ptskit_descriptions() -> None:
+    builder = object.__new__(DescriptionBuilder)
+    description = """[hide]Details[/hide]
+[img=450]https://example.test/image.jpg[/img]
+[comparison=Source A, Source B]
+https://example.test/a.jpg
+https://example.test/b.jpg
+[/comparison]"""
+
+    formatted = builder.tracker_specific_formats("PTSKIT", description)
+
+    assert "[hide]" not in formatted
+    assert "[img=450]" not in formatted
+    assert "[img]https://example.test/image.jpg[/img]" in formatted
+    assert "[comparison=" not in formatted
+    assert "[center]Source A | Source B" in formatted
 
 
 def test_clean_unit3d_description_removes_line_wrapped_align_center_signature() -> None:

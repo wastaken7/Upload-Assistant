@@ -2229,6 +2229,7 @@ class DescriptionBuilder:
 
         if tracker in {"ANTHELION", "BJSHARE", "BRASILTRACKER", "GREATPOSTERWALL"}:
             description = bbcode.clamp_size_tags(description)
+            description = bbcode.convert_named_colors(description)
 
         if tracker == "BRASILTRACKER":
             description = bbcode.remove_img_resize(description)
@@ -2338,7 +2339,7 @@ class DescriptionBuilder:
             description = bbcode.remove_img_resize(description)
             description = bbcode.convert_comparison_to_centered(description, 1000)
             description = bbcode.remove_spoiler(description)
-            description = bbcode.remove_color(description)
+            description = bbcode.convert_hex_colors_to_named(description)
 
             # Apply custom image line breaks for HDSPACE: if "imgbox" is not in the web_url, place only one image per line.
             def hds_image_formatter(match) -> str:
@@ -2391,7 +2392,7 @@ class DescriptionBuilder:
             description = bbcode.remove_spoiler(description)
             description = bbcode.remove_list(description)
 
-        if tracker == "PTSKIT":
+        if tracker in {"LAJIDUI", "LEMONHD", "LONGPT", "1PTBA", "PTCAFE", "PTFANS", "PTGTK", "PTSKIT", "PTZONE", "RAILGUNPT", "XINGYUNGEPT"}:
             description = description.replace("[user]", "").replace("[/user]", "")
             description = description.replace("[align=left]", "").replace("[/align]", "")
             description = description.replace("[right]", "").replace("[/right]", "")
@@ -2407,6 +2408,7 @@ class DescriptionBuilder:
             description = description.replace("[ul]", "").replace("[/ul]", "")
             description = description.replace("[ol]", "").replace("[/ol]", "")
             description = description.replace("[hide]", "").replace("[/hide]", "")
+            description = bbcode.remove_img_resize(description)
             description = re.sub(r"\[center\]\[spoiler=.*? NFO:\]\[code\](.*?)\[/code\]\[/spoiler\]\[/center\]", r"", description, flags=re.DOTALL)
             description = bbcode.convert_comparison_to_centered(description, 1000)
             description = bbcode.remove_spoiler(description)
