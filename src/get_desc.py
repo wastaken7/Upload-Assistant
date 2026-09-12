@@ -32,20 +32,6 @@ from src.tracker_images import get_tracker_image_collection, has_tracker_image_c
 from src.trackers.common import Common
 from src.uploadscreens import UploadScreensManager
 
-NEXUSPHP_TRACKERS = {
-    "1PTBA",
-    "LAJIDUI",
-    "LEMONHD",
-    "LONGPT",
-    "PTCAFE",
-    "PTFANS",
-    "PTGTK",
-    "PTZONE",
-    "RAILGUNPT",
-    "XINGYUNGEPT",
-    "NEXUSPHP",
-}
-
 
 def html_to_bbcode(text: str) -> str:
     """Convert HTML tags to BBCode format."""
@@ -2206,7 +2192,9 @@ class DescriptionBuilder:
         if not thumb_size:
             thumb_size = self._get_int_config("thumbnail_size", 350)
 
-        if self.tracker in NEXUSPHP_TRACKERS:
+        from src.trackersetup import get_tracker_framework
+
+        if get_tracker_framework(self.tracker) == "NEXUSPHP":
             return f"[img]{raw_url}[/img]"
         if self.tracker == "HDTORRENTS":
             return f"<a href='{raw_url}'><img src='{img_url}' height=137></a> "
@@ -2224,7 +2212,9 @@ class DescriptionBuilder:
 
     def tracker_specific_formats(self, tracker: str, description: str) -> str:
         bbcode = BBCODE()
-        if tracker in NEXUSPHP_TRACKERS:
+        from src.trackersetup import get_tracker_framework
+
+        if get_tracker_framework(tracker) == "NEXUSPHP":
             description = bbcode.remove_img_resize(description)
 
         if tracker in {"ANTHELION", "BJSHARE", "BRASILTRACKER", "GREATPOSTERWALL"}:
@@ -2392,7 +2382,7 @@ class DescriptionBuilder:
             description = bbcode.remove_spoiler(description)
             description = bbcode.remove_list(description)
 
-        if tracker in {"LAJIDUI", "LEMONHD", "LONGPT", "1PTBA", "PTCAFE", "PTFANS", "PTGTK", "PTSKIT", "PTZONE", "RAILGUNPT", "XINGYUNGEPT"}:
+        if get_tracker_framework(tracker) == "NEXUSPHP":
             description = description.replace("[user]", "").replace("[/user]", "")
             description = description.replace("[align=left]", "").replace("[/align]", "")
             description = description.replace("[right]", "").replace("[/right]", "")
@@ -2443,9 +2433,7 @@ class DescriptionBuilder:
             # Strip BBCode names and attributes while retaining their contents.
             description = re.sub(r"\[/?[a-z][a-z0-9_-]*(?:=[^\]]*|\s+[^\]]*)?\]|\[\*\]", "", description, flags=re.IGNORECASE)
 
-        from src.trackersetup import api_trackers as unit3d_trackers
-
-        if tracker in unit3d_trackers:
+        if get_tracker_framework(tracker) == "UNIT3D":
             description = bbcode.convert_hide_to_spoiler(description)
             description = description.replace("[user]", "").replace("[/user]", "")
             description = description.replace("[hr]", "").replace("[/hr]", "")

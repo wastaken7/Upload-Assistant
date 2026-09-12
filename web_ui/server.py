@@ -4750,12 +4750,12 @@ def _configured_cookie_tracker_names(
     return configured
 
 
-def _tracker_codebase(tracker_class: Any) -> str | None:
-    """Expose known tracker families without guessing from ungrouped modules."""
-    module_parts = str(getattr(tracker_class, "__module__", "")).split(".")
-    if len(module_parts) < 4 or module_parts[:2] != ["src", "trackers"]:
-        return None
-    return {"UNIT3D": "UNIT3D", "GAZELLE": "Gazelle", "NEXUSPHP": "NexusPHP", "AVISTAZ": "AvistaZ"}.get(module_parts[2])
+def _tracker_codebase(tracker_name: str) -> str | None:
+    """Expose the framework registered for a tracker."""
+    from src.trackersetup import get_tracker_framework
+
+    framework = get_tracker_framework(tracker_name) or ""
+    return {"UNIT3D": "UNIT3D", "GAZELLE": "Gazelle", "NEXUSPHP": "NexusPHP", "AVISTAZ": "AvistaZ"}.get(framework)
 
 
 def _tracker_destination_type(tracker_class: Any) -> str:
@@ -5032,7 +5032,7 @@ def get_trackers():
             {
                 "name": tracker_name,
                 "display_name": display_name,
-                "codebase": _tracker_codebase(tracker_class),
+                "codebase": _tracker_codebase(tracker_name),
                 "base_url": base_url,
                 "favicon": favicon_url,
                 "configured": tracker_name.upper() in configured_trackers,
