@@ -289,8 +289,10 @@ class SpeedApp:
                 data["systemRequirements"] = requirements
 
         tracker_config = self.config.get("TRACKERS", {}).get(self.tracker, {})
-        torrent_filename = await self.common.get_torrent_filename(meta, tracker_config)
-        data["file"] = await self.encode_to_base64(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/{torrent_filename}.torrent")
+        torrent_path = await self.common.get_base_torrent_path(meta, self.tracker, tracker_config)
+        if torrent_path is None:
+            raise FileNotFoundError("No selected base torrent is available")
+        data["file"] = await self.encode_to_base64(str(torrent_path))
         if meta.debug is True:
             data["file"] = data["file"][:50] + "...[DEBUG MODE]"
             if data.get("nfo"):

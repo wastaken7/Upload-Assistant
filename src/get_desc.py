@@ -1405,6 +1405,8 @@ class DescriptionBuilder:
         if bluray:
             release_url, cover_images = await self.get_bluray_section(meta)
             if release_url:
+                if self.tracker not in ("TORRENTLEECH", "IMMORTALSEED"):
+                    release_url = f"[url]{release_url}[/url]"
                 desc_parts.append(f"[center]{release_url}[/center]")
             if cover_images:
                 desc_parts.append(f"[center]{cover_images}[/center]\n")
@@ -2190,20 +2192,9 @@ class DescriptionBuilder:
         if not thumb_size:
             thumb_size = self._get_int_config("thumbnail_size", 350)
 
-        nexusphp_trackers = {
-            "1PTBA",
-            "LAJIDUI",
-            "LEMONHD",
-            "LONGPT",
-            "PTCAFE",
-            "PTFANS",
-            "PTGTK",
-            "PTZONE",
-            "RAILGUNPT",
-            "XINGYUNGEPT",
-            "NEXUSPHP",
-        }
-        if self.tracker in nexusphp_trackers:
+        from src.trackersetup import get_tracker_framework
+
+        if get_tracker_framework(self.tracker) == "NEXUSPHP":
             return f"[img]{raw_url}[/img]"
         if self.tracker == "HDTORRENTS":
             return f"<a href='{raw_url}'><img src='{img_url}' height=137></a> "
@@ -2221,8 +2212,14 @@ class DescriptionBuilder:
 
     def tracker_specific_formats(self, tracker: str, description: str) -> str:
         bbcode = BBCODE()
+        from src.trackersetup import get_tracker_framework
+
+        if get_tracker_framework(tracker) == "NEXUSPHP":
+            description = bbcode.remove_img_resize(description)
+
         if tracker in {"ANTHELION", "BJSHARE", "BRASILTRACKER", "GREATPOSTERWALL"}:
             description = bbcode.clamp_size_tags(description)
+            description = bbcode.convert_named_colors(description)
 
         if tracker == "BRASILTRACKER":
             description = bbcode.remove_img_resize(description)
@@ -2332,7 +2329,7 @@ class DescriptionBuilder:
             description = bbcode.remove_img_resize(description)
             description = bbcode.convert_comparison_to_centered(description, 1000)
             description = bbcode.remove_spoiler(description)
-            description = bbcode.remove_color(description)
+            description = bbcode.convert_hex_colors_to_named(description)
 
             # Apply custom image line breaks for HDSPACE: if "imgbox" is not in the web_url, place only one image per line.
             def hds_image_formatter(match) -> str:
@@ -2385,7 +2382,7 @@ class DescriptionBuilder:
             description = bbcode.remove_spoiler(description)
             description = bbcode.remove_list(description)
 
-        if tracker == "PTSKIT":
+        if get_tracker_framework(tracker) == "NEXUSPHP":
             description = description.replace("[user]", "").replace("[/user]", "")
             description = description.replace("[align=left]", "").replace("[/align]", "")
             description = description.replace("[right]", "").replace("[/right]", "")
@@ -2401,6 +2398,7 @@ class DescriptionBuilder:
             description = description.replace("[ul]", "").replace("[/ul]", "")
             description = description.replace("[ol]", "").replace("[/ol]", "")
             description = description.replace("[hide]", "").replace("[/hide]", "")
+            description = bbcode.remove_img_resize(description)
             description = re.sub(r"\[center\]\[spoiler=.*? NFO:\]\[code\](.*?)\[/code\]\[/spoiler\]\[/center\]", r"", description, flags=re.DOTALL)
             description = bbcode.convert_comparison_to_centered(description, 1000)
             description = bbcode.remove_spoiler(description)
@@ -2435,9 +2433,7 @@ class DescriptionBuilder:
             # Strip BBCode names and attributes while retaining their contents.
             description = re.sub(r"\[/?[a-z][a-z0-9_-]*(?:=[^\]]*|\s+[^\]]*)?\]|\[\*\]", "", description, flags=re.IGNORECASE)
 
-        from src.trackersetup import api_trackers as unit3d_trackers
-
-        if tracker in unit3d_trackers:
+        if get_tracker_framework(tracker) == "UNIT3D":
             description = bbcode.convert_hide_to_spoiler(description)
             description = description.replace("[user]", "").replace("[/user]", "")
             description = description.replace("[hr]", "").replace("[/hr]", "")

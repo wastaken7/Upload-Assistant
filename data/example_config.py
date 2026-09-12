@@ -299,11 +299,25 @@ config: dict[str, Any] = {
         # Works only when the input frame has a supported color tag.
         "desat": "10.0",
         # Screenshot overlays
-        # Set to True to overlay the frame number, frame type, and "Tonemapped" label when applicable.
+        # Layout examples and manual setup: docs/screenshot-overlays.md
+        # Show enabled screenshot labels without changing the individual selections below.
+        # Enable at least one label below to display overlay text.
         # Enabling overlays uses FFmpeg tone mapping instead of libplacebo.
         "frame_overlay": False,
-        # Overlay text size, scaled with resolution.
+        # Overlay text size (1-100), scaled with resolution. VapourSynth rounds to whole font-scale steps.
         "overlay_text_size": "18",
+        # Keep labels at the top, aligned to "left" or "right".
+        "overlay_position": "left",
+        # Use "stacked" for one label per line, or "single_line" for compact labels separated by bullets.
+        "overlay_layout": "stacked",
+        # Show the estimated frame number at the capture position.
+        "overlay_frame_number": False,
+        # Show the frame's picture type (I, P, or B).
+        "overlay_frame_type": False,
+        # Show the captured frame's elapsed video time (HH:MM:SS.mmm).
+        "overlay_timestamp": False,
+        # Show only when screenshots have been tonemapped to SDR.
+        "overlay_tonemapped": False,
         # --- DISC MENU SCREENSHOTS ---
         # Set to True to capture DVD menu screenshots from menu VOBs.
         "auto_dvd_menus": True,

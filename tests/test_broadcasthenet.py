@@ -21,6 +21,23 @@ def test_btn_name_normalizes_audio_and_no_group_suffix() -> None:
     assert asyncio.run(tracker().get_name(meta)) == "Le.Serie.S01E01.1080p.WEB-DL.DDPA5.1.x265-NOGRP"  # noqa: S101
 
 
+def test_btn_name_puts_hdr_formats_before_resolution() -> None:
+    meta = Meta(name="Example Show S01E01 2160p WEB-DL DDP 5.1 Atmos DV HDR H.265-GRP", hdr="DV HDR", resolution="2160p", tag="-GRP")
+
+    assert asyncio.run(tracker().get_name(meta)) == "Example.Show.S01E01.DV.HDR.2160p.WEB-DL.DDPA5.1.H.265-GRP"  # noqa: S101
+
+
+def test_btn_name_removes_foreign_aka_title() -> None:
+    meta = Meta(
+        name="English Title AKA Foreign Title S01E01 1080p WEB-DL AAC 2.0 H.264-GRP",
+        aka="AKA Foreign Title",
+        resolution="1080p",
+        tag="-GRP",
+    )
+
+    assert asyncio.run(tracker().get_name(meta)) == "English.Title.S01E01.1080p.WEB-DL.AAC2.0.H.264-GRP"  # noqa: S101
+
+
 def test_btn_form_fields_keeps_autofilled_values() -> None:
     fields = tracker()._form_fields(
         '<input name="seriesid" value="42"><input name="artist" value="Example Show">'

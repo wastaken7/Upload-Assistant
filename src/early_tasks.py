@@ -10,6 +10,7 @@ from typing import Any, cast
 from src.clients import Clients
 from src.console import CliProgressGate, logger, suppress_cli_progress
 from src.meta import Meta
+from src.torrent_manifest import TorrentManifest
 from src.torrentcreate import TorrentCreator
 from src.trackersetup import tracker_class_map
 from src.webui_progress import has_progress_callback
@@ -85,29 +86,32 @@ async def create_base_torrents_early(meta: Meta, client: Clients) -> None:
         logger.debug("[cyan]Skipping early torrent creation due to hashing or tracker settings.[/cyan]")
         return
 
-    torrent_path = Path(meta.base_dir) / "tmp" / meta.uuid / "BASE.torrent"
-    subs_torrent_path = Path(meta.base_dir) / "tmp" / meta.uuid / "BASE_SUBS.torrent"
-    if torrent_path.exists():
-        logger.debug(f"[cyan]Skipping early torrent creation; BASE already exists at {torrent_path}[/cyan]")
+    manifest = TorrentManifest(meta.base_dir, meta.uuid)
+    torrent_path = manifest.default_path("base")
+    subs_torrent_path = manifest.default_path("base_subs")
+    needs_subs = bool(meta.subtitle_files) and subs_torrent_path is None
+    if torrent_path is not None and not needs_subs:
+        logger.debug(f"[cyan]Skipping early torrent creation; a base is already registered at {torrent_path}[/cyan]")
         return
 
     try:
-        reuse_torrent = meta.reuse_torrent_path
-        if not reuse_torrent or not Path(reuse_torrent).exists():
-            logger.debug("[cyan]Early torrent creation has no cached reusable torrent; searching client.[/cyan]")
-            search_started = time.perf_counter()
-            reuse_torrent = await client.find_existing_torrent(meta)
-            logger.debug(f"[cyan]Early client torrent search completed in {time.perf_counter() - search_started:.2f}s[/cyan]")
-        if reuse_torrent and Path(reuse_torrent).exists():
-            meta.reuse_torrent_path = reuse_torrent
-            logger.debug("[cyan]Creating torrent from the client copy while metadata and screenshots are processed.[/cyan]")
-            base_creation_started = time.perf_counter()
-            created_path = await TorrentCreator.create_base_from_existing_torrent(reuse_torrent, meta.base_dir, meta.uuid)
-            logger.debug(f"[cyan]Early base torrent creation completed in {time.perf_counter() - base_creation_started:.2f}s: {created_path or 'no file created'}[/cyan]")
-        else:
-            logger.debug("[cyan]No reusable client torrent found; creating BASE torrent while metadata and screenshots are processed.[/cyan]")
+        if torrent_path is None:
+            reuse_torrent = meta.reuse_torrent_path
+            if not reuse_torrent or not Path(reuse_torrent).exists():
+                logger.debug("[cyan]Early torrent creation has no cached reusable torrent; searching client.[/cyan]")
+                search_started = time.perf_counter()
+                reuse_torrent = await client.find_existing_torrent(meta)
+                logger.debug(f"[cyan]Early client torrent search completed in {time.perf_counter() - search_started:.2f}s[/cyan]")
+            if reuse_torrent and Path(reuse_torrent).exists():
+                meta.reuse_torrent_path = reuse_torrent
+                logger.debug("[cyan]Creating torrent from the client copy while metadata and screenshots are processed.[/cyan]")
+                base_creation_started = time.perf_counter()
+                created_path = await TorrentCreator.create_base_from_existing_torrent(reuse_torrent, meta.base_dir, meta.uuid)
+                logger.debug(f"[cyan]Early base torrent creation completed in {time.perf_counter() - base_creation_started:.2f}s: {created_path or 'no file created'}[/cyan]")
+        if manifest.default_path("base") is None:
+            logger.debug("[cyan]No reusable base torrent found; creating BASE while metadata and screenshots are processed.[/cyan]")
             await TorrentCreator.create_torrent(meta, Path(cast(str, meta.path)), "BASE")
-        if meta.subtitle_files and not subs_torrent_path.exists():
+        if meta.subtitle_files and manifest.default_path("base_subs") is None:
             await TorrentCreator.create_torrent(meta, Path(cast(str, meta.path)), "BASE_SUBS")
         logger.debug(f"[cyan]Early torrent task completed in {time.perf_counter() - task_started:.2f}s[/cyan]")
     except asyncio.CancelledError:

@@ -10,6 +10,7 @@ from pathlib import Path
 import aiofiles
 import httpx
 
+from bin.binary_dependencies import DEPENDENCY_VERSIONS
 from bin.download_integrity import verify_downloaded_asset
 
 try:
@@ -31,28 +32,28 @@ class NyuuBinaryManager:
     """Download Nyuu binaries for the host architecture."""
 
     @staticmethod
-    async def ensure_nyuu_binary(base_dir: str | Path, path_7z: str | None = None, version: str = "v0.4.2") -> str:
+    async def ensure_nyuu_binary(base_dir: str | Path, path_7z: str | None = None, version: str = DEPENDENCY_VERSIONS["nyuu"]) -> str:
         system = platform.system().lower()
         machine = platform.machine().lower()
         logger.debug(f"[blue]Nyuu: Detected system: {system}, architecture: {machine}[/blue]")
 
         platform_map: dict[str, dict[str, dict[str, str]]] = {
             "windows": {
-                "x86_64": {"file": "nyuu-v0.4.2-win32.7z", "folder": "windows/x86_64"},
-                "amd64": {"file": "nyuu-v0.4.2-win32.7z", "folder": "windows/x86_64"},
-                "x86": {"file": "nyuu-v0.4.2-win32.7z", "folder": "windows/x86"},
-                "arm64": {"file": "nyuu-v0.4.2-win32.7z", "folder": "windows/arm64"},
+                "x86_64": {"file": f"nyuu-{version}-win32.7z", "folder": "windows/x86_64"},
+                "amd64": {"file": f"nyuu-{version}-win32.7z", "folder": "windows/x86_64"},
+                "x86": {"file": f"nyuu-{version}-win32.7z", "folder": "windows/x86"},
+                "arm64": {"file": f"nyuu-{version}-win32.7z", "folder": "windows/arm64"},
             },
             "darwin": {
-                "arm64": {"file": "nyuu-v0.4.2-macos-x64.tar.xz", "folder": "macos/arm64"},
-                "x86_64": {"file": "nyuu-v0.4.2-macos-x64.tar.xz", "folder": "macos/x86_64"},
-                "amd64": {"file": "nyuu-v0.4.2-macos-x64.tar.xz", "folder": "macos/x86_64"},
+                "arm64": {"file": f"nyuu-{version}-macos-x64.tar.xz", "folder": "macos/arm64"},
+                "x86_64": {"file": f"nyuu-{version}-macos-x64.tar.xz", "folder": "macos/x86_64"},
+                "amd64": {"file": f"nyuu-{version}-macos-x64.tar.xz", "folder": "macos/x86_64"},
             },
             "linux": {
-                "x86_64": {"file": "nyuu-v0.4.2-linux-amd64.tar.xz", "folder": "linux/amd64"},
-                "amd64": {"file": "nyuu-v0.4.2-linux-amd64.tar.xz", "folder": "linux/amd64"},
-                "arm64": {"file": "nyuu-v0.4.2-linux-aarch64.tar.xz", "folder": "linux/arm64"},
-                "aarch64": {"file": "nyuu-v0.4.2-linux-aarch64.tar.xz", "folder": "linux/arm64"},
+                "x86_64": {"file": f"nyuu-{version}-linux-amd64.tar.xz", "folder": "linux/amd64"},
+                "amd64": {"file": f"nyuu-{version}-linux-amd64.tar.xz", "folder": "linux/amd64"},
+                "arm64": {"file": f"nyuu-{version}-linux-aarch64.tar.xz", "folder": "linux/arm64"},
+                "aarch64": {"file": f"nyuu-{version}-linux-aarch64.tar.xz", "folder": "linux/arm64"},
             },
         }
 

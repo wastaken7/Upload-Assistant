@@ -18,6 +18,7 @@ from src.languages import languages_manager
 from src.meta import Meta
 from src.rehostimages import RehostImagesManager
 from src.tmdb import TmdbManager
+from src.tracker_images import get_tracker_image_collection, set_tracker_image_collection
 from src.trackers.common import Common
 
 
@@ -245,7 +246,7 @@ class GreatPosterWall:
 
     async def rehost_unapproved_images(self, meta: Meta) -> None:
         """Import public image URLs to GPW's KShare host before the normal host check."""
-        image_list = meta.image_list
+        image_list = get_tracker_image_collection(meta, self.tracker, "screenshots")
         if not isinstance(image_list, list) or not image_list:
             return
         if not self.api_key:
@@ -284,7 +285,7 @@ class GreatPosterWall:
                 rehosted_image.update({"img_url": hosted_url, "raw_url": hosted_url, "web_url": hosted_url})
                 rehosted_images.append(rehosted_image)
 
-        meta.image_list = rehosted_images
+        set_tracker_image_collection(meta, self.tracker, "screenshots", rehosted_images)
 
     async def check_image_hosts(self, meta: Meta) -> None:
         # Rule: 2.2.1. Screenshots: They have to be saved at kshare.club, pixhost.to, img.pterclub.com, yes.ilikeshots.club, imgbox.com, s3.pterclub.com

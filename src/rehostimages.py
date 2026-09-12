@@ -450,7 +450,7 @@ async def _check_hosts(
     if tracker == "covers":
         reuploaded_images_path = Path(meta.base_dir) / "tmp" / meta.uuid / "covers.json"
     else:
-        reuploaded_images_path = Path(meta.base_dir) / "tmp" / meta.uuid / "reuploaded_images.json"
+        reuploaded_images_path = screenshots_dir(meta.base_dir, meta.uuid) / "reuploaded_images.json"
     reuploaded_images: list[dict[str, str]] = []
 
     if Path(reuploaded_images_path).exists():

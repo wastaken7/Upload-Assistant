@@ -121,7 +121,7 @@ async def process_dynamic_hdr_plots(meta: Meta, config: dict[str, Any], uploadsc
         return []
     formats = _formats(meta)
     if not formats:
-        logger.info("[cyan]Dynamic HDR plot skipped: no Dolby Vision or HDR10+ metadata detected.[/cyan]")
+        logger.debug("[cyan]Dynamic HDR plot skipped: no Dolby Vision or HDR10+ metadata detected.[/cyan]")
         return []
     sources = _source_files(meta, _positive_config_int(config, "dynamic_hdr_plot_max_files", 1))
     if not sources:

@@ -20,6 +20,7 @@ from src.manualpackage import ManualPackageManager
 from src.meta import Meta
 from src.qbitwait import Wait
 from src.rehostimages import check_tracker_image_hosts, has_restricted_image_hosts, select_common_image_host
+from src.torrent_provision import provision_tracker_torrents
 from src.trackers.GAZELLE.passthepopcorn import PassThePopcorn
 from src.trackersetup import TrackerSetup
 
@@ -75,8 +76,14 @@ async def process_trackers(
     tracker_setup = TrackerSetup(config=config)
     tracker_setup_any = cast(Any, tracker_setup)
     enabled_trackers = list(cast(Sequence[str], tracker_setup_any.trackers_enabled(meta)))
+    manual_targets = "MANUAL" in enabled_trackers
+    torrent_targets = [
+        tracker
+        for tracker in enabled_trackers
+        if tracker not in {"MANUAL", "USENET"} and (manual_targets or bool(cast(Mapping[str, Any], meta.tracker_status.get(tracker, {})).get("upload", False)))
+    ]
+    await provision_tracker_torrents(meta, config, torrent_targets, tracker_class_map)
     if config.get("DEFAULT", {}).get("smart_image_host_selection", True) and not meta.imghost_from_cli:
-        manual_targets = "MANUAL" in enabled_trackers
         target_trackers = [
             tracker
             for tracker in enabled_trackers

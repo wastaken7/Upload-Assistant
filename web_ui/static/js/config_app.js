@@ -1034,7 +1034,24 @@ const isSensitiveKeyForPath = (key, pathParts) =>
   isSensitiveKey(key) || isTorrentClientUserPass(key, pathParts);
 const isReadOnlyKeyForPath = (key, pathParts) =>
   pathParts.includes("TORRENT_CLIENTS") && key === "torrent_client";
+const SCREENSHOT_OVERLAY_CHOICES = {
+  overlay_position: [
+    ["left", "Left"],
+    ["right", "Right"],
+  ],
+  overlay_layout: [
+    ["stacked", "Stacked"],
+    ["single_line", "Single line"],
+  ],
+};
 const DISPLAY_LABEL_OVERRIDES = {
+  frame_overlay: "Enable Frame Overlay",
+  overlay_position: "Alignment",
+  overlay_layout: "Layout",
+  overlay_frame_number: "Frame Number",
+  overlay_frame_type: "Frame Type",
+  overlay_timestamp: "Timestamp",
+  overlay_tonemapped: "Tonemapped Label",
   tag_overrides: "Release Group Overrides",
   hide_screenshot_header_if_only_section: "Hide Standalone Screenshot Header",
   multiScreens: "Multiple Screenshots",
@@ -3017,7 +3034,7 @@ function ConfigLeafEditor({
         case "min_successful_image_uploads":
           return { min: 1, max: 10, step: 1 };
         case "overlay_text_size":
-          return { min: 10, max: 50, step: 1 };
+          return { min: 1, max: 100, step: 1 };
         case "logo_size":
           return { min: 100, max: 1000, step: 50 };
         case "bluray_image_size":
@@ -6916,9 +6933,22 @@ function TrackerManager({
             </div>
             {isOpen && (
               <div className="ua-config-accordion-panel border-t p-4">
-                <p className="ua-config-service-description mb-4 text-xs">
-                  Tracker code: <code className="font-semibold">{name}</code>
-                </p>
+                <div className="ua-config-service-description mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+                  <span>
+                    Tracker code: <code className="font-semibold">{name}</code>
+                  </span>
+                  {tracker.codebase && (
+                    <span className="inline-flex items-center gap-2">
+                      <span aria-hidden="true">·</span>
+                      <span>
+                        Codebase:{" "}
+                        <span className="font-semibold">
+                          {tracker.codebase}
+                        </span>
+                      </span>
+                    </span>
+                  )}
+                </div>
                 {trackerView === "available" && (
                   <div className="ua-config-state-panel mb-4 rounded-lg border p-4 text-sm">
                     Enter the required authentication details and choose Save
@@ -7413,6 +7443,200 @@ function ArrIntegrationSettings({
   );
 }
 
+function ScreenshotOverlaySettings({
+  items,
+  pathParts,
+  pendingChanges,
+  isDarkMode,
+  onValueChange,
+}) {
+  const [showPreview, setShowPreview] = useState(false);
+  const previewId = React.useId();
+  const overlayKeys = [
+    "overlay_frame_number",
+    "overlay_frame_type",
+    "overlay_timestamp",
+    "overlay_tonemapped",
+  ];
+  const valueFor = (key) => {
+    const change = pendingChanges?.get([...pathParts, key].join("/"));
+    return change
+      ? change.value
+      : items.find((item) => item.key === key)?.value;
+  };
+  const enabled = Boolean(valueFor("frame_overlay"));
+  const singleLine = valueFor("overlay_layout") === "single_line";
+  const alignRight = valueFor("overlay_position") === "right";
+  const sampleLabels = singleLine
+    ? [
+        ["overlay_frame_number", "Frame 60921"],
+        ["overlay_timestamp", "00:42:18.375"],
+        ["overlay_frame_type", "I-Frame"],
+        ["overlay_tonemapped", "Tonemapped"],
+      ]
+    : [
+        ["overlay_frame_number", "Frame Number: 60921"],
+        ["overlay_frame_type", "Frame Type: I"],
+        ["overlay_timestamp", "Timestamp: 00:42:18.375"],
+        ["overlay_tonemapped", "Tonemapped"],
+      ];
+  const selectedLabels = enabled
+    ? sampleLabels.filter(([key]) => valueFor(key)).map(([, text]) => text)
+    : [];
+  const lines =
+    singleLine && selectedLabels.length
+      ? [selectedLabels.join(" • ")]
+      : selectedLabels;
+  const textSize = Math.max(
+    1,
+    Math.min(100, Number(valueFor("overlay_text_size")) || 18),
+  );
+  const renderField = (key) => {
+    const item = items.find((entry) => entry.key === key);
+    return item ? (
+      <ConfigLeaf
+        key={key}
+        item={{ ...item, value: valueFor(key) }}
+        pathParts={pathParts}
+        fullWidth={true}
+        depth={0}
+        isDarkMode={isDarkMode}
+        onValueChange={(path, value, meta) =>
+          onValueChange(path, value, {
+            ...meta,
+            originalValue:
+              typeof item.value === "number" ? String(item.value) : item.value,
+          })
+        }
+      />
+    ) : null;
+  };
+  const renderChoice = (key, label, choices) => {
+    const item = items.find((entry) => entry.key === key);
+    if (!item) return null;
+    const fieldId = [...pathParts, key].join("--");
+    const value = valueFor(key);
+    return (
+      <div key={key} className="space-y-2">
+        <label htmlFor={fieldId} className="block text-sm font-semibold">
+          {label}
+        </label>
+        <select
+          id={fieldId}
+          className="ua-config-select w-full rounded-lg border px-3 py-2 text-sm"
+          value={choices.some(([key]) => key === value) ? value : choices[0][0]}
+          onChange={(event) =>
+            onValueChange([...pathParts, key], event.target.value, {
+              originalValue: item.value,
+            })
+          }
+        >
+          {choices.map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </div>
+    );
+  };
+  return (
+    <section className="ua-config-section overflow-hidden rounded-xl border">
+      <div className="ua-config-section-heading flex items-center justify-between gap-4 border-b px-4 py-3">
+        <div>
+          <h3 className="text-sm font-semibold">Screenshot Overlays</h3>
+          <p className="ua-config-service-description mt-1 text-xs">
+            Place labels at the top of screenshots. Turning overlays off keeps
+            your selections.
+          </p>
+        </div>
+        <button
+          type="button"
+          className="ua-config-service-action shrink-0 rounded-lg border px-3 py-2 text-xs font-semibold"
+          aria-expanded={showPreview}
+          aria-controls={previewId}
+          onClick={() => setShowPreview((visible) => !visible)}
+        >
+          {showPreview ? "Hide preview" : "Preview"}
+        </button>
+      </div>
+      <div className="ua-config-section-panel space-y-5 p-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {renderField("frame_overlay")}
+          {renderField("overlay_text_size")}
+          {renderChoice(
+            "overlay_position",
+            "Alignment",
+            SCREENSHOT_OVERLAY_CHOICES.overlay_position,
+          )}
+          {renderChoice(
+            "overlay_layout",
+            "Layout",
+            SCREENSHOT_OVERLAY_CHOICES.overlay_layout,
+          )}
+        </div>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {overlayKeys.map(renderField)}
+        </div>
+        {showPreview && (
+          <figure id={previewId} className="w-full max-w-lg min-w-0">
+            <figcaption className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+              <span className="font-semibold">Overlay preview</span>
+              <span className="ua-config-service-description">
+                Sample tonemapped frame
+              </span>
+            </figcaption>
+            <svg
+              viewBox="0 0 800 450"
+              className="block w-full overflow-hidden rounded-lg border"
+              role="img"
+              aria-label={`Screenshot preview: ${lines.join(", ") || "no overlay labels"}`}
+            >
+              <rect width="800" height="450" fill="#334b66" />
+              <circle cx="610" cy="112" r="45" fill="#e6c39a" />
+              <path
+                d="M0 315 210 120 405 320 590 200 800 340V450H0Z"
+                fill="#182e42"
+              />
+              <path d="m147 178 63-58 75 77-69-29-29 22Z" fill="#91a4b2" />
+              <path d="M0 358Q220 295 425 372T800 353V450H0Z" fill="#0b202d" />
+              <g
+                fill="white"
+                stroke="black"
+                strokeWidth="2"
+                paintOrder="stroke"
+                fontFamily="sans-serif"
+                fontSize={textSize}
+                textAnchor={alignRight ? "end" : "start"}
+              >
+                {lines.map((line, index) => (
+                  <text
+                    key={line}
+                    x={alignRight ? 784 : 16}
+                    y={16 + textSize + index * textSize * 1.1}
+                  >
+                    {line}
+                  </text>
+                ))}
+              </g>
+            </svg>
+            <p
+              className="ua-config-service-description mt-2 text-xs"
+              aria-live="polite"
+            >
+              {!enabled
+                ? "Frame overlays are disabled."
+                : lines.length
+                  ? "Illustrative preview. Text scales with screenshot resolution."
+                  : "Choose at least one label to display."}
+            </p>
+          </figure>
+        )}
+      </div>
+    </section>
+  );
+}
+
 function ItemList({
   requestedTracker,
   onSavedApiKeyStatus,
@@ -7535,7 +7759,16 @@ function ItemList({
       "ffmpeg_is_good",
       "ffmpeg_warmup",
     ],
-    "Screenshot Overlays": ["frame_overlay", "overlay_text_size"],
+    "Screenshot Overlays": [
+      "frame_overlay",
+      "overlay_text_size",
+      "overlay_position",
+      "overlay_layout",
+      "overlay_frame_number",
+      "overlay_frame_type",
+      "overlay_timestamp",
+      "overlay_tonemapped",
+    ],
     Headers: [
       "custom_description_header",
       "tonemapped_header",
@@ -7577,7 +7810,7 @@ function ItemList({
   const isScreenshotEnhancementsSection =
     pathParts[0] === "DEFAULT" &&
     regularItems.some((item) => item.key === "tone_map") &&
-    regularItems.some((item) => item.key === "frame_overlay");
+    regularItems.some((item) => item.key === "overlay_frame_number");
 
   // Partition regularItems into subgroups and an "Other" bucket
   const grouped = {};
@@ -7755,6 +7988,21 @@ function ItemList({
           {Object.keys(grouped).map((gname) => {
             const itemsInGroup = grouped[gname] || [];
             if (!itemsInGroup.length) return null;
+            if (
+              gname === "Screenshot Overlays" &&
+              isScreenshotEnhancementsSection
+            ) {
+              return (
+                <ScreenshotOverlaySettings
+                  key={gname}
+                  items={itemsInGroup}
+                  pathParts={pathParts}
+                  pendingChanges={pendingChanges}
+                  isDarkMode={isDarkMode}
+                  onValueChange={onValueChange}
+                />
+              );
+            }
             if (gname === "Sonarr" || gname === "Radarr") {
               return (
                 <ArrIntegrationSettings
@@ -11854,6 +12102,16 @@ function ConfigApp() {
         if (selectedLanguage) return `Set to ${selectedLanguage.label}`;
       }
       if (update.value === "" || update.value === null) return "Set to empty";
+      if (
+        path[0] === "DEFAULT" &&
+        path.length === 2 &&
+        ["overlay_position", "overlay_layout"].includes(key)
+      ) {
+        const selectedChoice = SCREENSHOT_OVERLAY_CHOICES[key].find(
+          ([value]) => value === update.value,
+        );
+        if (selectedChoice) return `Set to ${selectedChoice[1]}`;
+      }
       if (key === "tracker_description_mode") {
         const selectedMode = TRACKER_DESCRIPTION_MODE_OPTIONS.find(
           (option) => option.value === String(update.value),

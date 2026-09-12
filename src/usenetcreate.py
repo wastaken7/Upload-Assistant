@@ -455,6 +455,7 @@ async def run_nyuu_with_progress(cmd: list[str], cwd: str | None = None) -> None
             TaskProgressColumn(),
             console=console,
             transient=False,
+            disable=has_progress_callback(),
         ) as progress:
             while True:
                 line_bytes = await process.stdout.readline()
@@ -514,21 +515,30 @@ async def run_nyuu_with_progress(cmd: list[str], cwd: str | None = None) -> None
         raise RuntimeError(f"Failed to execute command '{redacted_str}': {e}") from e
 
 
-async def run_pesto_with_progress(cmd: list[str], cwd: str | None = None) -> None:
-    """Execute pesto upload consuming its JSON event stream for progress reporting."""
+def _redact_pesto_command(cmd: list[str]) -> str:
+    """Render a Pesto command without credentials or archive passwords."""
+    sensitive_options = {"-p", "--proxy", "-u", "--username", "--auth-password", "--password", "--nzb-password"}
     redacted_cmd = []
     skip_next = False
     for i, arg in enumerate(cmd):
         if skip_next:
             skip_next = False
             continue
-        if arg in ("-p", "-u", "--auth-password", "--username") and i + 1 < len(cmd):
+        option = arg.split("=", 1)[0]
+        if option in sensitive_options and "=" in arg:
+            redacted_cmd.append(f"{option}=********")
+        elif arg in sensitive_options and i + 1 < len(cmd):
             redacted_cmd.append(arg)
             redacted_cmd.append("********")
             skip_next = True
         else:
             redacted_cmd.append(arg)
-    redacted_str = " ".join(redacted_cmd)
+    return " ".join(redacted_cmd)
+
+
+async def run_pesto_with_progress(cmd: list[str], cwd: str | None = None) -> None:
+    """Execute pesto upload consuming its JSON event stream for progress reporting."""
+    redacted_str = _redact_pesto_command(cmd)
 
     cwd_str = f" in {cwd}" if cwd else ""
     logger.debug(f"[cyan]Running command: {redacted_str}{cwd_str}[/cyan]")
@@ -577,6 +587,7 @@ async def run_pesto_with_progress(cmd: list[str], cwd: str | None = None) -> Non
             TaskProgressColumn(),
             console=console,
             transient=False,
+            disable=has_progress_callback(),
         ) as progress:
             while True:
                 line_bytes = await process.stdout.readline()
@@ -1206,7 +1217,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
             str(usenet_cfg.get("port", 563)),
             "-u",
             usenet_cfg.get("username"),
-            "-p",
+            "--auth-password",
             usenet_cfg.get("password"),
             "-n",
             str(usenet_cfg.get("connections", 20)),
@@ -1296,7 +1307,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
         cmd_pesto.extend(all_upload_files)
 
         if is_debug:
-            logger.info(f"[yellow][DEBUG SIMULATION] Would run Pesto upload: {' '.join(cmd_pesto)}[/yellow]")
+            logger.info(f"[yellow][DEBUG SIMULATION] Would run Pesto upload: {_redact_pesto_command(cmd_pesto)}[/yellow]")
             async with aiofiles.open(nzb_file, "w", encoding="utf-8") as f:
                 await f.write(mock_nzb_content)
         else:

@@ -21,7 +21,7 @@ from src.console import console, logger, progress_display, prompt_in_thread
 from src.exportmi import find_dvd_mediainfo
 from src.mediainfo import MediaInfo
 from src.meta import Meta
-from src.webui_progress import complete_progress, publish_progress
+from src.webui_progress import complete_progress, has_progress_callback, publish_progress
 
 PlaylistItem = dict[str, Any]
 PlaylistInfo = dict[str, Any]
@@ -124,6 +124,7 @@ class DiscParse:
             TaskProgressColumn(),
             console=console,
             transient=False,
+            disable=has_progress_callback(),
         ) as progress:
             task = progress.add_task("Scanning Blu-ray...", total=100)
             while chunk := await process.stderr.read(1024):

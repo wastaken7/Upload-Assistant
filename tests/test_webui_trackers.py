@@ -4,6 +4,19 @@ import web_ui.server as server
 from src.trackers.retroflix import RetroFlix
 
 
+def test_tracker_codebase_uses_registered_frameworks_only() -> None:
+    for tracker_name, expected in (
+        ("BLUTOPIA", "UNIT3D"),
+        ("ORPHEUS", "Gazelle"),
+        ("1PTBA", "NexusPHP"),
+        ("AVISTAZ", "AvistaZ"),
+        ("NZBGEEK", None),
+        ("BROADCASTHENET", None),
+        ("UNKNOWN", None),
+    ):
+        assert server._tracker_codebase(tracker_name) == expected
+
+
 def test_tracker_destination_type_uses_existing_usenet_marker() -> None:
     class TorrentTracker:
         pass

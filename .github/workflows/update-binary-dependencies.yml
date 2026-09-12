@@ -1,0 +1,65 @@
+name: Update binary dependencies
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: update-binary-dependencies
+  cancel-in-progress: false
+
+jobs:
+  update:
+    name: Check ${{ matrix.dependency }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        dependency:
+          - 7zip
+          - bdinfo
+          - dovi_tool
+          - ffmpeg
+          - hdr10plus_tool
+          - mkbrr
+          - nyuu
+          - par2
+          - pesto
+    steps:
+      - name: Check out development
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: development
+          persist-credentials: false
+
+      - name: Check latest stable release
+        id: update
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python -m scripts.update_binary_dependency "${{ matrix.dependency }}"
+
+      - name: Create or refresh pull request
+        if: steps.update.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676 # v7
+        with:
+          token: ${{ github.token }}
+          base: development
+          branch: automation/bin-dependency-${{ matrix.dependency }}
+          delete-branch: true
+          commit-message: "chore(deps): update ${{ matrix.dependency }} to ${{ steps.update.outputs.version }}"
+          title: "chore(deps): update ${{ matrix.dependency }} to ${{ steps.update.outputs.version }}"
+          body: |
+            Automated update of **${{ matrix.dependency }}** from `${{ steps.update.outputs.previous_version }}` to `${{ steps.update.outputs.version }}`.
+
+            - [Upstream release](${{ steps.update.outputs.release_url }})
+            - Required release assets verified: ${{ steps.update.outputs.asset_count }}
+            - SHA-256 integrity pins refreshed
+
+            This pull request was generated automatically.
+          add-paths: |
+            bin/binary_dependency_pins/

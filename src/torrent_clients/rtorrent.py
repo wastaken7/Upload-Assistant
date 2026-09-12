@@ -361,7 +361,7 @@ class RtorrentClientMixin:
         if not meta.uuid:
             meta.uuid = folder_id
 
-        extracted_torrent_dir = Path(meta.base_dir) / "tmp" / meta.uuid
+        extracted_torrent_dir = Path(meta.base_dir) / "tmp" / meta.uuid / "torrents" / ".client"
         Path(extracted_torrent_dir).mkdir(parents=True, exist_ok=True)
 
         # Check if the torrent file exists directly
@@ -424,18 +424,11 @@ class RtorrentClientMixin:
                 valid, resolved_path = await self.is_valid_torrent(meta, str(torrent_path), info_hash_v1, "rtorrent", client)
 
                 if valid:
-                    base_torrent_path = Path(extracted_torrent_dir) / "BASE.torrent"
-
                     try:
                         await TorrentCreator.create_base_from_existing_torrent(resolved_path, meta.base_dir, meta.uuid)
                         logger.debug("[green]Created BASE.torrent from existing torrent")
                     except Exception as e:
                         logger.info(f"[bold red]Error creating BASE.torrent: {e}")
-                        try:
-                            shutil.copy2(resolved_path, base_torrent_path)
-                            logger.info(f"[yellow]Created simple torrent copy as fallback: {base_torrent_path}")
-                        except Exception as copy_err:
-                            logger.info(f"[bold red]Failed to create backup copy: {copy_err}")
 
         except Exception as e:
             logger.info(f"[bold red]Error reading torrent file: {e}")

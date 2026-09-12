@@ -28,7 +28,7 @@ from src.rehostimages import ImageHostPolicy, RehostImagesManager
 from src.screenshot_manifest import files as manifest_files
 from src.takescreens import TakeScreensManager
 from src.temp_paths import artwork_dir, screenshots_dir
-from src.torrentcreate import TorrentCreator
+from src.torrent_policy import PASSTHEPOPCORN_POLICY
 from src.tracker_images import get_tracker_image_collection
 from src.trackers.common import Common
 from src.uploadscreens import UploadScreensManager
@@ -135,6 +135,7 @@ class PassThePopcorn:
         ("Vietnamese", "vie", "vi"): 25,
     }
     supported_categories = ("MOVIE",)
+    torrent_policy = PASSTHEPOPCORN_POLICY
     tracker_urls = ("passthepopcorn.me",)
 
     def __init__(self, config: dict[str, Any]) -> None:
@@ -1628,26 +1629,8 @@ class PassThePopcorn:
 
     async def upload(self, meta: Meta, url: str, data: dict[str, Any]) -> bool:
         common = Common(config=self.config)
-        base_piece_mb = meta.base_torrent_piece_mb or 0
         torrent_file_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}].torrent"
-
-        # Check if the piece size exceeds 16 MiB and regenerate the torrent if needed
-        if base_piece_mb > 16 and not meta.nohash:
-            logger.info(f"{self.tracker}: [red]Piece size is OVER 16M and does not work on PassThePopcorn. Generating a new .torrent")
-            tracker_url = self.announce_url.strip() if self.announce_url else "https://fake.tracker"
-            piece_size = 16
-            torrent_create = f"[{self.tracker}]"
-            try:
-                cooldown = int(self.config.get("DEFAULT", {}).get("rehash_cooldown", 0) or 0)
-            except ValueError, TypeError:
-                cooldown = 0
-            if cooldown > 0:
-                await asyncio.sleep(cooldown)  # Small cooldown before rehashing
-
-            await TorrentCreator.create_torrent(meta, str(meta.path), torrent_create, tracker_url=tracker_url, piece_size=piece_size)
-            await common.create_torrent_for_upload(meta, self.tracker, self.source_flag, torrent_filename=torrent_create)
-        else:
-            await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
+        await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
 
         # Proceed with the upload process
         async with aiofiles.open(torrent_file_path, "rb") as torrent_file_handle:

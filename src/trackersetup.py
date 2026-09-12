@@ -1479,7 +1479,7 @@ tracker_class_map: Any = LazyTrackerDict(
         "PTERCLUB": ("src.trackers.pterclub", "PTerClub"),
         "PTFANS": ("src.trackers.NEXUSPHP.ptfans", "PTFans"),
         "PTGTK": ("src.trackers.NEXUSPHP.ptgtk", "PTGTK"),
-        "PTSKIT": ("src.trackers.ptskit", "Ptskit"),
+        "PTSKIT": ("src.trackers.NEXUSPHP.ptskit", "Ptskit"),
         "PTZONE": ("src.trackers.NEXUSPHP.ptzone", "PTZone"),
         "RACING4EVERYONE": ("src.trackers.UNIT3D.racing4everyone", "Racing4Everyone"),
         "RAILGUNPT": ("src.trackers.NEXUSPHP.railgunpt", "RailgunPT"),
@@ -1509,6 +1509,26 @@ tracker_class_map: Any = LazyTrackerDict(
         "ZENITH": ("src.trackers.UNIT3D.znth", "Zenith"),
     }
 )
+
+
+def _tracker_framework_from_module(module_name: str) -> str | None:
+    """Return the framework directory for a registered tracker module."""
+    parts = module_name.split(".")
+    if len(parts) < 4 or parts[:2] != ["src", "trackers"]:
+        return None
+    return parts[2]
+
+
+# Keep framework classification derived from the tracker registry without
+# importing tracker modules (the registry is intentionally lazy).
+tracker_framework_map: dict[str, str] = {
+    tracker: framework for tracker, (module_name, _class_name) in tracker_class_map._modules.items() if (framework := _tracker_framework_from_module(module_name)) is not None
+}
+
+
+def get_tracker_framework(tracker: str) -> str | None:
+    """Return the codebase framework for a tracker, if it has one."""
+    return tracker_framework_map.get(tracker.upper())
 
 
 def get_tracker_comment_hosts(config: dict[str, Any]) -> dict[str, tuple[str, ...]]:

@@ -7,6 +7,7 @@ import asyncio
 import httpx
 
 from src.meta import Meta
+from src.tracker_images import get_tracker_image_collection
 from src.trackers.GAZELLE.greatposterwall import GreatPosterWall
 
 
@@ -54,6 +55,14 @@ def test_greatposterwall_rehosts_only_unapproved_urls(monkeypatch):
     asyncio.run(tracker.rehost_unapproved_images(meta))
 
     assert meta.image_list == [
+        {"img_url": "https://lostimg.cc/example.png", "raw_url": "https://lostimg.cc/example.png", "web_url": "https://lostimg.cc/example.png"},
+        {
+            "img_url": "https://img2.kshare.club/gpw/user/1/kept.png",
+            "raw_url": "https://img2.kshare.club/gpw/user/1/kept.png",
+            "web_url": "https://img2.kshare.club/gpw/user/1/kept.png",
+        },
+    ]
+    assert get_tracker_image_collection(meta, tracker.tracker, "screenshots") == [
         {
             "img_url": "https://img2.kshare.club/gpw/user/1/test.png",
             "raw_url": "https://img2.kshare.club/gpw/user/1/test.png",
@@ -76,6 +85,7 @@ def test_greatposterwall_leaves_images_unchanged_without_api_key():
     asyncio.run(tracker.rehost_unapproved_images(meta))
 
     assert meta.image_list == [{"raw_url": "https://lostimg.cc/example.png"}]
+    assert tracker.tracker not in meta.tracker_image_collections
 
 
 def test_greatposterwall_accepts_pterclub_s3_host():

@@ -110,15 +110,20 @@ Implementation notes:
 - `cutoff_screens` (str): If at least this many screenshots already exist (e.g. pulled from a description), skip capturing/uploading more.
 - `thumbnail_size` (str): Thumbnail width for hosts that support `[img=WIDTH]` (default `"350"`).
 - `screens_per_row` (str): Screenshots per row in description (only for some trackers).
-- `frame_overlay` (bool): Overlay frame number/type and “Tonemapped” (if applicable) on screenshots.
-- `overlay_text_size` (str): Overlay text size (scales with resolution).
+- `frame_overlay` (bool, default `False`): Master switch for screenshot labels. Individual selections are kept when explicitly configured.
+- `overlay_frame_number`, `overlay_frame_type`, `overlay_timestamp`, `overlay_tonemapped` (bool, default `False`): Choose each label independently. The Tonemapped label appears only when tone mapping occurred.
+- `overlay_text_size` (str or int, default `"18"`): Overlay text size from `1` to `100`, scaled with resolution. VapourSynth rounds to whole font-scale steps.
+- `overlay_position` (str, default `"left"`): Place labels at the top-left (`"left"`) or top-right (`"right"`).
+- `overlay_layout` (str, default `"stacked"`): Use separate lines (`"stacked"`) or a compact row separated by bullets (`"single_line"`).
 - `scale_screenshots_for_par` (bool): When `False` (the default), preserve MediaInfo's coded dimensions. Set to `True` only to apply pixel-aspect-ratio correction for non-square-pixel sources; this can change a PNG from `1920x1040` to `1924x1040`.
+
+See the [frame and screenshot overlay guide](screenshot-overlays.md) for help configuring **Frame Number, Frame Type, Timestamp and Tonemapped labels**. It includes images of stacked and single-line overlays, a copyable config example and guidance for existing configs.
 
 Implementation notes:
 
 - Screenshot capture/reuse logic is in `src/takescreens.py`. In particular, `cutoff_screens` is used to decide whether existing images in `meta['image_list']` are “enough” to skip taking new screenshots.
 - `thumbnail_size` and `screens_per_row` affect how screenshot BBCode is rendered in descriptions (see `src/get_desc.py`).
-- `frame_overlay` triggers extra probing work to collect frame information (slower), and can affect which tonemapping pipeline is used.
+- Active frame-number or frame-type labels trigger extra probing work to collect frame information (slower). Active overlays can affect which tonemapping pipeline is used.
 
 ### HDR tonemapping
 

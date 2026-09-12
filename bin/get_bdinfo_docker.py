@@ -15,6 +15,7 @@ import requests
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from bin.binary_dependencies import DEPENDENCY_VERSIONS
 from bin.download_integrity import verify_downloaded_asset
 
 try:
@@ -32,7 +33,7 @@ except ImportError:
     logger = logging.getLogger(__name__)
 
 
-BDINFO_VERSION = "v0.4.0"
+BDINFO_VERSION = DEPENDENCY_VERSIONS["bdinfo"]
 BASE_RELEASE_URL = "https://github.com/autobrr/go-bdinfo/releases/download"
 
 
