@@ -37,6 +37,7 @@ class HDBits:
     signature: str | None = None
     banned_groups: tuple[str, ...] = ("",)
     base_url = "https://hdbits.org"
+    torrent_url = f"{base_url}/details.php?id="
     supported_categories = ("TV", "MOVIE")
     torrent_policy = HDBITS_POLICY
     tracker_urls = ("https://tracker.hdbits.org",)
@@ -316,6 +317,7 @@ class HDBits:
         match = re.match(rf".*?{re.escape(self.base_url.replace('https://', ''))}/details\.php\?id=(\d+)&uploaded=(\d+)", str(up.url))
         if match:
             meta.tracker_status[self.tracker]["status_message"] = match.group(0)
+            meta.tracker_status[self.tracker]["torrent_id"] = match.group(1)
             if id_match := re.search(r"(id=)(\d+)", urlparse(str(up.url)).query):
                 id = id_match.group(2)
                 await self.download_new_torrent(id, torrent_file_path)
