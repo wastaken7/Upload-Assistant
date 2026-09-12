@@ -1,6 +1,30 @@
 # ruff: noqa: S101
+import asyncio
+
 from src.bbcode import BBCODE
 from src.get_desc import DescriptionBuilder
+from src.trackers.NEXUSPHP import NEXUSPHP
+from src.trackers.NEXUSPHP.ptskit import Ptskit
+from src.trackersetup import get_tracker_framework
+
+
+def test_tracker_framework_is_derived_from_registered_module_path() -> None:
+    assert get_tracker_framework("ANTHELION") == "GAZELLE"
+    assert get_tracker_framework("AITHER") == "UNIT3D"
+    assert get_tracker_framework("LEMONHD") == "NEXUSPHP"
+    assert get_tracker_framework("PTSKIT") == "NEXUSPHP"
+    assert get_tracker_framework("UNKNOWN") is None
+
+
+def test_ptskit_uses_the_nexusphp_base_initializer() -> None:
+    tracker = Ptskit({"DEFAULT": {"tmdb_api": "test-key"}, "TRACKERS": {"PTSKIT": {"announce_url": "https://example.test/announce"}}})
+
+    try:
+        assert isinstance(tracker, NEXUSPHP)
+        assert tracker.tracker == "PTSKIT"
+        assert tracker.announce_url == "https://example.test/announce"
+    finally:
+        asyncio.run(tracker.session.aclose())
 
 
 def test_clamp_size_tags_preserves_supported_sizes_and_other_markup() -> None:

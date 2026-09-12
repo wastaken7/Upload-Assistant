@@ -4,18 +4,17 @@ import web_ui.server as server
 from src.trackers.retroflix import RetroFlix
 
 
-def test_tracker_codebase_uses_known_module_families_only() -> None:
-    for module, expected in (
-        ("src.trackers.UNIT3D.blutopia", "UNIT3D"),
-        ("src.trackers.GAZELLE.orpheus", "Gazelle"),
-        ("src.trackers.NEXUSPHP.oneptba", "NexusPHP"),
-        ("src.trackers.AVISTAZ.avistaz", "AvistaZ"),
-        ("src.trackers.USENET.nzbgeek", None),
-        ("src.trackers.broadcasthenet", None),
-        ("unrelated.trackers.GAZELLE.example", None),
+def test_tracker_codebase_uses_registered_frameworks_only() -> None:
+    for tracker_name, expected in (
+        ("BLUTOPIA", "UNIT3D"),
+        ("ORPHEUS", "Gazelle"),
+        ("1PTBA", "NexusPHP"),
+        ("AVISTAZ", "AvistaZ"),
+        ("NZBGEEK", None),
+        ("BROADCASTHENET", None),
+        ("UNKNOWN", None),
     ):
-        tracker_class = type("Tracker", (), {"__module__": module})
-        assert server._tracker_codebase(tracker_class) == expected
+        assert server._tracker_codebase(tracker_name) == expected
 
 
 def test_tracker_destination_type_uses_existing_usenet_marker() -> None:
