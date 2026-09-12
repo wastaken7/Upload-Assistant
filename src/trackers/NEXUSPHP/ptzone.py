@@ -197,7 +197,7 @@ class PTZone(NEXUSPHP):
         subtitle_tracks = meta.subtitle_languages or []
         mhdr = meta.hdr
 
-        checkboxes = []
+        checkboxes: list[str] = []
 
         if meta.exclusive:
             checkboxes.append(str(reposting_prohibited))
