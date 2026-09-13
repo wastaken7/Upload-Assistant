@@ -13,6 +13,40 @@ from src.trackers.UNIT3D import UNIT3D
 Config = dict[str, Any]
 
 
+def _remove_last(name: str, token: str) -> str:
+    if not token:
+        return name
+    # Padding makes the matched leading space's index equal the token's index in name.
+    start = max(f" {name} ".rfind(f" {token}{boundary}") for boundary in (" ", "-"))
+    if start < 0:
+        return name
+    end = start + len(token)
+    if name[end : end + 1] == " ":
+        return name[:start] + name[end + 1 :]
+    return name[:max(0, start - 1)] + name[end:]
+
+
+def _insert_before_last(name: str, token: str, prefix: str) -> str:
+    if not token or not prefix:
+        return name
+    start = max(f" {name} ".rfind(f" {token}{boundary}") for boundary in (" ", "-"))
+    if start < 0 or f" {name[:start]}".endswith(f" {prefix} "):
+        return name
+    return name[:start] + f"{prefix} " + name[start:]
+
+
+def _insert_after_last(name: str, token: str, suffix: str) -> str:
+    if not token or not suffix:
+        return name
+    start = max(f" {name} ".rfind(f" {token}{boundary}") for boundary in (" ", "-"))
+    if start < 0:
+        return name
+    end = start + len(token)
+    if f"{name[end:]} ".startswith((f" {suffix} ", f" {suffix}-")):
+        return name
+    return name[:end] + f" {suffix}" + name[end:]
+
+
 class DreadVault(UNIT3D):
     """
     DreadVault (DV) is a Private Torrent Tracker for HORROR MOVIES / TV
@@ -71,19 +105,27 @@ class DreadVault(UNIT3D):
 
         if name_type == "ENCODE" and source in ("NTSC", "PAL"):
             # For an ENCODE, get_source returns a bare NTSC/PAL only for DVD sources; the site titles that DVDRip.
-            dvd_tokens = " ".join(f"{meta.edition} {meta.repack} {resolution} {source}".split())
-            dreadvault_name = dreadvault_name.replace(dvd_tokens, f"{resolution} DVDRip", 1)
+            dvd_tokens = f" {resolution} {source} "
+            start = dreadvault_name.rfind(dvd_tokens)
+            if start >= 0:
+                prefix = dreadvault_name[:start]
+                for token in (meta.repack, meta.edition):
+                    if token:
+                        prefix = prefix.removesuffix(f" {token}")
+                dreadvault_name = prefix + f" {resolution} DVDRip " + dreadvault_name[start + len(dvd_tokens) :]
 
         if name_type == "DVDRIP":
             source = "DVDRip"
             encode_token = video_encode.strip()
-            if meta.source:
-                dreadvault_name = dreadvault_name.replace(f"{meta.source} ", "", 1)
+            dreadvault_name = _remove_last(dreadvault_name, meta.source or "")
             if encode_token:
-                dreadvault_name = dreadvault_name.replace(f" {encode_token}", "", 1)
-                anchor = meta.audio or source
-                dreadvault_name = dreadvault_name.replace(anchor, f"{anchor} {encode_token}", 1)
-            dreadvault_name = dreadvault_name.replace(f"{source}", f"{resolution} {source}", 1)
+                encode_span = f" {encode_token} DVDRip"
+                start = max(f"{dreadvault_name} ".rfind(f"{encode_span}{boundary}") for boundary in (" ", "-"))
+                if start >= 0:
+                    dreadvault_name = dreadvault_name[:start] + dreadvault_name[start + len(encode_token) + 1 :]
+                    dreadvault_name = _insert_after_last(dreadvault_name, meta.audio or source, encode_token)
+            if resolution:
+                dreadvault_name = _insert_before_last(dreadvault_name, source, resolution)
 
         if alt_title and year:
             dreadvault_name = dreadvault_name.replace(f"{year} {alt_title}", f"{alt_title} {year}", 1)
@@ -99,11 +141,11 @@ class DreadVault(UNIT3D):
             foreign_lang = audio_languages[0].upper()
             dvd_remux = name_type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD")
             if dvd_remux and year:
-                dreadvault_name = dreadvault_name.replace(year, f"{year} {foreign_lang}", 1)
+                dreadvault_name = _insert_after_last(dreadvault_name, year, foreign_lang)
             elif meta.is_disc != "BDMV":
                 for anchor in (resolution, str(meta.service), meta.region, source):
-                    if anchor and anchor in dreadvault_name:
-                        dreadvault_name = dreadvault_name.replace(anchor, f"{foreign_lang} {anchor}", 1)
+                    if anchor and f" {anchor} " in f" {dreadvault_name} ":
+                        dreadvault_name = _insert_before_last(dreadvault_name, anchor, foreign_lang)
                         break
 
         return {"name": dreadvault_name}
