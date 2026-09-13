@@ -38,3 +38,19 @@ def test_example_config_tracker_templates_are_alphabetical() -> None:
     assert tracker_names == sorted(tracker_names)
     assert load_available_tracker_names() == tracker_names
     assert list(trackers)[-1] == "MANUAL"
+
+
+def test_unit3d_tracker_templates_define_anon() -> None:
+    # UNIT3D uploads always send the anonymous flag, so every family template must expose it
+    from src.trackersetup import get_tracker_framework
+
+    trackers = load_example_config()["TRACKERS"]
+    unit3d = sorted(
+        name
+        for name, settings in trackers.items()
+        if isinstance(settings, dict) and get_tracker_framework(name) == "UNIT3D"
+    )
+
+    assert unit3d, "expected UNIT3D-family trackers in the example config"
+    missing = [name for name in unit3d if not isinstance(trackers[name].get("anon"), bool)]
+    assert not missing, f"UNIT3D tracker templates missing boolean 'anon': {missing}"
