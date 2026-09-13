@@ -124,6 +124,64 @@ def test_dreadvault_formats_dvdrip_with_resolution_and_encode_after_audio():
     assert name == "Example Movie 2001 480p DVDRip DD 2.0 x264-GRP"  # noqa: S101
 
 
+@pytest.mark.parametrize(
+    ("source", "original_name"),
+    [
+        ("PAL DVD", "Example Movie 2001 PAL DVD x264 DVDRip-GRP"),
+        ("", "Example Movie 2001 x264 DVDRip-GRP"),
+    ],
+)
+def test_dreadvault_formats_dvdrip_with_empty_audio(source, original_name):
+    meta = Meta(
+        name=original_name,
+        type="DVDRIP",
+        source=source,
+        resolution="480p",
+        video_encode=" x264",
+        audio="",
+        language_checked=True,
+    )
+
+    name = asyncio.run(_tracker().get_name(meta))["name"]
+
+    assert name == "Example Movie 2001 480p DVDRip x264-GRP"  # noqa: S101
+
+
+def test_dreadvault_names_a_dvd_sourced_encode_as_a_dvdrip():
+    meta = Meta(
+        name="Ghost 1984 480p NTSC DD 2.0 x264-SaL",
+        type="ENCODE",
+        source="NTSC",
+        resolution="480p",
+        video_encode="x264",
+        audio="DD 2.0",
+        language_checked=True,
+    )
+
+    name = asyncio.run(_tracker().get_name(meta))["name"]
+
+    assert name == "Ghost 1984 480p DVDRip DD 2.0 x264-SaL"  # noqa: S101
+
+
+def test_dreadvault_keeps_the_episode_on_a_dvd_sourced_encode():
+    meta = Meta(
+        name="Example Show 1989 S04E02 Unrated REPACK 480p PAL DD 2.0 x264-GRP",
+        category="TV",
+        type="ENCODE",
+        source="PAL",
+        resolution="480p",
+        edition="Unrated",
+        repack="REPACK",
+        video_encode="x264",
+        audio="DD 2.0",
+        language_checked=True,
+    )
+
+    name = asyncio.run(_tracker().get_name(meta))["name"]
+
+    assert name == "Example Show 1989 S04E02 480p DVDRip DD 2.0 x264-GRP"  # noqa: S101
+
+
 def test_dreadvault_formats_hi10p_dvdrip_with_encode_after_audio():
     meta = Meta(
         name="Example Movie 2001 PAL DVD Hi10P x264 DVDRip DD 2.0-GRP",
@@ -140,38 +198,20 @@ def test_dreadvault_formats_hi10p_dvdrip_with_encode_after_audio():
     assert name == "Example Movie 2001 480p DVDRip DD 2.0 Hi10P x264-GRP"  # noqa: S101
 
 
-def test_dreadvault_formats_dvd_disc_with_resolution_codec_region_and_source():
+def test_dreadvault_preserves_title_spaces_when_dvdrip_source_and_encode_are_empty():
     meta = Meta(
-        name="Example Movie 2001 R1 NTSC DVD DVD9 DD 5.1-GRP",
-        type="DISC",
-        is_disc="DVD",
-        source="NTSC DVD",
+        name="Example Movie 1990 DVDRip DD 2.0-GRP",
+        type="DVDRIP",
+        source="",
         resolution="480p",
-        region="R1",
-        video_codec="MPEG-2",
-        audio="DD 5.1",
+        video_encode="",
+        audio="DD 2.0",
         language_checked=True,
     )
 
     name = asyncio.run(_tracker().get_name(meta))["name"]
 
-    assert name == "Example Movie 2001 480p R1 NTSC DVD DVD9 MPEG-2 DD 5.1-GRP"  # noqa: S101
-
-
-def test_dreadvault_formats_dvd_remux_with_resolution_before_source():
-    meta = Meta(
-        name="Example Movie 2001 PAL DVD REMUX DD 5.1-GRP",
-        type="REMUX",
-        source="PAL DVD",
-        resolution="576p",
-        video_codec="MPEG-2",
-        audio="DD 5.1",
-        language_checked=True,
-    )
-
-    name = asyncio.run(_tracker().get_name(meta))["name"]
-
-    assert name == "Example Movie 2001 576p PAL DVD REMUX MPEG-2 DD 5.1-GRP"  # noqa: S101
+    assert name == "Example Movie 1990 480p DVDRip DD 2.0-GRP"  # noqa: S101
 
 
 def test_dreadvault_adds_foreign_audio_language_before_encode_resolution():
@@ -251,6 +291,24 @@ def test_dreadvault_omits_language_marker_when_audio_includes_english():
     assert name == "Example Movie 2001 1080p BluRay DD 5.1 x264-GRP"  # noqa: S101
 
 
+@pytest.mark.parametrize("audio_language", ["No", "Undetermined"])
+def test_dreadvault_omits_language_marker_for_non_linguistic_audio(audio_language):
+    meta = Meta(
+        name="Ghost 1984 NTSC x264 DVDRip DD 2.0-SaL",
+        type="DVDRIP",
+        source="NTSC",
+        resolution="480p",
+        video_encode=" x264",
+        audio="DD 2.0",
+        audio_languages=[audio_language],
+        language_checked=True,
+    )
+
+    name = asyncio.run(_tracker().get_name(meta))["name"]
+
+    assert name == "Ghost 1984 480p DVDRip DD 2.0 x264-SaL"  # noqa: S101
+
+
 def test_dreadvault_adds_foreign_audio_language_to_a_dvdrip():
     # The DVDRip template carries no resolution of its own, so a language pass that ran before the
     # DVDRip branch had nothing to anchor to and dropped the marker (kainoa 2026-09-09).
@@ -272,11 +330,11 @@ def test_dreadvault_adds_foreign_audio_language_to_a_dvdrip():
 
 def test_dreadvault_adds_foreign_audio_language_to_a_dvd_full_disc():
     meta = Meta(
-        name="Hausu 1977 USA NTSC DVD DVD9 LPCM 2.0",
+        name="Hausu 1977 USA NTSC DVD9 LPCM 2.0",
         year=1977,
         type="DISC",
         is_disc="DVD",
-        source="NTSC DVD",
+        source="NTSC",
         resolution="480p",
         region="USA",
         video_codec="MPEG-2",
@@ -287,7 +345,7 @@ def test_dreadvault_adds_foreign_audio_language_to_a_dvd_full_disc():
 
     name = asyncio.run(_tracker().get_name(meta))["name"]
 
-    assert name.startswith("Hausu 1977 JAPANESE 480p USA NTSC DVD")  # noqa: S101
+    assert name == "Hausu 1977 JAPANESE USA NTSC DVD9 LPCM 2.0"  # noqa: S101
 
 
 def test_dreadvault_adds_foreign_audio_language_after_year_for_dvd_remux():
@@ -305,10 +363,10 @@ def test_dreadvault_adds_foreign_audio_language_after_year_for_dvd_remux():
 
     name = asyncio.run(_tracker().get_name(meta))["name"]
 
-    assert name == "Example Movie 2001 JAPANESE 576p PAL DVD REMUX MPEG-2 DD 5.1-GRP"  # noqa: S101
+    assert name == "Example Movie 2001 JAPANESE PAL DVD REMUX DD 5.1-GRP"  # noqa: S101
 
 
-def test_dreadvault_adds_foreign_audio_language_before_resolution_for_yearless_dvd_remux():
+def test_dreadvault_adds_foreign_audio_language_before_source_for_yearless_dvd_remux():
     meta = Meta(
         name="Example Movie PAL DVD REMUX DD 2.0-GRP",
         no_year=True,
@@ -323,7 +381,7 @@ def test_dreadvault_adds_foreign_audio_language_before_resolution_for_yearless_d
 
     name = asyncio.run(_tracker().get_name(meta))["name"]
 
-    assert name == "Example Movie JAPANESE 576p PAL DVD REMUX MPEG-2 DD 2.0-GRP"  # noqa: S101
+    assert name == "Example Movie JAPANESE PAL DVD REMUX DD 2.0-GRP"  # noqa: S101
 
 
 def test_dreadvault_never_adds_trump_suffix_for_exact_match():
@@ -371,4 +429,4 @@ def test_dreadvault_moves_tv_aka_before_year_with_foreign_audio_language():
 
     name = asyncio.run(_tracker().get_name(meta))["name"]
 
-    assert name == "Example Show AKA Alt Show 2024 JAPANESE S01 576p PAL DVD REMUX MPEG-2 DD 2.0-GRP"  # noqa: S101
+    assert name == "Example Show AKA Alt Show 2024 JAPANESE S01 PAL DVD REMUX DD 2.0-GRP"  # noqa: S101
