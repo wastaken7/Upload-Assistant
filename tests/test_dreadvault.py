@@ -124,6 +124,29 @@ def test_dreadvault_formats_dvdrip_with_resolution_and_encode_after_audio():
     assert name == "Example Movie 2001 480p DVDRip DD 2.0 x264-GRP"  # noqa: S101
 
 
+@pytest.mark.parametrize(
+    ("source", "original_name"),
+    [
+        ("PAL DVD", "Example Movie 2001 PAL DVD x264 DVDRip-GRP"),
+        ("", "Example Movie 2001 x264 DVDRip-GRP"),
+    ],
+)
+def test_dreadvault_formats_dvdrip_with_empty_audio(source, original_name):
+    meta = Meta(
+        name=original_name,
+        type="DVDRIP",
+        source=source,
+        resolution="480p",
+        video_encode=" x264",
+        audio="",
+        language_checked=True,
+    )
+
+    name = asyncio.run(_tracker().get_name(meta))["name"]
+
+    assert name == "Example Movie 2001 480p DVDRip x264-GRP"  # noqa: S101
+
+
 def test_dreadvault_names_a_dvd_sourced_encode_as_a_dvdrip():
     meta = Meta(
         name="Ghost 1984 480p NTSC DD 2.0 x264-SaL",
