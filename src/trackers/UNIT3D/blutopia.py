@@ -5,10 +5,19 @@ import cli_ui
 
 from src.console import logger
 from src.meta import Meta
-from src.release_name import NameRule, NameSelector, TrackerNameProfile, template
+from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, template
 from src.trackers.common import Common
-from src.trackers.naming import imdb_title_transform, remove_tv_episode_title
 from src.trackers.UNIT3D import UNIT3D
+from src.trackers.UNIT3D.naming import imdb_title_transform
+
+
+def remove_tv_episode_title(name: str, context: NameContext) -> str:
+    meta = context.meta
+    episode_title = str(getattr(meta, "episode_title", ""))
+    resolution = context.values.get("resolution", "")
+    if context.values.get("category") == "TV" and episode_title:
+        return name.replace(f"{episode_title} {resolution}", resolution, 1)
+    return name
 
 
 class Blutopia(UNIT3D):

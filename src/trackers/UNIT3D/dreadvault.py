@@ -9,10 +9,45 @@ from src.languages import languages_manager
 from src.meta import Meta
 from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, template
 from src.trackers.common import Common
-from src.trackers.naming import dreadvault_name
 from src.trackers.UNIT3D import UNIT3D
 
 Config = dict[str, Any]
+
+
+def dreadvault_name(name: str, context: NameContext) -> str:
+    resolution = context.values.get("resolution", "")
+    source = context.values.get("source", "")
+    name_type = context.values.get("type", "")
+    video_codec = context.values.get("video_codec", "")
+    video_encode = context.values.get("video_encode", "").strip()
+    audio = context.values.get("audio", "")
+    year = context.values.get("year", "")
+    if name_type == "DVDRIP":
+        name = name.replace(f"{source} ", "", 1).replace(f" {video_encode}", "", 1)
+        name = name.replace("DVDRip", f"{resolution} DVDRip", 1).replace(audio, f"{audio} {video_encode}", 1)
+    elif context.values.get("is_disc") == "DVD":
+        region = context.values.get("region", "")
+        region_source = " ".join(part for part in (region, source) if part)
+        details = " ".join(part for part in (resolution, region, source) if part)
+        if region_source:
+            name = name.replace(region_source, details, 1)
+        name = name.replace(audio, f"{video_codec} {audio}", 1)
+    elif name_type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD"):
+        name = name.replace(source, f"{resolution} {source}", 1).replace(audio, f"{video_codec} {audio}", 1)
+    alt_title = context.values.get("alt_title", "")
+    if alt_title and year:
+        name = name.replace(f"{year} {alt_title}", f"{alt_title} {year}", 1)
+    language = context.values.get("foreign_language", "")
+    if language:
+        dvd_remux = name_type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD")
+        if dvd_remux and year:
+            name = name.replace(year, f"{year} {language}", 1)
+        elif context.values.get("is_disc") != "BDMV":
+            for anchor in (resolution, context.values.get("service", ""), source):
+                if anchor and anchor in name:
+                    name = name.replace(anchor, f"{language} {anchor}", 1)
+                    break
+    return name
 
 
 class DreadVault(UNIT3D):

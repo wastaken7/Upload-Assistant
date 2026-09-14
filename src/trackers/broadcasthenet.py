@@ -21,9 +21,47 @@ from src.mediainfo import strip_report_by_line
 from src.meta import Meta
 from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, template
 from src.trackers.common import Common
-from src.trackers.naming import StringTrackerNameMixin, broadcasthe_net_name
+from src.trackers.naming import StringTrackerNameMixin
 
 Config = dict[str, Any]
+
+
+def _btn_clean(value: str) -> str:
+    value = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode()
+    value = value.replace("&", " and ").replace("'", "")
+    value = re.sub(r"\s+", ".", value.strip())
+    value = re.sub(r"(?i)\.DDP\.(\d(?:\.\d+)?)\.Atmos", r".DDPA\1", value)
+    value = re.sub(r"(?i)\.TrueHD\.(\d(?:\.\d+)?)\.Atmos", r".TrueHDA\1", value)
+    value = re.sub(r"(?i)\.(DDP|DD|AC3|DTS|AAC|FLAC|TrueHD|PCM|LPCM)\.(\d)", r".\1\2", value)
+    value = re.sub(r"[^A-Za-z0-9.\-]+", ".", value)
+    return re.sub(r"\.{2,}", ".", value).strip(".-")
+
+
+def broadcasthe_net_name(name: str, context: NameContext) -> str:
+    name = re.sub(r"(?i)\.(avi|mkv|mp4|ts|m4v|m2ts|wmv|mpeg|mpg|vob)$", "", name)
+    name = _btn_clean(name)
+    if not context.values.get("scene_name"):
+        aka = _btn_clean(context.values.get("alt_title", ""))
+        if aka:
+            name = re.sub(rf"(?i)(?:^|\.){re.escape(aka)}(?=\.|$)", ".", name, count=1)
+        hdr = _btn_clean(context.values.get("hdr", ""))
+        resolution = _btn_clean(context.values.get("resolution", ""))
+        if hdr and resolution:
+            hdr_pattern = rf"(?i)(?:^|\.){re.escape(hdr)}(?=\.|$)"
+            resolution_pattern = rf"(?i)(?:^|\.){re.escape(resolution)}(?=\.|$)"
+            if re.search(hdr_pattern, name) and re.search(resolution_pattern, name):
+                name = re.sub(hdr_pattern, ".", name, count=1)
+                name = re.sub(resolution_pattern, f".{hdr}.{resolution}", name, count=1)
+        name = re.sub(r"\.{2,}", ".", name).strip(".")
+    if context.values.get("resolution", "").lower() in {"sd", "480i", "480p", "576i", "576p"}:
+        name = re.sub(r"(?i)(?:^|\.)(?:sd|\d{3,4}[pi])(?=\.|$)", ".", name)
+        name = re.sub(r"\.{2,}", ".", name).strip(".")
+    tag = context.values.get("tag", "").lstrip("-")
+    if tag and not re.search(r"-[^.\-]+$", name):
+        name += f"-{tag}"
+    elif not tag and not re.search(r"-(?:nogrp|nogroup|unknown|unk)$", name, re.I):
+        name += "-NOGRP"
+    return name
 
 
 class BroadcasTheNet(StringTrackerNameMixin):

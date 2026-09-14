@@ -1,5 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import re
+from pathlib import Path
 from typing import Any, cast
 
 import cli_ui
@@ -8,10 +9,14 @@ from src.console import logger
 from src.meta import Meta
 from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, replace_text, template
 from src.trackers.common import Common
-from src.trackers.naming import strip_known_extension
 from src.trackers.UNIT3D import UNIT3D
 
 Config = dict[str, Any]
+
+
+def strip_known_extension(name: str, _context: NameContext) -> str:
+    path = Path(name)
+    return path.stem if path.suffix.lower() in {".mkv", ".mp4", ".avi", ".ts"} else name
 
 
 class Seedpool(UNIT3D):

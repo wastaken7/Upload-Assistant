@@ -7,8 +7,8 @@ from src.console import logger
 from src.meta import Meta
 from src.release_name import NameRule, NameSelector, TrackerNameProfile, template
 from src.trackers.common import Common
-from src.trackers.naming import invalid_group_suffix
 from src.trackers.UNIT3D import UNIT3D
+from src.trackers.UNIT3D.naming import invalid_group_suffix
 
 Config = dict[str, Any]
 

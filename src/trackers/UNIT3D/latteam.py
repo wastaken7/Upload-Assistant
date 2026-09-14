@@ -1,13 +1,65 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+import re
 from typing import Any, cast
 
 from src.meta import Meta
 from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, template
 from src.trackers.common import Common
-from src.trackers.naming import latteam_video_name
 from src.trackers.UNIT3D import UNIT3D
 
 Config = dict[str, Any]
+
+
+def latteam_video_name(name: str, context: NameContext) -> str:
+    meta = context.meta
+    if meta.category == "BOOK":
+        return re.sub(r"\s{2,}", " ", name).strip()
+    aka = meta.aka
+    name = name.replace("Dual-Audio", "").replace("Dubbed", "").replace(aka, "")
+    if meta.type != "DISC":
+        if meta.original_language == "es" and aka:
+            name = name.replace(meta.title, aka.replace("AKA", "")).strip()
+        latin_codes = {
+            "es-419",
+            "es-ar",
+            "es-bo",
+            "es-cl",
+            "es-co",
+            "es-cr",
+            "es-do",
+            "es-ec",
+            "es-gt",
+            "es-hn",
+            "es-mx",
+            "es-ni",
+            "es-pa",
+            "es-pe",
+            "es-pr",
+            "es-py",
+            "es-sv",
+            "es-uy",
+            "es-ve",
+        }
+        latin = castilian = False
+        found = 0
+        for track in meta.mediainfo.get("media", {}).get("track", [])[2:]:
+            if not isinstance(track, dict) or track.get("@type") != "Audio":
+                continue
+            language = str(track.get("Language", "")).lower()
+            title = str(track.get("Title", "")).lower()
+            if "commentary" in title:
+                continue
+            if language in latin_codes or (language == "es" and any(word in title for word in ("latino", "latin america"))):
+                latin = True
+                found += 1
+            elif (language == "es" and "castellano" in title) or language in ("es", "es-es"):
+                castilian = True
+                found += 1
+        if found and castilian and not latin:
+            name = name.replace(meta.tag, f" [CAST]{meta.tag}") if meta.tag else f"{name} [CAST]"
+        elif not found:
+            name = name.replace(meta.tag, f" [SUBS]{meta.tag}") if meta.tag else f"{name} [SUBS]"
+    return re.sub(r"\s{2,}", " ", name)
 
 
 class LatTeam(UNIT3D):

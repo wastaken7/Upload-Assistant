@@ -13,9 +13,45 @@ from src.get_desc import DescriptionBuilder
 from src.meta import Meta
 from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, template
 from src.torrent_manifest import TorrentManifest
-from src.trackers.naming import StringTrackerNameMixin, add_incomplete_pack_marker, iptorrents_name
+from src.trackers.naming import StringTrackerNameMixin, add_incomplete_pack_marker, add_incomplete_pack_marker_transform
 
 Config = dict[str, Any]
+
+
+def iptorrents_name(name: str, context: NameContext) -> str:
+    replacements = {
+        "3DAccess": "3DA",
+        "AreaFiles": "AF",
+        "BeyondHD": "BHD",
+        "Blu-Bits": "BluHD",
+        "Bluebird": "BB",
+        "BlueEvolution": "BluEvo",
+        "Chdbits": "CHD",
+        "HDAccess": "HDA",
+        "HDChina": "HDC",
+        "HDClub": "HDCL",
+        "HDGeek": "HDG",
+        "HDRoad": "HDR",
+        "HDStar": "HDS",
+        "HDWing": "HDW",
+        "ExtraTorrent": "ETRG",
+        "IWStream": "IWS",
+        "Kingdom-KVCD": "KVCD",
+        "MVGroup": "MVG",
+        "Projekt-Revolution": "Projekt",
+        "PublicHD": "PHD",
+        "SpaceHD": "SHD",
+        "ThumperDC": "TDC",
+        "TheWolfsDen": "TWD",
+    }
+    for old, new in replacements.items():
+        if old in name:
+            name = name.replace(old, new)
+    name = name.replace("'", "").replace('"', "")
+    if getattr(context.meta, "scene", False) and "[NO RAR]" not in name.upper():
+        name += " [NO RAR]"
+    name = re.sub(r"\s{2,}", " ", name)
+    return add_incomplete_pack_marker_transform(name, context)
 
 
 class IPTorrents(StringTrackerNameMixin):

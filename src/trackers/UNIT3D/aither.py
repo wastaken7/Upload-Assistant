@@ -6,8 +6,44 @@ from src.languages import languages_manager
 from src.meta import Meta
 from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, template
 from src.trackers.common import Common
-from src.trackers.naming import aither_name
+from src.trackers.naming import add_incomplete_pack_marker_transform
 from src.trackers.UNIT3D import UNIT3D
+
+
+def aither_name(name: str, context: NameContext) -> str:
+    meta = context.meta
+    resolution = context.values.get("resolution", "")
+    source = context.values.get("source", "")
+    name_type = context.values.get("type", "")
+    video_codec = context.values.get("video_codec", "")
+    video_encode = context.values.get("video_encode", "")
+    year = context.values.get("year", "")
+    foreign_language = context.values.get("foreign_language", "")
+    if foreign_language:
+        if name_type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD"):
+            if year:
+                name = name.replace(year, f"{year} {foreign_language}", 1)
+        elif context.values.get("is_disc") != "BDMV":
+            name = name.replace(resolution, f"{foreign_language} {resolution}", 1)
+    audio = context.values.get("audio", "")
+    if name_type == "DVDRIP":
+        name = name.replace(f"{source} ", "", 1).replace(video_encode, "", 1)
+        name = name.replace("DVDRip", f"{resolution} DVDRip", 1).replace(audio, f"{audio}{video_encode}", 1)
+    elif context.values.get("is_disc") == "DVD":
+        region = context.values.get("region", "")
+        region_source = " ".join(part for part in (region, source) if part)
+        details = " ".join(part for part in (resolution, region, source) if part)
+        if region_source:
+            name = name.replace(region_source, details, 1)
+        name = name.replace(audio, f"{video_codec} {audio}", 1)
+    elif name_type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD"):
+        name = name.replace(source, f"{resolution} {source}", 1).replace(audio, f"{video_codec} {audio}", 1)
+    if getattr(meta, "trump_reason", "") == "exact_match":
+        name += " - TRUMP"
+    alt_title = context.values.get("alt_title", "")
+    if alt_title and year:
+        name = name.replace(f"{year} {alt_title}", f"{alt_title} {year}", 1)
+    return add_incomplete_pack_marker_transform(name, context)
 
 
 class Aither(UNIT3D):

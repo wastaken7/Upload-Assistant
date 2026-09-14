@@ -7,8 +7,14 @@ from src.meta import Meta
 from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, template
 from src.torrentcreate import TorrentCreator
 from src.trackers.common import Common
-from src.trackers.naming import non_scene_dotted_name
 from src.trackers.UNIT3D import UNIT3D
+
+
+def non_scene_dotted_name(name: str, context: NameContext) -> str:
+    if not getattr(context.meta, "scene", False):
+        for old, new in ((".mkv", ""), (".mp4", ""), (".torrent", ""), (" ", ".")):
+            name = name.replace(old, new)
+    return name
 
 
 class TheOldSchool(UNIT3D):

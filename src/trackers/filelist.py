@@ -19,10 +19,56 @@ from src.cookie_auth import CookieValidator
 from src.description_review import get_base_description
 from src.exceptions import *  # noqa F403
 from src.meta import Meta
-from src.release_name import NameRule, NameSelector, TrackerNameProfile, template
+from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, template
 from src.temp_paths import screenshots_dir
 from src.trackers.common import Common
-from src.trackers.naming import StringTrackerNameMixin, filelist_name_transform
+from src.trackers.naming import StringTrackerNameMixin
+
+
+def filelist_name_transform(name: str, context: NameContext) -> str:
+    meta = context.meta
+    hdr = context.values.get("hdr", "")
+    audio = context.values.get("audio", "")
+    if "DV" in hdr:
+        name = name.replace(" DV ", " DoVi ")
+    if context.values.get("type") in ("WEBDL", "WEBRIP", "ENCODE"):
+        name = name.replace(audio, audio.replace(" ", "", 1))
+    name = name.replace(context.values.get("alt_title", ""), "")
+    imdb_info = getattr(meta, "imdb_info", {})
+    if isinstance(imdb_info, dict):
+        title = context.values.get("title", "")
+        imdb_aka = str(imdb_info.get("aka", ""))
+        if imdb_aka:
+            name = name.replace(title, imdb_aka)
+        meta_year = str(getattr(meta, "year", "")).strip() if getattr(meta, "year", None) is not None else ""
+        imdb_year = str(imdb_info.get("year", meta_year))
+        if meta_year and meta_year != imdb_year:
+            name = name.replace(meta_year, imdb_year)
+    basename = str(getattr(meta, "basename_no_ext", ""))
+    if "DD+" in audio and "DDP" in basename:
+        name = name.replace("DD+", "DDP")
+    if "Atmos" in audio and "Atmos" not in basename:
+        name = name.replace("Atmos", "")
+    for old, new in (
+        ("BluRay REMUX", "Remux"),
+        ("BluRay Remux", "Remux"),
+        ("Bluray Remux", "Remux"),
+        ("PQ10", "HDR"),
+        ("HDR10+", "HDR"),
+        ("DoVi HDR HEVC", "HEVC DoVi HDR"),
+        ("HDR HEVC", "HEVC HDR"),
+        ("DoVi HEVC", "HEVC DoVi"),
+        ("DTS7.1", "DTS"),
+        ("DTS5.1", "DTS"),
+        ("DTS2.0", "DTS"),
+        ("DTS1.0", "DTS"),
+        ("Dubbed", ""),
+        ("Dual-Audio", ""),
+    ):
+        name = name.replace(old, new)
+    name = " ".join(name.split())
+    name = re.sub(r"[^0-9a-zA-ZÀ-ÿ. &+'\-\[\]]+", "", name)
+    return name.replace(" ", ".").replace("..", ".")
 
 
 class FileList(StringTrackerNameMixin):

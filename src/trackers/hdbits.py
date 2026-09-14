@@ -17,13 +17,52 @@ from src.console import console, logger
 from src.description_review import get_base_description
 from src.exceptions import *  # noqa F403
 from src.meta import Meta
-from src.release_name import NameRule, NameSelector, TrackerNameProfile, template
+from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, template
 from src.temp_paths import screenshots_dir
 from src.torrent_policy import HDBITS_POLICY
 from src.trackers.common import Common
-from src.trackers.naming import StringTrackerNameMixin, add_incomplete_pack_marker_transform, hdbits_name_transform
+from src.trackers.naming import StringTrackerNameMixin, add_incomplete_pack_marker_transform
 
 Config = dict[str, Any]
+
+
+def hdbits_name_transform(name: str, context: NameContext) -> str:
+    meta = context.meta
+    audio = context.values.get("audio", "")
+    name = name.replace("H.265", "HEVC")
+    service = context.values.get("service", "")
+    if service:
+        name = name.replace(f"{service} ", "", 1)
+    hdr = context.values.get("hdr", "")
+    if "DV" in hdr:
+        name = name.replace(" DV ", " DoVi ")
+    if "HDR" in hdr and "HDR10+" not in hdr:
+        name = name.replace("HDR", "HDR10")
+    compact_audio = audio.replace(" ", "", 1).replace(" Atmos", "") if context.values.get("type") in ("WEBDL", "WEBRIP", "ENCODE") else audio.replace(" Atmos", "")
+    name = name.replace(audio, compact_audio)
+    name = name.replace(context.values.get("alt_title", ""), "")
+    imdb_info = getattr(meta, "imdb_info", {})
+    if imdb_info:
+        imdb_aka = str(imdb_info.get("aka") or "")
+        if imdb_aka:
+            name = name.replace(context.values.get("title", ""), imdb_aka)
+        meta_year = str(getattr(meta, "year", "")) if getattr(meta, "year", None) is not None else ""
+        imdb_year = str(imdb_info.get("year", meta_year))
+        if meta_year and meta_year != imdb_year:
+            name = name.replace(meta_year, imdb_year)
+    for old, new in (
+        ("PQ10", "HDR"),
+        ("Dubbed", ""),
+        ("Dual-Audio", ""),
+        ("REMUX", "Remux"),
+        ("BluRay Remux", "Remux"),
+        ("UHD Remux", "Remux"),
+        ("DTS-HD HRA", "DTS-HD HR"),
+    ):
+        name = name.replace(old, new)
+    name = " ".join(name.split())
+    name = re.sub(r"[^0-9a-zA-ZÀ-ÿ. :&+'\-\[\]]+", "", name)
+    return name.replace(" .", ".").replace("..", ".")
 
 
 class HDBits(StringTrackerNameMixin):

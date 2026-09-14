@@ -1,14 +1,32 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+import re
 from typing import Any
 
 from src.languages import languages_manager
 from src.meta import Meta
 from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, template
 from src.trackers.common import Common
-from src.trackers.naming import midnight_scene_name
 from src.trackers.UNIT3D import UNIT3D
 
 Config = dict[str, Any]
+
+
+def midnight_scene_name(name: str, context: NameContext) -> str:
+    if context.values.get("category") == "MUSIC":
+        return name
+    language = context.values.get("foreign_language", "")
+    if language:
+        name = re.sub(r"\bDual-Audio\b", "", name, flags=re.IGNORECASE)
+        name = " ".join(name.split())
+        source = context.values.get("source", "")
+        if context.values.get("type") == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD"):
+            year = str(getattr(context.meta, "year", "") or "")
+            if year:
+                name = name.replace(year, f"{year} {language}", 1)
+        elif context.values.get("is_disc") != "BDMV":
+            resolution = context.values.get("resolution", "")
+            name = name.replace(resolution, f"{language} {resolution}", 1)
+    return name
 
 
 class MidnightScene(UNIT3D):

@@ -23,9 +23,71 @@ from src.meta import Meta
 from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, template
 from src.temp_paths import screenshots_dir
 from src.trackers.common import Common
-from src.trackers.naming import StringTrackerNameMixin, avistaz_name
+from src.trackers.naming import StringTrackerNameMixin, add_incomplete_pack_marker_transform
 
 Config = dict[str, Any]
+
+
+def avistaz_name(name: str, context: NameContext) -> str:
+    meta = context.meta
+    normalize_cuts = bool(context.values.get("normalize_cuts"))
+    abbreviate_cuts = bool(context.values.get("abbreviate_cuts"))
+    invalid_group = context.values.get("invalid_group", "")
+    for value in (meta.aka or "", meta.manual_episode_title or "", meta.daily_episode_title or "", "Dubbed", "Dual-Audio"):
+        name = name.replace(value, "")
+    if normalize_cuts:
+        for term in (r"\bLIMITED\b", r"\bCriterion Collection\b", r"\b\d{1,3}(?:st|nd|rd|th)\s+Anniversary Edition\b"):
+            name = re.sub(term, "", name, flags=re.IGNORECASE).strip()
+        name = re.sub(r"\bDirector[\u2019'`]s\s+Cut\b", "DC", name, flags=re.IGNORECASE)
+        name = re.sub(r"\bExtended\s+Cut\b", "EXT" if abbreviate_cuts else "Extended", name, flags=re.IGNORECASE)
+        name = re.sub(r"\bTheatrical\s+Cut\b", "TC" if abbreviate_cuts else "Theatrical", name, flags=re.IGNORECASE)
+        name = name.replace("[", "").replace("]", "")
+        if context.values.get("reposition_hybrid") and (meta.webdv or "hybrid" in (meta.edition or "").casefold()):
+            title_match = re.search(re.escape(meta.title), name, flags=re.IGNORECASE) if meta.title else None
+            start = title_match.end() if title_match else 0
+            hybrid = re.search(r"\bHYBRID\b", name[start:], flags=re.IGNORECASE)
+            if hybrid:
+                begin, end = start + hybrid.start(), start + hybrid.end()
+                without = f"{name[:begin]}{name[end:]}"
+                resolution = re.search(r"\b(?:\d{3,4}[pi]|4K|UHD|SD)\b", without, flags=re.IGNORECASE)
+                if resolution:
+                    name = f"{without[: resolution.end()]} HYBRID{without[resolution.end() :]}"
+        name = re.sub(r"\s{2,}", " ", name).strip()
+    if meta.has_encode_settings:
+        name = name.replace("H.264", "x264").replace("H.265", "x265")
+    tag = meta.tag or ""
+    invalid = ("nogrp", "nogroup", "unknown", "-unk-")
+    if not tag or any(item in tag.lower() for item in invalid):
+        for item in invalid:
+            name = re.sub(f"-{item}", "", name, flags=re.IGNORECASE)
+        if invalid_group:
+            name += f"-{invalid_group}"
+    if meta.category == "TV":
+        year = meta.year
+        if not meta.no_year and not meta.search_year:
+            season_year = (
+                next((item.get("year") for item in meta.imdb_info.get("seasons_summary", []) if item.get("season") == meta.season_int), None) if meta.season_int else None
+            )
+            year = season_year or year
+            if year:
+                name = name.replace(meta.title, f"{meta.title} {year}", 1)
+        if context.values.get("remove_tv_year") and year:
+            name = name.replace(str(year), "")
+        if context.values.get("pack_year_after_season") and meta.tv_pack and year:
+            name = name.replace(f"{meta.title} {year} {meta.season}", f"{meta.title} {meta.season} {year}")
+    source = meta.source
+    if meta.type == "DVDRIP" and source:
+        name = name.replace(source, "")
+    if meta.is_disc == "DVD":
+        if meta.region:
+            name = name.replace(meta.region, "")
+        if source and meta.resolution:
+            name = name.replace(source, meta.resolution)
+        if meta.audio:
+            suffix = f" {meta.video_codec.strip()}" if meta.video_codec.strip() else ""
+            name = name.replace(meta.audio, f"{meta.audio}{suffix}")
+    name = re.sub(r"\s{2,}", " ", name)
+    return add_incomplete_pack_marker_transform(name, context)
 
 
 class AZTrackerBase(StringTrackerNameMixin):

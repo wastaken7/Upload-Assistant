@@ -6,10 +6,38 @@ from src.meta import Meta
 from src.rehostimages import ImageHostPolicy, RehostImagesManager
 from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, template
 from src.trackers.common import Common
-from src.trackers.naming import only_encodes_name
+from src.trackers.naming import add_incomplete_pack_marker_transform
 from src.trackers.UNIT3D import UNIT3D
+from src.trackers.UNIT3D.naming import imdb_title_transform, invalid_group_suffix
 
 Config = dict[str, Any]
+
+
+def only_encodes_name(name: str, context: NameContext) -> str:
+    name = imdb_title_transform()(name, context)
+    resolution = context.values.get("resolution", "")
+    video_encode = context.values.get("video_encode", "")
+    name_type = context.values.get("type", "")
+    source = context.values.get("source", "")
+    audio = context.values.get("audio", "")
+    video_codec = context.values.get("video_codec", "")
+    if name_type == "DVDRIP":
+        if context.values.get("category") == "MOVIE":
+            name = name.replace(f"{source}{video_encode}", resolution, 1).replace(audio, f"{audio}{video_encode}", 1)
+        else:
+            name = name.replace(source, resolution, 1).replace(video_codec, f"{audio} {video_codec}", 1)
+    language = context.values.get("foreign_language", "")
+    if language and context.values.get("is_disc") != "BDMV":
+        name = name.replace(resolution, f"{language} {resolution}", 1)
+    basename = context.values.get("basename_no_ext", "")
+    scale = "DS4K" if "DS4K" in basename.upper() else "RM4K" if "RM4K" in basename.upper() else ""
+    if name_type in ("ENCODE", "WEBDL", "WEBRIP") and scale:
+        if scale not in name and resolution in name:
+            name = name.replace(resolution, f"{resolution} {scale}", 1)
+        elif resolution and f"{resolution} {scale}" not in name:
+            name = name.replace(scale, f"{resolution} {scale}", 1)
+    name = invalid_group_suffix("NOGRP")(name, context)
+    return add_incomplete_pack_marker_transform(name, context)
 
 
 class OnlyEncodes(UNIT3D):

@@ -13,7 +13,6 @@ from src.cleanup import cleanup_manager
 from src.console import logger
 from src.meta import Meta
 from src.release_name import (
-    NameBuildResult,
     NameRule,
     NameSelector,
     ReleaseNameBuilder,
@@ -460,8 +459,7 @@ class NameManager:
         name = name_notag if meta.manual_name is not None or tag_already_present else name_notag + tag
 
         clean_name = await self.clean_filename(name)
-        result = NameBuildResult(name_notag=name_notag, name=name, clean_name=clean_name, potential_missing=tuple(potential_missing))
-        return result.name_notag, result.name, result.clean_name, list(result.potential_missing)
+        return name_notag, name, clean_name, potential_missing
 
     def _default_name_overrides(self, meta: Meta) -> dict[str, str]:
         if meta.category == "BOOK":

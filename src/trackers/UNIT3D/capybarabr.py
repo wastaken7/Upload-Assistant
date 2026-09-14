@@ -1,3 +1,4 @@
+import re
 from typing import Any
 
 from src.console import logger
@@ -11,9 +12,51 @@ from src.tracker_images import (
     set_tracker_image_collection,
 )
 from src.trackers.common import Common
-from src.trackers.naming import capybara_video_name
 from src.trackers.UNIT3D import UNIT3D
+from src.trackers.UNIT3D.naming import invalid_group_suffix
 from src.uploadscreens import upload_image_task
+
+
+def capybara_video_name(name: str, context: NameContext) -> str:
+    meta = context.meta
+    if context.values.get("category") not in ("MOVIE", "TV"):
+        return re.sub(r"\s{2,}", " ", name)
+    for old, new in (("DD+ ", "DDP"), ("DD ", "DD"), ("AAC ", "AAC"), ("FLAC ", "FLAC"), ("Dubbed", ""), ("Dual-Audio", "")):
+        name = name.replace(old, new)
+    if meta.category in ("TV", "ANIMES"):
+        year = str(meta.year) if meta.year is not None else ""
+        if year and year in name:
+            name = name.replace(f"({year})", "").replace(year, "").strip()
+    if meta.original_language != "pt":
+        name = name.replace(meta.aka, "")
+    elif meta.aka:
+        localized = meta.aka.replace("AKA", "").strip()
+        name = name.replace(meta.aka, "").replace(meta.title, localized).strip()
+    if context.values.get("rebuild_dvdrip_name") and meta.type == "DVDRIP":
+        title = meta.aka.replace("AKA", "").strip() if meta.original_language == "pt" and meta.aka else meta.title
+        episode = f"{meta.season}{meta.episode}" if meta.category == "TV" else ""
+        audio = str(meta.audio)
+        for old, new in (("DD+ ", "DDP"), ("DD ", "DD"), ("AAC ", "AAC"), ("FLAC ", "FLAC")):
+            audio = audio.replace(old, new)
+        name = " ".join(part for part in (title, str(meta.year or ""), episode, meta.resolution, "DVDRip", audio, meta.video_encode) if part)
+        if meta.tag:
+            name += meta.tag
+    if not meta.is_disc and meta.audio_languages:
+        try:
+            languages = set(meta.audio_languages)
+        except TypeError:
+            languages = set()
+        if any(lang.lower() == "portuguese" or lang == "português" for lang in languages):
+            audio_tag = " MULTI" if len(languages) >= 3 else " DUAL" if len(languages) == 2 else ""
+            if audio_tag and "-" in name:
+                parts = name.rsplit("-", 1)
+                match = next((found for source in (meta.path, meta.uuid) if source and (found := re.search(r"-([^.-]+)\.(?:DUAL|MULTI)(?=-|\.|$)", str(source), re.I))), None)
+                group = (meta.tag or "").lstrip("-")
+                name = f"{parts[0]}-{match.group(1)}{audio_tag}-{parts[1]}" if match and match.group(1).casefold() != group.casefold() else f"{parts[0]}{audio_tag}-{parts[1]}"
+            elif audio_tag:
+                name += audio_tag
+    name = invalid_group_suffix("NoGroup")(name, context)
+    return re.sub(r"\s{2,}", " ", name)
 
 
 class CapybaraBR(UNIT3D):

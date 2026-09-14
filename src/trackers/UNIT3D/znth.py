@@ -8,8 +8,8 @@ from src.console import logger
 from src.meta import Meta
 from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, collapse_whitespace, template
 from src.trackers.common import Common
-from src.trackers.naming import append_context_value, zenith_video_name
 from src.trackers.UNIT3D import UNIT3D, ParamsList
+from src.trackers.UNIT3D.naming import append_context_value
 
 Config = dict[str, Any]
 
@@ -28,6 +28,17 @@ def _is_misc(meta: Meta) -> bool:
 def _book_format(meta: Meta) -> str:
     """Uppercased format token, e.g. 'EPUB', 'M4B'."""
     return (meta.type or meta.container or "").strip().upper().lstrip(".")
+
+
+def zenith_video_name(name: str, context: NameContext) -> str:
+    meta = context.meta
+    if meta.category == "TV" and meta.episode_title:
+        name = name.replace(f"{meta.episode_title} {meta.resolution}", meta.resolution, 1)
+    imdb_year = str(meta.imdb_info.get("year", ""))
+    year = str(meta.year) if meta.year is not None else ""
+    if meta.category != "TV" and imdb_year.strip() and year.strip() and imdb_year != year:
+        name = name.replace(year, imdb_year, 1)
+    return name
 
 
 class Zenith(UNIT3D):

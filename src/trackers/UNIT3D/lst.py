@@ -7,10 +7,28 @@ from src.meta import Meta
 from src.music.sources import DiscogsEnricher
 from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, collapse_whitespace, template
 from src.trackers.common import Common
-from src.trackers.naming import lst_name
+from src.trackers.naming import add_incomplete_pack_marker_transform
 from src.trackers.UNIT3D import UNIT3D
 
 Config = dict[str, Any]
+
+
+def lst_name(name: str, context: NameContext) -> str:
+    meta = context.meta
+    if meta.category not in ("MUSIC", "BOOK") and meta.type == "DVDRIP":
+        resolution = context.values.get("resolution", "")
+        if meta.category == "MOVIE":
+            name = name.replace(f"{meta.source}{meta.video_encode}", resolution, 1)
+            name = name.replace(meta.audio, f"{meta.audio}{meta.video_encode}", 1)
+        else:
+            name = name.replace(str(meta.source), resolution, 1)
+            name = name.replace(meta.video_codec, f"{meta.audio} {meta.video_codec}", 1)
+    group = context.values.get("group_suffix", "")
+    if group:
+        name += group
+    if getattr(meta, "trump_reason", "") == "exact_match":
+        name += " - TRUMP"
+    return add_incomplete_pack_marker_transform(name, context)
 
 
 class LST(UNIT3D):

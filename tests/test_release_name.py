@@ -6,7 +6,6 @@ from src.meta import Meta
 from src.release_name import (
     NameRule,
     NameSelector,
-    NameSuffixPolicy,
     ReleaseNameBuilder,
     TrackerNameProfile,
     collapse_whitespace,
@@ -97,14 +96,3 @@ async def test_release_name_selects_book_subtype() -> None:
     name, _missing = await ReleaseNameBuilder().render(Meta(category="BOOK", audiobook=True, author="Author", title="Book"), profile)
 
     assert name == "Author Book"
-
-
-@pytest.mark.asyncio
-async def test_release_name_applies_suffix_policy_after_transforms() -> None:
-    profile = TrackerNameProfile(
-        rules=(NameRule(NameSelector(), template("title", transforms=(spaces_to_dots,), suffix_policy=NameSuffixPolicy.APPEND_TAG)),),
-    )
-
-    name, _missing = await ReleaseNameBuilder().render(Meta(title="A Movie", tag="-GROUP"), profile)
-
-    assert name == "A.Movie-GROUP"

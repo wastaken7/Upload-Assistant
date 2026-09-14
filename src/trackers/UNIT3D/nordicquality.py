@@ -1,13 +1,25 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+import re
+import unicodedata
 from pathlib import Path
 from typing import Any, ClassVar
 
 from src.meta import Meta
 from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, template
-from src.trackers.naming import nordic_name_transform
 from src.trackers.UNIT3D import UNIT3D
 
 Config = dict[str, Any]
+
+
+def nordic_name_transform(name: str, _context: NameContext) -> str:
+    name = name.replace(" ", ".").translate(
+        str.maketrans({"Æ": "AE", "æ": "ae", "Ð": "D", "ð": "d", "Ø": "O", "ø": "o", "Þ": "TH", "þ": "th", "Å": "A", "å": "a", "Œ": "OE", "œ": "oe", "ß": "ss"})
+    )
+    name = name.replace("HDR10+", "HDR10P").replace("DD+", "DDP").replace("DTS:X", "DTS-X").replace("&", "and")
+    name = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode("ascii")
+    name = re.sub(r"\(((?:19|20)\d{2})\)", r"\1", name)
+    name = re.sub(r"[^A-Za-z0-9._()\-]+", ".", name)
+    return re.sub(r"\.{2,}", ".", name).strip(".")
 
 
 class NordicQuality(UNIT3D):

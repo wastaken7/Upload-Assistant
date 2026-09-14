@@ -8,8 +8,9 @@ from src.console import logger
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
 from src.release_name import NameRule, NameSelector, TrackerNameProfile, template
-from src.trackers.naming import add_incomplete_pack_marker_transform, imdb_title_transform
+from src.trackers.naming import add_incomplete_pack_marker_transform
 from src.trackers.UNIT3D import UNIT3D
+from src.trackers.UNIT3D.naming import imdb_title_transform
 
 Config = dict[str, Any]
 

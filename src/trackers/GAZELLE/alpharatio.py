@@ -20,7 +20,25 @@ from src.mediainfo import MediaInfo
 from src.meta import Meta
 from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, template
 from src.trackers.common import Common
-from src.trackers.naming import StringTrackerNameMixin, alpha_ratio_name
+from src.trackers.naming import StringTrackerNameMixin
+
+
+def alpha_ratio_name(name: str, context: NameContext) -> str:
+    meta = context.meta
+    if not getattr(meta, "scene", False):
+        path = Path(name)
+        if path.suffix.lower() in {".mkv", ".mp4", ".avi", ".ts"}:
+            name = path.stem
+        for old, new in ((" ", "."), ("'", ""), (":", ""), ("(", "."), (")", "."), ("[", "."), ("]", "."), ("{", "."), ("}", ".")):
+            name = name.replace(old, new)
+        name = re.sub(r"\.{2,}", ".", name)
+    tag = context.values.get("tag", "")
+    invalid_tags = ("nogrp", "nogroup", "unknown", "-unk-")
+    if not tag or any(invalid in tag.lower() for invalid in invalid_tags):
+        for invalid in invalid_tags:
+            name = re.sub(f"-{invalid}", "", name, flags=re.IGNORECASE)
+        name = f"{name}-NoGRP"
+    return name
 
 
 class AlphaRatio(StringTrackerNameMixin):

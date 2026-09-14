@@ -6,8 +6,8 @@ from src.languages import languages_manager
 from src.meta import Meta
 from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, collapse_whitespace, replace_text, template
 from src.trackers.common import Common
-from src.trackers.naming import append_context_value
 from src.trackers.UNIT3D import UNIT3D
+from src.trackers.UNIT3D.naming import append_context_value
 
 Config = dict[str, Any]
 

@@ -6,12 +6,38 @@ import cli_ui
 
 from src.console import logger
 from src.meta import Meta
-from src.release_name import NameRule, NameSelector, TrackerNameProfile, template
+from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, template
 from src.trackers.common import Common
-from src.trackers.naming import old_toons_world_name
+from src.trackers.naming import add_incomplete_pack_marker_transform
 from src.trackers.UNIT3D import UNIT3D
 
 Config = dict[str, Any]
+
+
+def old_toons_world_name(name: str, context: NameContext) -> str:
+    meta = context.meta
+    aka = context.values.get("alt_title", "")
+    if aka:
+        name = name.replace(f"{aka} ", "")
+    source = context.values.get("source", "")
+    resolution = context.values.get("resolution", "")
+    if context.values.get("is_disc") == "DVD" or (context.values.get("type") == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD")):
+        name = name.replace(source, f"{resolution} {source}", 1)
+        audio = context.values.get("audio", "")
+        name = name.replace(audio, f"{context.values.get('video_codec', '')} {audio}", 1)
+    if context.values.get("category") == "TV" and not getattr(meta, "no_year", False) and not getattr(meta, "search_year", ""):
+        candidates: list[int] = []
+        tmdb_year = str(getattr(meta, "year", "")) if getattr(meta, "year", None) is not None else ""
+        if tmdb_year.isdigit():
+            year = tmdb_year
+        else:
+            imdb_year = getattr(meta, "imdb_info", {}).get("year")
+            series_year = getattr(meta, "tvdb_episode_data", {}).get("series_year")
+            candidates.extend(int(candidate) for candidate in (imdb_year, series_year) if candidate and str(candidate).isdigit())
+            year = str(min(candidates)) if candidates else ""
+        title = context.values.get("title", "")
+        name = name.replace(title, f"{title} {year}", 1)
+    return add_incomplete_pack_marker_transform(name, context)
 
 
 class OldToonsWorld(UNIT3D):

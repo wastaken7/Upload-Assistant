@@ -12,10 +12,22 @@ from src.console import logger
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
-from src.release_name import NameRule, NameSelector, TrackerNameProfile, template
-from src.trackers.naming import StringTrackerNameMixin, add_incomplete_pack_marker_transform, hdtorrents_name_transform
+from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, template
+from src.trackers.naming import StringTrackerNameMixin, add_incomplete_pack_marker_transform
 
 Config = dict[str, Any]
+
+
+def hdtorrents_name_transform(name: str, context: NameContext) -> str:
+    audio = context.values.get("audio", "")
+    if context.values.get("type") in ("WEBDL", "WEBRIP", "ENCODE"):
+        name = name.replace(audio, audio.replace(" ", "", 1))
+    if "DV" in context.values.get("hdr", ""):
+        name = name.replace(" DV ", " DoVi ")
+    name = name.replace("BluRay REMUX", "Blu-ray Remux")
+    name = " ".join(name.split())
+    name = re.sub(r"[^0-9a-zA-ZÀ-ÿ. &+'\-\[\]]+", "", name)
+    return name.replace(":", "").replace("..", " ").replace("  ", " ")
 
 
 class HDTorrents(StringTrackerNameMixin):

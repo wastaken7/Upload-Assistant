@@ -8,10 +8,15 @@ from src.languages import languages_manager
 from src.meta import Meta
 from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, template
 from src.trackers.common import Common
-from src.trackers.naming import insert_foreign_language
 from src.trackers.UNIT3D import UNIT3D
 
 Config = dict[str, Any]
+
+
+def insert_foreign_language(name: str, context: NameContext) -> str:
+    language = context.values.get("foreign_language", "")
+    resolution = context.values.get("resolution", "")
+    return name.replace(resolution, f"{language} {resolution}", 1) if language else name
 
 
 class InfinityHD(UNIT3D):

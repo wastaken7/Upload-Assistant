@@ -5,7 +5,6 @@ import unicodedata
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from dataclasses import field as dataclass_field
-from enum import StrEnum
 from typing import Any, Protocol
 
 from src.meta import Meta
@@ -91,18 +90,12 @@ class NamePredicate(Protocol):
     def __call__(self, context: NameContext) -> bool: ...
 
 
-class NameSuffixPolicy(StrEnum):
-    NONE = "none"
-    APPEND_TAG = "append_tag"
-
-
 @dataclass(frozen=True)
 class NameTemplate:
     parts: tuple[NamePart, ...]
     separator: str = " "
     potential_missing: tuple[str, ...] = ()
     transforms: tuple[NameTransform, ...] = ()
-    suffix_policy: NameSuffixPolicy = NameSuffixPolicy.NONE
 
 
 @dataclass(frozen=True)
@@ -136,14 +129,6 @@ class NameContext:
             source=values.get("source", self.selector.source or "").upper(),
         )
         return NameContext(meta=self.meta, selector=selector, values=values)
-
-
-@dataclass(frozen=True)
-class NameBuildResult:
-    name_notag: str
-    name: str
-    clean_name: str
-    potential_missing: tuple[str, ...] = ()
 
 
 DynamicNameOverrides = Callable[[NameContext], Mapping[str, str] | Awaitable[Mapping[str, str]]]
@@ -331,8 +316,6 @@ class ReleaseNameBuilder:
         name = template.separator.join(rendered)
         for transform in (*template.transforms, *profile.transforms):
             name = transform(name, context)
-        if template.suffix_policy == NameSuffixPolicy.APPEND_TAG:
-            name += context.values.get("tag", "")
         return name, template.potential_missing
 
 

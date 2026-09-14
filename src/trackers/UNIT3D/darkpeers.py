@@ -14,8 +14,24 @@ from src.music.models import MusicRelease
 from src.music.validation import MusicValidator, ValidationLevel
 from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, template
 from src.tmdb import TmdbManager
-from src.trackers.naming import append_context_value, darkpeers_video_name
+from src.trackers.naming import add_incomplete_pack_marker_transform
 from src.trackers.UNIT3D import UNIT3D
+from src.trackers.UNIT3D.naming import append_context_value
+
+
+def darkpeers_video_name(name: str, context: NameContext) -> str:
+    meta = context.meta
+    if meta.category not in ("MUSIC", "BOOK"):
+        if meta.category == "TV" and context.values.get("remove_tv_year"):
+            title = str(meta.title or "").strip()
+            year = str(meta.year or "").strip()
+            name = re.sub(rf"^({re.escape(title)})\s+{re.escape(year)}(?=\s|$)", r"\1", name, count=1, flags=re.IGNORECASE)
+            name = " ".join(name.split())
+        audio = context.values.get("replacement_audio", "")
+        if audio and "Dual-Audio" in name:
+            name = name.replace("Dual-Audio", audio)
+        return add_incomplete_pack_marker_transform(name, context)
+    return name
 
 
 class DarkPeers(UNIT3D):

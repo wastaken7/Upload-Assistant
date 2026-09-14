@@ -1,14 +1,22 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+import re
 from typing import Any
 
 from src.console import logger
 from src.meta import Meta
-from src.release_name import NameRule, NameSelector, TrackerNameProfile, template
+from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, template
 from src.trackers.common import Common
-from src.trackers.naming import remove_aka_and_sanitize
 from src.trackers.UNIT3D import UNIT3D
 
 Config = dict[str, Any]
+
+
+def remove_aka_and_sanitize(name: str, context: NameContext) -> str:
+    aka = context.values.get("alt_title", "").strip()
+    if aka:
+        name = name.replace(f" {aka} ", " ")
+    name = re.sub(r"[^A-Za-z0-9 ._+-]+", "", name)
+    return re.sub(r"\s+", " ", name).strip()
 
 
 class RetroMoviesClub(UNIT3D):

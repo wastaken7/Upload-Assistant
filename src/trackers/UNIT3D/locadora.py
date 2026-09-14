@@ -7,10 +7,44 @@ from src.get_desc import DescriptionBuilder
 from src.meta import Meta
 from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, template
 from src.trackers.common import Common
-from src.trackers.naming import locadora_name
 from src.trackers.UNIT3D import UNIT3D
+from src.trackers.UNIT3D.naming import invalid_group_suffix
 
 Config = dict[str, Any]
+
+
+def locadora_name(name: str, context: NameContext) -> str:
+    replacements = {
+        ".mkv": "",
+        ".mp4": "",
+        ".": " ",
+        "DDP2 0": "DDP2.0",
+        "DDP5 1": "DDP5.1",
+        "H 264": "H.264",
+        "H 265": "H.265",
+        "DD+7 1": "DDP7.1",
+        "AAC2 0": "AAC2.0",
+        "DD5 1": "DD5.1",
+        "DD2 0": "DD2.0",
+        "TrueHD 7 1": "TrueHD 7.1",
+        "TrueHD 5 1": "TrueHD 5.1",
+        "DTS-HD MA 7 1": "DTS-HD MA 7.1",
+        "DTS-HD MA 5 1": "DTS-HD MA 5.1",
+        "DTS-X 7 1": "DTS-X 7.1",
+        "DTS-X 5 1": "DTS-X 5.1",
+        "FLAC 2 0": "FLAC 2.0",
+        "FLAC 5 1": "FLAC 5.1",
+        "DD1 0": "DD1.0",
+        "DTS ES 5 1": "DTS ES 5.1",
+        "DTS5 1": "DTS 5.1",
+        "AAC1 0": "AAC1.0",
+        "DD+5 1": "DDP5.1",
+        "DD+2 0": "DDP2.0",
+        "DD+1 0": "DDP1.0",
+    }
+    for old, new in replacements.items():
+        name = name.replace(old, new)
+    return invalid_group_suffix("NoGroup")(name, context)
 
 
 class Locadora(UNIT3D):

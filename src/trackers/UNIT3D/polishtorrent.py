@@ -2,12 +2,21 @@
 from typing import Any
 
 from src.meta import Meta
-from src.release_name import NameRule, NameSelector, TrackerNameProfile, template
+from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, template
 from src.trackers.common import Common
-from src.trackers.naming import polish_original_title
 from src.trackers.UNIT3D import UNIT3D
 
 Config = dict[str, Any]
+
+
+def polish_original_title(name: str, context: NameContext) -> str:
+    meta = context.meta
+    imdb_info = getattr(meta, "imdb_info", {})
+    imdb_aka = str(imdb_info.get("aka") or "")
+    if getattr(meta, "original_language", "") == "pl" and imdb_aka:
+        name = name.replace(context.values.get("alt_title", ""), "")
+        name = name.replace(context.values.get("title", ""), imdb_aka)
+    return name.strip()
 
 
 class PolishTorrent(UNIT3D):

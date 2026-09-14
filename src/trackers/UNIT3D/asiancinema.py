@@ -5,8 +5,32 @@ from src.console import logger
 from src.meta import Meta
 from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, template
 from src.trackers.common import Common
-from src.trackers.naming import asian_cinema_transform
 from src.trackers.UNIT3D import UNIT3D
+
+
+def asian_cinema_transform(name: str, context: NameContext) -> str:
+    meta = context.meta
+    aka = context.values.get("alt_title", "")
+    original_title = str(getattr(meta, "original_title", ""))
+    title = context.values.get("title", "")
+    marker = chr(0x202A)
+    if aka:
+        name = name.replace(f"{aka} ", f" / {original_title} {marker}")
+    elif title != original_title:
+        name = name.replace(title, f"{title} / {original_title} {marker}")
+    audio = context.values.get("audio", "")
+    if "AAC" in audio:
+        name = name.replace(audio.strip().replace("  ", " "), audio.replace("AAC ", "AAC"))
+    for old, new in (("DD+ ", "DD+"), ("UHD BluRay REMUX", "Remux"), ("BluRay REMUX", "Remux"), ("H.265", "HEVC"), (" Atmos", "")):
+        name = name.replace(old, new)
+    if context.values.get("is_disc", "") == "DVD":
+        source = context.values.get("source", "")
+        resolution = context.values.get("resolution", "")
+        name = name.replace(f"{source} DVD5", f"{resolution} DVD {source}")
+        name = name.replace(f"{source} DVD9", f"{resolution} DVD {source}")
+        if audio == str(getattr(meta, "channels", "")):
+            name = name.replace(audio, f"MPEG {audio}")
+    return name + context.values.get("suffix", "")
 
 
 class AsianCinema(UNIT3D):
