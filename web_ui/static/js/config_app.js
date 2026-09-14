@@ -1121,6 +1121,8 @@ const DISPLAY_WORD_LABELS = {
   pesto: "pesto",
   predb: "PreDB",
   ptgen: "PTGen",
+  qbit: "qBit",
+  qbittorrent: "qBittorrent",
   qui: "qui",
   rar: "RAR",
   rpc: "RPC",
