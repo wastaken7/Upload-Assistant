@@ -53,5 +53,33 @@ async def test_hawkeuno_respects_configured_screenshot_rows():
     assert "\n" not in "".join(parts)
 
 
+@pytest.mark.asyncio
+async def test_hawkeuno_supplies_missing_web_service_and_release_group():
+    tracker = HawkeUno({"TRACKERS": {"HAWKEUNO": {}}})
+    meta = Meta(
+        type="WEBDL",
+        service=None,
+        tag=None,
+        name="Movie 2026 1080p WEB-DL DDP5.1 x265",
+        clean_name="Movie.2026.1080p.WEB-DL.DDP5.1.x265",
+    )
+
+    assert await tracker.get_name(meta) == {"name": "Movie 2026 1080p NADA WEB-DL DDP5.1 x265-NOGROUP"}
+    assert tracker._normalize_upload_name(meta.clean_name, meta) == "Movie.2026.1080p.NADA.WEB-DL.DDP5.1.x265-NOGROUP"
+
+
+@pytest.mark.asyncio
+async def test_hawkeuno_keeps_detected_service_and_group():
+    tracker = HawkeUno({"TRACKERS": {"HAWKEUNO": {}}})
+    meta = Meta(
+        type="WEBDL",
+        service="AMZN",
+        tag="-GROUP",
+        name="Movie 2026 1080p AMZN WEB-DL DDP5.1 x265-GROUP",
+    )
+
+    assert await tracker.get_name(meta) == {"name": meta.name}
+
+
 async def _noop():
     return None

@@ -166,6 +166,22 @@ class HawkeUno(UNIT3D):
 
         return should_continue
 
+    def _normalize_upload_name(self, name: str, meta: Meta) -> str:
+        normalized = name
+        separator = "." if " " not in normalized and "." in normalized else " "
+
+        if meta.type in {"WEBDL", "WEBRIP"} and not meta.service and not re.search(r"\bNADA\b", normalized, flags=re.IGNORECASE):
+            normalized = re.sub(r"\b(WEB(?:[ ._-]?DL|[ ._-]?RIP))\b", rf"NADA{separator}\1", normalized, count=1, flags=re.IGNORECASE)
+
+        if not str(meta.tag or "").strip("- ") and not re.search(r"-NOGROUP$", normalized, flags=re.IGNORECASE):
+            normalized = f"{normalized}-NOGROUP"
+
+        return normalized
+
+    async def get_name(self, meta: Meta) -> dict[str, str]:
+        name = self._normalize_upload_name(meta.name, meta)
+        return {"name": add_incomplete_pack_marker(name, meta, self.tracker)}
+
     async def get_description(self, meta: Meta) -> None:
         desc = await DescriptionBuilder(self.tracker, self.config).general_description_generator(
             meta,
@@ -286,7 +302,8 @@ class HawkeUno(UNIT3D):
         await self.common.create_torrent_for_upload(meta, self.tracker, self.source_flag, announce_url=self.announce_url)
         torrent_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}].torrent"
         async with aiofiles.open(torrent_path, "rb") as f:
-            files["torrent"] = (f"{add_incomplete_pack_marker(meta.clean_name, meta, self.tracker)}.torrent", await f.read(), "application/x-bittorrent")
+            upload_name = self._normalize_upload_name(meta.clean_name, meta)
+            files["torrent"] = (f"{add_incomplete_pack_marker(upload_name, meta, self.tracker)}.torrent", await f.read(), "application/x-bittorrent")
 
         desc_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt"
         async with aiofiles.open(desc_path, "rb") as f:
