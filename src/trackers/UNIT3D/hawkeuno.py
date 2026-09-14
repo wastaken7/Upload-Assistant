@@ -113,11 +113,6 @@ class HawkeUno(UNIT3D):
     async def get_additional_checks(self, meta: Meta) -> bool:
         should_continue = True
 
-        # No WEBRIPs allowed
-        if meta.type == "WEBRIP":
-            logger.info(f"{self.tracker}: [bold red]WEB-RIP is not allowed, skipping upload.[/bold red]")
-            return False
-
         # Check language requirements
         if not meta.language_checked:
             await languages_manager.process_desc_language(meta, tracker=self.tracker)
@@ -132,7 +127,7 @@ class HawkeUno(UNIT3D):
             return False
 
         # Check if x265 or HEVC is used
-        if not meta.is_disc and meta.type in ["ENCODE", "DVDRIP", "HDTV"] and ("x265" in meta.video_encode or "HEVC" in meta.video_codec):
+        if not meta.is_disc and meta.type in ["ENCODE", "DVDRIP", "HDTV", "WEBRIP"] and ("x265" in meta.video_encode or "HEVC" in meta.video_codec):
             tracks = meta.mediainfo.get("media", {}).get("track", [])
             for track in tracks:
                 if track.get("@type") == "Video":
@@ -165,6 +160,15 @@ class HawkeUno(UNIT3D):
                                         return False
 
         return should_continue
+
+    def _normalize_upload_name(self, name: str, meta: Meta) -> str:
+        if meta.type == "WEBRIP":
+            return re.sub(r"\bWEB[ ._-]?RIP\b", "WEB-DL", name, flags=re.IGNORECASE)
+        return name
+
+    async def get_name(self, meta: Meta) -> dict[str, str]:
+        name = self._normalize_upload_name(meta.name, meta)
+        return {"name": add_incomplete_pack_marker(name, meta, self.tracker)}
 
     async def get_description(self, meta: Meta) -> None:
         desc = await DescriptionBuilder(self.tracker, self.config).general_description_generator(
@@ -286,7 +290,8 @@ class HawkeUno(UNIT3D):
         await self.common.create_torrent_for_upload(meta, self.tracker, self.source_flag, announce_url=self.announce_url)
         torrent_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}].torrent"
         async with aiofiles.open(torrent_path, "rb") as f:
-            files["torrent"] = (f"{add_incomplete_pack_marker(meta.clean_name, meta, self.tracker)}.torrent", await f.read(), "application/x-bittorrent")
+            upload_name = self._normalize_upload_name(meta.clean_name, meta)
+            files["torrent"] = (f"{add_incomplete_pack_marker(upload_name, meta, self.tracker)}.torrent", await f.read(), "application/x-bittorrent")
 
         desc_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt"
         async with aiofiles.open(desc_path, "rb") as f:
