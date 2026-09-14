@@ -12,15 +12,30 @@ from rich.markup import escape
 
 from src.console import logger
 from src.meta import Meta
+from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, strip_characters, template
 from src.music.models import MusicRelease
 from src.music.validation import OrpheusMusicValidator, ValidationLevel
 from src.trackers.common import Common
+from src.trackers.naming import StringTrackerNameMixin
 
 
-class Orpheus:
+class Orpheus(StringTrackerNameMixin):
     """Orpheus is a Private Torrent Tracker for MUSIC"""
 
     tracker = "ORPHEUS"
+    name_profile = TrackerNameProfile(
+        rules=(NameRule(NameSelector(), template("artist", "dash", "album", "year_bracket")),),
+        transforms=(strip_characters(" -"),),
+    )
+
+    async def get_name_overrides(self, context: NameContext) -> dict[str, str]:
+        release = self._release(context.meta)
+        return {
+            "artist": str(release.get("artist", "")),
+            "dash": "-",
+            "album": str(release.get("album", "")),
+            "year_bracket": f"[{release.get('year', '')!s}]",
+        }
     display_name = "Orpheus"
     auth_type = "other_api"
     supported_categories = ("MUSIC",)
@@ -351,11 +366,6 @@ class Orpheus:
         release_year = str(release.get("year", "")).strip()
         year_match = bool(request_year and release_year and request_year == release_year)
         return "exact" if artist_match and year_match else "partial"
-
-    async def get_name(self, meta: Meta) -> str:
-        """For the terminal display only, not for upload."""
-        release = self._release(meta)
-        return f"{release.get('artist', '')} - {release.get('album', '')} [{release.get('year', '')!s}]".strip(" -")
 
     async def upload(self, meta: Meta) -> bool:
         release = self._release(meta)

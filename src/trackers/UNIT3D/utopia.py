@@ -2,7 +2,9 @@
 from typing import Any
 
 from src.meta import Meta
+from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, collapse_whitespace, template
 from src.trackers.common import Common
+from src.trackers.naming import append_context_value
 from src.trackers.UNIT3D import UNIT3D
 
 Config = dict[str, Any]
@@ -14,6 +16,29 @@ class Utopia(UNIT3D):
     """
 
     tracker = "UTOPIA"
+    name_profile = TrackerNameProfile(
+        rules=(
+            NameRule(NameSelector(category="MOVIE"), template("title", "alt_title", "year", "hybrid", "repack", "edition", "region", "three_d", "uhd", "effective_source", "type_label", "resolution", "hdr", "effective_codec", "lossless_audio")),
+            NameRule(NameSelector(category="TV"), template("title", "alt_title", "season_episode", "year", "hybrid", "edition", "repack", "region", "three_d", "uhd", "effective_source", "type_label", "resolution", "hdr", "effective_codec", "lossless_audio")),
+            NameRule(NameSelector(), template("base_name")),
+        ),
+        transforms=(collapse_whitespace, append_context_value("tag")),
+    )
+
+    async def get_name_overrides(self, context: NameContext) -> dict[str, str]:
+        meta = context.meta
+        release_type = str(meta.type).upper()
+        audio = meta.audio if any(indicator in meta.audio for indicator in ("Atmos", "TrueHD", "DTS-HD MA", "DTS:X", "LPCM", "FLAC", "PCM")) else ""
+        audio = " ".join(audio.replace("Dual-Audio", "").replace("Dubbed", "").split())
+        source, type_label, codec = str(meta.source), "", meta.video_codec
+        if release_type in ("REMUX", "ENCODE"):
+            source, type_label = "", "BDRemux" if release_type == "REMUX" else "BDRip"
+            codec = meta.video_encode if release_type == "ENCODE" else codec
+        elif release_type in ("WEBDL", "WEBRIP"):
+            source, type_label, codec = meta.service, "WEB-DL" if release_type == "WEBDL" else "WEBRip", meta.video_encode
+        elif release_type == "HDTV":
+            codec = meta.video_encode
+        return {"alt_title": meta.aka.strip(), "year": str(meta.year) if meta.year is not None else "", "edition": meta.edition, "effective_source": source, "type_label": type_label, "effective_codec": codec, "lossless_audio": audio}
     display_name = "UTOPIA"
     base_url = "https://utp.to"
     banned_groups = ()
@@ -129,76 +154,3 @@ class Utopia(UNIT3D):
                 meta[key] = value
 
         return {"description": description}
-
-    async def get_name(self, meta: Meta) -> dict[str, str]:
-        """
-        Build UTOPIA-compliant torrent name from meta components.
-        https://utp.to/pages/33 - rules used for naming.
-        https://github.com/maksii/UTOPIA-Upload-Assistant/blob/main/data/naming.json
-
-        Expected naming as per rules
-        Movie: Name AKA Original LOCALE Year Cut Ratio Hybrid REPACK PROPER RERip Edition Region 3D SOURCE TYPE Resolution HDR VCodec ACodec Channels Object-Tag
-        TV:    Name AKA Original LOCALE S##E## Year Cut Ratio Hybrid REPACK PROPER RERip Edition Region 3D SOURCE TYPE Resolution HDR VCodec ACodec Channels Object-Tag
-
-        """
-        category = str(meta.category)
-        release_type = str(meta.type).upper()
-
-        # Common components
-        title = meta.title
-        aka = meta.aka.strip()
-        year = str(meta.year) if meta.year is not None else ""
-        three_d = meta.three_d
-        uhd = meta.uhd
-        edition = meta.edition
-        hybrid = "Hybrid" if meta.webdv else ""
-        repack = meta.repack
-        resolution = meta.resolution
-        hdr = meta.hdr
-        service = meta.service
-        audio_raw = meta.audio
-        # Only include audio for Atmos or lossless codecs
-        lossless_indicators = ["Atmos", "TrueHD", "DTS-HD MA", "DTS:X", "LPCM", "FLAC", "PCM"]
-        if any(indicator in audio_raw for indicator in lossless_indicators):
-            audio = audio_raw.replace("Dual-Audio", "").replace("Dubbed", "").strip()
-            audio = " ".join(audio.split())
-        else:
-            audio = ""  # Don't include lossy audio (AAC, DD, DD+, etc.) in name
-        video_codec = meta.video_codec
-        video_encode = meta.video_encode
-        tag = meta.tag
-        region = meta.region if meta.region else ""
-        season = meta.season
-        episode = meta.episode
-
-        source_tag = str(meta.source)
-        type_tag = ""
-        vcodec = video_codec  # Default for DISC/REMUX (AVC, HEVC)
-
-        if release_type in ("REMUX", "ENCODE"):
-            source_tag = ""  # BDRemux/BDRip replaces source
-            type_tag = "BDRemux" if release_type == "REMUX" else "BDRip"
-            if release_type == "ENCODE":
-                vcodec = video_encode
-        elif release_type in ("WEBDL", "WEBRIP"):
-            source_tag = service  # Service (NF, AMZN, etc.) as source
-            type_tag = "WEB-DL" if release_type == "WEBDL" else "WEBRip"
-            vcodec = video_encode
-        elif release_type == "HDTV":
-            vcodec = video_encode
-        # DISC: source_tag stays as meta.source (Blu-ray), three_d/uhd handled in template
-
-        # Build name using single template per category
-        if category == "MOVIE":
-            name = f"{title} {aka} {year} {hybrid} {repack} {edition} {region} {three_d} {uhd} {source_tag} {type_tag} {resolution} {hdr} {vcodec} {audio}"
-        elif category == "TV":
-            name = f"{title} {aka} {season}{episode} {year} {hybrid} {edition} {repack} {region} {three_d} {uhd} {source_tag} {type_tag} {resolution} {hdr} {vcodec} {audio}"
-        else:
-            name = meta.name
-
-        # Clean up multiple spaces and add tag
-        name = " ".join(name.split())
-        if tag:
-            name = f"{name}{tag}"
-
-        return {"name": name}

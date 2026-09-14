@@ -2,7 +2,9 @@
 from typing import Any
 
 from src.meta import Meta
+from src.release_name import NameRule, NameSelector, TrackerNameProfile, template
 from src.trackers.common import Common
+from src.trackers.naming import polish_original_title
 from src.trackers.UNIT3D import UNIT3D
 
 Config = dict[str, Any]
@@ -14,6 +16,10 @@ class PolishTorrent(UNIT3D):
     """
 
     tracker = "POLISHTORRENT"
+    name_profile = TrackerNameProfile(
+        rules=(NameRule(NameSelector(), template("base_name")),),
+        transforms=(polish_original_title,),
+    )
     display_name = "Polish Torrent"
     allows_bloated_audio = True
     base_url = "https://polishtorrent.top"
@@ -43,11 +49,3 @@ class PolishTorrent(UNIT3D):
         meta_category = meta.category
         resolved_id = category_id.get(meta_category, "0")
         return {"category_id": resolved_id}
-
-    async def get_name(self, meta: Meta) -> dict[str, str]:
-        ptt_name = meta.name
-        imdb_info = meta.imdb_info
-        if meta.original_language == "pl" and imdb_info:
-            ptt_name = ptt_name.replace(meta.aka, "")
-            ptt_name = ptt_name.replace(meta.title, str(imdb_info.get("aka", "")))
-        return {"name": ptt_name.strip()}

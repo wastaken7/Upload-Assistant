@@ -11,16 +11,22 @@ from src.console import logger
 from src.description_review import get_base_description
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
+from src.release_name import NameRule, NameSelector, TrackerNameProfile, replace_text, template
+from src.trackers.naming import StringTrackerNameMixin
 from src.trackers.common import Common
 
 
-class BitHDTV:
+class BitHDTV(StringTrackerNameMixin):
     """
     BHDTV Private Torrent Tracker
     """
 
     auth_type = "other_api"
     tracker = "BITHDTV"
+    name_profile = TrackerNameProfile(
+        rules=(NameRule(NameSelector(), template("base_name")),),
+        transforms=(replace_text((" ", "."), (":.", "."), (":", "."), ("DD+", "DDP")),),
+    )
     display_name = "BitHDTV"
     allows_bloated_audio = True
     source_flag = "BIT-HDTV"
@@ -195,6 +201,3 @@ class BitHDTV:
     async def search_existing(self, _meta: dict[str, Any]) -> list[str]:
         logger.info(f"{self.tracker}: [red]Dupes must be checked Manually")
         return []
-
-    async def get_name(self, meta: Meta) -> str:
-        return meta.name.replace(" ", ".").replace(":.", ".").replace(":", ".").replace("DD+", "DDP")

@@ -6,6 +6,7 @@ import cli_ui
 from src.console import logger
 from src.languages import languages_manager
 from src.meta import Meta
+from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, template
 from src.trackers.common import Common
 from src.trackers.UNIT3D import UNIT3D
 
@@ -18,10 +19,11 @@ class Torrenteros(UNIT3D):
     """
 
     tracker = "TORRENTEROS"
+    name_profile = TrackerNameProfile(rules=(NameRule(NameSelector(), template("ttr_base", "spanish_suffix", "direct_tag", separator="")),))
     display_name = "Torrenteros"
     base_url = "https://torrenteros.org"
     banned_groups = ()
-    ttr_name = ""  # Initialize instance variable
+    ttr_name_parts: dict[str, str] | None = None
     id_url = f"{base_url}/api/torrents/"
     upload_url = f"{base_url}/api/torrents/upload"
     search_url = f"{base_url}/api/torrents/filter"
@@ -35,92 +37,44 @@ class Torrenteros(UNIT3D):
         self.config: Config = config
         self.common = Common(config)
 
-    async def get_name(self, meta: Meta) -> dict[str, str]:
-        name = self.ttr_name or self.build_name(meta)
+    @staticmethod
+    def _spanish_type(language: str) -> str | None:
+        language = language.lower()
+        if language in ("es-es", "es", "spa"):
+            return "Castellano"
+        return "Latino" if language.startswith("es-") else None
 
-        return {"name": name}
+    def _ask_spanish_type(self, kind: str, *, subtitles: bool = False) -> str:
+        logger.info(f"{self.tracker}: [green]Found Spanish {kind} track.[/green] [yellow]Is it Castellano or Latino?[/yellow]")
+        logger.info(f"{self.tracker}: 1 = Castellano")
+        logger.info(f"{self.tracker}: 2 = Latino")
+        logger.info(f"{self.tracker}: 3 = Castellano Latino")
+        choice = str(cli_ui.ask_string("Enter choice (1-3): "))
+        values = {"1": "Castellano", "2": "Latino", "3": "Castellano Latino"}
+        return f"{values.get(choice, 'Castellano')}{' Subs' if subtitles else ''}"
 
-    def build_name(self, meta: Meta) -> str:
-        name = meta.name_notag
-
-        def ask_spanish_type(kind: str) -> str:
-            logger.info(f"{self.tracker}: [green]Found Spanish {kind} track.[/green] [yellow]Is it Castellano or Latino?[/yellow]")
-            logger.info(f"{self.tracker}: 1 = Castellano")
-            logger.info(f"{self.tracker}: 2 = Latino")
-            logger.info(f"{self.tracker}: 3 = Castellano Latino")
-            return str(cli_ui.ask_string("Enter choice (1-3): "))
-
-        def get_spanish_type(lang_code: str) -> str | None:
-            if not lang_code:
-                return None
-            lang_code = lang_code.lower()
-            if lang_code in ("es-es", "es", "spa"):
-                return "Castellano"
-            if lang_code.startswith("es-"):
-                return "Latino"
-            return None
-
+    async def get_name_overrides(self, context: NameContext) -> dict[str, str]:
+        if self.ttr_name_parts is not None:
+            return dict(self.ttr_name_parts)
+        meta = context.meta
+        suffix = ""
         if meta.is_disc == "BDMV":
-            spanish_audio = "Spanish" in (meta.audio_languages or [])
-            spanish_subtitle = "Spanish" in (meta.subtitle_languages or [])
-            unattended = meta.unattended
-            confirm = meta.unattended_confirm
-
-            if spanish_audio:
-                if unattended or confirm:
-                    suffix = "Castellano"
-                else:
-                    user_choice = ask_spanish_type("audio")
-                    suffix = {"1": "Castellano", "2": "Latino", "3": "Castellano Latino"}.get(user_choice, "Castellano")
-                name += f" {suffix}"
-
-            elif spanish_subtitle:
-                if unattended or confirm:
-                    suffix = "Castellano Subs"
-                else:
-                    user_choice = ask_spanish_type("subtitle")
-                    suffix = {"1": "Castellano Subs", "2": "Latino Subs", "3": "Castellano Latino Subs"}.get(user_choice, "Castellano Subs")
-
-                name += f" {suffix}"
-
+            if "Spanish" in (meta.audio_languages or []):
+                suffix = "Castellano" if meta.unattended or meta.unattended_confirm else self._ask_spanish_type("audio")
+            elif "Spanish" in (meta.subtitle_languages or []):
+                suffix = "Castellano Subs" if meta.unattended or meta.unattended_confirm else self._ask_spanish_type("subtitle", subtitles=True)
         else:
-            tracks = cast(
-                list[dict[str, Any]],
-                meta.mediainfo.get("media", {}).get("track", []),
-            )
-            spanish_audio_type = None
-            spanish_subs_type = None
-
-            for track in tracks:
-                if track.get("@type") == "Audio":
-                    lang = track.get("Language", "")
-                    if isinstance(lang, dict):
-                        lang = ""
-                    spanish_audio_type = get_spanish_type(str(lang).strip())
-                    if spanish_audio_type:
-                        break
-
-            for track in tracks:
-                if track.get("@type") == "Text":
-                    lang = track.get("Language", "")
-                    if isinstance(lang, dict):
-                        lang = ""
-                    spanish_subs_type = get_spanish_type(str(lang).strip())
-                    if spanish_subs_type:
-                        break
-
-            if spanish_audio_type:
-                name += f" {spanish_audio_type}"
-            elif spanish_subs_type:
-                name += f" {spanish_subs_type} Subs"
-
-        tag = meta.tag
-        if tag:
-            name += tag
-
-        self.ttr_name = name
-
-        return name
+            tracks = cast(list[dict[str, Any]], meta.mediainfo.get("media", {}).get("track", []))
+            audio = next((self._spanish_type(str(track.get("Language", "")).strip()) for track in tracks if track.get("@type") == "Audio" and not isinstance(track.get("Language", ""), dict) and self._spanish_type(str(track.get("Language", "")).strip())), None)
+            subtitles = next((self._spanish_type(str(track.get("Language", "")).strip()) for track in tracks if track.get("@type") == "Text" and not isinstance(track.get("Language", ""), dict) and self._spanish_type(str(track.get("Language", "")).strip())), None)
+            suffix = audio if audio else f"{subtitles} Subs" if subtitles else ""
+        parts = {
+            "ttr_base": meta.name_notag,
+            "spanish_suffix": f" {suffix}" if suffix else "",
+            "direct_tag": meta.tag or "",
+        }
+        self.ttr_name_parts = parts
+        return dict(parts)
 
     async def get_additional_data(self, meta: Meta) -> dict[str, Any]:
         data: dict[str, Any] = {

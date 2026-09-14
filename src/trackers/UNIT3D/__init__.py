@@ -16,13 +16,13 @@ from src.console import logger
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
 from src.trackers.common import Common
-from src.trackers.naming import add_incomplete_pack_marker
+from src.trackers.naming import BASE_NAME_WITH_INCOMPLETE_PROFILE, TrackerNameMixin
 
 type QueryValue = str | int | float | bool | None
 type ParamsList = list[tuple[str, QueryValue]]
 
 
-class UNIT3D:
+class UNIT3D(TrackerNameMixin):
     auth_type = "unit3d_api"
     api_key_expiry_supported = True
     supported_categories: tuple[str, ...] = ("TV", "MOVIE")
@@ -32,6 +32,7 @@ class UNIT3D:
     pending_url: str = ""
     search_url: str = ""
     upload_url: str = ""
+    name_profile = BASE_NAME_WITH_INCOMPLETE_PROFILE
 
     def __init__(self, config: dict[str, Any], tracker_name: str):
         self.config = config
@@ -184,7 +185,7 @@ class UNIT3D:
         return dupes
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
-        return {"name": add_incomplete_pack_marker(meta.name, meta, self.tracker)}
+        return {"name": await self.render_name(meta)}
 
     async def get_description(self, meta: Meta) -> Any:
         return {

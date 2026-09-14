@@ -12,6 +12,18 @@ import guessit
 from src.cleanup import cleanup_manager
 from src.console import logger
 from src.meta import Meta
+from src.release_name import (
+    NameBuildResult,
+    NameRule,
+    NameSelector,
+    ReleaseNameBuilder,
+    TrackerNameProfile,
+    collapse_whitespace,
+    dots_to_spaces,
+    literal,
+    regex_sub,
+    template,
+)
 from src.trackers.common import Common
 
 guessit_module: Any = cast(Any, guessit)
@@ -29,10 +41,357 @@ TRACKER_DISC_REQUIREMENTS = {
 }
 
 
+DEFAULT_NAME_PROFILE = TrackerNameProfile(
+    rules=(
+        NameRule(NameSelector(category="XXX"), template("source_name", transforms=(dots_to_spaces, collapse_whitespace))),
+        NameRule(NameSelector(category="BOOK", subtype="AUDIOBOOK"), template("author", "dash", "book_series", "title", "book_series_index", "edition", "year", "book_language", "audiobook_label")),
+        NameRule(NameSelector(category="BOOK", subtype="COMIC"), template("title", "volume_label", "issue_label", "year", "book_language", "book_source", "book_format", "comic_label", "ebook_label")),
+        NameRule(NameSelector(category="BOOK", subtype="MANGA"), template("title", "volume_label", "year", "book_language", "book_source", "book_format", "manga_label", "ebook_label")),
+        NameRule(NameSelector(category="BOOK", subtype="MAGAZINE"), template("title", "issue_label", "year", "book_language", "book_source", "book_format", "magazine_label", "ebook_label")),
+        NameRule(NameSelector(category="BOOK", subtype="NEWSPAPER"), template("title", "year", "book_language", "book_source", "book_format", "ebook_label")),
+        NameRule(NameSelector(category="BOOK", subtype="EBOOK"), template("author_or_publisher", "dash", "book_series", "title", "book_series_index", "edition", "year", "book_language", "book_source", "book_format", "ebook_label")),
+        NameRule(
+            NameSelector(category="GAME"),
+            template(
+                "title",
+                "edition",
+                "game_version",
+                "year",
+                "game_language",
+                "game_platform",
+                "repack",
+                transforms=(regex_sub(r"\.{2,}", " "),),
+            ),
+        ),
+        NameRule(NameSelector(category="MUSIC"), template("artist", "dash", "title", "year", "music_source", "music_codec", "bit_depth", "sample_rate")),
+        NameRule(
+            NameSelector(category="MOVIE", type="DISC", is_disc="BDMV"),
+            template(
+                "title",
+                "alt_title",
+                "year",
+                "three_d",
+                "edition",
+                "hybrid",
+                "repack",
+                "resolution",
+                "region",
+                "uhd",
+                "source",
+                "hdr",
+                "video_codec",
+                "audio",
+                potential_missing=("edition", "region", "distributor"),
+            ),
+        ),
+        NameRule(
+            NameSelector(category="MOVIE", type="DISC", is_disc="DVD"),
+            template(
+                "title",
+                "alt_title",
+                "year",
+                "repack",
+                "edition",
+                "region",
+                "source",
+                "dvd_size",
+                "audio",
+                potential_missing=("edition", "distributor"),
+            ),
+        ),
+        NameRule(
+            NameSelector(category="MOVIE", type="DISC", is_disc="HDDVD"),
+            template(
+                "title",
+                "alt_title",
+                "year",
+                "edition",
+                "repack",
+                "resolution",
+                "source",
+                "video_codec",
+                "audio",
+                potential_missing=("edition", "region", "distributor"),
+            ),
+        ),
+        NameRule(
+            NameSelector(category="TV", type="DISC", is_disc="BDMV"),
+            template(
+                "title",
+                "year",
+                "alt_title",
+                "season_episode",
+                "three_d",
+                "edition",
+                "hybrid",
+                "repack",
+                "resolution",
+                "region",
+                "uhd",
+                "source",
+                "hdr",
+                "video_codec",
+                "audio",
+                potential_missing=("edition", "region", "distributor"),
+            ),
+        ),
+        NameRule(
+            NameSelector(category="TV", type="DISC", is_disc="DVD"),
+            template(
+                "title",
+                "year",
+                "alt_title",
+                "season_episode_three_d",
+                "repack",
+                "edition",
+                "region",
+                "source",
+                "dvd_size",
+                "audio",
+                potential_missing=("edition", "distributor"),
+            ),
+        ),
+        NameRule(
+            NameSelector(category="TV", type="DISC", is_disc="HDDVD"),
+            template(
+                "title",
+                "alt_title",
+                "year",
+                "edition",
+                "repack",
+                "resolution",
+                "source",
+                "video_codec",
+                "audio",
+                potential_missing=("edition", "region", "distributor"),
+            ),
+        ),
+        NameRule(
+            NameSelector(category="MOVIE", type="REMUX", source=("BLURAY", "HDDVD")),
+            template(
+                "title",
+                "alt_title",
+                "year",
+                "three_d",
+                "edition",
+                "hybrid",
+                "repack",
+                "resolution",
+                "uhd",
+                "source",
+                literal("REMUX"),
+                "hdr",
+                "video_codec",
+                "audio",
+                potential_missing=("edition", "description"),
+            ),
+        ),
+        NameRule(
+            NameSelector(category="MOVIE", type="REMUX", source=("PAL DVD", "NTSC DVD", "DVD")),
+            template(
+                "title",
+                "alt_title",
+                "year",
+                "edition",
+                "repack",
+                "source",
+                literal("REMUX"),
+                "audio",
+                potential_missing=("edition", "description"),
+            ),
+        ),
+        NameRule(
+            NameSelector(category="TV", type="REMUX", source=("BLURAY", "HDDVD")),
+            template(
+                "title",
+                "year",
+                "alt_title",
+                "season_episode",
+                "episode_title",
+                "part",
+                "three_d",
+                "edition",
+                "hybrid",
+                "repack",
+                "resolution",
+                "uhd",
+                "source",
+                literal("REMUX"),
+                "hdr",
+                "video_codec",
+                "audio",
+                potential_missing=("edition", "description"),
+            ),
+        ),
+        NameRule(
+            NameSelector(category="TV", type="REMUX", source=("PAL DVD", "NTSC DVD", "DVD")),
+            template(
+                "title",
+                "year",
+                "alt_title",
+                "season_episode",
+                "episode_title",
+                "part",
+                "edition",
+                "repack",
+                "source",
+                literal("REMUX"),
+                "audio",
+                potential_missing=("edition", "description"),
+            ),
+        ),
+        NameRule(
+            NameSelector(category="MOVIE", type="ENCODE"),
+            template(
+                "title",
+                "alt_title",
+                "year",
+                "edition",
+                "hybrid",
+                "repack",
+                "resolution",
+                "uhd",
+                "source",
+                "audio",
+                "hdr",
+                "video_encode",
+                potential_missing=("edition", "description"),
+            ),
+        ),
+        NameRule(
+            NameSelector(category="TV", type="ENCODE"),
+            template(
+                "title",
+                "year",
+                "alt_title",
+                "season_episode",
+                "episode_title",
+                "part",
+                "edition",
+                "hybrid",
+                "repack",
+                "resolution",
+                "uhd",
+                "source",
+                "audio",
+                "hdr",
+                "video_encode",
+                potential_missing=("edition", "description"),
+            ),
+        ),
+        NameRule(
+            NameSelector(category="MOVIE", type="WEBDL"),
+            template(
+                "title",
+                "alt_title",
+                "year",
+                "edition",
+                "hybrid",
+                "repack",
+                "resolution",
+                "uhd",
+                "service",
+                literal("WEB-DL"),
+                "hardcoded_subs",
+                "audio",
+                "hdr",
+                "video_encode",
+                potential_missing=("edition", "service"),
+            ),
+        ),
+        NameRule(
+            NameSelector(category="TV", type="WEBDL"),
+            template(
+                "title",
+                "year",
+                "alt_title",
+                "season_episode",
+                "episode_title",
+                "part",
+                "edition",
+                "hybrid",
+                "repack",
+                "resolution",
+                "uhd",
+                "service",
+                literal("WEB-DL"),
+                "hardcoded_subs",
+                "audio",
+                "hdr",
+                "video_encode",
+                potential_missing=("edition", "service"),
+            ),
+        ),
+        NameRule(
+            NameSelector(category="MOVIE", type="WEBRIP"),
+            template(
+                "title",
+                "alt_title",
+                "year",
+                "edition",
+                "hybrid",
+                "repack",
+                "resolution",
+                "uhd",
+                "service",
+                literal("WEBRip"),
+                "hardcoded_subs",
+                "audio",
+                "hdr",
+                "video_encode",
+                potential_missing=("edition", "service"),
+            ),
+        ),
+        NameRule(
+            NameSelector(category="TV", type="WEBRIP"),
+            template(
+                "title",
+                "year",
+                "alt_title",
+                "season_episode",
+                "episode_title",
+                "part",
+                "edition",
+                "hybrid",
+                "repack",
+                "resolution",
+                "uhd",
+                "service",
+                literal("WEBRip"),
+                "hardcoded_subs",
+                "audio",
+                "hdr",
+                "video_encode",
+                potential_missing=("edition", "service"),
+            ),
+        ),
+        NameRule(
+            NameSelector(category="MOVIE", type="HDTV"),
+            template("title", "alt_title", "year", "edition", "repack", "resolution", "source", "audio", "video_encode"),
+        ),
+        NameRule(
+            NameSelector(category="TV", type="HDTV"),
+            template("title", "year", "alt_title", "season_episode", "episode_title", "part", "edition", "repack", "resolution", "source", "audio", "video_encode"),
+        ),
+        NameRule(
+            NameSelector(category="MOVIE", type="DVDRIP"),
+            template("title", "alt_title", "year", "source", "video_encode", literal("DVDRip"), "audio"),
+        ),
+        NameRule(
+            NameSelector(category="TV", type="DVDRIP"),
+            template("title", "year", "alt_title", "season", "source", literal("DVDRip"), "audio", "video_encode"),
+        ),
+        NameRule(NameSelector(), template(literal(""))),
+    ),
+    transforms=(collapse_whitespace,),
+)
+
+
 class NameManager:
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
         self.common = Common(config=config)
+        self.release_name_builder = ReleaseNameBuilder()
 
     async def get_name(self, meta: Meta) -> tuple[str, str, str, list[str]]:
         active_trackers: list[str] = [tracker for tracker in TRACKER_DISC_REQUIREMENTS if tracker in meta.trackers]
@@ -48,64 +407,7 @@ class NameManager:
                 meta.distributor = distributor
             if region and "SKIPPED" not in region:
                 meta.region = region
-        type = str(meta.type).upper()
-        title = meta.title
-        alt_title = meta.aka
-        year = str(meta.year) if meta.year is not None else ""
-        manual_year_value = meta.manual_year
-        if manual_year_value is not None and manual_year_value > 0:
-            year = str(manual_year_value)
-        resolution = meta.resolution
-        if resolution == "OTHER":
-            resolution = ""
-        audio = meta.audio
-        hardcoded_subs = "HC" if meta.hardcoded_subs else ""
-        service = str(meta.service)
-        season = str(meta.season)
-        episode = meta.episode
-        part = meta.part
-        repack = meta.repack
-        three_d = meta.three_d
         tag = meta.tag or ""
-        source = str(meta.source)
-        uhd = str(meta.uhd)
-        hdr = meta.hdr
-        hybrid = "Hybrid" if meta.webdv else ""
-        if meta.manual_episode_title:
-            episode_title = meta.manual_episode_title
-        elif meta.daily_episode_title:
-            episode_title = meta.daily_episode_title
-        else:
-            episode_title = ""
-        video_codec = ""
-        video_encode = ""
-        region = ""
-        dvd_size = ""
-        if meta.is_disc == "BDMV":  # Disk
-            video_codec = meta.video_codec
-            region = str(meta.region or "")
-        elif meta.is_disc == "DVD":
-            region = str(meta.region or "")
-            dvd_size = meta.dvd_size
-        else:
-            video_codec = meta.video_codec
-            video_encode = meta.video_encode
-        edition = meta.edition
-        if "hybrid" in edition.upper():
-            edition = edition.replace("Hybrid", "").strip()
-
-        if meta.category == "TV":
-            year = str(meta.year) if (meta.year is not None and meta.search_year != "") else ""
-            if meta.manual_date:
-                # Ignore season and year for --daily flagged shows, just use manual date stored in episode_name
-                season = ""
-                episode = ""
-        if meta.no_season is True:
-            season = ""
-        if meta.no_year is True:
-            year = ""
-        if meta.no_aka is True:
-            alt_title = ""
         if meta.debug:
             logger.debug("[cyan]get_name cat/type")
             logger.debug(f"CATEGORY: {meta.category}")
@@ -113,89 +415,17 @@ class NameManager:
             logger.debug("[cyan]get_name meta:")
             # logger.debug(meta)
 
-        # YAY NAMING FUN
         name = ""
         potential_missing: list[str] = []
         if meta.manual_name is not None:
             name = str(meta.manual_name).strip()
-        elif meta.category == "XXX":
-            release_name = str(meta.scene_name or meta.basename_no_ext or meta.uuid or meta.title)
-            name = release_name.replace(".", " ")
-        elif meta.category == "MOVIE":  # MOVIE SPECIFIC
-            if type == "DISC":  # Disk
-                if meta.is_disc == "BDMV":
-                    name = f"{title} {alt_title} {year} {three_d} {edition} {hybrid} {repack} {resolution} {region} {uhd} {source} {hdr} {video_codec} {audio}"
-                    potential_missing = ["edition", "region", "distributor"]
-                elif meta.is_disc == "DVD":
-                    name = f"{title} {alt_title} {year} {repack} {edition} {region} {source} {dvd_size} {audio}"
-                    potential_missing = ["edition", "distributor"]
-                elif meta.is_disc == "HDDVD":
-                    name = f"{title} {alt_title} {year} {edition} {repack} {resolution} {source} {video_codec} {audio}"
-                    potential_missing = ["edition", "region", "distributor"]
-            elif type == "REMUX" and source in ("BluRay", "HDDVD"):  # BluRay/HDDVD Remux
-                name = f"{title} {alt_title} {year} {three_d} {edition} {hybrid} {repack} {resolution} {uhd} {source} REMUX {hdr} {video_codec} {audio}"
-                potential_missing = ["edition", "description"]
-            elif type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD"):  # DVD Remux
-                name = f"{title} {alt_title} {year} {edition} {repack} {source} REMUX  {audio}"
-                potential_missing = ["edition", "description"]
-            elif type == "ENCODE":  # Encode
-                name = f"{title} {alt_title} {year} {edition} {hybrid} {repack} {resolution} {uhd} {source} {audio} {hdr} {video_encode}"
-                potential_missing = ["edition", "description"]
-            elif type == "WEBDL":  # WEB-DL
-                name = f"{title} {alt_title} {year} {edition} {hybrid} {repack} {resolution} {uhd} {service} WEB-DL {hardcoded_subs} {audio} {hdr} {video_encode}"
-                potential_missing = ["edition", "service"]
-            elif type == "WEBRIP":  # WEBRip
-                name = f"{title} {alt_title} {year} {edition} {hybrid} {repack} {resolution} {uhd} {service} WEBRip {hardcoded_subs} {audio} {hdr} {video_encode}"
-                potential_missing = ["edition", "service"]
-            elif type == "HDTV":  # HDTV
-                name = f"{title} {alt_title} {year} {edition} {repack} {resolution} {source} {audio} {video_encode}"
-                potential_missing = []
-            elif type == "DVDRIP":
-                name = f"{title} {alt_title} {year} {source} {video_encode} DVDRip {audio}"
-                potential_missing = []
-        elif meta.category == "TV":  # TV SPECIFIC
-            if type == "DISC":  # Disk
-                if meta.is_disc == "BDMV":
-                    name = (
-                        f"{title} {year} {alt_title} {season}{episode} {three_d} {edition} {hybrid} {repack} {resolution} {region} {uhd} {source} {hdr} {video_codec} {audio}"
-                    )
-                    potential_missing = ["edition", "region", "distributor"]
-                if meta.is_disc == "DVD":
-                    name = f"{title} {year} {alt_title} {season}{episode}{three_d} {repack} {edition} {region} {source} {dvd_size} {audio}"
-                    potential_missing = ["edition", "distributor"]
-                elif meta.is_disc == "HDDVD":
-                    name = f"{title} {alt_title} {year} {edition} {repack} {resolution} {source} {video_codec} {audio}"
-                    potential_missing = ["edition", "region", "distributor"]
-            elif type == "REMUX" and source in ("BluRay", "HDDVD"):  # BluRay Remux
-                name = f"{title} {year} {alt_title} {season}{episode} {episode_title} {part} {three_d} {edition} {hybrid} {repack} {resolution} {uhd} {source} REMUX {hdr} {video_codec} {audio}"  # SOURCE
-                potential_missing = ["edition", "description"]
-            elif type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD"):  # DVD Remux
-                name = f"{title} {year} {alt_title} {season}{episode} {episode_title} {part} {edition} {repack} {source} REMUX {audio}"  # SOURCE
-                potential_missing = ["edition", "description"]
-            elif type == "ENCODE":  # Encode
-                name = f"{title} {year} {alt_title} {season}{episode} {episode_title} {part} {edition} {hybrid} {repack} {resolution} {uhd} {source} {audio} {hdr} {video_encode}"  # SOURCE
-                potential_missing = ["edition", "description"]
-            elif type == "WEBDL":  # WEB-DL
-                name = f"{title} {year} {alt_title} {season}{episode} {episode_title} {part} {edition} {hybrid} {repack} {resolution} {uhd} {service} WEB-DL {hardcoded_subs} {audio} {hdr} {video_encode}"
-                potential_missing = ["edition", "service"]
-            elif type == "WEBRIP":  # WEBRip
-                name = f"{title} {year} {alt_title} {season}{episode} {episode_title} {part} {edition} {hybrid} {repack} {resolution} {uhd} {service} WEBRip {hardcoded_subs} {audio} {hdr} {video_encode}"
-                potential_missing = ["edition", "service"]
-            elif type == "HDTV":  # HDTV
-                name = f"{title} {year} {alt_title} {season}{episode} {episode_title} {part} {edition} {repack} {resolution} {source} {audio} {video_encode}"
-                potential_missing = []
-            elif type == "DVDRIP":
-                name = f"{title} {year} {alt_title} {season} {source} DVDRip {audio} {video_encode}"
-                potential_missing = []
-        elif meta.category == "BOOK":
-            name = self.extract_book_name(meta)
-            potential_missing = []
-        elif meta.category == "GAME":
-            name = self.extract_game_name(meta)
-            potential_missing = []
-        elif meta.category == "MUSIC":
-            name = self.extract_music_name(meta)
-            potential_missing = []
+        else:
+            name, missing = await self.release_name_builder.render(
+                meta,
+                DEFAULT_NAME_PROFILE,
+                lambda _context: self._default_name_overrides(meta),
+            )
+            potential_missing = list(missing)
 
         try:
             name = " ".join(name.split())
@@ -213,159 +443,67 @@ class NameManager:
         name = name_notag if meta.manual_name is not None or tag_already_present else name_notag + tag
 
         clean_name = await self.clean_filename(name)
-        return name_notag, name, clean_name, potential_missing
+        result = NameBuildResult(name_notag=name_notag, name=name, clean_name=clean_name, potential_missing=tuple(potential_missing))
+        return result.name_notag, result.name, result.clean_name, list(result.potential_missing)
 
-    def extract_book_name(self, meta: Meta) -> str:
-        comic = meta.comic
-        manga = meta.manga
-        magazine = meta.magazine
-        newspaper = meta.newspaper
-        audiobook = meta.audiobook
-
-        author = meta.author.strip()
-        publisher = meta.publisher.strip()
-        title = meta.title.strip()
-        book_series = f"{meta.book_series.strip()}:" if meta.book_series else ""
-        book_series_index = meta.book_series_index
-        year = str(meta.year).strip() if meta.year is not None else ""
-
-        # Edition/Issue logic
-        edition = str(meta.manual_edition or meta.edition or "").strip()
-        if edition and not any(x in edition.lower() for x in ["edition", "ed.", "ed"]) and not audiobook:
-            edition = f"{edition} Edition"
-
-        volume = str(meta.manual_season or meta.season or "").strip()
-        issue = str(meta.manual_episode or meta.episode or "").strip()
-
-        # Language logic (needed for non-English only)
-        book_language = meta.book_language.strip()
-        book_language_iso = meta.book_language_iso.strip()
-        lang_display = book_language or book_language_iso
-        lang_display = "" if lang_display.lower() in ("english", "eng", "en") else lang_display.upper().replace("I", "i")
-
-        # Source logic: RETAiL, SCAN, HYBRiD
-        source = meta.source or "".strip().upper()
-        manual_source = str(meta.manual_source or "").strip().upper()
-        if manual_source in ("RETAIL", "SCAN", "HYBRID"):
-            source = manual_source
-
-        if source not in ("RETAIL", "SCAN", "HYBRID"):
-            filename_lower = (meta.uuid + " " + meta.title).lower()
-            if "scan" in filename_lower:
-                source = "SCAN"
-            elif "hybrid" in filename_lower:
-                source = "HYBRiD"
-            elif "retail" in filename_lower:
-                source = "RETAiL"
+    def _default_name_overrides(self, meta: Meta) -> dict[str, str]:
+        if meta.category == "BOOK":
+            author = meta.author.strip()
+            publisher = meta.publisher.strip()
+            edition = str(meta.manual_edition or meta.edition or "").strip()
+            if edition and not any(value in edition.lower() for value in ("edition", "ed.", "ed")) and not meta.audiobook:
+                edition = f"{edition} Edition"
+            language = meta.book_language.strip() or meta.book_language_iso.strip()
+            language = "" if language.lower() in ("english", "eng", "en") else language.upper().replace("I", "i")
+            source = meta.source or "".strip().upper()
+            manual_source = str(meta.manual_source or "").strip().upper()
+            if manual_source in ("RETAIL", "SCAN", "HYBRID"):
+                source = manual_source
+            if source not in ("RETAIL", "SCAN", "HYBRID"):
+                source_name = (meta.uuid + " " + meta.title).lower()
+                source = "SCAN" if "scan" in source_name else "HYBRiD" if "hybrid" in source_name else "RETAiL" if "retail" in source_name else "SCAN" if str(meta.type).upper() == "PDF" else "RETAiL"
             else:
-                ext = str(meta.type).upper()
-                source = "SCAN" if ext == "PDF" else "RETAiL"
-        else:
-            if source == "RETAIL":
-                source = "RETAiL"
-            elif source == "HYBRID":
-                source = "HYBRiD"
-            elif source == "SCAN":
-                source = "SCAN"
-
-        # Format logic
-        ebook_type = str(meta.type).strip()
-        if ebook_type.upper() == "EPUB":
-            ebook_type = "ePUB"
-        elif ebook_type.upper() == "PDF":
-            ebook_type = ""  # PDF format tag is omitted per rules.txt
-        else:
-            ebook_type = ebook_type.upper()
-
-        # Construct final string parts based on subtype
-        parts: list[str] = []
-
-        if audiobook:
-            parts.extend([author, "-", book_series, title, book_series_index, edition, year, lang_display, "AUDIOBOOK"])
-        elif comic:
-            vol_str = f"Vol {volume}" if volume else ""
-            no_str = f"No {issue}" if issue else ""
-            parts.extend([title, vol_str, no_str, year, lang_display, source, ebook_type, "COMiC", "eBOOK"])
-        elif manga:
-            vol_str = f"Vol {volume}" if volume else ""
-            parts.extend([title, vol_str, year, lang_display, source, ebook_type, "MANGA", "eBOOK"])
-        elif magazine:
-            no_str = f"No {issue}" if issue else ""
-            parts.extend([title, no_str, year, lang_display, source, ebook_type, "MAGAZiNE", "eBOOK"])
-        elif newspaper:
-            parts.extend([title, year, lang_display, source, ebook_type, "eBOOK"])
-        else:
-            author_or_publisher = author or publisher
-            parts.extend([author_or_publisher, "-", book_series, title, book_series_index, edition, year, lang_display, source, ebook_type, "eBOOK"])
-
-        cleaned_parts = [p for p in parts if p]
-        base_name = " ".join(cleaned_parts)
-        return " ".join(base_name.split())
-
-    def extract_game_name(self, meta: Meta) -> str:
-        """Build a game release name losely based on the SCENE 2021_GAMEiSO ruleset."""
-        title = meta.title.strip()
-        edition = str(meta.manual_edition or meta.edition or "").strip()
-        year = str(meta.manual_year or meta.year or "").strip()
-        platform = str(meta.manual_platform or meta.platform or "").strip().upper()
-        game_version = meta.game_version or "".strip()
-        repack = meta.repack or "".strip().upper()
-        force_multi = bool(meta.manual_multi)
-
-        #  language / MULTI tag
-        languages: dict[str, Any] | list[Any] = meta.languages or {}
-        lang_names: list[str] = [k for k in languages if k]
-        lang_count = len(lang_names)
-
-        # Detect "multi" in the original source directory/file name
-        source_path = str(meta.path or meta.uuid or "")
-        source_basename = Path(source_path).name.lower()
-        source_has_multi = "multi" in source_basename
-
-        lang_tag = ""
-        if lang_count > 1 and (source_has_multi or force_multi):
-            # MULTI<N> — only when the source name explicitly declares MULTI
-            lang_tag = f"MULTI{lang_count}"
-        elif force_multi:
-            lang_tag = "MULTI"
-        elif lang_count == 1:
-            single = lang_names[0].upper()
-            # Scene only tags non-English single-language releases
-            if single not in ("ENGLISH", "ENG", "EN"):
-                lang_tag = single
-
-        # build ordered token list
-        tokens: list[str] = [title]
-
-        # Edition (e.g. "Definitive Edition", "GOTY")
-        if edition:
-            tokens.append(edition)
-
-        # Version / Update tag  →  "Update v1.2.3"
-        if game_version:
-            # Normalise: ensure leading 'v'
-            ver = game_version if game_version.lower().startswith("v") else f"v{game_version}"
-            tokens.append(ver)
-
-        # Year - scene rarely includes year in the dirname, but keep it if present
-        if year:
-            tokens.append(year)
-
-        # Language tag (MULTI<N> or LANGUAGE)
-        if lang_tag:
-            tokens.append(lang_tag)
-
-        # Platform tag - only for non-PC releases (PC is implicit for GAMEiSO)
-        if platform and platform not in ("PC", "WINDOWS", "WIN"):
-            tokens.append(platform)
-
-        # REPACK / PROPER / etc.
-        if repack:
-            tokens.append(repack)
-
-        base_name = " ".join(t for t in tokens if t)
-        # Final safety: collapse any double spaces
-        return re.sub(r"\.{2,}", " ", base_name)
+                source = {"RETAIL": "RETAiL", "HYBRID": "HYBRiD", "SCAN": "SCAN"}[source]
+            book_format = str(meta.type).strip()
+            book_format = "ePUB" if book_format.upper() == "EPUB" else "" if book_format.upper() == "PDF" else book_format.upper()
+            volume = str(meta.manual_season or meta.season or "").strip()
+            issue = str(meta.manual_episode or meta.episode or "").strip()
+            return {
+                "author": author, "author_or_publisher": author or publisher, "dash": "-", "title": meta.title.strip(),
+                "book_series": f"{meta.book_series.strip()}:" if meta.book_series else "", "book_series_index": meta.book_series_index,
+                "edition": edition, "year": str(meta.year).strip() if meta.year is not None else "", "book_language": language,
+                "book_source": str(source), "book_format": book_format, "volume_label": f"Vol {volume}" if volume else "",
+                "issue_label": f"No {issue}" if issue else "", "audiobook_label": "AUDIOBOOK", "comic_label": "COMiC",
+                "manga_label": "MANGA", "magazine_label": "MAGAZiNE", "ebook_label": "eBOOK",
+            }
+        if meta.category == "GAME":
+            languages = meta.languages or {}
+            names = [name for name in languages if name]
+            source_name = Path(str(meta.path or meta.uuid or "")).name.lower()
+            force_multi = bool(meta.manual_multi)
+            language = f"MULTI{len(names)}" if len(names) > 1 and ("multi" in source_name or force_multi) else "MULTI" if force_multi else names[0].upper() if len(names) == 1 and names[0].upper() not in ("ENGLISH", "ENG", "EN") else ""
+            version = str(meta.game_version or "")
+            if version and not version.lower().startswith("v"):
+                version = f"v{version}"
+            platform = str(meta.manual_platform or meta.platform or "").strip().upper()
+            return {
+                "title": meta.title.strip(),
+                "edition": str(meta.manual_edition or meta.edition or "").strip(),
+                "game_version": version,
+                "year": str(meta.manual_year or meta.year or "").strip(),
+                "game_language": language,
+                "game_platform": platform if platform not in ("PC", "WINDOWS", "WIN") else "",
+                "repack": str(meta.repack or ""),
+            }
+        if meta.category == "MUSIC":
+            release = meta.music_release if isinstance(meta.music_release, dict) else {}
+            tracks = release.get("tracks", []) if isinstance(release.get("tracks"), list) else []
+            first = tracks[0] if tracks and isinstance(tracks[0], dict) else {}
+            codec = self._music_codec(first.get("codec") or first.get("format") or meta.format or meta.type)
+            depth = first.get("bit_depth") or self._music_release_field(release, "nfo_bit_depth")
+            rate = first.get("sample_rate") or self._music_release_field(release, "nfo_sample_rate")
+            return {"artist": str(self._music_release_field(release, "artist", meta.artist)), "dash": "-", "title": str(self._music_release_field(release, "album", meta.title)), "year": str(self._music_release_field(release, "release_year", self._music_release_field(release, "year", meta.year))), "music_source": self._music_source(self._music_release_field(release, "media", meta.source)), "music_codec": codec, "bit_depth": f"{depth}-bit" if depth and codec in {"FLAC", "ALAC"} else "", "sample_rate": f"{int(rate) / 1000:g} kHz" if rate and codec in {"FLAC", "ALAC"} else ""}
+        return {}
 
     @staticmethod
     def _music_release_field(release: dict[str, Any], name: str, default: Any = "") -> Any:
@@ -401,28 +539,6 @@ class NameManager:
             "cassette": "Cassette",
         }
         return aliases.get(source, str(value or "").strip())
-
-    def extract_music_name(self, meta: Meta) -> str:
-        """Build MUSIC names with the LST Discogs-based naming convention."""
-        release = meta.music_release if isinstance(meta.music_release, dict) else {}
-        artist = self._music_release_field(release, "artist", meta.artist)
-        title = self._music_release_field(release, "album", meta.title)
-        year = self._music_release_field(release, "release_year", self._music_release_field(release, "year", meta.year))
-        source = self._music_source(self._music_release_field(release, "media", meta.source))
-        tracks = release.get("tracks", []) if isinstance(release.get("tracks"), list) else []
-        first_track = tracks[0] if tracks and isinstance(tracks[0], dict) else {}
-        codec = self._music_codec(first_track.get("codec") or first_track.get("format") or meta.format or meta.type)
-        parts = [str(artist), "-", str(title), str(year), source, codec]
-
-        # LST omits technical PCM fields for lossy codecs.
-        if codec in {"FLAC", "ALAC"}:
-            depth = first_track.get("bit_depth") or self._music_release_field(release, "nfo_bit_depth")
-            rate = first_track.get("sample_rate") or self._music_release_field(release, "nfo_sample_rate")
-            if depth:
-                parts.append(f"{depth}-bit")
-            if rate:
-                parts.append(f"{int(rate) / 1000:g} kHz")
-        return " ".join(part.strip() for part in parts if str(part or "").strip())
 
     async def clean_filename(self, name: str) -> str:
         invalid = '<>:"/\\|?*'

@@ -20,15 +20,17 @@ from src.rehostimages import RehostImagesManager
 from src.tmdb import TmdbManager
 from src.tracker_images import get_tracker_image_collection, set_tracker_image_collection
 from src.trackers.common import Common
+from src.trackers.naming import StringTrackerNameMixin, TITLE_NAME_PROFILE
 
 
-class GreatPosterWall:
+class GreatPosterWall(StringTrackerNameMixin):
     """
     GPW Private Torrent Tracker
     """
 
     auth_type = "other_api"
     tracker = "GREATPOSTERWALL"
+    name_profile = TITLE_NAME_PROFILE
     display_name = "Great Poster Wall"
     allows_bloated_audio = True
     source_flag = "GreatPosterWall"
@@ -1193,6 +1195,3 @@ class GreatPosterWall:
             meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
             await self.common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
             return True
-
-    async def get_name(self, meta: Meta) -> str:
-        return meta.title

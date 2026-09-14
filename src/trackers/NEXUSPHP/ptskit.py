@@ -109,6 +109,3 @@ class Ptskit(NEXUSPHP):
             id_pattern=r"download\.php\?id=([^&]+)",
             success_status_code="302, 303",
         )
-
-    async def get_name(self, meta: Meta) -> dict[str, str]:
-        return {"name": meta.name}

@@ -18,16 +18,26 @@ from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.exceptions import *  # noqa F403
 from src.mediainfo import MediaInfo
 from src.meta import Meta
+from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, template
 from src.trackers.common import Common
+from src.trackers.naming import StringTrackerNameMixin, alpha_ratio_name
 
 
-class AlphaRatio:
+class AlphaRatio(StringTrackerNameMixin):
     """
     AlphaRatio(AR) is a Private Torrent Tracker for 0DAY / GENERAL
     """
 
     auth_type = "cookies"
     tracker = "ALPHARATIO"
+    name_profile = TrackerNameProfile(
+        rules=(NameRule(NameSelector(), template("alpha_source")),),
+        transforms=(alpha_ratio_name,),
+    )
+
+    async def get_name_overrides(self, context: NameContext) -> dict[str, str]:
+        meta = context.meta
+        return {"alpha_source": meta.scene_name or "" if meta.scene else meta.uuid}
     display_name = "AlphaRatio"
     allows_bloated_audio = True
     source_flag = "AlphaRatio"
@@ -439,36 +449,3 @@ class AlphaRatio:
         """Parse MediaInfo asynchronously using thread executor"""
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, lambda: MediaInfo.parse(video_path, output="STRING", full=False, mediainfo_options={"inform": f"file://{template_path}"}))
-
-    async def get_name(self, meta: Meta) -> str:
-        # must use scene name if scene release
-        known_extensions = {".mkv", ".mp4", ".avi", ".ts"}
-        if meta.scene:
-            ar_name = meta.scene_name or ""
-        else:
-            ar_name = meta.uuid
-            p = Path(ar_name)
-            base, ext = p.stem, p.suffix
-            if ext.lower() in known_extensions:
-                ar_name = base
-            ar_name = (
-                ar_name.replace(" ", ".")
-                .replace("'", "")
-                .replace(":", "")
-                .replace("(", ".")
-                .replace(")", ".")
-                .replace("[", ".")
-                .replace("]", ".")
-                .replace("{", ".")
-                .replace("}", ".")
-            )
-            ar_name = re.sub(r"\.{2,}", ".", ar_name)
-
-        tag_lower = "" if not meta.tag else meta.tag.lower()
-        invalid_tags = ["nogrp", "nogroup", "unknown", "-unk-"]
-        if meta.tag == "" or any(invalid_tag in tag_lower for invalid_tag in invalid_tags):
-            for invalid_tag in invalid_tags:
-                ar_name = re.sub(f"-{invalid_tag}", "", ar_name, flags=re.IGNORECASE)
-            ar_name = f"{ar_name}-NoGRP"
-
-        return ar_name

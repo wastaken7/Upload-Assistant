@@ -11,19 +11,28 @@ from src.console import logger
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
-from src.trackers.naming import add_incomplete_pack_marker
+from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, template
+from src.trackers.naming import StringTrackerNameMixin, iptorrents_name
 from src.torrent_manifest import TorrentManifest
 
 Config = dict[str, Any]
 
 
-class IPTorrents:
+class IPTorrents(StringTrackerNameMixin):
     """
     IPT Private Torrent Tracker
     """
 
     auth_type = "cookies"
     tracker = "IPTORRENTS"
+    name_profile = TrackerNameProfile(
+        rules=(NameRule(NameSelector(), template("ipt_source")),),
+        transforms=(iptorrents_name,),
+    )
+
+    async def get_name_overrides(self, context: NameContext) -> dict[str, str]:
+        meta = context.meta
+        return {"ipt_source": meta.scene_name or meta.clean_name}
     display_name = "IPTorrents"
     allows_bloated_audio = True
     source_flag = "IPTorrents"
@@ -363,49 +372,6 @@ class IPTorrents:
             return music_all_codecs
 
         return 0
-
-    async def get_name(self, meta: Meta):
-        name: str = meta.scene_name if meta.scene_name else meta.clean_name
-
-        replacements = {
-            "3DAccess": "3DA",
-            "AreaFiles": "AF",
-            "BeyondHD": "BHD",
-            "Blackcat": "Blackcat",
-            "Blu-Bits": "BluHD",
-            "Bluebird": "BB",
-            "BlueEvolution": "BluEvo",
-            "Chdbits": "CHD",
-            "CtrlHD": "CtrlHD",
-            "HDAccess": "HDA",
-            "HDChina": "HDC",
-            "HDClub": "HDCL",
-            "HDGeek": "HDG",
-            "HDRoad": "HDR",
-            "HDStar": "HDS",
-            "HDWing": "HDW",
-            "ExtraTorrent": "ETRG",
-            "IWStream": "IWS",
-            "Kingdom-KVCD": "KVCD",
-            "MVGroup": "MVG",
-            "Projekt-Revolution": "Projekt",
-            "PublicHD": "PHD",
-            "SpaceHD": "SHD",
-            "ThumperDC": "TDC",
-            "TrollHD": "TrollHD",
-            "TheWolfsDen": "TWD",
-        }
-
-        for key, value in replacements.items():
-            if key in name:
-                name = name.replace(key, value)
-
-        name = name.replace("'", "").replace('"', "")
-
-        if meta.scene and "[NO RAR]" not in name.upper():
-            name += " [NO RAR]"
-
-        return add_incomplete_pack_marker(re.sub(r"\s{2,}", " ", name), meta, self.tracker)
 
     async def get_is_freeleech(self, meta: Meta):
         torrent_path = TorrentManifest(meta.base_dir, meta.uuid).default_path()

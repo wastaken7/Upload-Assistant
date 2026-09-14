@@ -1,6 +1,5 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
-import unicodedata
 from typing import Any, cast
 
 import aiofiles
@@ -10,19 +9,32 @@ from src.cogs.redaction import Redaction
 from src.console import logger
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
+from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, template
+from src.trackers.naming import StringTrackerNameMixin, configured_metadata_name
 from src.rehostimages import ImageHostPolicy, RehostImagesManager
 from src.trackers.common import Common
 
 Config = dict[str, Any]
 
 
-class DigitalCore:
+class DigitalCore(StringTrackerNameMixin):
     """
     DIGITALCORE (DC) is a Private Torrent Tracker for 0DAY / GENERAL
     """
 
     auth_type = "other_api"
     tracker = "DIGITALCORE"
+    name_profile = TrackerNameProfile(
+        rules=(NameRule(NameSelector(), template("digitalcore_source")),),
+        transforms=(configured_metadata_name(append_unrar=True),),
+    )
+
+    async def get_name_overrides(self, context: NameContext) -> dict[str, str]:
+        meta = context.meta
+        use_metadata = self.config["TRACKERS"][self.tracker].get("use_metadata_name", False)
+        source = meta.scene_name or meta.clean_name or "" if use_metadata else (f"{meta.scene_name} [UNRAR]" if meta.scene_name else meta.basename_no_ext)
+        return {"digitalcore_source": source, "use_metadata_name": "1" if use_metadata else ""}
+
     display_name = "DigitalCore"
     base_url = "https://digitalcore.club"
     api_base_url = f"{base_url}/api/v1/torrents"
@@ -171,41 +183,6 @@ class DigitalCore:
             return dupes
 
         return []
-
-    async def get_name(self, meta: Meta) -> str:
-        """
-        Edits the name according to DIGITALCORE's naming conventions.
-        Scene uploads should use the scene name.
-        Scene uploads should also have "[UNRAR]" in the name, as the UA only uploads unzipped files, which are considered "altered".
-        https://digitalcore.club/forum/17/topic/1051/uploading-for-beginners
-
-        Mod mentioned that adding [UNRAR] is unnecessary, but according to my tests, their system does not accept it if there is already a release with the same title.
-        Mod also mentioned that metadata-based titles are acceptable.
-        https://digitalcore.club/forum/6/topic/2810/clarification-needed-p2p-non-scene-torrent-naming-conventions
-        """
-        tracker_name = meta.basename_no_ext
-        scene_name = meta.scene_name or ""
-
-        use_metadata_name = self.config["TRACKERS"][self.tracker].get("use_metadata_name", False)
-        if use_metadata_name:
-            clean_name = meta.clean_name or ""
-            tracker_name = scene_name if scene_name else clean_name
-            # T1)  Acceptable characters are as follows:
-            #         ABCDEFGHIJKLMNOPQRSTUVWXYZ
-            #         abcdefghijklmnopqrstuvwxyz
-            #         0123456789 . -
-            # https://scenerules.org/html/2014_BLURAY.html
-            tracker_name = tracker_name.replace("DD+", "DDP").replace("DTS:", "DTS-").replace("HDR10+", "HDR10P")
-            tracker_name = unicodedata.normalize("NFD", tracker_name)
-            tracker_name = "".join(c for c in tracker_name if c.isascii() and (c.isalnum() or c in (" ", ".", "-")))
-            tracker_name = tracker_name.replace("!", "")
-            if scene_name:
-                tracker_name += " [UNRAR]"
-
-        else:
-            tracker_name = f"{scene_name} [UNRAR]" if scene_name else meta.basename_no_ext
-
-        return tracker_name
 
     async def get_firstpic(self, meta: Meta) -> str:
         if meta.category in ("BOOK", "MUSIC"):

@@ -12,18 +12,23 @@ from src.console import logger
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
-from src.trackers.naming import add_incomplete_pack_marker
+from src.release_name import NameRule, NameSelector, TrackerNameProfile, template
+from src.trackers.naming import StringTrackerNameMixin, add_incomplete_pack_marker_transform, hdtorrents_name_transform
 
 Config = dict[str, Any]
 
 
-class HDTorrents:
+class HDTorrents(StringTrackerNameMixin):
     """
     HD-Torrents (HDT) is a Private Torrent Tracker for HD MOVIES / TV / MUSIC / 3X
     """
 
     auth_type = "cookies"
     tracker = "HDTORRENTS"
+    name_profile = TrackerNameProfile(
+        rules=(NameRule(NameSelector(), template("base_name")),),
+        transforms=(hdtorrents_name_transform, add_incomplete_pack_marker_transform),
+    )
     display_name = "HD-Torrents"
     allows_bloated_audio = True
     source_flag = "hd-torrents.org"
@@ -125,21 +130,6 @@ class HDTorrents:
                     cat_id = 38
 
         return cat_id
-
-    async def get_name(self, meta: Meta) -> str:
-        hdt_name = meta.name
-        audio = meta.audio
-        hdr = meta.hdr
-        if meta.type in ("WEBDL", "WEBRIP", "ENCODE"):
-            hdt_name = hdt_name.replace(audio, audio.replace(" ", "", 1))
-        if "DV" in hdr:
-            hdt_name = hdt_name.replace(" DV ", " DoVi ")
-        if "BluRay REMUX" in hdt_name:
-            hdt_name = hdt_name.replace("BluRay REMUX", "Blu-ray Remux")
-
-        hdt_name = " ".join(hdt_name.split())
-        hdt_name = re.sub(r"[^0-9a-zA-ZÀ-ÿ. &+'\-\[\]]+", "", hdt_name)
-        return add_incomplete_pack_marker(hdt_name.replace(":", "").replace("..", " ").replace("  ", " "), meta, self.tracker)
 
     async def edit_desc(self, meta: Meta) -> str:
         builder = DescriptionBuilder(self.tracker, self.config)

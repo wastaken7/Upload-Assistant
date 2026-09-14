@@ -30,11 +30,12 @@ from src.takescreens import TakeScreensManager
 from src.temp_paths import artwork_dir, screenshots_dir
 from src.torrent_policy import PASSTHEPOPCORN_POLICY
 from src.tracker_images import get_tracker_image_collection
+from src.trackers.naming import StringTrackerNameMixin
 from src.trackers.common import Common
 from src.uploadscreens import UploadScreensManager
 
 
-class PassThePopcorn:
+class PassThePopcorn(StringTrackerNameMixin):
     """
     PTP Private Torrent Tracker
     """
@@ -1622,10 +1623,6 @@ class PassThePopcorn:
             data["groupid"] = group_id
 
         return url, data
-
-    async def get_name(self, meta: Meta) -> str:
-        # PTP doesn't use a custom releasename in the upload form, so just return the filename
-        return meta.name
 
     async def upload(self, meta: Meta, url: str, data: dict[str, Any]) -> bool:
         common = Common(config=self.config)

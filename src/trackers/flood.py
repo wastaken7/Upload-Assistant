@@ -11,14 +11,16 @@ import httpx
 from src.console import logger
 from src.meta import Meta
 from src.trackers.common import Common
+from src.trackers.naming import DVD_CODEC_NAME_PROFILE, StringTrackerNameMixin
 
 
-class Flood:
+class Flood(StringTrackerNameMixin):
     """
     Flood (FLD) is a Private Torrent Tracker for MOVIES / TV
     """
 
     tracker = "FLOOD"
+    name_profile = DVD_CODEC_NAME_PROFILE
     auth_type = "other_api"
     display_name = "Flood"
     source_flag = "FLD"
@@ -262,11 +264,3 @@ class Flood:
             logger.info(f"{self.tracker}: [bold red]unexpected error: {e}[/bold red]")
 
         return []
-
-    async def get_name(self, meta: Meta) -> str:
-        name = meta.name
-        if meta.source in ("PAL DVD", "NTSC DVD", "DVD", "NTSC", "PAL"):
-            audio = meta.audio
-            audio = " ".join(audio.split())
-            name = name.replace(audio, f"{meta.video_codec} {audio}")
-        return name.replace("DD+", "DDP")

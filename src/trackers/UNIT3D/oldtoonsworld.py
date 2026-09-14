@@ -6,8 +6,9 @@ import cli_ui
 
 from src.console import logger
 from src.meta import Meta
+from src.release_name import NameRule, NameSelector, TrackerNameProfile, template
 from src.trackers.common import Common
-from src.trackers.naming import add_incomplete_pack_marker
+from src.trackers.naming import old_toons_world_name
 from src.trackers.UNIT3D import UNIT3D
 
 Config = dict[str, Any]
@@ -19,6 +20,10 @@ class OldToonsWorld(UNIT3D):
     """
 
     tracker = "OLDTOONSWORLD"
+    name_profile = TrackerNameProfile(
+        rules=(NameRule(NameSelector(), template("base_name")),),
+        transforms=(old_toons_world_name,),
+    )
     display_name = "OldToonsWorld"
     allows_bloated_audio = True
     base_url = "https://oldtoons.world"
@@ -170,47 +175,6 @@ class OldToonsWorld(UNIT3D):
             return {"type_id": "7"}
         type_value = type if type is not None and type != "" else str(meta.type)
         return {"type_id": type_id.get(type_value, "0")}
-
-    async def get_name(self, meta: Meta) -> dict[str, str]:
-        otw_name = meta.name
-        source = str(meta.source)
-        resolution = meta.resolution
-        aka = meta.aka
-        type = str(meta.type)
-        video_codec = meta.video_codec
-        if aka:
-            otw_name = otw_name.replace(f"{aka} ", "")
-        is_disc = str(meta.is_disc)
-        audio = meta.audio
-        if is_disc == "DVD" or (type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD")):
-            otw_name = otw_name.replace(source, f"{resolution} {source}", 1)
-            otw_name = otw_name.replace(audio, f"{video_codec} {audio}", 1)
-        if str(meta.category) == "TV":
-            years: list[int] = []
-
-            tmdb_year = str(meta.year) if meta.year is not None else ""
-            if tmdb_year and tmdb_year.isdigit():
-                year = tmdb_year
-            else:
-                if tmdb_year and tmdb_year.isdigit():
-                    years.append(int(tmdb_year))
-
-                imdb_info = cast(dict[str, Any], meta.imdb_info)
-                imdb_year = imdb_info.get("year")
-                if imdb_year and str(imdb_year).isdigit():
-                    years.append(int(imdb_year))
-
-                tvdb_episode_data = meta.tvdb_episode_data
-                series_year = tvdb_episode_data.get("series_year")
-                if series_year and str(series_year).isdigit():
-                    years.append(int(series_year))
-                # Use the oldest year if any found, else empty string
-                year = str(min(years)) if years else ""
-            if not meta.no_year and not meta.search_year:
-                title = meta.title
-                otw_name = otw_name.replace(title, f"{title} {year}", 1)
-
-        return {"name": add_incomplete_pack_marker(otw_name, meta, self.tracker)}
 
     async def get_additional_data(self, meta: Meta) -> dict[str, Any]:
         data: dict[str, Any] = {

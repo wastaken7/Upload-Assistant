@@ -5,7 +5,9 @@ from typing import Any, cast
 
 from src.console import logger
 from src.meta import Meta
+from src.release_name import NameRule, NameSelector, TrackerNameProfile, template
 from src.trackers.common import Common
+from src.trackers.naming import invalid_group_suffix
 from src.trackers.UNIT3D import UNIT3D
 
 Config = dict[str, Any]
@@ -17,6 +19,10 @@ class Portugas(UNIT3D):
     """
 
     tracker = "PORTUGAS"
+    name_profile = TrackerNameProfile(
+        rules=(NameRule(NameSelector(), template("base_name")),),
+        transforms=(invalid_group_suffix("NOGROUP", dotted=True),),
+    )
     display_name = "Portugas"
     base_url = "https://portugas.org"
     banned_groups = ()
@@ -55,20 +61,6 @@ class Portugas(UNIT3D):
         }.get(meta.resolution, "10")
         return {"resolution_id": resolution_id}
 
-    async def get_name(self, meta: Meta) -> dict[str, str]:
-        name = meta.name.replace(" ", ".")
-
-        pt_name = name
-        tag_value = meta.tag or ""
-        tag_lower = tag_value.lower()
-        invalid_tags = ["nogrp", "nogroup", "unknown", "-unk-"]
-
-        if tag_value == "" or any(invalid_tag in tag_lower for invalid_tag in invalid_tags):
-            for invalid_tag in invalid_tags:
-                pt_name = re.sub(f"-{invalid_tag}", "", pt_name, flags=re.IGNORECASE)
-            pt_name = f"{pt_name}-NOGROUP"
-
-        return {"name": pt_name}
 
     def get_audio(self, meta: Meta) -> int:
         found_portuguese_audio = False

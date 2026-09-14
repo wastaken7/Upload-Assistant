@@ -5,7 +5,9 @@ import cli_ui
 
 from src.console import logger
 from src.meta import Meta
+from src.release_name import NameRule, NameSelector, TrackerNameProfile, template
 from src.trackers.common import Common
+from src.trackers.naming import imdb_title_transform, remove_tv_episode_title
 from src.trackers.UNIT3D import UNIT3D
 
 
@@ -15,6 +17,10 @@ class Blutopia(UNIT3D):
     """
 
     tracker = "BLUTOPIA"
+    name_profile = TrackerNameProfile(
+        rules=(NameRule(NameSelector(), template("base_name")),),
+        transforms=(remove_tv_episode_title, imdb_title_transform(remove_web_hybrid=True, add_dv_profile=True)),
+    )
     display_name = "Blutopia"
     base_url = "https://blutopia.cc"
     banned_groups = (
@@ -170,34 +176,6 @@ class Blutopia(UNIT3D):
 
         return should_continue
 
-    async def get_name(self, meta: Meta) -> dict[str, str]:
-        blu_name = meta.name
-        if meta.category == "TV" and meta.episode_title != "":
-            blu_name = blu_name.replace(f"{meta.episode_title} {meta.resolution}", f"{meta.resolution}", 1)
-        imdb_name = meta.imdb_info.get("title", "")
-        imdb_year = str(meta.imdb_info.get("year", ""))
-        imdb_aka = meta.imdb_info.get("aka", "")
-        year = str(meta.year) if meta.year is not None else ""
-        aka = meta.aka
-        webdv = meta.webdv
-        if imdb_name and imdb_name.strip():
-            if aka:
-                blu_name = blu_name.replace(f"{aka} ", "", 1)
-            blu_name = blu_name.replace(f"{meta.title}", imdb_name, 1)
-
-            if imdb_aka and imdb_aka.strip() and imdb_aka != imdb_name and not meta.no_aka:
-                blu_name = blu_name.replace(f"{imdb_name}", f"{imdb_name} AKA {imdb_aka}", 1)
-
-        if meta.category != "TV" and imdb_year and imdb_year.strip() and year and year.strip() and imdb_year != year:
-            blu_name = blu_name.replace(f"{year}", imdb_year, 1)
-
-        if webdv:
-            blu_name = blu_name.replace("HYBRID ", "", 1)
-
-        if meta.tracker_status.get(self.tracker, {}).get("other", False):
-            blu_name = blu_name.replace(f"{meta.resolution}", f"{meta.resolution} DVP5/DVP8", 1)
-
-        return {"name": blu_name}
 
     async def get_additional_data(self, meta: Meta) -> dict[str, Any]:
         return {

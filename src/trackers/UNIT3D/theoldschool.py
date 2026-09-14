@@ -4,8 +4,10 @@ from typing import Any
 
 from src.console import logger
 from src.meta import Meta
+from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, template
 from src.torrentcreate import TorrentCreator
 from src.trackers.common import Common
+from src.trackers.naming import non_scene_dotted_name
 from src.trackers.UNIT3D import UNIT3D
 
 
@@ -15,6 +17,24 @@ class TheOldSchool(UNIT3D):
     """
 
     tracker = "THEOLDSCHOOL"
+    name_profile = TrackerNameProfile(
+        rules=(NameRule(NameSelector(), template("oldschool_source")),),
+        transforms=(non_scene_dotted_name,),
+    )
+
+    async def get_name_overrides(self, context: NameContext) -> dict[str, str]:
+        meta = context.meta
+        if meta.keep_nfo:
+            tracker_config = self.config["TRACKERS"].get(self.tracker, {})
+            tracker_url = str(tracker_config.get("announce_url", "https://fake.tracker")).strip()
+            try:
+                cooldown = int(self.config.get("DEFAULT", {}).get("rehash_cooldown", 0) or 0)
+            except (ValueError, TypeError):
+                cooldown = 0
+            if cooldown > 0:
+                await asyncio.sleep(cooldown)
+            await TorrentCreator.create_torrent(meta, str(meta.path), f"[{self.tracker}]", tracker_url=tracker_url)
+        return {"oldschool_source": meta.scene_name if meta.scene else meta.basename_no_ext}
     display_name = "The Old School"
     source_flag = "TheOldSchool"
     base_url = "https://theoldschool.cc"
@@ -77,37 +97,6 @@ class TheOldSchool(UNIT3D):
                 "HDTV": "6",
             }.get(meta.type or "", "0")
         return {"type_id": type_id}
-
-    async def get_name(self, meta: Meta) -> dict[str, str]:
-        is_scene = meta.scene
-        base_name: str = meta.scene_name if is_scene else meta.basename_no_ext
-
-        if is_scene is False:
-            replacements = {
-                ".mkv": "",
-                ".mp4": "",
-                ".torrent": "",
-                " ": ".",
-            }
-
-            for old, new in replacements.items():
-                base_name = base_name.replace(old, new)
-
-        # Hook into this function for torrent file recreation if needed
-        if meta.keep_nfo:
-            tracker_config = self.config["TRACKERS"].get(self.tracker, {})
-            tracker_url = str(tracker_config.get("announce_url", "https://fake.tracker")).strip()
-            torrent_create = f"[{self.tracker}]"
-            try:
-                cooldown = int(self.config.get("DEFAULT", {}).get("rehash_cooldown", 0) or 0)
-            except ValueError, TypeError:
-                cooldown = 0
-            if cooldown > 0:
-                await asyncio.sleep(cooldown)  # Small cooldown before rehashing
-
-            await TorrentCreator.create_torrent(meta, str(meta.path), torrent_create, tracker_url=tracker_url)
-
-        return {"name": base_name}
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         # Check language requirements: must be French audio OR original audio with French subtitles

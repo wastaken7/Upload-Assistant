@@ -10,10 +10,11 @@ from src.console import logger
 from src.get_desc import DescriptionBuilder
 from src.languages import languages_manager
 from src.meta import Meta
+from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, template
 from src.music.models import MusicRelease
 from src.music.validation import MusicValidator, ValidationLevel
 from src.tmdb import TmdbManager
-from src.trackers.naming import add_incomplete_pack_marker
+from src.trackers.naming import append_context_value, darkpeers_video_name
 from src.trackers.UNIT3D import UNIT3D
 
 
@@ -23,6 +24,59 @@ class DarkPeers(UNIT3D):
     """
 
     tracker = "DARKPEERS"
+    name_profile = TrackerNameProfile(
+        rules=(
+            NameRule(NameSelector(category="MUSIC"), template("artist", "dash", "album", "year_label", "format_dash", "format_label")),
+            NameRule(NameSelector(category="BOOK"), template("author", "dash", "title", "year", "book_edition", "book_format", "book_bitrate", "book_identifier", "book_source", "ocr_label")),
+            NameRule(NameSelector(), template("base_name")),
+        ),
+        transforms=(darkpeers_video_name, append_context_value("direct_tag")),
+    )
+
+    async def get_name_overrides(self, context: NameContext) -> dict[str, str]:
+        meta = context.meta
+        if meta.category == "MUSIC":
+            release = meta.music_release if isinstance(meta.music_release, dict) else {}
+            artist = str(self._release_field(release, "artist", meta.artist)).strip()
+            album = str(self._release_field(release, "album", meta.title)).strip()
+            year = str(self._release_field(release, "release_year", self._release_field(release, "year", meta.year or ""))).strip()
+            media = str(self._release_field(release, "media", meta.source)).strip()
+            tracks = release.get("tracks") if isinstance(release.get("tracks"), list) else []
+            first = tracks[0] if tracks and isinstance(tracks[0], dict) else {}
+            codec = str(first.get("codec") or first.get("format") or meta.format or meta.type).upper().strip()
+            parts = [media, codec]
+            if codec in {"FLAC", "ALAC", "PCM"}:
+                depth = first.get("bit_depth") or self._release_field(release, "nfo_bit_depth")
+                rate = first.get("sample_rate") or self._release_field(release, "nfo_sample_rate")
+                if depth is not None and rate is not None:
+                    with suppress(TypeError, ValueError):
+                        parts.append(f"{int(depth)}-{int(rate) / 1000:g}")
+            elif codec in {"MP3", "AAC", "OPUS", "VORBIS"}:
+                bitrate = first.get("bitrate") or meta.audio_bitrate
+                if bitrate is not None:
+                    with suppress(TypeError, ValueError):
+                        value = int(bitrate)
+                        parts.append(str(value // 1000 if value >= 1000 else value))
+                mode = str(first.get("bitrate_mode") or "").upper().strip()
+                if mode:
+                    parts.append(mode)
+            format_label = " ".join(part for part in parts if part)
+            return {"artist": artist, "dash": "-" if artist and album else "", "album": album, "year_label": f"({year})" if year else "", "format_dash": "-" if format_label else "", "format_label": format_label}
+        if meta.category == "BOOK":
+            author = str(meta.author or meta.book_author or "").strip()
+            title = str(meta.title or "").strip()
+            edition = str(meta.manual_edition or meta.edition or "").strip()
+            format_name = self._book_format(meta)
+            identifier = self._book_identifier(meta)
+            source = str(meta.manual_source or meta.source or "").upper().strip()
+            direct_tag = ""
+            if meta.audiobook and meta.tag:
+                tag = str(meta.tag).strip()
+                direct_tag = tag if tag.startswith("-") else f"-{tag}"
+            return {"author": author, "dash": "-" if author and title else "", "title": title, "year": str(meta.year or "").strip(), "book_edition": edition if not meta.audiobook and edition and not re.search(r"\b(?:1st|first)\b", edition, re.I) else "", "book_format": format_name, "book_bitrate": str(meta.audiobook_bitrate) if meta.audiobook and format_name in {"MP3", "AAC", "OPUS", "VORBIS"} and meta.audiobook_bitrate else "", "book_identifier": identifier, "book_source": "Retail" if not meta.audiobook and source == "RETAIL" else "Scan" if not meta.audiobook and source == "SCAN" else "", "ocr_label": "OCR" if not meta.audiobook and meta.ocr else "", "direct_tag": direct_tag}
+        remove_year = meta.category == "TV" and bool(meta.year) and not await self._tv_title_needs_year(meta)
+        audio = await self.get_audio(meta)
+        return {"remove_tv_year": "1" if remove_year else "", "replacement_audio": audio if audio and audio != "SKIPPED" else ""}
     display_name = "DarkPeers"
     allows_bloated_audio = True
     reject_episode_if_season_pack_exists = True
@@ -428,33 +482,6 @@ class DarkPeers(UNIT3D):
         other = audio - accepted
         return f"{next(iter(other)).title()} MULTi" if len(other) == 1 and len(audio) == 2 else "SKIPPED"
 
-    async def get_name(self, meta: Meta) -> dict[str, str]:
-        if meta.category == "MUSIC":
-            return {"name": self._music_name(meta)}
-
-        if meta.category == "BOOK":
-            return {"name": self._book_name(meta)}
-
-        # DP prohibits retags.  When the preparation stage identified a scene
-        # release, submit its recorded release name rather than rebuilding it.
-        dp_name = str(meta.name or "")
-
-        if meta.category == "TV":
-            dp_name = await self._tv_name(meta, dp_name)
-
-        audio = await self.get_audio(meta)
-        if audio and audio != "SKIPPED" and "Dual-Audio" in dp_name:
-            dp_name = dp_name.replace("Dual-Audio", audio)
-
-        return {"name": add_incomplete_pack_marker(dp_name, meta, self.tracker)}
-
-    async def _tv_name(self, meta: Meta, name: str) -> str:
-        title = str(meta.title or "").strip()
-        year = str(meta.year or "").strip()
-        if year and not await self._tv_title_needs_year(meta):
-            name = re.sub(rf"^({re.escape(title)})\s+{re.escape(year)}(?=\s|$)", r"\1", name, count=1, flags=re.IGNORECASE)
-        return " ".join(name.split())
-
     async def _tv_title_needs_year(self, meta: Meta) -> bool:
         title = str(meta.title or "").strip()
         api_key = str(self.config.get("DEFAULT", {}).get("tmdb_api", "")).strip()
@@ -495,82 +522,6 @@ class DarkPeers(UNIT3D):
         fields = release.get("fields") if isinstance(release, dict) else {}
         value = fields.get(name) if isinstance(fields, dict) else {}
         return value.get("value", default) if isinstance(value, dict) else default
-
-    @classmethod
-    def _music_name(cls, meta: Meta) -> str:
-        """Format music as ``Artist - Album (Year) - Format`` for DarkPeers."""
-        release = meta.music_release if isinstance(meta.music_release, dict) else {}
-        artist = str(cls._release_field(release, "artist", meta.artist)).strip()
-        album = str(cls._release_field(release, "album", meta.title)).strip()
-        year = str(cls._release_field(release, "release_year", cls._release_field(release, "year", meta.year or ""))).strip()
-        media = str(cls._release_field(release, "media", meta.source)).strip()
-        raw_tracks = release.get("tracks")
-        tracks = raw_tracks if isinstance(raw_tracks, list) else []
-        first_track = tracks[0] if tracks and isinstance(tracks[0], dict) else {}
-        codec = str(first_track.get("codec") or first_track.get("format") or meta.format or meta.type).upper().strip()
-
-        format_parts = [media, codec]
-        if codec in {"FLAC", "ALAC", "PCM"}:
-            depth = first_track.get("bit_depth") or cls._release_field(release, "nfo_bit_depth")
-            rate = first_track.get("sample_rate") or cls._release_field(release, "nfo_sample_rate")
-            if depth is not None and rate is not None:
-                with suppress(TypeError, ValueError):
-                    format_parts.append(f"{int(depth)}-{int(rate) / 1000:g}")
-        elif codec in {"MP3", "AAC", "OPUS", "VORBIS"}:
-            bitrate = first_track.get("bitrate") or meta.audio_bitrate
-            if bitrate is not None:
-                with suppress(TypeError, ValueError):
-                    b = int(bitrate)
-                    bitrate_kbps = b // 1000 if b >= 1000 else b
-                    format_parts.append(str(bitrate_kbps))
-            bitrate_mode = str(first_track.get("bitrate_mode") or "").upper().strip()
-            if bitrate_mode:
-                format_parts.append(bitrate_mode)
-
-        format_name = " ".join(part for part in format_parts if part)
-        title = " - ".join(part for part in (artist, album) if part)
-        if year:
-            title = f"{title} ({year})" if title else f"({year})"
-        return f"{title} - {format_name}" if format_name else title
-
-    @staticmethod
-    def _book_name(meta: Meta) -> str:
-        """Format eBooks and audiobooks according to DarkPeers' book rules."""
-        # Publisher is a description field, never a substitute for the author.
-        author = str(meta.author or meta.book_author or "").strip()
-        title = str(meta.title or "").strip()
-        year = str(meta.year or "").strip()
-        edition = str(meta.manual_edition or meta.edition or "").strip()
-        format_name = DarkPeers._book_format(meta)
-        identifier = DarkPeers._book_identifier(meta)
-
-        parts = [part for part in (author, "-" if author and title else "", title, year) if part]
-        if not meta.audiobook and edition and not re.search(r"\b(?:1st|first)\b", edition, re.IGNORECASE):
-            parts.append(edition)
-        if format_name:
-            parts.append(format_name)
-
-        if meta.audiobook:
-            if format_name in {"MP3", "AAC", "OPUS", "VORBIS"} and meta.audiobook_bitrate:
-                parts.append(str(meta.audiobook_bitrate))
-            if identifier:
-                parts.append(identifier)
-            base_name = " ".join(parts)
-            tag = str(meta.tag or "").strip()
-            if tag:
-                return f"{base_name}{tag if tag.startswith('-') else f'-{tag}'}"
-            return base_name
-
-        if identifier:
-            parts.append(identifier)
-        source = str(meta.manual_source or meta.source or "").upper().strip()
-        if source == "RETAIL":
-            parts.append("Retail")
-        if source == "SCAN":
-            parts.append("Scan")
-        if meta.ocr:
-            parts.append("OCR")
-        return " ".join(parts)
 
     async def get_category_id(self, meta: Meta, category: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         category_id = {

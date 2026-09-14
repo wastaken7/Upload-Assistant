@@ -4,7 +4,6 @@ import contextlib
 import hashlib
 import io
 import re
-import unicodedata
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -18,6 +17,8 @@ from src.console import logger
 from src.meta import Meta
 from src.temp_paths import artwork_dir
 from src.trackers.common import Common
+from src.release_name import NameRule, NameSelector, TrackerNameProfile, strip_diacritics, template
+from src.trackers.naming import StringTrackerNameMixin
 from src.trackers.USENET.search_helpers import (
     build_newznab_search_query,
     get_daily_api_hit_limit,
@@ -29,13 +30,17 @@ from src.trackers.USENET.search_helpers import (
 Config = dict[str, Any]
 
 
-class Suio:
+class Suio(StringTrackerNameMixin):
     """
     SUIO Private Torrent Tracker
     """
 
     auth_type = "other_api"
     tracker = "SUIO"
+    name_profile = TrackerNameProfile(
+        rules=(NameRule(NameSelector(), template("scene_or_basename")),),
+        transforms=(strip_diacritics,),
+    )
     display_name = "Suio"
     allows_bloated_audio = True
     banned_groups: tuple[str, ...] = ()
@@ -397,11 +402,6 @@ class Suio:
                     filename = cover_path.stem + ".jpg"
                 files["cover"] = (filename, cover_content, "image/jpeg")
         return files
-
-    async def get_name(self, meta: Meta) -> str:
-        name = meta.scene_name or meta.basename_no_ext or ""
-        normalized = unicodedata.normalize("NFKD", name)
-        return "".join(char for char in normalized if not unicodedata.combining(char))
 
     async def _prepare_data(self, meta: Meta) -> dict[str, Any]:
         return {

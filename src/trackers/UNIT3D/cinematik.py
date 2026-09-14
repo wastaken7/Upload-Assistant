@@ -15,6 +15,7 @@ from rich.markup import escape
 from src.console import logger
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
+from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, template
 from src.temp_paths import artwork_dir
 from src.trackers.UNIT3D import UNIT3D
 from src.uploadscreens import UploadScreensManager
@@ -28,6 +29,40 @@ class Cinematik(UNIT3D):
     """
 
     tracker = "CINEMATIK"
+    name_profile = TrackerNameProfile(
+        rules=(NameRule(NameSelector(), template("cinematik_title", "year_part", "season_label", "disc_label", "resolution_part", "codec_or_size", "three_d_label", separator="")),)
+    )
+
+    async def get_name_overrides(self, context: NameContext) -> dict[str, str]:
+        meta = context.meta
+        category_id = (await self.get_category_id(meta))["category_id"]
+        meta.category_id = category_id
+        allowed_movie = category_id in ("1", "3", "5", "6")
+        allowed_tv = meta.category == "TV" and str(meta.type) == "DISC"
+        if not (allowed_movie or allowed_tv) or meta.is_disc not in ("BDMV", "DVD"):
+            return {"cinematik_title": ""}
+        title = meta.title.replace("AKA", "/").strip()
+        alt_title = meta.aka.replace("AKA", "/").strip()
+        year = str(meta.year) if meta.year is not None else ""
+        if allowed_tv:
+            year = str(meta.search_year).strip() or year
+        if meta.is_disc == "BDMV":
+            disc_label = meta.disctype
+            codec_or_size = meta.video_codec
+            three_d_label = f" [{meta.three_d}]" if meta.three_d and allowed_movie else " " if allowed_movie else ""
+        else:
+            disc_label = str(meta.source)
+            codec_or_size = meta.dvd_size
+            three_d_label = ""
+        return {
+            "cinematik_title": f"{title}{f' {alt_title}' if alt_title else ''}",
+            "year_part": f" ({year})",
+            "season_label": f" {meta.season}" if allowed_tv else "",
+            "disc_label": f" {disc_label}",
+            "resolution_part": f" {meta.resolution}" if meta.is_disc == "BDMV" else "",
+            "codec_or_size": f" {codec_or_size}",
+            "three_d_label": three_d_label,
+        }
     display_name = "Cinematik"
     allows_bloated_audio = True
     base_url = "https://cinematik.net"
@@ -56,53 +91,6 @@ class Cinematik(UNIT3D):
         }
 
         return data
-
-    async def get_name(self, meta: Meta) -> dict[str, str]:
-        disctype = meta.disctype
-        filelist = meta.filelist
-        basename = Path(next(iter(filelist), str(meta.path))).name
-        type_value = str(meta.type)
-        title = meta.title.replace("AKA", "/").strip()
-        alt_title = meta.aka.replace("AKA", "/").strip()
-        year = str(meta.year) if meta.year is not None else ""
-        resolution = meta.resolution
-        season = str(meta.season)
-        repack = meta.repack
-        if repack.strip():
-            repack = f"[{repack}]"
-        three_d = meta.three_d
-        three_d_tag = f"[{three_d}]" if three_d else ""
-        tag = meta.tag.replace("-", "- ") if meta.tag else ""
-        if tag == "":
-            tag = "- NOGRP"
-        source = str(meta.source)
-        hdr = meta.hdr
-        if not hdr.strip():
-            hdr = "SDR"
-        video_codec = meta.video_codec
-        video_encode = meta.video_encode.replace(".", "")
-        if "x265" in basename:
-            video_encode = video_encode.replace("H", "x")
-        dvd_size = meta.dvd_size
-        search_year = str(meta.search_year)
-        if not search_year.strip():
-            search_year = year
-        meta.category_id = (await self.get_category_id(meta))["category_id"]
-
-        name = ""
-        alt_title_part = f" {alt_title}" if alt_title else ""
-        if meta.category_id in ("1", "3", "5", "6"):
-            if meta.is_disc == "BDMV":
-                name = f"{title}{alt_title_part} ({year}) {disctype} {resolution} {video_codec} {three_d_tag}"
-            elif meta.is_disc == "DVD":
-                name = f"{title}{alt_title_part} ({year}) {source} {dvd_size}"
-        elif meta.category == "TV" and type_value == "DISC":  # TV SPECIFIC - Disk
-            if meta.is_disc == "BDMV":
-                name = f"{title}{alt_title_part} ({search_year}) {season} {disctype} {resolution} {video_codec}"
-            if meta.is_disc == "DVD":
-                name = f"{title}{alt_title_part} ({search_year}) {season} {source} {dvd_size}"
-
-        return {"name": name}
 
     async def get_category_id(self, meta: Meta, category: str | None = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         _ = (category, reverse, mapping_only)

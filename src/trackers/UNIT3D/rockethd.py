@@ -9,7 +9,9 @@ import pycountry
 from src.console import logger, prompt_in_thread
 from src.languages import languages_manager
 from src.meta import Meta
+from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, collapse_whitespace, replace_text, template
 from src.trackers.common import Common
+from src.trackers.naming import append_context_value
 from src.trackers.UNIT3D import UNIT3D
 
 
@@ -19,6 +21,63 @@ class RocketHD(UNIT3D):
     """
 
     tracker = "ROCKETHD"
+    name_profile = TrackerNameProfile(
+        rules=(
+            NameRule(NameSelector(type="DISC"), template("effective_title", "year", "season_episode", "incomplete", "three_d", "edition", "repack", "resolution", "complete", "region", "uhd", "effective_source", "dvd_size", "clean_audio", "hdr", "video_codec", "internal")),
+            NameRule(NameSelector(type="REMUX"), template("effective_title", "year", "season_episode", "incomplete", "three_d", "edition", "hybrid", "audio_language", "repack", "resolution", "uhd", "effective_source", "type_label", "clean_audio", "hdr", "video_codec", "internal")),
+            NameRule(NameSelector(type=("DVDRIP", "BRRIP")), template("effective_title", "year", "season_episode", "incomplete", "three_d", "edition", "hybrid", "audio_language", "repack", "resolution", "type_label", "clean_audio", "hdr", "video_encode", "internal")),
+            NameRule(NameSelector(type=("ENCODE", "HDTV")), template("effective_title", "year", "season_episode", "incomplete", "three_d", "edition", "hybrid", "audio_language", "repack", "resolution", "uhd", "effective_source", "clean_audio", "hdr", "video_encode", "internal")),
+            NameRule(NameSelector(type=("WEBDL", "WEBRIP")), template("effective_title", "year", "season_episode", "incomplete", "three_d", "edition", "hybrid", "audio_language", "repack", "resolution", "uhd", "service", "type_label", "clean_audio", "hdr", "video_encode", "internal")),
+            NameRule(NameSelector(), template("fallback_name")),
+        ),
+        transforms=(replace_text(("Dual-Audio", "")), collapse_whitespace, append_context_value("group_suffix")),
+    )
+
+    async def get_name_overrides(self, context: NameContext) -> dict[str, str]:
+        meta = context.meta
+        if not meta.language_checked:
+            await languages_manager.process_desc_language(meta, tracker=self.tracker)
+        title = meta.title
+        german = self._get_german_title(meta.imdb_info)
+        if german and self.config["TRACKERS"].get(self.tracker, {}).get("use_german_title", False):
+            title = german
+        source_value = meta.source or ""
+        source = str(source_value[0]) if isinstance(source_value, list) and source_value else str(source_value)
+        source = source.replace("Blu-ray", "BluRay")
+        basename = self.get_basename(meta).upper()
+        languages = [self._get_language_name(str(item)) for item in (meta.audio_languages if isinstance(meta.audio_languages, list) else [])]
+        languages = list(dict.fromkeys(item for item in languages if item))
+        if len(languages) == 1:
+            audio_language = languages[0]
+        elif len(languages) == 2:
+            audio_language = "GERMAN DL" if "GERMAN" in languages else "ENGLISH DL" if "ENGLISH" in languages else f"{languages[0]} DL"
+        elif len(languages) >= 3:
+            audio_language = "GERMAN ML" if "GERMAN" in languages else "MULTI"
+        else:
+            audio_language = ""
+        if not self._has_german_audio(meta) and self._has_german_subtitles(meta):
+            audio_language = "GERMAN SUBBED"
+        release_type = str(meta.type or "")
+        type_label = "REMUX" if release_type == "REMUX" else "DVDRip" if release_type == "DVDRIP" else "BRRip" if release_type == "BRRIP" else "WEB-DL" if release_type == "WEBDL" else "WEBRip" if release_type == "WEBRIP" else ""
+        group = self._extract_clean_release_group(meta)
+        return {
+            "effective_title": title,
+            "year": str(meta.year or ""),
+            "edition": meta.edition or "",
+            "effective_source": source,
+            "internal": "iNTERNAL" if "INTERNAL" in basename else "",
+            "incomplete": "INCOMPLETE" if (meta.tv_pack and meta.season_pack_incomplete) or "INCOMPLETE" in basename else "",
+            "clean_audio": meta.audio.replace("DD+", "DDP"),
+            "audio_language": audio_language,
+            "hybrid": "Hybrid"
+            if not meta.edition and (meta.webdv or isinstance(meta.source, list)) and "HYBRID" not in title.upper()
+            else "",
+            "repack": meta.repack.strip(),
+            "type_label": type_label,
+            "complete": "COMPLETE",
+            "fallback_name": meta.name or "UNKNOWN",
+            "group_suffix": f"-{group}" if group else "",
+        }
     display_name = "RocketHD"
     supported_categories = ("MOVIE", "TV")
     base_url = "https://rocket-hd.cc"
@@ -185,131 +244,6 @@ class RocketHD(UNIT3D):
             return str(lang.name).upper()
 
         return iso_code.upper()
-
-    async def get_name(self, meta: Meta) -> dict[str, str]:
-        """
-        Rebuild release name from meta components following RocketHD naming rules.
-        """
-        if not meta.language_checked:
-            await languages_manager.process_desc_language(meta, tracker=self.tracker)
-
-        # Title and basic info
-        title = meta.title
-        german_title = self._get_german_title(meta.imdb_info)
-        use_german_title = self.config["TRACKERS"].get(self.tracker, {}).get("use_german_title", False)
-        if german_title and use_german_title:
-            title = german_title
-
-        year_value: Any = meta.year or ""
-        resolution_value: Any = meta.resolution
-        source_value: Any = meta.source or ""
-        year = str(year_value)
-        resolution = str(resolution_value)
-        source = (str(cast(Any, source_value[0])) if source_value else "") if isinstance(source_value, list) else str(source_value)
-        video_codec = meta.video_codec
-        video_encode = meta.video_encode
-
-        # TV specific
-        season = str(meta.season or "")
-        episode = str(meta.episode or "")
-
-        # Optional fields
-        edition = meta.edition
-        hdr = meta.hdr
-        uhd = str(meta.uhd or "")
-        three_d = meta.three_d
-
-        # extract tags from basename for potential later use
-        basename_up = self.get_basename(meta).upper()
-        internal = "iNTERNAL" if "INTERNAL" in basename_up else ""
-        incomplete = "INCOMPLETE" if (meta.tv_pack and meta.season_pack_incomplete) or "INCOMPLETE" in basename_up else ""
-
-        # Clean audio: remove Dual-Audio and trailing language codes
-        audio = meta.audio
-        if "DD+" in audio:
-            audio = audio.replace("DD+", "DDP")
-
-        # Build audio language tag
-        audio_lang_str = ""
-        if meta.audio_languages:
-            # Normalize all to abbreviated ISO 639-3 codes
-            audio_langs_value = meta.audio_languages
-            audio_langs_raw = cast(list[Any], audio_langs_value) if isinstance(audio_langs_value, list) else []
-            audio_langs = [self._get_language_name(str(lang)) for lang in audio_langs_raw]
-            audio_langs = [lang for lang in audio_langs if lang]  # Remove empty
-            audio_langs = list(dict.fromkeys(audio_langs))  # Dedupe preserving order
-
-            num_langs = len(audio_langs)
-
-            if num_langs == 1:
-                # One language (GERMAN or non-GERMAN)
-                audio_lang_str = audio_langs[0]
-
-            elif num_langs == 2:
-                # Two languages ("GERMAN DL" if GERMAN is present, "[lang] DL" if not)
-                if "GERMAN" in audio_langs:
-                    audio_lang_str = "GERMAN DL"
-                elif "ENGLISH" in audio_langs:
-                    audio_lang_str = "ENGLISH DL"
-                else:
-                    audio_lang_str = f"{audio_langs[0]} DL"
-
-            elif num_langs >= 3:
-                # Three or more languages, "GERMAN ML" if GERMAN is present, "MULTI" only if not)
-                audio_lang_str = "GERMAN ML" if "GERMAN" in audio_langs else "MULTI"
-
-        # Add [GERMAN SUBBED] for German subtitles without German audio
-        if not self._has_german_audio(meta) and self._has_german_subtitles(meta):
-            audio_lang_str = "GERMAN SUBBED"
-
-        effective_type = str(meta.type or "")
-
-        source = source.replace("Blu-ray", "BluRay")
-
-        # Detect Hybrid from filename if not in title
-        hybrid = ""
-        if not edition and (meta.webdv or isinstance(meta.source, list)) and "HYBRID" not in title.upper():
-            hybrid = "Hybrid"
-
-        repack = meta.repack.strip()
-
-        name = None
-        # Build name per RocketHD type-specific format
-        if effective_type == "DISC":
-            region = meta.region
-            dvd_size = meta.dvd_size
-            name = f"{title} {year} {season}{episode} {incomplete} {three_d} {edition} {repack} {resolution} COMPLETE {region} {uhd} {source} {dvd_size} {audio} {hdr} {video_codec} {internal}"
-        elif effective_type == "REMUX":
-            name = f"{title} {year} {season}{episode} {incomplete} {three_d} {edition} {hybrid} {audio_lang_str} {repack} {resolution} {uhd} {source} REMUX {audio} {hdr} {video_codec} {internal}"
-        elif effective_type in ("DVDRIP", "BRRIP"):
-            type_str = "DVDRip" if effective_type == "DVDRIP" else "BRRip"
-            name = f"{title} {year} {season}{episode} {incomplete} {three_d} {edition} {hybrid} {audio_lang_str} {repack} {resolution} {type_str} {audio} {hdr} {video_encode} {internal}"
-        elif effective_type in ("ENCODE", "HDTV"):
-            name = f"{title} {year} {season}{episode} {incomplete} {three_d} {edition} {hybrid} {audio_lang_str} {repack} {resolution} {uhd} {source} {audio} {hdr} {video_encode} {internal}"
-        elif effective_type in ("WEBDL", "WEBRIP"):
-            service = str(meta.service or "")
-            type_str = "WEB-DL" if effective_type == "WEBDL" else "WEBRip"
-            name = f"{title} {year} {season}{episode} {incomplete} {three_d} {edition} {hybrid} {audio_lang_str} {repack} {resolution} {uhd} {service} {type_str} {audio} {hdr} {video_encode} {internal}"
-        else:
-            logger.info(f"{self.tracker}: [bold red]Name enrichment failed. Please manually update the name after Uploading.[/bold red]")
-
-        # Ensure name is always a string
-        if not name:
-            name = meta.name or "UNKNOWN"
-
-        # Remove any leftover "Dual-Audio" markers
-        if "Dual-Audio" in name:
-            name = name.replace("Dual-Audio", "").strip()
-
-        # Cleanup whitespace
-        name = self.WHITESPACE_PATTERN.sub(" ", name).strip()
-
-        # Extract tag and append if valid
-        tag = self._extract_clean_release_group(meta)
-        if tag:
-            name = f"{name}-{tag}"
-
-        return {"name": name}
 
     def _extract_clean_release_group(self, meta: Meta) -> str:
         """Extract release group - only accepts VU/UNTOUCHED markers from filename"""

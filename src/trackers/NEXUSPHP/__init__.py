@@ -13,11 +13,12 @@ from src.get_desc import DescriptionBuilder
 from src.meta import Meta
 from src.tmdb import TmdbManager
 from src.trackers.common import Common
+from src.trackers.naming import TrackerNameMixin
 
 Config = dict[str, Any]
 
 
-class NEXUSPHP:
+class NEXUSPHP(TrackerNameMixin):
     auth_type = "cookies"
     supported_categories: tuple[str, ...] = ("TV", "MOVIE")
     tracker: str = ""
@@ -357,7 +358,7 @@ class NEXUSPHP:
             return {"technical_info": await f.read()}
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
-        return {"name": meta.name}
+        return {"name": await self.render_name(meta)}
 
     async def get_category_data(self, meta: Meta) -> dict[str, int]:
         return {"type": self.get_category(meta)}

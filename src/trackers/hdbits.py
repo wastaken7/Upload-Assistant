@@ -17,21 +17,26 @@ from src.console import console, logger
 from src.description_review import get_base_description
 from src.exceptions import *  # noqa F403
 from src.meta import Meta
+from src.release_name import NameRule, NameSelector, TrackerNameProfile, template
 from src.temp_paths import screenshots_dir
 from src.torrent_policy import HDBITS_POLICY
 from src.trackers.common import Common
-from src.trackers.naming import add_incomplete_pack_marker
+from src.trackers.naming import StringTrackerNameMixin, add_incomplete_pack_marker_transform, hdbits_name_transform
 
 Config = dict[str, Any]
 
 
-class HDBits:
+class HDBits(StringTrackerNameMixin):
     """
     HDB Private Torrent Tracker
     """
 
     auth_type = "cookies"
     tracker = "HDBITS"
+    name_profile = TrackerNameProfile(
+        rules=(NameRule(NameSelector(), template("base_name")),),
+        transforms=(hdbits_name_transform, add_incomplete_pack_marker_transform),
+    )
     display_name = "HDBits"
     allows_bloated_audio = True
     source_flag = "HDBits"
@@ -205,38 +210,6 @@ class HDBits:
             tags.append(10)  # HLG
 
         return tags
-
-    async def get_name(self, meta: Meta) -> str:
-        hdb_name = meta.name
-        audio = meta.audio
-        hdb_name = hdb_name.replace("H.265", "HEVC")
-        if meta.service:
-            hdb_name = hdb_name.replace(f"{meta.service} ", "", 1)
-        if "DV" in meta.hdr:
-            hdb_name = hdb_name.replace(" DV ", " DoVi ")
-        if "HDR" in meta.hdr and "HDR10+" not in meta.hdr:
-            hdb_name = hdb_name.replace("HDR", "HDR10")
-        if meta.type in ("WEBDL", "WEBRIP", "ENCODE"):
-            hdb_name = hdb_name.replace(audio, audio.replace(" ", "", 1).replace(" Atmos", ""))
-        else:
-            hdb_name = hdb_name.replace(audio, audio.replace(" Atmos", ""))
-        hdb_name = hdb_name.replace(meta.aka, "")
-        if meta.imdb_info:
-            hdb_name = hdb_name.replace(meta.title, meta.imdb_info["aka"])
-            meta_year_str = str(meta.year) if meta.year is not None else ""
-            imdb_year_str = str(meta.imdb_info.get("year", meta_year_str))
-            if meta_year_str != imdb_year_str and meta_year_str != "":
-                hdb_name = hdb_name.replace(meta_year_str, imdb_year_str)
-        # Remove Dubbed/Dual-Audio from title
-        hdb_name = hdb_name.replace("PQ10", "HDR")
-        hdb_name = hdb_name.replace("Dubbed", "").replace("Dual-Audio", "")
-        hdb_name = hdb_name.replace("REMUX", "Remux")
-        hdb_name = hdb_name.replace("BluRay Remux", "Remux")
-        hdb_name = hdb_name.replace("UHD Remux", "Remux")
-        hdb_name = hdb_name.replace("DTS-HD HRA", "DTS-HD HR")
-        hdb_name = " ".join(hdb_name.split())
-        hdb_name = re.sub(r"[^0-9a-zA-ZÀ-ÿ. :&+'\-\[\]]+", "", hdb_name)
-        return add_incomplete_pack_marker(hdb_name.replace(" .", ".").replace("..", "."), meta, self.tracker)
 
     async def upload(self, meta: Meta) -> bool | None:
         common = Common(config=self.config)

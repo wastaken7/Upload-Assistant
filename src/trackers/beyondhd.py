@@ -16,15 +16,17 @@ from src.meta import Meta
 from src.rehostimages import ImageHostPolicy, RehostImagesManager
 from src.tracker_images import get_tracker_image_collection
 from src.trackers.common import Common
+from src.trackers.naming import DVD_CODEC_NAME_PROFILE, StringTrackerNameMixin
 
 
-class BEYONDHD:
+class BEYONDHD(StringTrackerNameMixin):
     """
     BHD Private Torrent Tracker
     """
 
     auth_type = "unit3d_api"
     tracker = "BEYONDHD"
+    name_profile = DVD_CODEC_NAME_PROFILE
     display_name = "BeyondHD"
     reject_english_original_bloat = True
     source_flag = "BHD"
@@ -523,11 +525,3 @@ class BEYONDHD:
         if "HLG" in meta.hdr:
             tags.append("HLG")
         return tags
-
-    async def get_name(self, meta: Meta) -> str:
-        name = meta.name or ""
-        if meta.source in ("PAL DVD", "NTSC DVD", "DVD", "NTSC", "PAL"):
-            audio = meta.audio
-            audio = " ".join(audio.split())
-            name = name.replace(audio, f"{meta.video_codec} {audio}")
-        return name.replace("DD+", "DDP")

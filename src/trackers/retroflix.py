@@ -12,9 +12,10 @@ from src.console import logger
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
 from src.trackers.common import Common
+from src.trackers.naming import StringTrackerNameMixin
 
 
-class RetroFlix:
+class RetroFlix(StringTrackerNameMixin):
     """
     RTF Private Torrent Tracker
     """
@@ -440,6 +441,3 @@ class RetroFlix:
         except Exception as e:
             logger.info(f"{self.tracker}: [bold red]An unexpected error occurred: {e!s}")
             return None
-
-    async def get_name(self, meta: Meta) -> str:
-        return meta.name

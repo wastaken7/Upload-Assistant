@@ -5,7 +5,9 @@ from typing import Any, cast
 from src.book_prep import extract_first_author as _primary_name
 from src.console import logger
 from src.meta import Meta
+from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, collapse_whitespace, template
 from src.trackers.common import Common
+from src.trackers.naming import append_context_value, zenith_video_name
 from src.trackers.UNIT3D import UNIT3D, ParamsList
 
 Config = dict[str, Any]
@@ -33,6 +35,77 @@ class Zenith(UNIT3D):
     """
 
     tracker = "ZENITH"
+    name_profile = TrackerNameProfile(
+        rules=(
+            NameRule(NameSelector(category="MUSIC"), template("music_artist", "music_dash", "music_album", "music_year", "format_dash", "music_format")),
+            NameRule(NameSelector(category="BOOK"), template("book_author", "book_dash", "book_series", "series_dash", "book_title", "book_year", "book_language", "book_edition", "book_narrator", "book_source", "book_container", "book_codec", "book_bitrate", "book_retail")),
+            NameRule(NameSelector(), template("base_name")),
+        ),
+        transforms=(collapse_whitespace, zenith_video_name, append_context_value("direct_tag")),
+    )
+
+    async def get_name_overrides(self, context: NameContext) -> dict[str, str]:
+        meta = context.meta
+        if meta.category == "MUSIC":
+            release = cast(dict[str, Any], meta.music_release) if isinstance(meta.music_release, dict) else {}
+            artist_value = self._music_field(release, "artist", meta.artist)
+            artist = str(artist_value).strip() if isinstance(artist_value, str) else ""
+            if not artist:
+                artists = self._music_field(release, "artists", [])
+                artist = " & ".join(str(item).strip() for item in artists if str(item).strip()) if isinstance(artists, list) else str(artists or "").strip()
+            album = str(self._music_field(release, "album", meta.title or meta.name) or "").strip()
+            year = self._music_field(release, "release_year", self._music_field(release, "year", meta.year))
+            source = self._music_source(self._music_field(release, "media", meta.source))
+            tracks = release.get("tracks") if isinstance(release.get("tracks"), list) else []
+            first = tracks[0] if tracks and isinstance(tracks[0], dict) else {}
+            codec = str(self._music_field(release, "format", first.get("codec") or first.get("format") or meta.format or meta.type) or "").upper().strip()
+            format_parts = [part for part in (source, codec) if part]
+            depth = first.get("bit_depth") or self._music_field(release, "nfo_bit_depth")
+            rate = first.get("sample_rate") or self._music_field(release, "nfo_sample_rate")
+            depth_name = f"{depth}bit" if depth else ""
+            rate_name = self._music_sample_rate(rate) if rate else ""
+            if depth_name or rate_name:
+                format_parts.append(f"{depth_name}-{rate_name}" if depth_name and rate_name else depth_name or rate_name)
+            bitrate = first.get("bitrate")
+            if bitrate and codec not in {"FLAC", "ALAC", "WAV", "AIFF"}:
+                try:
+                    format_parts.append(f"{round(float(bitrate) / 1000)} {str(first.get('bitrate_mode') or '').upper().strip()}".strip())
+                except (TypeError, ValueError):
+                    pass
+            if str(self._music_field(release, "release_type", "")).casefold() == "single":
+                format_parts.append("Single")
+            return {"music_artist": artist, "music_dash": "-", "music_album": album, "music_year": f"({year})" if year else "", "format_dash": "-" if format_parts else "", "music_format": f"[{' '.join(format_parts)}]" if format_parts else "", "direct_tag": str(meta.tag or "").strip()}
+        if meta.category == "BOOK" and _is_misc(meta):
+            return {"book_title": meta.name}
+        if meta.category != "BOOK":
+            return {}
+        author = _primary_name(meta.author or "")
+        title = (meta.title or meta.name or "").strip()
+        year = str(meta.year) if meta.year is not None else ""
+        format_name = _book_format(meta)
+        language = _iso_639_2_code(meta.book_language_iso)
+        edition = str(meta.manual_edition or meta.edition or "").strip()
+        if meta.audiobook:
+            source = ((meta.manual_source or "").strip() or (meta.source or "").strip() or "WEB").upper()
+            container, codec = {"FLAC": ("", "FLAC"), "MP3": ("", "MP3"), "M4B": ("M4B", "AAC")}.get(format_name, ("", format_name))
+            narrator = _primary_name(meta.narrator or "")
+            return {"book_author": author, "book_dash": "-" if author and title else "", "book_title": title, "book_year": f"({year})" if year else "", "book_language": language, "book_edition": edition, "book_narrator": f"{{{narrator}}}" if narrator else "", "book_source": f"[{source}]" if source else "", "book_container": container, "book_codec": codec, "book_bitrate": f"{meta.audiobook_bitrate}kbps" if meta.audiobook_bitrate else "", "direct_tag": (meta.tag or "").strip()}
+        series = (meta.book_series or "").strip()
+        index = (meta.book_series_index or "").strip()
+        series = f"{series} #{index}" if series and index else series
+        if edition and ("1st" in edition.lower() or "first" in edition.lower()):
+            edition = ""
+        elif edition and not any(token in ("edition", "ed") for token in edition.lower().replace(".", " ").split()):
+            edition = f"{edition} Edition"
+        source = (meta.source or "").strip().upper()
+        manual_source = (meta.manual_source or "").strip().upper()
+        if manual_source in ("RETAIL", "SCAN", "HYBRID"):
+            source = manual_source
+        if source not in ("RETAIL", "SCAN", "HYBRID"):
+            source_text = (meta.basename_no_ext + " " + meta.title).lower()
+            source = "SCAN" if "scan" in source_text else "HYBRID" if "hybrid" in source_text else "RETAIL" if "retail" in source_text else "SCAN" if format_name == "PDF" else "RETAIL"
+        return {"book_author": author, "book_dash": "-" if author and (series or title) else "", "book_series": series, "series_dash": "-" if series and title else "", "book_title": title, "book_year": year, "book_language": language, "book_edition": edition, "book_codec": format_name, "book_retail": "Retail" if source == "RETAIL" or "retail" in meta.basename_no_ext.lower() else "", "direct_tag": (meta.tag or "").strip()}
+
     display_name = "Zenith"
     allows_bloated_audio = True
     base_url = "https://znth.cx"
@@ -183,140 +256,6 @@ class Zenith(UNIT3D):
                 urls.append((self.search_url, [("bookId", meta.asin), ("perPage", "100")], False))
         return urls
 
-    async def get_name(self, meta: Meta) -> dict[str, str]:
-        category = meta.category
-        audiobook = meta.audiobook
-
-        if category == "MUSIC":
-            return {"name": self._music_name(meta)}
-
-        if category == "BOOK":
-            if _is_misc(meta):
-                return {"name": meta.name}
-
-            author = _primary_name(meta.author or "")
-            title = (meta.title or meta.name or "").strip()
-            year = str(meta.year) if meta.year is not None else ""
-            format_val = _book_format(meta)
-            # get_tag returns "" for books, so this is only a user-supplied --tag ("-Group")
-            tag = (meta.tag or "").strip()
-
-            if audiobook:
-                # AudioBook: Author - Title (Year) LANG [Edition] {Narrator} [Source] [Container] Codec Bitrate
-                language = _iso_639_2_code(meta.book_language_iso)
-                edition = str(meta.manual_edition or meta.edition or "").strip()
-                narrator = _primary_name(meta.narrator or "")
-                source = ((meta.manual_source or "").strip() or (meta.source or "").strip() or "WEB").upper()
-
-                audio_map = {
-                    "FLAC": ("", "FLAC"),
-                    "MP3": ("", "MP3"),
-                    "M4B": ("M4B", "AAC"),
-                }
-                container, codec = audio_map.get(format_val, ("", format_val))
-
-                bitrate_val = f"{meta.audiobook_bitrate}kbps" if meta.audiobook_bitrate else ""
-
-                parts: list[str] = []
-                if author:
-                    parts.append(author)
-                if title:
-                    if parts:
-                        parts.append("-")
-                    parts.append(title)
-                if year:
-                    parts.append(f"({year})")
-                if language:
-                    parts.append(language)
-                if edition:
-                    parts.append(edition)
-                if narrator:
-                    parts.append(f"{{{narrator}}}")
-                if source:
-                    parts.append(f"[{source}]")
-                if container:
-                    parts.append(container)
-                if codec:
-                    parts.append(codec)
-                if bitrate_val:
-                    parts.append(bitrate_val)
-
-                base_name = " ".join(parts)
-                base_name = " ".join(base_name.split())
-                znth_name = f"{base_name}{tag}"
-
-            else:
-                # eBook: Author - [Series #N -] Title [Year] LANG [Edition] Format [Retail]
-                language = _iso_639_2_code(meta.book_language_iso)
-                series = (meta.book_series or "").strip()
-                series_index = (meta.book_series_index or "").strip()
-                series_part = ""
-                if series:
-                    series_part = f"{series} #{series_index}" if series_index else series
-                edition = str(meta.manual_edition or meta.edition or "").strip()
-                if edition:
-                    edition_lower = edition.lower()
-                    if "1st" in edition_lower or "first" in edition_lower:
-                        edition = ""
-                    elif not any(t in ("edition", "ed") for t in edition_lower.replace(".", " ").split()):
-                        edition = f"{edition} Edition"
-
-                source = (meta.source or "").strip().upper()
-                manual_source = (meta.manual_source or "").strip().upper()
-                if manual_source in ("RETAIL", "SCAN", "HYBRID"):
-                    source = manual_source
-                if source not in ("RETAIL", "SCAN", "HYBRID"):
-                    filename_lower = (meta.basename_no_ext + " " + meta.title).lower()
-                    if "scan" in filename_lower:
-                        source = "SCAN"
-                    elif "hybrid" in filename_lower:
-                        source = "HYBRID"
-                    elif "retail" in filename_lower:
-                        source = "RETAIL"
-                    else:
-                        source = "SCAN" if format_val == "PDF" else "RETAIL"
-                is_retail = source == "RETAIL" or "retail" in meta.basename_no_ext.lower()
-
-                parts = []
-                if author:
-                    parts.append(author)
-                if series_part:
-                    if parts:
-                        parts.append("-")
-                    parts.append(series_part)
-                if title:
-                    if parts:
-                        parts.append("-")
-                    parts.append(title)
-                if year:
-                    parts.append(year)
-                if language:
-                    parts.append(language)
-                if edition:
-                    parts.append(edition)
-                if format_val:
-                    parts.append(format_val)
-                if is_retail:
-                    parts.append("Retail")
-
-                base_name = " ".join(parts)
-                base_name = " ".join(base_name.split())
-                znth_name = f"{base_name}{tag}"
-
-            return {"name": znth_name}
-
-        if category in ("TV", "MOVIE"):
-            znth_name = meta.name
-            if meta.category == "TV" and meta.episode_title != "":
-                znth_name = znth_name.replace(f"{meta.episode_title} {meta.resolution}", f"{meta.resolution}", 1)
-            imdb_year = str(meta.imdb_info.get("year", ""))
-            year = str(meta.year) if meta.year is not None else ""
-            if meta.category != "TV" and imdb_year and imdb_year.strip() and year and year.strip() and imdb_year != year:
-                znth_name = znth_name.replace(f"{year}", imdb_year, 1)
-            return {"name": znth_name}
-
-        return {"name": meta.name}
-
     @staticmethod
     def _music_field(release: dict[str, Any], name: str, default: Any = "") -> Any:
         """Read a serialized MusicRelease field, ignoring its provenance metadata."""
@@ -339,56 +278,6 @@ class Zenith(UNIT3D):
             return f"{float(value) / 1000:g}kHz"
         except TypeError, ValueError:
             return ""
-
-    @classmethod
-    def _music_name(cls, meta: Meta) -> str:
-        """Format MUSIC as ``Artist - Album (Year) - [Format]`` for Zenith."""
-        release = cast(dict[str, Any], meta.music_release) if isinstance(meta.music_release, dict) else {}
-        artist_value = cls._music_field(release, "artist", meta.artist)
-        artist = str(artist_value).strip() if isinstance(artist_value, str) else ""
-        if not artist:
-            artists = cls._music_field(release, "artists", [])
-            artist_list = cast(list[Any], artists) if isinstance(artists, list) else []
-            artist = " & ".join(str(item).strip() for item in artist_list if str(item).strip()) if artist_list else str(artists or "").strip()
-        album = cls._music_field(release, "album", meta.title or meta.name)
-        year = cls._music_field(release, "release_year", cls._music_field(release, "year", meta.year))
-        source = cls._music_source(cls._music_field(release, "media", meta.source))
-        tracks_raw = release.get("tracks")
-        tracks = cast(list[Any], tracks_raw) if isinstance(tracks_raw, list) else []
-        first_track: dict[str, Any] = {}
-        if tracks and isinstance(tracks[0], dict):
-            first_track = cast(dict[str, Any], tracks[0])
-        codec = str(cls._music_field(release, "format", first_track.get("codec") or first_track.get("format") or meta.format or meta.type) or "").upper().strip()
-
-        format_parts: list[str] = [part for part in (source, codec) if part]
-        bit_depth = first_track.get("bit_depth") or cls._music_field(release, "nfo_bit_depth")
-        sample_rate = first_track.get("sample_rate") or cls._music_field(release, "nfo_sample_rate")
-        bit_depth_name = f"{bit_depth}bit" if bit_depth else ""
-        sample_rate_name = cls._music_sample_rate(sample_rate) if sample_rate else ""
-        if bit_depth_name and sample_rate_name:
-            format_parts.append(f"{bit_depth_name}-{sample_rate_name}")
-        elif bit_depth_name or sample_rate_name:
-            format_parts.append(bit_depth_name or sample_rate_name)
-        bitrate = first_track.get("bitrate")
-        if bitrate and codec not in {"FLAC", "ALAC", "WAV", "AIFF"}:
-            try:
-                bitrate_kbps = round(float(bitrate) / 1000)
-                bitrate_mode = str(first_track.get("bitrate_mode") or "").upper().strip()
-                format_parts.append(f"{bitrate_kbps} {bitrate_mode}".strip())
-            except TypeError, ValueError:
-                pass
-        release_type = str(cls._music_field(release, "release_type", "")).casefold()
-        if release_type == "single":
-            format_parts.append("Single")
-
-        title_parts = [str(artist or "").strip(), "-", str(album or "").strip()]
-        if year:
-            title_parts.append(f"({year})")
-        if format_parts:
-            title_parts.extend(["-", f"[{' '.join(part for part in format_parts if part)}]"])
-        name = " ".join(part for part in title_parts if part)
-        name = " ".join(name.split())
-        return f"{name}{str(meta.tag or '').strip()}"
 
     async def get_category_id(self, meta: Meta, category: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         category_id = {

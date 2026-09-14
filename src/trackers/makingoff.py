@@ -26,18 +26,34 @@ from src.cookie_auth import CookieValidator
 from src.genre_map import ENG_TO_PTBR_GENRE_MAP
 from src.languages import languages_manager
 from src.meta import Meta
+from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, template
 from src.trackers.common import Common
+from src.trackers.naming import StringTrackerNameMixin
 
 Config = dict[str, Any]
 
 
-class MakingOff:
+class MakingOff(StringTrackerNameMixin):
     """
     Making Off is a BRAZILIAN Private Torrent Tracker for MOVIES / TV / GENERAL
     """
 
     auth_type = "cookies"
     tracker = "MAKINGOFF"
+    name_profile = TrackerNameProfile(rules=(NameRule(NameSelector(), template("prefix_title", "original_part", "year_part")),))
+
+    async def get_name_overrides(self, context: NameContext) -> dict[str, str]:
+        meta = context.meta
+        prefix = "[Hidef] " if self._is_hidef(meta) else ""
+        title_ptbr = await self._resolve_display_title(meta)
+        original = ""
+        if not self._is_brazilian(meta) and meta.original_title and meta.original_title.lower() != title_ptbr.lower():
+            original = f"/ {meta.original_title}"
+        return {
+            "prefix_title": f"{prefix}{title_ptbr}",
+            "original_part": original,
+            "year_part": f"({meta.year})" if meta.year else "",
+        }
     display_name = "MakingOff"
     source_flag = ""
     base_url = "https://www.makingoff.org"
@@ -1493,32 +1509,6 @@ class MakingOff:
         if cache_key:
             self._display_title_cache[cache_key] = title_native
         return title_native
-
-    async def get_name(self, meta: Meta) -> str:
-        """
-        Generate the forum topic title.
-
-        Format for Brazilian films:  [Hidef] PT-BR Title (Year)
-        Format for foreign films:    [Hidef] PT-BR Title / Original Title (Year)
-
-        Args:
-            meta (dict[str, Any]): Release metadata.
-
-        Returns:
-            str: Formatted topic title.
-        """
-        prefix = "[Hidef] " if self._is_hidef(meta) else ""
-
-        title_ptbr = await self._resolve_display_title(meta)
-        year: str = str(meta.year) if meta.year else ""
-
-        if self._is_brazilian(meta):
-            title_part = title_ptbr
-        else:
-            title_orig = meta.original_title
-            title_part = f"{title_ptbr} / {title_orig}" if title_orig and title_orig.lower() != title_ptbr.lower() else title_ptbr
-
-        return f"{prefix}{title_part} ({year})" if year else f"{prefix}{title_part}"
 
     # -- description generation
 

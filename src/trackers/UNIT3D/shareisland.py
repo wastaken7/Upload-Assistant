@@ -17,7 +17,9 @@ from src.audio import AudioManager
 from src.console import logger
 from src.languages import languages_manager
 from src.meta import Meta
+from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, collapse_whitespace, template
 from src.trackers.common import Common
+from src.trackers.naming import append_context_value
 from src.trackers.UNIT3D import UNIT3D
 
 _shri_session_data: dict[str, dict[str, str | None]] = {}
@@ -30,6 +32,62 @@ class ShareIsland(UNIT3D):
     """
 
     tracker = "SHAREISLAND"
+    name_profile = TrackerNameProfile(
+        rules=(
+            NameRule(NameSelector(type="DISC", is_disc="BDMV"), template("effective_title", "year", "season_episode", "three_d", "edition", "hybrid", "repack", "resolution", "effective_region", "uhd", "effective_source", "hdr", "video_codec", "best_audio")),
+            NameRule(NameSelector(type="DISC", is_disc="DVD"), template("effective_title", "year", "season_episode", "three_d", "edition", "repack", "resolution", "effective_region", "effective_source", "dvd_size", "best_audio")),
+            NameRule(NameSelector(type="DISC", is_disc="HDDVD"), template("effective_title", "year", "edition", "repack", "resolution", "effective_region", "effective_source", "video_codec", "best_audio")),
+            NameRule(NameSelector(type="REMUX"), template("effective_title", "year", "season_episode", "episode_title", "part", "three_d", "audio_language", "edition", "hybrid", "repack", "resolution", "uhd", "effective_source", "type_label", "hdr", "video_codec", "best_audio")),
+            NameRule(NameSelector(type=("DVDRIP", "BRRIP")), template("effective_title", "year", "season", "audio_language", "edition", "hybrid", "repack", "resolution", "type_label", "best_audio", "hdr", "video_encode")),
+            NameRule(NameSelector(type=("ENCODE", "HDTV")), template("effective_title", "year", "season_episode", "episode_title", "part", "audio_language", "edition", "hybrid", "repack", "resolution", "uhd", "effective_source", "best_audio", "hdr", "video_encode")),
+            NameRule(NameSelector(type=("WEBDL", "WEBRIP")), template("effective_title", "year", "season_episode", "episode_title", "part", "audio_language", "edition", "hybrid", "repack", "resolution", "uhd", "service", "type_label", "best_audio", "hdr", "video_encode")),
+            NameRule(NameSelector(), template("fallback_name")),
+        ),
+        transforms=(collapse_whitespace, append_context_value("group_suffix")),
+    )
+
+    async def get_name_overrides(self, context: NameContext) -> dict[str, str]:
+        meta = context.meta
+        if not meta.language_checked:
+            await languages_manager.process_desc_language(meta, tracker=self.tracker)
+        title = meta.title
+        italian = self._get_italian_title(meta.imdb_info)
+        if italian and self.config["TRACKERS"][self.tracker].get("use_italian_title", False):
+            title = italian
+        source_value = meta.source
+        source = str(source_value[0]) if isinstance(source_value, list) and source_value else str(source_value)
+        effective_type = self.get_effective_type(meta)
+        if effective_type != "DISC":
+            source = source.replace("Blu-ray", "BluRay")
+        languages = [self._get_language_name(str(item)) for item in (meta.audio_languages if isinstance(meta.audio_languages, list) else [])]
+        languages = list(dict.fromkeys(item for item in languages if item))
+        if len(languages) == 1:
+            audio_language = languages[0]
+        elif len(languages) == 2:
+            audio_language = f"ITA - {next(item for item in languages if item != 'ITA')}" if "ITA" in languages else " - ".join(languages)
+        elif len(languages) >= 3:
+            audio_language = "ITA - MULTI" if "ITA" in languages else "MULTI"
+        else:
+            audio_language = ""
+        label = "REMUX" if effective_type == "REMUX" else "DVDRip" if effective_type == "DVDRIP" else "BRRip" if effective_type == "BRRIP" else "WEB-DL" if effective_type == "WEBDL" else "WEBRip" if effective_type == "WEBRIP" else ""
+        group = self._extract_clean_release_group(meta)
+        return {
+            "type": effective_type,
+            "effective_title": title,
+            "year": str(meta.year) if meta.year is not None else "",
+            "effective_source": source,
+            "effective_region": _shri_session_data.get(meta.uuid, {}).get("_shri_region_name") or meta.region,
+            "best_audio": await self._get_best_italian_audio_format(meta),
+            "audio_language": audio_language,
+            "edition": meta.edition or "",
+            "hybrid": "Hybrid"
+            if not meta.edition and (meta.webdv or isinstance(meta.source, list)) and "HYBRID" not in title.upper()
+            else "",
+            "repack": meta.repack.strip(),
+            "type_label": label,
+            "fallback_name": meta.name.replace("Dual-Audio", "").strip() if meta.name else "UNKNOWN",
+            "group_suffix": f"-{group}" if group else "",
+        }
     display_name = "ShareIsland"
     base_url = "https://shareisland.org"
     banned_groups: tuple[str, ...] = ()
@@ -80,146 +138,6 @@ class ShareIsland(UNIT3D):
     async def get_additional_data(self, meta: Meta) -> dict[str, Any]:
         """Get additional tracker-specific upload data"""
         return {"mod_queue_opt_in": await self.get_flag(meta, "modq")}
-
-    async def get_name(self, meta: Meta) -> dict[str, str]:
-        """
-        Rebuild release name from meta components following ShareIsland naming rules.
-
-        Handles:
-        - REMUX detection from filename markers (VU/UNTOUCHED)
-        - Italian title substitution from IMDb AKAs
-        - Multi-language audio tags (ITA - ENG format using ISO 639-3 codes)
-        - Release group tag cleaning and validation
-        - DISC region injection
-        """
-        if not meta.language_checked:
-            await languages_manager.process_desc_language(meta, tracker=self.tracker)
-
-        # Title and basic info
-        title = meta.title
-        italian_title = self._get_italian_title(meta.imdb_info)
-        use_italian_title = self.config["TRACKERS"][self.tracker].get("use_italian_title", False)
-        if italian_title and use_italian_title:
-            title = italian_title
-
-        year_value: Any = meta.year
-        resolution_value: Any = meta.resolution
-        source_value: Any = meta.source
-        year = str(year_value) if year_value is not None else ""
-        resolution = str(resolution_value)
-        source = (str(cast(Any, source_value[0])) if source_value else "") if isinstance(source_value, list) else str(source_value)
-        video_codec = meta.video_codec
-        video_encode = meta.video_encode
-
-        # TV specific
-        season = str(meta.season or "")
-        episode = meta.episode or ""
-        episode_title = meta.episode_title or ""
-        part = meta.part or ""
-
-        # Optional fields
-        edition = meta.edition or ""
-        hdr = meta.hdr or ""
-        uhd = str(meta.uhd or "")
-        three_d = meta.three_d or ""
-
-        # Clean audio: remove Dual-Audio and trailing language codes
-        audio = await self._get_best_italian_audio_format(meta)
-
-        # Build audio language tag
-        audio_lang_str = ""
-        if meta.audio_languages:
-            # Normalize all to abbreviated ISO 639-3 codes
-            audio_langs_value = meta.audio_languages
-            audio_langs_raw = audio_langs_value if isinstance(audio_langs_value, list) else []
-            audio_langs = [self._get_language_name(str(lang)) for lang in audio_langs_raw]
-            audio_langs = [lang for lang in audio_langs if lang]  # Remove empty
-            audio_langs = list(dict.fromkeys(audio_langs))  # Dedupe preserving order
-
-            num_langs = len(audio_langs)
-
-            if num_langs == 1:
-                # One language (ITA or non-ITA)
-                audio_lang_str = audio_langs[0]
-
-            elif num_langs == 2:
-                # Two languages ("ITA - [lang]" if ITA is present, "[lang] - [lang]" if not)
-                if "ITA" in audio_langs:
-                    other = next(lang for lang in audio_langs if lang != "ITA")
-                    audio_lang_str = f"ITA - {other}"
-                else:
-                    audio_lang_str = " - ".join(audio_langs)
-
-            elif num_langs >= 3:
-                # Three or more languages, "ITA - MULTI" if ITA is present, "MULTI" only if not)
-                audio_lang_str = "ITA - MULTI" if "ITA" in audio_langs else "MULTI"
-
-        effective_type = self.get_effective_type(meta)
-
-        if effective_type != "DISC":
-            source = source.replace("Blu-ray", "BluRay")
-
-        # Detect Hybrid from filename if not in title
-        hybrid = ""
-        if not edition and (meta.webdv or isinstance(meta.source, list)) and "HYBRID" not in title.upper():
-            hybrid = "Hybrid"
-
-        repack = meta.repack.strip()
-
-        name = None
-        # Build name per ShareIsland type-specific format
-        if effective_type == "DISC":
-            # Inject region from validated session data if available
-            region = _shri_session_data.get(meta.uuid, {}).get("_shri_region_name") or meta.region
-            if meta.is_disc == "BDMV":
-                # BDMV: Title Year 3D Edition Hybrid REPACK Resolution Region UHD Source HDR VideoCodec Audio
-                name = f"{title} {year} {season}{episode} {three_d} {edition} {hybrid} {repack} {resolution} {region} {uhd} {source} {hdr} {video_codec} {audio}"
-            elif meta.is_disc == "DVD":
-                dvd_size = meta.dvd_size
-                # DVD: Title Year 3D Edition REPACK Resolution Region Source DVDSize Audio
-                name = f"{title} {year} {season}{episode} {three_d} {edition} {repack} {resolution} {region} {source} {dvd_size} {audio}"
-            elif meta.is_disc == "HDDVD":
-                # HDDVD: Title Year Edition REPACK Resolution Region Source VideoCodec Audio
-                name = f"{title} {year} {edition} {repack} {resolution} {region} {source} {video_codec} {audio}"
-
-        elif effective_type == "REMUX":
-            # REMUX: Title Year 3D LANG Edition Hybrid REPACK Resolution UHD Source REMUX HDR VideoCodec Audio
-            name = f"{title} {year} {season}{episode} {episode_title} {part} {three_d} {audio_lang_str} {edition} {hybrid} {repack} {resolution} {uhd} {source} REMUX {hdr} {video_codec} {audio}"
-
-        elif effective_type in ("DVDRIP", "BRRIP"):
-            type_str = "DVDRip" if effective_type == "DVDRIP" else "BRRip"
-            # DVDRip/BRRip: Title Year LANG Edition Hybrid REPACK Resolution Type Audio HDR VideoCodec
-            name = f"{title} {year} {season} {audio_lang_str} {edition} {hybrid} {repack} {resolution} {type_str} {audio} {hdr} {video_encode}"
-
-        elif effective_type in ("ENCODE", "HDTV"):
-            # Encode/HDTV: Title Year LANG Edition Hybrid REPACK Resolution UHD Source Audio HDR VideoCodec
-            name = (
-                f"{title} {year} {season}{episode} {episode_title} {part} {audio_lang_str} {edition} {hybrid} {repack} {resolution} {uhd} {source} {audio} {hdr} {video_encode}"
-            )
-
-        elif effective_type in ("WEBDL", "WEBRIP"):
-            service = meta.service
-            type_str = "WEB-DL" if effective_type == "WEBDL" else "WEBRip"
-            # WEB: Title Year LANG Edition Hybrid REPACK Resolution UHD Service Type Audio HDR VideoCodec
-            name = f"{title} {year} {season}{episode} {episode_title} {part} {audio_lang_str} {edition} {hybrid} {repack} {resolution} {uhd} {service} {type_str} {audio} {hdr} {video_encode}"
-
-        else:
-            # Fallback: use original name with cleaned audio
-            name = meta.name.replace("Dual-Audio", "").strip()
-
-        # Ensure name is always a string
-        if not name:
-            name = meta.name if meta.name is not None else "UNKNOWN"
-
-        # Cleanup whitespace
-        name = self.WHITESPACE_PATTERN.sub(" ", name).strip()
-
-        # Extract tag and append if valid
-        tag = self._extract_clean_release_group(meta)
-        if tag:
-            name = f"{name}-{tag}"
-
-        return {"name": name}
 
     def _extract_clean_release_group(self, meta: Meta) -> str:
         """Extract release group - only accepts VU/UNTOUCHED markers from filename"""

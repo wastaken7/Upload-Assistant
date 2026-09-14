@@ -9,6 +9,7 @@ import httpx
 from src.console import logger
 from src.meta import Meta
 from src.trackers.common import Common
+from src.trackers.naming import SCENE_OR_BASENAME_PROFILE, StringTrackerNameMixin
 from src.trackers.USENET.search_helpers import (
     build_newznab_search_query,
     get_daily_api_hit_limit,
@@ -20,7 +21,7 @@ from src.trackers.USENET.search_helpers import (
 Config = dict[str, Any]
 
 
-class NZBGeek:
+class NZBGeek(StringTrackerNameMixin):
     """NZBGeek Usenet indexer."""
 
     base_url = "https://api.nzbgeek.info"
@@ -30,6 +31,7 @@ class NZBGeek:
 
     auth_type = "other_api"
     tracker = "NZBGEEK"
+    name_profile = SCENE_OR_BASENAME_PROFILE
     display_name = "NZBGeek"
     allows_bloated_audio = True
     banned_groups: tuple[str, ...] = ()
@@ -43,9 +45,6 @@ class NZBGeek:
         self.tracker_cfg = config.get("TRACKERS", {}).get(self.tracker, {})
         self.api_key = str(self.tracker_cfg.get("api_key", "")).strip()
         self.daily_api_hit_limit = get_daily_api_hit_limit(self.tracker_cfg)
-
-    async def get_name(self, meta: Meta) -> str:
-        return meta.scene_name or meta.basename_no_ext
 
     def get_search_query(self, meta: Meta) -> str:
         return build_newznab_search_query(meta)

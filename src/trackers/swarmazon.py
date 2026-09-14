@@ -8,11 +8,12 @@ from src.cogs.redaction import Redaction
 from src.console import console, logger
 from src.meta import Meta
 from src.trackers.common import Common
+from src.trackers.naming import StringTrackerNameMixin
 
 Config = dict[str, Any]
 
 
-class Swarmazon:
+class Swarmazon(StringTrackerNameMixin):
     """
     SWARMAZON is a Private Torrent Tracker for MOVIES / TV / GENERAL
     """
@@ -206,6 +207,3 @@ class Swarmazon:
                     dupes.append(str(result))
 
         return dupes
-
-    async def get_name(self, meta: Meta) -> str:
-        return meta.name

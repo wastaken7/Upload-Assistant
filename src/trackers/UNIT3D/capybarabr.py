@@ -1,16 +1,17 @@
-import re
 from typing import Any
 
 from src.console import logger
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
 from src.rehostimages import _download_image_for_rehost, _local_image_path
+from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, template
 from src.screenshot_manifest import files as manifest_files
 from src.tracker_images import (
     ImageCollection,
     set_tracker_image_collection,
 )
 from src.trackers.common import Common
+from src.trackers.naming import capybara_video_name
 from src.trackers.UNIT3D import UNIT3D
 from src.uploadscreens import upload_image_task
 
@@ -21,6 +22,32 @@ class CapybaraBR(UNIT3D):
     """
 
     tracker = "CAPYBARABR"
+    name_profile = TrackerNameProfile(
+        rules=(
+            NameRule(NameSelector(category="BOOK"), template("book_title", "dash", "author", "year_bracket", "audiobook_label", "tail", "language_label")),
+            NameRule(NameSelector(category="GAME"), template("title", "update_label", "game_version", "year", "dash", "group", "game_language", "dlc_label", "tail")),
+            NameRule(NameSelector(), template("base_name")),
+        ),
+        transforms=(capybara_video_name,),
+    )
+
+    async def get_name_overrides(self, context: NameContext) -> dict[str, str]:
+        meta = context.meta
+        bioma = "[BiOMA]" if "bioma" in (meta.tag or "").lower() and self.tracker == "CAPYBARABR" else ""
+        if meta.category == "BOOK":
+            title = f"{meta.book_series.strip()}: " if meta.book_series else ""
+            title += meta.title.strip()
+            title += f" {meta.book_series_index.strip()}" if meta.book_series_index else ""
+            title = self.common.portuguese_title_capitalization(title)
+            language = f"[{meta.book_language_iso.upper()}]" if meta.book_language_iso and meta.book_language_iso != "por" else ""
+            return {"book_title": title, "dash": "-", "author": meta.author, "year_bracket": f"[{meta.year if meta.year is not None else ''}]", "audiobook_label": "[AUDIOBOOK]" if meta.audiobook else "", "tail": bioma or (" " if meta.audiobook else ""), "language_label": language}
+        if meta.category == "GAME":
+            languages = str(meta.languages).upper()
+            game_language = "[MULTI]" if len(meta.languages) > 1 and "PORTUGUESE" in languages else "[INGLÊS]" if "ENGLISH" in languages else f"[{meta.language.upper()}]"
+            subcategory = meta.game_subcategory.lower()
+            dlc = "[DLC]" if subcategory == "dlc" else "[+DLC]" if subcategory == "full_game_dlc" else ""
+            return {"update_label": "Update" if subcategory == "update" else "", "game_version": meta.game_version, "dash": "-", "group": meta.tag.lstrip("-") if meta.tag else meta.tag, "game_language": game_language, "dlc_label": dlc, "tail": bioma or " "}
+        return {}
     display_name = "CapybaraBR"
     base_url = "https://capybarabr.com"
     allows_bloated_audio = True
@@ -154,119 +181,6 @@ class CapybaraBR(UNIT3D):
                 signature=signature,
             )
         }
-
-    async def get_name(self, meta: Meta) -> dict[str, str]:
-        category = meta.category
-        cbr_name = meta.name
-        bioma_tag = "[BiOMA]" if "bioma" in (meta.tag or "").lower() and self.tracker == "CAPYBARABR" else ""
-
-        if category == "BOOK":
-            book_title = f"{meta.book_series.strip()}: " if meta.book_series else ""
-            book_title += meta.title.strip()
-            book_title += f" {meta.book_series_index.strip()}" if meta.book_series_index else ""
-            book_title = self.common.portuguese_title_capitalization(book_title)
-
-            year_str = str(meta.year) if meta.year is not None else ""
-            cbr_name = f"{book_title} - {meta.author} [{year_str}] [AUDIOBOOK] {bioma_tag}" if meta.audiobook else f"{book_title} - {meta.author} [{year_str}]"
-            book_language_iso = meta.book_language_iso
-            if book_language_iso and book_language_iso != "por":
-                cbr_name += f" [{book_language_iso.upper()}]"
-
-        elif category == "GAME":
-            tag = meta.tag
-            if tag:
-                tag = tag.lstrip("-")
-            game_has_multiple_languages = len(meta.languages) > 1
-            game_lang_has_pt = "PORTUGUESE" in str(meta.languages).upper()
-            game_lang_has_eng = "ENGLISH" in str(meta.languages).upper()
-
-            if game_has_multiple_languages and game_lang_has_pt:
-                game_lang = "[MULTI]"
-            elif game_lang_has_eng:
-                game_lang = "[INGLÊS]"
-            else:
-                game_lang = f"[{meta.language.upper()}]"
-
-            game_subcategory = meta.game_subcategory.lower()
-            update = "Update" if game_subcategory == "update" else ""
-            dlc = "[DLC]" if game_subcategory == "dlc" else "[+DLC]" if game_subcategory == "full_game_dlc" else ""
-            if dlc:
-                dlc = f" {dlc}"
-
-            year_str = str(meta.year) if meta.year is not None else ""
-            cbr_name = f"{meta.title} {update} {meta.game_version} {year_str} - {tag} {game_lang}{dlc} {bioma_tag}"
-
-        elif category in ("MOVIE", "TV"):
-            cbr_name = cbr_name.replace("DD+ ", "DDP").replace("DD ", "DD").replace("AAC ", "AAC").replace("FLAC ", "FLAC").replace("Dubbed", "").replace("Dual-Audio", "")
-
-            # If it is a Series or Anime, remove the year from the title.
-            if meta.category in ["TV", "ANIMES"]:
-                year_str = str(meta.year) if meta.year is not None else ""
-                if year_str and year_str in cbr_name:
-                    cbr_name = cbr_name.replace(f"({year_str})", "").replace(year_str, "").strip()
-
-            # Remove the AKA title, unless it is Brazilian
-            if meta.original_language != "pt":
-                cbr_name = cbr_name.replace(meta.aka, "")
-
-            # If it is Brazilian, use only the AKA title, deleting the foreign title
-            if meta.original_language == "pt" and meta.aka:
-                aka_clean = meta.aka.replace("AKA", "").strip()
-                title = meta.title
-                cbr_name = cbr_name.replace(meta.aka, "").replace(title, aka_clean).strip()
-
-            if self.tracker == "CAPYBARABR" and meta.type == "DVDRIP":
-                title = meta.aka.replace("AKA", "").strip() if meta.original_language == "pt" and meta.aka else meta.title
-                episode = f"{meta.season}{meta.episode}" if category == "TV" else ""
-                audio = str(meta.audio).replace("DD+ ", "DDP").replace("DD ", "DD").replace("AAC ", "AAC").replace("FLAC ", "FLAC")
-                cbr_name = " ".join(part for part in (title, str(meta.year or ""), episode, meta.resolution, "DVDRip", audio, meta.video_encode) if part)
-                if meta.tag:
-                    cbr_name += meta.tag
-
-            tag_lower = "" if not meta.tag else meta.tag.lower()
-            invalid_tags = ["nogrp", "nogroup", "unknown", "-unk-"]
-
-            if not meta.is_disc:
-                audio_tag = ""
-                audio_langs = meta.audio_languages
-                if audio_langs:
-                    try:
-                        audio_languages: set[str] = set(audio_langs)
-                    except TypeError:
-                        audio_languages = set()
-
-                    if any(lang.lower() == "portuguese" or lang == "português" for lang in audio_languages):
-                        if len(audio_languages) >= 3:
-                            audio_tag = " MULTI"
-                        elif len(audio_languages) == 2:
-                            audio_tag = " DUAL"
-                        else:
-                            audio_tag = ""
-
-                if audio_tag:
-                    if "-" in cbr_name:
-                        parts = cbr_name.rsplit("-", 1)
-
-                        match = None
-                        for source_name in (meta.path, meta.uuid):
-                            if source_name:
-                                match = re.search(r"-([^.-]+)\.(?:DUAL|MULTI)(?=-|\.|$)", str(source_name), re.IGNORECASE)
-                                if match:
-                                    break
-                        current_group_tag = (meta.tag or "").lstrip("-")
-                        if match and match.group(1).casefold() != current_group_tag.casefold():
-                            cbr_name = f"{parts[0]}-{match.group(1)}{audio_tag}-{parts[1]}"
-                        else:
-                            cbr_name = f"{parts[0]}{audio_tag}-{parts[1]}"
-                    else:
-                        cbr_name += audio_tag
-
-            if not meta.tag or any(invalid_tag in tag_lower for invalid_tag in invalid_tags):
-                for invalid_tag in invalid_tags:
-                    cbr_name = re.sub(f"-{invalid_tag}", "", cbr_name, flags=re.IGNORECASE)
-                cbr_name = f"{cbr_name}-NoGroup"
-
-        return {"name": re.sub(r"\s{2,}", " ", cbr_name)}
 
     async def get_additional_data(self, meta: Meta) -> dict[str, str]:
         return {

@@ -6,7 +6,9 @@ import pycountry
 from src.console import logger
 from src.languages import languages_manager
 from src.meta import Meta
+from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, template
 from src.trackers.common import Common
+from src.trackers.naming import insert_foreign_language
 from src.trackers.UNIT3D import UNIT3D
 
 Config = dict[str, Any]
@@ -18,6 +20,19 @@ class InfinityHD(UNIT3D):
     """
 
     tracker = "INFINITYHD"
+    name_profile = TrackerNameProfile(
+        rules=(NameRule(NameSelector(), template("base_name")),),
+        transforms=(insert_foreign_language,),
+    )
+
+    async def get_name_overrides(self, context: NameContext) -> dict[str, str]:
+        meta = context.meta
+        if not meta.language_checked:
+            await languages_manager.process_desc_language(meta, tracker=self.tracker)
+        audio_languages = [str(item) for item in meta.audio_languages] if isinstance(meta.audio_languages, list) else []
+        if audio_languages and not await languages_manager.has_english_language(audio_languages):
+            return {"foreign_language": audio_languages[0].upper()}
+        return {}
     display_name = "InfinityHD"
     allows_bloated_audio = True
     base_url = "https://infinityhd.net"
@@ -261,22 +276,6 @@ class InfinityHD(UNIT3D):
                 return True
         return False
 
-    async def get_name(self, meta: Meta) -> dict[str, str]:
-        ihd_name = meta.name
-        resolution = meta.resolution
-
-        if not meta.language_checked:
-            await languages_manager.process_desc_language(meta, tracker=self.tracker)
-        audio_languages_value = meta.audio_languages
-        audio_languages: list[str] = []
-        if isinstance(audio_languages_value, list):
-            audio_languages_list = audio_languages_value
-            audio_languages = [str(item) for item in audio_languages_list]
-        if audio_languages and not await languages_manager.has_english_language(audio_languages):
-            foreign_lang = audio_languages[0].upper()
-            ihd_name = ihd_name.replace(resolution, f"{foreign_lang} {resolution}", 1)
-
-        return {"name": ihd_name}
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         if meta.resolution not in ["4320p", "2160p", "1440p", "1080p", "1080i"]:

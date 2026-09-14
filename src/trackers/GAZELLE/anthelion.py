@@ -17,17 +17,19 @@ from src.mediainfo import strip_report_by_line
 from src.meta import Meta
 from src.torrent_policy import ANTHELION_POLICY
 from src.trackers.common import Common
+from src.trackers.naming import StringTrackerNameMixin, TITLE_NAME_PROFILE
 
 Config = dict[str, Any]
 
 
-class Anthelion:
+class Anthelion(StringTrackerNameMixin):
     """
     Anthelion (ANT) is a Private Torrent Tracker for MOVIES
     """
 
     auth_type = "other_api"
     tracker = "ANTHELION"
+    name_profile = TITLE_NAME_PROFILE
     display_name = "Anthelion"
     source_flag = "ANT"
     allowed_bloated_audio_languages = ("en",)
@@ -606,6 +608,3 @@ class Anthelion:
             imdb_tmdb_list = []
 
         return imdb_tmdb_list
-
-    async def get_name(self, meta: Meta) -> str:
-        return meta.title

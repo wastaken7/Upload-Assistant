@@ -1,11 +1,11 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-import re
 from typing import Any, cast
 
 import cloudscraper
 
 from src.languages import languages_manager
 from src.meta import Meta
+from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, regex_sub, template
 from src.tmdb import TmdbManager
 from src.trackers.UNIT3D import UNIT3D
 
@@ -14,6 +14,21 @@ class Emuwarez(UNIT3D):
     """
     eMuwarez is a SPANISH Private Torrent Tracker for MOVIES / TV / GENERAL
     """
+
+    tracker = "EMUWAREZ"
+    name_profile = TrackerNameProfile(
+        rules=(NameRule(NameSelector(), template("localized_title", "season_label", "year", "mapped_resolution", "video_format", "mapped_codec", "audio_label", "group_suffix")),),
+        transforms=(regex_sub(r"\s+(?=-[^\s]+$)", ""),),
+    )
+
+    async def get_name_overrides(self, context: NameContext) -> dict[str, str]:
+        meta = context.meta
+        if not meta.language_checked:
+            await languages_manager.process_desc_language(meta, tracker=self.tracker)
+        tag = "" if not meta.tag else meta.tag.strip().lstrip("-")
+        if not tag or tag.lower() in ("nogrp", "nogroup", "unknown", "unk", "hd.ma.5.1", "untouched"):
+            tag = "EMUWAREZ"
+        return {"localized_title": await self._get_title(meta), "season_label": f"S{meta.season_int:02d}" if meta.category == "TV" and meta.season_int else "", "mapped_resolution": self._map_resolution(meta.resolution), "video_format": self._map_format(meta), "mapped_codec": self._map_codec(meta), "audio_label": await self._build_audio_string(meta), "group_suffix": f"{'SUBS' if self._has_spanish_subs(meta) else ''}-{tag}"}
 
     display_name = "eMuwarez"
     allows_bloated_audio = True
@@ -28,59 +43,6 @@ class Emuwarez(UNIT3D):
     def __init__(self, config: dict[str, Any]):
         super().__init__(config, tracker_name="EMUWAREZ")
         self.tmdb_manager = TmdbManager(config)
-
-    async def get_name(self, meta: Meta) -> dict[str, str]:
-        """
-        Generate Emuwarez-compliant torrent name format
-        Format: [Spanish Title] [Season] [Year] [Resolution] [Format] [Codec] [Audio] [SUBS] - [Group]
-
-        Examples:
-        - Hora punta 1998 1080p BluRay x264 ESP DD 5.1 ING DTS 5.1 SUBS-EMUWAREZ
-        - Sound! Euphonium S03 2025 1080p WEB-DL AVC JAP AAC 2.0 SUBS-Fool
-        """
-        # Get Spanish title if available and configured
-        title = await self._get_title(meta)
-
-        # Get season using season_int
-        season = ""
-        if meta.category == "TV" and meta.season_int:
-            season = f"S{meta.season_int:02d}"
-
-        year = str(meta.year) if meta.year is not None else ""
-        resolution = self._map_resolution(meta.resolution)
-        video_format = self._map_format(meta)
-        video_codec = self._map_codec(meta)
-
-        # Process language information
-        if not meta.language_checked:
-            await languages_manager.process_desc_language(meta, tracker=self.tracker)
-
-        # Build audio string
-        audio_str = await self._build_audio_string(meta)
-
-        # Check for Spanish subtitles
-        subs_tag = " SUBS" if self._has_spanish_subs(meta) else ""
-
-        # Get tag from meta.tag
-        tag = "" if not meta.tag else meta.tag.strip()
-
-        # Remove leading dash if present
-        if tag.startswith("-"):
-            tag = tag[1:]
-
-        # Filter out invalid tags and use default if needed
-        if not tag or tag.lower() in ["nogrp", "nogroup", "unknown", "unk", "hd.ma.5.1", "untouched"]:
-            tag = "EMUWAREZ"
-
-        # Build final name
-        name_parts = [part for part in [title, season, year, resolution, video_format, video_codec, audio_str] if part]
-        base_name = " ".join(name_parts)
-
-        # Clean up spaces and build final name
-        base_name = re.sub(r"\s{2,}", " ", base_name).strip()
-        emuwarez_name = f"{base_name}{subs_tag}-{tag}"
-
-        return {"name": emuwarez_name}
 
     async def _get_title(self, meta: Meta) -> str:
         """Get Spanish title if available and configured"""

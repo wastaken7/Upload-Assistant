@@ -8,6 +8,7 @@ from rich.markup import escape
 from src.console import logger
 from src.languages import languages_manager
 from src.meta import Meta
+from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, template
 from src.trackers.common import Common
 from src.trackers.UNIT3D import UNIT3D
 
@@ -20,6 +21,44 @@ class LastDigitalUnderground(UNIT3D):
     """
 
     tracker = "LASTDIGITALUNDERGROUND"
+    name_profile = TrackerNameProfile(rules=(NameRule(NameSelector(), template("base_name", "audio_label", "subtitle_label")),))
+
+    async def get_name_overrides(self, context: NameContext) -> dict[str, str]:
+        meta = context.meta
+        category_id = (await self.get_category_id(meta))["category_id"]
+        non_english = str(meta.original_language) != "en"
+        non_english_audio = False
+        audio_label = ""
+        subtitle_label = ""
+        if isinstance(meta.audio_languages, list):
+            for item in meta.audio_languages:
+                language = str(item).strip()
+                if not language:
+                    continue
+                try:
+                    audio_label = f"[{langcodes.find(language).to_alpha3().upper()}]"
+                    non_english_audio = not await languages_manager.has_english_language(language)
+                    break
+                except (LookupError, AttributeError, ValueError) as error:
+                    logger.info(f"{self.tracker}: [bold red]Error extracting audio language: {escape(str(error))}[/bold red]")
+        if meta.no_subs:
+            subtitle_label = "[NoSubs]"
+        elif isinstance(meta.subtitle_languages, list):
+            for item in meta.subtitle_languages:
+                language = str(item).strip()
+                if not language:
+                    continue
+                try:
+                    subtitle_label = f"[Subs {langcodes.find(language).to_alpha3().upper()}]"
+                    break
+                except (LookupError, AttributeError, ValueError) as error:
+                    logger.info(f"{self.tracker}: [bold red]Error extracting subtitle language: {escape(str(error))}[/bold red]")
+        if category_id == "18":
+            audio_label = ""
+        elif not (non_english or non_english_audio):
+            audio_label = ""
+            subtitle_label = ""
+        return {"audio_label": audio_label, "subtitle_label": subtitle_label}
     display_name = "LastDigitalUnderground"
     allows_bloated_audio = True
     base_url = "https://theldu.to"
@@ -152,60 +191,3 @@ class LastDigitalUnderground(UNIT3D):
             val = "16"
 
         return {"type_id": val}
-
-    async def get_name(self, meta: Meta) -> dict[str, str]:
-        ldu_name = meta.name
-        cat_id = (await self.get_category_id(meta))["category_id"]
-        non_eng = False
-        non_eng_audio = False
-        iso_audio: str | None = None
-        iso_subtitle: str | None = None
-        if str(meta.original_language) != "en":
-            non_eng = True
-        audio_languages_value = meta.audio_languages
-        if isinstance(audio_languages_value, list) and audio_languages_value:
-            audio_languages_list = audio_languages_value
-            for audio_item in audio_languages_list:
-                audio_language = str(audio_item).strip()
-                if not audio_language:
-                    continue
-                try:
-                    lang = langcodes.find(audio_language).to_alpha3()
-                    iso_audio = lang.upper()
-                    if not await languages_manager.has_english_language(audio_language):
-                        non_eng_audio = True
-                    break
-                except (LookupError, AttributeError, ValueError) as e:
-                    logger.info(f"{self.tracker}: [bold red]Error extracting audio language: {escape(str(e))}[/bold red]")
-
-        if meta.no_subs:
-            iso_subtitle = "NoSubs"
-        else:
-            subtitle_languages_value = meta.subtitle_languages
-            if isinstance(subtitle_languages_value, list) and subtitle_languages_value:
-                subtitle_languages_list = subtitle_languages_value
-                for subtitle_item in subtitle_languages_list:
-                    subtitle_language = str(subtitle_item).strip()
-                    if not subtitle_language:
-                        continue
-                    try:
-                        lang = langcodes.find(subtitle_language).to_alpha3()
-                        iso_subtitle = f"Subs {lang.upper()}"
-                        break
-                    except (LookupError, AttributeError, ValueError) as e:
-                        logger.info(f"{self.tracker}: [bold red]Error extracting subtitle language: {escape(str(e))}[/bold red]")
-
-        if cat_id == "18" and iso_subtitle:
-            ldu_name = f"{ldu_name} [{iso_subtitle}]"
-
-        elif non_eng or non_eng_audio:
-            language_parts: list[str] = []
-            if iso_audio:
-                language_parts.append(f"[{iso_audio}]")
-            if iso_subtitle:
-                language_parts.append(f"[{iso_subtitle}]")
-
-            if language_parts:
-                ldu_name = f"{ldu_name} {' '.join(language_parts)}"
-
-        return {"name": ldu_name}

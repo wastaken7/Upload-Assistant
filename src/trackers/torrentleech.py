@@ -1,6 +1,5 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import platform
-import re
 from typing import Any, cast
 
 import aiofiles
@@ -12,18 +11,23 @@ from src.cookie_auth import CookieValidator
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
 from src.trackers.common import Common
-from src.trackers.naming import add_incomplete_pack_marker
+from src.release_name import NameRule, NameSelector, TrackerNameProfile, collapse_whitespace, remove_context_value, template
+from src.trackers.naming import StringTrackerNameMixin, add_incomplete_pack_marker_transform
 
 Config = dict[str, Any]
 
 
-class TorrentLeech:
+class TorrentLeech(StringTrackerNameMixin):
     """
     TORRENTLEECH (TL) is a Private Torrent Tracker for 0DAY / GENERAL. not here _ not scene
     """
 
     auth_type = "other_api"
     tracker = "TORRENTLEECH"
+    name_profile = TrackerNameProfile(
+        rules=(NameRule(NameSelector(), template("base_name")),),
+        transforms=(remove_context_value("alt_title"), collapse_whitespace, add_incomplete_pack_marker_transform),
+    )
     display_name = "TorrentLeech"
     source_flag = "TorrentLeech.org"
     base_url = "https://www.torrentleech.org"
@@ -208,10 +212,6 @@ class TorrentLeech:
     def get_screens(self, meta: Meta) -> list[str]:
         images = cast(list[dict[str, Any]], meta.menu_images) + meta.image_list + meta.spectrograms_images + meta.dynamic_hdr_plot_images
         return [image["raw_url"] for image in images if image.get("raw_url")]
-
-    async def get_name(self, meta: Meta) -> str:
-        tl_name = meta.name.replace(meta.aka, "")
-        return add_incomplete_pack_marker(re.sub(r"\s{2,}", " ", tl_name), meta, self.tracker)
 
     async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
         results: list[dict[str, Any]] = []

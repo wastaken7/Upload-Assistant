@@ -20,17 +20,22 @@ from src.cookie_auth import CookieValidator
 from src.get_desc import DescriptionBuilder
 from src.languages import languages_manager
 from src.meta import Meta
+from src.release_name import NameRule, NameSelector, TrackerNameProfile, template
 from src.temp_paths import screenshots_dir
 from src.trackers.common import Common
-from src.trackers.naming import add_incomplete_pack_marker
+from src.trackers.naming import StringTrackerNameMixin, avistaz_name
 
 Config = dict[str, Any]
 
 
-class AZTrackerBase:
+class AZTrackerBase(StringTrackerNameMixin):
     auth_type = "cookies"
     supported_categories: tuple[str, ...] = ("TV", "MOVIE")
     tracker: str = ""
+    name_profile = TrackerNameProfile(
+        rules=(NameRule(NameSelector(), template("base_name")),),
+        transforms=(avistaz_name,),
+    )
     source_flag: str = ""
     banned_groups: tuple[str, ...] = ()
 
@@ -781,110 +786,6 @@ class AZTrackerBase:
 
         meta.tracker_status[self.tracker]["status_message"] = status_message
         return {}
-
-    async def get_name(self, meta: Meta) -> str:
-        # https://avistaz.to/guides/how-to-properly-titlename-a-torrent
-        # https://cinemaz.to/guides/how-to-properly-titlename-a-torrent
-        # https://privatehd.to/rules/upload-rules
-        aka_name = meta.aka or ""
-        manual_episode_title = meta.manual_episode_title or ""
-        daily_episode_title = meta.daily_episode_title or ""
-        upload_name: str = meta.name.replace(aka_name, "").replace("Dubbed", "").replace("Dual-Audio", "").replace(manual_episode_title, "").replace(daily_episode_title, "")
-
-        if self.tracker in ("CINEMAZ", "PRIVATEHD"):
-            # Both sites prohibit these release descriptors in torrent titles.
-            forbidden_terms = [r"\bLIMITED\b", r"\bCriterion Collection\b", r"\b\d{1,3}(?:st|nd|rd|th)\s+Anniversary Edition\b"]
-            for term in forbidden_terms:
-                upload_name = re.sub(term, "", upload_name, flags=re.IGNORECASE).strip()
-
-            upload_name = re.sub(r"\bDirector[’\'`]s\s+Cut\b", "DC", upload_name, flags=re.IGNORECASE)  # noqa: RUF001
-            if self.tracker == "CINEMAZ":
-                upload_name = re.sub(r"\bExtended\s+Cut\b", "EXT", upload_name, flags=re.IGNORECASE)
-                upload_name = re.sub(r"\bTheatrical\s+Cut\b", "TC", upload_name, flags=re.IGNORECASE)
-            else:
-                upload_name = re.sub(r"\bExtended\s+Cut\b", "Extended", upload_name, flags=re.IGNORECASE)
-                upload_name = re.sub(r"\bTheatrical\s+Cut\b", "Theatrical", upload_name, flags=re.IGNORECASE)
-
-            # CinemaZ and PrivateHD prohibit brackets in torrent titles.
-            upload_name = upload_name.replace("[", "").replace("]", "")
-
-            if self.tracker == "CINEMAZ":
-                # CinemaZ requires HYBRID immediately after the video quality.
-                has_hybrid_marker = bool(meta.webdv) or "hybrid" in (meta.edition or "").casefold()
-                title_match = re.search(re.escape(meta.title), upload_name, flags=re.IGNORECASE) if meta.title else None
-                marker_search_start = title_match.end() if title_match else 0
-                hybrid_match = re.search(r"\bHYBRID\b", upload_name[marker_search_start:], flags=re.IGNORECASE) if has_hybrid_marker else None
-                if hybrid_match:
-                    hybrid_start = marker_search_start + hybrid_match.start()
-                    hybrid_end = marker_search_start + hybrid_match.end()
-                    upload_name_without_hybrid = f"{upload_name[:hybrid_start]}{upload_name[hybrid_end:]}"
-                    resolution_match = re.search(r"\b(?:\d{3,4}[pi]|4K|UHD|SD)\b", upload_name_without_hybrid, flags=re.IGNORECASE)
-                    if resolution_match:
-                        upload_name = upload_name_without_hybrid
-                        upload_name = f"{upload_name[: resolution_match.end()]} HYBRID{upload_name[resolution_match.end() :]}"
-
-            upload_name = re.sub(r"\s{2,}", " ", upload_name).strip()
-
-        if meta.has_encode_settings:
-            upload_name = upload_name.replace("H.264", "x264").replace("H.265", "x265")
-
-        tag_lower = "" if not meta.tag else meta.tag.lower()
-        invalid_tags = ["nogrp", "nogroup", "unknown", "-unk-"]
-
-        if meta.tag == "" or any(invalid_tag in tag_lower for invalid_tag in invalid_tags):
-            for invalid_tag in invalid_tags:
-                upload_name = re.sub(f"-{invalid_tag}", "", upload_name, flags=re.IGNORECASE)
-
-            if self.tracker == "CINEMAZ":
-                upload_name = f"{upload_name}-NoGroup"
-            if self.tracker == "PRIVATEHD":
-                upload_name = f"{upload_name}-NOGROUP"
-
-        if meta.category == "TV":
-            year_to_use = meta.year
-            if not meta.no_year and not meta.search_year:
-                season_int = meta.season_int
-                season_info = meta.imdb_info.get("seasons_summary", [])
-
-                # Find the correct year for this specific season
-                season_year = None
-                if season_int and season_info:
-                    for season_data in season_info:
-                        if season_data.get("season") == season_int:
-                            season_year = season_data.get("year")
-                            break
-
-                # Use the season-specific year if found, otherwise fall back to meta year
-                if season_year:
-                    year_to_use = season_year
-                if year_to_use:
-                    upload_name = upload_name.replace(meta.title, f"{meta.title} {year_to_use}", 1)
-
-            if self.tracker == "PRIVATEHD" and year_to_use:
-                upload_name = upload_name.replace(str(year_to_use), "")
-
-            if self.tracker == "AVISTAZ" and meta.tv_pack and year_to_use:
-                upload_name = upload_name.replace(f"{meta.title} {year_to_use} {meta.season}", f"{meta.title} {meta.season} {year_to_use}")
-
-        source = meta.source
-        audio = meta.audio
-        if meta.type == "DVDRIP" and source:
-            upload_name = upload_name.replace(source, "")
-
-        if meta.is_disc == "DVD":
-            region = meta.region
-            resolution = meta.resolution
-            video_codec = meta.video_codec.strip()
-
-            if region:
-                upload_name = upload_name.replace(region, "")
-            if source and resolution:
-                upload_name = upload_name.replace(source, resolution)
-            if audio:
-                codec_suffix = f" {video_codec}" if video_codec else ""
-                upload_name = upload_name.replace(audio, f"{audio}{codec_suffix}")
-
-        return add_incomplete_pack_marker(re.sub(r"\s{2,}", " ", upload_name), meta, self.tracker)
 
     def get_rip_type(self, meta: Meta, display_name: bool = False) -> str:
         # Translation from meta keywords to site display labels

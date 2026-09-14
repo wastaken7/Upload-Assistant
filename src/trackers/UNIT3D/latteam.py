@@ -1,9 +1,10 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-import re
 from typing import Any, cast
 
 from src.meta import Meta
+from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, template
 from src.trackers.common import Common
+from src.trackers.naming import latteam_video_name
 from src.trackers.UNIT3D import UNIT3D
 
 Config = dict[str, Any]
@@ -15,6 +16,39 @@ class LatTeam(UNIT3D):
     """
 
     tracker = "LATTEAM"
+    name_profile = TrackerNameProfile(
+        rules=(
+            NameRule(NameSelector(category="BOOK"), template("author", "author_dash", "title", "book_extras", "book_format")),
+            NameRule(NameSelector(), template("base_name")),
+        ),
+        transforms=(latteam_video_name,),
+    )
+
+    async def get_name_overrides(self, context: NameContext) -> dict[str, str]:
+        meta = context.meta
+        if meta.category != "BOOK":
+            return {}
+        extras = []
+        volume = str(meta.manual_season or meta.season or "").strip()
+        issue = str(meta.manual_episode or meta.episode or "").strip()
+        if volume:
+            extras.append(f"Vol {volume}")
+        if issue:
+            extras.append(f"No {issue}")
+        edition = str(meta.manual_edition or meta.edition or "").strip()
+        if edition:
+            extras.append(
+                edition
+                if any(word in edition.lower() for word in ("edición", "edicion", "edition", "ed.", "ed"))
+                else f"{edition} Edition"
+            )
+        if meta.audiobook:
+            language = meta.book_language.lower()
+            narration = "Castellano" if any(word in language for word in ("spain", "castilian", "castellano")) else "Latino" if any(word in language for word in ("latin", "latino")) else "Portugués" if any(word in language for word in ("portuguese", "português", "portugues")) else meta.book_language.title() if language else ""
+            if narration:
+                extras.append(f"Narración en {narration}")
+        author = meta.author.strip()
+        return {"author": author, "author_dash": "-" if author else "", "title": meta.title.strip(), "book_extras": " ".join(f"({item})" for item in extras), "book_format": str(meta.type).strip().upper()}
     display_name = "Lat-Team"
     base_url = "https://lat-team.com"
     banned_groups = ("EVO",)
@@ -177,135 +211,6 @@ class LatTeam(UNIT3D):
             val = "21"
 
         return {"type_id": val}
-
-    async def get_name(self, meta: Meta) -> dict[str, str]:
-        if meta.category == "BOOK":
-            author = meta.author.strip()
-            title = meta.title.strip()
-            fmt = str(meta.type).strip().upper()
-
-            extra_info = []
-
-            # If it's comic/manga/magazine/newspaper, we can add volume, issue/number info if available
-            volume = str(meta.manual_season or meta.season or "").strip()
-            issue = str(meta.manual_episode or meta.episode or "").strip()
-
-            if volume:
-                extra_info.append(f"Vol {volume}")
-            if issue:
-                extra_info.append(f"No {issue}")
-
-            edition = str(meta.manual_edition or meta.edition or "").strip()
-            if edition:
-                if not any(x in edition.lower() for x in ["edición", "edicion", "edition", "ed.", "ed"]):
-                    extra_info.append(f"{edition} Edition")
-                else:
-                    extra_info.append(edition)
-
-            if meta.audiobook:
-                book_lang = meta.book_language.lower()
-                if "spain" in book_lang or "castilian" in book_lang or "castellano" in book_lang:
-                    extra_info.append("Narración en Castellano")
-                elif "latin" in book_lang or "latino" in book_lang:
-                    extra_info.append("Narración en Latino")
-                elif "portuguese" in book_lang or "português" in book_lang or "portugues" in book_lang:
-                    extra_info.append("Narración en Portugués")
-                elif book_lang:
-                    lang_title = meta.book_language.title()
-                    extra_info.append(f"Narración en {lang_title}")
-
-            extra_str = ""
-            if extra_info:
-                extra_str = " " + " ".join(f"({info})" for info in extra_info)
-
-            lt_name = f"{author} - {title}{extra_str} {fmt}" if author else f"{title}{extra_str} {fmt}"
-
-            return {"name": re.sub(r"\s{2,}", " ", lt_name).strip()}
-
-        aka_value = meta.aka
-        lt_name = meta.name.replace("Dual-Audio", "").replace("Dubbed", "").replace(aka_value, "")
-
-        if meta.type != "DISC":  # DISC don't have mediainfo
-            # Check if original language is "es" if true replace title for AKA if available
-            title_value = meta.title
-            if meta.original_language == "es" and aka_value:
-                lt_name = lt_name.replace(title_value, aka_value.replace("AKA", "")).strip()
-            # Check if audio Spanish exists
-
-            audio_latino_check = {
-                "es-419",
-                "es-mx",
-                "es-ar",
-                "es-cl",
-                "es-ve",
-                "es-bo",
-                "es-co",
-                "es-cr",
-                "es-do",
-                "es-ec",
-                "es-sv",
-                "es-gt",
-                "es-hn",
-                "es-ni",
-                "es-pa",
-                "es-py",
-                "es-pe",
-                "es-pr",
-                "es-uy",
-            }
-
-            audio_castilian_check = ["es", "es-es"]
-            # Use keywords instead of massive exact-match lists
-            # "latino" matches: "latino", "latinoamérica", "latinoamericano", etc.
-            latino_keywords = ["latino", "latin america"]
-            # "castellano" matches any title explicitly labeled as such.
-            castilian_keywords = ["castellano"]
-
-            audios: list[dict[str, Any]] = []
-            has_latino = False
-            has_castilian = False
-
-            tracks_value = meta.mediainfo.get("media", {}).get("track", [])
-            tracks_list = cast(list[Any], tracks_value) if isinstance(tracks_value, list) else []
-            for audio in tracks_list[2:]:
-                if not isinstance(audio, dict):
-                    continue
-                audio_map = cast(dict[str, Any], audio)
-                if audio_map.get("@type") != "Audio":
-                    continue
-                lang = str(audio_map.get("Language", "")).lower()
-                title = str(audio_map.get("Title", "")).lower()
-
-                if "commentary" in title:
-                    continue
-
-                # Check if title contains keywords
-                is_latino_title = any(kw in title for kw in latino_keywords)
-                is_castilian_title = any(kw in title for kw in castilian_keywords)
-
-                # 1. Check strict Latino language codes or Edge Case: Language is 'es' but Title contains Latino keywords
-                if lang in audio_latino_check or (lang == "es" and is_latino_title):
-                    has_latino = True
-                    audios.append(audio_map)
-
-                # 2. Edge Case: Language is 'es' and Title contains Castilian keywords or Fallback: Check strict Castilian codes (includes 'es' as default)
-                elif (lang == "es" and is_castilian_title) or lang in audio_castilian_check:
-                    has_castilian = True
-                    audios.append(audio_map)
-
-            if len(audios) > 0:  # If there is at least 1 audio spanish
-                if not has_latino and has_castilian:
-                    tag_value = meta.tag
-                    lt_name = lt_name.replace(tag_value, f" [CAST]{tag_value}") if tag_value else f"{lt_name} [CAST]"
-                # else: no special tag needed for Latino-only or mixed audio
-            # if not audio Spanish exists, add "[SUBS]"
-            elif not meta.tag:
-                lt_name = lt_name + " [SUBS]"
-            else:
-                tag_value = meta.tag
-                lt_name = lt_name.replace(tag_value, f" [SUBS]{tag_value}")
-
-        return {"name": re.sub(r"\s{2,}", " ", lt_name)}
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         if meta.category == "BOOK":

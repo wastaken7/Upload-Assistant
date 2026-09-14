@@ -19,16 +19,26 @@ from src.console import logger
 from src.exceptions import UploadError
 from src.mediainfo import strip_report_by_line
 from src.meta import Meta
+from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, template
+from src.trackers.naming import StringTrackerNameMixin, broadcasthe_net_name
 from src.trackers.common import Common
 
 Config = dict[str, Any]
 
 
-class BroadcasTheNet:
+class BroadcasTheNet(StringTrackerNameMixin):
     """BTN TV uploader using its JSON-RPC lookup API and cookie upload form."""
 
     auth_type = "cookies"
     tracker = "BROADCASTHENET"
+    name_profile = TrackerNameProfile(
+        rules=(NameRule(NameSelector(), template("btn_source")),),
+        transforms=(broadcasthe_net_name,),
+    )
+
+    async def get_name_overrides(self, context: NameContext) -> dict[str, str]:
+        meta = context.meta
+        return {"btn_source": str(meta.get("scene_name") or meta.name or meta.basename_no_ext or "")}
     display_name = "BroadcasTheNet"
     source_flag = "BTN"
     base_url = "https://backup.landof.tv"
@@ -451,35 +461,6 @@ class BroadcasTheNet:
         value = re.sub(r"(?i)\.(DDP|DD|AC3|DTS|AAC|FLAC|TrueHD|PCM|LPCM)\.(\d)", r".\1\2", value)
         value = re.sub(r"[^A-Za-z0-9.\-]+", ".", value)
         return re.sub(r"\.{2,}", ".", value).strip(".-")
-
-    async def get_name(self, meta: Meta) -> str:
-        name = str(meta.get("scene_name") or meta.name or meta.basename_no_ext or "")
-        name = re.sub(r"(?i)\.(avi|mkv|mp4|ts|m4v|m2ts|wmv|mpeg|mpg|vob)$", "", name)
-        name = self._clean_name(name)
-        if not meta.scene_name:
-            aka = self._clean_name(str(meta.aka or ""))
-            if aka:
-                name = re.sub(rf"(?i)(?:^|\.){re.escape(aka)}(?=\.|$)", ".", name, count=1)
-
-            hdr = self._clean_name(str(meta.hdr or ""))
-            resolution = self._clean_name(str(meta.resolution or ""))
-            if hdr and resolution:
-                hdr_pattern = rf"(?i)(?:^|\.){re.escape(hdr)}(?=\.|$)"
-                resolution_pattern = rf"(?i)(?:^|\.){re.escape(resolution)}(?=\.|$)"
-                if re.search(hdr_pattern, name) and re.search(resolution_pattern, name):
-                    name = re.sub(hdr_pattern, ".", name, count=1)
-                    name = re.sub(resolution_pattern, f".{hdr}.{resolution}", name, count=1)
-
-            name = re.sub(r"\.{2,}", ".", name).strip(".")
-        if str(meta.resolution).lower() in {"sd", "480i", "480p", "576i", "576p"}:
-            name = re.sub(r"(?i)(?:^|\.)(?:sd|\d{3,4}[pi])(?=\.|$)", ".", name)
-            name = re.sub(r"\.{2,}", ".", name).strip(".")
-        tag = str(meta.tag or "").lstrip("-")
-        if tag and not re.search(r"-[^.\-]+$", name):
-            name += f"-{tag}"
-        elif not tag and not re.search(r"-(?:nogrp|nogroup|unknown|unk)$", name, re.I):
-            name += "-NOGRP"
-        return name
 
     async def _api(self, method: str, params: list[Any]) -> dict[str, Any]:
         payload: dict[str, Any] = {"jsonrpc": "2.0", "id": "upload-assistant-btn", "method": method, "params": [self.api_key, *params]}

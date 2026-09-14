@@ -15,6 +15,8 @@ from src.console import logger
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
+from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, template
+from src.trackers.naming import StringTrackerNameMixin
 from src.rehostimages import ImageHostPolicy, RehostImagesManager
 from src.takescreens import download_artwork_from_meta
 from src.temp_paths import artwork_dir
@@ -22,11 +24,19 @@ from src.tracker_images import get_tracker_image_collection
 from src.trackers.common import Common
 
 
-class CathodeRayTube:
+class CathodeRayTube(StringTrackerNameMixin):
     """Cathode-Ray.Tube (CRT) is a Private Torrent Tracker for CLASSIC MOVIES / TV"""
 
     auth_type = "cookies"
     tracker = "CATHODERAYTUBE"
+    name_profile = TrackerNameProfile(
+        rules=(
+            NameRule(NameSelector(), template("title")),
+            NameRule(NameSelector(category="MOVIE"), template("title", "alt_title", "parenthesized_year", "edition")),
+            NameRule(NameSelector(category="TV"), template("title", "tv_separator", "season_label", "parenthesized_year", "edition")),
+            NameRule(NameSelector(category="GAME"), template("title", "parenthesized_year", "platform")),
+        )
+    )
     display_name = "Cathode-Ray.Tube"
     source_flag = "CRT"
     base_url = "https://www.cathode-ray.tube"
@@ -81,28 +91,18 @@ class CathodeRayTube:
         match = re.search(r"\bauthkey\s*=\s*['\"]([^'\"]+)['\"]", html)
         return match.group(1) if match else ""
 
-    async def get_name(self, meta: Meta) -> str:
-        """Format CRT titles according to its category-specific upload rules."""
-        name = str(meta.title or meta.name).strip()
-        aka = str(meta.aka or "").strip()
-        year = str(meta.year or "").strip()
-        edition = str(meta.edition or "").strip()
-        category = str(meta.category).upper()
-
-        if category == "MOVIE":
-            return " ".join(part for part in (name, aka, f"({year})" if year else "", edition) if part)
-
-        if category == "TV":
-            season = str(meta.season or "").strip()
-            season_label = self._season_label(season)
-            suffix = " ".join(part for part in (f"({year})" if year else "", edition) if part)
-            return f"{name} - {season_label}{f' {suffix}' if suffix else ''}" if season_label else " ".join(part for part in (name, suffix) if part)
-
-        if category == "GAME":
-            platform = str(meta.platform or "").strip()
-            return " ".join(part for part in (name, f"({year})" if year else "", platform) if part)
-
-        return name
+    async def get_name_overrides(self, context: NameContext) -> dict[str, str]:
+        year = str(context.meta.year or "").strip()
+        season_label = self._season_label(str(context.meta.season or "").strip()) if context.meta.category == "TV" else ""
+        return {
+            "title": str(context.meta.title or context.meta.name).strip(),
+            "alt_title": str(context.meta.aka or "").strip(),
+            "edition": str(context.meta.edition or "").strip(),
+            "platform": str(context.meta.platform or "").strip(),
+            "parenthesized_year": f"({year})" if year else "",
+            "season_label": season_label,
+            "tv_separator": "-" if season_label else "",
+        }
 
     @staticmethod
     def _season_label(season: str) -> str:

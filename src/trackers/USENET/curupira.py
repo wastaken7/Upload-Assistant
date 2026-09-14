@@ -14,12 +14,13 @@ from src.console import logger
 from src.meta import Meta
 from src.tracker_images import get_tracker_image_collection
 from src.trackers.common import Common
+from src.trackers.naming import SCENE_OR_BASENAME_PROFILE, StringTrackerNameMixin
 from src.trackers.USENET.search_helpers import build_newznab_search_query, parse_newznab_dupes
 
 Config = dict[str, Any]
 
 
-class Curupira:
+class Curupira(StringTrackerNameMixin):
     """
     CRP Private Torrent Tracker
     """
@@ -28,6 +29,7 @@ class Curupira:
 
     auth_type = "other_api"
     tracker = "CURUPIRA"
+    name_profile = SCENE_OR_BASENAME_PROFILE
     display_name = "Curupira"
     banned_groups = (
         "4K4U",
@@ -257,9 +259,6 @@ class Curupira:
         if category == "TV":
             return "5000"
         return "2000"
-
-    async def get_name(self, meta: Meta) -> str:
-        return meta.scene_name or meta.basename_no_ext
 
     def get_iso_639_1(self, lang_name: str) -> str | None:
         with contextlib.suppress(Exception):

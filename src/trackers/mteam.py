@@ -11,19 +11,41 @@ from src.cogs.redaction import Redaction
 from src.console import logger
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
+from src.release_name import NameRule, NameSelector, TrackerNameProfile, regex_sub, template
+from src.trackers.naming import StringTrackerNameMixin
 from src.tmdb import TmdbManager
 from src.trackers.common import Common
 
 Config = dict[str, Any]
 
 
-class MTeam:
+class MTeam(StringTrackerNameMixin):
     """
     MTEAM Private Torrent Tracker
     """
 
     auth_type = "other_api"
     tracker = "MTEAM"
+    name_profile = TrackerNameProfile(
+        rules=(NameRule(NameSelector(), template("base_name")),),
+        transforms=(
+            regex_sub(r"\bblu[-_]?ray\b", "BluRay", flags=re.IGNORECASE),
+            regex_sub(r"\bweb[-_]?dl\b", "WEB-DL", flags=re.IGNORECASE),
+            regex_sub(r"\bdovi\b", "DV", flags=re.IGNORECASE),
+            regex_sub(
+                r"\b(hdr|hlg)(10)?(\+)?\b",
+                lambda match: f"{match.group(1).upper()}{match.group(2) or ''}{match.group(3) or ''}",
+                flags=re.IGNORECASE,
+            ),
+            regex_sub(r"\b(eac[-_]?3|dd\+)(?![a-zA-Z0-9])", "DDP", flags=re.IGNORECASE),
+            regex_sub(r"\bac[-_]?3(?![a-zA-Z0-9])", "DD", flags=re.IGNORECASE),
+            regex_sub(r"\bdts[-_\s]?x\b", "DTS:X", flags=re.IGNORECASE),
+            regex_sub(r"\btrue[-_]?hd\b", "TrueHD", flags=re.IGNORECASE),
+            regex_sub(r"\b(50|60|120)fps\b", "HFR", flags=re.IGNORECASE),
+            regex_sub(r"\bHFR\b([-.\s_]+HFR)+", "HFR", flags=re.IGNORECASE),
+            regex_sub(r"\.(mkv|mp4|avi|ts)$", "", flags=re.IGNORECASE),
+        ),
+    )
     display_name = "M-Team"
     allows_bloated_audio = True
     base_url = "https://kp.m-team.cc"
@@ -592,40 +614,3 @@ class MTeam:
             meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading"
             await self.common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
             return True  # Debug mode - simulated success
-
-    async def get_name(self, meta: Meta) -> str:
-        """https://wiki.m-team.cc/zh-tw/upload-title-rules"""
-        name = meta.name
-
-        # 1. Normalize Blu-ray / BLURAY / Blu-Ray to BluRay (incorporates UHD Blu-ray -> UHD BluRay)
-        name = re.sub(r"\bblu[-_]?ray\b", "BluRay", name, flags=re.IGNORECASE)
-
-        # 2. Normalize WEBDL / Web-DL to WEB-DL
-        name = re.sub(r"\bweb[-_]?dl\b", "WEB-DL", name, flags=re.IGNORECASE)
-
-        # 3. Normalize Dolby Vision: DoVi / Dovi / DOVI to DV
-        name = re.sub(r"\bdovi\b", "DV", name, flags=re.IGNORECASE)
-
-        # 4. Normalize HDR / Hdr / hdr / HLG case (e.g. Hdr10 -> HDR10, hdr10+ -> HDR10+)
-        name = re.sub(r"\b(hdr|hlg)(10)?(\+)?\b", lambda m: f"{m.group(1).upper()}{m.group(2) or ''}{m.group(3) or ''}", name, flags=re.IGNORECASE)
-
-        # 5. Dolby Digital Plus: EAC3 / EAC-3 / DD+ / DDPlus to DDP
-        name = re.sub(r"\b(eac[-_]?3|dd\+)(?![a-zA-Z0-9])", "DDP", name, flags=re.IGNORECASE)
-
-        # 6. Dolby Digital: AC3 / AC-3 to DD
-        name = re.sub(r"\bac[-_]?3(?![a-zA-Z0-9])", "DD", name, flags=re.IGNORECASE)
-
-        # 7. DTS:X: DTS-X / DTS_X / DTSX / DTS X to DTS:X
-        name = re.sub(r"\bdts[-_\s]?x\b", "DTS:X", name, flags=re.IGNORECASE)
-
-        # 8. TrueHD: True-HD to TrueHD
-        name = re.sub(r"\btrue[-_]?hd\b", "TrueHD", name, flags=re.IGNORECASE)
-
-        # 9. High Frame Rate: 50fps / 60fps / 120fps to HFR
-        name = re.sub(r"\b(50|60|120)fps\b", "HFR", name, flags=re.IGNORECASE)
-
-        # Clean up duplicate HFR words (e.g. "HFR HFR" or "HFR.HFR" or "HFR-HFR" -> "HFR")
-        name = re.sub(r"\bHFR\b([-.\s_]+HFR)+", "HFR", name, flags=re.IGNORECASE)
-
-        # 10. Strip video file extension suffixes if they are present in the name
-        return re.sub(r"\.(mkv|mp4|avi|ts)$", "", name, flags=re.IGNORECASE)

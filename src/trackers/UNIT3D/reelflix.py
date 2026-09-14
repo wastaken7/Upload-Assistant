@@ -1,9 +1,10 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-import re
 from typing import Any
 
 from src.meta import Meta
+from src.release_name import NameRule, NameSelector, TrackerNameProfile, template
 from src.trackers.common import Common
+from src.trackers.naming import invalid_group_suffix
 from src.trackers.UNIT3D import UNIT3D
 
 Config = dict[str, Any]
@@ -15,6 +16,10 @@ class ReelFlix(UNIT3D):
     """
 
     tracker = "REELFLIX"
+    name_profile = TrackerNameProfile(
+        rules=(NameRule(NameSelector(), template("base_name")),),
+        transforms=(invalid_group_suffix("NoGroup"),),
+    )
     display_name = "ReelFLiX"
     allows_bloated_audio = True
     base_url = "https://reelflix.cc"
@@ -35,18 +40,6 @@ class ReelFlix(UNIT3D):
     async def get_additional_checks(self, meta: Meta) -> bool:
         return self.common.check_and_confirm_adult_media_upload(meta, self.tracker)
 
-    async def get_name(self, meta: Meta) -> dict[str, str]:
-        rf_name = meta.name
-        tag_value = meta.tag or ""
-        tag_lower = tag_value.lower()
-        invalid_tags = ["nogrp", "nogroup", "unknown", "-unk-"]
-
-        if tag_value == "" or any(invalid_tag in tag_lower for invalid_tag in invalid_tags):
-            for invalid_tag in invalid_tags:
-                rf_name = re.sub(f"-{invalid_tag}", "", rf_name, flags=re.IGNORECASE)
-            rf_name = f"{rf_name}-NoGroup"
-
-        return {"name": rf_name}
 
     async def get_type_id(self, meta: Meta, type: str | None = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         type_id = {

@@ -1,7 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import base64
 import re
-import unicodedata
 from pathlib import Path
 from typing import Any, cast
 
@@ -14,12 +13,14 @@ from src.console import console, logger
 from src.get_desc import DescriptionBuilder, html_to_bbcode
 from src.languages import languages_manager
 from src.meta import Meta
+from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, template
+from src.trackers.naming import StringTrackerNameMixin, configured_metadata_name
 from src.trackers.common import Common
 
 Config = dict[str, Any]
 
 
-class SpeedApp:
+class SpeedApp(StringTrackerNameMixin):
     """
     SPD Private Torrent Tracker
     """
@@ -29,6 +30,16 @@ class SpeedApp:
     auth_type = "other_api"
     url = f"{base_url}"
     tracker = "SPEEDAPP"
+    name_profile = TrackerNameProfile(
+        rules=(NameRule(NameSelector(), template("speedapp_source")),),
+        transforms=(configured_metadata_name(),),
+    )
+
+    async def get_name_overrides(self, context: NameContext) -> dict[str, str]:
+        meta = context.meta
+        use_metadata = self.config["TRACKERS"][self.tracker].get("use_metadata_name", False)
+        source = meta.scene_name or meta.clean_name or "" if use_metadata else (meta.scene_name or meta.basename_no_ext)
+        return {"speedapp_source": source, "use_metadata_name": "1" if use_metadata else ""}
     display_name = "SpeedApp"
     banned_groups = ()
     upload_url = f"{base_url}/api/upload"
@@ -219,24 +230,6 @@ class SpeedApp:
             screenshots=False,
             signature=f"\n[url=https://github.com/wastaken7/Upload-Assistant]{meta.ua_signature}[/url]",
         )
-
-    async def get_name(self, meta: Meta) -> str:
-        tracker_name = meta.basename_no_ext
-        scene_name = meta.scene_name or ""
-
-        use_metadata_name = self.config["TRACKERS"][self.tracker].get("use_metadata_name", False)
-        if use_metadata_name:
-            clean_name = meta.clean_name or ""
-            tracker_name = scene_name if scene_name else clean_name
-            tracker_name = tracker_name.replace("DD+", "DDP").replace("DTS:", "DTS-").replace("HDR10+", "HDR10P")
-            tracker_name = unicodedata.normalize("NFD", tracker_name)
-            tracker_name = "".join(c for c in tracker_name if c.isascii() and (c.isalnum() or c in (" ", ".", "-")))
-            tracker_name = tracker_name.replace("!", "")
-
-        else:
-            tracker_name = scene_name or meta.basename_no_ext
-
-        return tracker_name
 
     async def encode_to_base64(self, file_path: str) -> str:
         async with aiofiles.open(file_path, "rb") as binary_file:

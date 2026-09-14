@@ -1,10 +1,11 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-import re
 from typing import Any
 
 from src.languages import languages_manager
 from src.meta import Meta
+from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, template
 from src.trackers.common import Common
+from src.trackers.naming import midnight_scene_name
 from src.trackers.UNIT3D import UNIT3D
 
 Config = dict[str, Any]
@@ -16,6 +17,37 @@ class MidnightScene(UNIT3D):
     """
 
     tracker = "MIDNIGHTSCENE"
+    name_profile = TrackerNameProfile(
+        rules=(NameRule(NameSelector(category="MUSIC"), template("music_title", "music_year", "catalogue_edition", "media_format")), NameRule(NameSelector(), template("base_name"))),
+        transforms=(midnight_scene_name,),
+    )
+
+    async def get_name_overrides(self, context: NameContext) -> dict[str, str]:
+        meta = context.meta
+        if meta.category == "MUSIC":
+            if meta.scene:
+                scene = str(meta.scene_name or meta.basename_no_ext or meta.name or "").strip()
+                if scene:
+                    return {"music_title": scene.replace("_", " ")}
+            release = meta.music_release if isinstance(meta.music_release, dict) else {}
+            fields = release.get("fields", {}) if isinstance(release.get("fields"), dict) else {}
+            def release_field(name: str, fallback: Any = "") -> str:
+                value = fields.get(name, {}) if isinstance(fields.get(name), dict) else {}
+                return str(value.get("value", fallback) or "").strip()
+            artist = release_field("artist", meta.artist)
+            title = release_field("album", meta.title)
+            year = release_field("release_year", release_field("year", meta.year))
+            catalogue = release_field("release_catalogue_number", release_field("catalogue_number", meta.music_catalogue_number))
+            edition = release_field("edition", meta.manual_edition or meta.edition)
+            media = release_field("media", meta.source)
+            format_name = release_field("format", meta.format or meta.type).upper()
+            catalogue_edition = " - ".join(part for part in (catalogue, edition) if part)
+            media_format = " - ".join(part for part in (media, format_name) if part)
+            return {"music_title": " - ".join(part for part in (artist, title) if part), "music_year": f"({year})" if year else "", "catalogue_edition": f"[{catalogue_edition}]" if catalogue_edition else "", "media_format": f"[{media_format}]" if media_format else ""}
+        if not meta.language_checked:
+            await languages_manager.process_desc_language(meta, tracker=self.tracker)
+        languages = [] if not meta.audio_languages else meta.audio_languages
+        return {"foreign_language": languages[0].upper()} if languages and not await languages_manager.has_english_language(languages) else {}
     display_name = "MidnightScene"
     allows_bloated_audio = True
     base_url = "https://midnightscene.cc"
@@ -191,60 +223,3 @@ class MidnightScene(UNIT3D):
             val = type_id.get(meta_type, "0")
 
         return {"type_id": val}
-
-    async def get_name(self, meta: Meta):
-        if meta.category == "MUSIC":
-            # Scene titles retain their original segment separators; only the
-            # artist/title underscores are rendered as spaces on the site.
-            if meta.scene:
-                scene_name = str(meta.scene_name or meta.basename_no_ext or meta.name or "").strip()
-                if scene_name:
-                    return {"name": scene_name.replace("_", " ")}
-
-            release = meta.music_release if isinstance(meta.music_release, dict) else {}
-            fields = release.get("fields", {}) if isinstance(release.get("fields"), dict) else {}
-
-            def release_field(name: str, fallback: Any = "") -> str:
-                field = fields.get(name, {}) if isinstance(fields.get(name), dict) else {}
-                return str(field.get("value", fallback) or "").strip()
-
-            artist = release_field("artist", meta.artist)
-            title = release_field("album", meta.title)
-            year = release_field("release_year", release_field("year", meta.year))
-            catalogue = release_field("release_catalogue_number", release_field("catalogue_number", meta.music_catalogue_number))
-            edition = release_field("edition", meta.manual_edition or meta.edition)
-            media = release_field("media", meta.source)
-            format_name = release_field("format", meta.format or meta.type).upper()
-
-            name = " - ".join(part for part in (artist, title) if part)
-            if year:
-                name = f"{name} ({year})" if name else f"({year})"
-            catalogue_edition = " - ".join(part for part in (catalogue, edition) if part)
-            if catalogue_edition:
-                name = f"{name} [{catalogue_edition}]" if name else f"[{catalogue_edition}]"
-            media_format = " - ".join(part for part in (media, format_name) if part)
-            if media_format:
-                name = f"{name} [{media_format}]" if name else f"[{media_format}]"
-            return {"name": name}
-
-        ms_name: str = meta.name
-        name_type: str = meta.type or ""
-        source: str = meta.source or ""
-
-        if not meta.language_checked:
-            await languages_manager.process_desc_language(meta, tracker=self.tracker)
-
-        audio_languages: list[str] = [] if not meta.audio_languages else meta.audio_languages
-        has_english_audio = await languages_manager.has_english_language(audio_languages)
-
-        if audio_languages and not has_english_audio:
-            ms_name = re.sub(r"\bDual-Audio\b", "", ms_name, flags=re.IGNORECASE)
-            ms_name = " ".join(ms_name.split())
-            foreign_lang = audio_languages[0].upper()
-            if name_type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD"):
-                if meta.year:
-                    ms_name = ms_name.replace(str(meta.year), f"{meta.year!s} {foreign_lang}", 1)
-            elif meta.is_disc != "BDMV":
-                ms_name = ms_name.replace(meta.resolution, f"{foreign_lang} {meta.resolution}", 1)
-
-        return {"name": ms_name}

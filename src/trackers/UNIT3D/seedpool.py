@@ -1,13 +1,14 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import re
-from pathlib import Path
 from typing import Any, cast
 
 import cli_ui
 
 from src.console import logger
 from src.meta import Meta
+from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, replace_text, template
 from src.trackers.common import Common
+from src.trackers.naming import strip_known_extension
 from src.trackers.UNIT3D import UNIT3D
 
 Config = dict[str, Any]
@@ -19,6 +20,20 @@ class Seedpool(UNIT3D):
     """
 
     tracker = "SEEDPOOL"
+    name_profile = TrackerNameProfile(
+        rules=(NameRule(NameSelector(), template("seedpool_source")),),
+        transforms=(replace_text((" ", ".")), strip_known_extension),
+    )
+
+    async def get_name_overrides(self, context: NameContext) -> dict[str, str]:
+        meta = context.meta
+        if meta.scene:
+            source = meta.scene_name or meta.basename_no_ext
+        elif bool(meta.is_disc):
+            source = meta.name
+        else:
+            source = meta.name if meta.mal_id or 0 != 0 else meta.basename_no_ext
+        return {"seedpool_source": source}
     display_name = "seedpool"
     base_url = "https://seedpool.org"
     banned_groups = ()
@@ -184,23 +199,6 @@ class Seedpool(UNIT3D):
 
         return {"type_id": type_id.get(type_value, "17" if meta.category in {"BOOK", "GAME", "MUSIC"} else "0")}
 
-    async def get_name(self, meta: Meta) -> dict[str, str]:
-        known_extensions = {".mkv", ".mp4", ".avi", ".ts"}
-        if meta.scene:
-            scene_name = meta.scene_name
-            name = scene_name if scene_name != "" else meta.basename_no_ext.replace(" ", ".")
-        elif bool(meta.is_disc):
-            name = meta.name.replace(" ", ".")
-        else:
-            base_name = meta.name.replace(" ", ".")
-            uuid_name = meta.basename_no_ext.replace(" ", ".")
-            name = base_name if meta.mal_id or 0 != 0 else uuid_name
-        p = Path(name)
-        base, ext = p.stem, p.suffix
-        if ext.lower() in known_extensions:
-            name = base.replace(" ", ".")
-
-        return {"name": name}
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         resolution = meta.resolution

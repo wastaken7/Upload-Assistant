@@ -16,13 +16,15 @@ from src.console import logger
 from src.cookie_auth import CookieValidator
 from src.exceptions import *  # noqa E403
 from src.meta import Meta
+from src.release_name import NameRule, NameSelector, TrackerNameProfile, conditional, remove_context_value, replace_text, template
+from src.trackers.naming import StringTrackerNameMixin
 from src.temp_paths import screenshots_dir
 from src.trackers.common import Common
 
 Config = dict[str, Any]
 
 
-class PTerClub:
+class PTerClub(StringTrackerNameMixin):
     """
     PTERCLUB (PT之友俱乐部) is a CHINESE Private Torrent Tracker for HD MUSIC VIDEOS / MOVIES / TV / ANIME
     """
@@ -31,6 +33,18 @@ class PTerClub:
 
     auth_type = "cookies"
     tracker = "PTERCLUB"
+    name_profile = TrackerNameProfile(
+        rules=(NameRule(NameSelector(), template("base_name")),),
+        transforms=(
+            replace_text(("Dubbed", ""), ("Dual-Audio", "")),
+            remove_context_value("alt_title"),
+            replace_text(("PQ10", "HDR")),
+            conditional(
+                lambda context: context.values.get("type") == "WEBDL" and context.meta.has_encode_settings,
+                replace_text(("H.264", "x264")),
+            ),
+        ),
+    )
     display_name = "PTerClub"
     allows_bloated_audio = True
     source_flag = "PTER"
@@ -344,21 +358,6 @@ class PTerClub:
                     }
                     image_list.append(image_dict)
         return image_list
-
-    async def get_name(self, meta: Meta) -> str:
-        pter_name = meta.name
-
-        remove_list = ["Dubbed", "Dual-Audio"]
-        for each in remove_list:
-            pter_name = pter_name.replace(each, "")
-
-        pter_name = pter_name.replace(meta.aka, "")
-        pter_name = pter_name.replace("PQ10", "HDR")
-
-        if meta.type == "WEBDL" and meta.has_encode_settings is True:
-            pter_name = pter_name.replace("H.264", "x264")
-
-        return pter_name
 
     async def is_zhongzi(self, meta: Meta) -> str | None:
         if meta.is_disc != "BDMV":

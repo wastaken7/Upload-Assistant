@@ -3,6 +3,7 @@ from typing import Any
 
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
+from src.release_name import NameContext
 from src.trackers.common import Common
 from src.trackers.UNIT3D import UNIT3D
 from src.trackers.UNIT3D.capybarabr import CapybaraBR
@@ -16,6 +17,12 @@ class Samaritano(UNIT3D):
     """
 
     tracker = "SAMARITANO"
+    name_profile = CapybaraBR.name_profile
+
+    async def get_name_overrides(self, context: NameContext) -> dict[str, str]:
+        capybara = CapybaraBR(self.config)
+        capybara.tracker = self.tracker
+        return await capybara.get_name_overrides(context)
     display_name = "Samaritano"
     base_url = "https://samaritano.cc"
     banned_groups = ()
@@ -50,11 +57,6 @@ class Samaritano(UNIT3D):
         meta_resolution = meta.resolution
         resolved_id = resolution_id.get(meta_resolution, "10")
         return {"resolution_id": resolved_id}
-
-    async def get_name(self, meta: Meta) -> dict[str, str]:
-        cbr = CapybaraBR(self.config)
-        cbr.tracker = self.tracker
-        return await cbr.get_name(meta)
 
     async def get_category_id(self, meta: Meta, category: str | None = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         cat_map = {

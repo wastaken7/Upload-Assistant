@@ -10,17 +10,19 @@ from bs4 import BeautifulSoup
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
+from src.trackers.naming import SCENE_OR_BASENAME_PROFILE, StringTrackerNameMixin
 
 Config = dict[str, Any]
 
 
-class ImmortalSeed:
+class ImmortalSeed(StringTrackerNameMixin):
     """
     IS Private Torrent Tracker
     """
 
     auth_type = "cookies"
     tracker = "IMMORTALSEED"
+    name_profile = SCENE_OR_BASENAME_PROFILE
     display_name = "ImmortalSeed"
     allows_bloated_audio = True
     source_flag = "https://immortalseed.me"
@@ -259,12 +261,6 @@ class ImmortalSeed:
         nfo_bytes = nfo_content.encode("utf-8")
         nfo_filename = f"{(meta.scene_name or meta.basename_no_ext)}.nfo"
         return {"nfofile": (nfo_filename, nfo_bytes, "application/octet-stream")}
-
-    async def get_name(self, meta: Meta) -> str:
-        if meta.scene_name:
-            return meta.scene_name
-
-        return meta.basename_no_ext
 
     async def get_cover(self, meta: Meta) -> str:
         covers = meta.hosted_artwork

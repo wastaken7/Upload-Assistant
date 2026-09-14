@@ -19,17 +19,20 @@ from src.cookie_auth import CookieValidator
 from src.description_review import get_base_description
 from src.exceptions import *  # noqa F403
 from src.meta import Meta
+from src.release_name import NameRule, NameSelector, TrackerNameProfile, template
 from src.temp_paths import screenshots_dir
 from src.trackers.common import Common
+from src.trackers.naming import StringTrackerNameMixin, filelist_name_transform
 
 
-class FileList:
+class FileList(StringTrackerNameMixin):
     """
     FL Private Torrent Tracker
     """
 
     auth_type = "cookies"
     tracker = "FILELIST"
+    name_profile = TrackerNameProfile(rules=(NameRule(NameSelector(), template("base_name")),), transforms=(filelist_name_transform,))
     display_name = "FileList"
     allows_bloated_audio = True
     source_flag = "FL"
@@ -95,40 +98,6 @@ class FileList:
             # 24 = Anime
             cat_id = 24
         return cat_id
-
-    async def get_name(self, meta: Meta) -> str:
-        fl_name = meta.name
-        hdr = meta.hdr
-        audio = meta.audio
-        if "DV" in hdr:
-            fl_name = fl_name.replace(" DV ", " DoVi ")
-        if meta.type in ("WEBDL", "WEBRIP", "ENCODE"):
-            fl_name = fl_name.replace(audio, audio.replace(" ", "", 1))
-        fl_name = fl_name.replace(meta.aka, "")
-        imdb_info = meta.imdb_info
-        if isinstance(imdb_info, dict):
-            imdb_info_dict = imdb_info
-            title = meta.title
-            imdb_aka = str(imdb_info_dict.get("aka", ""))
-            if imdb_aka:
-                fl_name = fl_name.replace(title, imdb_aka)
-            meta_year = str(meta.year).strip() if meta.year is not None else ""
-            imdb_year = str(imdb_info_dict.get("year", meta_year))
-            if meta_year and meta_year != imdb_year:
-                fl_name = fl_name.replace(meta_year, imdb_year)
-        if "DD+" in audio and "DDP" in meta.basename_no_ext:
-            fl_name = fl_name.replace("DD+", "DDP")
-        if "Atmos" in audio and "Atmos" not in meta.basename_no_ext:
-            fl_name = fl_name.replace("Atmos", "")
-
-        fl_name = fl_name.replace("BluRay REMUX", "Remux").replace("BluRay Remux", "Remux").replace("Bluray Remux", "Remux")
-        fl_name = fl_name.replace("PQ10", "HDR").replace("HDR10+", "HDR")
-        fl_name = fl_name.replace("DoVi HDR HEVC", "HEVC DoVi HDR").replace("HDR HEVC", "HEVC HDR").replace("DoVi HEVC", "HEVC DoVi")
-        fl_name = fl_name.replace("DTS7.1", "DTS").replace("DTS5.1", "DTS").replace("DTS2.0", "DTS").replace("DTS1.0", "DTS")
-        fl_name = fl_name.replace("Dubbed", "").replace("Dual-Audio", "")
-        fl_name = " ".join(fl_name.split())
-        fl_name = re.sub(r"[^0-9a-zA-ZÀ-ÿ. &+'\-\[\]]+", "", fl_name)
-        return fl_name.replace(" ", ".").replace("..", ".")
 
     def _is_true(self, value: Any) -> bool:
         return str(value).strip().lower() in {"true", "1", "yes"}

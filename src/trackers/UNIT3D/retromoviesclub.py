@@ -1,10 +1,11 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-import re
 from typing import Any
 
 from src.console import logger
 from src.meta import Meta
+from src.release_name import NameRule, NameSelector, TrackerNameProfile, template
 from src.trackers.common import Common
+from src.trackers.naming import remove_aka_and_sanitize
 from src.trackers.UNIT3D import UNIT3D
 
 Config = dict[str, Any]
@@ -14,6 +15,10 @@ class RetroMoviesClub(UNIT3D):
     """Retro Movies Club (RMC) tracker adapter."""
 
     tracker = "RETROMOVIESCLUB"
+    name_profile = TrackerNameProfile(
+        rules=(NameRule(NameSelector(), template("base_name")),),
+        transforms=(remove_aka_and_sanitize,),
+    )
     display_name = "Retro Movies Club"
     base_url = "https://retro-movies.club"
     banned_groups = (
@@ -193,11 +198,3 @@ class RetroMoviesClub(UNIT3D):
 
     async def get_additional_data(self, meta: Meta) -> dict[str, str]:
         return {"mod_queue_opt_in": await self.get_flag(meta, "modq")}
-
-    async def get_name(self, meta: Meta) -> dict[str, str]:
-        name = meta.name or ""
-        aka = meta.aka.strip()
-        if aka:
-            name = name.replace(f" {aka} ", " ")
-        name = re.sub(r"[^A-Za-z0-9 ._+-]+", "", name)
-        return {"name": re.sub(r"\s+", " ", name).strip()}

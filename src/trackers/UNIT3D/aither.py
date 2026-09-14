@@ -4,8 +4,9 @@ from typing import Any, ClassVar
 from src.console import logger
 from src.languages import languages_manager
 from src.meta import Meta
+from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, template
 from src.trackers.common import Common
-from src.trackers.naming import add_incomplete_pack_marker
+from src.trackers.naming import aither_name
 from src.trackers.UNIT3D import UNIT3D
 
 
@@ -15,6 +16,27 @@ class Aither(UNIT3D):
     """
 
     tracker = "AITHER"
+    name_profile = TrackerNameProfile(
+        rules=(NameRule(NameSelector(), template("base_name")),),
+        transforms=(aither_name,),
+    )
+
+    async def get_name_overrides(self, context: NameContext) -> dict[str, str]:
+        meta = context.meta
+        year = str(meta.year) if meta.year is not None else ""
+        if meta.category == "TV":
+            year = str(meta.year) if meta.year is not None and meta.search_year != "" else ""
+        manual_year = str(meta.manual_year)
+        if manual_year and int(manual_year) > 0:
+            year = manual_year
+        if meta.no_year:
+            year = ""
+        if not meta.language_checked:
+            await languages_manager.process_desc_language(meta, tracker=self.tracker)
+        languages = [] if not meta.audio_languages else meta.audio_languages
+        if languages and not await languages_manager.has_english_language(languages):
+            return {"year": year, "foreign_language": languages[0].upper()}
+        return {"year": year}
     display_name = "Aither"
     base_url = "https://aither.cc"
     banned_groups: tuple[str, ...] = ()
@@ -107,58 +129,3 @@ class Aither(UNIT3D):
         except TypeError, ValueError:
             return ""
         return await self.common.unit3d_region_ids(reverse=True, region_id=normalized_id)
-
-    async def get_name(self, meta: Meta):
-        aither_name: str = meta.name
-        resolution: str = meta.resolution
-        video_codec: str = meta.video_codec
-        video_encode: str = meta.video_encode
-        name_type: str = meta.type or ""
-        source: str = meta.source or ""
-        alt_title = meta.aka if not meta.no_aka else ""
-
-        year = str(meta.year) if meta.year is not None else ""
-        if meta.category == "TV":
-            year = str(meta.year) if (meta.year is not None and meta.search_year != "") else ""
-        manual_year_value = str(meta.manual_year)
-        if manual_year_value and int(manual_year_value) > 0:
-            year = manual_year_value
-        if meta.no_year:
-            year = ""
-
-        if not meta.language_checked:
-            await languages_manager.process_desc_language(meta, tracker=self.tracker)
-        audio_languages: list[str] = [] if not meta.audio_languages else meta.audio_languages
-        if audio_languages and not await languages_manager.has_english_language(audio_languages):
-            foreign_lang = audio_languages[0].upper()
-            if name_type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD"):
-                if year:
-                    aither_name = aither_name.replace(year, f"{year} {foreign_lang}", 1)
-            elif meta.is_disc != "BDMV":
-                aither_name = aither_name.replace(meta.resolution, f"{foreign_lang} {meta.resolution}", 1)
-
-        if name_type == "DVDRIP":
-            source = "DVDRip"
-            aither_name = aither_name.replace(f"{meta.source} ", "", 1)
-            aither_name = aither_name.replace(f"{meta.video_encode}", "", 1)
-            aither_name = aither_name.replace(f"{source}", f"{resolution} {source}", 1)
-            aither_name = aither_name.replace((meta.audio), f"{meta.audio}{video_encode}", 1)
-
-        elif meta.is_disc == "DVD":
-            region_and_source = " ".join(part for part in (meta.region, source) if part)
-            disc_details = " ".join(part for part in (resolution, meta.region, source) if part)
-            if region_and_source:
-                aither_name = aither_name.replace(region_and_source, disc_details, 1)
-            aither_name = aither_name.replace((meta.audio), f"{video_codec} {meta.audio}", 1)
-
-        elif name_type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD"):
-            aither_name = aither_name.replace(meta.source or "", f"{resolution} {meta.source}", 1)
-            aither_name = aither_name.replace((meta.audio), f"{video_codec} {meta.audio}", 1)
-
-        if meta.trump_reason == "exact_match":
-            aither_name = aither_name + " - TRUMP"
-
-        if alt_title and year:
-            aither_name = aither_name.replace(f"{year} {alt_title}", f"{alt_title} {year}", 1)
-
-        return {"name": add_incomplete_pack_marker(aither_name, meta, self.tracker)}

@@ -16,12 +16,14 @@ from src.console import logger, prompt_in_thread
 from src.cookie_auth import CookieValidator
 from src.exceptions import *  # noqa #F405
 from src.meta import Meta
+from src.release_name import NameRule, NameSelector, TrackerNameProfile, replace_text, template
+from src.trackers.naming import StringTrackerNameMixin
 from src.trackers.common import Common
 
 Config = dict[str, Any]
 
 
-class ToTheGlory:
+class ToTheGlory(StringTrackerNameMixin):
     """
     TTG Private Torrent Tracker
     """
@@ -30,6 +32,10 @@ class ToTheGlory:
 
     auth_type = "cookies"
     tracker = "TOTHEGLORY"
+    name_profile = TrackerNameProfile(
+        rules=(NameRule(NameSelector(), template("base_name")),),
+        transforms=(replace_text(("Dubbed", ""), ("Dual-Audio", ""), ("PQ10", "HDR"), (".", "{@}")),),
+    )
     display_name = "ToTheGlory"
     allows_bloated_audio = True
     source_flag = "TTG"
@@ -46,15 +52,6 @@ class ToTheGlory:
         self.uid = str(config["TRACKERS"][self.tracker].get("user_id", "")).strip()
         self.passkey = str(config["TRACKERS"][self.tracker].get("announce_url", "")).strip().split("/")[-1]
         self.cookie_validator = CookieValidator(config)
-
-    async def get_name(self, meta: Meta) -> str:
-        ttg_name = meta.name
-
-        remove_list = ["Dubbed", "Dual-Audio"]
-        for each in remove_list:
-            ttg_name = ttg_name.replace(each, "")
-        ttg_name = ttg_name.replace("PQ10", "HDR")
-        return ttg_name.replace(".", "{@}")
 
     async def get_type_id(self, meta: Meta) -> int:
         type_id = 0

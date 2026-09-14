@@ -7,7 +7,8 @@ import aiofiles
 from src.console import logger
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
-from src.trackers.naming import add_incomplete_pack_marker
+from src.release_name import NameRule, NameSelector, TrackerNameProfile, template
+from src.trackers.naming import add_incomplete_pack_marker_transform, imdb_title_transform
 from src.trackers.UNIT3D import UNIT3D
 
 Config = dict[str, Any]
@@ -19,6 +20,10 @@ class ULCX(UNIT3D):
     """
 
     tracker = "ULCX"
+    name_profile = TrackerNameProfile(
+        rules=(NameRule(NameSelector(), template("base_name")),),
+        transforms=(imdb_title_transform(remove_web_hybrid=True, anime_aka=False), add_incomplete_pack_marker_transform),
+    )
     display_name = "ULCX"
     reject_english_original_bloat = True
     base_url = "https://upload.cx"
@@ -285,26 +290,3 @@ class ULCX(UNIT3D):
                 await f.write(desc)
 
         return {"description": desc}
-
-    async def get_name(self, meta: Meta) -> dict[str, str]:
-        ulcx_name = meta.name
-        imdb_name = meta.imdb_info.get("title", "")
-        imdb_year = str(meta.imdb_info.get("year", ""))
-        imdb_aka = meta.imdb_info.get("aka", "")
-        year = str(meta.year) if meta.year is not None else ""
-        aka = meta.aka
-        if imdb_name and imdb_name.strip():
-            if aka:
-                ulcx_name = ulcx_name.replace(f"{aka} ", "", 1)
-            ulcx_name = ulcx_name.replace(f"{meta.title}", imdb_name, 1)
-            if imdb_aka and imdb_aka.strip() and imdb_aka != imdb_name and not meta.no_aka and not meta.anime:
-                ulcx_name = ulcx_name.replace(f"{imdb_name}", f"{imdb_name} AKA {imdb_aka}", 1)
-        if "Hybrid" in ulcx_name and meta.type == "WEBDL":
-            ulcx_name = ulcx_name.replace("Hybrid ", "", 1)
-        if meta.category != "TV" and imdb_year and imdb_year.strip() and year and year.strip() and imdb_year != year:
-            ulcx_name = ulcx_name.replace(f"{year}", imdb_year, 1)
-
-        if meta.type == "WEBDL" and ("hybrid" in meta.edition.lower() or meta.webdv):
-            ulcx_name = ulcx_name.replace("Hybrid ", "", 1)
-
-        return {"name": add_incomplete_pack_marker(ulcx_name, meta, self.tracker)}

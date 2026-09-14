@@ -3,7 +3,9 @@ from typing import Any
 
 from src.console import logger
 from src.meta import Meta
+from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, template
 from src.trackers.common import Common
+from src.trackers.naming import asian_cinema_transform
 from src.trackers.UNIT3D import UNIT3D
 
 
@@ -13,6 +15,13 @@ class AsianCinema(UNIT3D):
     """
 
     tracker = "ASIANCINEMA"
+    name_profile = TrackerNameProfile(
+        rules=(NameRule(NameSelector(), template("base_name")),),
+        transforms=(asian_cinema_transform,),
+    )
+
+    async def get_name_overrides(self, context: NameContext) -> dict[str, str]:
+        return {"suffix": self.get_subs_tag(context.meta)}
     display_name = "AsianCinema"
     allows_bloated_audio = True
     source_flag = "AsianCinema"
@@ -161,35 +170,3 @@ class AsianCinema(UNIT3D):
         region = meta.region
 
         return {"region_id": region_map.get(region, "")}
-
-    async def get_name(self, meta: Meta) -> dict[str, str]:
-        name: str = meta.name
-        aka: str = meta.aka
-        original_title: str = meta.original_title
-        audio: str = meta.audio
-        source: str = meta.source or ""
-        is_disc: str = meta.is_disc
-        resolution: str = meta.resolution
-        if aka != "":
-            # ugly fix to remove the extra space in the title
-            aka = aka + " "
-            name = name.replace(aka, f" / {original_title} {chr(int('202A', 16))}")
-        elif aka == "":
-            if meta.title != original_title:
-                # name = f'{name[:name.find(year)]}/ {original_title} {chr(int("202A", 16))}{name[name.find(year):]}'
-                name = name.replace(meta.title, f"{meta.title} / {original_title} {chr(int('202A', 16))}")
-        if "AAC" in audio:
-            name = name.replace(audio.strip().replace("  ", " "), audio.replace("AAC ", "AAC"))
-        name = name.replace("DD+ ", "DD+")
-        name = name.replace("UHD BluRay REMUX", "Remux")
-        name = name.replace("BluRay REMUX", "Remux")
-        name = name.replace("H.265", "HEVC")
-        name = name.replace(" Atmos", "")
-        if is_disc == "DVD":
-            name = name.replace(f"{source} DVD5", f"{resolution} DVD {source}")
-            name = name.replace(f"{source} DVD9", f"{resolution} DVD {source}")
-            if audio == meta.channels:
-                name = name.replace(f"{audio}", f"MPEG {audio}")
-
-        name = name + self.get_subs_tag(meta)
-        return {"name": name}

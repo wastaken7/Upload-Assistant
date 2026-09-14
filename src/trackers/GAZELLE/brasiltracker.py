@@ -20,17 +20,25 @@ from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder, html_to_bbcode
 from src.languages import languages_manager
 from src.meta import Meta
+from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, template
 from src.tmdb import TmdbManager
 from src.trackers.common import Common
+from src.trackers.naming import StringTrackerNameMixin
 
 
-class BrasilTracker:
+class BrasilTracker(StringTrackerNameMixin):
     """
     BT Private Torrent Tracker
     """
 
     auth_type = "cookies"
     tracker = "BRASILTRACKER"
+    name_profile = TrackerNameProfile(rules=(NameRule(NameSelector(), template("localized_title")),))
+
+    async def get_name_overrides(self, context: NameContext) -> dict[str, str]:
+        original_title, brazilian_title = self.get_titles(context.meta)
+        localized_title = f"{brazilian_title} [{original_title}]" if brazilian_title else original_title
+        return {"localized_title": localized_title}
     display_name = "BrasilTracker"
     banned_groups: tuple[str, ...] = ()
     source_flag = "BT"
@@ -573,13 +581,6 @@ class BrasilTracker:
                     return codec_name
 
         return "Outro"
-
-    async def get_name(self, meta: Meta) -> str:
-        """This is for the terminal display of the name only, not the actual upload name."""
-        original_title, brazilian_title = self.get_titles(meta)
-        if not brazilian_title:
-            return original_title
-        return f"{brazilian_title} [{original_title}]"
 
     def get_titles(self, meta: Meta) -> tuple[str, str]:
         if meta.category == "BOOK":

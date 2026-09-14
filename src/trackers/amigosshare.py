@@ -18,17 +18,50 @@ from src.description_review import get_base_description
 from src.get_desc import DescriptionBuilder
 from src.languages import languages_manager
 from src.meta import Meta
+from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, collapse_whitespace, template
 from src.tmdb import TmdbManager
 from src.trackers.common import Common
+from src.trackers.naming import StringTrackerNameMixin
 
 
-class AmigosShare:
+class AmigosShare(StringTrackerNameMixin):
     """
     Amigos Share Club (ASC) is a BRAZILIAN Private Torrent Tracker for MOVIES / TV / GENERAL
     """
 
     auth_type = "cookies"
     tracker = "AMIGOSSHARE"
+    name_profile = TrackerNameProfile(
+        rules=(
+            NameRule(NameSelector(category="BOOK"), template("author", "dash", "localized_title")),
+            NameRule(NameSelector(category="GAME"), template("title", "dash", "bracketed_tag")),
+            NameRule(NameSelector(category="TV"), template("localized_title", "dash", "season_episode")),
+            NameRule(NameSelector(), template("localized_title")),
+        ),
+        transforms=(collapse_whitespace,),
+    )
+
+    async def get_name_overrides(self, context: NameContext) -> dict[str, str]:
+        meta = context.meta
+        if meta.category == "BOOK":
+            return {
+                "author": meta.author.strip(),
+                "dash": "-",
+                "localized_title": self.common.portuguese_title_capitalization(meta.title),
+            }
+        if meta.category == "GAME":
+            tag = meta.tag.lstrip("-") if meta.tag else meta.tag
+            return {"dash": "-", "bracketed_tag": f"[{tag}]"}
+        title = meta.title
+        original = (
+            meta.tmdb_localized_data.get("pt-BR", {}).get("main", {}).get("original_name")
+            or meta.tmdb_localized_data.get("pt-BR", {}).get("main", {}).get("original_title")
+            or ""
+        )
+        key = "name" if meta.category == "TV" else "title"
+        localized = meta.tmdb_localized_data.get("pt-BR", {}).get("main", {}).get(key)
+        display = f"{localized} ({title})" if localized and localized.lower() != title.lower() and (not original or localized.lower() != original.lower()) else title
+        return {"localized_title": display, "dash": "-"}
     display_name = "Amigos Share Club"
     source_flag = "ASC"
     banned_groups: tuple[str, ...] = ()
@@ -318,36 +351,6 @@ class AmigosShare:
 
         return "20"
 
-    async def get_name(self, meta: Meta) -> str:
-        if meta.category == "BOOK":
-            author = meta.author.strip()
-            title = self.common.portuguese_title_capitalization(meta.title)
-            return f"{author} - {title}"
-
-        if meta.category == "GAME":
-            return self.get_game_name(meta)
-
-        name = meta.title
-        base_name = name
-        original_name_title = (
-            meta.tmdb_localized_data.get("pt-BR", {}).get("main", {}).get("original_name")
-            or meta.tmdb_localized_data.get("pt-BR", {}).get("main", {}).get("original_title")
-            or ""
-        )
-
-        if meta.category == "TV":
-            tv_title_ptbr = meta.tmdb_localized_data.get("pt-BR", {}).get("main", {}).get("name")
-            if tv_title_ptbr and tv_title_ptbr.lower() != name.lower() and (not original_name_title or tv_title_ptbr.lower() != original_name_title.lower()):
-                base_name = f"{tv_title_ptbr} ({name})"
-
-            return f"{base_name} - {meta.season}{meta.episode}"
-
-        movie_title_ptbr = meta.tmdb_localized_data.get("pt-BR", {}).get("main", {}).get("title")
-        if movie_title_ptbr and movie_title_ptbr.lower() != name.lower() and (not original_name_title or movie_title_ptbr.lower() != original_name_title.lower()):
-            base_name = f"{movie_title_ptbr} ({name})"
-
-        return f"{base_name}"
-
     def get_book_cover(self, meta: Meta) -> str:
         covers = meta.hosted_artwork
         if isinstance(covers, list) and len(covers) > 0:
@@ -625,15 +628,6 @@ class AmigosShare:
             logger.info(f"{self.tracker}: [bold red]Falha ao obter nome do arquivo para ID {torrent_id}: {e}[/bold red]")
 
         return {"name": filename, "size": size, "link": torrent_link}
-
-    def get_game_name(self, meta: Meta) -> str:
-        """Build the torrent name for GAME category."""
-        tag = meta.tag
-        if tag:
-            tag = tag.lstrip("-")
-
-        name = f"{meta.title} - [{tag}]"
-        return re.sub(r"\s{2,}", " ", name).strip()
 
     def get_game_type(self, meta: Meta) -> str:
         """Map meta.platform to AMIGOSSHARE game category (type field) value."""

@@ -1,13 +1,12 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-import re
 from typing import Any
-
-from rich.markup import escape
 
 from src.console import logger
 from src.languages import languages_manager
 from src.meta import Meta
+from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, collapse_whitespace, replace_text, template
 from src.trackers.common import Common
+from src.trackers.naming import append_context_value
 from src.trackers.UNIT3D import UNIT3D
 
 Config = dict[str, Any]
@@ -19,6 +18,20 @@ class ItaTorrents(UNIT3D):
     """
 
     tracker = "ITATORRENTS"
+    name_profile = TrackerNameProfile(
+        rules=(
+            NameRule(NameSelector(type="DISC"), template("title", "year", "season_episode", "repack", "resolution", "edition", "region", "three_d", "source", "resolved_type_label", "hdr", "video_codec", "dubs", "audio")),
+            NameRule(NameSelector(type="REMUX"), template("title", "year", "season_episode", "repack", "resolution", "edition", "region", "three_d", "source", "resolved_type_label", "hdr", "video_codec", "dubs", "audio")),
+            NameRule(NameSelector(), template("title", "year", "season_episode", "repack", "resolution", "edition", "three_d", "resolved_type_label", "dubs", "audio", "hdr", "video_codec")),
+        ),
+        transforms=(collapse_whitespace, append_context_value("tag"), replace_text(("Dubbed", ""), ("Dual-Audio", ""))),
+    )
+
+    async def get_name_overrides(self, context: NameContext) -> dict[str, str]:
+        meta = context.meta
+        resolved = await self.get_type_name(meta) or ""
+        label = "REMUX" if resolved == "REMUX" else "" if resolved == "DISC" else resolved.replace("WEBDL", "WEB-DL").replace("WEBRIP", "WEBRip").replace("DVDRIP", "DVDRip").replace("ENCODE", "BluRay")
+        return {"edition": meta.edition, "dubs": await self.get_dubs(meta), "resolved_type_label": label}
     display_name = "ItaTorrents"
     base_url = "https://itatorrents.xyz"
     banned_groups = ()
@@ -87,79 +100,6 @@ class ItaTorrents(UNIT3D):
         type_id = type_id_map.get(resolved_type or "", "0")
 
         return {"type_id": type_id}
-
-    async def get_name(self, meta: Meta) -> dict[str, str]:
-        type_name = await self.get_type_name(meta) or ""
-        title = meta.title
-        year = str(meta.year) if meta.year is not None else ""
-        if meta.manual_year or 0 > 0:
-            year = str(meta.manual_year)
-        resolution = meta.resolution
-        if resolution == "OTHER":
-            resolution = ""
-        audio = meta.audio
-        season = str(meta.season or "")
-        episode = meta.episode or ""
-        repack = meta.repack
-        three_d = meta.three_d
-        tag = meta.tag or ""
-        source = str(meta.source)
-        hdr = meta.hdr
-        video_codec = meta.video_codec
-        region = str(meta.region)
-        if meta.is_disc == "BDMV":
-            video_codec = meta.video_codec
-            region = str(meta.region)
-        elif meta.is_disc == "DVD":
-            region = str(meta.region)
-        edition = meta.edition
-        if "hybrid" in edition.upper():
-            edition = edition.replace("Hybrid", "").strip()
-
-        if meta.category == "TV":
-            year = str(meta.year) if (meta.year is not None and meta.search_year != "") else ""
-            if meta.manual_date:
-                season = ""
-                episode = ""
-        if meta.no_season is True:
-            season = ""
-        if meta.no_year is True:
-            year = ""
-
-        dubs = await self.get_dubs(meta)
-
-        """
-        From https://itatorrents.xyz/wikis/20
-
-        Struttura Titolo per: Full Disc, Remux
-        Name Year S##E## Cut REPACK Resolution Edition Region 3D SOURCE TYPE Hi10P HDR VCodec Dub ACodec Channels Object-Tag
-
-        Struttura Titolo per: Encode, WEB-DL, WEBRip, HDTV, DLMux, BDMux, WEBMux, DVDMux, BDRip, DVDRip
-        Name Year S##E## Cut REPACK Resolution Edition 3D SOURCE TYPE Dub ACodec Channels Object Hi10P HDR VCodec-Tag
-        """
-
-        if type_name == "DISC" or type_name == "REMUX":
-            itt_name = f"{title} {year} {season}{episode} {repack} {resolution} {edition} {region} {three_d} {source} {'REMUX' if type_name == 'REMUX' else ''} {hdr} {video_codec} {dubs} {audio}"
-
-        else:
-            type_name = type_name.replace("WEBDL", "WEB-DL").replace("WEBRIP", "WEBRip").replace("DVDRIP", "DVDRip").replace("ENCODE", "BluRay")
-            itt_name = f"{title} {year} {season}{episode} {repack} {resolution} {edition} {three_d} {type_name} {dubs} {audio} {hdr} {video_codec}"
-
-        try:
-            itt_name = " ".join(itt_name.split())
-        except Exception:
-            logger.info(f"{self.tracker}: [bold red]Unable to generate name. Please re-run and correct any of the following args if needed.")
-            logger.info(f"{self.tracker}: --category [yellow]{escape(str(meta.category))}")
-            logger.info(f"{self.tracker}: --type [yellow]{escape(str(meta.type))}")
-            logger.info(f"{self.tracker}: --source [yellow]{escape(str(meta.source))}")
-            logger.info(f"{self.tracker}: [bold green]If you specified type, try also specifying source")
-
-            exit()
-        name_notag = itt_name
-        itt_name = name_notag + tag
-        itt_name = itt_name.replace("Dubbed", "").replace("Dual-Audio", "")
-
-        return {"name": re.sub(r"\s{2,}", " ", itt_name)}
 
     async def get_dubs(self, meta: Meta) -> str:
         if not meta.language_checked:

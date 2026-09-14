@@ -13,15 +13,27 @@ from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder
 from src.languages import languages_manager
 from src.meta import Meta
+from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, replace_text, template
+from src.trackers.naming import StringTrackerNameMixin
 
 
-class FunFile:
+class FunFile(StringTrackerNameMixin):
     """
     FF Private Torrent Tracker
     """
 
     auth_type = "cookies"
     tracker = "FUNFILE"
+    name_profile = TrackerNameProfile(
+        rules=(NameRule(NameSelector(), template("funfile_source")),),
+        transforms=(replace_text((" ", ".")),),
+    )
+
+    async def get_name_overrides(self, context: NameContext) -> dict[str, str]:
+        meta = context.meta
+        if meta.scene:
+            return {"funfile_source": meta.scene_name or meta.basename_no_ext}
+        return {"funfile_source": meta.clean_name}
     display_name = "FunFile"
     banned_groups: tuple[str, ...] = ()
     source_flag = "FunFile"
@@ -337,9 +349,6 @@ class FunFile:
         if self.video_encode == "h.264":
             return "h264"
         return "x264"
-
-    async def get_name(self, meta: Meta) -> str:
-        return (meta.scene_name if meta.scene_name else meta.basename_no_ext.replace(" ", ".")) if meta.scene else meta.clean_name.replace(" ", ".")
 
     async def languages(self, meta: Meta) -> dict[str, list[str]]:
         if not meta.language_checked:

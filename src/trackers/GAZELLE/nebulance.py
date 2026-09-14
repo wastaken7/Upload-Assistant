@@ -13,17 +13,19 @@ from src.console import logger
 from src.mediainfo import strip_report_by_line
 from src.meta import Meta
 from src.trackers.common import Common
+from src.trackers.naming import StringTrackerNameMixin, TITLE_NAME_PROFILE
 
 Config = dict[str, Any]
 
 
-class Nebulance:
+class Nebulance(StringTrackerNameMixin):
     """
     Nebulance (NBL) is a ratioless Private Torrent Tracker for TV
     """
 
     auth_type = "other_api"
     tracker = "NEBULANCE"
+    name_profile = TITLE_NAME_PROFILE
     display_name = "Nebulance"
     allows_bloated_audio = True
     source_flag = "NBL"
@@ -280,6 +282,3 @@ class Nebulance:
                         dupes.append(result)
 
         return dupes
-
-    async def get_name(self, meta: Meta) -> str:
-        return meta.title

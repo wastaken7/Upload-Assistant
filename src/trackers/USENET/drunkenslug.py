@@ -10,6 +10,7 @@ import httpx
 from src.console import logger
 from src.meta import Meta
 from src.trackers.common import Common
+from src.trackers.naming import SCENE_OR_BASENAME_PROFILE, StringTrackerNameMixin
 from src.trackers.USENET.search_helpers import (
     build_newznab_search_query,
     get_daily_api_hit_limit,
@@ -21,7 +22,7 @@ from src.trackers.USENET.search_helpers import (
 Config = dict[str, Any]
 
 
-class DrunkenSlug:
+class DrunkenSlug(StringTrackerNameMixin):
     """
     DS Private Torrent Tracker
     """
@@ -30,6 +31,7 @@ class DrunkenSlug:
 
     auth_type = "other_api"
     tracker = "DRUNKENSLUG"
+    name_profile = SCENE_OR_BASENAME_PROFILE
     display_name = "DrunkenSlug"
     allows_bloated_audio = True
     banned_groups = ()
@@ -116,9 +118,6 @@ class DrunkenSlug:
                 dupes.append(dupe)
 
         return dupes
-
-    async def get_name(self, meta: Meta) -> str:
-        return meta.scene_name or meta.basename_no_ext
 
     def get_search_query(self, meta: Meta) -> str:
         return build_newznab_search_query(meta)

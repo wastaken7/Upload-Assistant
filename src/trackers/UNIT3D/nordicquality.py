@@ -1,10 +1,10 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-import re
-import unicodedata
 from pathlib import Path
 from typing import Any, ClassVar
 
 from src.meta import Meta
+from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, template
+from src.trackers.naming import nordic_name_transform
 from src.trackers.UNIT3D import UNIT3D
 
 Config = dict[str, Any]
@@ -14,6 +14,13 @@ class NordicQuality(UNIT3D):
     """NordicQuality UNIT3D tracker adapter."""
 
     tracker = "NORDICQUALITY"
+    name_profile = TrackerNameProfile(
+        rules=(NameRule(NameSelector(), template("release_name_source")),),
+        transforms=(nordic_name_transform,),
+    )
+
+    async def get_name_overrides(self, context: NameContext) -> dict[str, str]:
+        return {"release_name_source": self._release_name_source(context.meta)}
     display_name = "NordicQuality"
     base_url = "https://nordicq.org"
     banned_groups: tuple[str, ...] = ()
@@ -146,34 +153,3 @@ class NordicQuality(UNIT3D):
 
         extension = Path(source_name).suffix
         return source_name[: -len(extension)] if extension.casefold() in cls.KNOWN_MEDIA_EXTENSIONS else source_name
-
-    async def get_name(self, meta: Meta) -> dict[str, str]:
-        name = self._release_name_source(meta).replace(" ", ".")
-
-        name = name.translate(
-            str.maketrans(
-                {
-                    "\u00c6": "AE",
-                    "\u00e6": "ae",
-                    "\u00d0": "D",
-                    "\u00f0": "d",
-                    "\u00d8": "O",
-                    "\u00f8": "o",
-                    "\u00de": "TH",
-                    "\u00fe": "th",
-                    "\u00c5": "A",
-                    "\u00e5": "a",
-                    "\u0152": "OE",
-                    "\u0153": "oe",
-                    "\u00df": "ss",
-                }
-            )
-        )
-
-        name = name.replace("HDR10+", "HDR10P").replace("DD+", "DDP").replace("DTS:X", "DTS-X").replace("&", "and")
-        name = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode("ascii")
-        name = re.sub(r"\(((?:19|20)\d{2})\)", r"\1", name)
-        name = re.sub(r"[^A-Za-z0-9._()\-]+", ".", name)
-        name = re.sub(r"\.{2,}", ".", name).strip(".")
-
-        return {"name": name}

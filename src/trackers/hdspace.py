@@ -12,18 +12,19 @@ from src.console import logger
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
-from src.trackers.naming import add_incomplete_pack_marker
+from src.trackers.naming import BASE_NAME_WITH_INCOMPLETE_PROFILE, StringTrackerNameMixin
 
 Config = dict[str, Any]
 
 
-class HDSpace:
+class HDSpace(StringTrackerNameMixin):
     """
     HD-Space (HDS) is a Private Torrent Tracker for HD MOVIES / TV
     """
 
     auth_type = "cookies"
     tracker = "HDSPACE"
+    name_profile = BASE_NAME_WITH_INCOMPLETE_PROFILE
     display_name = "HD-Space"
     allows_bloated_audio = True
     source_flag = "HD-Space"
@@ -294,6 +295,3 @@ class HDSpace:
             success_text="download.php?id=",
             additional_files=files,
         )
-
-    async def get_name(self, meta: Meta) -> str:
-        return add_incomplete_pack_marker(meta.name, meta, self.tracker)
