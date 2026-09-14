@@ -15,13 +15,13 @@ from src.console import logger
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
-from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, template
-from src.trackers.naming import StringTrackerNameMixin
 from src.rehostimages import ImageHostPolicy, RehostImagesManager
+from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, template
 from src.takescreens import download_artwork_from_meta
 from src.temp_paths import artwork_dir
 from src.tracker_images import get_tracker_image_collection
 from src.trackers.common import Common
+from src.trackers.naming import StringTrackerNameMixin
 
 
 class CathodeRayTube(StringTrackerNameMixin):

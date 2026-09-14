@@ -34,6 +34,7 @@ class Seedpool(UNIT3D):
         else:
             source = meta.name if meta.mal_id or 0 != 0 else meta.basename_no_ext
         return {"seedpool_source": source}
+
     display_name = "seedpool"
     base_url = "https://seedpool.org"
     banned_groups = ()
@@ -198,7 +199,6 @@ class Seedpool(UNIT3D):
             type_value = normalise(meta.type)
 
         return {"type_id": type_id.get(type_value, "17" if meta.category in {"BOOK", "GAME", "MUSIC"} else "0")}
-
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         resolution = meta.resolution

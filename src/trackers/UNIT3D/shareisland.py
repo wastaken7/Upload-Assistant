@@ -34,13 +34,102 @@ class ShareIsland(UNIT3D):
     tracker = "SHAREISLAND"
     name_profile = TrackerNameProfile(
         rules=(
-            NameRule(NameSelector(type="DISC", is_disc="BDMV"), template("effective_title", "year", "season_episode", "three_d", "edition", "hybrid", "repack", "resolution", "effective_region", "uhd", "effective_source", "hdr", "video_codec", "best_audio")),
-            NameRule(NameSelector(type="DISC", is_disc="DVD"), template("effective_title", "year", "season_episode", "three_d", "edition", "repack", "resolution", "effective_region", "effective_source", "dvd_size", "best_audio")),
-            NameRule(NameSelector(type="DISC", is_disc="HDDVD"), template("effective_title", "year", "edition", "repack", "resolution", "effective_region", "effective_source", "video_codec", "best_audio")),
-            NameRule(NameSelector(type="REMUX"), template("effective_title", "year", "season_episode", "episode_title", "part", "three_d", "audio_language", "edition", "hybrid", "repack", "resolution", "uhd", "effective_source", "type_label", "hdr", "video_codec", "best_audio")),
-            NameRule(NameSelector(type=("DVDRIP", "BRRIP")), template("effective_title", "year", "season", "audio_language", "edition", "hybrid", "repack", "resolution", "type_label", "best_audio", "hdr", "video_encode")),
-            NameRule(NameSelector(type=("ENCODE", "HDTV")), template("effective_title", "year", "season_episode", "episode_title", "part", "audio_language", "edition", "hybrid", "repack", "resolution", "uhd", "effective_source", "best_audio", "hdr", "video_encode")),
-            NameRule(NameSelector(type=("WEBDL", "WEBRIP")), template("effective_title", "year", "season_episode", "episode_title", "part", "audio_language", "edition", "hybrid", "repack", "resolution", "uhd", "service", "type_label", "best_audio", "hdr", "video_encode")),
+            NameRule(
+                NameSelector(type="DISC", is_disc="BDMV"),
+                template(
+                    "effective_title",
+                    "year",
+                    "season_episode",
+                    "three_d",
+                    "edition",
+                    "hybrid",
+                    "repack",
+                    "resolution",
+                    "effective_region",
+                    "uhd",
+                    "effective_source",
+                    "hdr",
+                    "video_codec",
+                    "best_audio",
+                ),
+            ),
+            NameRule(
+                NameSelector(type="DISC", is_disc="DVD"),
+                template(
+                    "effective_title", "year", "season_episode", "three_d", "edition", "repack", "resolution", "effective_region", "effective_source", "dvd_size", "best_audio"
+                ),
+            ),
+            NameRule(
+                NameSelector(type="DISC", is_disc="HDDVD"),
+                template("effective_title", "year", "edition", "repack", "resolution", "effective_region", "effective_source", "video_codec", "best_audio"),
+            ),
+            NameRule(
+                NameSelector(type="REMUX"),
+                template(
+                    "effective_title",
+                    "year",
+                    "season_episode",
+                    "episode_title",
+                    "part",
+                    "three_d",
+                    "audio_language",
+                    "edition",
+                    "hybrid",
+                    "repack",
+                    "resolution",
+                    "uhd",
+                    "effective_source",
+                    "type_label",
+                    "hdr",
+                    "video_codec",
+                    "best_audio",
+                ),
+            ),
+            NameRule(
+                NameSelector(type=("DVDRIP", "BRRIP")),
+                template("effective_title", "year", "season", "audio_language", "edition", "hybrid", "repack", "resolution", "type_label", "best_audio", "hdr", "video_encode"),
+            ),
+            NameRule(
+                NameSelector(type=("ENCODE", "HDTV")),
+                template(
+                    "effective_title",
+                    "year",
+                    "season_episode",
+                    "episode_title",
+                    "part",
+                    "audio_language",
+                    "edition",
+                    "hybrid",
+                    "repack",
+                    "resolution",
+                    "uhd",
+                    "effective_source",
+                    "best_audio",
+                    "hdr",
+                    "video_encode",
+                ),
+            ),
+            NameRule(
+                NameSelector(type=("WEBDL", "WEBRIP")),
+                template(
+                    "effective_title",
+                    "year",
+                    "season_episode",
+                    "episode_title",
+                    "part",
+                    "audio_language",
+                    "edition",
+                    "hybrid",
+                    "repack",
+                    "resolution",
+                    "uhd",
+                    "service",
+                    "type_label",
+                    "best_audio",
+                    "hdr",
+                    "video_encode",
+                ),
+            ),
             NameRule(NameSelector(), template("fallback_name")),
         ),
         transforms=(collapse_whitespace, append_context_value("group_suffix")),
@@ -69,7 +158,19 @@ class ShareIsland(UNIT3D):
             audio_language = "ITA - MULTI" if "ITA" in languages else "MULTI"
         else:
             audio_language = ""
-        label = "REMUX" if effective_type == "REMUX" else "DVDRip" if effective_type == "DVDRIP" else "BRRip" if effective_type == "BRRIP" else "WEB-DL" if effective_type == "WEBDL" else "WEBRip" if effective_type == "WEBRIP" else ""
+        label = (
+            "REMUX"
+            if effective_type == "REMUX"
+            else "DVDRip"
+            if effective_type == "DVDRIP"
+            else "BRRip"
+            if effective_type == "BRRIP"
+            else "WEB-DL"
+            if effective_type == "WEBDL"
+            else "WEBRip"
+            if effective_type == "WEBRIP"
+            else ""
+        )
         group = self._extract_clean_release_group(meta)
         return {
             "type": effective_type,
@@ -80,14 +181,13 @@ class ShareIsland(UNIT3D):
             "best_audio": await self._get_best_italian_audio_format(meta),
             "audio_language": audio_language,
             "edition": meta.edition or "",
-            "hybrid": "Hybrid"
-            if not meta.edition and (meta.webdv or isinstance(meta.source, list)) and "HYBRID" not in title.upper()
-            else "",
+            "hybrid": "Hybrid" if not meta.edition and (meta.webdv or isinstance(meta.source, list)) and "HYBRID" not in title.upper() else "",
             "repack": meta.repack.strip(),
             "type_label": label,
             "fallback_name": meta.name.replace("Dual-Audio", "").strip() if meta.name else "UNKNOWN",
             "group_suffix": f"-{group}" if group else "",
         }
+
     display_name = "ShareIsland"
     base_url = "https://shareisland.org"
     banned_groups: tuple[str, ...] = ()

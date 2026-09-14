@@ -14,8 +14,8 @@ from src.get_desc import DescriptionBuilder, html_to_bbcode
 from src.languages import languages_manager
 from src.meta import Meta
 from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, template
-from src.trackers.naming import StringTrackerNameMixin, configured_metadata_name
 from src.trackers.common import Common
+from src.trackers.naming import StringTrackerNameMixin, configured_metadata_name
 
 Config = dict[str, Any]
 
@@ -40,6 +40,7 @@ class SpeedApp(StringTrackerNameMixin):
         use_metadata = self.config["TRACKERS"][self.tracker].get("use_metadata_name", False)
         source = meta.scene_name or meta.clean_name or "" if use_metadata else (meta.scene_name or meta.basename_no_ext)
         return {"speedapp_source": source, "use_metadata_name": "1" if use_metadata else ""}
+
     display_name = "SpeedApp"
     banned_groups = ()
     upload_url = f"{base_url}/api/upload"

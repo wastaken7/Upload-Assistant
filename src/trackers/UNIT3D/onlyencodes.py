@@ -3,8 +3,8 @@ from typing import Any, cast
 
 from src.languages import languages_manager
 from src.meta import Meta
-from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, template
 from src.rehostimages import ImageHostPolicy, RehostImagesManager
+from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, template
 from src.trackers.common import Common
 from src.trackers.naming import only_encodes_name
 from src.trackers.UNIT3D import UNIT3D
@@ -32,6 +32,7 @@ class OnlyEncodes(UNIT3D):
         if languages and not await languages_manager.has_english_language(languages):
             return {"foreign_language": str(languages[0]).upper()}
         return {}
+
     display_name = "OnlyEncodes+"
     allows_bloated_audio = True
     base_url = "https://onlyencodes.cc"

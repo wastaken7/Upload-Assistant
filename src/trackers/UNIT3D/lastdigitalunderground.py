@@ -59,6 +59,7 @@ class LastDigitalUnderground(UNIT3D):
             audio_label = ""
             subtitle_label = ""
         return {"audio_label": audio_label, "subtitle_label": subtitle_label}
+
     display_name = "LastDigitalUnderground"
     allows_bloated_audio = True
     base_url = "https://theldu.to"

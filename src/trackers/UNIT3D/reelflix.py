@@ -40,7 +40,6 @@ class ReelFlix(UNIT3D):
     async def get_additional_checks(self, meta: Meta) -> bool:
         return self.common.check_and_confirm_adult_media_upload(meta, self.tracker)
 
-
     async def get_type_id(self, meta: Meta, type: str | None = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         type_id = {
             "DISC": "43",

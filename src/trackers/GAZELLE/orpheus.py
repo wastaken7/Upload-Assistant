@@ -12,9 +12,9 @@ from rich.markup import escape
 
 from src.console import logger
 from src.meta import Meta
-from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, strip_characters, template
 from src.music.models import MusicRelease
 from src.music.validation import OrpheusMusicValidator, ValidationLevel
+from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, strip_characters, template
 from src.trackers.common import Common
 from src.trackers.naming import StringTrackerNameMixin
 
@@ -36,6 +36,7 @@ class Orpheus(StringTrackerNameMixin):
             "album": str(release.get("album", "")),
             "year_bracket": f"[{release.get('year', '')!s}]",
         }
+
     display_name = "Orpheus"
     auth_type = "other_api"
     supported_categories = ("MUSIC",)

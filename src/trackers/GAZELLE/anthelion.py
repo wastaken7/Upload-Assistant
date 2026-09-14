@@ -17,7 +17,7 @@ from src.mediainfo import strip_report_by_line
 from src.meta import Meta
 from src.torrent_policy import ANTHELION_POLICY
 from src.trackers.common import Common
-from src.trackers.naming import StringTrackerNameMixin, TITLE_NAME_PROFILE
+from src.trackers.naming import TITLE_NAME_PROFILE, StringTrackerNameMixin
 
 Config = dict[str, Any]
 

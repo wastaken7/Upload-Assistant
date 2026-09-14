@@ -65,8 +65,22 @@ class Torrenteros(UNIT3D):
                 suffix = "Castellano Subs" if meta.unattended or meta.unattended_confirm else self._ask_spanish_type("subtitle", subtitles=True)
         else:
             tracks = cast(list[dict[str, Any]], meta.mediainfo.get("media", {}).get("track", []))
-            audio = next((self._spanish_type(str(track.get("Language", "")).strip()) for track in tracks if track.get("@type") == "Audio" and not isinstance(track.get("Language", ""), dict) and self._spanish_type(str(track.get("Language", "")).strip())), None)
-            subtitles = next((self._spanish_type(str(track.get("Language", "")).strip()) for track in tracks if track.get("@type") == "Text" and not isinstance(track.get("Language", ""), dict) and self._spanish_type(str(track.get("Language", "")).strip())), None)
+            audio = next(
+                (
+                    self._spanish_type(str(track.get("Language", "")).strip())
+                    for track in tracks
+                    if track.get("@type") == "Audio" and not isinstance(track.get("Language", ""), dict) and self._spanish_type(str(track.get("Language", "")).strip())
+                ),
+                None,
+            )
+            subtitles = next(
+                (
+                    self._spanish_type(str(track.get("Language", "")).strip())
+                    for track in tracks
+                    if track.get("@type") == "Text" and not isinstance(track.get("Language", ""), dict) and self._spanish_type(str(track.get("Language", "")).strip())
+                ),
+                None,
+            )
             suffix = audio if audio else f"{subtitles} Subs" if subtitles else ""
         parts = {
             "ttr_base": meta.name_notag,

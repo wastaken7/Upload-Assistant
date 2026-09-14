@@ -12,8 +12,8 @@ from src.description_review import get_base_description
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
 from src.release_name import NameRule, NameSelector, TrackerNameProfile, replace_text, template
-from src.trackers.naming import StringTrackerNameMixin
 from src.trackers.common import Common
+from src.trackers.naming import StringTrackerNameMixin
 
 
 class BitHDTV(StringTrackerNameMixin):

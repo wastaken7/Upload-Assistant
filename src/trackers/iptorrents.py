@@ -12,8 +12,8 @@ from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
 from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, template
-from src.trackers.naming import StringTrackerNameMixin, iptorrents_name
 from src.torrent_manifest import TorrentManifest
+from src.trackers.naming import StringTrackerNameMixin, add_incomplete_pack_marker, iptorrents_name
 
 Config = dict[str, Any]
 
@@ -33,6 +33,7 @@ class IPTorrents(StringTrackerNameMixin):
     async def get_name_overrides(self, context: NameContext) -> dict[str, str]:
         meta = context.meta
         return {"ipt_source": meta.scene_name or meta.clean_name}
+
     display_name = "IPTorrents"
     allows_bloated_audio = True
     source_flag = "IPTorrents"

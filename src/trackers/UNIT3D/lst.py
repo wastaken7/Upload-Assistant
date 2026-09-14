@@ -4,8 +4,8 @@ from typing import Any, ClassVar
 
 from src.console import logger
 from src.meta import Meta
-from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, collapse_whitespace, template
 from src.music.sources import DiscogsEnricher
+from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, collapse_whitespace, template
 from src.trackers.common import Common
 from src.trackers.naming import lst_name
 from src.trackers.UNIT3D import UNIT3D
@@ -22,7 +22,10 @@ class LST(UNIT3D):
     name_profile = TrackerNameProfile(
         rules=(
             NameRule(NameSelector(category="MUSIC"), template("author", "dash", "title", "year", "effective_source", "effective_codec", "bit_depth", "sample_rate")),
-            NameRule(NameSelector(category="BOOK"), template("author", "dash", "title", "book_edition", "year", "effective_source", "effective_codec", "bit_depth", "sample_rate", "scan_type", "isbn")),
+            NameRule(
+                NameSelector(category="BOOK"),
+                template("author", "dash", "title", "book_edition", "year", "effective_source", "effective_codec", "bit_depth", "sample_rate", "scan_type", "isbn"),
+            ),
             NameRule(NameSelector(), template("base_name")),
         ),
         transforms=(collapse_whitespace, lst_name),
@@ -44,7 +47,17 @@ class LST(UNIT3D):
                     value = float(match.group().replace(",", "."))
                     rate_label = f"{value / 1000:g} kHz" if value >= 1000 else f"{value:g} kHz"
             tag = str(meta.tag or "").strip().lstrip("-").strip()
-            return {"author": str(self._release_field(release, "artist", meta.artist)), "dash": "-", "title": str(self._release_field(release, "album", meta.title)), "year": str(self._release_field(release, "release_year", self._release_field(release, "year", meta.year))), "effective_source": self._source(self._release_field(release, "media", meta.source)), "effective_codec": codec, "bit_depth": f"{depth}-bit" if depth and codec in {"FLAC", "ALAC"} else "", "sample_rate": rate_label if codec in {"FLAC", "ALAC"} else "", "group_suffix": f"-{tag}" if tag else ""}
+            return {
+                "author": str(self._release_field(release, "artist", meta.artist)),
+                "dash": "-",
+                "title": str(self._release_field(release, "album", meta.title)),
+                "year": str(self._release_field(release, "release_year", self._release_field(release, "year", meta.year))),
+                "effective_source": self._source(self._release_field(release, "media", meta.source)),
+                "effective_codec": codec,
+                "bit_depth": f"{depth}-bit" if depth and codec in {"FLAC", "ALAC"} else "",
+                "sample_rate": rate_label if codec in {"FLAC", "ALAC"} else "",
+                "group_suffix": f"-{tag}" if tag else "",
+            }
         if meta.category == "BOOK":
             author = str(meta.author or meta.publisher or "")
             codec = self._codec(meta.type)
@@ -59,8 +72,22 @@ class LST(UNIT3D):
                     value = float(rate.group().replace(",", "."))
                     rate_label = f"{value / 1000:g} kHz" if value >= 1000 else f"{value:g} kHz"
             tag = str(meta.tag or "").strip().lstrip("-").strip()
-            return {"author": author, "dash": "-", "title": str(meta.title or ""), "book_edition": "" if meta.audiobook else str(meta.manual_edition or meta.edition or ""), "year": str(meta.year or ""), "effective_source": source if meta.audiobook else "", "effective_codec": codec, "bit_depth": depth_label, "sample_rate": rate_label, "scan_type": "" if meta.audiobook else "OCR" if meta.ocr else "SCAN" if source.upper() == "SCAN" else "", "isbn": "" if meta.audiobook else re.sub(r"[^0-9Xx]", "", str(meta.isbn or "")), "group_suffix": f"-{tag}" if tag else ""}
+            return {
+                "author": author,
+                "dash": "-",
+                "title": str(meta.title or ""),
+                "book_edition": "" if meta.audiobook else str(meta.manual_edition or meta.edition or ""),
+                "year": str(meta.year or ""),
+                "effective_source": source if meta.audiobook else "",
+                "effective_codec": codec,
+                "bit_depth": depth_label,
+                "sample_rate": rate_label,
+                "scan_type": "" if meta.audiobook else "OCR" if meta.ocr else "SCAN" if source.upper() == "SCAN" else "",
+                "isbn": "" if meta.audiobook else re.sub(r"[^0-9Xx]", "", str(meta.isbn or "")),
+                "group_suffix": f"-{tag}" if tag else "",
+            }
         return {}
+
     display_name = "LST"
     allows_bloated_audio = True
     base_url = "https://lst.gg"

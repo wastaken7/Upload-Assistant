@@ -37,6 +37,7 @@ class Aither(UNIT3D):
         if languages and not await languages_manager.has_english_language(languages):
             return {"year": year, "foreign_language": languages[0].upper()}
         return {"year": year}
+
     display_name = "Aither"
     base_url = "https://aither.cc"
     banned_groups: tuple[str, ...] = ()

@@ -34,6 +34,7 @@ class FunFile(StringTrackerNameMixin):
         if meta.scene:
             return {"funfile_source": meta.scene_name or meta.basename_no_ext}
         return {"funfile_source": meta.clean_name}
+
     display_name = "FunFile"
     banned_groups: tuple[str, ...] = ()
     source_flag = "FunFile"

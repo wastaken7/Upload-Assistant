@@ -17,9 +17,9 @@ from src.cookie_auth import CookieValidator
 from src.exceptions import *  # noqa E403
 from src.meta import Meta
 from src.release_name import NameRule, NameSelector, TrackerNameProfile, conditional, remove_context_value, replace_text, template
-from src.trackers.naming import StringTrackerNameMixin
 from src.temp_paths import screenshots_dir
 from src.trackers.common import Common
+from src.trackers.naming import StringTrackerNameMixin
 
 Config = dict[str, Any]
 

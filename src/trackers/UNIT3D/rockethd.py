@@ -23,11 +23,113 @@ class RocketHD(UNIT3D):
     tracker = "ROCKETHD"
     name_profile = TrackerNameProfile(
         rules=(
-            NameRule(NameSelector(type="DISC"), template("effective_title", "year", "season_episode", "incomplete", "three_d", "edition", "repack", "resolution", "complete", "region", "uhd", "effective_source", "dvd_size", "clean_audio", "hdr", "video_codec", "internal")),
-            NameRule(NameSelector(type="REMUX"), template("effective_title", "year", "season_episode", "incomplete", "three_d", "edition", "hybrid", "audio_language", "repack", "resolution", "uhd", "effective_source", "type_label", "clean_audio", "hdr", "video_codec", "internal")),
-            NameRule(NameSelector(type=("DVDRIP", "BRRIP")), template("effective_title", "year", "season_episode", "incomplete", "three_d", "edition", "hybrid", "audio_language", "repack", "resolution", "type_label", "clean_audio", "hdr", "video_encode", "internal")),
-            NameRule(NameSelector(type=("ENCODE", "HDTV")), template("effective_title", "year", "season_episode", "incomplete", "three_d", "edition", "hybrid", "audio_language", "repack", "resolution", "uhd", "effective_source", "clean_audio", "hdr", "video_encode", "internal")),
-            NameRule(NameSelector(type=("WEBDL", "WEBRIP")), template("effective_title", "year", "season_episode", "incomplete", "three_d", "edition", "hybrid", "audio_language", "repack", "resolution", "uhd", "service", "type_label", "clean_audio", "hdr", "video_encode", "internal")),
+            NameRule(
+                NameSelector(type="DISC"),
+                template(
+                    "effective_title",
+                    "year",
+                    "season_episode",
+                    "incomplete",
+                    "three_d",
+                    "edition",
+                    "repack",
+                    "resolution",
+                    "complete",
+                    "region",
+                    "uhd",
+                    "effective_source",
+                    "dvd_size",
+                    "clean_audio",
+                    "hdr",
+                    "video_codec",
+                    "internal",
+                ),
+            ),
+            NameRule(
+                NameSelector(type="REMUX"),
+                template(
+                    "effective_title",
+                    "year",
+                    "season_episode",
+                    "incomplete",
+                    "three_d",
+                    "edition",
+                    "hybrid",
+                    "audio_language",
+                    "repack",
+                    "resolution",
+                    "uhd",
+                    "effective_source",
+                    "type_label",
+                    "clean_audio",
+                    "hdr",
+                    "video_codec",
+                    "internal",
+                ),
+            ),
+            NameRule(
+                NameSelector(type=("DVDRIP", "BRRIP")),
+                template(
+                    "effective_title",
+                    "year",
+                    "season_episode",
+                    "incomplete",
+                    "three_d",
+                    "edition",
+                    "hybrid",
+                    "audio_language",
+                    "repack",
+                    "resolution",
+                    "type_label",
+                    "clean_audio",
+                    "hdr",
+                    "video_encode",
+                    "internal",
+                ),
+            ),
+            NameRule(
+                NameSelector(type=("ENCODE", "HDTV")),
+                template(
+                    "effective_title",
+                    "year",
+                    "season_episode",
+                    "incomplete",
+                    "three_d",
+                    "edition",
+                    "hybrid",
+                    "audio_language",
+                    "repack",
+                    "resolution",
+                    "uhd",
+                    "effective_source",
+                    "clean_audio",
+                    "hdr",
+                    "video_encode",
+                    "internal",
+                ),
+            ),
+            NameRule(
+                NameSelector(type=("WEBDL", "WEBRIP")),
+                template(
+                    "effective_title",
+                    "year",
+                    "season_episode",
+                    "incomplete",
+                    "three_d",
+                    "edition",
+                    "hybrid",
+                    "audio_language",
+                    "repack",
+                    "resolution",
+                    "uhd",
+                    "service",
+                    "type_label",
+                    "clean_audio",
+                    "hdr",
+                    "video_encode",
+                    "internal",
+                ),
+            ),
             NameRule(NameSelector(), template("fallback_name")),
         ),
         transforms=(replace_text(("Dual-Audio", "")), collapse_whitespace, append_context_value("group_suffix")),
@@ -58,7 +160,19 @@ class RocketHD(UNIT3D):
         if not self._has_german_audio(meta) and self._has_german_subtitles(meta):
             audio_language = "GERMAN SUBBED"
         release_type = str(meta.type or "")
-        type_label = "REMUX" if release_type == "REMUX" else "DVDRip" if release_type == "DVDRIP" else "BRRip" if release_type == "BRRIP" else "WEB-DL" if release_type == "WEBDL" else "WEBRip" if release_type == "WEBRIP" else ""
+        type_label = (
+            "REMUX"
+            if release_type == "REMUX"
+            else "DVDRip"
+            if release_type == "DVDRIP"
+            else "BRRip"
+            if release_type == "BRRIP"
+            else "WEB-DL"
+            if release_type == "WEBDL"
+            else "WEBRip"
+            if release_type == "WEBRIP"
+            else ""
+        )
         group = self._extract_clean_release_group(meta)
         return {
             "effective_title": title,
@@ -69,15 +183,14 @@ class RocketHD(UNIT3D):
             "incomplete": "INCOMPLETE" if (meta.tv_pack and meta.season_pack_incomplete) or "INCOMPLETE" in basename else "",
             "clean_audio": meta.audio.replace("DD+", "DDP"),
             "audio_language": audio_language,
-            "hybrid": "Hybrid"
-            if not meta.edition and (meta.webdv or isinstance(meta.source, list)) and "HYBRID" not in title.upper()
-            else "",
+            "hybrid": "Hybrid" if not meta.edition and (meta.webdv or isinstance(meta.source, list)) and "HYBRID" not in title.upper() else "",
             "repack": meta.repack.strip(),
             "type_label": type_label,
             "complete": "COMPLETE",
             "fallback_name": meta.name or "UNKNOWN",
             "group_suffix": f"-{group}" if group else "",
         }
+
     display_name = "RocketHD"
     supported_categories = ("MOVIE", "TV")
     base_url = "https://rocket-hd.cc"

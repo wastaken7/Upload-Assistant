@@ -22,6 +22,7 @@ class AsianCinema(UNIT3D):
 
     async def get_name_overrides(self, context: NameContext) -> dict[str, str]:
         return {"suffix": self.get_subs_tag(context.meta)}
+
     display_name = "AsianCinema"
     allows_bloated_audio = True
     source_flag = "AsianCinema"

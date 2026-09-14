@@ -176,7 +176,6 @@ class Blutopia(UNIT3D):
 
         return should_continue
 
-
     async def get_additional_data(self, meta: Meta) -> dict[str, Any]:
         return {
             "mod_queue_opt_in": await self.get_flag(meta, "modq"),

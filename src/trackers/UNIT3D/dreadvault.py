@@ -42,6 +42,7 @@ class DreadVault(UNIT3D):
         if languages and not await languages_manager.has_english_language(languages):
             return {"year": year, "foreign_language": str(languages[0]).upper()}
         return {"year": year}
+
     display_name = "DreadVault"
     allows_bloated_audio = True
     base_url = "https://dreadvault.org"

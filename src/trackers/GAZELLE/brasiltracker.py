@@ -39,6 +39,7 @@ class BrasilTracker(StringTrackerNameMixin):
         original_title, brazilian_title = self.get_titles(context.meta)
         localized_title = f"{brazilian_title} [{original_title}]" if brazilian_title else original_title
         return {"localized_title": localized_title}
+
     display_name = "BrasilTracker"
     banned_groups: tuple[str, ...] = ()
     source_flag = "BT"

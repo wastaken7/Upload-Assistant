@@ -1,6 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import re
-from typing import Any
+from typing import Any, ClassVar
 
 from src.meta import Meta
 from src.trackers.AVISTAZ import AZTrackerBase
@@ -13,6 +13,7 @@ class AvistaZ(AZTrackerBase):
     """
 
     tracker = "AVISTAZ"
+    naming_options: ClassVar[dict[str, str]] = {"pack_year_after_season": "1"}
     display_name = "AvistaZ"
     allows_bloated_audio = True
     source_flag = "AvistaZ"

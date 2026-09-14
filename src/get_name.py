@@ -44,12 +44,29 @@ TRACKER_DISC_REQUIREMENTS = {
 DEFAULT_NAME_PROFILE = TrackerNameProfile(
     rules=(
         NameRule(NameSelector(category="XXX"), template("source_name", transforms=(dots_to_spaces, collapse_whitespace))),
-        NameRule(NameSelector(category="BOOK", subtype="AUDIOBOOK"), template("author", "dash", "book_series", "title", "book_series_index", "edition", "year", "book_language", "audiobook_label")),
-        NameRule(NameSelector(category="BOOK", subtype="COMIC"), template("title", "volume_label", "issue_label", "year", "book_language", "book_source", "book_format", "comic_label", "ebook_label")),
-        NameRule(NameSelector(category="BOOK", subtype="MANGA"), template("title", "volume_label", "year", "book_language", "book_source", "book_format", "manga_label", "ebook_label")),
-        NameRule(NameSelector(category="BOOK", subtype="MAGAZINE"), template("title", "issue_label", "year", "book_language", "book_source", "book_format", "magazine_label", "ebook_label")),
+        NameRule(
+            NameSelector(category="BOOK", subtype="AUDIOBOOK"),
+            template("author", "dash", "book_series", "title", "book_series_index", "edition", "year", "book_language", "audiobook_label"),
+        ),
+        NameRule(
+            NameSelector(category="BOOK", subtype="COMIC"),
+            template("title", "volume_label", "issue_label", "year", "book_language", "book_source", "book_format", "comic_label", "ebook_label"),
+        ),
+        NameRule(
+            NameSelector(category="BOOK", subtype="MANGA"),
+            template("title", "volume_label", "year", "book_language", "book_source", "book_format", "manga_label", "ebook_label"),
+        ),
+        NameRule(
+            NameSelector(category="BOOK", subtype="MAGAZINE"),
+            template("title", "issue_label", "year", "book_language", "book_source", "book_format", "magazine_label", "ebook_label"),
+        ),
         NameRule(NameSelector(category="BOOK", subtype="NEWSPAPER"), template("title", "year", "book_language", "book_source", "book_format", "ebook_label")),
-        NameRule(NameSelector(category="BOOK", subtype="EBOOK"), template("author_or_publisher", "dash", "book_series", "title", "book_series_index", "edition", "year", "book_language", "book_source", "book_format", "ebook_label")),
+        NameRule(
+            NameSelector(category="BOOK", subtype="EBOOK"),
+            template(
+                "author_or_publisher", "dash", "book_series", "title", "book_series_index", "edition", "year", "book_language", "book_source", "book_format", "ebook_label"
+            ),
+        ),
         NameRule(
             NameSelector(category="GAME"),
             template(
@@ -461,7 +478,17 @@ class NameManager:
                 source = manual_source
             if source not in ("RETAIL", "SCAN", "HYBRID"):
                 source_name = (meta.uuid + " " + meta.title).lower()
-                source = "SCAN" if "scan" in source_name else "HYBRiD" if "hybrid" in source_name else "RETAiL" if "retail" in source_name else "SCAN" if str(meta.type).upper() == "PDF" else "RETAiL"
+                source = (
+                    "SCAN"
+                    if "scan" in source_name
+                    else "HYBRiD"
+                    if "hybrid" in source_name
+                    else "RETAiL"
+                    if "retail" in source_name
+                    else "SCAN"
+                    if str(meta.type).upper() == "PDF"
+                    else "RETAiL"
+                )
             else:
                 source = {"RETAIL": "RETAiL", "HYBRID": "HYBRiD", "SCAN": "SCAN"}[source]
             book_format = str(meta.type).strip()
@@ -469,19 +496,39 @@ class NameManager:
             volume = str(meta.manual_season or meta.season or "").strip()
             issue = str(meta.manual_episode or meta.episode or "").strip()
             return {
-                "author": author, "author_or_publisher": author or publisher, "dash": "-", "title": meta.title.strip(),
-                "book_series": f"{meta.book_series.strip()}:" if meta.book_series else "", "book_series_index": meta.book_series_index,
-                "edition": edition, "year": str(meta.year).strip() if meta.year is not None else "", "book_language": language,
-                "book_source": str(source), "book_format": book_format, "volume_label": f"Vol {volume}" if volume else "",
-                "issue_label": f"No {issue}" if issue else "", "audiobook_label": "AUDIOBOOK", "comic_label": "COMiC",
-                "manga_label": "MANGA", "magazine_label": "MAGAZiNE", "ebook_label": "eBOOK",
+                "author": author,
+                "author_or_publisher": author or publisher,
+                "dash": "-",
+                "title": meta.title.strip(),
+                "book_series": f"{meta.book_series.strip()}:" if meta.book_series else "",
+                "book_series_index": meta.book_series_index,
+                "edition": edition,
+                "year": str(meta.year).strip() if meta.year is not None else "",
+                "book_language": language,
+                "book_source": str(source),
+                "book_format": book_format,
+                "volume_label": f"Vol {volume}" if volume else "",
+                "issue_label": f"No {issue}" if issue else "",
+                "audiobook_label": "AUDIOBOOK",
+                "comic_label": "COMiC",
+                "manga_label": "MANGA",
+                "magazine_label": "MAGAZiNE",
+                "ebook_label": "eBOOK",
             }
         if meta.category == "GAME":
             languages = meta.languages or {}
             names = [name for name in languages if name]
             source_name = Path(str(meta.path or meta.uuid or "")).name.lower()
             force_multi = bool(meta.manual_multi)
-            language = f"MULTI{len(names)}" if len(names) > 1 and ("multi" in source_name or force_multi) else "MULTI" if force_multi else names[0].upper() if len(names) == 1 and names[0].upper() not in ("ENGLISH", "ENG", "EN") else ""
+            language = (
+                f"MULTI{len(names)}"
+                if len(names) > 1 and ("multi" in source_name or force_multi)
+                else "MULTI"
+                if force_multi
+                else names[0].upper()
+                if len(names) == 1 and names[0].upper() not in ("ENGLISH", "ENG", "EN")
+                else ""
+            )
             version = str(meta.game_version or "")
             if version and not version.lower().startswith("v"):
                 version = f"v{version}"
@@ -502,7 +549,16 @@ class NameManager:
             codec = self._music_codec(first.get("codec") or first.get("format") or meta.format or meta.type)
             depth = first.get("bit_depth") or self._music_release_field(release, "nfo_bit_depth")
             rate = first.get("sample_rate") or self._music_release_field(release, "nfo_sample_rate")
-            return {"artist": str(self._music_release_field(release, "artist", meta.artist)), "dash": "-", "title": str(self._music_release_field(release, "album", meta.title)), "year": str(self._music_release_field(release, "release_year", self._music_release_field(release, "year", meta.year))), "music_source": self._music_source(self._music_release_field(release, "media", meta.source)), "music_codec": codec, "bit_depth": f"{depth}-bit" if depth and codec in {"FLAC", "ALAC"} else "", "sample_rate": f"{int(rate) / 1000:g} kHz" if rate and codec in {"FLAC", "ALAC"} else ""}
+            return {
+                "artist": str(self._music_release_field(release, "artist", meta.artist)),
+                "dash": "-",
+                "title": str(self._music_release_field(release, "album", meta.title)),
+                "year": str(self._music_release_field(release, "release_year", self._music_release_field(release, "year", meta.year))),
+                "music_source": self._music_source(self._music_release_field(release, "media", meta.source)),
+                "music_codec": codec,
+                "bit_depth": f"{depth}-bit" if depth and codec in {"FLAC", "ALAC"} else "",
+                "sample_rate": f"{int(rate) / 1000:g} kHz" if rate and codec in {"FLAC", "ALAC"} else "",
+            }
         return {}
 
     @staticmethod

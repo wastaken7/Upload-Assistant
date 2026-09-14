@@ -17,7 +17,9 @@ class Emuwarez(UNIT3D):
 
     tracker = "EMUWAREZ"
     name_profile = TrackerNameProfile(
-        rules=(NameRule(NameSelector(), template("localized_title", "season_label", "year", "mapped_resolution", "video_format", "mapped_codec", "audio_label", "group_suffix")),),
+        rules=(
+            NameRule(NameSelector(), template("localized_title", "season_label", "year", "mapped_resolution", "video_format", "mapped_codec", "audio_label", "group_suffix")),
+        ),
         transforms=(regex_sub(r"\s+(?=-[^\s]+$)", ""),),
     )
 
@@ -28,7 +30,15 @@ class Emuwarez(UNIT3D):
         tag = "" if not meta.tag else meta.tag.strip().lstrip("-")
         if not tag or tag.lower() in ("nogrp", "nogroup", "unknown", "unk", "hd.ma.5.1", "untouched"):
             tag = "EMUWAREZ"
-        return {"localized_title": await self._get_title(meta), "season_label": f"S{meta.season_int:02d}" if meta.category == "TV" and meta.season_int else "", "mapped_resolution": self._map_resolution(meta.resolution), "video_format": self._map_format(meta), "mapped_codec": self._map_codec(meta), "audio_label": await self._build_audio_string(meta), "group_suffix": f"{'SUBS' if self._has_spanish_subs(meta) else ''}-{tag}"}
+        return {
+            "localized_title": await self._get_title(meta),
+            "season_label": f"S{meta.season_int:02d}" if meta.category == "TV" and meta.season_int else "",
+            "mapped_resolution": self._map_resolution(meta.resolution),
+            "video_format": self._map_format(meta),
+            "mapped_codec": self._map_codec(meta),
+            "audio_label": await self._build_audio_string(meta),
+            "group_suffix": f"{'SUBS' if self._has_spanish_subs(meta) else ''}-{tag}",
+        }
 
     display_name = "eMuwarez"
     allows_bloated_audio = True

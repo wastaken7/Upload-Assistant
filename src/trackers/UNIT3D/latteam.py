@@ -37,18 +37,31 @@ class LatTeam(UNIT3D):
             extras.append(f"No {issue}")
         edition = str(meta.manual_edition or meta.edition or "").strip()
         if edition:
-            extras.append(
-                edition
-                if any(word in edition.lower() for word in ("edición", "edicion", "edition", "ed.", "ed"))
-                else f"{edition} Edition"
-            )
+            extras.append(edition if any(word in edition.lower() for word in ("edición", "edicion", "edition", "ed.", "ed")) else f"{edition} Edition")
         if meta.audiobook:
             language = meta.book_language.lower()
-            narration = "Castellano" if any(word in language for word in ("spain", "castilian", "castellano")) else "Latino" if any(word in language for word in ("latin", "latino")) else "Portugués" if any(word in language for word in ("portuguese", "português", "portugues")) else meta.book_language.title() if language else ""
+            narration = (
+                "Castellano"
+                if any(word in language for word in ("spain", "castilian", "castellano"))
+                else "Latino"
+                if any(word in language for word in ("latin", "latino"))
+                else "Portugués"
+                if any(word in language for word in ("portuguese", "português", "portugues"))
+                else meta.book_language.title()
+                if language
+                else ""
+            )
             if narration:
                 extras.append(f"Narración en {narration}")
         author = meta.author.strip()
-        return {"author": author, "author_dash": "-" if author else "", "title": meta.title.strip(), "book_extras": " ".join(f"({item})" for item in extras), "book_format": str(meta.type).strip().upper()}
+        return {
+            "author": author,
+            "author_dash": "-" if author else "",
+            "title": meta.title.strip(),
+            "book_extras": " ".join(f"({item})" for item in extras),
+            "book_format": str(meta.type).strip().upper(),
+        }
+
     display_name = "Lat-Team"
     base_url = "https://lat-team.com"
     banned_groups = ("EVO",)

@@ -61,7 +61,6 @@ class Portugas(UNIT3D):
         }.get(meta.resolution, "10")
         return {"resolution_id": resolution_id}
 
-
     def get_audio(self, meta: Meta) -> int:
         found_portuguese_audio = False
 

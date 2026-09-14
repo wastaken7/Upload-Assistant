@@ -17,12 +17,15 @@ class Samaritano(UNIT3D):
     """
 
     tracker = "SAMARITANO"
+    rebuild_dvdrip_name = False
+    use_bioma_tag = False
     name_profile = CapybaraBR.name_profile
 
     async def get_name_overrides(self, context: NameContext) -> dict[str, str]:
         capybara = CapybaraBR(self.config)
         capybara.tracker = self.tracker
         return await capybara.get_name_overrides(context)
+
     display_name = "Samaritano"
     base_url = "https://samaritano.cc"
     banned_groups = ()

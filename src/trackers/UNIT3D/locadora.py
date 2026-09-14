@@ -27,6 +27,7 @@ class Locadora(UNIT3D):
     async def get_name_overrides(self, context: NameContext) -> dict[str, str]:
         meta = context.meta
         return {"locadora_source": meta.name if meta.is_disc == "BDMV" else meta.basename_no_ext}
+
     display_name = "Locadora"
     base_url = "https://locadora.cc"
     banned_groups = ()

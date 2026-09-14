@@ -18,7 +18,10 @@ class MidnightScene(UNIT3D):
 
     tracker = "MIDNIGHTSCENE"
     name_profile = TrackerNameProfile(
-        rules=(NameRule(NameSelector(category="MUSIC"), template("music_title", "music_year", "catalogue_edition", "media_format")), NameRule(NameSelector(), template("base_name"))),
+        rules=(
+            NameRule(NameSelector(category="MUSIC"), template("music_title", "music_year", "catalogue_edition", "media_format")),
+            NameRule(NameSelector(), template("base_name")),
+        ),
         transforms=(midnight_scene_name,),
     )
 
@@ -31,9 +34,11 @@ class MidnightScene(UNIT3D):
                     return {"music_title": scene.replace("_", " ")}
             release = meta.music_release if isinstance(meta.music_release, dict) else {}
             fields = release.get("fields", {}) if isinstance(release.get("fields"), dict) else {}
+
             def release_field(name: str, fallback: Any = "") -> str:
                 value = fields.get(name, {}) if isinstance(fields.get(name), dict) else {}
                 return str(value.get("value", fallback) or "").strip()
+
             artist = release_field("artist", meta.artist)
             title = release_field("album", meta.title)
             year = release_field("release_year", release_field("year", meta.year))
@@ -43,11 +48,17 @@ class MidnightScene(UNIT3D):
             format_name = release_field("format", meta.format or meta.type).upper()
             catalogue_edition = " - ".join(part for part in (catalogue, edition) if part)
             media_format = " - ".join(part for part in (media, format_name) if part)
-            return {"music_title": " - ".join(part for part in (artist, title) if part), "music_year": f"({year})" if year else "", "catalogue_edition": f"[{catalogue_edition}]" if catalogue_edition else "", "media_format": f"[{media_format}]" if media_format else ""}
+            return {
+                "music_title": " - ".join(part for part in (artist, title) if part),
+                "music_year": f"({year})" if year else "",
+                "catalogue_edition": f"[{catalogue_edition}]" if catalogue_edition else "",
+                "media_format": f"[{media_format}]" if media_format else "",
+            }
         if not meta.language_checked:
             await languages_manager.process_desc_language(meta, tracker=self.tracker)
         languages = [] if not meta.audio_languages else meta.audio_languages
         return {"foreign_language": languages[0].upper()} if languages and not await languages_manager.has_english_language(languages) else {}
+
     display_name = "MidnightScene"
     allows_bloated_audio = True
     base_url = "https://midnightscene.cc"

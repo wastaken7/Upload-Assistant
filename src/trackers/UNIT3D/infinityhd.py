@@ -33,6 +33,7 @@ class InfinityHD(UNIT3D):
         if audio_languages and not await languages_manager.has_english_language(audio_languages):
             return {"foreign_language": audio_languages[0].upper()}
         return {}
+
     display_name = "InfinityHD"
     allows_bloated_audio = True
     base_url = "https://infinityhd.net"
@@ -275,7 +276,6 @@ class InfinityHD(UNIT3D):
             if lang_code and lang_code.lower() in original_languages:
                 return True
         return False
-
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         if meta.resolution not in ["4320p", "2160p", "1440p", "1080p", "1080i"]:

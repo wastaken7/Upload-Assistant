@@ -10,9 +10,9 @@ from src.console import logger
 from src.get_desc import DescriptionBuilder
 from src.languages import languages_manager
 from src.meta import Meta
-from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, template
 from src.music.models import MusicRelease
 from src.music.validation import MusicValidator, ValidationLevel
+from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, template
 from src.tmdb import TmdbManager
 from src.trackers.naming import append_context_value, darkpeers_video_name
 from src.trackers.UNIT3D import UNIT3D
@@ -27,7 +27,10 @@ class DarkPeers(UNIT3D):
     name_profile = TrackerNameProfile(
         rules=(
             NameRule(NameSelector(category="MUSIC"), template("artist", "dash", "album", "year_label", "format_dash", "format_label")),
-            NameRule(NameSelector(category="BOOK"), template("author", "dash", "title", "year", "book_edition", "book_format", "book_bitrate", "book_identifier", "book_source", "ocr_label")),
+            NameRule(
+                NameSelector(category="BOOK"),
+                template("author", "dash", "title", "year", "book_edition", "book_format", "book_bitrate", "book_identifier", "book_source", "ocr_label"),
+            ),
             NameRule(NameSelector(), template("base_name")),
         ),
         transforms=(darkpeers_video_name, append_context_value("direct_tag")),
@@ -61,7 +64,14 @@ class DarkPeers(UNIT3D):
                 if mode:
                     parts.append(mode)
             format_label = " ".join(part for part in parts if part)
-            return {"artist": artist, "dash": "-" if artist and album else "", "album": album, "year_label": f"({year})" if year else "", "format_dash": "-" if format_label else "", "format_label": format_label}
+            return {
+                "artist": artist,
+                "dash": "-" if artist and album else "",
+                "album": album,
+                "year_label": f"({year})" if year else "",
+                "format_dash": "-" if format_label else "",
+                "format_label": format_label,
+            }
         if meta.category == "BOOK":
             author = str(meta.author or meta.book_author or "").strip()
             title = str(meta.title or "").strip()
@@ -73,10 +83,23 @@ class DarkPeers(UNIT3D):
             if meta.audiobook and meta.tag:
                 tag = str(meta.tag).strip()
                 direct_tag = tag if tag.startswith("-") else f"-{tag}"
-            return {"author": author, "dash": "-" if author and title else "", "title": title, "year": str(meta.year or "").strip(), "book_edition": edition if not meta.audiobook and edition and not re.search(r"\b(?:1st|first)\b", edition, re.I) else "", "book_format": format_name, "book_bitrate": str(meta.audiobook_bitrate) if meta.audiobook and format_name in {"MP3", "AAC", "OPUS", "VORBIS"} and meta.audiobook_bitrate else "", "book_identifier": identifier, "book_source": "Retail" if not meta.audiobook and source == "RETAIL" else "Scan" if not meta.audiobook and source == "SCAN" else "", "ocr_label": "OCR" if not meta.audiobook and meta.ocr else "", "direct_tag": direct_tag}
+            return {
+                "author": author,
+                "dash": "-" if author and title else "",
+                "title": title,
+                "year": str(meta.year or "").strip(),
+                "book_edition": edition if not meta.audiobook and edition and not re.search(r"\b(?:1st|first)\b", edition, re.I) else "",
+                "book_format": format_name,
+                "book_bitrate": str(meta.audiobook_bitrate) if meta.audiobook and format_name in {"MP3", "AAC", "OPUS", "VORBIS"} and meta.audiobook_bitrate else "",
+                "book_identifier": identifier,
+                "book_source": "Retail" if not meta.audiobook and source == "RETAIL" else "Scan" if not meta.audiobook and source == "SCAN" else "",
+                "ocr_label": "OCR" if not meta.audiobook and meta.ocr else "",
+                "direct_tag": direct_tag,
+            }
         remove_year = meta.category == "TV" and bool(meta.year) and not await self._tv_title_needs_year(meta)
         audio = await self.get_audio(meta)
         return {"remove_tv_year": "1" if remove_year else "", "replacement_audio": audio if audio and audio != "SKIPPED" else ""}
+
     display_name = "DarkPeers"
     allows_bloated_audio = True
     reject_episode_if_season_pack_exists = True

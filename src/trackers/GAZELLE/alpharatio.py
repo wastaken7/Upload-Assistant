@@ -38,6 +38,7 @@ class AlphaRatio(StringTrackerNameMixin):
     async def get_name_overrides(self, context: NameContext) -> dict[str, str]:
         meta = context.meta
         return {"alpha_source": meta.scene_name or "" if meta.scene else meta.uuid}
+
     display_name = "AlphaRatio"
     allows_bloated_audio = True
     source_flag = "AlphaRatio"

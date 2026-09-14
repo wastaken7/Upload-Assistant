@@ -22,6 +22,8 @@ class CapybaraBR(UNIT3D):
     """
 
     tracker = "CAPYBARABR"
+    rebuild_dvdrip_name = True
+    use_bioma_tag = True
     name_profile = TrackerNameProfile(
         rules=(
             NameRule(NameSelector(category="BOOK"), template("book_title", "dash", "author", "year_bracket", "audiobook_label", "tail", "language_label")),
@@ -33,21 +35,39 @@ class CapybaraBR(UNIT3D):
 
     async def get_name_overrides(self, context: NameContext) -> dict[str, str]:
         meta = context.meta
-        bioma = "[BiOMA]" if "bioma" in (meta.tag or "").lower() and self.tracker == "CAPYBARABR" else ""
+        bioma = "[BiOMA]" if "bioma" in (meta.tag or "").lower() and self.use_bioma_tag else ""
+        common = {"rebuild_dvdrip_name": "1" if self.rebuild_dvdrip_name else ""}
         if meta.category == "BOOK":
             title = f"{meta.book_series.strip()}: " if meta.book_series else ""
             title += meta.title.strip()
             title += f" {meta.book_series_index.strip()}" if meta.book_series_index else ""
             title = self.common.portuguese_title_capitalization(title)
             language = f"[{meta.book_language_iso.upper()}]" if meta.book_language_iso and meta.book_language_iso != "por" else ""
-            return {"book_title": title, "dash": "-", "author": meta.author, "year_bracket": f"[{meta.year if meta.year is not None else ''}]", "audiobook_label": "[AUDIOBOOK]" if meta.audiobook else "", "tail": bioma or (" " if meta.audiobook else ""), "language_label": language}
+            return common | {
+                "book_title": title,
+                "dash": "-",
+                "author": meta.author,
+                "year_bracket": f"[{meta.year if meta.year is not None else ''}]",
+                "audiobook_label": "[AUDIOBOOK]" if meta.audiobook else "",
+                "tail": bioma or (" " if meta.audiobook else ""),
+                "language_label": language,
+            }
         if meta.category == "GAME":
             languages = str(meta.languages).upper()
             game_language = "[MULTI]" if len(meta.languages) > 1 and "PORTUGUESE" in languages else "[INGLÊS]" if "ENGLISH" in languages else f"[{meta.language.upper()}]"
             subcategory = meta.game_subcategory.lower()
             dlc = "[DLC]" if subcategory == "dlc" else "[+DLC]" if subcategory == "full_game_dlc" else ""
-            return {"update_label": "Update" if subcategory == "update" else "", "game_version": meta.game_version, "dash": "-", "group": meta.tag.lstrip("-") if meta.tag else meta.tag, "game_language": game_language, "dlc_label": dlc, "tail": bioma or " "}
-        return {}
+            return common | {
+                "update_label": "Update" if subcategory == "update" else "",
+                "game_version": meta.game_version,
+                "dash": "-",
+                "group": meta.tag.lstrip("-") if meta.tag else meta.tag,
+                "game_language": game_language,
+                "dlc_label": dlc,
+                "tail": bioma or " ",
+            }
+        return common
+
     display_name = "CapybaraBR"
     base_url = "https://capybarabr.com"
     allows_bloated_audio = True

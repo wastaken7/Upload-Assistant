@@ -9,10 +9,10 @@ from src.cogs.redaction import Redaction
 from src.console import logger
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
-from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, template
-from src.trackers.naming import StringTrackerNameMixin, configured_metadata_name
 from src.rehostimages import ImageHostPolicy, RehostImagesManager
+from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, template
 from src.trackers.common import Common
+from src.trackers.naming import StringTrackerNameMixin, configured_metadata_name
 
 Config = dict[str, Any]
 

@@ -15,9 +15,9 @@ from PIL import Image
 from src.cogs.redaction import Redaction
 from src.console import logger
 from src.meta import Meta
+from src.release_name import NameRule, NameSelector, TrackerNameProfile, strip_diacritics, template
 from src.temp_paths import artwork_dir
 from src.trackers.common import Common
-from src.release_name import NameRule, NameSelector, TrackerNameProfile, strip_diacritics, template
 from src.trackers.naming import StringTrackerNameMixin
 from src.trackers.USENET.search_helpers import (
     build_newznab_search_query,

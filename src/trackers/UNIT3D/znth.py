@@ -1,3 +1,4 @@
+import contextlib
 import re
 import unicodedata
 from typing import Any, cast
@@ -38,7 +39,25 @@ class Zenith(UNIT3D):
     name_profile = TrackerNameProfile(
         rules=(
             NameRule(NameSelector(category="MUSIC"), template("music_artist", "music_dash", "music_album", "music_year", "format_dash", "music_format")),
-            NameRule(NameSelector(category="BOOK"), template("book_author", "book_dash", "book_series", "series_dash", "book_title", "book_year", "book_language", "book_edition", "book_narrator", "book_source", "book_container", "book_codec", "book_bitrate", "book_retail")),
+            NameRule(
+                NameSelector(category="BOOK"),
+                template(
+                    "book_author",
+                    "book_dash",
+                    "book_series",
+                    "series_dash",
+                    "book_title",
+                    "book_year",
+                    "book_language",
+                    "book_edition",
+                    "book_narrator",
+                    "book_source",
+                    "book_container",
+                    "book_codec",
+                    "book_bitrate",
+                    "book_retail",
+                ),
+            ),
             NameRule(NameSelector(), template("base_name")),
         ),
         transforms=(collapse_whitespace, zenith_video_name, append_context_value("direct_tag")),
@@ -68,13 +87,19 @@ class Zenith(UNIT3D):
                 format_parts.append(f"{depth_name}-{rate_name}" if depth_name and rate_name else depth_name or rate_name)
             bitrate = first.get("bitrate")
             if bitrate and codec not in {"FLAC", "ALAC", "WAV", "AIFF"}:
-                try:
+                with contextlib.suppress(TypeError, ValueError):
                     format_parts.append(f"{round(float(bitrate) / 1000)} {str(first.get('bitrate_mode') or '').upper().strip()}".strip())
-                except (TypeError, ValueError):
-                    pass
             if str(self._music_field(release, "release_type", "")).casefold() == "single":
                 format_parts.append("Single")
-            return {"music_artist": artist, "music_dash": "-", "music_album": album, "music_year": f"({year})" if year else "", "format_dash": "-" if format_parts else "", "music_format": f"[{' '.join(format_parts)}]" if format_parts else "", "direct_tag": str(meta.tag or "").strip()}
+            return {
+                "music_artist": artist,
+                "music_dash": "-",
+                "music_album": album,
+                "music_year": f"({year})" if year else "",
+                "format_dash": "-" if format_parts else "",
+                "music_format": f"[{' '.join(format_parts)}]" if format_parts else "",
+                "direct_tag": str(meta.tag or "").strip(),
+            }
         if meta.category == "BOOK" and _is_misc(meta):
             return {"book_title": meta.name}
         if meta.category != "BOOK":
@@ -89,7 +114,20 @@ class Zenith(UNIT3D):
             source = ((meta.manual_source or "").strip() or (meta.source or "").strip() or "WEB").upper()
             container, codec = {"FLAC": ("", "FLAC"), "MP3": ("", "MP3"), "M4B": ("M4B", "AAC")}.get(format_name, ("", format_name))
             narrator = _primary_name(meta.narrator or "")
-            return {"book_author": author, "book_dash": "-" if author and title else "", "book_title": title, "book_year": f"({year})" if year else "", "book_language": language, "book_edition": edition, "book_narrator": f"{{{narrator}}}" if narrator else "", "book_source": f"[{source}]" if source else "", "book_container": container, "book_codec": codec, "book_bitrate": f"{meta.audiobook_bitrate}kbps" if meta.audiobook_bitrate else "", "direct_tag": (meta.tag or "").strip()}
+            return {
+                "book_author": author,
+                "book_dash": "-" if author and title else "",
+                "book_title": title,
+                "book_year": f"({year})" if year else "",
+                "book_language": language,
+                "book_edition": edition,
+                "book_narrator": f"{{{narrator}}}" if narrator else "",
+                "book_source": f"[{source}]" if source else "",
+                "book_container": container,
+                "book_codec": codec,
+                "book_bitrate": f"{meta.audiobook_bitrate}kbps" if meta.audiobook_bitrate else "",
+                "direct_tag": (meta.tag or "").strip(),
+            }
         series = (meta.book_series or "").strip()
         index = (meta.book_series_index or "").strip()
         series = f"{series} #{index}" if series and index else series
@@ -103,8 +141,30 @@ class Zenith(UNIT3D):
             source = manual_source
         if source not in ("RETAIL", "SCAN", "HYBRID"):
             source_text = (meta.basename_no_ext + " " + meta.title).lower()
-            source = "SCAN" if "scan" in source_text else "HYBRID" if "hybrid" in source_text else "RETAIL" if "retail" in source_text else "SCAN" if format_name == "PDF" else "RETAIL"
-        return {"book_author": author, "book_dash": "-" if author and (series or title) else "", "book_series": series, "series_dash": "-" if series and title else "", "book_title": title, "book_year": year, "book_language": language, "book_edition": edition, "book_codec": format_name, "book_retail": "Retail" if source == "RETAIL" or "retail" in meta.basename_no_ext.lower() else "", "direct_tag": (meta.tag or "").strip()}
+            source = (
+                "SCAN"
+                if "scan" in source_text
+                else "HYBRID"
+                if "hybrid" in source_text
+                else "RETAIL"
+                if "retail" in source_text
+                else "SCAN"
+                if format_name == "PDF"
+                else "RETAIL"
+            )
+        return {
+            "book_author": author,
+            "book_dash": "-" if author and (series or title) else "",
+            "book_series": series,
+            "series_dash": "-" if series and title else "",
+            "book_title": title,
+            "book_year": year,
+            "book_language": language,
+            "book_edition": edition,
+            "book_codec": format_name,
+            "book_retail": "Retail" if source == "RETAIL" or "retail" in meta.basename_no_ext.lower() else "",
+            "direct_tag": (meta.tag or "").strip(),
+        }
 
     display_name = "Zenith"
     allows_bloated_audio = True

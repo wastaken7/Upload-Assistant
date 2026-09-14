@@ -29,12 +29,13 @@ class TheOldSchool(UNIT3D):
             tracker_url = str(tracker_config.get("announce_url", "https://fake.tracker")).strip()
             try:
                 cooldown = int(self.config.get("DEFAULT", {}).get("rehash_cooldown", 0) or 0)
-            except (ValueError, TypeError):
+            except ValueError, TypeError:
                 cooldown = 0
             if cooldown > 0:
                 await asyncio.sleep(cooldown)
             await TorrentCreator.create_torrent(meta, str(meta.path), f"[{self.tracker}]", tracker_url=tracker_url)
         return {"oldschool_source": meta.scene_name if meta.scene else meta.basename_no_ext}
+
     display_name = "The Old School"
     source_flag = "TheOldSchool"
     base_url = "https://theoldschool.cc"

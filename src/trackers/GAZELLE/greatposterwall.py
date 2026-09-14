@@ -20,7 +20,7 @@ from src.rehostimages import RehostImagesManager
 from src.tmdb import TmdbManager
 from src.tracker_images import get_tracker_image_collection, set_tracker_image_collection
 from src.trackers.common import Common
-from src.trackers.naming import StringTrackerNameMixin, TITLE_NAME_PROFILE
+from src.trackers.naming import TITLE_NAME_PROFILE, StringTrackerNameMixin
 
 
 class GreatPosterWall(StringTrackerNameMixin):

@@ -1,7 +1,7 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import re
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, ClassVar
 
 from src.meta import Meta
 from src.trackers.AVISTAZ import AZTrackerBase
@@ -14,6 +14,12 @@ class CinemaZ(AZTrackerBase):
     """
 
     tracker = "CINEMAZ"
+    naming_options: ClassVar[dict[str, str]] = {
+        "normalize_cuts": "1",
+        "abbreviate_cuts": "1",
+        "reposition_hybrid": "1",
+        "invalid_group": "NoGroup",
+    }
     display_name = "CinemaZ"
     allows_bloated_audio = True
     source_flag = "CinemaZ"

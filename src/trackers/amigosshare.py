@@ -62,6 +62,7 @@ class AmigosShare(StringTrackerNameMixin):
         localized = meta.tmdb_localized_data.get("pt-BR", {}).get("main", {}).get(key)
         display = f"{localized} ({title})" if localized and localized.lower() != title.lower() and (not original or localized.lower() != original.lower()) else title
         return {"localized_title": display, "dash": "-"}
+
     display_name = "Amigos Share Club"
     source_flag = "ASC"
     banned_groups: tuple[str, ...] = ()

@@ -21,6 +21,7 @@ class NordicQuality(UNIT3D):
 
     async def get_name_overrides(self, context: NameContext) -> dict[str, str]:
         return {"release_name_source": self._release_name_source(context.meta)}
+
     display_name = "NordicQuality"
     base_url = "https://nordicq.org"
     banned_groups: tuple[str, ...] = ()

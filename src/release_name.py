@@ -230,7 +230,7 @@ class ReleaseNameBuilder:
         category = str(value("category") or "")
         year = str(value("year")) if value("year") is not None else ""
         manual_year = value("manual_year")
-        if manual_year is not None and manual_year > 0:
+        if manual_year not in (None, "") and manual_year > 0:
             year = str(manual_year)
         if category == "TV":
             year = str(value("year") or "") if value("search_year") != "" else ""

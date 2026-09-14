@@ -54,6 +54,7 @@ class MakingOff(StringTrackerNameMixin):
             "original_part": original,
             "year_part": f"({meta.year})" if meta.year else "",
         }
+
     display_name = "MakingOff"
     source_flag = ""
     base_url = "https://www.makingoff.org"

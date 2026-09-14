@@ -1,7 +1,7 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import re
 from datetime import UTC, datetime
-from typing import Any, cast
+from typing import Any, ClassVar, cast
 
 from src.meta import Meta
 from src.trackers.AVISTAZ import AZTrackerBase
@@ -16,6 +16,11 @@ class PrivateHD(AZTrackerBase):
     """
 
     tracker = "PRIVATEHD"
+    naming_options: ClassVar[dict[str, str]] = {
+        "normalize_cuts": "1",
+        "invalid_group": "NOGROUP",
+        "remove_tv_year": "1",
+    }
     display_name = "PrivateHD"
     allows_bloated_audio = True
     source_flag = "PrivateHD"

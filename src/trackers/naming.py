@@ -129,9 +129,7 @@ def imdb_title_transform(*, remove_web_hybrid: bool = False, anime_aka: bool = T
         if context.values.get("category") != "TV" and imdb_year.strip() and year.strip() and imdb_year != year:
             name = name.replace(year, imdb_year, 1)
         if remove_web_hybrid:
-            if context.values.get("type") == "WEBDL" and (
-                "hybrid" in str(getattr(meta, "edition", "")).lower() or getattr(meta, "webdv", False)
-            ):
+            if context.values.get("type") == "WEBDL" and ("hybrid" in str(getattr(meta, "edition", "")).lower() or getattr(meta, "webdv", False)):
                 name = name.replace("Hybrid ", "", 1)
             if getattr(meta, "webdv", False):
                 name = name.replace("HYBRID ", "", 1)
@@ -250,7 +248,6 @@ def _btn_clean(value: str) -> str:
 
 
 def broadcasthe_net_name(name: str, context: NameContext) -> str:
-    meta = context.meta
     name = re.sub(r"(?i)\.(avi|mkv|mp4|ts|m4v|m2ts|wmv|mpeg|mpg|vob)$", "", name)
     name = _btn_clean(name)
     if not context.values.get("scene_name"):
@@ -279,12 +276,32 @@ def broadcasthe_net_name(name: str, context: NameContext) -> str:
 
 def locadora_name(name: str, context: NameContext) -> str:
     replacements = {
-        ".mkv": "", ".mp4": "", ".": " ", "DDP2 0": "DDP2.0", "DDP5 1": "DDP5.1", "H 264": "H.264",
-        "H 265": "H.265", "DD+7 1": "DDP7.1", "AAC2 0": "AAC2.0", "DD5 1": "DD5.1", "DD2 0": "DD2.0",
-        "TrueHD 7 1": "TrueHD 7.1", "TrueHD 5 1": "TrueHD 5.1", "DTS-HD MA 7 1": "DTS-HD MA 7.1",
-        "DTS-HD MA 5 1": "DTS-HD MA 5.1", "DTS-X 7 1": "DTS-X 7.1", "DTS-X 5 1": "DTS-X 5.1",
-        "FLAC 2 0": "FLAC 2.0", "FLAC 5 1": "FLAC 5.1", "DD1 0": "DD1.0", "DTS ES 5 1": "DTS ES 5.1",
-        "DTS5 1": "DTS 5.1", "AAC1 0": "AAC1.0", "DD+5 1": "DDP5.1", "DD+2 0": "DDP2.0", "DD+1 0": "DDP1.0",
+        ".mkv": "",
+        ".mp4": "",
+        ".": " ",
+        "DDP2 0": "DDP2.0",
+        "DDP5 1": "DDP5.1",
+        "H 264": "H.264",
+        "H 265": "H.265",
+        "DD+7 1": "DDP7.1",
+        "AAC2 0": "AAC2.0",
+        "DD5 1": "DD5.1",
+        "DD2 0": "DD2.0",
+        "TrueHD 7 1": "TrueHD 7.1",
+        "TrueHD 5 1": "TrueHD 5.1",
+        "DTS-HD MA 7 1": "DTS-HD MA 7.1",
+        "DTS-HD MA 5 1": "DTS-HD MA 5.1",
+        "DTS-X 7 1": "DTS-X 7.1",
+        "DTS-X 5 1": "DTS-X 5.1",
+        "FLAC 2 0": "FLAC 2.0",
+        "FLAC 5 1": "FLAC 5.1",
+        "DD1 0": "DD1.0",
+        "DTS ES 5 1": "DTS ES 5.1",
+        "DTS5 1": "DTS 5.1",
+        "AAC1 0": "AAC1.0",
+        "DD+5 1": "DDP5.1",
+        "DD+2 0": "DDP2.0",
+        "DD+1 0": "DDP1.0",
     }
     for old, new in replacements.items():
         name = name.replace(old, new)
@@ -310,9 +327,7 @@ def old_toons_world_name(name: str, context: NameContext) -> str:
         else:
             imdb_year = getattr(meta, "imdb_info", {}).get("year")
             series_year = getattr(meta, "tvdb_episode_data", {}).get("series_year")
-            for candidate in (imdb_year, series_year):
-                if candidate and str(candidate).isdigit():
-                    candidates.append(int(candidate))
+            candidates.extend(int(candidate) for candidate in (imdb_year, series_year) if candidate and str(candidate).isdigit())
             year = str(min(candidates)) if candidates else ""
         title = context.values.get("title", "")
         name = name.replace(title, f"{title} {year}", 1)
@@ -393,7 +408,6 @@ def dreadvault_name(name: str, context: NameContext) -> str:
 
 def only_encodes_name(name: str, context: NameContext) -> str:
     name = imdb_title_transform()(name, context)
-    meta = context.meta
     resolution = context.values.get("resolution", "")
     video_encode = context.values.get("video_encode", "")
     name_type = context.values.get("type", "")
@@ -435,11 +449,29 @@ def append_context_value(field_name: str):
 
 def iptorrents_name(name: str, context: NameContext) -> str:
     replacements = {
-        "3DAccess": "3DA", "AreaFiles": "AF", "BeyondHD": "BHD", "Blu-Bits": "BluHD", "Bluebird": "BB",
-        "BlueEvolution": "BluEvo", "Chdbits": "CHD", "HDAccess": "HDA", "HDChina": "HDC", "HDClub": "HDCL",
-        "HDGeek": "HDG", "HDRoad": "HDR", "HDStar": "HDS", "HDWing": "HDW", "ExtraTorrent": "ETRG",
-        "IWStream": "IWS", "Kingdom-KVCD": "KVCD", "MVGroup": "MVG", "Projekt-Revolution": "Projekt",
-        "PublicHD": "PHD", "SpaceHD": "SHD", "ThumperDC": "TDC", "TheWolfsDen": "TWD",
+        "3DAccess": "3DA",
+        "AreaFiles": "AF",
+        "BeyondHD": "BHD",
+        "Blu-Bits": "BluHD",
+        "Bluebird": "BB",
+        "BlueEvolution": "BluEvo",
+        "Chdbits": "CHD",
+        "HDAccess": "HDA",
+        "HDChina": "HDC",
+        "HDClub": "HDCL",
+        "HDGeek": "HDG",
+        "HDRoad": "HDR",
+        "HDStar": "HDS",
+        "HDWing": "HDW",
+        "ExtraTorrent": "ETRG",
+        "IWStream": "IWS",
+        "Kingdom-KVCD": "KVCD",
+        "MVGroup": "MVG",
+        "Projekt-Revolution": "Projekt",
+        "PublicHD": "PHD",
+        "SpaceHD": "SHD",
+        "ThumperDC": "TDC",
+        "TheWolfsDen": "TWD",
     }
     for old, new in replacements.items():
         if old in name:
@@ -466,7 +498,7 @@ def capybara_video_name(name: str, context: NameContext) -> str:
     elif meta.aka:
         localized = meta.aka.replace("AKA", "").strip()
         name = name.replace(meta.aka, "").replace(meta.title, localized).strip()
-    if context.values.get("tracker") == "CAPYBARABR" and meta.type == "DVDRIP":
+    if context.values.get("rebuild_dvdrip_name") and meta.type == "DVDRIP":
         title = meta.aka.replace("AKA", "").strip() if meta.original_language == "pt" and meta.aka else meta.title
         episode = f"{meta.season}{meta.episode}" if meta.category == "TV" else ""
         audio = str(meta.audio)
@@ -495,17 +527,19 @@ def capybara_video_name(name: str, context: NameContext) -> str:
 
 def avistaz_name(name: str, context: NameContext) -> str:
     meta = context.meta
-    tracker = context.values.get("tracker", "")
+    normalize_cuts = bool(context.values.get("normalize_cuts"))
+    abbreviate_cuts = bool(context.values.get("abbreviate_cuts"))
+    invalid_group = context.values.get("invalid_group", "")
     for value in (meta.aka or "", meta.manual_episode_title or "", meta.daily_episode_title or "", "Dubbed", "Dual-Audio"):
         name = name.replace(value, "")
-    if tracker in ("CINEMAZ", "PRIVATEHD"):
+    if normalize_cuts:
         for term in (r"\bLIMITED\b", r"\bCriterion Collection\b", r"\b\d{1,3}(?:st|nd|rd|th)\s+Anniversary Edition\b"):
             name = re.sub(term, "", name, flags=re.IGNORECASE).strip()
-        name = re.sub(r"\bDirector[’'`]s\s+Cut\b", "DC", name, flags=re.IGNORECASE)
-        name = re.sub(r"\bExtended\s+Cut\b", "EXT" if tracker == "CINEMAZ" else "Extended", name, flags=re.IGNORECASE)
-        name = re.sub(r"\bTheatrical\s+Cut\b", "TC" if tracker == "CINEMAZ" else "Theatrical", name, flags=re.IGNORECASE)
+        name = re.sub(r"\bDirector[\u2019'`]s\s+Cut\b", "DC", name, flags=re.IGNORECASE)
+        name = re.sub(r"\bExtended\s+Cut\b", "EXT" if abbreviate_cuts else "Extended", name, flags=re.IGNORECASE)
+        name = re.sub(r"\bTheatrical\s+Cut\b", "TC" if abbreviate_cuts else "Theatrical", name, flags=re.IGNORECASE)
         name = name.replace("[", "").replace("]", "")
-        if tracker == "CINEMAZ" and (meta.webdv or "hybrid" in (meta.edition or "").casefold()):
+        if context.values.get("reposition_hybrid") and (meta.webdv or "hybrid" in (meta.edition or "").casefold()):
             title_match = re.search(re.escape(meta.title), name, flags=re.IGNORECASE) if meta.title else None
             start = title_match.end() if title_match else 0
             hybrid = re.search(r"\bHYBRID\b", name[start:], flags=re.IGNORECASE)
@@ -514,7 +548,7 @@ def avistaz_name(name: str, context: NameContext) -> str:
                 without = f"{name[:begin]}{name[end:]}"
                 resolution = re.search(r"\b(?:\d{3,4}[pi]|4K|UHD|SD)\b", without, flags=re.IGNORECASE)
                 if resolution:
-                    name = f"{without[:resolution.end()]} HYBRID{without[resolution.end():]}"
+                    name = f"{without[: resolution.end()]} HYBRID{without[resolution.end() :]}"
         name = re.sub(r"\s{2,}", " ", name).strip()
     if meta.has_encode_settings:
         name = name.replace("H.264", "x264").replace("H.265", "x265")
@@ -523,20 +557,20 @@ def avistaz_name(name: str, context: NameContext) -> str:
     if not tag or any(item in tag.lower() for item in invalid):
         for item in invalid:
             name = re.sub(f"-{item}", "", name, flags=re.IGNORECASE)
-        if tracker == "CINEMAZ":
-            name += "-NoGroup"
-        if tracker == "PRIVATEHD":
-            name += "-NOGROUP"
+        if invalid_group:
+            name += f"-{invalid_group}"
     if meta.category == "TV":
         year = meta.year
         if not meta.no_year and not meta.search_year:
-            season_year = next((item.get("year") for item in meta.imdb_info.get("seasons_summary", []) if item.get("season") == meta.season_int), None) if meta.season_int else None
+            season_year = (
+                next((item.get("year") for item in meta.imdb_info.get("seasons_summary", []) if item.get("season") == meta.season_int), None) if meta.season_int else None
+            )
             year = season_year or year
             if year:
                 name = name.replace(meta.title, f"{meta.title} {year}", 1)
-        if tracker == "PRIVATEHD" and year:
+        if context.values.get("remove_tv_year") and year:
             name = name.replace(str(year), "")
-        if tracker == "AVISTAZ" and meta.tv_pack and year:
+        if context.values.get("pack_year_after_season") and meta.tv_pack and year:
             name = name.replace(f"{meta.title} {year} {meta.season}", f"{meta.title} {meta.season} {year}")
     source = meta.source
     if meta.type == "DVDRIP" and source:

@@ -30,7 +30,9 @@ class Cinematik(UNIT3D):
 
     tracker = "CINEMATIK"
     name_profile = TrackerNameProfile(
-        rules=(NameRule(NameSelector(), template("cinematik_title", "year_part", "season_label", "disc_label", "resolution_part", "codec_or_size", "three_d_label", separator="")),)
+        rules=(
+            NameRule(NameSelector(), template("cinematik_title", "year_part", "season_label", "disc_label", "resolution_part", "codec_or_size", "three_d_label", separator="")),
+        )
     )
 
     async def get_name_overrides(self, context: NameContext) -> dict[str, str]:
@@ -63,6 +65,7 @@ class Cinematik(UNIT3D):
             "codec_or_size": f" {codec_or_size}",
             "three_d_label": three_d_label,
         }
+
     display_name = "Cinematik"
     allows_bloated_audio = True
     base_url = "https://cinematik.net"

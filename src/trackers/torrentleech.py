@@ -10,8 +10,8 @@ from src.console import logger
 from src.cookie_auth import CookieValidator
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
-from src.trackers.common import Common
 from src.release_name import NameRule, NameSelector, TrackerNameProfile, collapse_whitespace, remove_context_value, template
+from src.trackers.common import Common
 from src.trackers.naming import StringTrackerNameMixin, add_incomplete_pack_marker_transform
 
 Config = dict[str, Any]

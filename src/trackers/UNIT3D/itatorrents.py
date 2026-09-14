@@ -20,9 +20,48 @@ class ItaTorrents(UNIT3D):
     tracker = "ITATORRENTS"
     name_profile = TrackerNameProfile(
         rules=(
-            NameRule(NameSelector(type="DISC"), template("title", "year", "season_episode", "repack", "resolution", "edition", "region", "three_d", "source", "resolved_type_label", "hdr", "video_codec", "dubs", "audio")),
-            NameRule(NameSelector(type="REMUX"), template("title", "year", "season_episode", "repack", "resolution", "edition", "region", "three_d", "source", "resolved_type_label", "hdr", "video_codec", "dubs", "audio")),
-            NameRule(NameSelector(), template("title", "year", "season_episode", "repack", "resolution", "edition", "three_d", "resolved_type_label", "dubs", "audio", "hdr", "video_codec")),
+            NameRule(
+                NameSelector(type="DISC"),
+                template(
+                    "title",
+                    "year",
+                    "season_episode",
+                    "repack",
+                    "resolution",
+                    "edition",
+                    "region",
+                    "three_d",
+                    "source",
+                    "resolved_type_label",
+                    "hdr",
+                    "video_codec",
+                    "dubs",
+                    "audio",
+                ),
+            ),
+            NameRule(
+                NameSelector(type="REMUX"),
+                template(
+                    "title",
+                    "year",
+                    "season_episode",
+                    "repack",
+                    "resolution",
+                    "edition",
+                    "region",
+                    "three_d",
+                    "source",
+                    "resolved_type_label",
+                    "hdr",
+                    "video_codec",
+                    "dubs",
+                    "audio",
+                ),
+            ),
+            NameRule(
+                NameSelector(),
+                template("title", "year", "season_episode", "repack", "resolution", "edition", "three_d", "resolved_type_label", "dubs", "audio", "hdr", "video_codec"),
+            ),
         ),
         transforms=(collapse_whitespace, append_context_value("tag"), replace_text(("Dubbed", ""), ("Dual-Audio", ""))),
     )
@@ -30,8 +69,15 @@ class ItaTorrents(UNIT3D):
     async def get_name_overrides(self, context: NameContext) -> dict[str, str]:
         meta = context.meta
         resolved = await self.get_type_name(meta) or ""
-        label = "REMUX" if resolved == "REMUX" else "" if resolved == "DISC" else resolved.replace("WEBDL", "WEB-DL").replace("WEBRIP", "WEBRip").replace("DVDRIP", "DVDRip").replace("ENCODE", "BluRay")
+        label = (
+            "REMUX"
+            if resolved == "REMUX"
+            else ""
+            if resolved == "DISC"
+            else resolved.replace("WEBDL", "WEB-DL").replace("WEBRIP", "WEBRip").replace("DVDRIP", "DVDRip").replace("ENCODE", "BluRay")
+        )
         return {"edition": meta.edition, "dubs": await self.get_dubs(meta), "resolved_type_label": label}
+
     display_name = "ItaTorrents"
     base_url = "https://itatorrents.xyz"
     banned_groups = ()

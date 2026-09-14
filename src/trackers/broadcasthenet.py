@@ -20,8 +20,8 @@ from src.exceptions import UploadError
 from src.mediainfo import strip_report_by_line
 from src.meta import Meta
 from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, template
-from src.trackers.naming import StringTrackerNameMixin, broadcasthe_net_name
 from src.trackers.common import Common
+from src.trackers.naming import StringTrackerNameMixin, broadcasthe_net_name
 
 Config = dict[str, Any]
 
@@ -39,6 +39,7 @@ class BroadcasTheNet(StringTrackerNameMixin):
     async def get_name_overrides(self, context: NameContext) -> dict[str, str]:
         meta = context.meta
         return {"btn_source": str(meta.get("scene_name") or meta.name or meta.basename_no_ext or "")}
+
     display_name = "BroadcasTheNet"
     source_flag = "BTN"
     base_url = "https://backup.landof.tv"

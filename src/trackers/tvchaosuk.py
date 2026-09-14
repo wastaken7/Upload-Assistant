@@ -18,8 +18,8 @@ from src.bbcode import BBCODE
 from src.cogs.redaction import Redaction
 from src.console import logger
 from src.meta import Meta
-from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, template
 from src.rehostimages import ImageHostPolicy, RehostImagesManager
+from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, template
 from src.tracker_images import get_tracker_image_collection
 from src.trackers.common import Common
 from src.trackers.naming import StringTrackerNameMixin
@@ -40,7 +40,9 @@ class TVChaosUK(StringTrackerNameMixin):
 
     async def get_name_overrides(self, context: NameContext) -> dict[str, str]:
         meta = context.meta
-        release_type = "BRRip" if meta.type == "ENCODE" and any(token in str(meta.path).lower() for token in ("bluray", "brrip", "bdrip")) else str(meta.type).replace("WEBDL", "WEB-DL")
+        release_type = (
+            "BRRip" if meta.type == "ENCODE" and any(token in str(meta.path).lower() for token in ("bluray", "brrip", "bdrip")) else str(meta.type).replace("WEBDL", "WEB-DL")
+        )
         original_lang = str(meta.original_language)
         foreign = bool(original_lang and not original_lang.startswith("en") and original_lang not in ("ga", "gd", "cy"))
         if not original_lang:
@@ -78,9 +80,33 @@ class TVChaosUK(StringTrackerNameMixin):
                 episode_part = f"{meta.season}{meta.episode}{date}"
         else:
             raise ValueError(f"Unsupported category for TVCHAOSUK: {meta.category}")
-        country_map = {"AT":"AUT","AU":"AUS","BE":"BEL","CA":"CAN","CH":"CHE","CZ":"CZE","DE":"GER","DK":"DNK","EE":"EST","ES":"SPA","FI":"FIN","FR":"FRA","IE":"IRL","IS":"ISL","IT":"ITA","NL":"NLD","NO":"NOR","NZ":"NZL","PL":"POL","PT":"POR","RU":"RUS","SE":"SWE"}
+        country_map = {
+            "AT": "AUT",
+            "AU": "AUS",
+            "BE": "BEL",
+            "CA": "CAN",
+            "CH": "CHE",
+            "CZ": "CZE",
+            "DE": "GER",
+            "DK": "DNK",
+            "EE": "EST",
+            "ES": "SPA",
+            "FI": "FIN",
+            "FR": "FRA",
+            "IE": "IRL",
+            "IS": "ISL",
+            "IT": "ITA",
+            "NL": "NLD",
+            "NO": "NOR",
+            "NZ": "NZL",
+            "PL": "POL",
+            "PT": "POR",
+            "RU": "RUS",
+            "SE": "SWE",
+        }
         country = next((country_map[code] for code in meta.origin_country_code or [] if code in country_map), "")
         return {"title_part": title_part, "episode_part": episode_part, "media_part": media_part, "country_part": f"[{country}]" if country else ""}
+
     display_name = "TV Chaos UK"
     allows_bloated_audio = True
     source_flag = "TVCHAOS"

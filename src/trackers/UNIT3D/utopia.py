@@ -18,8 +18,47 @@ class Utopia(UNIT3D):
     tracker = "UTOPIA"
     name_profile = TrackerNameProfile(
         rules=(
-            NameRule(NameSelector(category="MOVIE"), template("title", "alt_title", "year", "hybrid", "repack", "edition", "region", "three_d", "uhd", "effective_source", "type_label", "resolution", "hdr", "effective_codec", "lossless_audio")),
-            NameRule(NameSelector(category="TV"), template("title", "alt_title", "season_episode", "year", "hybrid", "edition", "repack", "region", "three_d", "uhd", "effective_source", "type_label", "resolution", "hdr", "effective_codec", "lossless_audio")),
+            NameRule(
+                NameSelector(category="MOVIE"),
+                template(
+                    "title",
+                    "alt_title",
+                    "year",
+                    "hybrid",
+                    "repack",
+                    "edition",
+                    "region",
+                    "three_d",
+                    "uhd",
+                    "effective_source",
+                    "type_label",
+                    "resolution",
+                    "hdr",
+                    "effective_codec",
+                    "lossless_audio",
+                ),
+            ),
+            NameRule(
+                NameSelector(category="TV"),
+                template(
+                    "title",
+                    "alt_title",
+                    "season_episode",
+                    "year",
+                    "hybrid",
+                    "edition",
+                    "repack",
+                    "region",
+                    "three_d",
+                    "uhd",
+                    "effective_source",
+                    "type_label",
+                    "resolution",
+                    "hdr",
+                    "effective_codec",
+                    "lossless_audio",
+                ),
+            ),
             NameRule(NameSelector(), template("base_name")),
         ),
         transforms=(collapse_whitespace, append_context_value("tag")),
@@ -38,7 +77,16 @@ class Utopia(UNIT3D):
             source, type_label, codec = meta.service, "WEB-DL" if release_type == "WEBDL" else "WEBRip", meta.video_encode
         elif release_type == "HDTV":
             codec = meta.video_encode
-        return {"alt_title": meta.aka.strip(), "year": str(meta.year) if meta.year is not None else "", "edition": meta.edition, "effective_source": source, "type_label": type_label, "effective_codec": codec, "lossless_audio": audio}
+        return {
+            "alt_title": meta.aka.strip(),
+            "year": str(meta.year) if meta.year is not None else "",
+            "edition": meta.edition,
+            "effective_source": source,
+            "type_label": type_label,
+            "effective_codec": codec,
+            "lossless_audio": audio,
+        }
+
     display_name = "UTOPIA"
     base_url = "https://utp.to"
     banned_groups = ()

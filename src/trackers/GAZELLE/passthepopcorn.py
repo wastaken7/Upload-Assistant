@@ -30,8 +30,8 @@ from src.takescreens import TakeScreensManager
 from src.temp_paths import artwork_dir, screenshots_dir
 from src.torrent_policy import PASSTHEPOPCORN_POLICY
 from src.tracker_images import get_tracker_image_collection
-from src.trackers.naming import StringTrackerNameMixin
 from src.trackers.common import Common
+from src.trackers.naming import StringTrackerNameMixin
 from src.uploadscreens import UploadScreensManager
 
 

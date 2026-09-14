@@ -5,7 +5,7 @@ import platform
 import re
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 from urllib.parse import urlparse
 
 import aiofiles
@@ -20,7 +20,7 @@ from src.cookie_auth import CookieValidator
 from src.get_desc import DescriptionBuilder
 from src.languages import languages_manager
 from src.meta import Meta
-from src.release_name import NameRule, NameSelector, TrackerNameProfile, template
+from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, template
 from src.temp_paths import screenshots_dir
 from src.trackers.common import Common
 from src.trackers.naming import StringTrackerNameMixin, avistaz_name
@@ -38,6 +38,25 @@ class AZTrackerBase(StringTrackerNameMixin):
     )
     source_flag: str = ""
     banned_groups: tuple[str, ...] = ()
+    naming_options: ClassVar[dict[str, str]] = {}
+
+    async def get_name_overrides(self, _context: NameContext) -> dict[str, str]:
+        if self.naming_options:
+            return self.naming_options
+        return {
+            "CINEMAZ": {
+                "normalize_cuts": "1",
+                "abbreviate_cuts": "1",
+                "reposition_hybrid": "1",
+                "invalid_group": "NoGroup",
+            },
+            "PRIVATEHD": {
+                "normalize_cuts": "1",
+                "invalid_group": "NOGROUP",
+                "remove_tv_year": "1",
+            },
+            "AVISTAZ": {"pack_year_after_season": "1"},
+        }.get(self.tracker, {})
 
     def __init__(self, config: Config, tracker_name: str):
         self.config = config
