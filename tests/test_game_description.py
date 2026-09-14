@@ -95,6 +95,12 @@ def test_clean_description_text_decodes_json_string_literals():
     assert _clean_description_text(value) == 'A description with "quotes" and a /slash'  # noqa: S101
 
 
+def test_clean_description_text_preserves_entity_encoded_quotes():
+    value = '&quot;The title&quot; is shown in the overview.'
+
+    assert _clean_description_text(value) == '"The title" is shown in the overview.'  # noqa: S101
+
+
 def test_game_description_cleans_escaped_overview():
     meta = Meta(category="GAME", overview=r'\"A story \/with quotes\"')
 

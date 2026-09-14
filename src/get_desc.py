@@ -77,7 +77,7 @@ def _safe_game_field(value: Any) -> str:
 
 def _clean_description_text(value: Any) -> str:
     """Remove serialization escapes that may be returned in synopsis text."""
-    text = html.unescape(str(value or "")).strip()
+    text = str(value or "").strip()
 
     # Some providers return the complete synopsis as a JSON string literal.
     if len(text) >= 2 and text[0] == text[-1] == '"':
@@ -88,6 +88,8 @@ def _clean_description_text(value: Any) -> str:
         else:
             if isinstance(decoded, str):
                 text = decoded.strip()
+
+    text = html.unescape(text)
 
     # Handle partially escaped payloads as well (for example, ``\\"text\\"``).
     return text.replace(r"\"", '"').replace(r"\/", "/")
