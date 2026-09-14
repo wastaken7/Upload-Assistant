@@ -358,7 +358,11 @@ class QbittorrentClientMixin:
 
             if client.get("qbit_api_key"):
                 qbt_client = qbittorrentapi.Client(
-                    host=client["qbit_url"], port=client["qbit_port"], api_key=client["qbit_api_key"], VERIFY_WEBUI_CERTIFICATE=client.get("VERIFY_WEBUI_CERTIFICATE", True)
+                    host=client["qbit_url"],
+                    port=client["qbit_port"],
+                    api_key=client["qbit_api_key"],
+                    VERIFY_WEBUI_CERTIFICATE=client.get("VERIFY_WEBUI_CERTIFICATE", True),
+                    FORCE_SCHEME_FROM_HOST=True,
                 )
                 try:
                     await self.retry_qbt_operation(lambda: asyncio.to_thread(qbt_client.app_version), "qBittorrent API Key verification")
@@ -378,6 +382,7 @@ class QbittorrentClientMixin:
                     username=client.get("qbit_user"),
                     password=client.get("qbit_pass"),
                     VERIFY_WEBUI_CERTIFICATE=client.get("VERIFY_WEBUI_CERTIFICATE", True),
+                    FORCE_SCHEME_FROM_HOST=True,
                 )
                 try:
                     await self.retry_qbt_operation(lambda: asyncio.to_thread(qbt_client.auth_log_in), "qBittorrent login")

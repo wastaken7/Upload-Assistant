@@ -5649,6 +5649,7 @@ def config_test_torrent_client():
                     "host": str(client_config.get("qbit_url", "")),
                     "port": str(client_config.get("qbit_port", "")),
                     "VERIFY_WEBUI_CERTIFICATE": verify_certificate,
+                    "FORCE_SCHEME_FROM_HOST": True,
                     "REQUESTS_ARGS": {"timeout": 10},
                 }
                 api_key = str(client_config.get("qbit_api_key", "")).strip()
