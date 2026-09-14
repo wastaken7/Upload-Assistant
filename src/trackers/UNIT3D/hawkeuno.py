@@ -113,11 +113,6 @@ class HawkeUno(UNIT3D):
     async def get_additional_checks(self, meta: Meta) -> bool:
         should_continue = True
 
-        # No WEBRIPs allowed
-        if meta.type == "WEBRIP":
-            logger.info(f"{self.tracker}: [bold red]WEB-RIP is not allowed, skipping upload.[/bold red]")
-            return False
-
         # Check language requirements
         if not meta.language_checked:
             await languages_manager.process_desc_language(meta, tracker=self.tracker)
@@ -132,7 +127,7 @@ class HawkeUno(UNIT3D):
             return False
 
         # Check if x265 or HEVC is used
-        if not meta.is_disc and meta.type in ["ENCODE", "DVDRIP", "HDTV"] and ("x265" in meta.video_encode or "HEVC" in meta.video_codec):
+        if not meta.is_disc and meta.type in ["ENCODE", "DVDRIP", "HDTV", "WEBRIP"] and ("x265" in meta.video_encode or "HEVC" in meta.video_codec):
             tracks = meta.mediainfo.get("media", {}).get("track", [])
             for track in tracks:
                 if track.get("@type") == "Video":
@@ -168,6 +163,9 @@ class HawkeUno(UNIT3D):
 
     def _normalize_upload_name(self, name: str, meta: Meta) -> str:
         normalized = name
+        if meta.type == "WEBRIP":
+            normalized = re.sub(r"\bWEB[ ._-]?RIP\b", "WEB-DL", normalized, flags=re.IGNORECASE)
+
         separator = "." if " " not in normalized and "." in normalized else " "
 
         if meta.type in {"WEBDL", "WEBRIP"} and not meta.service and not re.search(r"\bNADA\b", normalized, flags=re.IGNORECASE):

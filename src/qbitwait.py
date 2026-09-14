@@ -68,7 +68,7 @@ class Wait:
         if client.get("qbit_api_key"):
             api_key_value = client.get("qbit_api_key")
             api_key = str(api_key_value) if api_key_value is not None else None
-            qbt_client = qbittorrentapi.Client(host=host, port=port, api_key=api_key, VERIFY_WEBUI_CERTIFICATE=verify_cert)
+            qbt_client = qbittorrentapi.Client(host=host, port=port, api_key=api_key, VERIFY_WEBUI_CERTIFICATE=verify_cert, FORCE_SCHEME_FROM_HOST=True)
             try:
                 qbt_client.app_version()
                 return qbt_client
@@ -80,7 +80,14 @@ class Wait:
             username = str(username_value) if username_value is not None else None
             password = str(password_value) if password_value is not None else None
 
-            qbt_client = qbittorrentapi.Client(host=host, port=port, username=username, password=password, VERIFY_WEBUI_CERTIFICATE=verify_cert)
+            qbt_client = qbittorrentapi.Client(
+                host=host,
+                port=port,
+                username=username,
+                password=password,
+                VERIFY_WEBUI_CERTIFICATE=verify_cert,
+                FORCE_SCHEME_FROM_HOST=True,
+            )
 
             try:
                 qbt_client.auth_log_in()

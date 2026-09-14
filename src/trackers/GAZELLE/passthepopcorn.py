@@ -848,6 +848,22 @@ class PassThePopcorn:
         desc = re.sub(r"\[img=[^\]]+\]", "[img]", desc)
         return BBCODE().clamp_size_tags(desc)
 
+    def _description_images(self, meta: Meta) -> list[dict[str, Any]]:
+        if meta.skip_imghost_upload:
+            return []
+
+        screenshots = get_tracker_image_collection(meta, self.tracker, "screenshots")
+        if not meta.is_disc:
+            return cast(list[dict[str, Any]], screenshots)
+
+        menu_images = get_tracker_image_collection(meta, self.tracker, "menu_images")
+        return cast(list[dict[str, Any]], [*menu_images, *screenshots])
+
+    def _description_image_limit(self, meta: Meta, screenshot_limit: int) -> int:
+        if not meta.is_disc:
+            return screenshot_limit
+        return screenshot_limit + len(get_tracker_image_collection(meta, self.tracker, "menu_images"))
+
     async def edit_desc(self, meta: Meta) -> None:
         from src.description_review import get_base_description
 
@@ -866,8 +882,7 @@ class PassThePopcorn:
             multi_screens = 2
             logger.info(f"{self.tracker}: [yellow]requires at least 2 screenshots for multi disc/file content, overriding config")
 
-        image_list_value: Any = get_tracker_image_collection(meta, self.tracker, "screenshots") if not meta.skip_imghost_upload else []
-        image_list = cast(list[dict[str, Any]], image_list_value) if isinstance(image_list_value, list) else []
+        image_list = self._description_images(meta)
         images: list[dict[str, Any]] = image_list
 
         # Check for saved pack_image_links.json file
@@ -959,7 +974,7 @@ class PassThePopcorn:
                         desc.write("\n\n")
                 except Exception as e:
                     logger.warning(f"{self.tracker}: [yellow]Warning: Error setting tonemapped header: {e!s}[/yellow]")
-                for img_index in range(len(images[: meta.screens])):
+                for img_index in range(len(images[: self._description_image_limit(meta, meta.screens)])):
                     raw_url = str(image_list[img_index].get("raw_url", ""))
                     desc.write(f"[img]{raw_url}[/img]\n")
                 desc.write("\n")
@@ -971,7 +986,7 @@ class PassThePopcorn:
                 if base2ptp.strip() != "":
                     desc.write(base2ptp)
                     desc.write("\n\n")
-                for img_index in range(len(images[: meta.screens])):
+                for img_index in range(len(images[: self._description_image_limit(meta, meta.screens)])):
                     raw_url = image_list[img_index]["raw_url"]
                     desc.write(f"[img]{raw_url}[/img]\n")
                 desc.write("\n")
@@ -1057,7 +1072,7 @@ class PassThePopcorn:
                                 desc.write("\n\n")
                         except Exception as e:
                             logger.warning(f"{self.tracker}: [yellow]Warning: Error setting tonemapped header: {e!s}[/yellow]")
-                        for img_index in range(min(multi_screens, len(image_list))):
+                        for img_index in range(min(self._description_image_limit(meta, multi_screens), len(image_list))):
                             raw_url = str(image_list[img_index].get("raw_url", ""))
                             desc.write(f"[img]{raw_url}[/img]\n")
                         desc.write("\n")
@@ -1117,7 +1132,7 @@ class PassThePopcorn:
                         if base2ptp.strip() != "":
                             desc.write(base2ptp)
                             desc.write("\n\n")
-                        for img_index in range(min(multi_screens, len(image_list))):
+                        for img_index in range(min(self._description_image_limit(meta, multi_screens), len(image_list))):
                             raw_url = image_list[img_index]["raw_url"]
                             desc.write(f"[img]{raw_url}[/img]\n")
                         desc.write("\n")
@@ -1213,7 +1228,7 @@ class PassThePopcorn:
             except Exception as e:
                 logger.warning(f"{self.tracker}: [yellow]Warning: Error setting tonemapped header: {e!s}[/yellow]")
 
-            for img_index in range(len(images[: meta.screens])):
+            for img_index in range(len(images[: self._description_image_limit(meta, meta.screens)])):
                 raw_url = image_list[img_index]["raw_url"]
                 desc.write(f"[img]{raw_url}[/img]\n")
             desc.write("\n")
@@ -1239,7 +1254,7 @@ class PassThePopcorn:
                             desc.write("\n\n")
                     except Exception as e:
                         logger.warning(f"{self.tracker}: [yellow]Warning: Error setting tonemapped header: {e!s}[/yellow]")
-                    for img_index in range(min(multi_screens, len(image_list))):
+                    for img_index in range(min(self._description_image_limit(meta, multi_screens), len(image_list))):
                         raw_url = image_list[img_index]["raw_url"]
                         desc.write(f"[img]{raw_url}[/img]\n")
                     desc.write("\n")
