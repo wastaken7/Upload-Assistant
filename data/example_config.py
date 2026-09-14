@@ -2823,6 +2823,7 @@ config: dict[str, Any] = {
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
             "use_for_search": False,
             "api_key": "",
+            "anon": True,
             # Only block uploads when the existing release exactly matches files and size.
             "exact_match_only": False,
             # For authorized users only. Do not change this unless you know what you are doing
@@ -3139,6 +3140,7 @@ config: dict[str, Any] = {
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
             "use_for_search": False,
             "api_key": "",
+            "anon": True,
             # For authorized users only. Do not change this unless you know what you are doing
             # Upload as featured
             "featured": False,
