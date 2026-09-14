@@ -3,7 +3,8 @@ from __future__ import annotations
 import re
 import unicodedata
 from collections.abc import Awaitable, Callable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from dataclasses import field as dataclass_field
 from enum import StrEnum
 from typing import Any, Protocol
 
@@ -113,7 +114,7 @@ class NameRule:
 @dataclass(frozen=True)
 class TrackerNameProfile:
     rules: tuple[NameRule, ...]
-    overrides: Mapping[str, str] = field(default_factory=dict)
+    overrides: Mapping[str, str] = dataclass_field(default_factory=dict)
     transforms: tuple[NameTransform, ...] = ()
 
 
@@ -158,10 +159,6 @@ def spaces_to_dots(value: str, _context: NameContext) -> str:
 
 def dots_to_spaces(value: str, _context: NameContext) -> str:
     return value.replace(".", " ")
-
-
-def strip_name(value: str, _context: NameContext) -> str:
-    return value.strip()
 
 
 def strip_characters(characters: str) -> NameTransform:
