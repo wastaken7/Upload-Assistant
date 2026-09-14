@@ -1,8 +1,8 @@
-"""Release and integrity pins for Pesto."""
+"""Release and integrity pins for pesto."""
 
-VERSION = "pesto-v0.10.3"
+VERSION = "pesto-v0.10.4"
 REPOSITORY = "franzopl/pesto"
 SHA256_BY_ASSET = {
-    "pesto-linux-x86_64": "4eff75ade11b1f8e67c1347be3ed3a1b2e2c7ddc54ff65a3f8f1e1e9604b80b7",
-    "pesto-windows-x86_64.exe": "f3dfa8d91dbbbb7147ed76aef2a68c890160f809c113f08c18cdb3bd2337bdce",
+    "pesto-linux-x86_64": "99d78f64f7876f79a34ef252be66d672e3f0cfad150c33b8f65b79ef3d1007f8",
+    "pesto-windows-x86_64.exe": "dcca9067f0ff70a49cc65bba7b00738c2a76e65d64a8381fb815e761dbdd53c4",
 }
