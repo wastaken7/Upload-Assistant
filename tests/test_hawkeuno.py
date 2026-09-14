@@ -54,12 +54,42 @@ async def test_hawkeuno_respects_configured_screenshot_rows():
 
 
 @pytest.mark.asyncio
+async def test_hawkeuno_supplies_missing_web_service_and_release_group():
+    tracker = HawkeUno({"TRACKERS": {"HAWKEUNO": {}}})
+    meta = Meta(
+        type="WEBDL",
+        service=None,
+        tag=None,
+        name="Movie 2026 1080p WEB-DL DDP5.1 x265",
+        clean_name="Movie.2026.1080p.WEB-DL.DDP5.1.x265",
+    )
+
+    assert await tracker.get_name(meta) == {"name": "Movie 2026 1080p NADA WEB-DL DDP5.1 x265-NOGROUP"}
+    assert tracker._normalize_upload_name(meta.clean_name, meta) == "Movie.2026.1080p.NADA.WEB-DL.DDP5.1.x265-NOGROUP"
+
+
+@pytest.mark.asyncio
+async def test_hawkeuno_keeps_detected_service_and_group():
+    tracker = HawkeUno({"TRACKERS": {"HAWKEUNO": {}}})
+    meta = Meta(
+        type="WEBDL",
+        service="AMZN",
+        tag="-GROUP",
+        name="Movie 2026 1080p AMZN WEB-DL DDP5.1 x265-GROUP",
+    )
+
+    assert await tracker.get_name(meta) == {"name": meta.name}
+
+
+@pytest.mark.asyncio
 async def test_hawkeuno_accepts_webrip_as_encode_and_uses_webdl_name():
     tracker = HawkeUno({"TRACKERS": {"HAWKEUNO": {}}})
     meta = Meta(
         type="WEBRIP",
-        name="Movie 2026 1080p WEBRip x265-GROUP",
-        clean_name="Movie.2026.1080p.WEBRip.x265-GROUP",
+        service="AMZN",
+        tag="-GROUP",
+        name="Movie 2026 1080p AMZN WEBRip x265-GROUP",
+        clean_name="Movie.2026.1080p.AMZN.WEBRip.x265-GROUP",
         language_checked=True,
         audio_languages=["English"],
         valid_mi_settings=True,
@@ -67,8 +97,8 @@ async def test_hawkeuno_accepts_webrip_as_encode_and_uses_webdl_name():
 
     assert await tracker.get_additional_checks(meta)
     assert await tracker.get_type_id(meta) == {"type_id": "15"}
-    assert await tracker.get_name(meta) == {"name": "Movie 2026 1080p WEB-DL x265-GROUP"}
-    assert tracker._normalize_upload_name(meta.clean_name, meta) == "Movie.2026.1080p.WEB-DL.x265-GROUP"
+    assert await tracker.get_name(meta) == {"name": "Movie 2026 1080p AMZN WEB-DL x265-GROUP"}
+    assert tracker._normalize_upload_name(meta.clean_name, meta) == "Movie.2026.1080p.AMZN.WEB-DL.x265-GROUP"
 
 
 async def _noop():

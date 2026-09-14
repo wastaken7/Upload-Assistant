@@ -162,9 +162,19 @@ class HawkeUno(UNIT3D):
         return should_continue
 
     def _normalize_upload_name(self, name: str, meta: Meta) -> str:
+        normalized = name
         if meta.type == "WEBRIP":
-            return re.sub(r"\bWEB[ ._-]?RIP\b", "WEB-DL", name, flags=re.IGNORECASE)
-        return name
+            normalized = re.sub(r"\bWEB[ ._-]?RIP\b", "WEB-DL", normalized, flags=re.IGNORECASE)
+
+        separator = "." if " " not in normalized and "." in normalized else " "
+
+        if meta.type in {"WEBDL", "WEBRIP"} and not meta.service and not re.search(r"\bNADA\b", normalized, flags=re.IGNORECASE):
+            normalized = re.sub(r"\b(WEB(?:[ ._-]?DL|[ ._-]?RIP))\b", rf"NADA{separator}\1", normalized, count=1, flags=re.IGNORECASE)
+
+        if not str(meta.tag or "").strip("- ") and not re.search(r"-NOGROUP$", normalized, flags=re.IGNORECASE):
+            normalized = f"{normalized}-NOGROUP"
+
+        return normalized
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
         name = self._normalize_upload_name(meta.name, meta)
