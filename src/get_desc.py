@@ -75,6 +75,26 @@ def _safe_game_field(value: Any) -> str:
     return " ".join(text.replace("[", "").replace("]", "").split())
 
 
+def _clean_description_text(value: Any) -> str:
+    """Remove serialization escapes that may be returned in synopsis text."""
+    text = str(value or "").strip()
+
+    # Some providers return the complete synopsis as a JSON string literal.
+    if len(text) >= 2 and text[0] == text[-1] == '"':
+        try:
+            decoded = json.loads(text)
+        except json.JSONDecodeError, TypeError:
+            pass
+        else:
+            if isinstance(decoded, str):
+                text = decoded.strip()
+
+    text = html.unescape(text)
+
+    # Handle partially escaped payloads as well (for example, ``\\"text\\"``).
+    return text.replace(r"\"", '"').replace(r"\/", "/")
+
+
 def _safe_game_url(value: Any) -> str:
     url = str(value or "").strip()
     parsed = urllib.parse.urlparse(url)
@@ -425,6 +445,8 @@ class DescriptionBuilder:
                 episode_tmdb_data = meta.episode_tmdb_data
                 title = episode_tmdb_data.get("name", "")
                 overview = episode_tmdb_data.get("overview", "")
+                if overview:
+                    overview = _clean_description_text(html_to_bbcode(str(overview)))
                 return title, overview
 
             tvmaze_episode_data = meta.tvmaze_episode_data
@@ -437,6 +459,7 @@ class DescriptionBuilder:
             # Convert HTML tags to BBCode
             if overview:
                 overview = html_to_bbcode(overview)
+                overview = _clean_description_text(overview)
 
             episode_name = tvmaze_episode_data.get("episode_name", "")
             episode_title = meta.auto_episode_title or (episode_name if (not episode_name.lower().startswith("episode") and "tba" not in episode_name.lower()) else "")
@@ -802,6 +825,7 @@ class DescriptionBuilder:
         if overview:
             overview = html_to_bbcode(overview)
             overview = re.sub(r"<[^>]+>", "", overview).strip()
+            overview = _clean_description_text(overview)
 
         # Collect key-value pairs
         fields: list[tuple[str, str]] = []
@@ -1021,6 +1045,7 @@ class DescriptionBuilder:
         if overview:
             overview = html_to_bbcode(str(overview))
             overview = re.sub(r"<[^>]+>", "", overview).strip()
+            overview = _clean_description_text(overview)
 
         if overview:
             overview_text = f"\n{header}{str_overview}{header_end}\n{overview}\n"

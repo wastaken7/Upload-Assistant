@@ -1,4 +1,4 @@
-from src.get_desc import DescriptionBuilder, _safe_game_field
+from src.get_desc import DescriptionBuilder, _clean_description_text, _safe_game_field
 from src.meta import Meta
 
 
@@ -81,3 +81,30 @@ def test_safe_game_field_strips_html_after_decoding_entities():
     value = "&lt;img src=x onerror=alert(1)&gt;Safe"
 
     assert _safe_game_field(value) == "Safe"  # noqa: S101
+
+
+def test_clean_description_text_removes_serialization_escapes():
+    value = r'\"It did not take long to make this journey.\" Extracted from the book \/My formation\/'
+
+    assert _clean_description_text(value) == '"It did not take long to make this journey." Extracted from the book /My formation/'  # noqa: S101
+
+
+def test_clean_description_text_decodes_json_string_literals():
+    value = '"A description with \\"quotes\\" and a \\/slash"'
+
+    assert _clean_description_text(value) == 'A description with "quotes" and a /slash'  # noqa: S101
+
+
+def test_clean_description_text_preserves_entity_encoded_quotes():
+    value = '&quot;The title&quot; is shown in the overview.'
+
+    assert _clean_description_text(value) == '"The title" is shown in the overview.'  # noqa: S101
+
+
+def test_game_description_cleans_escaped_overview():
+    meta = Meta(category="GAME", overview=r'\"A story \/with quotes\"')
+
+    description = _builder()._build_game_desc_section(meta)
+
+    assert '"A story /with quotes"' in description  # noqa: S101
+    assert r'\"' not in description  # noqa: S101
