@@ -36,6 +36,30 @@ class TVChaosUK(StringTrackerNameMixin):
 
     auth_type = "other_api"
     tracker = "TVCHAOSUK"
+    COUNTRY_CODES: ClassVar[dict[str, str]] = {
+        "AT": "AUT",
+        "AU": "AUS",
+        "BE": "BEL",
+        "CA": "CAN",
+        "CH": "CHE",
+        "CZ": "CZE",
+        "DE": "GER",
+        "DK": "DNK",
+        "EE": "EST",
+        "ES": "SPA",
+        "FI": "FIN",
+        "FR": "FRA",
+        "IE": "IRL",
+        "IS": "ISL",
+        "IT": "ITA",
+        "NL": "NLD",
+        "NO": "NOR",
+        "NZ": "NZL",
+        "PL": "POL",
+        "PT": "POR",
+        "RU": "RUS",
+        "SE": "SWE",
+    }
     name_profile = TrackerNameProfile(rules=(NameRule(NameSelector(), template("title_part", "episode_part", "media_part", "country_part")),))
 
     async def get_name_overrides(self, context: NameContext) -> dict[str, str]:
@@ -80,31 +104,7 @@ class TVChaosUK(StringTrackerNameMixin):
                 episode_part = f"{meta.season}{meta.episode}{date}"
         else:
             raise ValueError(f"Unsupported category for TVCHAOSUK: {meta.category}")
-        country_map = {
-            "AT": "AUT",
-            "AU": "AUS",
-            "BE": "BEL",
-            "CA": "CAN",
-            "CH": "CHE",
-            "CZ": "CZE",
-            "DE": "GER",
-            "DK": "DNK",
-            "EE": "EST",
-            "ES": "SPA",
-            "FI": "FIN",
-            "FR": "FRA",
-            "IE": "IRL",
-            "IS": "ISL",
-            "IT": "ITA",
-            "NL": "NLD",
-            "NO": "NOR",
-            "NZ": "NZL",
-            "PL": "POL",
-            "PT": "POR",
-            "RU": "RUS",
-            "SE": "SWE",
-        }
-        country = next((country_map[code] for code in meta.origin_country_code or [] if code in country_map), "")
+        country = next((self.COUNTRY_CODES[code] for code in meta.origin_country_code or [] if code in self.COUNTRY_CODES), "")
         return {"title_part": title_part, "episode_part": episode_part, "media_part": media_part, "country_part": f"[{country}]" if country else ""}
 
     display_name = "TV Chaos UK"
@@ -465,50 +465,6 @@ class TVChaosUK(StringTrackerNameMixin):
                 resolution, "SD"
             )
         return resolution_id
-
-    async def append_country_code(self, meta: Meta, name: str) -> str:
-        """
-        Append ISO country code suffix to release name based on origin_country_code.
-
-        Args:
-            meta (dict): Metadata containing 'origin_country_code' list.
-            name (str): Base release name.
-
-        Returns:
-            str: Release name with appended country code (e.g. "Show Title [IRL]").
-        """
-        country_map = {
-            "AT": "AUT",
-            "AU": "AUS",
-            "BE": "BEL",
-            "CA": "CAN",
-            "CH": "CHE",
-            "CZ": "CZE",
-            "DE": "GER",
-            "DK": "DNK",
-            "EE": "EST",
-            "ES": "SPA",
-            "FI": "FIN",
-            "FR": "FRA",
-            "IE": "IRL",
-            "IS": "ISL",
-            "IT": "ITA",
-            "NL": "NLD",
-            "NO": "NOR",
-            "NZ": "NZL",
-            "PL": "POL",
-            "PT": "POR",
-            "RU": "RUS",
-            "SE": "SWE",
-        }
-
-        if meta.origin_country_code:
-            for code in meta.origin_country_code:
-                if code in country_map:
-                    name += f" [{country_map[code]}]"
-                    break  # append only the first match
-
-        return name
 
     async def read_file(self, path: str, encoding: str = "utf-8") -> str:
         """

@@ -104,9 +104,10 @@ def remove_aka_and_sanitize(name: str, context: NameContext) -> str:
 def polish_original_title(name: str, context: NameContext) -> str:
     meta = context.meta
     imdb_info = getattr(meta, "imdb_info", {})
-    if getattr(meta, "original_language", "") == "pl" and imdb_info:
+    imdb_aka = str(imdb_info.get("aka") or "")
+    if getattr(meta, "original_language", "") == "pl" and imdb_aka:
         name = name.replace(context.values.get("alt_title", ""), "")
-        name = name.replace(context.values.get("title", ""), str(imdb_info.get("aka", "")))
+        name = name.replace(context.values.get("title", ""), imdb_aka)
     return name.strip()
 
 
@@ -781,7 +782,9 @@ def hdbits_name_transform(name: str, context: NameContext) -> str:
     name = name.replace(context.values.get("alt_title", ""), "")
     imdb_info = getattr(meta, "imdb_info", {})
     if imdb_info:
-        name = name.replace(context.values.get("title", ""), str(imdb_info["aka"]))
+        imdb_aka = str(imdb_info.get("aka") or "")
+        if imdb_aka:
+            name = name.replace(context.values.get("title", ""), imdb_aka)
         meta_year = str(getattr(meta, "year", "")) if getattr(meta, "year", None) is not None else ""
         imdb_year = str(imdb_info.get("year", meta_year))
         if meta_year and meta_year != imdb_year:

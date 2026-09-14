@@ -24,6 +24,9 @@ class TheOldSchool(UNIT3D):
 
     async def get_name_overrides(self, context: NameContext) -> dict[str, str]:
         meta = context.meta
+        return {"oldschool_source": meta.scene_name if meta.scene else meta.basename_no_ext}
+
+    async def upload(self, meta: Meta) -> bool | None:
         if meta.keep_nfo:
             tracker_config = self.config["TRACKERS"].get(self.tracker, {})
             tracker_url = str(tracker_config.get("announce_url", "https://fake.tracker")).strip()
@@ -34,7 +37,7 @@ class TheOldSchool(UNIT3D):
             if cooldown > 0:
                 await asyncio.sleep(cooldown)
             await TorrentCreator.create_torrent(meta, str(meta.path), f"[{self.tracker}]", tracker_url=tracker_url)
-        return {"oldschool_source": meta.scene_name if meta.scene else meta.basename_no_ext}
+        return await super().upload(meta)
 
     display_name = "The Old School"
     source_flag = "TheOldSchool"

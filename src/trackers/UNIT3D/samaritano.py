@@ -24,6 +24,8 @@ class Samaritano(UNIT3D):
     async def get_name_overrides(self, context: NameContext) -> dict[str, str]:
         capybara = CapybaraBR(self.config)
         capybara.tracker = self.tracker
+        capybara.rebuild_dvdrip_name = self.rebuild_dvdrip_name
+        capybara.use_bioma_tag = self.use_bioma_tag
         return await capybara.get_name_overrides(context)
 
     display_name = "Samaritano"

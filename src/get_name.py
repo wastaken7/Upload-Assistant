@@ -472,7 +472,7 @@ class NameManager:
                 edition = f"{edition} Edition"
             language = meta.book_language.strip() or meta.book_language_iso.strip()
             language = "" if language.lower() in ("english", "eng", "en") else language.upper().replace("I", "i")
-            source = meta.source or "".strip().upper()
+            source = (meta.source or "").strip().upper()
             manual_source = str(meta.manual_source or "").strip().upper()
             if manual_source in ("RETAIL", "SCAN", "HYBRID"):
                 source = manual_source
@@ -498,7 +498,7 @@ class NameManager:
             return {
                 "author": author,
                 "author_or_publisher": author or publisher,
-                "dash": "-",
+                "dash": "-" if (author if meta.audiobook else author or publisher) else "",
                 "title": meta.title.strip(),
                 "book_series": f"{meta.book_series.strip()}:" if meta.book_series else "",
                 "book_series_index": meta.book_series_index,
@@ -549,9 +549,10 @@ class NameManager:
             codec = self._music_codec(first.get("codec") or first.get("format") or meta.format or meta.type)
             depth = first.get("bit_depth") or self._music_release_field(release, "nfo_bit_depth")
             rate = first.get("sample_rate") or self._music_release_field(release, "nfo_sample_rate")
+            artist = str(self._music_release_field(release, "artist", meta.artist))
             return {
-                "artist": str(self._music_release_field(release, "artist", meta.artist)),
-                "dash": "-",
+                "artist": artist,
+                "dash": "-" if artist else "",
                 "title": str(self._music_release_field(release, "album", meta.title)),
                 "year": str(self._music_release_field(release, "release_year", self._music_release_field(release, "year", meta.year))),
                 "music_source": self._music_source(self._music_release_field(release, "media", meta.source)),

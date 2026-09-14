@@ -117,6 +117,7 @@ class Zenith(UNIT3D):
             return {
                 "book_author": author,
                 "book_dash": "-" if author and title else "",
+                "book_series": "",
                 "book_title": title,
                 "book_year": f"({year})" if year else "",
                 "book_language": language,

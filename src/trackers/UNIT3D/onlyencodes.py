@@ -25,9 +25,8 @@ class OnlyEncodes(UNIT3D):
 
     async def get_name_overrides(self, context: NameContext) -> dict[str, str]:
         meta = context.meta
-        if not meta.audio_languages:
+        if not meta.language_checked:
             await languages_manager.process_desc_language(meta, tracker=self.tracker)
-            return {}
         languages = cast(list[str], meta.audio_languages) if isinstance(meta.audio_languages, list) else []
         if languages and not await languages_manager.has_english_language(languages):
             return {"foreign_language": str(languages[0]).upper()}

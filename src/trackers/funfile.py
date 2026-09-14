@@ -13,7 +13,7 @@ from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder
 from src.languages import languages_manager
 from src.meta import Meta
-from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, replace_text, template
+from src.release_name import NameContext, NameRule, NameSelector, TrackerNameProfile, template
 from src.trackers.naming import StringTrackerNameMixin
 
 
@@ -24,16 +24,13 @@ class FunFile(StringTrackerNameMixin):
 
     auth_type = "cookies"
     tracker = "FUNFILE"
-    name_profile = TrackerNameProfile(
-        rules=(NameRule(NameSelector(), template("funfile_source")),),
-        transforms=(replace_text((" ", ".")),),
-    )
+    name_profile = TrackerNameProfile(rules=(NameRule(NameSelector(), template("funfile_source")),))
 
     async def get_name_overrides(self, context: NameContext) -> dict[str, str]:
         meta = context.meta
         if meta.scene:
-            return {"funfile_source": meta.scene_name or meta.basename_no_ext}
-        return {"funfile_source": meta.clean_name}
+            return {"funfile_source": meta.scene_name or meta.basename_no_ext.replace(" ", ".")}
+        return {"funfile_source": meta.clean_name.replace(" ", ".")}
 
     display_name = "FunFile"
     banned_groups: tuple[str, ...] = ()
