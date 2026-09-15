@@ -214,6 +214,7 @@ Sequence Usenet and torrent tracker uploads while limiting contention with qBitt
 | <img src="web_ui/static/img/trackers/curupira.png" width="16" height="16" />    | Curupira    | CURUPIRA    | MOVIE, TV, BOOK, GAME        |
 | <img src="web_ui/static/img/trackers/drunkenslug.png" width="16" height="16" /> | DrunkenSlug | DRUNKENSLUG | MOVIE, TV, BOOK, GAME        |
 | <img src="web_ui/static/img/trackers/nzbgeek.png" width="16" height="16" />     | NZBGeek     | NZBGEEK     | MOVIE, TV, BOOK, GAME, MUSIC |
+| <img src="web_ui/static/img/trackers/nzbnest.svg" width="16" height="16" />     | NzbNest     | NZBNEST     | MOVIE, TV, BOOK, GAME, MUSIC |
 
 </details>
 
