@@ -40,23 +40,6 @@ class TrackerStatusManager:
         await AvistaZNetworkRouter(self.config, tracker_class_map).apply(meta)
         helper: Any = UploadHelper(self.config)
         dupe_checker = DupeChecker(self.config)
-        if any(
-            tracker in meta.trackers
-            for tracker in [
-                "1PTBA",
-                "LAJIDUI",
-                "LEMONHD",
-                "LONGPT",
-                "MTEAM",
-                "PTCAFE",
-                "PTFANS",
-                "PTGTK",
-                "PTZONE",
-                "RAILGUNPT",
-                "XINGYUNGEPT",
-            ]
-        ):
-            meta.douban_id = await get_douban_id(meta)
         meta_lock = asyncio.Lock()
         status_map = meta.tracker_status
         for tracker in meta.trackers:
@@ -86,12 +69,32 @@ class TrackerStatusManager:
                     if imdb_id.startswith("tt") and imdb_id[2:].isdigit():
                         meta["imdb_id"] = int(imdb_id[2:])
                         meta["imdb"] = imdb_id[2:].zfill(7)
+                        meta["imdb_tt"] = imdb_id
                         meta["imdb_info"] = await imdb_manager.get_imdb_info_api(
                             meta["imdb_id"],
                             manual_language=meta.get("manual_language"),
                         )
                         break
                     cli_ui.error("Invalid IMDB ID format. Expected format: tt1234567")
+
+        if any(
+            tracker in meta.trackers
+            for tracker in [
+                "1PTBA",
+                "LAJIDUI",
+                "LEMONHD",
+                "LONGPT",
+                "MTEAM",
+                "PTCAFE",
+                "PTERCLUB",
+                "PTFANS",
+                "PTGTK",
+                "PTZONE",
+                "RAILGUNPT",
+                "XINGYUNGEPT",
+            ]
+        ):
+            meta.douban_id = await get_douban_id(meta)
 
         async def process_single_tracker(tracker_name: str, shared_meta: Meta) -> tuple[str, dict[str, bool], str | None, Any]:
             local_meta = copy.deepcopy(shared_meta)  # Ensure each task gets its own copy of meta

@@ -71,9 +71,7 @@ def optimize_images(image: str | Path, config: dict[str, Any]) -> None:
     return
 
 
-def vs_screengn(
-    source: str, encode: str | None = None, num: int = 5, dir: str = ".", config: dict[str, Any] | None = None, overlays_enabled: bool = True
-) -> None:
+def vs_screengn(source: str, encode: str | None = None, num: int = 5, dir: str = ".", config: dict[str, Any] | None = None, overlays_enabled: bool = True) -> None:
     if config is None:
         config = {"optimize_images": True}  # Default configuration
 

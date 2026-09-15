@@ -46,7 +46,7 @@ def overlay_text_size(defaults: Mapping[str, Any]) -> int:
     """Return the bounded text size shared by FFmpeg and VapourSynth."""
     try:
         text_size = int(defaults.get("overlay_text_size", 18))
-    except (OverflowError, TypeError, ValueError):
+    except OverflowError, TypeError, ValueError:
         text_size = 18
     return max(1, min(text_size, 100))
 
@@ -60,9 +60,7 @@ def format_timestamp(seconds: float) -> str:
     return f"{hours:02d}:{minutes:02d}:{seconds:02d}.{milliseconds:03d}"
 
 
-def overlay_lines(
-    options: Mapping[str, bool], frame_number: int, frame_type: str, timestamp: str, tonemapped: bool, *, layout: str = "stacked"
-) -> list[str]:
+def overlay_lines(options: Mapping[str, bool], frame_number: int, frame_type: str, timestamp: str, tonemapped: bool, *, layout: str = "stacked") -> list[str]:
     """Build only enabled labels, with the conditional tone-mapping label last."""
     if layout == "single_line":
         candidates = (
