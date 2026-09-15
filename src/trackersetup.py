@@ -1476,7 +1476,7 @@ tracker_class_map: Any = LazyTrackerDict(
         "PORTUGAS": ("src.trackers.UNIT3D.portugas", "Portugas"),
         "PRIVATEHD": ("src.trackers.AVISTAZ.privatehd", "PrivateHD"),
         "PTCAFE": ("src.trackers.NEXUSPHP.ptcafe", "PTCafe"),
-        "PTERCLUB": ("src.trackers.pterclub", "PTerClub"),
+        "PTERCLUB": ("src.trackers.NEXUSPHP.pterclub", "PTerClub"),
         "PTFANS": ("src.trackers.NEXUSPHP.ptfans", "PTFans"),
         "PTGTK": ("src.trackers.NEXUSPHP.ptgtk", "PTGTK"),
         "PTSKIT": ("src.trackers.NEXUSPHP.ptskit", "Ptskit"),

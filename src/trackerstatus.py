@@ -49,6 +49,7 @@ class TrackerStatusManager:
                 "LONGPT",
                 "MTEAM",
                 "PTCAFE",
+                "PTERCLUB",
                 "PTFANS",
                 "PTGTK",
                 "PTZONE",

@@ -23,7 +23,7 @@ def _remove_last(name: str, token: str) -> str:
     end = start + len(token)
     if name[end : end + 1] == " ":
         return name[:start] + name[end + 1 :]
-    return name[:max(0, start - 1)] + name[end:]
+    return name[: max(0, start - 1)] + name[end:]
 
 
 def _insert_before_last(name: str, token: str, prefix: str) -> str:
@@ -132,11 +132,7 @@ class DreadVault(UNIT3D):
 
         if not meta.language_checked:
             await languages_manager.process_desc_language(meta, tracker=self.tracker)
-        audio_languages: list[str] = [
-            language
-            for language in meta.audio_languages or []
-            if language.lower() not in {"no", "undetermined"}
-        ]
+        audio_languages: list[str] = [language for language in meta.audio_languages or [] if language.lower() not in {"no", "undetermined"}]
         if audio_languages and not await languages_manager.has_english_language(audio_languages):
             foreign_lang = audio_languages[0].upper()
             dvd_remux = name_type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD")

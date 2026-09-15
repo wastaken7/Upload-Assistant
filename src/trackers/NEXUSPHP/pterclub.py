@@ -156,6 +156,45 @@ class PTerClub:
         for area in area_map:
             if area in regions:
                 return area_map[area]
+
+        country_codes = [str(code).upper() for code in meta.origin_country if isinstance(code, str)]
+        country_codes.extend(str(country.get("iso_3166_1", "")).upper() for country in meta.production_countries if isinstance(country, dict) and country.get("iso_3166_1"))
+        country_map = {
+            "CN": 1,
+            "HK": 2,
+            "TW": 3,
+            "KR": 5,
+            "JP": 6,
+            "IN": 7,
+        }
+        western_countries = {
+            "AT",
+            "AU",
+            "BE",
+            "CA",
+            "CH",
+            "DE",
+            "DK",
+            "ES",
+            "FI",
+            "FR",
+            "GB",
+            "IE",
+            "IS",
+            "IT",
+            "LU",
+            "NL",
+            "NO",
+            "NZ",
+            "PT",
+            "SE",
+            "US",
+        }
+        for country_code in country_codes:
+            if country_code in country_map:
+                return country_map[country_code]
+            if country_code in western_countries:
+                return 4
         return area_id
 
     async def get_type_medium_id(self, meta: Meta) -> str:
@@ -241,8 +280,8 @@ class PTerClub:
             if len(images) > 0:
                 parts.append("[center]")
                 for each in range(len(images[: meta.screens])):
-                    web_url = images[each]["web_url"]
-                    img_url = images[each]["img_url"]
+                    img_url = images[each].get("raw_url") or images[each].get("img_url", "")
+                    web_url = images[each].get("web_url") or img_url
                     parts.append(f"[url={web_url}][img]{img_url}[/img][/url]")
                 parts.append("[/center]")
 
@@ -378,6 +417,29 @@ class PTerClub:
                     return "yes"
         return None
 
+    def get_small_description(self, meta: Meta) -> str:
+        """Build PTer's optional Chinese subtitle without emitting empty PTGen labels."""
+        ptgen = meta.ptgen if isinstance(meta.ptgen, dict) else {}
+        trans_title_value = ptgen.get("trans_title", [])
+        trans_titles = [str(title).strip() for title in trans_title_value if str(title).strip()] if isinstance(trans_title_value, list) else []
+        if not trans_titles:
+            return str(meta.title)
+
+        small_descr = " / ".join(trans_titles)
+        genres_value = ptgen.get("genre", [])
+        genres = [str(genre).strip() for genre in genres_value if str(genre).strip()] if isinstance(genres_value, list) else []
+        if genres:
+            small_descr += f" | 类别:{genres[0]}"
+        return small_descr
+
+    @staticmethod
+    def get_imdb_url(meta: Meta) -> str:
+        return f"https://www.imdb.com/title/{meta.imdb_tt}/" if meta.imdb_tt else ""
+
+    @staticmethod
+    def get_douban_url(meta: Meta) -> str:
+        return f"https://movie.douban.com/subject/{meta.douban_id}/" if meta.douban_id else ""
+
     async def upload(self, meta: Meta) -> bool:
 
         common = Common(config=self.config)
@@ -406,29 +468,20 @@ class PTerClub:
             "file": (f"{torrent_file_name}.torrent", torrent_bytes, "application/x-bittorent"),
         }
 
-        # use chinese small_descr
-        ptgen = meta.ptgen
-        trans_title = cast(list[str], ptgen.get("trans_title", []))
-        genres = cast(list[str], ptgen.get("genre", []))
-        if trans_title != [""]:
-            small_descr = ""
-            for title_ in trans_title:
-                small_descr += f"{title_} / "
-            genre_value = genres[0] if genres else ""
-            small_descr += "| 类别:" + genre_value
-            small_descr = small_descr.replace("/ |", "|")
-        else:
-            small_descr = meta.title
         data: dict[str, Any] = {
             "name": pter_name,
-            "small_descr": small_descr,
+            "small_descr": self.get_small_description(meta),
+            "url": self.get_imdb_url(meta),
+            "douban": self.get_douban_url(meta),
             "descr": pter_desc,
             "type": await self.get_type_category_id(meta),
             "source_sel": await self.get_type_medium_id(meta),
             "team_sel": await self.get_area_id(meta),
-            "uplver": anon,
-            "zhongzi": await self.is_zhongzi(meta),
         }
+        if anon == "yes":
+            data["uplver"] = "yes"
+        if await self.is_zhongzi(meta) == "yes":
+            data["zhongzi"] = "yes"
         if meta.personalrelease is True:
             data["pr"] = "yes"
 

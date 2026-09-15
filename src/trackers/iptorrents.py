@@ -11,8 +11,8 @@ from src.console import logger
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
-from src.trackers.naming import add_incomplete_pack_marker
 from src.torrent_manifest import TorrentManifest
+from src.trackers.naming import add_incomplete_pack_marker
 
 Config = dict[str, Any]
 
