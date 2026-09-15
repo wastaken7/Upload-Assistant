@@ -538,7 +538,7 @@ config: dict[str, Any] = {
         #   BRASILTRACKER, BROADCASTHENET, CAPYBARABR, CATHODERAYTUBE, CINEMATIK, CINEMAZ, CURUPIRA, DARKPEERS, DESITORRENTS, DIGITALCORE,
         #   DREADVAULT, DRUNKENSLUG, EMUWAREZ, FILELIST, FLOOD, FUNFILE, GREATPOSTERWALL, HAWKEUNO, HDBITS, HDSPACE, HDTORRENTS, HOMIEHELPDESK,
         #   IMMORTALSEED, INFINITYHD, IPTORRENTS, ITATORRENTS, LAJIDUI, LASTDIGITALUNDERGROUND, LATTEAM, LEMONHD, LOCADORA, LONGPT, LST,
-        #   LUMINARR, MAKINGOFF, MIDNIGHTSCENE, MTEAM, NEBULANCE, NORDICQUALITY, NZBGEEK, OLDTOONSWORLD, ONLYENCODES, ORPHEUS, PASSTHEPOPCORN,
+        #   LUMINARR, MAKINGOFF, MIDNIGHTSCENE, MTEAM, NEBULANCE, NORDICQUALITY, NZBGEEK, NZBNEST, OLDTOONSWORLD, ONLYENCODES, ORPHEUS, PASSTHEPOPCORN,
         #   PEERGARDEN, POLISHTORRENT, PORTUGAS, PRIVATEHD, PTCAFE, PTERCLUB, PTFANS, PTGTK, PTSKIT, PTZONE, RACING4EVERYONE, RAILGUNPT,
         #   RASTASTUGAN, REELFLIX, RETROFLIX, RETROMOVIESCLUB, ROCKETHD, SAMARITANO, SEEDPOOL, SHAREISLAND, SKIPTHECOMMERCIALS, SPEEDAPP,
         #   SUIO, SWARMAZON, THELEACHZONE, THEOLDSCHOOL, TORRENTEROS, TORRENTHR, TORRENTLEECH, TOTHEGLORY, TVCHAOSUK, ULCX, UTOPIA,
@@ -2123,6 +2123,16 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "NZBGEEK": {
+            "api_key": "",
+            # Maximum number of API hits the script may make within 24 hours for duplicate search.
+            # Set to 0 to disable duplicate search via API.
+            "daily_api_hit_limit": 0,
+            # Only block uploads when the existing release exactly matches files.
+            "exact_match_only": False,
+            "inject_delay": 0,
+        },
+        "NZBNEST": {
+            # NzbNest API key
             "api_key": "",
             # Maximum number of API hits the script may make within 24 hours for duplicate search.
             # Set to 0 to disable duplicate search via API.
