@@ -1,4 +1,6 @@
 # ruff: noqa: S101
+import io
+import json
 import subprocess
 import sys
 import time
@@ -6,6 +8,58 @@ import time
 import pytest
 
 import web_ui.server as server
+
+
+@pytest.mark.parametrize(
+    "output, expected_type",
+    [("Status: gathering metadata\n", None), ("Upload? checking eligibility\n", None), ("Enter a title: ", "text"), ("> ", "text"), ("Continue? (y/N)", "yes_no")],
+)
+def test_prompt_state_changes_only_when_output_flushes(output, expected_type, tmp_path, monkeypatch) -> None:
+    """Keep partial log lines inactive and publish real prompts on the idle path."""
+    class WaitingProcess:
+        stdin = io.StringIO()
+        stdout = io.StringIO(output)
+        stderr = io.StringIO()
+
+        def poll(self):
+            return None
+
+    process = WaitingProcess()
+    session_id = "flush-state-test"
+    monkeypatch.setattr(server, "_is_authenticated", lambda: True)
+    monkeypatch.setattr(server, "_verify_csrf_header", lambda: True)
+    monkeypatch.setattr(server, "_resolve_user_path", lambda *_args, **_kwargs: str(tmp_path))
+    monkeypatch.setattr(server, "_assert_safe_resolved_path", lambda _: None)
+    monkeypatch.setattr(server, "_validate_upload_assistant_args", lambda args: args)
+    monkeypatch.setattr(server, "_spawn_webui_upload_process", lambda *_args: (process, "subprocess"))
+    monkeypatch.setattr(server, "_terminate_process_tree", lambda _process: True)
+    original_flush = server._should_flush_subprocess_output
+    states_before_flush = []
+
+    def observe_flush(buffer, char, *, idle=False):
+        states_before_flush.append(server.active_processes[session_id]["awaiting_input"])
+        return original_flush(buffer, char, idle=idle)
+
+    monkeypatch.setattr(server, "_should_flush_subprocess_output", observe_flush)
+    response = server.app.test_client().post("/api/execute", json={"path": str(tmp_path), "session_id": session_id}, buffered=False)
+    try:
+        assert response.status_code == 200
+        deadline = time.monotonic() + 5
+        for chunk in response.response:
+            assert time.monotonic() < deadline, "Output never reached the browser"
+            event = json.loads(chunk.decode().removeprefix("data: "))
+            if event["type"] == "html":
+                break
+        else:
+            pytest.fail("No HTML output received")
+        assert states_before_flush and not any(states_before_flush)
+        state = server.active_processes[session_id]
+        assert state["awaiting_input"] is (expected_type is not None)
+        if expected_type is not None:
+            assert state["input_type"] == expected_type
+    finally:
+        response.close()
+        server.active_processes.pop(session_id, None)
 
 
 def test_subprocess_yes_no_prompt_is_classified_for_dedicated_buttons() -> None:

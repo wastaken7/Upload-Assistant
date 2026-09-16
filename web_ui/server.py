@@ -6808,8 +6808,6 @@ def execute_command():
                                 buffers[output_type] = ""
                             buffers[output_type] += char
                             prompt_type = _subprocess_prompt_type(buffers[output_type], previous_prompt_type)
-                            if prompt_type:
-                                _set_process_awaiting_input_if_current(session_id, process_state, True, prompt_type)
 
                             if not _should_flush_subprocess_output(buffers[output_type], char):
                                 continue
@@ -6827,7 +6825,9 @@ def execute_command():
                             buffers[output_type] = ""
                             yield f"data: {json.dumps({'type': 'prompt_sound'})}\n\n"
                             continue
-                        if not prompt_type:
+                        if prompt_type:
+                            _set_process_awaiting_input_if_current(session_id, process_state, True, prompt_type)
+                        else:
                             _set_process_awaiting_input_if_current(session_id, process_state, False)
                         chunk = buffers[output_type]
                         buffers[output_type] = ""
