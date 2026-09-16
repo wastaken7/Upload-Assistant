@@ -399,6 +399,7 @@ class Zenith(UNIT3D):
             "MISC": "9",
             "GAME": "3",
             "MUSIC": "5",
+            "SOFTWARE": "8",
         }
         if mapping_only:
             return category_id
@@ -428,6 +429,10 @@ class Zenith(UNIT3D):
             "EPUB": "9",
             "M4B": "10",
             "PDF": "19",
+            "EDUCATIONAL": "15",
+            "LIVE SPORTS": "14",
+            "CONSOLE": "18",
+            "PC": "17",
             "OTHER": "16",
         }
         if mapping_only:
@@ -443,7 +448,7 @@ class Zenith(UNIT3D):
             meta_type = meta_type.upper().strip().lstrip(".")
 
         if category == "GAME":
-            resolved_id = "16"
+            resolved_id = "18" if meta.console_game else "17" if any(platform in meta.platform.lower() for platform in ("windows", "pc")) else "16"
         elif category == "BOOK":
             resolved_id = type_id.get(_book_format(meta) or "", "16")
         elif category == "MUSIC":
@@ -455,6 +460,28 @@ class Zenith(UNIT3D):
             resolved_id = type_id.get(meta_type or "", "0")
 
         return {"type_id": resolved_id}
+
+    async def get_resolution_id(self, meta: Meta, resolution: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
+        resolution_id = {
+            "4320p": "1",
+            "2160p": "2",
+            "1440p": "11",
+            "1080p": "3",
+            "1080i": "4",
+            "720p": "5",
+            "576p": "6",
+            "576i": "7",
+            "540p": "12",
+            "480p": "8",
+            "480i": "9",
+        }
+        if mapping_only:
+            return resolution_id
+        if reverse:
+            return {v: k for k, v in resolution_id.items()}
+        if resolution:
+            return {"resolution_id": resolution_id.get(resolution, "10")}
+        return {"resolution_id": resolution_id.get(meta.resolution, "10")}
 
     async def get_additional_data(self, meta: Meta) -> dict[str, str]:
         data: dict[str, str] = {}

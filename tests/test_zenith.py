@@ -3,7 +3,7 @@
 import asyncio
 
 from src.meta import Meta
-from src.trackers.UNIT3D.znth import Zenith
+from src.trackers.UNIT3D.zenith import Zenith
 
 
 def test_zenith_supports_music_and_uses_its_music_naming_guide():
@@ -90,3 +90,28 @@ def test_zenith_music_type_id_comes_from_the_analyzed_codec():
     type_data = asyncio.run(Zenith({"DEFAULT": {}, "TRACKERS": {"ZENITH": {}}}).get_type_id(meta))
 
     assert type_data == {"type_id": "7"}
+
+
+def test_zenith_reported_ids():
+    tracker = Zenith({"DEFAULT": {}, "TRACKERS": {"ZENITH": {}}})
+    meta = Meta()
+
+    assert asyncio.run(tracker.get_category_id(meta, mapping_only=True))["SOFTWARE"] == "8"
+    types = asyncio.run(tracker.get_type_id(meta, mapping_only=True))
+    assert {name: types[name] for name in ("CONSOLE", "PC", "EDUCATIONAL", "LIVE SPORTS")} == {
+        "CONSOLE": "18",
+        "PC": "17",
+        "EDUCATIONAL": "15",
+        "LIVE SPORTS": "14",
+    }
+    resolutions = asyncio.run(tracker.get_resolution_id(meta, mapping_only=True))
+    assert resolutions["540p"] == "12"
+    assert resolutions["1440p"] == "11"
+
+
+def test_zenith_game_type_uses_platform():
+    tracker = Zenith({"DEFAULT": {}, "TRACKERS": {"ZENITH": {}}})
+
+    assert asyncio.run(tracker.get_type_id(Meta(category="GAME", console_game=True))) == {"type_id": "18"}
+    assert asyncio.run(tracker.get_type_id(Meta(category="GAME", platform="Windows"))) == {"type_id": "17"}
+    assert asyncio.run(tracker.get_type_id(Meta(category="GAME"))) == {"type_id": "16"}

@@ -1508,7 +1508,7 @@ tracker_class_map: Any = LazyTrackerDict(
         "UTOPIA": ("src.trackers.UNIT3D.utopia", "Utopia"),
         "XINGYUNGEPT": ("src.trackers.NEXUSPHP.xingyungept", "XingyungePT"),
         "YUSCENE": ("src.trackers.UNIT3D.yuscene", "YUSCENE"),
-        "ZENITH": ("src.trackers.UNIT3D.znth", "Zenith"),
+        "ZENITH": ("src.trackers.UNIT3D.zenith", "Zenith"),
     }
 )
 
