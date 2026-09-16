@@ -6,8 +6,6 @@ import asyncio
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
-import pytest
-
 from src.args import Args
 from src.meta import Meta
 from src.prep_helpers import detect_disc_and_category
@@ -38,8 +36,5 @@ def test_cli_accepts_and_routes_manual_xxx_category(tmp_path):
     assert meta.category == "XXX"  # noqa: S101
 
 
-def test_missing_cli_video_exits_with_failure_status(tmp_path):
-    with pytest.raises(SystemExit) as error:
-        asyncio.run(video_manager.get_video(str(tmp_path), "cli"))
-
-    assert error.value.code == 1  # noqa: S101
+def test_missing_video_returns_empty_result(tmp_path):
+    assert asyncio.run(video_manager.get_video(str(tmp_path))) == ("", [])  # noqa: S101
