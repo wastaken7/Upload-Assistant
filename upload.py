@@ -2415,7 +2415,9 @@ async def do_the_thing(base_dir: str) -> None:
             set_runtime_browse_roots(browse_roots)
 
             try:
-                _webui_server = cast(WebUIServer, create_server(app, host=host, port=port))
+                # Each execution stream occupies a worker while the upload runs.
+                # Leave capacity for polling, prompt responses and other sessions.
+                _webui_server = cast(WebUIServer, create_server(app, host=host, port=port, threads=16))
 
                 # Build clickable URL (use localhost for 0.0.0.0 display)
                 display_host = "localhost" if host == "0.0.0.0" else host  # noqa: S104
