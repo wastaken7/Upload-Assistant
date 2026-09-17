@@ -1830,13 +1830,15 @@ def _resolve_execution_preview_meta(session_id: str) -> tuple[str, Path | None, 
     return execution_path, None, None
 
 
-def _subprocess_prompt_type(buffer: str) -> str | None:
+def _subprocess_prompt_type(buffer: str, previous_type: str | None = None) -> str | None:
     last_line = buffer.splitlines()[-1] if buffer else ""
     stripped = re.sub(r"\x1b\[[0-?]*[ -/]*[@-~]", "", last_line).strip()
     if not stripped:
         return None
     if stripped.startswith(PROGRESS_STDOUT_PREFIX):
         return None
+    if stripped == ">":
+        return previous_type or "text"
     lowered = stripped.lower()
     if "running:" in lowered:
         return None
@@ -1872,8 +1874,14 @@ def _subprocess_progress_event(chunk: str) -> dict[str, object] | None:
     return event if isinstance(event, dict) else None
 
 
-def _should_flush_subprocess_output(buffer: str, char: str) -> bool:
-    return char == "\n" or (len(buffer) > 512 and not buffer.lstrip().startswith(PROGRESS_STDOUT_PREFIX))
+def _should_flush_subprocess_output(buffer: str, char: str, *, idle: bool = False) -> bool:
+    if char == "\n" or (len(buffer) > 512 and not buffer.lstrip().startswith(PROGRESS_STDOUT_PREFIX)):
+        return True
+    # Wait for a pause in output before flushing unterminated prompts. Checking
+    # each character would split ordinary lines at their first colon/question mark.
+    if idle and not re.search(r"\x1b(?:\[[0-?]*[ -/]*)?$", buffer):
+        return _subprocess_prompt_type(buffer) is not None
+    return False
 
 
 def _append_metadata_source(
@@ -6802,51 +6810,59 @@ def execute_command():
 
                     while process.poll() is None or not output_queue.empty():
                         has_output, output = _read_output(output_queue)
+                        previous_prompt_type = str(process_state.get("input_type") or "text") if process_state.get("awaiting_input") else None
                         if has_output and output is not None:
                             output_type, char = output
                             if output_type not in buffers:
                                 buffers[output_type] = ""
                             buffers[output_type] += char
-                            prompt_type = _subprocess_prompt_type(buffers[output_type])
-                            if prompt_type:
-                                _set_process_awaiting_input_if_current(session_id, process_state, True, prompt_type)
+                            prompt_type = _subprocess_prompt_type(buffers[output_type], previous_prompt_type)
 
-                            # Flush on newline or when buffer grows large
-                            if _should_flush_subprocess_output(buffers[output_type], char):
-                                if buffers[output_type].strip() == PROMPT_SOUND_STDOUT_MARKER:
-                                    buffers[output_type] = ""
-                                    yield f"data: {json.dumps({'type': 'prompt_sound'})}\n\n"
-                                    continue
-                                if not prompt_type:
-                                    _set_process_awaiting_input_if_current(session_id, process_state, False)
-                                chunk = buffers[output_type]
-                                buffers[output_type] = ""
-
-                                progress_event = _subprocess_progress_event(chunk)
-                                if progress_event is not None:
-                                    _set_process_progress_if_current(session_id, process_state, progress_event)
-                                    yield f"data: {json.dumps({'type': 'progress', 'data': progress_event})}\n\n"
-                                    continue
-
-                                # Convert to HTML fragment. If helper missing, escape and wrap in <pre>
-                                try:
-                                    if ansi_to_html:
-                                        html_fragment = ansi_to_html(chunk)
-                                    else:
-                                        import html as _html
-
-                                        html_fragment = f"<pre>{_html.escape(chunk)}</pre>"
-
-                                    yield f"data: {json.dumps({'type': 'html', 'data': html_fragment, 'origin': output_type})}\n\n"
-                                except Exception as e:
-                                    console.print(f"HTML conversion error: {e}", markup=False)
-                                    import html as _html
-
-                                    html_fragment = f"<pre>{_html.escape(chunk)}</pre>"
-                                    yield f"data: {json.dumps({'type': 'html', 'data': html_fragment, 'origin': output_type})}\n\n"
+                            if not _should_flush_subprocess_output(buffers[output_type], char):
+                                continue
                         else:
-                            # keepalive to keep the SSE connection alive
-                            yield f"data: {json.dumps({'type': 'keepalive'})}\n\n"
+                            # cli_ui writes its input marker without a newline.
+                            # Flush it when output has been idle for the queue timeout.
+                            pending_type = next((kind for kind, buffer in buffers.items() if _should_flush_subprocess_output(buffer, "", idle=True)), None)
+                            if pending_type is None:
+                                yield f"data: {json.dumps({'type': 'keepalive'})}\n\n"
+                                continue
+                            output_type = pending_type
+                            prompt_type = _subprocess_prompt_type(buffers[output_type], previous_prompt_type)
+
+                        if buffers[output_type].strip() == PROMPT_SOUND_STDOUT_MARKER:
+                            buffers[output_type] = ""
+                            yield f"data: {json.dumps({'type': 'prompt_sound'})}\n\n"
+                            continue
+                        if prompt_type:
+                            _set_process_awaiting_input_if_current(session_id, process_state, True, prompt_type)
+                        else:
+                            _set_process_awaiting_input_if_current(session_id, process_state, False)
+                        chunk = buffers[output_type]
+                        buffers[output_type] = ""
+
+                        progress_event = _subprocess_progress_event(chunk)
+                        if progress_event is not None:
+                            _set_process_progress_if_current(session_id, process_state, progress_event)
+                            yield f"data: {json.dumps({'type': 'progress', 'data': progress_event})}\n\n"
+                            continue
+
+                        # Convert to HTML fragment. If helper missing, escape and wrap in <pre>
+                        try:
+                            if ansi_to_html:
+                                html_fragment = ansi_to_html(chunk)
+                            else:
+                                import html as _html
+
+                                html_fragment = f"<pre>{_html.escape(chunk)}</pre>"
+
+                            yield f"data: {json.dumps({'type': 'html', 'data': html_fragment, 'origin': output_type})}\n\n"
+                        except Exception as e:
+                            console.print(f"HTML conversion error: {e}", markup=False)
+                            import html as _html
+
+                            html_fragment = f"<pre>{_html.escape(chunk)}</pre>"
+                            yield f"data: {json.dumps({'type': 'html', 'data': html_fragment, 'origin': output_type})}\n\n"
 
                     # Flush remaining buffers as HTML
                     for t, remaining in list(buffers.items()):
