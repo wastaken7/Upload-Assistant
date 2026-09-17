@@ -228,6 +228,7 @@ class Meta:
     igdb_manual: str | None = None
     igdb_rating_count: int | str = ""
     igdb_rating: float | str = ""
+    igdb_url: str | None = None
     image_list: list[dict[str, Any]] = field(default_factory=list)
     image_sizes: dict[str, Any] = field(default_factory=dict)
     imdb_id: int | None = None
