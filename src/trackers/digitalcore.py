@@ -226,18 +226,19 @@ class DigitalCore:
         anon = "1" if meta.anon or self.config["TRACKERS"][self.tracker].get("anon", False) else "0"
 
         return {
+            "anonymousUpload": anon,
             "category": self.get_category_id(meta),
+            "firstpic": await self.get_firstpic(meta),
+            "frileech": "1",
+            "gameUrl": meta.steam_url or meta.igdb_url,
             "imdbId": meta.imdb_tt,
-            "nfo": await self.generate_description(meta),
+            "language": meta.book_language,
             "mediainfo": await self.mediainfo(meta),
+            "nfo": await self.generate_description(meta),
+            "p2p": "0",
             "reqid": "0",
             "section": "new",
-            "frileech": "1",
-            "anonymousUpload": anon,
-            "p2p": "0",
             "unrar": "1",
-            "firstpic": await self.get_firstpic(meta),
-            "language": meta.book_language,
         }
 
     async def upload(self, meta: Meta) -> bool:

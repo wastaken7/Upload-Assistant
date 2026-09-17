@@ -47,6 +47,7 @@ def test_search_is_lightweight_and_selected_detail_is_rich(tmp_path, monkeypatch
     assert detail and detail["game_modes"][0]["name"] == "Single player"  # noqa: S101
     assert "summary" not in FakeClient.queries[0]  # noqa: S101
     assert "game_modes.name" in FakeClient.queries[1]  # noqa: S101
+    assert "url" in FakeClient.queries[1]  # noqa: S101
 
 
 def test_time_to_beat_is_normalized_and_cached(tmp_path, monkeypatch):
