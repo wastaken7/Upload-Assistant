@@ -1380,6 +1380,16 @@ def _stringify_optional_id(value: object) -> str:
     return "" if text in {"", "0"} else text
 
 
+def _extract_preview_imdb_id(meta_data: Mapping[str, object]) -> str:
+    """Format IMDb title IDs without losing zeros or truncating newer IDs."""
+    for key in ("imdb_id", "imdb_tt", "imdb"):
+        value = _stringify_optional_id(meta_data.get(key))
+        match = re.fullmatch(r"(?:tt)?([0-9]+)", value, re.IGNORECASE)
+        if match and match[1].strip("0"):
+            return f"tt{match[1].zfill(7)}"
+    return ""
+
+
 def _set_process_awaiting_input(session_id: str, waiting: bool, input_type: str = "text") -> None:
     with active_processes_lock:
         process_info = active_processes.get(session_id)
@@ -1896,7 +1906,7 @@ def _extract_metadata_sources(meta_data: Mapping[str, object]) -> list[MetadataS
 
     category = _stringify_preview_value(meta_data.get("category")).upper()
     tmdb_value = _stringify_optional_id(meta_data.get("tmdb_id")) or _stringify_optional_id(meta_data.get("tmdb"))
-    imdb_value = _stringify_optional_id(meta_data.get("imdb_id")) or _stringify_optional_id(meta_data.get("imdb_tt")) or _stringify_optional_id(meta_data.get("imdb"))
+    imdb_value = _extract_preview_imdb_id(meta_data)
     tvdb_value = _stringify_optional_id(meta_data.get("tvdb_id")) or _stringify_optional_id(meta_data.get("tvdb"))
     tvmaze_value = _stringify_optional_id(meta_data.get("tvmaze_id")) or _stringify_optional_id(meta_data.get("tvmaze"))
     mal_value = _stringify_optional_id(meta_data.get("mal_id")) or _stringify_optional_id(meta_data.get("mal"))
@@ -1927,14 +1937,13 @@ def _extract_metadata_sources(meta_data: Mapping[str, object]) -> list[MetadataS
         )
 
     if category in {"MOVIE", "TV"} and imdb_value:
-        imdb_id = imdb_value if imdb_value.startswith("tt") else f"tt{imdb_value}"
         _append_metadata_source(
             sources,
             seen_keys,
             "imdb",
             "IMDb",
-            imdb_id,
-            f"https://www.imdb.com/title/{quote(imdb_id)}/",
+            imdb_value,
+            f"https://www.imdb.com/title/{quote(imdb_value)}/",
         )
 
     if category == "TV" and tvdb_value:
@@ -2211,7 +2220,7 @@ def _extract_execution_preview(meta_data: Mapping[str, object], fallback_path: s
         "source": _stringify_preview_value(meta_data.get("source")),
         "resolution": _stringify_preview_value(meta_data.get("resolution")),
         "tmdb": _stringify_optional_id(meta_data.get("tmdb_id")) or _stringify_optional_id(meta_data.get("tmdb")),
-        "imdb": (_stringify_optional_id(meta_data.get("imdb_id")) or _stringify_optional_id(meta_data.get("imdb_tt")) or _stringify_optional_id(meta_data.get("imdb"))),
+        "imdb": _extract_preview_imdb_id(meta_data),
         "metadata_sources": _extract_metadata_sources(meta_data),
         "poster_url": poster_url,
         "overview": _stringify_preview_value(meta_data.get("overview")),

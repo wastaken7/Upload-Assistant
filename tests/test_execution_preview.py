@@ -6,6 +6,41 @@ from web_ui import server
 from web_ui.server import _extract_execution_preview
 
 
+@pytest.mark.parametrize("category", ["MOVIE", "TV"])
+@pytest.mark.parametrize(
+    "metadata, expected",
+    [
+        ({"imdb_id": 98764, "imdb_tt": "tt0098764", "imdb": "0098764"}, "tt0098764"),
+        ({"imdb_id": 98764}, "tt0098764"),
+        ({"imdb_id": "0098764"}, "tt0098764"),
+        ({"imdb_tt": "tt0098764"}, "tt0098764"),
+        ({"imdb": "0098764"}, "tt0098764"),
+        ({"imdb_id": 0, "imdb_tt": "tt0098764"}, "tt0098764"),
+        ({"imdb_id": 12345678}, "tt12345678"),
+        ({"imdb_tt": "tt12345678"}, "tt12345678"),
+        ({"imdb_id": 98764, "imdb_tt": "tt0111161"}, "tt0098764"),
+        ({"imdb_id": None, "imdb": "  tt0098764  "}, "tt0098764"),
+    ],
+)
+def test_execution_preview_preserves_imdb_title_ids(metadata, expected, category):
+    original = dict(metadata)
+    preview = _extract_execution_preview({"category": category, **metadata}, "sample.mkv")
+    source = next(source for source in preview["metadata_sources"] if source["key"] == "imdb")
+
+    assert preview["imdb"] == expected
+    assert source["value"] == expected
+    assert source["url"] == f"https://www.imdb.com/title/{expected}/"
+    assert metadata == original
+
+
+@pytest.mark.parametrize("value", [None, "", 0, "0000000", "tt0000000", -1, True, "not-an-id"])
+def test_execution_preview_omits_missing_or_invalid_imdb_links(value):
+    preview = _extract_execution_preview({"category": "MOVIE", "imdb_id": value}, "sample.mkv")
+
+    assert preview["imdb"] == ""
+    assert all(source["key"] != "imdb" for source in preview["metadata_sources"])
+
+
 def _detail_items(preview, section_key):
     section = next(section for section in preview["detail_sections"] if section["key"] == section_key)
     return {item["key"]: item["value"] for item in section["items"]}
