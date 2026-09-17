@@ -2200,14 +2200,16 @@ config: dict[str, Any] = {
             # Upload as sticky/pinned
             "sticky": False,
             # The configurations below override the DEFAULT configuration
-            "add_logo": True,
+            # OnlyEncodes forbids description logos and requires linked medium screenshots
+            # from the first episode/movie rather than screenshots for every pack item.
+            "add_logo": False,
             "logo_size": "",
-            "thumbnail_size": "",
+            "thumbnail_size": 350,
             "screens_per_row": "",
             "episode_overview": True,
             "tonemapped_header": "[note]Screenshots have been adapted for SDR viewing, for reference only.[/note]",
-            "multiScreens": "",
-            "pack_thumb_size": "",
+            "multiScreens": 0,
+            "pack_thumb_size": 350,
             "charLimit": "",
             "fileLimit": "",
             "processLimit": "",
