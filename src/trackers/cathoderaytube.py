@@ -18,7 +18,7 @@ from src.meta import Meta
 from src.rehostimages import ImageHostPolicy, RehostImagesManager
 from src.takescreens import download_artwork_from_meta
 from src.temp_paths import artwork_dir
-from src.tracker_images import get_tracker_image_collection
+from src.tracker_images import ImageCollection, get_tracker_image_collection
 from src.trackers.common import Common
 
 
@@ -320,15 +320,13 @@ class CathodeRayTube:
             links.append(meta.steam_url)
         return "\n".join(dict.fromkeys(links))
 
-    def _valid_screenshot_images(self, meta: Meta) -> list[dict[str, Any]]:
-        """Return CRT image records with usable raw URLs in publication order."""
-        collections = (
-            get_tracker_image_collection(meta, self.tracker, "menu_images"),
-            get_tracker_image_collection(meta, self.tracker, "screenshots"),
-            get_tracker_image_collection(meta, self.tracker, "spectrograms_images"),
-            get_tracker_image_collection(meta, self.tracker, "dynamic_hdr_plot_images"),
-        )
-        return [image for collection in collections for image in collection if isinstance(image, dict) and isinstance(image.get("raw_url"), str) and image["raw_url"]]
+    def _valid_images(self, meta: Meta, collection: ImageCollection) -> list[dict[str, Any]]:
+        """Return tracker images with usable raw URLs."""
+        return [
+            image
+            for image in get_tracker_image_collection(meta, self.tracker, collection)
+            if isinstance(image, dict) and isinstance(image.get("raw_url"), str) and image["raw_url"]
+        ]
 
     async def generate_description(self, meta: Meta) -> str:
         """Render CRT's category-specific upload template from prepared metadata."""
@@ -337,7 +335,14 @@ class CathodeRayTube:
         links = self._metadata_links(meta)
         overview = meta.overview or meta.overview_meta
         notes = "\n\n".join(part for part in (meta.description.strip(), await builder.get_user_description(meta)) if part)
-        screenshots = "\n".join(image["raw_url"] for image in self._valid_screenshot_images(meta))
+        supplemental_images = [
+            image["raw_url"] for collection in ("menu_images", "spectrograms_images", "dynamic_hdr_plot_images") for image in self._valid_images(meta, collection)
+        ]
+        if supplemental_images:
+            notes = "\n\n".join(part for part in (notes, "\n".join(supplemental_images)) if part)
+        screenshot_urls = [image["raw_url"] for image in self._valid_images(meta, "screenshots")]
+        screenshot_urls = screenshot_urls[: len(screenshot_urls) // 3 * 3]
+        screenshots = "\n".join(" ".join(screenshot_urls[index : index + 3]) for index in range(0, len(screenshot_urls), 3))
 
         sections: list[str] = []
         if links:
@@ -407,12 +412,6 @@ class CathodeRayTube:
                 logger.warning(f"{self.tracker}: [red]Archives are not allowed outside Games: {archive}[/red]")
                 return False
 
-            # Disc images in ISO format are NOT allowed, with the exception of 3D Blu-ray images
-            is_iso = any(Path(str(item)).suffix.lower() == ".iso" for item in meta.filelist) or (isinstance(meta.is_disc, str) and meta.is_disc.upper() == "ISO")
-            if is_iso and not meta.three_d:
-                logger.warning(f"{self.tracker}: [red]ISO disc images are not allowed outside 3D Blu-ray on CRT.[/red]")
-                return False
-
         # English language requirement & screenshot guidelines for Movies and TV
         if category in ("MOVIE", "TV"):
             if not self._has_english(meta.audio_languages) and not self._has_english(meta.subtitle_languages):
@@ -420,22 +419,13 @@ class CathodeRayTube:
                 return False
 
             # Minimum 6 screenshots requirement
-            screens_count = len(self._valid_screenshot_images(meta))
-            if screens_count == 0 and hasattr(meta, "screens"):
-                try:
-                    screens_count = int(meta.screens or 0)
-                except ValueError, TypeError:
-                    screens_count = 0
-
-            if screens_count < 6:
-                logger.warning(f"{self.tracker}: [red]CRT requires at least 6 screenshots for video content (found {screens_count}).[/red]")
+            if meta.screens < 6:
+                logger.warning(f"{self.tracker}: [red]CRT requires at least 6 screenshots for video content (found {meta.screens}).[/red]")
                 return False
-            if screens_count > 6 and screens_count % 3 != 0:
-                logger.warning(f"{self.tracker}: [yellow]CRT guidelines state screenshot count above 6 should be in multiples of 3 (found {screens_count}).[/yellow]")
 
-            # MediaInfo / BDInfo check
-            if getattr(meta, "valid_mi", None) is False:
-                logger.warning(f"{self.tracker}: [red]Invalid or missing MediaInfo/BDInfo data.[/red]")
+            # MediaInfo
+            if meta.valid_mi is False:
+                logger.warning(f"{self.tracker}: [red]Invalid MediaInfo.[/red]")
                 return False
 
         # 10-Year Age Limit Rule (release date for movies, last air date for TV must be at least 10 years old)
