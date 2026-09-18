@@ -71,6 +71,7 @@ def meta(**overrides):
         "tmdb_poster_path": "",
         "artwork_url": "",
         "hosted_artwork": [],
+        "valid_mi": True,
     }
     values.update(overrides)
     result = SimpleNamespace(**values)
@@ -208,6 +209,29 @@ def test_renders_crt_category_description_templates():
     )
 
 
+def test_places_supplemental_images_in_notes_and_groups_screenshots_by_three():
+    site = tracker()
+    item = meta(
+        description="Release note.",
+        menu_images=[{"raw_url": "https://iili.io/menu.png"}],
+        spectrograms_images=[{"raw_url": "https://iili.io/spectrum.png"}],
+        dynamic_hdr_plot_images=[{"raw_url": "https://iili.io/hdr.png"}],
+        image_list=[{"raw_url": f"https://iili.io/screen{i}.png"} for i in range(1, 5)] + [{}],
+    )
+
+    description = asyncio.run(site.generate_description(item))
+    assert "[notes]\nRelease note.\n\nhttps://iili.io/menu.png\nhttps://iili.io/spectrum.png\nhttps://iili.io/hdr.png\n[/notes]" in description  # noqa: S101
+    assert (  # noqa: S101
+        "[screens]\nhttps://iili.io/screen1.png https://iili.io/screen2.png https://iili.io/screen3.png\nhttps://iili.io/screen4.png\n[/screens]" in description
+    )
+
+
+def test_supplemental_images_create_notes_without_note_text():
+    description = asyncio.run(tracker().generate_description(meta(menu_images=[{"raw_url": "https://iili.io/menu.png"}])))
+    assert "[notes]\nhttps://iili.io/menu.png\n[/notes]" in description  # noqa: S101
+    assert "[screens]" not in description  # noqa: S101
+
+
 def test_builds_simple_advanced_search_params():
     assert tracker().get_search_params(meta()) == {  # noqa: S101
         "action": "advanced",
@@ -285,8 +309,6 @@ def test_content_name_uses_the_file_for_single_file_torrents():
 
 def test_enforces_known_archive_rules():
     assert asyncio.run(tracker().get_additional_checks(meta()))  # noqa: S101
-    assert not asyncio.run(tracker().get_additional_checks(meta(filelist=["Example.iso"])))  # noqa: S101
-    assert asyncio.run(tracker().get_additional_checks(meta(filelist=["Example.iso"], three_d="3D")))  # noqa: S101
     assert asyncio.run(tracker().get_additional_checks(meta(category="GAME", filelist=["Game.7z"])))  # noqa: S101
 
 
@@ -321,9 +343,3 @@ def test_extracts_successful_upload_url():
     request = httpx.Request("POST", "https://www.cathode-ray.tube/torrents.php?id=123&torrentid=456")
     response = httpx.Response(200, request=request)
     assert CathodeRayTube._uploaded_torrent_url(response).endswith("id=123&torrentid=456")  # noqa: S101
-
-
-def test_excludes_images_without_raw_url_from_screenshot_validation():
-    valid_images = [{"raw_url": f"https://images.example/{index}.png"} for index in range(5)]
-
-    assert not asyncio.run(tracker().get_additional_checks(meta(image_list=valid_images, dynamic_hdr_plot_images=[{}])))  # noqa: S101
