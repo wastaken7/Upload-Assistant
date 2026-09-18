@@ -1042,21 +1042,20 @@ def _token_is_valid(token: str) -> bool:
 
 
 def _validate_upload_assistant_args(args: Sequence[object]) -> list[str]:
-    """Validate upload-assistant arguments to avoid command-injection.
+    """Validate upload-assistant arguments before passing them as argv values.
 
-    Rejects arguments containing nulls, newlines, or common shell metacharacters.
-    Returns the original args if they pass validation, otherwise raises ValueError.
+    The WebUI launches the controller without a shell, so shell punctuation is
+    valid data. Keep rejecting controls and arguments that are unsafe or
+    unsupported for the WebUI.
     """
     safe_args: list[str] = []
-    # Disallow characters that enable shell injection or command chaining.
-    forbidden = set(";&|$`><*?~!\n\r\x00")
     for a in args:
         if not isinstance(a, str):
             raise ValueError("Invalid arg type")
         if a == "--paths-from-stdin":
             raise ValueError("--paths-from-stdin is only available in CLI mode")
-        if any(ch in a for ch in forbidden):
-            raise ValueError("Invalid characters in arg")
+        if any(ord(ch) < 32 or ord(ch) == 127 for ch in a):
+            raise ValueError("Invalid control character in arg")
         # Disallow arguments that are just parent-directory references
         if a == ".." or a == ".":
             raise ValueError("Invalid arg")
@@ -1274,6 +1273,7 @@ def _spawn_webui_upload_process(command: list[str], base_dir: Path, env: dict[st
     return (
         subprocess.Popen(  # lgtm[py/command-line-injection]  # noqa: S603
             command,
+            shell=False,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -6678,37 +6678,21 @@ def execute_command():
                 if not Path(str(base_dir)).is_absolute():
                     base_dir = str(Path(str(base_dir)).resolve())
 
-                # Extra validation for the constructed command to guard
-                # against command-injection and to make validation explicit
-                # for static analysis tools.
+                # Validate the constructed argv structure and the values that carry
+                # security meaning. Shell punctuation is valid data when passed as
+                # an argv value to a subprocess that does not invoke a shell.
                 try:
-                    # Ensure command is a list of strings
-                    command = _validate_upload_assistant_args(command)
+                    if not isinstance(command, list) or not all(isinstance(arg, str) for arg in command):
+                        raise ValueError("Invalid command structure")
+                    if len(command) < 4 or command[0] != sys.executable or command[1] != "-u" or command[3] != validated_path:
+                        raise ValueError("Invalid command structure")
 
-                    # Re-assert the execution path is safe
-                    try:
-                        _assert_safe_resolved_path(command[3] if len(command) > 3 else command[-1])
-                    except Exception:
-                        # Fallback: validated_path is expected at position 3 for subprocess
-                        try:
-                            _assert_safe_resolved_path(validated_path)
-                        except Exception as err:
-                            raise ValueError("Invalid execution path") from err
+                    _assert_safe_resolved_path(validated_path)
 
-                    # Ensure the upload_script is the expected script under the repo
-                    try:
-                        expected_script = os.path.realpath(str(CODE_DIR / "upload.py"))
-                        script_real = os.path.realpath(command[2])
-                        if script_real != expected_script:
-                            raise ValueError("Invalid script path")
-                    except IndexError as err:
-                        raise ValueError("Invalid command structure") from err
-
-                    # Disallow shell metacharacters in any argument
-                    forbidden = set(";&|$`><*?~!\n\r\x00")
-                    for a in command:
-                        if any(ch in a for ch in forbidden):
-                            raise ValueError("Invalid characters in command argument")
+                    expected_script = os.path.realpath(str(CODE_DIR / "upload.py"))
+                    script_real = os.path.realpath(command[2])
+                    if script_real != expected_script:
+                        raise ValueError("Invalid script path")
                 except Exception as err:
                     console.print(f"Refusing to run unsafe command: {err}", markup=False)
                     _discard_session_state(session_id, process_state)
