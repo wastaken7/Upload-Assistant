@@ -341,6 +341,7 @@ class CathodeRayTube:
         if supplemental_images:
             notes = "\n\n".join(part for part in (notes, "\n".join(supplemental_images)) if part)
         screenshot_urls = [image["raw_url"] for image in self._valid_images(meta, "screenshots")]
+        screenshot_urls = screenshot_urls[: len(screenshot_urls) // 3 * 3]
         screenshots = "\n".join(" ".join(screenshot_urls[index : index + 3]) for index in range(0, len(screenshot_urls), 3))
 
         sections: list[str] = []

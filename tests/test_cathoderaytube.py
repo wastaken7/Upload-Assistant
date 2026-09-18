@@ -188,7 +188,7 @@ def test_renders_crt_category_description_templates():
     movie = meta(
         overview="A spoiler-free plot.",
         description="Release-specific note.",
-        image_list=[{"raw_url": "https://iili.io/one.png"}],
+        image_list=[{"raw_url": f"https://iili.io/{index}.png"} for index in range(1, 4)],
         is_disc="BDMV",
         discs=[{"summary": "Disc Title: EXAMPLE"}],
     )
@@ -196,7 +196,7 @@ def test_renders_crt_category_description_templates():
         "[info]\nhttps://www.imdb.com/title/tt1234567/\nhttps://www.themoviedb.org/movie/123\n[/info]\n"
         "[plot]\nA spoiler-free plot.\n[/plot]\n"
         "[notes]\nRelease-specific note.\n[/notes]\n"
-        "[screens]\nhttps://iili.io/one.png\n[/screens]\n"
+        "[screens]\nhttps://iili.io/1.png https://iili.io/2.png https://iili.io/3.png\n[/screens]\n"
         "[details]\n[mediainfo]\nDisc Title: EXAMPLE\n[/mediainfo]\n[/details]\n\n"
         "[align=right][url=https://github.com/wastaken7/Upload-Assistant][size=1]Upload-Assistant[/size][/url][/align]"
     )
@@ -216,13 +216,14 @@ def test_places_supplemental_images_in_notes_and_groups_screenshots_by_three():
         menu_images=[{"raw_url": "https://iili.io/menu.png"}],
         spectrograms_images=[{"raw_url": "https://iili.io/spectrum.png"}],
         dynamic_hdr_plot_images=[{"raw_url": "https://iili.io/hdr.png"}],
-        image_list=[{"raw_url": f"https://iili.io/screen{i}.png"} for i in range(1, 5)] + [{}],
+        image_list=[{"raw_url": f"https://iili.io/screen{i}.png"} for i in range(1, 9)] + [{}],
     )
 
     description = asyncio.run(site.generate_description(item))
     assert "[notes]\nRelease note.\n\nhttps://iili.io/menu.png\nhttps://iili.io/spectrum.png\nhttps://iili.io/hdr.png\n[/notes]" in description  # noqa: S101
     assert (  # noqa: S101
-        "[screens]\nhttps://iili.io/screen1.png https://iili.io/screen2.png https://iili.io/screen3.png\nhttps://iili.io/screen4.png\n[/screens]" in description
+        "[screens]\nhttps://iili.io/screen1.png https://iili.io/screen2.png https://iili.io/screen3.png\n"
+        "https://iili.io/screen4.png https://iili.io/screen5.png https://iili.io/screen6.png\n[/screens]" in description
     )
 
 
