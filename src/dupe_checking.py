@@ -215,6 +215,11 @@ class DupeChecker:
             if supports_exact_match_only and isinstance(configured_exact_match_only, bool)
             else bool(getattr(tracker_cls, "exact_match_only", False))
         )
+        # Pesto season episodes are separate releases from an existing season
+        # pack or another group's encode.  Only suppress the generated episode
+        # when that exact release name is already present on the indexer.
+        if is_usenet and meta.usenet_is_episode_submission:
+            is_exact_match_only = True
 
         async def log_exclusion(reason: str, item: str) -> None:
             if meta.debug:

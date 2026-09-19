@@ -338,6 +338,7 @@ class Meta:
     usenet_nzb_paths: list[str] = field(default_factory=list)
     usenet_pack_nzb_path: str | None = None
     usenet_is_pack: bool = False
+    usenet_is_episode_submission: bool = False
     usenet_media_source: str | None = None
     ocr: bool | None = None
     only_id: bool | None = None

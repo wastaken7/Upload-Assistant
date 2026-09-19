@@ -116,7 +116,11 @@ def parse_newznab_dupes(
         dupes.append(
             {
                 "name": title,
-                "files": title,
+                # Newznab search results do not expose the NZB's file list.
+                # Leaving this empty lets exact-match detection use the
+                # release title fallback instead of treating the title as a
+                # fabricated filename.
+                "files": [],
                 "size": int(size_text) if size_text.isdigit() else 0,
                 "link": item_link,
             }

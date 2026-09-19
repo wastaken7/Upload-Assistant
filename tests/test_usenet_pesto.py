@@ -243,6 +243,7 @@ async def test_build_usenet_indexer_metas_uses_episode_metadata_and_keeps_pack_l
     assert episode_meta.episode_int == 1
     assert episode_meta.tv_pack is False
     assert episode_meta.usenet_is_pack is False
+    assert episode_meta.usenet_is_episode_submission is True
     assert episode_meta.path == str(episode_file)
     assert episode_meta.filelist == [str(episode_file)]
     assert episode_meta.tracker_status == {"CURUPIRA": {}}
@@ -254,6 +255,7 @@ async def test_build_usenet_indexer_metas_uses_episode_metadata_and_keeps_pack_l
     assert pack_meta.nzb_path == str(pack_nzb)
     assert pack_meta.tv_pack is True
     assert pack_meta.usenet_is_pack is True
+    assert pack_meta.usenet_is_episode_submission is False
 
 
 @pytest.mark.asyncio

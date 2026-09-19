@@ -99,6 +99,7 @@ async def build_usenet_indexer_metas(
         episode_meta.scene_name = ""
         episode_meta.tv_pack = False
         episode_meta.usenet_is_pack = False
+        episode_meta.usenet_is_episode_submission = True
         episode_meta.mediainfo = {}
         episode_meta.usenet_media_source = None
 
@@ -145,6 +146,7 @@ async def build_usenet_indexer_metas(
         pack_meta = meta.copy()
         pack_meta.nzb_path = pack_nzb_path
         pack_meta.usenet_is_pack = True
+        pack_meta.usenet_is_episode_submission = False
         submissions.append(pack_meta)
     return submissions
 
