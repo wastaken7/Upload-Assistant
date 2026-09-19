@@ -2752,6 +2752,10 @@ async def do_the_thing(base_dir: str) -> None:
 
                     explicit_usenet_post = "USENET" in trackers_upper or meta.usenet
                     eligible_usenet_trackers = [tracker for tracker in usenet_trackers if cast(Mapping[str, Any], meta.tracker_status.get(tracker, {})).get("upload", False)]
+                    from src.usenetcreate import select_usenet_episode_indexers
+
+                    requested_episode_only_trackers = {tracker.strip().upper() for tracker in meta.usenet_episodes_only if tracker.strip()}
+                    episode_usenet_trackers = select_usenet_episode_indexers(usenet_trackers, meta.tracker_status, requested_episode_only_trackers)
                     usenet_cfg = config.get("USENET", {})
                     pesto_season_active = (
                         str(usenet_cfg.get("usenet_uploader", "nyuu")).lower() == "pesto"
@@ -2759,11 +2763,12 @@ async def do_the_thing(base_dir: str) -> None:
                         and meta.category == "TV"
                         and bool(meta.tv_pack)
                     )
-                    need_usenet_post = explicit_usenet_post or len(eligible_usenet_trackers) > 0 or (pesto_season_active and bool(usenet_trackers))
+                    need_usenet_post = explicit_usenet_post or len(eligible_usenet_trackers) > 0 or (pesto_season_active and bool(episode_usenet_trackers))
 
                     async def upload_usenet_flow(
                         meta: Meta,
                         selected_usenet_trackers: list[str],
+                        episode_usenet_trackers: list[str],
                         pack_usenet_trackers: list[str],
                         need_usenet_post: bool,
                         has_usenet_trackers: bool,
@@ -2795,14 +2800,14 @@ async def do_the_thing(base_dir: str) -> None:
                                     logger.info("[bold green]Usenet upload completed successfully!")
                                     if selected_usenet_trackers:
                                         nzb_paths = meta.usenet_nzb_paths or [str(nzb_path)]
-                                        indexer_metas = await build_usenet_indexer_metas(meta, nzb_paths, selected_usenet_trackers)
+                                        indexer_metas = await build_usenet_indexer_metas(meta, nzb_paths, episode_usenet_trackers)
                                         logger.info(f"[yellow]Processing {len(indexer_metas)} NZB upload(s) to Usenet indexers: {', '.join(selected_usenet_trackers)}.....")
-                                        failed_episode_nzbs: dict[str, list[str]] = {tracker.upper(): [] for tracker in selected_usenet_trackers}
+                                        failed_episode_nzbs: dict[str, list[str]] = {tracker.upper(): [] for tracker in episode_usenet_trackers}
                                         episode_report: list[tuple[str, list[str]]] = []
                                         for index, meta_usenet in enumerate(indexer_metas, start=1):
                                             is_pack_submission = index == len(indexer_metas)
                                             submission_trackers = select_usenet_indexers_for_submission(
-                                                pack_usenet_trackers if is_pack_submission else selected_usenet_trackers,
+                                                pack_usenet_trackers if is_pack_submission else episode_usenet_trackers,
                                                 episodes_only_trackers,
                                                 is_pack=is_pack_submission,
                                             )
@@ -2857,7 +2862,7 @@ async def do_the_thing(base_dir: str) -> None:
                                                 logger.info("[yellow]Skipping the season NZB for indexers selected by --usenet-episodes-only.[/yellow]")
                                             if not is_pack_submission:
                                                 episode_results: list[str] = []
-                                                for tracker in selected_usenet_trackers:
+                                                for tracker in episode_usenet_trackers:
                                                     tracker_key = tracker.upper()
                                                     episode_status = cast(Mapping[str, Any], meta_usenet.tracker_status.get(tracker_key, {}))
                                                     if episode_status.get("upload", False) and not episode_status.get("upload_success", False):
@@ -2952,6 +2957,7 @@ async def do_the_thing(base_dir: str) -> None:
                     async def run_usenet_flow(
                         meta: Meta = meta,
                         selected_usenet_trackers: list[str] = usenet_trackers,
+                        episode_usenet_trackers: list[str] = episode_usenet_trackers,
                         eligible_usenet_trackers: list[str] = eligible_usenet_trackers,
                         need_usenet_post: bool = need_usenet_post,
                         has_usenet_trackers: bool = bool(usenet_trackers),
@@ -2960,6 +2966,7 @@ async def do_the_thing(base_dir: str) -> None:
                         await upload_usenet_flow(
                             meta,
                             selected_usenet_trackers,
+                            episode_usenet_trackers,
                             eligible_usenet_trackers,
                             need_usenet_post,
                             has_usenet_trackers,

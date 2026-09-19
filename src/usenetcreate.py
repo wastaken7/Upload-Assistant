@@ -184,6 +184,17 @@ def select_usenet_indexers_for_submission(trackers: list[str], episodes_only_tra
     return [tracker for tracker in trackers if tracker.upper() not in episodes_only_trackers]
 
 
+def select_usenet_episode_indexers(trackers: list[str], tracker_status: dict[str, dict[str, Any]], episodes_only_trackers: set[str]) -> list[str]:
+    """Select indexers authorized for episode checks without bypassing a declined upload."""
+    selected: list[str] = []
+    for tracker in trackers:
+        tracker_key = tracker.upper()
+        status = tracker_status.get(tracker, tracker_status.get(tracker_key, {}))
+        if status.get("upload", False) or (tracker_key in episodes_only_trackers and status.get("dupe", False)):
+            selected.append(tracker)
+    return selected
+
+
 def get_path_size(path: str) -> int:
     """Calculate the total size of a file or directory in bytes."""
     if Path(path).is_file():

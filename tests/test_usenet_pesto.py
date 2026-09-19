@@ -235,6 +235,17 @@ def test_episode_only_indexer_filter_applies_only_to_pack() -> None:
     assert usenetcreate.select_usenet_indexers_for_submission(trackers, episodes_only, is_pack=True) == ["NZBNEST"]
 
 
+def test_episode_indexers_do_not_bypass_declined_upload() -> None:
+    trackers = ["CURUPIRA", "NZBNEST", "NZBGEEK"]
+    statuses = {
+        "CURUPIRA": {"upload": False, "dupe": False},
+        "NZBNEST": {"upload": False, "dupe": True},
+        "NZBGEEK": {"upload": True, "dupe": False},
+    }
+
+    assert usenetcreate.select_usenet_episode_indexers(trackers, statuses, {"CURUPIRA", "NZBNEST"}) == ["NZBNEST", "NZBGEEK"]
+
+
 @pytest.mark.asyncio
 async def test_episode_screenshots_capture_and_host_configured_count(tmp_path: Path, monkeypatch) -> None:
     video = tmp_path / "Show.S01E01.mkv"
