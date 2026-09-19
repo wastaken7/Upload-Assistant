@@ -79,6 +79,16 @@ def test_pesto_command_redaction_masks_all_sensitive_values() -> None:
     assert rendered == "pesto -u ******** --auth-password ******** --nzb-password=******** --proxy ******** release.bin"
 
 
+def test_pesto_obfuscation_mode_validation() -> None:
+    from src.configvalidator import _validate_usenet_section
+
+    _, valid_warnings = _validate_usenet_section({"pesto_obfuscation_mode": "light"})
+    _, invalid_warnings = _validate_usenet_section({"pesto_obfuscation_mode": "hidden"})
+
+    assert not any(warning.key == "pesto_obfuscation_mode" for warning in valid_warnings)
+    assert any(warning.key == "pesto_obfuscation_mode" for warning in invalid_warnings)
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize("include_pack", [True, False])
 async def test_pesto_season_upload_collects_episode_and_optional_pack_nzbs(tmp_path: Path, monkeypatch, include_pack: bool) -> None:
@@ -132,6 +142,7 @@ async def test_pesto_season_upload_collects_episode_and_optional_pack_nzbs(tmp_p
                 "newsgroups": "alt.binaries.test",
                 "usenet_uploader": "pesto",
                 "pesto_season_upload": True,
+                "pesto_obfuscation_mode": "light",
                 "skip_archive": False,
                 "archive_password": "pack-secret",
                 "rar_volume_size": "auto",
@@ -143,6 +154,7 @@ async def test_pesto_season_upload_collects_episode_and_optional_pack_nzbs(tmp_p
     command = captured["cmd"]
     assert isinstance(command, list)
     assert "--season" in command
+    assert "--obfuscate=light" in command
     assert "--nzb-dir" in command
     assert command[command.index("--ext") + 1] == "avi,m2ts,m4v,mkv,mov,mp4,ts,webm,wmv"
     assert Path(command[command.index("--compress-temp-dir") + 1]).parts[-2:] == ("usenet", "pesto-compress")

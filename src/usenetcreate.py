@@ -1097,6 +1097,9 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
         return None
     uploader = str(usenet_cfg.get("usenet_uploader", "nyuu")).lower()
     use_pesto = uploader == "pesto"
+    pesto_obfuscation_mode = str(usenet_cfg.get("pesto_obfuscation_mode", "full")).strip().lower()
+    if pesto_obfuscation_mode not in {"full", "light", "article", "full-shared"}:
+        raise ValueError("USENET.pesto_obfuscation_mode must be one of: full, light, article, full-shared")
     pesto_season_upload = use_pesto and bool(usenet_cfg.get("pesto_season_upload", False)) and meta.category == "TV" and bool(meta.tv_pack) and Path(input_path).is_dir()
     meta.usenet_nzb_paths = []
     meta.usenet_pack_nzb_path = None
@@ -1554,7 +1557,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
             cmd_pesto.extend(["-f", poster])
 
         if obscure_subject and not custom_subject:
-            cmd_pesto.append("--obfuscate=full")
+            cmd_pesto.append(f"--obfuscate={pesto_obfuscation_mode}")
 
         # --nzb-password only writes the <meta type="password"> tag in the NZB;
         # it doesn't itself encrypt anything (that would be pesto's own

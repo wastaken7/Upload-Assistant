@@ -3614,6 +3614,10 @@ config: dict[str, Any] = {
         "par2_percentage": "10",
         # Obfuscate the subject line of the NNTP post to prevent DMCA takedowns
         "obscure_subject": True,
+        # Pesto only: "light" also keeps archive filenames opaque inside the
+        # NZB; "full" hides them on NNTP but restores readable names in the NZB.
+        # Existing configs without this key retain Pesto's previous "full" mode.
+        "pesto_obfuscation_mode": "light",
         # --- UPLOADER AND VERIFICATION ---
         # Uploader backend: "nyuu" (default) or "pesto"
         # pesto handles PAR2 and NZB password injection internally

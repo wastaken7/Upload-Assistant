@@ -220,6 +220,7 @@ USENET_KEY_TYPES: dict[str, tuple[type, ...]] = {
     "archive_password": (str,),
     "par2_percentage": (str, int),
     "obscure_subject": (bool,),
+    "pesto_obfuscation_mode": (str,),
     "usenet_uploader": (str,),
     "pesto_check": (bool,),
     "pesto_season_upload": (bool,),
@@ -838,6 +839,16 @@ def _validate_usenet_section(usenet: dict[str, Any], is_usenet_active: bool = Fa
                     int(value)
                 except ValueError:
                     warnings.append(ConfigValidationWarning(f"Cannot parse '{value}' as integer", key=key, section="USENET"))
+
+    pesto_obfuscation_mode = str(usenet.get("pesto_obfuscation_mode", "full")).strip().lower()
+    if pesto_obfuscation_mode not in {"full", "light", "article", "full-shared"}:
+        warnings.append(
+            ConfigValidationWarning(
+                "Must be one of: full, light, article, full-shared",
+                key="pesto_obfuscation_mode",
+                section="USENET",
+            )
+        )
 
     return errors, warnings
 
