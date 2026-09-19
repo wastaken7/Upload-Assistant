@@ -41,6 +41,57 @@ def generate_random_poster() -> str:
     return f"{first.capitalize()} {last.capitalize()} <{email_user}@{domain}.{tld}>"
 
 
+def build_usenet_indexer_metas(meta: Meta, nzb_paths: list[str], trackers: list[str]) -> list[Meta]:
+    """Build one indexer submission per Pesto episode NZB, followed by the pack."""
+    if len(nzb_paths) <= 1:
+        meta.nzb_path = nzb_paths[0] if nzb_paths else meta.nzb_path
+        return [meta]
+
+    submissions: list[Meta] = []
+    source_root = Path(meta.path) if meta.path else None
+    for nzb_path in nzb_paths[:-1]:
+        episode_meta = meta.copy()
+        stem = Path(nzb_path).stem
+        episode_meta.nzb_path = nzb_path
+        episode_meta.name = stem
+        episode_meta.basename_no_ext = stem
+        episode_meta.scene_name = ""
+        episode_meta.tv_pack = False
+
+        season_episode = re.search(r"(?i)(?<![A-Z0-9])S(\d{1,3})((?:E\d{1,4})+)(?!\d)", stem)
+        if season_episode:
+            season_number = int(season_episode.group(1))
+            episode_numbers = [int(value) for value in re.findall(r"E(\d{1,4})", season_episode.group(2), re.IGNORECASE)]
+            episode_meta.season_int = season_number
+            episode_meta.season = f"S{season_number:02d}"
+            if episode_numbers:
+                episode_meta.episode_int = episode_numbers[0]
+                episode_meta.episode = "".join(f"E{number:02d}" for number in episode_numbers)
+
+        if source_root and source_root.is_dir():
+            source_entry = next(
+                (entry for entry in source_root.iterdir() if entry.name == stem or (entry.is_file() and entry.stem == stem)),
+                None,
+            )
+            if source_entry is not None:
+                episode_meta.path = str(source_entry)
+                episode_meta.filelist = [str(source_entry)]
+
+        episode_meta.tracker_status = {tracker.upper(): {"upload": True} for tracker in trackers}
+        submissions.append(episode_meta)
+
+    meta.nzb_path = nzb_paths[-1]
+    submissions.append(meta)
+    return submissions
+
+
+def select_usenet_indexers_for_submission(trackers: list[str], episodes_only_trackers: set[str], *, is_pack: bool) -> list[str]:
+    """Return indexers eligible for an episode or consolidated season NZB."""
+    if not is_pack:
+        return list(trackers)
+    return [tracker for tracker in trackers if tracker.upper() not in episodes_only_trackers]
+
+
 def get_path_size(path: str) -> int:
     """Calculate the total size of a file or directory in bytes."""
     if Path(path).is_file():
@@ -536,7 +587,7 @@ def _redact_pesto_command(cmd: list[str]) -> str:
     return " ".join(redacted_cmd)
 
 
-async def run_pesto_with_progress(cmd: list[str], cwd: str | None = None) -> None:
+async def run_pesto_with_progress(cmd: list[str], cwd: str | None = None, env: dict[str, str] | None = None) -> None:
     """Execute pesto upload consuming its JSON event stream for progress reporting."""
     redacted_str = _redact_pesto_command(cmd)
 
@@ -550,6 +601,7 @@ async def run_pesto_with_progress(cmd: list[str], cwd: str | None = None) -> Non
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             cwd=cwd,
+            env=env,
         )
 
         stderr_accum = []
@@ -901,6 +953,10 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
     if not input_path:
         logger.error("[red]Error: Input path is missing.[/red]")
         return None
+    uploader = str(usenet_cfg.get("usenet_uploader", "nyuu")).lower()
+    use_pesto = uploader == "pesto"
+    pesto_season_upload = use_pesto and bool(usenet_cfg.get("pesto_season_upload", False)) and meta.category == "TV" and bool(meta.tv_pack) and Path(input_path).is_dir()
+    meta.usenet_nzb_paths = []
     import hashlib
 
     # Shorten the UUID to prevent path-length issues (MAX_PATH limit of 260) on Windows specifically for Usenet staging
@@ -959,18 +1015,18 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
     final_nzb_path = Path(nzb_output_dir) / f"{safe_nzb_name}.nzb"
     nzb_file = Path(tmp_base) / uuid / f"{safe_nzb_name}.nzb"
 
-    for path_to_check in [final_nzb_path, nzb_file]:
-        if path_to_check and await is_valid_nzb(path_to_check):
-            return path_to_check
+    # A season run produces several NZBs, so a single pre-existing pack NZB
+    # is not enough to prove the whole batch has already completed.
+    if not pesto_season_upload:
+        for path_to_check in [final_nzb_path, nzb_file]:
+            if path_to_check and await is_valid_nzb(path_to_check):
+                return path_to_check
 
     # Temp Usenet directory
     usenet_dir = Path(tmp_base) / uuid / "usenet"
     await aiofiles.os.makedirs(usenet_dir, exist_ok=True)
 
     is_debug = meta.debug
-    uploader = str(usenet_cfg.get("usenet_uploader", "nyuu")).lower()
-    use_pesto = uploader == "pesto"
-
     path_7z: str | None = None
     path_par2: str | None = None
     path_nyuu: str | None = None
@@ -1026,7 +1082,17 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
     prepared_files = meta.get("usenet_prepared_files", [])
     use_prepared_files = not skip_archive and isinstance(prepared_files, list) and bool(prepared_files) and all(Path(str(file_path)).is_file() for file_path in prepared_files)
 
-    if use_prepared_files:
+    if pesto_season_upload:
+        # Pesto must see the season directory itself so it can treat each
+        # top-level entry as an episode. UA's normal whole-release archive
+        # would collapse that structure into one upload.
+        upload_root = Path(input_path)
+        cleanup_upload_root = False
+        upload_files = [upload_root]
+        if volume_size and str(volume_size).lower() == "auto":
+            volume_size = get_dynamic_volume_size(total_size)
+        logger.info("[cyan]Pesto season mode enabled; posting episodes individually and building a season NZB...[/cyan]")
+    elif use_prepared_files:
         upload_files = [Path(str(file_path)) for file_path in prepared_files]
         logger.debug("[cyan]Reusing prepared Usenet archive and PAR2 files.[/cyan]")
     elif skip_archive:
@@ -1127,7 +1193,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
             generated_par2_files = [file_path for file_path in sorted(Path(par2_output_dir).glob(f"{archive_name}.par2*")) if file_path.is_file()]
             upload_files.extend(file_path for file_path in generated_par2_files if file_path not in upload_files)
 
-    if not skip_archive:
+    if not skip_archive and not pesto_season_upload:
         meta.usenet_prepared_files = [str(file_path) for file_path in upload_files]
 
     if prepare_only:
@@ -1160,13 +1226,16 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
     nzb_file = Path(tmp_base) / uuid / f"{safe_nzb_name}.nzb"
 
     all_upload_files = []
-    for file_path in upload_files:
-        if not file_path.is_file():
-            continue
-        with contextlib.suppress(ValueError):
-            all_upload_files.append(str(file_path.relative_to(upload_root)))
-            continue
-        all_upload_files.append(str(file_path))
+    if pesto_season_upload:
+        all_upload_files = [str(Path(input_path).resolve())]
+    else:
+        for file_path in upload_files:
+            if not file_path.is_file():
+                continue
+            with contextlib.suppress(ValueError):
+                all_upload_files.append(str(file_path.relative_to(upload_root)))
+                continue
+            all_upload_files.append(str(file_path))
 
     logger.debug(f"[yellow]Posting {len(all_upload_files)} files to Usenet via NNTP ({uploader})...[/yellow]")
 
@@ -1209,6 +1278,8 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
 
     if use_pesto:
         # 6a. Upload via pesto
+        season_nzb_dir = Path(tmp_base) / uuid / "season-nzbs"
+        pesto_env: dict[str, str] | None = None
         cmd_pesto = [
             path_pesto or "pesto",
             "-s",
@@ -1223,8 +1294,6 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
             str(usenet_cfg.get("connections", 20)),
             "-g",
             usenet_cfg.get("newsgroups"),
-            "--out",
-            str(nzb_file),
             "--par2",
             str(par2_percentage),
             "--output-format",
@@ -1237,6 +1306,32 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
             # submission and causing it to be rejected as a duplicate.
             "--no-hooks",
         ]
+
+        if pesto_season_upload:
+            await aiofiles.os.makedirs(season_nzb_dir, exist_ok=True)
+            cmd_pesto.extend(["--season", "--nzb-dir", str(season_nzb_dir)])
+            # Preserve UA's archive settings, but let Pesto create one archive
+            # per episode rather than one archive around the entire season.
+            if not skip_archive:
+                cmd_pesto.append("--compress=7z")
+                if volume_size:
+                    cmd_pesto.extend(["--compress-volume-size", str(volume_size).lower()])
+                if archive_password:
+                    cmd_pesto.append(f"--password={archive_password}")
+
+                # UA's managed 7-Zip binary is named `7zz`, while Pesto looks
+                # specifically for `7z` (`7z.exe` on Windows) in PATH. Stage a
+                # private alias for this subprocess so managed and custom
+                # 7-Zip paths work without changing the process-wide PATH.
+                if path_7z and Path(path_7z).is_file():
+                    pesto_bin_dir = usenet_dir / "pesto-bin"
+                    await aiofiles.os.makedirs(pesto_bin_dir, exist_ok=True)
+                    seven_zip_alias = pesto_bin_dir / ("7z.exe" if os.name == "nt" else "7z")
+                    await asyncio.to_thread(shutil.copy2, path_7z, seven_zip_alias)
+                    pesto_env = os.environ.copy()
+                    pesto_env["PATH"] = os.pathsep.join([str(pesto_bin_dir), pesto_env.get("PATH", "")])
+        else:
+            cmd_pesto.extend(["--out", str(nzb_file)])
 
         if not usenet_cfg.get("ssl", True):
             cmd_pesto.append("--no-ssl")
@@ -1308,11 +1403,15 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
 
         if is_debug:
             logger.info(f"[yellow][DEBUG SIMULATION] Would run Pesto upload: {_redact_pesto_command(cmd_pesto)}[/yellow]")
-            async with aiofiles.open(nzb_file, "w", encoding="utf-8") as f:
-                await f.write(mock_nzb_content)
+            debug_nzbs = [nzb_file]
+            if pesto_season_upload:
+                debug_nzbs = [season_nzb_dir / "Show.S01E01.nzb", season_nzb_dir / f"{Path(input_path).name}.nzb"]
+            for debug_nzb in debug_nzbs:
+                async with aiofiles.open(debug_nzb, "w", encoding="utf-8") as f:
+                    await f.write(mock_nzb_content)
         else:
             try:
-                await run_pesto_with_progress(cmd_pesto, cwd=str(upload_root))
+                await run_pesto_with_progress(cmd_pesto, cwd=str(upload_root), env=pesto_env)
             except Exception:
                 # pesto writes the NZB to --out before it knows the post-check
                 # verification failed, so a failed run can still leave a
@@ -1321,7 +1420,9 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
                 # attempt would find it at the top of this function and reuse
                 # it as-is instead of re-uploading the missing articles.
                 with contextlib.suppress(Exception):
-                    if await aiofiles.ospath.exists(nzb_file):
+                    if pesto_season_upload and await aiofiles.ospath.exists(season_nzb_dir):
+                        await asyncio.to_thread(shutil.rmtree, season_nzb_dir)
+                    elif await aiofiles.ospath.exists(nzb_file):
                         await aiofiles.os.remove(nzb_file)
                 await cleanup_temp_upload_dir()
                 raise
@@ -1436,6 +1537,33 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
     await cleanup_temp_upload_dir()
 
     # 8. Relocate NZB output
+    if pesto_season_upload:
+        generated_nzbs = sorted(path for path in season_nzb_dir.glob("*.nzb") if path.is_file())
+        expected_pack_name = f"{Path(input_path).name}.nzb"
+        pack_nzb = next((path for path in generated_nzbs if path.name == expected_pack_name), None)
+        if pack_nzb is None:
+            logger.error(f"[red]Pesto season upload did not produce the expected pack NZB '{expected_pack_name}'.[/red]")
+            return None
+
+        ordered_nzbs = [path for path in generated_nzbs if path != pack_nzb] + [pack_nzb]
+        relocated_nzbs: list[str] = []
+        for generated_nzb in ordered_nzbs:
+            destination = Path(nzb_output_dir) / generated_nzb.name
+            try:
+                if destination.exists():
+                    destination.unlink()
+                await asyncio.to_thread(shutil.move, generated_nzb, destination)
+                relocated_nzbs.append(str(destination))
+            except Exception as e:
+                logger.error(f"[red]Error moving season NZB '{generated_nzb}' to final destination: {e}[/red]")
+                relocated_nzbs.append(str(generated_nzb))
+
+        meta.usenet_nzb_paths = relocated_nzbs
+        with contextlib.suppress(Exception):
+            if await aiofiles.ospath.exists(season_nzb_dir) and not any(season_nzb_dir.iterdir()):
+                await asyncio.to_thread(os.rmdir, season_nzb_dir)
+        return Path(relocated_nzbs[-1]) if relocated_nzbs else None
+
     if await aiofiles.ospath.exists(nzb_file):
         try:
             await asyncio.to_thread(shutil.move, nzb_file, final_nzb_path)

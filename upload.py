@@ -2756,30 +2756,80 @@ async def do_the_thing(base_dir: str) -> None:
 
                     async def upload_usenet_flow(meta: Meta, usenet_trackers: list[str], need_usenet_post: bool, has_usenet_trackers: bool) -> None:
                         if need_usenet_post:
-                            from src.usenetcreate import prepare_and_upload_usenet
+                            from src.usenetcreate import build_usenet_indexer_metas, prepare_and_upload_usenet, select_usenet_indexers_for_submission
 
                             try:
+                                episodes_only_trackers = {tracker.strip().upper() for tracker in meta.usenet_episodes_only if tracker.strip()}
+                                if episodes_only_trackers:
+                                    selected_usenet_trackers = {tracker.strip().upper() for tracker in usenet_trackers}
+                                    unknown_trackers = episodes_only_trackers - selected_usenet_trackers
+                                    if unknown_trackers:
+                                        raise ValueError(
+                                            f"--usenet-episodes-only contains indexers that are not selected for this upload: {', '.join(sorted(unknown_trackers))}"
+                                        )
+                                    usenet_cfg = config.get("USENET", {})
+                                    if (
+                                        str(usenet_cfg.get("usenet_uploader", "nyuu")).lower() != "pesto"
+                                        or not usenet_cfg.get("pesto_season_upload", False)
+                                        or meta.category != "TV"
+                                        or not meta.tv_pack
+                                    ):
+                                        raise ValueError("--usenet-episodes-only requires an active Pesto season-pack upload")
+
                                 nzb_path = await prepare_and_upload_usenet(meta, config)
                                 if nzb_path:
                                     meta.nzb_path = nzb_path
                                     logger.info("[bold green]Usenet upload completed successfully!")
                                     if usenet_trackers:
-                                        meta_usenet = meta.copy()
-                                        meta_usenet["trackers"] = usenet_trackers
-                                        # Meta.copy() is deep; keep results on the queue item's
-                                        # status map so its final summary can see this flow.
-                                        meta_usenet.tracker_status = meta.tracker_status
-                                        logger.info(f"[yellow]Processing uploads to Usenet indexers: {', '.join(usenet_trackers)}.....")
-                                        await process_trackers(
-                                            meta_usenet,
-                                            config,
-                                            client,
-                                            list(api_trackers),
-                                            tracker_class_map,
-                                            list(http_trackers),
-                                            list(other_api_trackers),
-                                            upload_target="usenet indexer",
-                                        )
+                                        nzb_paths = meta.usenet_nzb_paths or [str(nzb_path)]
+                                        indexer_metas = build_usenet_indexer_metas(meta, nzb_paths, usenet_trackers)
+                                        logger.info(f"[yellow]Processing {len(indexer_metas)} NZB upload(s) to Usenet indexers: {', '.join(usenet_trackers)}.....")
+                                        failed_episode_nzbs: dict[str, list[str]] = {tracker.upper(): [] for tracker in usenet_trackers}
+                                        for index, meta_usenet in enumerate(indexer_metas, start=1):
+                                            is_pack_submission = meta_usenet is meta and len(indexer_metas) > 1
+                                            submission_trackers = select_usenet_indexers_for_submission(
+                                                usenet_trackers,
+                                                episodes_only_trackers,
+                                                is_pack=is_pack_submission,
+                                            )
+                                            meta_usenet["trackers"] = submission_trackers
+                                            # Keep the final pack's results on the queue item's
+                                            # status map so its final summary can see this flow.
+                                            if meta_usenet is not meta:
+                                                logger.info(f"[cyan]Submitting episode NZB {index}/{len(indexer_metas)}: {Path(meta_usenet.nzb_path).name}[/cyan]")
+                                            else:
+                                                meta_usenet.tracker_status = meta.tracker_status
+                                                if len(indexer_metas) > 1:
+                                                    logger.info(f"[cyan]Submitting season NZB {index}/{len(indexer_metas)}: {Path(meta_usenet.nzb_path).name}[/cyan]")
+                                            if submission_trackers:
+                                                await process_trackers(
+                                                    meta_usenet,
+                                                    config,
+                                                    client,
+                                                    list(api_trackers),
+                                                    tracker_class_map,
+                                                    list(http_trackers),
+                                                    list(other_api_trackers),
+                                                    upload_target="usenet indexer",
+                                                )
+                                            elif is_pack_submission:
+                                                logger.info("[yellow]Skipping the season NZB for indexers selected by --usenet-episodes-only.[/yellow]")
+                                            if meta_usenet is not meta:
+                                                for tracker in usenet_trackers:
+                                                    tracker_key = tracker.upper()
+                                                    if not cast(Mapping[str, Any], meta_usenet.tracker_status.get(tracker_key, {})).get("upload_success", False):
+                                                        failed_episode_nzbs[tracker_key].append(Path(meta_usenet.nzb_path).name)
+
+                                        for tracker_key, failed_nzbs in failed_episode_nzbs.items():
+                                            if failed_nzbs:
+                                                status = meta.tracker_status.setdefault(tracker_key, {})
+                                                status["upload_success"] = False
+                                                status["status_message"] = f"data error: {len(failed_nzbs)} episode NZB upload(s) failed: {', '.join(failed_nzbs)}"
+                                                logger.info(f"[red]{tracker_key}: {status['status_message']}[/red]")
+                                            elif tracker_key in episodes_only_trackers:
+                                                status = meta.tracker_status.setdefault(tracker_key, {})
+                                                status["upload_success"] = True
+                                                status["status_message"] = "Episode NZBs uploaded; season pack skipped by --usenet-episodes-only"
                                 else:
                                     logger.info("[bold red]Usenet upload failed.[/bold red]")
                                     status_map = meta.tracker_status

@@ -267,6 +267,9 @@ See [Upload Order and qBittorrent Bandwidth Control](upload-order-and-bandwidth-
 
 - `-u`, `--usenet`: Trigger Usenet upload.
 - `--usenet-subject SUBJECT`: Custom subject line for the Usenet post.
+- `--usenet-episodes-only INDEXER[,INDEXER...]`: With Pesto season mode, submit
+  episode NZBs but skip the final season-pack NZB for the named Usenet
+  indexers. Other selected indexers still receive both episodes and the pack.
 
 ## Unattended (hidden)
 

@@ -1006,6 +1006,16 @@ class Args:
         )
         parser.add_argument("-u", "--usenet", action="store_true", required=False, help="Upload files to Usenet (NNTP)")
         parser.add_argument("--usenet-subject", nargs=1, required=False, help="Custom subject line for Usenet post", type=str, dest="usenet_subject", default=None)
+        episodes_only_action = parser.add_argument(
+            "--usenet-episodes-only",
+            nargs=1,
+            required=False,
+            help="Pesto season mode: submit episode NZBs, but not the season pack, to these comma-separated Usenet indexers",
+            type=str,
+            dest="usenet_episodes_only",
+            default=None,
+        )
+        episodes_only_action.completer = _tracker_completer
         parser.add_argument(
             "--archive-password",
             nargs=1,
@@ -1098,6 +1108,8 @@ class Args:
                             meta.set_tracker_ids({tracker_name: torrent_id})
                     elif key == "manual_cast":
                         meta.manual_cast = [name.strip() for name in value2.split(",") if name.strip()]
+                    elif key == "usenet_episodes_only":
+                        meta.usenet_episodes_only = [tracker.strip().upper() for tracker in value2.split(",") if tracker.strip()]
                     elif key == "openlibrary":
                         if value2.startswith("http"):
                             parsed = urllib.parse.urlparse(value2)

@@ -222,6 +222,7 @@ USENET_KEY_TYPES: dict[str, tuple[type, ...]] = {
     "obscure_subject": (bool,),
     "usenet_uploader": (str,),
     "pesto_check": (bool,),
+    "pesto_season_upload": (bool,),
     "pesto_check_delay": (str, int),
     "pesto_check_retries": (str, int),
     "pesto_check_connections": (str, int),

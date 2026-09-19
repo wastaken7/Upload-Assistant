@@ -3618,6 +3618,10 @@ config: dict[str, Any] = {
         # Uploader backend: "nyuu" (default) or "pesto"
         # pesto handles PAR2 and NZB password injection internally
         "usenet_uploader": "nyuu",
+        # pesto only: for TV season packs, upload each top-level episode as an
+        # independent release and also generate a consolidated season NZB.
+        # Every generated NZB is then submitted to the configured indexers.
+        "pesto_season_upload": False,
         # pesto only: a streaming STAT check that runs concurrently with the
         # upload, confirming each article shortly after it posts. Missing
         # articles are reposted and reverified automatically; the upload is

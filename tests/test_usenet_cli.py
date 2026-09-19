@@ -18,6 +18,15 @@ def test_archive_password_cli_override_marks_static_password(tmp_path):
     assert meta.usenet_archive_password_is_random is False
 
 
+def test_usenet_episodes_only_normalizes_comma_separated_indexers(tmp_path):
+    meta, _, _ = Args({"DEFAULT": {"screens": 1}}).parse(
+        [str(tmp_path), "--usenet-episodes-only", "curupira, NzbNest"],
+        Meta(),
+    )
+
+    assert meta.usenet_episodes_only == ["CURUPIRA", "NZBNEST"]
+
+
 def test_name_cli_override_sets_manual_release_name(tmp_path):
     meta, _, _ = Args({"DEFAULT": {"screens": 1}}).parse([str(tmp_path), "--name", "Custom.Release.Name"], Meta())
 
