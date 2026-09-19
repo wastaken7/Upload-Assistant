@@ -6,6 +6,7 @@ import mimetypes
 import platform
 import re
 import shutil
+import unicodedata
 import zipfile
 from pathlib import Path
 from typing import Any, ClassVar, cast
@@ -49,10 +50,10 @@ class MakingOff:
     allows_bloated_audio = True
     tmdb_localization_requirements: ClassVar = {
         "pt-BR": {
-            "main": "credits,translations",
+            "main": "credits,translations,videos",
         },
         "en-US": {
-            "main": "credits,translations",
+            "main": "credits,translations,videos",
         },
     }
 
@@ -70,9 +71,9 @@ class MakingOff:
 
     AUDIO_CODEC_MAP: ClassVar[list[tuple[list[str], str]]] = [
         (["aac"], "AAC"),
-        (["e-ac-3", "eac3"], "E-AC-3 (Dolby Digital Plus)"),
-        (["ac-3", "ac3"], "AC-3 (Dolby Digital)"),
-        (["truehd"], "Dolby TrueHD"),
+        (["e-ac-3", "eac3"], "E-AC-3"),
+        (["ac-3", "ac3"], "AC-3"),
+        (["truehd"], "TrueHD"),
         (["dts"], "DTS"),
         (["mp3", "mpeg audio"], "MP3"),
         (["flac"], "FLAC"),
@@ -87,6 +88,7 @@ class MakingOff:
         # Cache for the resolved PT-BR display title, keyed by meta.uuid.
         self._display_title_cache: dict[str, str] = {}
         self._csrf_token: str = ""
+        self._prefix_ids: dict[str, str] = {}
 
         tracker_config = dict(dict(config.get("TRACKERS", {})).get("MAKINGOFF", {}))
         public_trackers_raw = tracker_config.get("trackers", [])
@@ -180,31 +182,72 @@ class MakingOff:
         """Return the text unchanged (XenForo supports native UTF-8)."""
         return text
 
-    def _screen_rows(self, image_urls: list[str]) -> str:
-        """Pair screenshot URLs into two-column BBCode rows matching makingoff structure."""
-        # The forum permits no more than eight screenshots.  The upload check
-        # reports an overage, but retain this cap here as a defensive measure
-        # for callers which generate a description directly.
-        image_urls = image_urls[:8]
-        scr = [image_urls[i] if i < len(image_urls) else "" for i in range(max(4, len(image_urls)))]
+    @staticmethod
+    def _slugify_tag(value: str) -> str:
+        slug = unicodedata.normalize("NFD", value).encode("ascii", "ignore").decode().lower()
+        slug = re.sub("['\u2019]", "", slug)
+        return re.sub(r"[^a-z0-9]+", "-", slug).strip("-")
 
-        # Row 4 already opened in _build_bbcode with [tr][poster]...[tableScreen]Screenshots[/tableScreen]
-        cg = f"[screenLeft][screenIma]{scr[0]}[/screenIma][/screenLeft][screenRight][screenIma]{scr[1]}[/screenIma][/screenRight][/tr]"
-        cg += f"[tr][screenLeft][screenIma]{scr[2]}[/screenIma][/screenLeft][screenRight][screenIma]{scr[3]}[/screenIma][/screenRight]"
+    @classmethod
+    def _tag_links(cls, value: str) -> str:
+        """Render a comma-separated value as MakingOff's searchable tags."""
+        links: list[str] = []
+        for item in value.split(","):
+            label = item.strip()
+            slug = cls._slugify_tag(label)
+            if label and slug:
+                links.append(f"[TAG={slug}]{label}[/TAG]")
+        return ", ".join(links)
 
-        # Check if we have additional screens (5 & 6)
-        if len(scr) >= 5 and scr[4]:
-            scr5 = scr[4]
-            scr6 = scr[5] if len(scr) > 5 else ""
-            cg += f"[/tr][tr][screenLeft][screenIma]{scr5}[/screenIma][/screenLeft][screenRight][screenIma]{scr6}[/screenIma][/screenRight]"
-            # Check if we have 7 & 8
-            if len(scr) >= 7 and scr[6]:
-                scr7 = scr[6]
-                scr8 = scr[7] if len(scr) > 7 else ""
-                cg += f"[/tr][tr][screenLeft][screenIma]{scr7}[/screenIma][/screenLeft][screenRight][screenIma]{scr8}[/screenIma][/screenRight]"
+    @staticmethod
+    def _resolution_quality(res_str: str) -> str:
+        """Return the quality label used by the current MakingOff generator."""
+        match = re.search(r"(\d{2,5})\s*[x\u00d7]\s*(\d{2,5})", res_str)
+        if not match:
+            return ""
+        width, height = map(int, match.groups())
+        if width >= 3600 or height >= 2000:
+            return "4K · 2160p"
+        if width >= 1700 or height >= 900:
+            return "FHD · 1080p"
+        if width >= 1150 or height >= 650:
+            return "HD · 720p"
+        if height >= 550:
+            return "SD · 576p"
+        return "SD · 480p" if height else ""
 
-        cg += "[closeTab][/closeTab][/tr]"
-        return cg
+    @staticmethod
+    def _youtube_id(url: str) -> str:
+        match = re.search(r"(?:youtu\.be/|youtube\.com/(?:watch\?v=|embed/|shorts/|live/))([\w-]{6,})", url)
+        return match.group(1) if match else ""
+
+    @staticmethod
+    def _tmdb_youtube_trailer(*localized_main: dict[str, Any]) -> str:
+        """Choose the best localized YouTube trailer using the generator's priorities."""
+        candidates: list[dict[str, Any]] = []
+        for main in localized_main:
+            candidates.extend(cast(list[dict[str, Any]], main.get("videos", {}).get("results", [])))
+
+        def score(video: dict[str, Any]) -> tuple[int, str]:
+            name = str(video.get("name", "")).lower()
+            value = 100 if video.get("official") is True else 0
+            value += 40 if "official trailer" in name or "trailer oficial" in name else 20 if "official" in name else 0
+            value += 15 if str(video.get("iso_3166_1", "")).upper() == "BR" else 0
+            value += 10 if str(video.get("iso_639_1", "")).lower() == "pt" else 0
+            return value, str(video.get("published_at", ""))
+
+        trailers = [video for video in candidates if str(video.get("site", "")).lower() == "youtube" and str(video.get("type", "")).lower() == "trailer" and video.get("key")]
+        selected = max(trailers, key=score, default=None)
+        return f"https://www.youtube.com/watch?v={selected['key']}" if selected else ""
+
+    @staticmethod
+    def _audio_channels(audio_track: dict[str, Any]) -> str:
+        raw = str(audio_track.get("Channel(s)") or audio_track.get("Channels") or "")
+        match = re.search(r"\d+", raw)
+        if not match:
+            return raw
+        count = int(match.group())
+        return {1: "1.0", 2: "2.0", 3: "3.0", 4: "4.0", 5: "5.0", 6: "5.1", 7: "6.1", 8: "7.1"}.get(count, f"{count} canais")
 
     def _get_ffmpeg_path(self, meta: Meta) -> str:
         if configured := configured_binary("ffmpeg_path", self.config):
@@ -427,73 +470,159 @@ class MakingOff:
         aspect: str,
         fps_str: str,
         filesize: str,
+        crew_text: str = "",
+        audio_channels: str = "",
+        tmdb_id: str = "",
+        youtube_url: str = "",
         awards: str = "",
         trivia: str = "",
         critic: str = "",
     ) -> str:
         """Render and return the complete BBCode post body matching MakingOff's JavaScript generator."""
-        s_rows = self._screen_rows(image_urls)
+        res_display = res_str.replace("x", "\u00d7")
+        video_quality = self._resolution_quality(res_str)
+        aspect_tag = re.search(r"\(([^()]+)\)$", aspect)
+        aspect_value = aspect_tag.group(1) if aspect_tag else aspect
+        video_bitrate = f"{video_brate} Kbps" if video_brate and video_brate != "None" else ""
+        audio_bitrate = f"{audio_brate} Kbps" if audio_brate and audio_brate != "None" else ""
 
-        bbcode = "[tablePrinc][tr][titMasc]Título do Filme[/titMasc][/tr]"
-        bbcode += f"[tr][titTrad]{title_br}[/titTrad][titOri]{title_orig}[/titOri]"
-        if release:
-            bbcode += f"[release]{release}[/release][/tr]"
-        else:
-            bbcode += "[release]Release não informado[/release][/tr]"
-
-        bbcode += "[tr][posterMasc]Poster[/posterMasc][sinopseMasc]Sinopse[/sinopseMasc][/tr]"
-        bbcode += f"[tr][poster][posterIma]{poster_url}[/posterIma][/poster][sinopse]{overview}[/sinopse]"
-        bbcode += "[tableScreen]Screenshots[/tableScreen]"
-        bbcode += f"{s_rows}[/tablePrinc]"
-
-        bbcode += "[tablePrinc][tr][posterMasc]Elenco[/posterMasc]"
-        bbcode += "[infoMasc]Informações sobre o filme[/infoMasc]"
-        bbcode += "[infoMasc]Informações sobre o release[/infoMasc][/tr]"
-        bbcode += f"[tr][elenco]{cast_text}[/elenco]"
-
-        bbcode += f"[info][b]Gênero: [/b]{genres}\n"
-        bbcode += f"[b]Diretor: [/b]{directors}\n"
-        if duration:
-            bbcode += f"[b]Duração: [/b]{duration} minutos\n"
-        bbcode += f"[b]Ano de Lançamento: [/b]{year}\n"
-        bbcode += f"[b]País de Origem: [/b]{countries}\n"
-        bbcode += f"[b]Idioma do Áudio: [/b]{audio}\n"
+        title_info = f"[TITULOBR]{title_br}[/TITULOBR]"
+        if year:
+            title_info += f" ([ANO]{year}[/ANO])"
         if imdb_url:
-            bbcode += f"[b]IMDB: [/b][url={imdb_url}]{imdb_url}[/url]\n"
-        if homepage_url:
-            bbcode += f"[b]Site Oficial: [/b][url={homepage_url}]{homepage_url}[/url]\n"
-        bbcode += "[/info]"
+            title_info += f'\n[IMDB][URL="{imdb_url}"]IMDb[/URL][/IMDB]'
 
-        bbcode += f"[info][b]Qualidade de Vídeo: [/b]{quality}\n"
-        if container:
-            bbcode += f"[b]Container: [/b]{container}\n"
-        if video_codec:
-            bbcode += f"[b]Vídeo Codec: [/b]{video_codec}\n"
-        if video_brate and video_brate != "None":
-            bbcode += f"[b]Vídeo Bitrate: [/b]{video_brate} Kbps\n"
-        if audio_codec:
-            bbcode += f"[b]Áudio Codec: [/b]{audio_codec}\n"
-        if audio_brate and audio_brate != "None":
-            bbcode += f"[b]Áudio Bitrate: [/b]{audio_brate} Kbps\n"
-        if res_str and "x0" not in res_str and "0x" not in res_str:
-            bbcode += f"[b]Resolução: [/b]{res_str}\n"
-        if aspect:
-            bbcode += f"[b]Formato de Tela: [/b]{aspect}\n"
-        if fps_str:
-            bbcode += f"[b]Frame Rate: [/b]{fps_str}\n"
-        bbcode += f"[b]Tamanho: [/b]{filesize}\n"
-        bbcode += f"[b]Legendas: [/b]{subs}[/info]"
+        details = "\n".join(
+            item
+            for item in (
+                f"[PAIS]{self._tag_links(countries)}[/PAIS]" if countries else "",
+                f"[GENERO]{self._tag_links(genres)}[/GENERO]" if genres else "",
+                f"[IDIOMA]{audio}[/IDIOMA]" if audio else "",
+            )
+            if item
+        )
+        format_line = " · ".join(item for item in (f"[FORMATO]{quality}[/FORMATO]" if quality else "", f"[CONTAINER]{container}[/CONTAINER]" if container else "") if item)
+        video_line = " · ".join(
+            item
+            for item in (
+                f"[QUALIDADE]{video_quality}[/QUALIDADE]" if video_quality else "",
+                f"[VIDEOCODEC]{video_codec}[/VIDEOCODEC]" if video_codec else "",
+                f"[VIDEOBITRATE]{video_bitrate}[/VIDEOBITRATE]" if video_bitrate else "",
+                f"[RESOLUCAO]{res_display}[/RESOLUCAO]" if res_display and "0" not in res_display.split("\u00d7") else "",
+                f"[ASPECTRATIO]{aspect_value}[/ASPECTRATIO]" if aspect_value else "",
+                f"[FRAMERATE]{fps_str}[/FRAMERATE]" if fps_str else "",
+            )
+            if item
+        )
+        audio_line = " · ".join(
+            item
+            for item in (
+                f"[AUDIOCODEC]{audio_codec}[/AUDIOCODEC]" if audio_codec else "",
+                f"[AUDIOCANAIS]{audio_channels}[/AUDIOCANAIS]" if audio_channels else "",
+                f"[AUDIOBITRATE]{audio_bitrate}[/AUDIOBITRATE]" if audio_bitrate else "",
+            )
+            if item
+        )
+        subtitle_tooltip = "" if subs == "Sem Legenda" else "pt-BR"
+        subtitle_text = "[TAG=legendas-exclusivas]Exclusivas![/TAG]" if subs == "Exclusivas!" else subs
+        subtitles = f'[LEGENDAS="{subtitle_tooltip}"]{subtitle_text}[/LEGENDAS]'
+        technical = "\n".join(
+            item
+            for item in (
+                format_line,
+                f"[DURACAO]{duration} minutos[/DURACAO]" if duration else "",
+                f"[TAMANHO]{filesize}[/TAMANHO]" if filesize else "",
+                subtitles,
+                f"[VIDEO]{video_line}[/VIDEO]" if video_line else "",
+                f"[AUDIO]{audio_line}[/AUDIO]" if audio_line else "",
+            )
+            if item
+        )
 
+        info = "\n".join(
+            item
+            for item in (
+                f"[TITULOINFO]\n{title_info}\n[/TITULOINFO]",
+                f"[TITULO]{title_orig}[/TITULO]" if title_orig else "",
+                f"[DIRECAO]{self._tag_links(directors)}[/DIRECAO]" if directors else "",
+                f"[DETALHES]\n{details}\n[/DETALHES]" if details else "",
+                f"[RELEASE]{release}[/RELEASE]" if release else "",
+                f"[INFOTEC]\n{technical}\n[/INFOTEC]" if technical else "",
+            )
+            if item
+        )
+        poster = f"[POSTER][IMG]{poster_url}[/IMG][/POSTER]" if poster_url else "[POSTER][/POSTER]"
+        head = f"[PRINCIPAL]\n[DADOS]\n{poster}\n[INFO]\n{info}\n[/INFO]\n[/DADOS]\n[SINOPSE]{overview}[/SINOPSE]\n[/PRINCIPAL]"
+
+        imdb_id = re.search(r"tt\d+", imdb_url)
+        credits_links: list[str] = []
+        if imdb_id:
+            credits_links.append(f'[URL="https://www.imdb.com/title/{imdb_id.group()}/fullcredits/"]IMDb[/URL]')
+        if tmdb_id:
+            tmdb_path = f"{tmdb_id}-{self._slugify_tag(title_orig)}" if title_orig else tmdb_id
+            credits_links.append(f'[URL="https://www.themoviedb.org/movie/{tmdb_path}/cast"]TMDb[/URL]')
+        credits_more = f"Mais informações: {', '.join(credits_links)}." if credits_links else ""
+
+        tabs: list[tuple[str, str, str]] = []
+        screenshots = "\n".join(f"[SCREENSHOT][IMG]{url}[/IMG][/SCREENSHOT]" for url in image_urls[:8] if url)
+        if screenshots:
+            tabs.append(("screenshots", "Screenshots", f"[SCREENSHOTSGRID]\n{screenshots}\n[/SCREENSHOTSGRID]"))
+        youtube_id = self._youtube_id(youtube_url)
+        if youtube_id:
+            tabs.append(("trailer", "Trailer", f"[MEDIA=youtube]{youtube_id}[/MEDIA]"))
+        if crew_text:
+            crew_content = f"{crew_text}\n\n{credits_more}" if credits_more else crew_text
+            tabs.append(("equipe", "Equipe", f"[TABTEXTO]{crew_content}[/TABTEXTO]"))
+        if cast_text:
+            cast_content = cast_text.rstrip(".") + "."
+            if credits_more:
+                cast_content += f"\n\n{credits_more}"
+            tabs.append(("elenco", "Elenco", f"[TABTEXTO]{cast_content}[/TABTEXTO]"))
         if awards:
-            bbcode += f"[/tr][tr][infoExtraMasc]Premiações[/infoExtraMasc][/tr][tr][infoExtra]{awards}[/infoExtra]"
+            awards_content = awards.rstrip(".") + "."
+            if imdb_id:
+                awards_content += f'\n\nMais informações: [URL="https://www.imdb.com/title/{imdb_id.group()}/awards/"]IMDb[/URL].'
+            tabs.append(("premiacoes", "Premiações", f"[TABTEXTO]{awards_content}[/TABTEXTO]"))
         if trivia:
-            bbcode += f"[/tr][tr][infoExtraMasc]Curiosidades[/infoExtraMasc][/tr][tr][infoExtra]{trivia}[/infoExtra]"
+            tabs.append(("curiosidades", "Curiosidades", f"[TABTEXTO][JUSTIFY]{trivia}[/JUSTIFY][/TABTEXTO]"))
         if critic:
-            bbcode += f"[/tr][tr][infoExtraMasc]Crítica[/infoExtraMasc][/tr][tr][infoExtra]{critic}[/infoExtra]"
+            tabs.append(("critica", "Crítica", f"[TABTEXTO][JUSTIFY]{critic}[/JUSTIFY][/TABTEXTO]"))
 
-        bbcode += "[/tr][tr][rodape]Coopere, deixe semeando ao menos duas vezes o tamanho do arquivo que baixar.[/rodape][/tr][/tablePrinc]"
+        extras_links: list[str] = []
+        if imdb_url:
+            extras_links.append(f'[URL="{imdb_url}"]IMDb[/URL]')
+        if tmdb_id:
+            extras_links.append(f'[URL="https://www.themoviedb.org/movie/{tmdb_id}"]TMDb[/URL]')
+        if imdb_id:
+            extras_links.append(f'[URL="https://www.letterboxd.com/imdb/{imdb_id.group()}"]Letterboxd[/URL]')
+        if homepage_url:
+            extras_links.append(f'[URL="{homepage_url}"]Site Oficial[/URL]')
+        if extras_links:
+            tabs.append(("extras", "Extras", f"[TABTEXTO]Mais informações: {', '.join(extras_links)}.[/TABTEXTO]"))
 
-        return self._html_encode(bbcode)
+        mediainfo_lines = [
+            f"Qualidade de Vídeo: {quality}",
+            f"Container: {container}",
+            f"Vídeo Codec: {video_codec}",
+            f"Vídeo Bitrate: {video_bitrate}",
+            f"Áudio Codec: {audio_codec}",
+            f"Áudio Bitrate: {audio_bitrate}",
+            f"Resolução: {res_str}",
+            f"Formato de Tela: {aspect}",
+            f"Frame Rate: {fps_str}",
+            f"Tamanho: {filesize}",
+            f"Legendas: {subs}",
+        ]
+        mediainfo_text = "\n".join(line for line in mediainfo_lines if line.split(": ", 1)[-1])
+        tabs.append(("mediainfo", "MediaInfo", f"[MEDIAINFO]{mediainfo_text}[/MEDIAINFO]"))
+
+        nav = "\n".join(f"[{'TABATIVA' if index == 0 else 'TAB'}=id-{key}]{label}[/{'TABATIVA' if index == 0 else 'TAB'}]" for index, (key, label, _) in enumerate(tabs))
+        panels = "\n".join(
+            f"[{'TABPAINELATIVO' if index == 0 else 'TABPAINEL'}=id-{key}]\n{content}\n[/{'TABPAINELATIVO' if index == 0 else 'TABPAINEL'}]"
+            for index, (key, _, content) in enumerate(tabs)
+        )
+        tabs_block = f"[TABS]\n[TABNAV]\n{nav}\n[/TABNAV]\n[TABPAINEIS]\n{panels}\n[/TABPAINEIS]\n[/TABS]"
+        return self._html_encode(f"[FILME]\n{head}\n{tabs_block}\n[/FILME]")
 
     def _get_lang_name(self, lang_string: str) -> str:
         if not lang_string:
@@ -509,7 +638,7 @@ class MakingOff:
         return lang_string.capitalize()
 
     def _localizer_countries(self, meta: Meta) -> str:
-        """Convert the first production country code to PT-BR name, matching the JS generator."""
+        """Convert production country codes to PT-BR names, matching the JS generator."""
         try:
             pt_normal = gettext.translation("iso3166-1", pycountry.LOCALES_DIR, languages=["pt_BR"])
             pt_historic = gettext.translation("iso3166-3", pycountry.LOCALES_DIR, languages=["pt_BR"])
@@ -529,21 +658,20 @@ class MakingOff:
         if not codes or not codes[0]:
             return "Desconhecido"
 
-        code_upper = codes[0].upper()
-        if code_upper in custom_country_mapping:
-            return custom_country_mapping[code_upper]
-
-        # Tenta encontrar no pycountry (países ativos)
-        country = pycountry.countries.get(alpha_2=code_upper)
-        if country:
-            return pt_normal.gettext(country.name) if pt_normal else country.name
-
-        # Tenta encontrar no pycountry (países históricos, ex: SU)
-        historic_country = pycountry.historic_countries.get(alpha_2=code_upper)
-        if historic_country:
-            return pt_historic.gettext(historic_country.name) if pt_historic else historic_country.name
-
-        return codes[0]
+        localized: list[str] = []
+        for code in codes:
+            code_upper = code.upper()
+            if code_upper in custom_country_mapping:
+                name = custom_country_mapping[code_upper]
+            elif country := pycountry.countries.get(alpha_2=code_upper):
+                name = pt_normal.gettext(country.name) if pt_normal else country.name
+            elif historic_country := pycountry.historic_countries.get(alpha_2=code_upper):
+                name = pt_historic.gettext(historic_country.name) if pt_historic else historic_country.name
+            else:
+                name = code
+            if name not in localized:
+                localized.append(name)
+        return ", ".join(localized)
 
     def _localizer_genres(self, meta: Meta) -> str:
         """Convert genre names to PT-BR.
@@ -592,23 +720,78 @@ class MakingOff:
 
     def _localizer_video_quality(self, meta: Meta) -> str:
         """Convert release type to a localised video quality label matching MakingOff options."""
+        release = re.sub(r"[\s._-]+", "", self._release_tokens(meta))
+        if str(meta.is_disc).upper() == "DVD":
+            return "DVD Full"
+        if ("bluray" in release and "remux" in release) or "bdremux" in release:
+            return "Blu-ray Remux"
+        if ("bluray" in release and "full" in release) or "bdfull" in release:
+            return "Blu-ray Full"
+        detected_formats = (
+            ("bdrip", "BDRip"),
+            ("webdl", "WEB-DL"),
+            ("webrip", "WEBRip"),
+            ("dvdrip", "DVDRip"),
+            ("dvdfull", "DVD Full"),
+            ("dvd5", "DVD Full"),
+            ("dvd9", "DVD Full"),
+            ("satrip", "SATRip"),
+            ("hdtvrip", "HDTVRip"),
+            ("hdtv", "HDTVRip"),
+            ("tvrip", "TVRip"),
+            ("vhsrip", "VHSRip"),
+        )
+        for marker, label in detected_formats:
+            if marker in release:
+                return label
+
         type_raw = (meta.type or "").upper()
 
         video_quality_ptbr: dict[str, str] = {
-            "WEBDL": "Web DL",
-            "WEBRIP": "Web DL",
+            "WEBDL": "WEB-DL",
+            "WEBRIP": "WEBRip",
             "BLURAY": "BDRip",
-            "REMUX": "BR Remux",
+            "REMUX": "Blu-ray Remux",
             "ENCODE": "BDRip",
-            "DISC": "Blu-Ray Full",
-            "DVDRIP": "DVD Rip",
-            "HDTV": "HDTV Rip",
-            "TVRIP": "TV Rip",
-            "VHSRIP": "VHS Rip",
-            "CAM": "Outro",
+            "DISC": "Blu-ray Full",
+            "DVDRIP": "DVDRip",
+            "HDTV": "HDTVRip",
+            "TVRIP": "TVRip",
+            "VHSRIP": "VHSRip",
+            "SATRIP": "SATRip",
+            "CAM": "Indefinido",
         }
 
-        return video_quality_ptbr.get(type_raw, "Outro")
+        return video_quality_ptbr.get(type_raw, "Indefinido")
+
+    def _topic_prefix_category(self, meta: Meta) -> str:
+        release_format = self._localizer_video_quality(meta)
+        for category, formats in {
+            "Blu-ray": {"BDRip", "Blu-ray Remux", "Blu-ray Full"},
+            "WEB": {"WEB-DL", "WEBRip"},
+            "DVD": {"DVDRip", "DVD Full"},
+            "TV": {"HDTVRip", "TVRip", "SATRip"},
+            "VHS": {"VHSRip"},
+        }.items():
+            if release_format in formats:
+                return category
+        return "OUTRO"
+
+    def _topic_prefix_id(self, meta: Meta) -> str:
+        return self._prefix_ids.get(self._slugify_tag(self._topic_prefix_category(meta)), "")
+
+    @staticmethod
+    def _topic_tags(meta: Meta, post_body: str) -> str:
+        values = [str(meta.year)] if meta.year else []
+        values.extend(re.findall(r"\[TAG=[^\]]+\]([^[]+)\[/TAG\]", post_body, flags=re.IGNORECASE))
+        tags: list[str] = []
+        seen: set[str] = set()
+        for value in values:
+            normalized = unicodedata.normalize("NFD", value).encode("ascii", "ignore").decode().casefold()
+            if normalized and normalized not in seen:
+                seen.add(normalized)
+                tags.append(value)
+        return ", ".join(tags)
 
     # -- IPB client methods
 
@@ -679,6 +862,7 @@ class MakingOff:
             return "", "", ""
 
         soup = BeautifulSoup(resp.text, "html.parser")
+        self._prefix_ids = self._parse_prefix_ids(soup)
 
         html_tag = soup.find("html")
         logged_in = html_tag.get("data-logged-in") == "true" if html_tag else False
@@ -702,6 +886,24 @@ class MakingOff:
             logger.warning(f"{self.tracker}: It wasn't possible to extract xfToken. Check if the session is valid.")
 
         return csrf_token, attachment_hash, attachment_hash_combined
+
+    @classmethod
+    def _parse_prefix_ids(cls, soup: BeautifulSoup) -> dict[str, str]:
+        """Extract current XenForo topic-prefix IDs without hard-coding them."""
+        prefix_ids: dict[str, str] = {}
+        for option in soup.select('select[name="prefix_id"] option[value]'):
+            value = str(option.get("value", "")).strip()
+            label = option.get_text(" ", strip=True)
+            if value and value != "0" and label:
+                prefix_ids[cls._slugify_tag(label)] = value
+        for field in soup.select('input[name="prefix_id"][value]'):
+            value = str(field.get("value", "")).strip()
+            field_id = str(field.get("id", "")).strip()
+            label_node = soup.select_one(f'label[for="{field_id}"]') if field_id else field.find_parent("label")
+            label = label_node.get_text(" ", strip=True) if label_node else ""
+            if value and value != "0" and label:
+                prefix_ids[cls._slugify_tag(label)] = value
+        return prefix_ids
 
     @staticmethod
     def _extract_post_height(text: str) -> int:
@@ -965,14 +1167,17 @@ class MakingOff:
         attachment_hash_combined: str,
         topic_title: str,
         post_body: str,
+        prefix_id: str,
+        topic_tags: str,
     ) -> dict[str, str]:
         """
         Build the dictionary of form fields for creating a new XenForo topic.
         """
         return {
             "_xfToken": csrf_token,
-            "prefix_id": "0",
+            "prefix_id": prefix_id,
             "title": topic_title,
+            "tags": topic_tags,
             "discussion_type": "discussion",
             "message": post_body,
             "attachment_hash": attachment_hash,
@@ -991,6 +1196,8 @@ class MakingOff:
         attachment_hash_combined: str,
         topic_title: str,
         post_body: str,
+        prefix_id: str,
+        topic_tags: str,
     ) -> str:
         """
         Create a new forum topic and return its URL.
@@ -1013,6 +1220,8 @@ class MakingOff:
             attachment_hash_combined=attachment_hash_combined,
             topic_title=topic_title,
             post_body=post_body,
+            prefix_id=prefix_id,
+            topic_tags=topic_tags,
         )
 
         url = f"{self.base_url}/forums/{forum_id}/post-thread"
@@ -1498,8 +1707,8 @@ class MakingOff:
         """
         Generate the forum topic title.
 
-        Format for Brazilian films:  [Hidef] PT-BR Title (Year)
-        Format for foreign films:    [Hidef] PT-BR Title / Original Title (Year)
+        Format for Brazilian films:  PT-BR Title (Year)
+        Format for foreign films:    PT-BR Title / Original Title (Year)
 
         Args:
             meta (dict[str, Any]): Release metadata.
@@ -1507,8 +1716,6 @@ class MakingOff:
         Returns:
             str: Formatted topic title.
         """
-        prefix = "[Hidef] " if self._is_hidef(meta) else ""
-
         title_ptbr = await self._resolve_display_title(meta)
         year: str = str(meta.year) if meta.year else ""
 
@@ -1518,7 +1725,7 @@ class MakingOff:
             title_orig = meta.original_title
             title_part = f"{title_ptbr} / {title_orig}" if title_orig and title_orig.lower() != title_ptbr.lower() else title_ptbr
 
-        return f"{prefix}{title_part} ({year})" if year else f"{prefix}{title_part}"
+        return f"{title_part} ({year})" if year else title_part
 
     # -- description generation
 
@@ -1609,8 +1816,7 @@ class MakingOff:
         title_br = await self._resolve_display_title(meta)
         title_orig = title_br if self._is_brazilian(meta) else meta.original_title or title_br
 
-        release_name = meta.basename_no_ext or meta.name or meta.uuid
-        release = release_name.replace(" ", ".")
+        release = meta.basename_no_ext or meta.name or meta.uuid
 
         # Prefer TMDB PT-BR overview already cached by the UA; fall back to
         # translation details from the pre-fetched translations list.
@@ -1652,6 +1858,22 @@ class MakingOff:
         )
         imdb_dirs: list[str] = [name for name in cast(list[Any], meta.imdb_info.get("directors", []) or []) if isinstance(name, str)]
         directors = ", ".join(tmdb_dirs if tmdb_dirs else imdb_dirs)
+
+        crew_roles = (
+            ("Direção", {"Director"}),
+            ("Roteiro", {"Screenplay", "Writer", "Teleplay"}),
+            ("Produção", {"Producer"}),
+            ("Montagem", {"Editor"}),
+            ("Composição", {"Original Music Composer"}),
+            ("Direção de Fotografia", {"Director of Photography"}),
+        )
+        crew_list = cast(list[dict[str, Any]], en_main.get("credits", {}).get("crew", [])) if en_main else []
+        crew_lines: list[str] = []
+        for label, jobs in crew_roles:
+            names = list(dict.fromkeys(str(member["name"]) for member in crew_list if member.get("job") in jobs and member.get("name")))
+            if names:
+                crew_lines.append(f"[B]{label}:[/B] {', '.join(names)}")
+        crew_text = "\n".join(crew_lines)
 
         imdb_url = ""
         if meta.imdb_tt or meta.imdb_info.get("imdb_url"):
@@ -1699,6 +1921,10 @@ class MakingOff:
             aspect=self._aspect_ratio(width, height),
             fps_str=f"{meta.frame_rate:.3f} FPS" if meta.frame_rate else "23.976 FPS",
             filesize=self._mediainfo_filesize(meta),
+            crew_text=crew_text,
+            audio_channels=self._audio_channels(audio_track),
+            tmdb_id=str(meta.tmdb_id or ""),
+            youtube_url=str(meta.youtube or self._tmdb_youtube_trailer(ptbr_main, en_main)),
             awards=awards,
             trivia=trivia,
             critic=critic,
@@ -1833,6 +2059,7 @@ class MakingOff:
         if meta.debug:
             topic_title = await self.get_name(meta)
             post_body = await self.generate_description(meta)
+            topic_tags = self._topic_tags(meta, post_body)
 
             fields = self.get_topic_fields(
                 forum_id=forum_id,
@@ -1841,10 +2068,12 @@ class MakingOff:
                 attachment_hash_combined="DEBUG_COMBINED",
                 topic_title=topic_title,
                 post_body=post_body,
+                prefix_id=f"DEBUG:{self._topic_prefix_category(meta)}",
+                topic_tags=topic_tags,
             )
 
             logger.info(f"{self.tracker}: [cyan]Request Data:[/cyan]")
-            logger.info(Redaction.redact_private_info(fields))
+            logger.info(Redaction.redact_private_info(fields), extra={"markup": False})
 
             if sub_files:
                 logger.info(f"{self.tracker}: [cyan]Debug Subtitles to upload:[/cyan] {sub_files}")
@@ -1868,6 +2097,13 @@ class MakingOff:
             meta["tracker_status"][self.tracker]["status_message"] = "data error: Failed to retrieve XenForo tokens."
             return False
 
+        prefix_id = self._topic_prefix_id(meta)
+        if not prefix_id:
+            prefix_category = self._topic_prefix_category(meta)
+            logger.warning(f"{self.tracker}: [bold red]Unable to resolve the required '{prefix_category}' topic prefix from the forum form.[/bold red]")
+            meta["tracker_status"][self.tracker]["status_message"] = f"data error: Missing required topic prefix: {prefix_category}."
+            return False
+
         if not await self.upload_attachment(named_torrent_path, csrf_token, attachment_hash, attachment_hash_combined, forum_id):
             meta["tracker_status"][self.tracker]["status_message"] = "data error: Failed to upload .torrent attachment."
             return False
@@ -1881,6 +2117,7 @@ class MakingOff:
 
         topic_title = await self.get_name(meta)
         post_body = await self.generate_description(meta)
+        topic_tags = self._topic_tags(meta, post_body)
 
         topic_url = await self.create_topic(
             forum_id=forum_id,
@@ -1889,6 +2126,8 @@ class MakingOff:
             attachment_hash_combined=attachment_hash_combined,
             topic_title=topic_title,
             post_body=post_body,
+            prefix_id=prefix_id,
+            topic_tags=topic_tags,
         )
 
         if topic_url:
