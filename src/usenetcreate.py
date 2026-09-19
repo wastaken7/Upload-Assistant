@@ -99,6 +99,8 @@ async def build_usenet_indexer_metas(
         episode_meta.scene_name = ""
         episode_meta.tv_pack = False
         episode_meta.usenet_is_pack = False
+        episode_meta.mediainfo = {}
+        episode_meta.usenet_media_source = None
 
         season_episode = re.search(r"(?i)(?<![A-Z0-9])S(\d{1,3})((?:E\d{1,4})+)(?!\d)", stem)
         if season_episode:
@@ -118,9 +120,12 @@ async def build_usenet_indexer_metas(
                 episode_meta.filelist = [str(source_entry)]
 
         episode_meta.image_list = []
+        episode_meta.tracker_image_collections = {}
         episode_meta.screenshots_in_description = False
         episode_meta.tracker_status = {tracker.upper(): {} for tracker in trackers}
         episode_meta.unattended = True
+        artifact_dir = Path(meta.base_dir) / "tmp" / episode_meta.uuid
+        await aiofiles.os.makedirs(artifact_dir, exist_ok=True)
         media_source = source_entry
         if source_entry is not None and source_entry.is_dir():
             candidates = [path for path in source_entry.rglob("*") if path.is_file() and path.suffix.lower() in VIDEO_EXTENSIONS]
@@ -129,8 +134,6 @@ async def build_usenet_indexer_metas(
             episode_meta.usenet_media_source = str(media_source)
             from src.exportmi import export_info
 
-            artifact_dir = Path(meta.base_dir) / "tmp" / episode_meta.uuid
-            await aiofiles.os.makedirs(artifact_dir, exist_ok=True)
             try:
                 episode_meta.mediainfo = await export_info(str(media_source), False, episode_meta.uuid, meta.base_dir)
             except Exception as exc:
@@ -204,6 +207,31 @@ def select_usenet_episode_indexers(trackers: list[str], tracker_status: dict[str
         if status.get("upload", False) or (tracker_key in episodes_only_trackers and status.get("dupe", False)):
             selected.append(tracker)
     return selected
+
+
+def apply_episode_upload_summary(
+    meta: Meta,
+    failed_episode_nzbs: dict[str, list[str]],
+    uploaded_episode_counts: dict[str, int],
+    duplicate_episode_counts: dict[str, int],
+    episodes_only_trackers: set[str],
+) -> None:
+    """Merge per-episode outcomes into the parent release status."""
+    for tracker_key, failed_nzbs in failed_episode_nzbs.items():
+        status = meta.tracker_status.setdefault(tracker_key, {})
+        if failed_nzbs:
+            status["upload_success"] = False
+            status["status_message"] = f"data error: {len(failed_nzbs)} episode NZB upload(s) failed: {', '.join(failed_nzbs)}"
+            logger.info(f"[red]{tracker_key}: {status['status_message']}[/red]")
+        elif uploaded_episode_counts.get(tracker_key, 0) > 0:
+            status["upload_success"] = True
+            status["status_message"] = f"{uploaded_episode_counts[tracker_key]} episode NZB upload(s) succeeded"
+            if tracker_key in episodes_only_trackers:
+                status["status_message"] += "; season pack skipped by --usenet-episodes-only"
+        elif duplicate_episode_counts.get(tracker_key, 0) > 0 and tracker_key in episodes_only_trackers:
+            status["dupe"] = True
+            status["upload_success"] = False
+            status["status_message"] = "All episode NZBs were duplicates; season pack skipped by --usenet-episodes-only"
 
 
 def get_path_size(path: str) -> int:
@@ -1127,6 +1155,8 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
     # Check if a valid NZB file already exists to skip the upload process
     final_nzb_path = Path(nzb_output_dir) / f"{safe_nzb_name}.nzb"
     nzb_file = Path(tmp_base) / uuid / f"{safe_nzb_name}.nzb"
+    reusable_episode_paths: list[Path] = []
+    reusable_pack_path: Path | None = None
 
     # A season run produces several NZBs, so a single pre-existing pack NZB
     # is not enough to prove the whole batch has already completed.
@@ -1140,12 +1170,9 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
         expected_pack_path = Path(nzb_output_dir) / f"{Path(input_path).name}.nzb"
         episode_validity = await asyncio.gather(*(is_valid_nzb(path) for path in expected_episode_paths))
         if all(episode_validity):
-            meta.usenet_nzb_paths = [str(path) for path in expected_episode_paths]
+            reusable_episode_paths = expected_episode_paths
             if await is_valid_nzb(expected_pack_path):
-                meta.usenet_pack_nzb_path = str(expected_pack_path)
-                meta.usenet_nzb_paths.append(str(expected_pack_path))
-            logger.info("[cyan]Reusing existing Pesto season episode NZBs; NNTP repost skipped.[/cyan]")
-            return Path(meta.usenet_pack_nzb_path or meta.usenet_nzb_paths[0])
+                reusable_pack_path = expected_pack_path
 
     # Temp Usenet directory
     usenet_dir = Path(tmp_base) / uuid / "usenet"
@@ -1196,6 +1223,54 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
                 else:
                     logger.info(f"[bold red]Configuration Error: {e}[/bold red]")
                     return None
+
+    if reusable_episode_paths and not prepare_only:
+        meta.usenet_nzb_paths = [str(path) for path in reusable_episode_paths]
+        if reusable_pack_path is not None:
+            meta.usenet_pack_nzb_path = str(reusable_pack_path)
+            meta.usenet_nzb_paths.append(str(reusable_pack_path))
+            logger.info("[cyan]Reusing the complete existing Pesto season NZB set; NNTP repost skipped.[/cyan]")
+            return reusable_pack_path
+
+        # A previous season post may have completed every episode but failed
+        # before Pesto wrote the consolidated NZB. Rebuild that file offline
+        # from the saved episode NZBs instead of reposting their articles.
+        merge_dir = Path(tmp_base) / uuid / "season-merge"
+        await aiofiles.os.makedirs(merge_dir, exist_ok=True)
+        for episode_nzb in reusable_episode_paths:
+            await asyncio.to_thread(shutil.copy2, episode_nzb, merge_dir / episode_nzb.name)
+        before_merge = {path.name for path in merge_dir.glob("*.nzb")}
+        merge_cmd = [path_pesto or "pesto", "--merge-season", str(merge_dir), "--nzb-title", Path(input_path).name, "--no-hooks"]
+        tmdb_type = meta.category.lower()
+        if meta.tmdb_id and str(meta.tmdb_id).isdigit() and int(meta.tmdb_id) > 0 and tmdb_type in ("movie", "tv"):
+            merge_cmd.extend(["--nzb-tag", f"tmdb:{tmdb_type}:{meta.tmdb_id}"])
+        if meta.imdb_tt:
+            merge_cmd.extend(["--nzb-tag", f"imdb:{meta.imdb_tt}"])
+        if meta.tvdb_id and str(meta.tvdb_id).isdigit() and int(meta.tvdb_id) > 0:
+            merge_cmd.extend(["--nzb-tag", f"tvdb:series:{meta.tvdb_id}"])
+        if meta.mal_id and str(meta.mal_id).isdigit() and int(meta.mal_id) > 0:
+            merge_cmd.extend(["--nzb-tag", f"mal:{meta.mal_id}"])
+        try:
+            await run_pesto_with_progress(merge_cmd, cwd=str(merge_dir))
+            merged_candidates = [path for path in merge_dir.glob("*.nzb") if path.name not in before_merge and await is_valid_nzb(path)]
+            if len(merged_candidates) != 1:
+                raise RuntimeError(f"expected one merged season NZB, found {len(merged_candidates)}")
+            expected_pack_path = Path(nzb_output_dir) / f"{Path(input_path).name}.nzb"
+            if expected_pack_path.exists():
+                expected_pack_path.unlink()
+            await asyncio.to_thread(shutil.move, merged_candidates[0], expected_pack_path)
+            if archive_password:
+                await inject_nzb_password(expected_pack_path, str(archive_password))
+            meta.usenet_pack_nzb_path = str(expected_pack_path)
+            meta.usenet_nzb_paths.append(str(expected_pack_path))
+            logger.info("[cyan]Rebuilt the missing season NZB from saved episode NZBs; NNTP repost skipped.[/cyan]")
+            return expected_pack_path
+        except Exception as exc:
+            logger.warning(f"[yellow]Could not rebuild the missing season NZB from saved episodes: {exc}. Continuing with episode NZBs.[/yellow]")
+            return reusable_episode_paths[0]
+        finally:
+            with contextlib.suppress(Exception):
+                await asyncio.to_thread(shutil.rmtree, merge_dir)
 
     # 2. Archive and Split with 7z (mx=0 to store without compression)
     skip_archive = usenet_cfg.get("skip_archive", False)
@@ -1544,7 +1619,8 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
             logger.info(f"[yellow][DEBUG SIMULATION] Would run Pesto upload: {_redact_pesto_command(cmd_pesto)}[/yellow]")
             debug_nzbs = [nzb_file]
             if pesto_season_upload:
-                debug_nzbs = [season_nzb_dir / "Show.S01E01.nzb", season_nzb_dir / f"{Path(input_path).name}.nzb"]
+                debug_nzbs = [season_nzb_dir / f"{stem}.nzb" for stem in season_entries]
+                debug_nzbs.append(season_nzb_dir / f"{Path(input_path).name}.nzb")
             for debug_nzb in debug_nzbs:
                 async with aiofiles.open(debug_nzb, "w", encoding="utf-8") as f:
                     await f.write(mock_nzb_content)

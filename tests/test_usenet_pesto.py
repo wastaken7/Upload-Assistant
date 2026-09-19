@@ -23,7 +23,9 @@ async def test_pesto_uses_stable_auth_password_flag(tmp_path: Path, monkeypatch)
         captured["cmd"] = cmd
         captured["cwd"] = cwd
         captured["env"] = env
-        captured["archive_dir_exists"] = Path(env["XDG_CONFIG_HOME"], "pesto", "nzb").is_dir()
+        config_root = env["APPDATA"] if os.name == "nt" else env["XDG_CONFIG_HOME"]
+        captured["config_root"] = config_root
+        captured["archive_dir_exists"] = Path(config_root, "pesto", "nzb").is_dir()
         nzb_path = Path(cmd[cmd.index("--out") + 1])
         nzb_path.write_text("<nzb>" + (" " * 100) + "</nzb>", encoding="utf-8")
 
@@ -50,7 +52,7 @@ async def test_pesto_uses_stable_auth_password_flag(tmp_path: Path, monkeypatch)
     assert command[command.index("--auth-password") + 1] == "secret"
     assert "-p" not in command
     assert isinstance(captured["env"], dict)
-    assert captured["env"]["XDG_CONFIG_HOME"].endswith("usenet/pesto-config")
+    assert Path(captured["config_root"]).parts[-2:] == ("usenet", "pesto-config")
     assert captured["archive_dir_exists"] is True
     assert result == tmp_path / "tmp" / "release.mkv" / "release.nzb"
 
@@ -97,7 +99,9 @@ async def test_pesto_season_upload_collects_episode_and_optional_pack_nzbs(tmp_p
         captured["cmd"] = cmd
         captured["cwd"] = cwd
         captured["env"] = env
-        captured["archive_dir_exists"] = Path(env["XDG_CONFIG_HOME"], "pesto", "nzb").is_dir()
+        config_root = env["APPDATA"] if os.name == "nt" else env["XDG_CONFIG_HOME"]
+        captured["config_root"] = config_root
+        captured["archive_dir_exists"] = Path(config_root, "pesto", "nzb").is_dir()
         nzb_dir = Path(cmd[cmd.index("--nzb-dir") + 1])
         nzb_dir.mkdir(parents=True, exist_ok=True)
         content = "<nzb>" + (" " * 100) + "</nzb>"
@@ -141,7 +145,7 @@ async def test_pesto_season_upload_collects_episode_and_optional_pack_nzbs(tmp_p
     assert "--season" in command
     assert "--nzb-dir" in command
     assert command[command.index("--ext") + 1] == "avi,m2ts,m4v,mkv,mov,mp4,ts,webm,wmv"
-    assert command[command.index("--compress-temp-dir") + 1].endswith("usenet/pesto-compress")
+    assert Path(command[command.index("--compress-temp-dir") + 1]).parts[-2:] == ("usenet", "pesto-compress")
     assert "--out" not in command
     assert "--compress=7z" in command
     assert command[command.index("--compress-volume-size") + 1] == "100m"
@@ -150,7 +154,7 @@ async def test_pesto_season_upload_collects_episode_and_optional_pack_nzbs(tmp_p
     assert command[-1] == str(season_dir.resolve())
     assert captured["cwd"] == str(season_dir)
     assert isinstance(captured["env"], dict)
-    assert captured["env"]["XDG_CONFIG_HOME"].endswith("usenet/pesto-config")
+    assert Path(captured["config_root"]).parts[-2:] == ("usenet", "pesto-config")
     assert captured["archive_dir_exists"] is True
     staged_7z_dir = Path(captured["env"]["PATH"].split(os.pathsep)[0])
     assert staged_7z_dir.name == "pesto-bin"
@@ -204,6 +208,8 @@ async def test_build_usenet_indexer_metas_uses_episode_metadata_and_keeps_pack_l
         season_int=1,
         tv_pack=True,
         tracker_status={"CURUPIRA": {"upload": True}},
+        mediainfo={"media": {"track": [{"@type": "General", "Duration": "pack"}]}},
+        tracker_image_collections={"CURUPIRA": {"screenshots": [{"raw_url": "pack.png"}]}},
         usenet_nzb_paths=[str(episode_nzb), str(pack_nzb)],
         usenet_pack_nzb_path=str(pack_nzb),
     )
@@ -230,6 +236,8 @@ async def test_build_usenet_indexer_metas_uses_episode_metadata_and_keeps_pack_l
     assert episode_meta.tracker_status == {"CURUPIRA": {}}
     assert episode_meta.uuid != meta.uuid
     assert episode_meta.usenet_media_source == str(episode_file)
+    assert episode_meta.mediainfo == {"media": {"track": []}}
+    assert episode_meta.tracker_image_collections == {}
     assert pack_meta is not meta
     assert pack_meta.nzb_path == str(pack_nzb)
     assert pack_meta.tv_pack is True
@@ -268,6 +276,79 @@ async def test_build_usenet_indexer_metas_marks_regular_single_nzb_as_pack() -> 
 
     assert len(submissions) == 1
     assert submissions[0].usenet_is_pack is True
+
+
+@pytest.mark.asyncio
+async def test_pesto_rebuilds_missing_pack_from_saved_episode_nzbs(tmp_path: Path, monkeypatch) -> None:
+    season_dir = tmp_path / "Show.S01"
+    season_dir.mkdir()
+    for episode in ("Show.S01E01", "Show.S01E02"):
+        (season_dir / f"{episode}.mkv").write_bytes(b"video")
+
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+    valid_nzb = "<nzb>" + (" " * 100) + "</nzb>"
+    for episode in ("Show.S01E01", "Show.S01E02"):
+        (output_dir / f"{episode}.nzb").write_text(valid_nzb, encoding="utf-8")
+
+    async def fake_check_binary(binary_name, *_args, **_kwargs):
+        return binary_name
+
+    async def fake_run_pesto(cmd, **_kwargs):
+        assert "--merge-season" in cmd
+        assert "tmdb:tv:123" in cmd
+        assert "imdb:tt1234567" in cmd
+        merge_dir = Path(cmd[cmd.index("--merge-season") + 1])
+        (merge_dir / "Show.S01.nzb").write_text(valid_nzb, encoding="utf-8")
+
+    monkeypatch.setattr(usenetcreate, "check_binary", fake_check_binary)
+    monkeypatch.setattr(usenetcreate, "run_pesto_with_progress", fake_run_pesto)
+    meta = Meta(
+        base_dir=str(tmp_path),
+        path=str(season_dir),
+        uuid="season-retry",
+        basename_no_ext=season_dir.name,
+        category="TV",
+        tv_pack=True,
+        archive_password="pack-secret",  # noqa: S106
+        tmdb_id=123,
+        imdb_tt="tt1234567",
+    )
+
+    result = await usenetcreate.prepare_and_upload_usenet(
+        meta,
+        {
+            "USENET": {
+                "usenet_uploader": "pesto",
+                "pesto_season_upload": True,
+                "nzb_output_dir": str(output_dir),
+            }
+        },
+    )
+
+    expected_pack = output_dir / f"{season_dir.name}.nzb"
+    assert result == expected_pack
+    assert meta.usenet_pack_nzb_path == str(expected_pack)
+    assert [Path(path).name for path in meta.usenet_nzb_paths] == ["Show.S01E01.nzb", "Show.S01E02.nzb", "Show.S01.nzb"]
+    assert await usenetcreate.verify_nzb_has_password(str(expected_pack)) is True
+
+
+def test_episode_upload_summary_records_real_uploads_without_pack() -> None:
+    meta = Meta(tracker_status={"CURUPIRA": {}})
+
+    usenetcreate.apply_episode_upload_summary(meta, {"CURUPIRA": []}, {"CURUPIRA": 2}, {"CURUPIRA": 0}, set())
+
+    assert meta.tracker_status["CURUPIRA"]["upload_success"] is True
+    assert meta.tracker_status["CURUPIRA"]["status_message"] == "2 episode NZB upload(s) succeeded"
+
+
+def test_episode_upload_summary_does_not_treat_duplicates_as_uploads() -> None:
+    meta = Meta(tracker_status={"CURUPIRA": {}})
+
+    usenetcreate.apply_episode_upload_summary(meta, {"CURUPIRA": []}, {"CURUPIRA": 0}, {"CURUPIRA": 2}, {"CURUPIRA"})
+
+    assert meta.tracker_status["CURUPIRA"]["dupe"] is True
+    assert meta.tracker_status["CURUPIRA"]["upload_success"] is False
 
 
 def test_episode_only_indexer_filter_applies_only_to_pack() -> None:
