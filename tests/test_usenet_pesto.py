@@ -2,6 +2,7 @@
 
 import os
 from pathlib import Path
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -213,6 +214,7 @@ async def test_build_usenet_indexer_metas_uses_episode_metadata_and_keeps_pack_l
     assert episode_meta.filelist == [str(episode_file)]
     assert episode_meta.tracker_status == {"CURUPIRA": {}}
     assert episode_meta.uuid != meta.uuid
+    assert episode_meta.usenet_media_source == str(episode_file)
     assert pack_meta is not meta
     assert pack_meta.nzb_path == str(pack_nzb)
     assert pack_meta.tv_pack is True
@@ -224,3 +226,49 @@ def test_episode_only_indexer_filter_applies_only_to_pack() -> None:
 
     assert usenetcreate.select_usenet_indexers_for_submission(trackers, episodes_only, is_pack=False) == trackers
     assert usenetcreate.select_usenet_indexers_for_submission(trackers, episodes_only, is_pack=True) == ["NZBNEST"]
+
+
+@pytest.mark.asyncio
+async def test_episode_screenshots_capture_and_host_configured_count(tmp_path: Path, monkeypatch) -> None:
+    video = tmp_path / "Show.S01E01.mkv"
+    video.write_bytes(b"video")
+    captures = [str(tmp_path / f"screen-{index}.png") for index in range(3)]
+    for capture in captures:
+        Path(capture).write_bytes(b"png")
+    uploaded = [{"img_url": f"thumb-{index}", "raw_url": f"raw-{index}", "web_url": f"web-{index}"} for index in range(3)]
+
+    screenshot_mock = AsyncMock(return_value=captures)
+    upload_mock = AsyncMock(return_value=(uploaded, 3))
+    monkeypatch.setattr("src.takescreens.TakeScreensManager.screenshots", screenshot_mock)
+    monkeypatch.setattr("src.uploadscreens.UploadScreensManager.upload_screens", upload_mock)
+
+    meta = Meta(
+        base_dir=str(tmp_path),
+        uuid="episode-screens",
+        name="Show.S01E01",
+        category="TV",
+        screens=3,
+        usenet_media_source=str(video),
+        imghost="imgbox",
+    )
+    count = await usenetcreate.prepare_usenet_episode_screenshots(meta, {"DEFAULT": {"img_host_1": "imgbox"}})
+
+    assert count == 3
+    assert meta.image_list == uploaded
+    assert screenshot_mock.await_args.kwargs["num_screens"] == 3
+    assert upload_mock.await_args.args[1] == 3
+
+
+@pytest.mark.asyncio
+async def test_episode_screenshots_fail_when_not_all_are_hosted(tmp_path: Path, monkeypatch) -> None:
+    video = tmp_path / "Show.S01E01.mkv"
+    video.write_bytes(b"video")
+    captures = [str(tmp_path / f"screen-{index}.png") for index in range(2)]
+    for capture in captures:
+        Path(capture).write_bytes(b"png")
+
+    monkeypatch.setattr("src.takescreens.TakeScreensManager.screenshots", AsyncMock(return_value=captures))
+    meta = Meta(base_dir=str(tmp_path), uuid="episode-screens", name="Show.S01E01", category="TV", screens=3, usenet_media_source=str(video))
+
+    with pytest.raises(RuntimeError, match="2/3 screenshots were captured"):
+        await usenetcreate.prepare_usenet_episode_screenshots(meta, {"DEFAULT": {}})

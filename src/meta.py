@@ -336,6 +336,7 @@ class Meta:
     not_anime: bool = False
     nzb_path: str = ""
     usenet_nzb_paths: list[str] = field(default_factory=list)
+    usenet_media_source: str | None = None
     ocr: bool | None = None
     only_id: bool | None = None
     openlibrary_book_id: int | None = None

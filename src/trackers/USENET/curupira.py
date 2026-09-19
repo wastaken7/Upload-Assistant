@@ -29,6 +29,7 @@ class Curupira:
     auth_type = "other_api"
     tracker = "CURUPIRA"
     display_name = "Curupira"
+    supports_screenshots = True
     banned_groups = (
         "4K4U",
         "afm72",

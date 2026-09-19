@@ -117,6 +117,7 @@ async def build_usenet_indexer_metas(meta: Meta, nzb_paths: list[str], trackers:
             candidates = [path for path in source_entry.rglob("*") if path.is_file() and path.suffix.lower() in VIDEO_EXTENSIONS]
             media_source = max(candidates, key=lambda path: path.stat().st_size) if candidates else None
         if media_source is not None and media_source.is_file():
+            episode_meta.usenet_media_source = str(media_source)
             from src.exportmi import export_info
 
             artifact_dir = Path(meta.base_dir) / "tmp" / episode_meta.uuid
@@ -132,6 +133,48 @@ async def build_usenet_indexer_metas(meta: Meta, nzb_paths: list[str], trackers:
     pack_meta.nzb_path = nzb_paths[-1]
     submissions.append(pack_meta)
     return submissions
+
+
+async def prepare_usenet_episode_screenshots(meta: Meta, config: dict[str, Any]) -> int:
+    """Capture and host the configured screenshots for one episode."""
+    requested = max(0, int(meta.screens or 0))
+    media_source = Path(meta.usenet_media_source) if meta.usenet_media_source else None
+    if requested == 0:
+        return 0
+    if media_source is None or not media_source.is_file():
+        raise RuntimeError(f"Cannot create episode screenshots because no video file was resolved for {meta.name}")
+
+    from src.takescreens import TakeScreensManager
+    from src.uploadscreens import UploadScreensManager
+
+    logger.info(f"[cyan]{meta.name}: capturing {requested} episode screenshot(s)...[/cyan]")
+    captured = await TakeScreensManager(config).screenshots(
+        str(media_source),
+        media_source.name,
+        meta.uuid,
+        meta.base_dir,
+        meta,
+        num_screens=requested,
+        cleanup_after_capture=False,
+    )
+    capture_paths = list(captured or [])
+    if len(capture_paths) < requested:
+        raise RuntimeError(f"Only {len(capture_paths)}/{requested} screenshots were captured for {meta.name}")
+
+    uploaded, uploaded_count = await UploadScreensManager(config).upload_screens(
+        meta,
+        requested,
+        1,
+        0,
+        requested,
+        capture_paths[:requested],
+        {},
+    )
+    if uploaded_count < requested:
+        raise RuntimeError(f"Only {uploaded_count}/{requested} screenshots were hosted for {meta.name}")
+    meta.image_list = uploaded[:requested]
+    logger.info(f"[green]{meta.name}: {requested} episode screenshot(s) hosted successfully.[/green]")
+    return requested
 
 
 def select_usenet_indexers_for_submission(trackers: list[str], episodes_only_trackers: set[str], *, is_pack: bool) -> list[str]:
