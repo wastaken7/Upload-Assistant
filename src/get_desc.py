@@ -1328,12 +1328,12 @@ class DescriptionBuilder:
         screenshots: bool = True,
         tonemapped_header: bool = True,
         tv_info: bool = True,
-        ua_signature: bool = True,
+        ua_signature: bool = True,  # ci: ua_signature v4.2
         user_description: bool = True,
         music: bool = True,
         dynamic_hdr_plot: bool = True,
         approved_image_hosts: list[str] | None = None,
-        signature: str = "",
+        signature: str = "",  # ci: ua_signature v4.2
         desc_header: str = "",
     ) -> str:
         apply_saved_draft(meta)
@@ -1553,14 +1553,6 @@ class DescriptionBuilder:
         audio_spectrogram_section = await self.get_audio_spectrogram_section(meta) if audio_spectrogram else ""
         dynamic_hdr_plot_section = await self.get_dynamic_hdr_plot_section(meta) if dynamic_hdr_plot else ""
         custom_signature_section = await self.get_custom_signature(meta) if custom_signature else ""
-        if ua_signature:
-            if not signature:
-                script_signature = meta.ua_signature
-                if script_signature:
-                    signature = f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=4]{script_signature}[/size][/url][/right]"
-            ua_signature_section = signature
-        else:
-            ua_signature_section = ""
 
         # Signatures are footers, not content sections. Ignoring them here lets
         # the standalone-header setting work in normal runs, where UA always
@@ -1590,21 +1582,17 @@ class DescriptionBuilder:
         if custom_signature:
             desc_parts.append(custom_signature_section)
 
-        # UA Signature
-        desc_parts.append(ua_signature_section)
-
         description_str: str = "\n".join(part for part in desc_parts if part.strip())
-
-        # Formatting
-        description_str = self.tracker_specific_formats(self.tracker, description_str)
 
         if meta.debug:
             desc_file = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt"
             logger.debug(f"DEBUG: Saving final description to [yellow]{desc_file}[/yellow]")
             async with aiofiles.open(desc_file, "w", encoding="utf-8") as description_file:
-                await description_file.write(description_str)
+                await description_file.write(self.tracker_specific_formats(self.tracker, "\n".join(part for part in (description_str, ((signature or (f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=4]{meta.ua_signature}[/size][/url][/right]" if meta.ua_signature else "")) if ua_signature else "")) if part.strip())))  # fmt: off
 
-        return description_str
+        # fmt: off
+        return self.tracker_specific_formats(self.tracker, "\n".join(part for part in (description_str, ((signature or (f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=4]{meta.ua_signature}[/size][/url][/right]" if meta.ua_signature else "")) if ua_signature else "")) if part.strip()))  # ci: ua_signature v4.2
+        # fmt: on
 
     async def _check_saved_pack_image_links(self, meta: Meta, approved_image_hosts: list[str]) -> dict[str, Any]:
         pack_images_file = Path(meta.base_dir) / "tmp" / meta.uuid / "pack_image_links.json"
