@@ -163,34 +163,44 @@ async def prepare_usenet_episode_screenshots(meta: Meta, config: dict[str, Any])
     from src.takescreens import TakeScreensManager
     from src.uploadscreens import UploadScreensManager
 
-    logger.info(f"[cyan]{meta.name}: capturing {requested} episode screenshot(s)...[/cyan]")
-    captured = await TakeScreensManager(config).screenshots(
-        str(media_source),
-        media_source.name,
-        meta.uuid,
-        meta.base_dir,
-        meta,
-        num_screens=requested,
-        cleanup_after_capture=False,
-    )
-    capture_paths = list(captured or [])
-    if len(capture_paths) < requested:
-        raise RuntimeError(f"Only {len(capture_paths)}/{requested} screenshots were captured for {meta.name}")
+    try:
+        previous_cwd = Path.cwd()
+    except OSError:
+        previous_cwd = Path(meta.base_dir)
 
-    uploaded, uploaded_count = await UploadScreensManager(config).upload_screens(
-        meta,
-        requested,
-        1,
-        0,
-        requested,
-        capture_paths[:requested],
-        {},
-    )
-    if uploaded_count < requested:
-        raise RuntimeError(f"Only {uploaded_count}/{requested} screenshots were hosted for {meta.name}")
-    meta.image_list = uploaded[:requested]
-    logger.info(f"[green]{meta.name}: {requested} episode screenshot(s) hosted successfully.[/green]")
-    return requested
+    try:
+        logger.info(f"[cyan]{meta.name}: capturing {requested} episode screenshot(s)...[/cyan]")
+        captured = await TakeScreensManager(config).screenshots(
+            str(media_source),
+            media_source.name,
+            meta.uuid,
+            meta.base_dir,
+            meta,
+            num_screens=requested,
+            cleanup_after_capture=False,
+        )
+        capture_paths = list(captured or [])
+        if len(capture_paths) < requested:
+            raise RuntimeError(f"Only {len(capture_paths)}/{requested} screenshots were captured for {meta.name}")
+
+        uploaded, uploaded_count = await UploadScreensManager(config).upload_screens(
+            meta,
+            requested,
+            1,
+            0,
+            requested,
+            capture_paths[:requested],
+            {},
+        )
+        if uploaded_count < requested:
+            raise RuntimeError(f"Only {uploaded_count}/{requested} screenshots were hosted for {meta.name}")
+        meta.image_list = uploaded[:requested]
+        logger.info(f"[green]{meta.name}: {requested} episode screenshot(s) hosted successfully.[/green]")
+        return requested
+    finally:
+        restore_cwd = previous_cwd if previous_cwd.is_dir() else Path(meta.base_dir)
+        with contextlib.suppress(OSError):
+            os.chdir(restore_cwd)
 
 
 def select_usenet_indexers_for_submission(trackers: list[str], episodes_only_trackers: set[str], *, is_pack: bool) -> list[str]:
@@ -216,24 +226,33 @@ def apply_episode_upload_summary(
     failed_episode_nzbs: dict[str, list[str]],
     uploaded_episode_counts: dict[str, int],
     duplicate_episode_counts: dict[str, int],
+    skipped_episode_counts: dict[str, int],
     episodes_only_trackers: set[str],
 ) -> None:
     """Merge per-episode outcomes into the parent release status."""
     for tracker_key, failed_nzbs in failed_episode_nzbs.items():
         status = meta.tracker_status.setdefault(tracker_key, {})
         if failed_nzbs:
+            status["dupe"] = False
             status["upload_success"] = False
             status["status_message"] = f"data error: {len(failed_nzbs)} episode NZB upload(s) failed: {', '.join(failed_nzbs)}"
             logger.info(f"[red]{tracker_key}: {status['status_message']}[/red]")
         elif uploaded_episode_counts.get(tracker_key, 0) > 0:
+            status["dupe"] = False
             status["upload_success"] = True
             status["status_message"] = f"{uploaded_episode_counts[tracker_key]} episode NZB upload(s) succeeded"
             if tracker_key in episodes_only_trackers:
                 status["status_message"] += "; season pack skipped by --usenet-episodes-only"
-        elif duplicate_episode_counts.get(tracker_key, 0) > 0 and tracker_key in episodes_only_trackers:
+        elif duplicate_episode_counts.get(tracker_key, 0) > 0 and skipped_episode_counts.get(tracker_key, 0) == 0 and tracker_key in episodes_only_trackers:
             status["dupe"] = True
             status["upload_success"] = False
             status["status_message"] = "All episode NZBs were duplicates; season pack skipped by --usenet-episodes-only"
+        elif tracker_key in episodes_only_trackers:
+            status["dupe"] = False
+            status["upload_success"] = False
+            duplicate_count = duplicate_episode_counts.get(tracker_key, 0)
+            skipped_count = skipped_episode_counts.get(tracker_key, 0)
+            status["status_message"] = f"Episode NZBs were not uploaded ({duplicate_count} duplicate, {skipped_count} skipped); season pack skipped by --usenet-episodes-only"
 
 
 def get_path_size(path: str) -> int:
@@ -251,6 +270,14 @@ def get_path_size(path: str) -> int:
                 with contextlib.suppress(OSError):
                     total_size += Path(fp).stat().st_size
     return total_size
+
+
+def get_pesto_obfuscation_mode(usenet_cfg: dict[str, Any], *, use_pesto: bool) -> str:
+    """Return and, when Pesto is active, validate its obfuscation mode."""
+    mode = str(usenet_cfg.get("pesto_obfuscation_mode", "full")).strip().lower()
+    if use_pesto and mode not in {"full", "light", "article", "full-shared"}:
+        raise ValueError("USENET.pesto_obfuscation_mode must be one of: full, light, article, full-shared")
+    return mode
 
 
 def get_dynamic_volume_size(total_bytes: int) -> str:
@@ -1099,9 +1126,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
         return None
     uploader = str(usenet_cfg.get("usenet_uploader", "nyuu")).lower()
     use_pesto = uploader == "pesto"
-    pesto_obfuscation_mode = str(usenet_cfg.get("pesto_obfuscation_mode", "full")).strip().lower()
-    if pesto_obfuscation_mode not in {"full", "light", "article", "full-shared"}:
-        raise ValueError("USENET.pesto_obfuscation_mode must be one of: full, light, article, full-shared")
+    pesto_obfuscation_mode = get_pesto_obfuscation_mode(usenet_cfg, use_pesto=use_pesto)
     pesto_season_upload = use_pesto and bool(usenet_cfg.get("pesto_season_upload", False)) and meta.category == "TV" and bool(meta.tv_pack) and Path(input_path).is_dir()
     meta.usenet_nzb_paths = []
     meta.usenet_pack_nzb_path = None

@@ -2814,6 +2814,7 @@ async def do_the_thing(base_dir: str) -> None:
                                         failed_episode_nzbs: dict[str, list[str]] = {tracker.upper(): [] for tracker in episode_usenet_trackers}
                                         uploaded_episode_counts: dict[str, int] = {tracker.upper(): 0 for tracker in episode_usenet_trackers}
                                         duplicate_episode_counts: dict[str, int] = {tracker.upper(): 0 for tracker in episode_usenet_trackers}
+                                        skipped_episode_counts: dict[str, int] = {tracker.upper(): 0 for tracker in episode_usenet_trackers}
                                         episode_report: list[tuple[str, list[str]]] = []
                                         for index, meta_usenet in enumerate(indexer_metas, start=1):
                                             is_pack_submission = meta_usenet.usenet_is_pack
@@ -2888,6 +2889,7 @@ async def do_the_thing(base_dir: str) -> None:
                                                         duplicate_episode_counts[tracker_key] += 1
                                                         episode_results.append(f"{tracker_key}=duplicate")
                                                     else:
+                                                        skipped_episode_counts[tracker_key] += 1
                                                         episode_results.append(f"{tracker_key}=skipped")
                                                 episode_report.append((Path(meta_usenet.nzb_path).stem, episode_results))
                                                 logger.info(f"[bold cyan]Episode result:[/bold cyan] {Path(meta_usenet.nzb_path).stem} — {', '.join(episode_results)}")
@@ -2897,6 +2899,7 @@ async def do_the_thing(base_dir: str) -> None:
                                             failed_episode_nzbs,
                                             uploaded_episode_counts,
                                             duplicate_episode_counts,
+                                            skipped_episode_counts,
                                             episodes_only_trackers,
                                         )
                                         if episode_report:

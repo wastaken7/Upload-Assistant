@@ -89,6 +89,12 @@ def test_pesto_obfuscation_mode_validation() -> None:
     assert any(warning.key == "pesto_obfuscation_mode" for warning in invalid_warnings)
 
 
+def test_unused_pesto_obfuscation_mode_does_not_block_nyuu() -> None:
+    assert usenetcreate.get_pesto_obfuscation_mode({"pesto_obfuscation_mode": "unused-invalid"}, use_pesto=False) == "unused-invalid"
+    with pytest.raises(ValueError, match="pesto_obfuscation_mode"):
+        usenetcreate.get_pesto_obfuscation_mode({"pesto_obfuscation_mode": "invalid"}, use_pesto=True)
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize("include_pack", [True, False])
 async def test_pesto_season_upload_collects_episode_and_optional_pack_nzbs(tmp_path: Path, monkeypatch, include_pack: bool) -> None:
@@ -350,7 +356,7 @@ async def test_pesto_rebuilds_missing_pack_from_saved_episode_nzbs(tmp_path: Pat
 def test_episode_upload_summary_records_real_uploads_without_pack() -> None:
     meta = Meta(tracker_status={"CURUPIRA": {}})
 
-    usenetcreate.apply_episode_upload_summary(meta, {"CURUPIRA": []}, {"CURUPIRA": 2}, {"CURUPIRA": 0}, set())
+    usenetcreate.apply_episode_upload_summary(meta, {"CURUPIRA": []}, {"CURUPIRA": 2}, {"CURUPIRA": 0}, {"CURUPIRA": 0}, set())
 
     assert meta.tracker_status["CURUPIRA"]["upload_success"] is True
     assert meta.tracker_status["CURUPIRA"]["status_message"] == "2 episode NZB upload(s) succeeded"
@@ -359,10 +365,20 @@ def test_episode_upload_summary_records_real_uploads_without_pack() -> None:
 def test_episode_upload_summary_does_not_treat_duplicates_as_uploads() -> None:
     meta = Meta(tracker_status={"CURUPIRA": {}})
 
-    usenetcreate.apply_episode_upload_summary(meta, {"CURUPIRA": []}, {"CURUPIRA": 0}, {"CURUPIRA": 2}, {"CURUPIRA"})
+    usenetcreate.apply_episode_upload_summary(meta, {"CURUPIRA": []}, {"CURUPIRA": 0}, {"CURUPIRA": 2}, {"CURUPIRA": 0}, {"CURUPIRA"})
 
     assert meta.tracker_status["CURUPIRA"]["dupe"] is True
     assert meta.tracker_status["CURUPIRA"]["upload_success"] is False
+
+
+def test_episode_upload_summary_does_not_call_mixed_duplicates_and_skips_all_duplicate() -> None:
+    meta = Meta(tracker_status={"CURUPIRA": {"dupe": True}})
+
+    usenetcreate.apply_episode_upload_summary(meta, {"CURUPIRA": []}, {"CURUPIRA": 0}, {"CURUPIRA": 1}, {"CURUPIRA": 1}, {"CURUPIRA"})
+
+    assert meta.tracker_status["CURUPIRA"]["dupe"] is False
+    assert meta.tracker_status["CURUPIRA"]["upload_success"] is False
+    assert "1 duplicate, 1 skipped" in meta.tracker_status["CURUPIRA"]["status_message"]
 
 
 def test_episode_only_indexer_filter_applies_only_to_pack() -> None:
@@ -413,6 +429,39 @@ async def test_episode_screenshots_capture_and_host_configured_count(tmp_path: P
     assert meta.image_list == uploaded
     assert screenshot_mock.await_args.kwargs["num_screens"] == 3
     assert upload_mock.await_args.args[1] == 3
+
+
+@pytest.mark.asyncio
+async def test_episode_screenshots_restore_working_directory(tmp_path: Path, monkeypatch) -> None:
+    starting_dir = tmp_path / "working"
+    screenshot_dir = tmp_path / "tmp" / "episode-screens" / "screenshots"
+    starting_dir.mkdir()
+    screenshot_dir.mkdir(parents=True)
+    video = tmp_path / "Show.S01E01.mkv"
+    capture = screenshot_dir / "screen.png"
+    video.write_bytes(b"video")
+    capture.write_bytes(b"png")
+    monkeypatch.chdir(starting_dir)
+
+    async def upload_from_screenshot_dir(*_args, **_kwargs):
+        os.chdir(screenshot_dir)
+        return ([{"img_url": "thumb", "raw_url": "raw", "web_url": "web"}], 1)
+
+    monkeypatch.setattr("src.takescreens.TakeScreensManager.screenshots", AsyncMock(return_value=[str(capture)]))
+    monkeypatch.setattr("src.uploadscreens.UploadScreensManager.upload_screens", upload_from_screenshot_dir)
+    meta = Meta(
+        base_dir=str(tmp_path),
+        uuid="episode-screens",
+        name="Show.S01E01",
+        category="TV",
+        screens=1,
+        usenet_media_source=str(video),
+        imghost="imgbox",
+    )
+
+    await usenetcreate.prepare_usenet_episode_screenshots(meta, {"DEFAULT": {"img_host_1": "imgbox"}})
+
+    assert Path.cwd() == starting_dir
 
 
 @pytest.mark.asyncio
