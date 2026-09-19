@@ -132,6 +132,8 @@ async def test_pesto_season_upload_collects_episode_and_pack_nzbs(tmp_path: Path
     assert isinstance(command, list)
     assert "--season" in command
     assert "--nzb-dir" in command
+    assert command[command.index("--ext") + 1] == "avi,m2ts,m4v,mkv,mov,mp4,ts,webm,wmv"
+    assert command[command.index("--compress-temp-dir") + 1].endswith("usenet/pesto-compress")
     assert "--out" not in command
     assert "--compress=7z" in command
     assert command[command.index("--compress-volume-size") + 1] == "100m"
@@ -151,7 +153,29 @@ async def test_pesto_season_upload_collects_episode_and_pack_nzbs(tmp_path: Path
     assert all(Path(path).is_file() for path in meta.usenet_nzb_paths)
 
 
-def test_build_usenet_indexer_metas_uses_episode_metadata_and_keeps_pack_last(tmp_path: Path) -> None:
+def test_pesto_season_entries_reject_top_level_sample_video(tmp_path: Path) -> None:
+    season_dir = tmp_path / "Show.S01"
+    season_dir.mkdir()
+    (season_dir / "Show.S01E01.mkv").write_bytes(b"episode")
+    (season_dir / "Sample.mkv").write_bytes(b"sample")
+
+    with pytest.raises(ValueError, match="Sample.mkv"):
+        usenetcreate.discover_pesto_season_entries(season_dir)
+
+
+def test_pesto_season_entries_ignore_sidecars(tmp_path: Path) -> None:
+    season_dir = tmp_path / "Show.S01"
+    season_dir.mkdir()
+    episode = season_dir / "Show.S01E01.mkv"
+    episode.write_bytes(b"episode")
+    (season_dir / "Show.S01E01.srt").write_text("subtitle", encoding="utf-8")
+    (season_dir / "release.sfv").write_text("checksum", encoding="utf-8")
+
+    assert usenetcreate.discover_pesto_season_entries(season_dir) == {episode.stem: episode}
+
+
+@pytest.mark.asyncio
+async def test_build_usenet_indexer_metas_uses_episode_metadata_and_keeps_pack_last(tmp_path: Path, monkeypatch) -> None:
     season_dir = tmp_path / "Show.S01"
     season_dir.mkdir()
     episode_file = season_dir / "Show.S01E01E02.1080p.WEB-DL-GROUP.mkv"
@@ -169,7 +193,11 @@ def test_build_usenet_indexer_metas_uses_episode_metadata_and_keeps_pack_last(tm
         tracker_status={"CURUPIRA": {"upload": True}},
     )
 
-    submissions = usenetcreate.build_usenet_indexer_metas(meta, [str(episode_nzb), str(pack_nzb)], ["CURUPIRA"])
+    async def fake_export_info(*_args, **_kwargs):
+        return {"media": {"track": []}}
+
+    monkeypatch.setattr("src.exportmi.export_info", fake_export_info)
+    submissions = await usenetcreate.build_usenet_indexer_metas(meta, [str(episode_nzb), str(pack_nzb)], ["CURUPIRA"])
 
     assert len(submissions) == 2
     episode_meta, pack_meta = submissions
@@ -183,8 +211,9 @@ def test_build_usenet_indexer_metas_uses_episode_metadata_and_keeps_pack_last(tm
     assert episode_meta.tv_pack is False
     assert episode_meta.path == str(episode_file)
     assert episode_meta.filelist == [str(episode_file)]
-    assert episode_meta.tracker_status == {"CURUPIRA": {"upload": True}}
-    assert pack_meta is meta
+    assert episode_meta.tracker_status == {"CURUPIRA": {}}
+    assert episode_meta.uuid != meta.uuid
+    assert pack_meta is not meta
     assert pack_meta.nzb_path == str(pack_nzb)
     assert pack_meta.tv_pack is True
 
