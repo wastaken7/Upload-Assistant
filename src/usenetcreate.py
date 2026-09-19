@@ -71,17 +71,25 @@ def discover_pesto_season_entries(source_root: Path) -> dict[str, Path]:
     return entries
 
 
-async def build_usenet_indexer_metas(meta: Meta, nzb_paths: list[str], trackers: list[str]) -> list[Meta]:
-    """Build one indexer submission per Pesto episode NZB, followed by the pack."""
-    if len(nzb_paths) <= 1:
+async def build_usenet_indexer_metas(
+    meta: Meta,
+    nzb_paths: list[str],
+    trackers: list[str],
+    pack_nzb_path: str | None = None,
+) -> list[Meta]:
+    """Build explicitly classified Pesto episode and optional pack submissions."""
+    if not meta.usenet_nzb_paths:
         submission = meta.copy()
         submission.nzb_path = nzb_paths[0] if nzb_paths else meta.nzb_path
+        submission.usenet_is_pack = True
         return [submission]
+
+    episode_paths = [path for path in nzb_paths if path != pack_nzb_path]
 
     submissions: list[Meta] = []
     source_root = Path(meta.path) if meta.path else None
     source_entries = discover_pesto_season_entries(source_root) if source_root and source_root.is_dir() else {}
-    for nzb_path in nzb_paths[:-1]:
+    for nzb_path in episode_paths:
         episode_meta = meta.copy()
         stem = Path(nzb_path).stem
         episode_meta.uuid = f"{meta.uuid}-usenet-{hashlib.sha256(stem.encode('utf-8')).hexdigest()[:12]}"
@@ -90,6 +98,7 @@ async def build_usenet_indexer_metas(meta: Meta, nzb_paths: list[str], trackers:
         episode_meta.basename_no_ext = stem
         episode_meta.scene_name = ""
         episode_meta.tv_pack = False
+        episode_meta.usenet_is_pack = False
 
         season_episode = re.search(r"(?i)(?<![A-Z0-9])S(\d{1,3})((?:E\d{1,4})+)(?!\d)", stem)
         if season_episode:
@@ -129,9 +138,11 @@ async def build_usenet_indexer_metas(meta: Meta, nzb_paths: list[str], trackers:
 
         submissions.append(episode_meta)
 
-    pack_meta = meta.copy()
-    pack_meta.nzb_path = nzb_paths[-1]
-    submissions.append(pack_meta)
+    if pack_nzb_path:
+        pack_meta = meta.copy()
+        pack_meta.nzb_path = pack_nzb_path
+        pack_meta.usenet_is_pack = True
+        submissions.append(pack_meta)
     return submissions
 
 
@@ -1060,6 +1071,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
     use_pesto = uploader == "pesto"
     pesto_season_upload = use_pesto and bool(usenet_cfg.get("pesto_season_upload", False)) and meta.category == "TV" and bool(meta.tv_pack) and Path(input_path).is_dir()
     meta.usenet_nzb_paths = []
+    meta.usenet_pack_nzb_path = None
     # Shorten the UUID to prevent path-length issues (MAX_PATH limit of 260) on Windows specifically for Usenet staging
     clean_uuid = "".join(c for c in meta.uuid if c.isalnum() or c in "._-")[:30]
     uuid_hash = hashlib.sha256(meta.uuid.encode("utf-8")).hexdigest()[:8]
@@ -1124,13 +1136,16 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
                 return path_to_check
     else:
         season_entries = discover_pesto_season_entries(Path(input_path))
-        expected_paths = [Path(nzb_output_dir) / f"{stem}.nzb" for stem in season_entries]
-        expected_paths.append(Path(nzb_output_dir) / f"{Path(input_path).name}.nzb")
-        existing_nzb_validity = await asyncio.gather(*(is_valid_nzb(path) for path in expected_paths))
-        if all(existing_nzb_validity):
-            meta.usenet_nzb_paths = [str(path) for path in expected_paths]
-            logger.info("[cyan]Reusing the complete existing Pesto season NZB set; NNTP repost skipped.[/cyan]")
-            return expected_paths[-1]
+        expected_episode_paths = [Path(nzb_output_dir) / f"{stem}.nzb" for stem in season_entries]
+        expected_pack_path = Path(nzb_output_dir) / f"{Path(input_path).name}.nzb"
+        episode_validity = await asyncio.gather(*(is_valid_nzb(path) for path in expected_episode_paths))
+        if all(episode_validity):
+            meta.usenet_nzb_paths = [str(path) for path in expected_episode_paths]
+            if await is_valid_nzb(expected_pack_path):
+                meta.usenet_pack_nzb_path = str(expected_pack_path)
+                meta.usenet_nzb_paths.append(str(expected_pack_path))
+            logger.info("[cyan]Reusing existing Pesto season episode NZBs; NNTP repost skipped.[/cyan]")
+            return Path(meta.usenet_pack_nzb_path or meta.usenet_nzb_paths[0])
 
     # Temp Usenet directory
     usenet_dir = Path(tmp_base) / uuid / "usenet"
@@ -1666,10 +1681,11 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
         expected_pack_name = f"{Path(input_path).name}.nzb"
         pack_nzb = next((path for path in generated_nzbs if path.name == expected_pack_name), None)
         if pack_nzb is None:
-            logger.error(f"[red]Pesto season upload did not produce the expected pack NZB '{expected_pack_name}'.[/red]")
-            return None
+            logger.warning(f"[yellow]Pesto season upload did not produce the expected pack NZB '{expected_pack_name}'; continuing with episode NZBs.[/yellow]")
 
-        ordered_nzbs = [path for path in generated_nzbs if path != pack_nzb] + [pack_nzb]
+        ordered_nzbs = [path for path in generated_nzbs if path != pack_nzb]
+        if pack_nzb is not None:
+            ordered_nzbs.append(pack_nzb)
         relocated_nzbs: list[str] = []
         for generated_nzb in ordered_nzbs:
             destination = Path(nzb_output_dir) / generated_nzb.name
@@ -1683,10 +1699,12 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
                 relocated_nzbs.append(str(generated_nzb))
 
         meta.usenet_nzb_paths = relocated_nzbs
+        if pack_nzb is not None:
+            meta.usenet_pack_nzb_path = next((path for path in relocated_nzbs if Path(path).name == expected_pack_name), None)
         with contextlib.suppress(Exception):
             if await aiofiles.ospath.exists(season_nzb_dir) and not any(season_nzb_dir.iterdir()):
                 await asyncio.to_thread(os.rmdir, season_nzb_dir)
-        return Path(relocated_nzbs[-1]) if relocated_nzbs else None
+        return Path(meta.usenet_pack_nzb_path or relocated_nzbs[0]) if relocated_nzbs else None
 
     if await aiofiles.ospath.exists(nzb_file):
         try:

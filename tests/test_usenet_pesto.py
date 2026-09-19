@@ -78,7 +78,8 @@ def test_pesto_command_redaction_masks_all_sensitive_values() -> None:
 
 
 @pytest.mark.asyncio
-async def test_pesto_season_upload_collects_episode_and_pack_nzbs(tmp_path: Path, monkeypatch) -> None:
+@pytest.mark.parametrize("include_pack", [True, False])
+async def test_pesto_season_upload_collects_episode_and_optional_pack_nzbs(tmp_path: Path, monkeypatch, include_pack: bool) -> None:
     season_dir = tmp_path / "Show.S01.1080p.WEB-DL-GROUP"
     season_dir.mkdir()
     (season_dir / "Show.S01E01.1080p.WEB-DL-GROUP.mkv").write_bytes(b"episode one")
@@ -102,7 +103,8 @@ async def test_pesto_season_upload_collects_episode_and_pack_nzbs(tmp_path: Path
         content = "<nzb>" + (" " * 100) + "</nzb>"
         (nzb_dir / "Show.S01E01.1080p.WEB-DL-GROUP.nzb").write_text(content, encoding="utf-8")
         (nzb_dir / "Show.S01E02.1080p.WEB-DL-GROUP.nzb").write_text(content, encoding="utf-8")
-        (nzb_dir / f"{season_dir.name}.nzb").write_text(content, encoding="utf-8")
+        if include_pack:
+            (nzb_dir / f"{season_dir.name}.nzb").write_text(content, encoding="utf-8")
 
     monkeypatch.setattr(usenetcreate, "check_binary", fake_check_binary)
     monkeypatch.setattr(usenetcreate, "run_pesto_with_progress", fake_run_pesto)
@@ -152,12 +154,15 @@ async def test_pesto_season_upload_collects_episode_and_pack_nzbs(tmp_path: Path
     assert captured["archive_dir_exists"] is True
     staged_7z_dir = Path(captured["env"]["PATH"].split(os.pathsep)[0])
     assert staged_7z_dir.name == "pesto-bin"
-    assert result == output_dir / f"{season_dir.name}.nzb"
-    assert [Path(path).name for path in meta.usenet_nzb_paths] == [
+    expected_episode_names = [
         "Show.S01E01.1080p.WEB-DL-GROUP.nzb",
         "Show.S01E02.1080p.WEB-DL-GROUP.nzb",
-        f"{season_dir.name}.nzb",
     ]
+    expected_names = expected_episode_names + ([f"{season_dir.name}.nzb"] if include_pack else [])
+    expected_result = output_dir / (f"{season_dir.name}.nzb" if include_pack else expected_episode_names[0])
+    assert result == expected_result
+    assert meta.usenet_pack_nzb_path == (str(output_dir / f"{season_dir.name}.nzb") if include_pack else None)
+    assert [Path(path).name for path in meta.usenet_nzb_paths] == expected_names
     assert all(Path(path).is_file() for path in meta.usenet_nzb_paths)
 
 
@@ -199,13 +204,15 @@ async def test_build_usenet_indexer_metas_uses_episode_metadata_and_keeps_pack_l
         season_int=1,
         tv_pack=True,
         tracker_status={"CURUPIRA": {"upload": True}},
+        usenet_nzb_paths=[str(episode_nzb), str(pack_nzb)],
+        usenet_pack_nzb_path=str(pack_nzb),
     )
 
     async def fake_export_info(*_args, **_kwargs):
         return {"media": {"track": []}}
 
     monkeypatch.setattr("src.exportmi.export_info", fake_export_info)
-    submissions = await usenetcreate.build_usenet_indexer_metas(meta, [str(episode_nzb), str(pack_nzb)], ["CURUPIRA"])
+    submissions = await usenetcreate.build_usenet_indexer_metas(meta, [str(episode_nzb), str(pack_nzb)], ["CURUPIRA"], str(pack_nzb))
 
     assert len(submissions) == 2
     episode_meta, pack_meta = submissions
@@ -217,6 +224,7 @@ async def test_build_usenet_indexer_metas_uses_episode_metadata_and_keeps_pack_l
     assert episode_meta.episode == "E01E02"
     assert episode_meta.episode_int == 1
     assert episode_meta.tv_pack is False
+    assert episode_meta.usenet_is_pack is False
     assert episode_meta.path == str(episode_file)
     assert episode_meta.filelist == [str(episode_file)]
     assert episode_meta.tracker_status == {"CURUPIRA": {}}
@@ -225,6 +233,41 @@ async def test_build_usenet_indexer_metas_uses_episode_metadata_and_keeps_pack_l
     assert pack_meta is not meta
     assert pack_meta.nzb_path == str(pack_nzb)
     assert pack_meta.tv_pack is True
+    assert pack_meta.usenet_is_pack is True
+
+
+@pytest.mark.asyncio
+async def test_build_usenet_indexer_metas_keeps_all_episodes_when_pack_is_missing(tmp_path: Path, monkeypatch) -> None:
+    season_dir = tmp_path / "Show.S01"
+    season_dir.mkdir()
+    episode_file = season_dir / "Show.S01E01.mkv"
+    episode_file.write_bytes(b"video")
+    episode_nzb = tmp_path / "Show.S01E01.nzb"
+    meta = Meta(
+        path=str(season_dir),
+        category="TV",
+        tv_pack=True,
+        usenet_nzb_paths=[str(episode_nzb)],
+    )
+
+    monkeypatch.setattr("src.exportmi.export_info", AsyncMock(return_value={"media": {"track": []}}))
+
+    submissions = await usenetcreate.build_usenet_indexer_metas(meta, meta.usenet_nzb_paths, ["CURUPIRA"], None)
+
+    assert len(submissions) == 1
+    assert submissions[0].nzb_path == str(episode_nzb)
+    assert submissions[0].tv_pack is False
+    assert submissions[0].usenet_is_pack is False
+
+
+@pytest.mark.asyncio
+async def test_build_usenet_indexer_metas_marks_regular_single_nzb_as_pack() -> None:
+    meta = Meta(nzb_path="release.nzb")
+
+    submissions = await usenetcreate.build_usenet_indexer_metas(meta, ["release.nzb"], ["CURUPIRA"])
+
+    assert len(submissions) == 1
+    assert submissions[0].usenet_is_pack is True
 
 
 def test_episode_only_indexer_filter_applies_only_to_pack() -> None:

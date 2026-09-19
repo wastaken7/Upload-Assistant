@@ -2800,12 +2800,17 @@ async def do_the_thing(base_dir: str) -> None:
                                     logger.info("[bold green]Usenet upload completed successfully!")
                                     if selected_usenet_trackers:
                                         nzb_paths = meta.usenet_nzb_paths or [str(nzb_path)]
-                                        indexer_metas = await build_usenet_indexer_metas(meta, nzb_paths, episode_usenet_trackers)
+                                        indexer_metas = await build_usenet_indexer_metas(
+                                            meta,
+                                            nzb_paths,
+                                            episode_usenet_trackers,
+                                            meta.usenet_pack_nzb_path,
+                                        )
                                         logger.info(f"[yellow]Processing {len(indexer_metas)} NZB upload(s) to Usenet indexers: {', '.join(selected_usenet_trackers)}.....")
                                         failed_episode_nzbs: dict[str, list[str]] = {tracker.upper(): [] for tracker in episode_usenet_trackers}
                                         episode_report: list[tuple[str, list[str]]] = []
                                         for index, meta_usenet in enumerate(indexer_metas, start=1):
-                                            is_pack_submission = index == len(indexer_metas)
+                                            is_pack_submission = meta_usenet.usenet_is_pack
                                             submission_trackers = select_usenet_indexers_for_submission(
                                                 pack_usenet_trackers if is_pack_submission else episode_usenet_trackers,
                                                 episodes_only_trackers,
