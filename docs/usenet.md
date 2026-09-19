@@ -59,6 +59,7 @@ config = {
         "random_poster": True,  # Generate randomized poster name/email (default: True)
         "poster": "Uploader <up@anon.org>",  # Custom poster to use if random_poster is False
         "obscure_subject": True,  # Use a randomized hex string for the post subject (default: True)
+        "pesto_obfuscation_mode": "light",  # Pesto: keep filenames opaque in the NZB/indexer listing
         # Archiving & Parity & Encryption
         "rar_volume_size": "auto",  # Volume size (e.g. "100m", "500m", "1g", or "auto" for dynamic sizing)
         "archive_password": "random",  # Password for 7z archive. "random" (default/recommended) generates a unique random password,
@@ -68,12 +69,49 @@ config = {
         "7z_path": "7z",  # Custom path to 7z executable
         "par2_path": "par2",  # Custom path to par2 executable
         "nyuu_path": "nyuu",  # Custom path to nyuu executable
+        "pesto_path": "pesto",  # Custom path to pesto executable
+        "usenet_uploader": "nyuu",  # "nyuu" or "pesto"
+        "pesto_season_upload": False,  # Pesto only: post each TV episode and a consolidated season NZB
         # Staging & Output Directories
         "nzb_output_dir": "/path/to/nzbs",  # Directory to save the completed .nzb file
         "usenet_tmp_dir": "/path/to/staging",  # Staging directory for temporary files during upload
     }
 }
 ```
+
+### Pesto season uploads
+
+Set `"usenet_uploader": "pesto"` and `"pesto_season_upload": True` to use
+Pesto's `--season` mode for TV season packs. The input must be a directory and
+each top-level entry is treated as an independent episode. Pesto generates one
+NZB per episode and a consolidated NZB named after the season directory.
+Upload Assistant submits every episode NZB to the selected Usenet indexers
+first, followed by the complete season NZB.
+
+This option is ignored for movies, individual TV episodes, non-directory
+inputs, and the Nyuu backend. When `skip_archive` is false, Pesto creates a
+separate archive for each episode and preserves the configured volume size and
+archive password. The feature is disabled by default.
+
+When `obscure_subject` is enabled, `pesto_obfuscation_mode` controls Pesto's
+filename behavior. Use `"light"` when archive volume names must remain opaque
+inside the NZB and therefore in indexer file listings. Pesto's `"full"` mode
+obfuscates the NNTP Subject and yEnc name but deliberately restores readable
+filenames inside the NZB. Existing configurations without this key continue to
+use `"full"`; add `"pesto_obfuscation_mode": "light"` to opt into opaque NZB
+filenames. Other Pesto modes accepted by UA are `"article"` and
+`"full-shared"`.
+
+To suppress only the final pack submission for specific indexers, pass their
+codes to `--usenet-episodes-only`. For example:
+
+```bash
+ua "/path/to/Show.S01" -tk CURUPIRA,NZBNEST \
+  --usenet-episodes-only CURUPIRA
+```
+
+Both indexers receive the individual episode NZBs; only NZBNEST receives the
+consolidated season NZB. Multiple episode-only indexers can be comma-separated.
 
 ### Dynamic Volume Size Mapping (`auto`)
 

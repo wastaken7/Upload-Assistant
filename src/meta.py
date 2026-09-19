@@ -335,6 +335,10 @@ class Meta:
     non_disc_has_pcm_audio_tracks: bool = False
     not_anime: bool = False
     nzb_path: str = ""
+    usenet_nzb_paths: list[str] = field(default_factory=list)
+    usenet_pack_nzb_path: str | None = None
+    usenet_is_pack: bool = False
+    usenet_media_source: str | None = None
     ocr: bool | None = None
     only_id: bool | None = None
     openlibrary_book_id: int | None = None
@@ -528,6 +532,7 @@ class Meta:
     uploader_comments: str = ""
     use_bluray_images: bool = False
     usenet_archive_password_is_random: bool | None = None
+    usenet_episodes_only: list[str] = field(default_factory=list)
     usenet_subject: str | None = None
     usenet: bool = False
     uuid: str = ""
