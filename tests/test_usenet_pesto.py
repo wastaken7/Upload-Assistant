@@ -23,6 +23,7 @@ async def test_pesto_uses_stable_auth_password_flag(tmp_path: Path, monkeypatch)
         captured["cmd"] = cmd
         captured["cwd"] = cwd
         captured["env"] = env
+        captured["archive_dir_exists"] = Path(env["XDG_CONFIG_HOME"], "pesto", "nzb").is_dir()
         nzb_path = Path(cmd[cmd.index("--out") + 1])
         nzb_path.write_text("<nzb>" + (" " * 100) + "</nzb>", encoding="utf-8")
 
@@ -48,6 +49,9 @@ async def test_pesto_uses_stable_auth_password_flag(tmp_path: Path, monkeypatch)
     assert isinstance(command, list)
     assert command[command.index("--auth-password") + 1] == "secret"
     assert "-p" not in command
+    assert isinstance(captured["env"], dict)
+    assert captured["env"]["XDG_CONFIG_HOME"].endswith("usenet/pesto-config")
+    assert captured["archive_dir_exists"] is True
     assert result == tmp_path / "tmp" / "release.mkv" / "release.nzb"
 
 
@@ -92,6 +96,7 @@ async def test_pesto_season_upload_collects_episode_and_pack_nzbs(tmp_path: Path
         captured["cmd"] = cmd
         captured["cwd"] = cwd
         captured["env"] = env
+        captured["archive_dir_exists"] = Path(env["XDG_CONFIG_HOME"], "pesto", "nzb").is_dir()
         nzb_dir = Path(cmd[cmd.index("--nzb-dir") + 1])
         nzb_dir.mkdir(parents=True, exist_ok=True)
         content = "<nzb>" + (" " * 100) + "</nzb>"
@@ -143,6 +148,8 @@ async def test_pesto_season_upload_collects_episode_and_pack_nzbs(tmp_path: Path
     assert command[-1] == str(season_dir.resolve())
     assert captured["cwd"] == str(season_dir)
     assert isinstance(captured["env"], dict)
+    assert captured["env"]["XDG_CONFIG_HOME"].endswith("usenet/pesto-config")
+    assert captured["archive_dir_exists"] is True
     staged_7z_dir = Path(captured["env"]["PATH"].split(os.pathsep)[0])
     assert staged_7z_dir.name == "pesto-bin"
     assert result == output_dir / f"{season_dir.name}.nzb"

@@ -1379,7 +1379,14 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
     if use_pesto:
         # 6a. Upload via pesto
         season_nzb_dir = Path(tmp_base) / uuid / "season-nzbs"
-        pesto_env: dict[str, str] | None = None
+        pesto_env = os.environ.copy()
+        pesto_config_root = usenet_dir / "pesto-config"
+        pesto_nzb_archive_dir = pesto_config_root / "pesto" / "nzb"
+        await aiofiles.os.makedirs(pesto_nzb_archive_dir, exist_ok=True)
+        if os.name == "nt":
+            pesto_env["APPDATA"] = str(pesto_config_root)
+        else:
+            pesto_env["XDG_CONFIG_HOME"] = str(pesto_config_root)
         cmd_pesto = [
             path_pesto or "pesto",
             "-s",
@@ -1435,7 +1442,6 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
                     if os.name == "nt":
                         for dependency in Path(path_7z).parent.glob("7z*.dll"):
                             await asyncio.to_thread(shutil.copy2, dependency, pesto_bin_dir / dependency.name)
-                    pesto_env = os.environ.copy()
                     pesto_env["PATH"] = os.pathsep.join([str(pesto_bin_dir), pesto_env.get("PATH", "")])
         else:
             cmd_pesto.extend(["--out", str(nzb_file)])
