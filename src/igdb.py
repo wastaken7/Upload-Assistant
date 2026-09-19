@@ -16,6 +16,7 @@ IGDB_GAME_FIELDS = ", ".join(
     (
         "id",
         "name",
+        "url",
         "summary",
         "storyline",
         "first_release_date",
@@ -157,7 +158,7 @@ class IGDBAPI:
             return None
 
         cache = cache_for(self.base_dir)
-        cached_data = await cache.get("igdb", "game_v2", igdb_id_str)
+        cached_data = await cache.get("igdb", "game_v3", igdb_id_str)
         if not is_cache_miss(cached_data) and isinstance(cached_data, dict):
             logger.info(f"[cyan]IGDB: Using cached game details for ID '{igdb_id_str}'[/cyan]")
             return cached_data
@@ -180,7 +181,7 @@ class IGDBAPI:
                     if isinstance(data, list) and len(data) > 0:
                         game_data = data[0]
                         if game_data is not None:
-                            await cache.set("igdb", "game_v2", igdb_id_str, game_data)
+                            await cache.set("igdb", "game_v3", igdb_id_str, game_data)
                         return game_data
                     logger.info(f"[red]IGDB: No game found with ID {igdb_id_str}[/red]")
                 else:
@@ -197,7 +198,7 @@ class IGDBAPI:
             return None
 
         cache = cache_for(self.base_dir)
-        cached_data = await cache.get("igdb", "steam_v2", steam_id_str)
+        cached_data = await cache.get("igdb", "steam_v3", steam_id_str)
         if not is_cache_miss(cached_data) and isinstance(cached_data, dict):
             logger.info(f"[cyan]IGDB: Using cached game details for Steam ID: {steam_id_str}[/cyan]")
             return cached_data
@@ -220,7 +221,7 @@ class IGDBAPI:
                     if isinstance(data, list) and len(data) > 0:
                         game_data = data[0]
                         if game_data is not None:
-                            await cache.set("igdb", "steam_v2", steam_id_str, game_data)
+                            await cache.set("igdb", "steam_v3", steam_id_str, game_data)
                         return game_data
                     logger.info(f"[red]IGDB: No game found with Steam ID {steam_id_str}[/red]")
                 else:
@@ -234,7 +235,7 @@ class IGDBAPI:
         if not self.base_dir or not game_data or "id" not in game_data:
             return
         igdb_id = str(game_data["id"])
-        await cache_for(self.base_dir).set("igdb", "game_v2", igdb_id, game_data)
+        await cache_for(self.base_dir).set("igdb", "game_v3", igdb_id, game_data)
 
     async def fetch_time_to_beat(self, game_id: str | int) -> dict[str, int]:
         """Return IGDB's completion-time estimates in seconds."""

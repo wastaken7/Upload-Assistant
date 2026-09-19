@@ -1071,6 +1071,8 @@ async def gather_game_prep(
         await igdb.cache_game_details(selected_game)
 
     # Populate metadata
+    if selected_game.get("url"):
+        meta.igdb_url = selected_game["url"]
     name = selected_game.get("name")
     if name and not cli_overrides["title"] and "title" not in ggn_fields:
         meta.title = name

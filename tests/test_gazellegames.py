@@ -469,7 +469,7 @@ def test_igdb_search_hydrates_selected_game_and_time_to_beat(tmp_path, monkeypat
 
         async def fetch_game_by_id(self, game_id):
             assert game_id == "7"  # noqa: S101
-            return {"id": 7, "name": "Game", "summary": "Detailed overview", "game_modes": [{"name": "Single player"}], "platforms": [{"name": "PC (Microsoft Windows)"}]}
+            return {"id": 7, "name": "Game", "url": "https://www.igdb.com/games/game", "summary": "Detailed overview", "game_modes": [{"name": "Single player"}], "platforms": [{"name": "PC (Microsoft Windows)"}]}
 
         async def fetch_game_by_steam_id(self, _steam_id):
             return None
@@ -488,6 +488,7 @@ def test_igdb_search_hydrates_selected_game_and_time_to_beat(tmp_path, monkeypat
     asyncio.run(gather_game_prep(meta, str(meta.path), str(tmp_path), config))
 
     assert meta.overview == "Detailed overview"  # noqa: S101
+    assert meta.igdb_url == "https://www.igdb.com/games/game"  # noqa: S101
     assert meta.game_modes == ["Single player"]  # noqa: S101
     assert meta.game_time_to_beat == {"hastily": 3600}  # noqa: S101
 

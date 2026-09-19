@@ -3,6 +3,7 @@ import asyncio
 import builtins
 import contextlib
 import contextvars
+import io
 import logging
 import os
 import re
@@ -48,7 +49,7 @@ def ansi_to_html(ansi_chunk: str, width: int = 120) -> str:
     with inline styles so it can be embedded directly into the web UI.
     """
     try:
-        c = Console(record=True, force_terminal=True, width=width)
+        c = Console(file=io.StringIO(), record=True, force_terminal=True, width=width)
         # Try parsing ANSI sequences first. If there are no style spans and
         # the chunk looks like Rich markup (e.g. contains [bold] tags),
         # parse as markup so styled output is preserved.

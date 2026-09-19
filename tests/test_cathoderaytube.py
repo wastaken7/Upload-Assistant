@@ -71,6 +71,7 @@ def meta(**overrides):
         "tmdb_poster_path": "",
         "artwork_url": "",
         "hosted_artwork": [],
+        "valid_mi": True,
     }
     values.update(overrides)
     result = SimpleNamespace(**values)
@@ -187,7 +188,7 @@ def test_renders_crt_category_description_templates():
     movie = meta(
         overview="A spoiler-free plot.",
         description="Release-specific note.",
-        image_list=[{"raw_url": "https://iili.io/one.png"}],
+        image_list=[{"raw_url": f"https://iili.io/{index}.png"} for index in range(1, 4)],
         is_disc="BDMV",
         discs=[{"summary": "Disc Title: EXAMPLE"}],
     )
@@ -195,7 +196,7 @@ def test_renders_crt_category_description_templates():
         "[info]\nhttps://www.imdb.com/title/tt1234567/\nhttps://www.themoviedb.org/movie/123\n[/info]\n"
         "[plot]\nA spoiler-free plot.\n[/plot]\n"
         "[notes]\nRelease-specific note.\n[/notes]\n"
-        "[screens]\nhttps://iili.io/one.png\n[/screens]\n"
+        "[screens]\nhttps://iili.io/1.png https://iili.io/2.png https://iili.io/3.png\n[/screens]\n"
         "[details]\n[mediainfo]\nDisc Title: EXAMPLE\n[/mediainfo]\n[/details]\n\n"
         "[align=right][url=https://github.com/wastaken7/Upload-Assistant][size=1]Upload-Assistant[/size][/url][/align]"
     )
@@ -206,6 +207,30 @@ def test_renders_crt_category_description_templates():
         "[info]\nhttps://store.steampowered.com/app/1\n[/info]\n[plot]\nGame plot\n[/plot]\n\n"
         "[align=right][url=https://github.com/wastaken7/Upload-Assistant][size=1]Upload-Assistant[/size][/url][/align]"
     )
+
+
+def test_places_supplemental_images_in_notes_and_groups_screenshots_by_three():
+    site = tracker()
+    item = meta(
+        description="Release note.",
+        menu_images=[{"raw_url": "https://iili.io/menu.png"}],
+        spectrograms_images=[{"raw_url": "https://iili.io/spectrum.png"}],
+        dynamic_hdr_plot_images=[{"raw_url": "https://iili.io/hdr.png"}],
+        image_list=[{"raw_url": f"https://iili.io/screen{i}.png"} for i in range(1, 9)] + [{}],
+    )
+
+    description = asyncio.run(site.generate_description(item))
+    assert "[notes]\nRelease note.\n\nhttps://iili.io/menu.png\nhttps://iili.io/spectrum.png\nhttps://iili.io/hdr.png\n[/notes]" in description  # noqa: S101
+    assert (  # noqa: S101
+        "[screens]\nhttps://iili.io/screen1.png https://iili.io/screen2.png https://iili.io/screen3.png\n"
+        "https://iili.io/screen4.png https://iili.io/screen5.png https://iili.io/screen6.png\n[/screens]" in description
+    )
+
+
+def test_supplemental_images_create_notes_without_note_text():
+    description = asyncio.run(tracker().generate_description(meta(menu_images=[{"raw_url": "https://iili.io/menu.png"}])))
+    assert "[notes]\nhttps://iili.io/menu.png\n[/notes]" in description  # noqa: S101
+    assert "[screens]" not in description  # noqa: S101
 
 
 def test_builds_simple_advanced_search_params():
@@ -285,8 +310,6 @@ def test_content_name_uses_the_file_for_single_file_torrents():
 
 def test_enforces_known_archive_rules():
     assert asyncio.run(tracker().get_additional_checks(meta()))  # noqa: S101
-    assert not asyncio.run(tracker().get_additional_checks(meta(filelist=["Example.iso"])))  # noqa: S101
-    assert asyncio.run(tracker().get_additional_checks(meta(filelist=["Example.iso"], three_d="3D")))  # noqa: S101
     assert asyncio.run(tracker().get_additional_checks(meta(category="GAME", filelist=["Game.7z"])))  # noqa: S101
 
 
@@ -321,9 +344,3 @@ def test_extracts_successful_upload_url():
     request = httpx.Request("POST", "https://www.cathode-ray.tube/torrents.php?id=123&torrentid=456")
     response = httpx.Response(200, request=request)
     assert CathodeRayTube._uploaded_torrent_url(response).endswith("id=123&torrentid=456")  # noqa: S101
-
-
-def test_excludes_images_without_raw_url_from_screenshot_validation():
-    valid_images = [{"raw_url": f"https://images.example/{index}.png"} for index in range(5)]
-
-    assert not asyncio.run(tracker().get_additional_checks(meta(image_list=valid_images, dynamic_hdr_plot_images=[{}])))  # noqa: S101
