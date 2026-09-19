@@ -2767,6 +2767,7 @@ async def do_the_thing(base_dir: str) -> None:
                         pack_usenet_trackers: list[str],
                         need_usenet_post: bool,
                         has_usenet_trackers: bool,
+                        pesto_season_enabled: bool,
                     ) -> None:
                         if need_usenet_post:
                             from src.usenetcreate import build_usenet_indexer_metas, prepare_and_upload_usenet, select_usenet_indexers_for_submission
@@ -2780,12 +2781,7 @@ async def do_the_thing(base_dir: str) -> None:
                                         raise ValueError(
                                             f"--usenet-episodes-only contains indexers that are not selected for this upload: {', '.join(sorted(unknown_trackers))}"
                                         )
-                                    if (
-                                        str(usenet_cfg.get("usenet_uploader", "nyuu")).lower() != "pesto"
-                                        or not usenet_cfg.get("pesto_season_upload", False)
-                                        or meta.category != "TV"
-                                        or not meta.tv_pack
-                                    ):
+                                    if not pesto_season_enabled:
                                         raise ValueError("--usenet-episodes-only requires an active Pesto season-pack upload")
 
                                 nzb_path = await prepare_and_upload_usenet(meta, config)
@@ -2922,8 +2918,16 @@ async def do_the_thing(base_dir: str) -> None:
                         eligible_usenet_trackers: list[str] = eligible_usenet_trackers,
                         need_usenet_post: bool = need_usenet_post,
                         has_usenet_trackers: bool = bool(usenet_trackers),
+                        pesto_season_enabled: bool = pesto_season_active,
                     ) -> None:
-                        await upload_usenet_flow(meta, selected_usenet_trackers, eligible_usenet_trackers, need_usenet_post, has_usenet_trackers)
+                        await upload_usenet_flow(
+                            meta,
+                            selected_usenet_trackers,
+                            eligible_usenet_trackers,
+                            need_usenet_post,
+                            has_usenet_trackers,
+                            pesto_season_enabled,
+                        )
 
                     async def run_torrent_flow(
                         bandwidth_control: bool,

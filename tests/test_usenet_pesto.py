@@ -159,7 +159,7 @@ def test_pesto_season_entries_reject_top_level_sample_video(tmp_path: Path) -> N
     (season_dir / "Show.S01E01.mkv").write_bytes(b"episode")
     (season_dir / "Sample.mkv").write_bytes(b"sample")
 
-    with pytest.raises(ValueError, match="Sample.mkv"):
+    with pytest.raises(ValueError, match=r"Sample\.mkv"):
         usenetcreate.discover_pesto_season_entries(season_dir)
 
 
