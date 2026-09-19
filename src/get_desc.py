@@ -1562,7 +1562,10 @@ class DescriptionBuilder:
         else:
             ua_signature_section = ""
 
-        other_sections = [*desc_parts, menu_section, tonemapped_section, audio_spectrogram_section, dynamic_hdr_plot_section, custom_signature_section, ua_signature_section]
+        # Signatures are footers, not content sections. Ignoring them here lets
+        # the standalone-header setting work in normal runs, where UA always
+        # supplies ``meta.ua_signature``.
+        other_sections = [*desc_parts, menu_section, tonemapped_section, audio_spectrogram_section, dynamic_hdr_plot_section]
         include_screenshot_header = not (self._get_bool_config("hide_screenshot_header_if_only_section", True) and not any(part.strip() for part in other_sections))
 
         # Menu Screenshots
