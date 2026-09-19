@@ -382,7 +382,7 @@ async def process_trackers(
                         print_tracker_result(tracker, ptp, status, False)
                         logger.info(f"[red]{tracker} upload failed or returned data error.[/red]")
                 except Exception:
-                    logger.info(traceback.format_exc())
+                    logger.info(traceback.format_exc(), extra={"markup": False})
                     return
 
     multi_screens = int(config["DEFAULT"].get("multiScreens", 2))
