@@ -107,3 +107,32 @@ def test_tracker_override_replaces_main_screenshots_and_keeps_pack_layout(pack):
     assert "Show.S01E01" in result
     assert "[spoiler=Show.S01E02]" in result
     assert _image("second")["raw_url"] in result
+
+
+def test_pack_capture_does_not_run_global_cleanup(tmp_path, monkeypatch):
+    (tmp_path / "tmp" / "pack").mkdir(parents=True)
+    builder = DescriptionBuilder(
+        "TEST",
+        {"DEFAULT": {"multiScreens": 2, "processLimit": 2, "fileLimit": 1}, "TRACKERS": {"TEST": {}}},
+    )
+    meta = Meta(
+        base_dir=str(tmp_path),
+        uuid="pack",
+        category="TV",
+        filelist=["Show.S01E01.mkv", "Show.S01E02.mkv"],
+        screens=1,
+        image_list=[_image("first")],
+        skip_imghost_upload=True,
+    )
+    capture_kwargs = []
+
+    async def screenshots(*_args, **kwargs):
+        capture_kwargs.append(kwargs)
+        return []
+
+    monkeypatch.setattr(builder.takescreens_manager, "screenshots", screenshots)
+    monkeypatch.setattr("src.get_desc.MediaInfo.parse", lambda *_args, **_kwargs: "General\nDuration : 42 min\n")
+
+    asyncio.run(builder._handle_discs_and_screenshots(meta, [], meta.image_list, 2))
+
+    assert capture_kwargs == [{"cleanup_after_capture": False, "capture_group": "FILE_1"}]

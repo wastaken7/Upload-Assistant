@@ -243,6 +243,7 @@ class Meta:
     infohash: str = ""
     initial_dupes: dict[str, Any] = field(default_factory=dict)
     is_disc: str = ""
+    is_sports: bool = False
     pre_release: bool = False
     isbn: str = ""
     isdir: bool = False

@@ -60,7 +60,7 @@ class DrunkenSlug:
         params: dict[str, str] = {
             "cat": get_newznab_search_category_id(meta),
         }
-        category = meta.category.upper()
+        category = meta.category.upper() if not meta.is_sports else "SPORTS"
         if category == "TV":
             params["t"] = "tvsearch"
             if meta.tvdb_id and str(meta.tvdb_id).isdigit() and int(meta.tvdb_id) > 0:

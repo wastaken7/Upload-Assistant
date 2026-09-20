@@ -121,7 +121,7 @@ class Suio:
             "cat": get_newznab_search_category_id(meta),
         }
 
-        category = meta.category.upper()
+        category = meta.category.upper() if not meta.is_sports else "SPORTS"
         if category == "TV":
             params["t"] = "tvsearch"
             if meta.tvdb_id and str(meta.tvdb_id).isdigit() and int(meta.tvdb_id) > 0:
@@ -185,7 +185,7 @@ class Suio:
         return True
 
     def get_category_id(self, meta: Meta) -> str:
-        category = meta.category.upper()
+        category = meta.category.upper() if not meta.is_sports else "SPORTS"
         resolution = meta.resolution.lower()
         uhd_resolutions = {"2160p", "4320p", "8640p"}
         hd_resolutions = {"1080p", "1080i", "720p", "1440p"}

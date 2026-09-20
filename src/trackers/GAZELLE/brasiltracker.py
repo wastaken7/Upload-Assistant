@@ -255,6 +255,9 @@ class BrasilTracker:
                 return "11"
             return "12"
 
+        if meta.is_sports:
+            return "13"
+
         category_map = {
             "TV": "1",
             "MOVIE": "0",
