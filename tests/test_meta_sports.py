@@ -22,6 +22,10 @@ def test_detects_sports_from_category_or_genre() -> None:
     assert detect_sports(Meta(genres=["Esportes"]))
 
 
+def test_game_category_does_not_use_sports_metadata() -> None:
+    assert not detect_sports(Meta(category="GAME", keywords=["UFC"]))
+
+
 def test_detects_sports_from_release_title() -> None:
     assert detect_sports(Meta(name="Formula 1 2026 Round 08 Monaco Grand Prix 1080p"))
 

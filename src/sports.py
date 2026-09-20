@@ -47,8 +47,11 @@ def _text_values(value: Any) -> list[str]:
 
 def detect_sports(meta: Meta) -> bool:
     """Return whether the available metadata describes a sports upload."""
-    if _normalize(str(meta.category or "")) in {"sport", "sports", "esporte", "esportes"}:
+    category = _normalize(str(meta.category or ""))
+    if category in {"sport", "sports", "esporte", "esportes"}:
         return True
+    if category == "game":
+        return False
 
     structured_metadata: list[str] = []
     for field_name in ("genres", "keywords", "combined_genres"):
