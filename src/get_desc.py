@@ -2045,6 +2045,7 @@ class DescriptionBuilder:
                                     meta,
                                     multi_screens,
                                     True,
+                                    cleanup_after_capture=False,
                                     capture_group=f"FILE_{i}",
                                 )
                                 await asyncio.sleep(0.1)

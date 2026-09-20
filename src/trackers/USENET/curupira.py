@@ -152,7 +152,7 @@ class Curupira:
 
         params: dict[str, str] = {}
 
-        category = meta.category.upper()
+        category = meta.category.upper() if not meta.is_sports else "SPORTS"
 
         if category == "TV":
             params["t"] = "tvsearch"
@@ -225,6 +225,9 @@ class Curupira:
         # Check if anime
         if meta.anime:
             return "5070"
+
+        if meta.is_sports:
+            return "5060"
 
         category = meta.category.upper()
         resolution = meta.resolution.lower()

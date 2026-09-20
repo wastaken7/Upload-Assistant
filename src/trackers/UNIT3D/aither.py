@@ -41,6 +41,20 @@ class Aither(UNIT3D):
         self.config = config
         self.common = Common(config)
 
+    async def get_category_id(self, meta: Meta, category: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
+        category_id = {
+            "MOVIE": "1",
+            "TV": "2",
+            "SPORTS": "9",
+        }
+        if mapping_only:
+            return category_id
+        if reverse:
+            return {value: key for key, value in category_id.items()}
+
+        resolved_category = "SPORTS" if meta.is_sports else category or meta.category
+        return {"category_id": category_id.get(resolved_category, "0")}
+
     async def get_additional_checks(self, meta: Meta):
         should_continue = True
 
