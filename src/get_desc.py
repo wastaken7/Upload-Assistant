@@ -70,6 +70,54 @@ def html_to_bbcode(text: str) -> str:
     return re.sub(r"<[^>]+>", "", converted_text)
 
 
+def _clean_game_requirements(value: str) -> str:
+    """Convert a Steam requirements block to clean BBCode."""
+    cleaned = html.unescape(html_to_bbcode(value))
+    cleaned = re.sub(r"<[^>]+>", "", cleaned).strip()
+    return re.sub(
+        r"^\[b\](?:Minimum|Recommended|Mínimo|Mínimos|Recomendado|Recomendados):?\[/b\]\s*",
+        "",
+        cleaned,
+        flags=re.IGNORECASE,
+    )
+
+
+def _parse_game_requirement_items(value: str) -> list[tuple[str, str, str]]:
+    """Return normalized key, display label, and value for each Steam requirement."""
+    cleaned = _clean_game_requirements(value)
+    if not cleaned:
+        return []
+
+    items: list[list[str]] = []
+    unlabeled_count = 0
+    label_counts: dict[str, int] = {}
+    item_pattern = re.compile(r"^\[b\](?P<label>.+?)(?::\s*)?\[/b\]\s*:?[ \t]*(?P<value>.*)$", re.IGNORECASE)
+
+    for raw_line in cleaned.splitlines():
+        is_list_item = bool(re.match(r"^\s*\*\s*", raw_line))
+        line = re.sub(r"^\s*\*\s*", "", raw_line).strip()
+        if not line:
+            continue
+        match = item_pattern.match(line)
+        if match:
+            label = _safe_game_field(match.group("label").rstrip(":").replace("*", "")).strip()
+            item_value = match.group("value").strip()
+            base_key = label.casefold()
+            occurrence = label_counts.get(base_key, 0)
+            label_counts[base_key] = occurrence + 1
+            key = f"label:{base_key}:{occurrence}"
+            items.append([key, label or "-", item_value or "-"])
+        elif is_list_item or not items:
+            items.append([f"unlabeled:{unlabeled_count}", "-", line])
+            unlabeled_count += 1
+        else:
+            items[-1][2] = f"{items[-1][2]}\n{line}"
+
+    if not items:
+        return [("details", "-", cleaned)]
+    return [(key, label, item_value) for key, label, item_value in items]
+
+
 def _safe_game_field(value: Any) -> str:
     text = re.sub(r"<[^>]+>", "", html.unescape(str(value or ""))).strip()
     return " ".join(text.replace("[", "").replace("]", "").split())
@@ -784,19 +832,13 @@ class DescriptionBuilder:
         desc_parts.append("[/center]\n")
         return "".join(desc_parts)
 
-    def _build_book_desc_section(self, meta: Meta, header_size: int = 0, table: bool = True, underline: bool = False, bullet: str = "") -> str:
+    def _build_book_desc_section(self, meta: Meta, table: bool = True, underline: bool = False, bullet: str = "") -> str:
         """Build the BBCode table or list for BOOK-category uploads."""
-        if self.tracker in ("TORRENTLEECH", "IMMORTALSEED", "IPTORRENTS", "SPEEDAPP"):
+        if self.tracker in ("TORRENTLEECH", "IMMORTALSEED", "IPTORRENTS", "SPEEDAPP", "AMIGOSSHARE"):
             table = False
-            header_size = -1
-        elif self.tracker in ("BJSHARE", "BRASILTRACKER", "AMIGOSSHARE"):
-            if not header_size:
-                header_size = 3
-            if self.tracker == "AMIGOSSHARE":
-                table = False
 
-        header = "[h2]" if not header_size else f"[size={header_size}][b]"
-        header_end = "[/h2]" if not header_size else "[/b][/size]\n"
+        header = "[h2]"
+        header_end = "[/h2]"
 
         asin = meta.asin
         author = meta.author
@@ -872,9 +914,6 @@ class DescriptionBuilder:
             if underline:
                 header = "[b][u]"
                 header_end = "[/u][/b]\n"
-            elif header_size == -1:
-                header = "[b]"
-                header_end = "[/b]\n"
 
             if fields:
                 final_book_parts.append(f"{header}{str_technical_details}{header_end}")
@@ -900,12 +939,9 @@ class DescriptionBuilder:
         if underline:
             header = "[b][u]"
             header_end = "[/u][/b]\n"
-        elif header_size == -1:
-            header = "[b]"
-            header_end = "[/b]\n"
         else:
-            header = "[h2]" if not header_size else f"[size={header_size}][b]"
-            header_end = "[/h2]" if not header_size else "[/b][/size]\n"
+            header = "[h2]"
+            header_end = "[/h2]"
 
         if book_parts:
             final_book_parts.append(f"{header}{str_technical_details}{header_end}" + "\n".join(book_parts))
@@ -915,20 +951,15 @@ class DescriptionBuilder:
 
         return "\n\n".join(final_book_parts)
 
-    def _build_game_desc_section(self, meta: Meta, header_size: int = 0, table: bool = True) -> str:
+    def _build_game_desc_section(self, meta: Meta, table: bool = True) -> str:
         """Build the beautiful BBCode layout for GAME-category uploads."""
         if meta.category != "GAME":
             return ""
 
         game_parts: list[str] = []
 
-        if self.tracker == "TORRENTLEECH" and not header_size:
-            header_size = 1
-        elif self.tracker in ("BJSHARE", "BRASILTRACKER") and not header_size:
-            header_size = 3
-
-        header = "[h2]" if not header_size else f"[size={header_size}][b]"
-        header_end = "[/h2]" if not header_size else "[/b][/size]\n"
+        header = "[h2]"
+        header_end = "[/h2]"
 
         use_pt_br = self.language == "pt-BR"
         str_technical_details = "Technical Details" if not use_pt_br else "Detalhes Técnicos"
@@ -1094,35 +1125,30 @@ class DescriptionBuilder:
         req_rec = meta.requirements_recommended
 
         if req_min or req_rec:
-            import html
-
             header_title = f"{str_system_requirements}"
             game_parts.append(f"{header}{header_title}{header_end}")
 
             col_min_header = f"{str_minimum}"
             col_rec_header = f"{str_recommended}"
 
-            clean_min = ""
-            if req_min:
-                clean_min = html_to_bbcode(req_min)
-                clean_min = html.unescape(clean_min)
-                clean_min = re.sub(r"<[^>]+>", "", clean_min).strip()
-                clean_min = re.sub(r"^\[b\](Minimum|Mínimo):\[/b\]\s*", "", clean_min, flags=re.IGNORECASE)
-
-            clean_rec = ""
-            if req_rec:
-                clean_rec = html_to_bbcode(req_rec)
-                clean_rec = html.unescape(clean_rec)
-                clean_rec = re.sub(r"<[^>]+>", "", clean_rec).strip()
-                clean_rec = re.sub(r"^\[b\](Recommended|Recomendado):\[/b\]\s*", "", clean_rec, flags=re.IGNORECASE)
+            clean_min = _clean_game_requirements(req_min) if req_min else ""
+            clean_rec = _clean_game_requirements(req_rec) if req_rec else ""
 
             if table:
-                clean_min = clean_min or "-"
-                clean_rec = clean_rec or "-"
+                min_items = _parse_game_requirement_items(req_min) if req_min else []
+                rec_items = _parse_game_requirement_items(req_rec) if req_rec else []
+                min_by_key = {key: (label, value) for key, label, value in min_items}
+                rec_by_key = {key: (label, value) for key, label, value in rec_items}
+                row_keys = list(min_by_key)
+                row_keys.extend(key for key in rec_by_key if key not in min_by_key)
 
                 table_lines = ["[table]"]
-                table_lines.append(f"[tr][td][b]{col_min_header}[/b][/td][td][b]{col_rec_header}[/b][/td][/tr]")
-                table_lines.append(f"[tr][td]{clean_min}[/td][td]{clean_rec}[/td][/tr]")
+                table_lines.append(f"[tr][td][b]{game_labels['hardware']}[/b][/td][td][b]{col_min_header}[/b][/td][td][b]{col_rec_header}[/b][/td][/tr]")
+                for key in row_keys:
+                    min_label, min_value = min_by_key.get(key, ("", "-"))
+                    rec_label, rec_value = rec_by_key.get(key, ("", "-"))
+                    label = min_label or rec_label or "-"
+                    table_lines.append(f"[tr][td][b]{label}[/b][/td][td]{min_value}[/td][td]{rec_value}[/td][/tr]")
                 table_lines.append("[/table]")
                 game_parts.append("\n".join(table_lines))
             else:
@@ -1137,13 +1163,19 @@ class DescriptionBuilder:
         # 4. Supported Languages
         languages = meta.languages
         if languages and isinstance(languages, dict):
+            support_labels = game_labels["language_support_types"]
+
+            def localized_support(support: Any) -> str:
+                cleaned_support = _safe_game_field(support)
+                return support_labels.get(cleaned_support.casefold(), cleaned_support)
+
             if table:
                 table_rows = []
                 table_rows.append(f"[tr][td][b]{str_language}[/b][/td][td][b]{str_support}[/b][/td][/tr]")
 
                 for lang, support in sorted(languages.items()):
                     lang = (lang or "").strip() or "-"
-                    support_str = ", ".join(support).strip() or "-"
+                    support_str = ", ".join(localized_support(value) for value in support).strip() or "-"
 
                     table_rows.append(f"[tr][td]{lang}[/td][td]{support_str}[/td][/tr]")
 
@@ -1154,14 +1186,14 @@ class DescriptionBuilder:
                 # Simple BBCode format without table
                 simple_lang_lines = []
                 for lang, support in sorted(languages.items()):
-                    support_str = ", ".join(support)
+                    support_str = ", ".join(localized_support(value) for value in support)
                     simple_lang_lines.append(f"[b]{lang}[/b]: {support_str}")
                 simple_section = f"{header}{str_official_supported_languages}{header_end}\n" + "\n".join(simple_lang_lines) + "\n"
                 game_parts.append(simple_section)
 
         return "\n".join(part for part in game_parts if part.strip())
 
-    def _build_music_desc_section(self, meta: Meta, header_size: int = 0, table: bool = True) -> str:
+    def _build_music_desc_section(self, meta: Meta, table: bool = True) -> str:
         """Build a tracker-neutral BBCode summary for MUSIC-category uploads."""
         if meta.category != "MUSIC" or not isinstance(meta.music_release, dict):
             return ""
@@ -1182,13 +1214,8 @@ class DescriptionBuilder:
         if not fields_data and not tracks and not external_ids:
             return ""
 
-        if self.tracker == "TORRENTLEECH" and not header_size:
-            header_size = 1
-        elif self.tracker in ("BJSHARE", "BRASILTRACKER", "SPEEDAPP") and not header_size:
-            header_size = 3
-
-        header = "[h2]" if not header_size else f"[size={header_size}][b]"
-        header_end = "[/h2]" if not header_size else "[/b][/size]\n"
+        header = "[h2]"
+        header_end = "[/h2]"
         use_pt_br = self.language == "pt-BR"
 
         def value(name: str, fallback: Any = "") -> Any:
@@ -2237,6 +2264,10 @@ class DescriptionBuilder:
         if tracker in {"ANTHELION", "BJSHARE", "BRASILTRACKER", "GREATPOSTERWALL"}:
             description = bbcode.clamp_size_tags(description)
             description = bbcode.convert_named_colors(description)
+            description = bbcode.convert_headings_to_sizes(description)
+
+        if tracker == "AMIGOSSHARE":
+            description = bbcode.convert_headings_to_sizes(description)
 
         if tracker == "BRASILTRACKER":
             description = bbcode.remove_img_resize(description)

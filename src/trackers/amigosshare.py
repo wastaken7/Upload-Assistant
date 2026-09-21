@@ -384,7 +384,7 @@ class AmigosShare:
 
         # Book details using DescriptionBuilder
         builder = DescriptionBuilder(self.tracker, self.config, "pt-BR")
-        book_section = builder._build_book_desc_section(meta, header_size=3, table=False)
+        book_section = builder._build_book_desc_section(meta, table=False)
         if book_section:
             description_parts.append(book_section)
             description_parts.append("")
@@ -412,7 +412,7 @@ class AmigosShare:
 
         final_desc_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt"
         async with aiofiles.open(final_desc_path, "w", encoding="utf-8") as descfile:
-            final_description = "\n".join(filter(None, description_parts))
+            final_description = builder.tracker_specific_formats(self.tracker, "\n".join(filter(None, description_parts)))
             await descfile.write(final_description)
 
         return final_description
@@ -736,14 +736,14 @@ class AmigosShare:
         builder = DescriptionBuilder(self.tracker, self.config, "pt-BR")
         desc_parts: list[str] = []
 
-        game_section = builder._build_game_desc_section(meta, header_size=5, table=False)
+        game_section = builder._build_game_desc_section(meta, table=False)
         if game_section:
             desc_parts.append(game_section)
 
         desc_parts.append(await builder.get_user_description(meta))
         desc_parts.append(f"[center][url=https://github.com/wastaken7/Upload-Assistant]Compartilhado com {meta.ua_name} {meta.current_version} (fork)[/url][/center]")
 
-        final_description = "\n\n".join(part for part in desc_parts if part.strip())
+        final_description = builder.tracker_specific_formats(self.tracker, "\n\n".join(part for part in desc_parts if part.strip()))
 
         final_desc_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt"
         async with aiofiles.open(final_desc_path, "w", encoding="utf-8") as descfile:
