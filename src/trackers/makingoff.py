@@ -2010,14 +2010,9 @@ class MakingOff:
         """
         forum_id = await self.get_forum_id(meta)
         logger.info(f"{self.tracker}: [green]Selected subforum:[/green] {forum_id} ")
-        # Extract before creating the torrent so a non-hardcoded embedded
-        # Portuguese subtitle can be included in the torrent as well as
-        # attached separately to the forum post.
+        # Extract before creating the torrent so any Portuguese subtitle can be
+        # included in the torrent as well as attached separately to the forum post.
         sub_files = await self._get_portuguese_subtitles(meta)
-        if not sub_files and not getattr(meta, "hardcoded_subs", False) and not meta.debug:
-            logger.warning(f"{self.tracker}: [bold red]Unable to provide a separate Portuguese subtitle file.[/bold red]")
-            meta["tracker_status"][self.tracker]["status_message"] = "Upload blocked: no separate Portuguese subtitle file."
-            return False
 
         if sub_files:
             existing = list(getattr(meta, "subtitle_files", []) or [])
