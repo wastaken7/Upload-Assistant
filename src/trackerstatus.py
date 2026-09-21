@@ -48,10 +48,16 @@ class TrackerStatusManager:
         if result or meta.get("unattended", False):
             return bool(result)
 
-        return await helper.prompt_yes_no(
-            f"{tracker_name}: one or more upload checks failed. Do you want to proceed with the upload anyway?",
-            default=False,
-        )
+        if sys.stdin.closed:
+            return False
+
+        try:
+            return await helper.prompt_yes_no(
+                f"{tracker_name}: one or more upload checks failed. Do you want to proceed with the upload anyway?",
+                default=False,
+            )
+        except EOFError:
+            return False
 
     async def process_all_trackers(self, meta: Meta) -> int:
         tracker_status: dict[str, dict[str, Any]] = {}
