@@ -19,6 +19,7 @@ from src.console import logger
 from src.meta import Meta
 from src.screenshot_manifest import files as manifest_files
 from src.temp_paths import screenshots_dir
+from src.tracker_images import image_tags
 
 type ImageDict = dict[str, Any]
 
@@ -697,6 +698,7 @@ async def _upload_screens(
             "img_url": upload["img_url"],
             "raw_url": raw_url,
             "web_url": upload["web_url"],
+            "tags": image_tags(upload_meta),
         }
         upload_image_list.append(new_image)
         known_raw_urls.add(raw_url)
@@ -955,7 +957,7 @@ async def _upload_screens(
         new_images: list[ImageDict] = []
         for _index, upload in successfully_uploaded:
             raw_url = upload["raw_url"]
-            new_image = {"img_url": upload["img_url"], "raw_url": raw_url, "web_url": upload["web_url"]}
+            new_image = {"img_url": upload["img_url"], "raw_url": raw_url, "web_url": upload["web_url"], "tags": image_tags(meta, custom=using_custom_img_list)}
             # Custom uploads (disc menus and spectrograms) are not added to
             # ``meta.image_list``.  Keep their local source so a tracker that
             # rejects the initially selected host can re-upload the same asset.

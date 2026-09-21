@@ -172,6 +172,7 @@ class Meta:
     found_tracker_match: bool | None = None
     frame_info_map: dict[str, Any] = field(default_factory=dict)
     frame_overlay: bool = False
+    force_tonemap: bool = False
     frame_rate: float | None = None
     framestor: bool | None = None
     freeleech: int = 0

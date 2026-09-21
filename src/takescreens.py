@@ -2564,7 +2564,7 @@ async def determine_tonemapping(w_sar: float, h_sar: float, width: float, height
     """Select a verified tonemapping path and record its actual metadata state."""
     meta.libplacebo = False
     meta.tonemapped = False
-    if not tone_map or not any(marker in meta.hdr for marker in ("HDR", "DV", "HLG")):
+    if not (tone_map or meta.force_tonemap) or not any(marker in meta.hdr for marker in ("HDR", "DV", "HLG")):
         return False
 
     if use_libplacebo and not meta.frame_overlay:
