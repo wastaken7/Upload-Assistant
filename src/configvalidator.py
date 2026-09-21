@@ -746,6 +746,22 @@ def _validate_trackers_section(trackers: dict[str, Any], active_trackers: list[s
                     )
 
         # Check integer fields
+        list_fields = [
+            "image_tag_whitelist",
+            "image_tag_blacklist",
+        ]
+        for field in list_fields:
+            if field in tracker_config_dict:
+                value = tracker_config_dict[field]
+                if not isinstance(value, list) or any(not isinstance(tag, str) or not tag.strip() for tag in value):
+                    warnings.append(
+                        ConfigValidationWarning(
+                            f"'{field}' must be a list of non-empty strings, got {type(value).__name__}: {value!r}",
+                            key=tracker_name,
+                            section="TRACKERS",
+                        )
+                    )
+
         int_fields = [
             "freeleech_until",
             "double_upload_until",

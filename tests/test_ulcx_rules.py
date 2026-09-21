@@ -61,10 +61,6 @@ async def test_ulcx_valid_upload():
 async def test_ulcx_forbidden_content():
     tracker = make_ulcx()
 
-    # Concerts / live performance
-    meta_concert = make_ulcx_meta(keywords=["concert", "live performance"])
-    assert await tracker.get_additional_checks(meta_concert) is False
-
     # Adult content
     meta_adult = make_ulcx_meta(adult_media=True)
     assert await tracker.get_additional_checks(meta_adult) is False

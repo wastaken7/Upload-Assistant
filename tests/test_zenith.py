@@ -65,6 +65,7 @@ def test_zenith_music_additional_data_sends_valid_external_ids():
     data = asyncio.run(Zenith({"DEFAULT": {}, "TRACKERS": {"ZENITH": {}}}).get_additional_data(meta))
 
     assert data == {
+        "mod_queue_opt_in": "0",
         "exists_on_musicbrainz": "1",
         "musicbrainz_release_id": "c0d17e85-3a36-4dc8-9a88-c188a5e78b0d",
         "musicbrainz_release_group_id": "3bdb2b21-f6f5-3f8b-a1e0-067f8bb71940",
@@ -81,7 +82,13 @@ def test_zenith_music_additional_data_omits_invalid_or_disabled_external_ids():
         music_release={"external_ids": {"musicbrainz_release": "invalid", "discogs_release": "not-a-number"}},
     )
 
-    assert asyncio.run(Zenith({"DEFAULT": {}, "TRACKERS": {"ZENITH": {}}}).get_additional_data(meta)) == {}
+    assert asyncio.run(Zenith({"DEFAULT": {}, "TRACKERS": {"ZENITH": {}}}).get_additional_data(meta)) == {"mod_queue_opt_in": "0"}
+
+
+def test_zenith_additional_data_opts_into_moderation_queue():
+    tracker = Zenith({"DEFAULT": {}, "TRACKERS": {"ZENITH": {}}})
+
+    assert asyncio.run(tracker.get_additional_data(Meta(modq=True))) == {"mod_queue_opt_in": "1"}
 
 
 def test_zenith_music_type_id_comes_from_the_analyzed_codec():

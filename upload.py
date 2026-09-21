@@ -58,6 +58,8 @@ check_dependencies()
 
 import logging
 
+from rich.markup import escape
+
 from bin.get_ffmpeg import FfmpegBinaryManager
 from bin.get_mkbrr import MkbrrBinaryManager
 from src.add_comparison import ComparisonManager
@@ -1458,14 +1460,9 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
     from src.screenshot_overlays import overlays_active
 
     meta.frame_overlay = overlays_active(config["DEFAULT"])
-    tracker_status_map = cast(dict[str, dict[str, Any]], meta.tracker_status)
-    for tracker in ["AVISTAZ", "CINEMAZ", "PRIVATEHD"]:
-        upload_status = tracker_status_map.get(tracker, {}).get("upload", False)
-        if tracker in meta.trackers and meta.frame_overlay and upload_status is True:
-            meta.frame_overlay = False
-            logger.info("[yellow]AVISTAZ, CINEMAZ, and PRIVATEHD do not allow frame overlays. Frame overlay will be disabled for this upload.[/yellow]")
 
     bdmv_mi_created = False
+    tracker_status_map = cast(dict[str, dict[str, Any]], meta.tracker_status)
     for tracker in ["ANTHELION", "DIGITALCORE", "HAWKEUNO", "LOCADORA"]:
         upload_status = tracker_status_map.get(tracker, {}).get("upload", False)
         if tracker in trackers and upload_status is True and not bdmv_mi_created:
@@ -2948,10 +2945,10 @@ async def do_the_thing(base_dir: str) -> None:
         current_release_log_path.set(None)
 
     except Exception as e:
-        logger.info(f"[bold red]An unexpected error occurred: {e}")
+        logger.info(f"[bold red]An unexpected error occurred: {escape(str(e))}[/bold red]")
         if sanitize_meta:
             meta = await Redaction.clean_meta_for_export(meta)
-        logger.info(traceback.format_exc())
+        logger.info(traceback.format_exc(), extra={"markup": False})
         cleanup_manager.reset_terminal()
 
     finally:

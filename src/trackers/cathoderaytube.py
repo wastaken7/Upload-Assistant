@@ -35,6 +35,7 @@ class CathodeRayTube:
     tracker_urls = ("signal.cathode-ray.tube",)
     supported_categories = ("MOVIE", "TV", "GAME")
     allows_bloated_audio = True
+    requires_tonemapped_hdr_screenshots = True
     banned_groups: tuple[str, ...] = ()
     auth_token: ClassVar[str] = ""
     approved_image_hosts = ("ptpimg", "catbox", "imgbb", "postimages", "freeimage", "imgbox")

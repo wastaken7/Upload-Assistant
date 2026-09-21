@@ -859,7 +859,7 @@ class Args:
             dest="force_recheck",
         )
         parser.add_argument("-dr", "--draft", action="store_true", required=False, help="Send to drafts (BEYONDHD, LST)")
-        parser.add_argument("-mq", "--modq", action="store_true", required=False, help="Send to modQ")
+        parser.add_argument("-mq", "--modq", action="store_true", required=False, help="Send the torrent to the moderation queue instead of publishing it immediately.")
         parser.add_argument("-feat", "--featured", action="store_true", required=False, help="Featured torrent")
         parser.add_argument(
             "-dup",

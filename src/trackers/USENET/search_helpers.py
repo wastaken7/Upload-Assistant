@@ -63,14 +63,16 @@ def build_newznab_search_query(meta: Meta) -> str:
     except TypeError, ValueError:
         year = 0
 
-    if meta.category.upper() == "TV":
+    category = meta.category.upper() if not meta.is_sports else "SPORTS"
+
+    if category == "TV":
         if title and meta.season_int > 0 and meta.episode_int > 0:
             return f"{title} S{meta.season_int:02d}E{meta.episode_int:02d}"
         if title and meta.season_int > 0:
             return f"{title} S{meta.season_int:02d}"
         if title:
             return title
-    elif meta.category.upper() == "MOVIE":
+    elif category == "MOVIE":
         if title and year > 0:
             return f"{title} {year}"
         if title:

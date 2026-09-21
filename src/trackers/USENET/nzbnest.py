@@ -63,7 +63,7 @@ class NzbNest:
             logger.info(f"{self.tracker}: [yellow]Duplicate search via API is disabled because daily_api_hit_limit is 0.[/yellow]")
             return []
 
-        category = meta.category.upper()
+        category = meta.category.upper() if not meta.is_sports else "SPORTS"
         params: dict[str, str] = {}
         if category != "XXX":
             params["cat"] = get_newznab_search_category_id(meta)

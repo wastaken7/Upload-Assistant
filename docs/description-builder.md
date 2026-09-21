@@ -132,7 +132,7 @@ For the `GAME` category, it renders:
 
 1.  **Technical Specs:** Platform, Game Version, Genres, Developer, Publisher, Steam link.
 2.  **Overview:** The game's description from the Steam API.
-3.  **System Requirements:** Minimum and Recommended requirements placed side by side in a `[table]` layout.
+3.  **System Requirements:** Hardware labels with Minimum and Recommended values aligned in a three-column `[table]` layout.
 4.  **Languages:** A detailed table of supported interface, full audio, and subtitle configurations.
 
 #### 9. Music Details
@@ -269,16 +269,12 @@ Explore dangerous dungeons, loot ancient relics, and upgrade your character's ab
 
 [size=3][b]System Requirements[/b][/size]
 [table]
-[tr][td][b]Minimum[/b][/td][td][b]Recommended[/b][/td][/tr]
-[tr][td]OS: Windows 10 64-bit
-Processor: Intel Core i5-4460 or AMD FX-6300
-Memory: 8 GB RAM
-Graphics: NVIDIA GeForce GTX 760 or AMD Radeon R7 260x
-Storage: 15 GB available space[/td][td]OS: Windows 11 64-bit
-Processor: Intel Core i7-7700K or AMD Ryzen 5 1600
-Memory: 16 GB RAM
-Graphics: NVIDIA GeForce GTX 1060 or AMD Radeon RX 580
-Storage: 15 GB available space (SSD Recommended)[/td][/tr]
+[tr][td][b]Hardware[/b][/td][td][b]Minimum[/b][/td][td][b]Recommended[/b][/td][/tr]
+[tr][td][b]OS[/b][/td][td]Windows 10 64-bit[/td][td]Windows 11 64-bit[/td][/tr]
+[tr][td][b]Processor[/b][/td][td]Intel Core i5-4460 or AMD FX-6300[/td][td]Intel Core i7-7700K or AMD Ryzen 5 1600[/td][/tr]
+[tr][td][b]Memory[/b][/td][td]8 GB RAM[/td][td]16 GB RAM[/td][/tr]
+[tr][td][b]Graphics[/b][/td][td]NVIDIA GeForce GTX 760 or AMD Radeon R7 260x[/td][td]NVIDIA GeForce GTX 1060 or AMD Radeon RX 580[/td][/tr]
+[tr][td][b]Storage[/b][/td][td]15 GB available space[/td][td]15 GB available space (SSD Recommended)[/td][/tr]
 [/table]
 
 [size=3][b]Officially Supported Languages[/b][/size]

@@ -1,7 +1,7 @@
-"""Release and integrity pins for FFmpeg."""
+"""Release and integrity pins for ffmpeg."""
 
-VERSION = "9.0.1"
+VERSION = "9.0.2"
 REPOSITORY = "GyanD/codexffmpeg"
 SHA256_BY_ASSET = {
-    "ffmpeg-9.0.1-essentials_build.zip": "fec81ae03971d9dd4be3ebe02e263bd2ec1d789483f931bdba5f5715e65da2e9",
+    "ffmpeg-9.0.2-essentials_build.zip": "60f467265b1e312373dbcd92200c2618a74850f98d3d078e94296bb3fa2047ba",
 }

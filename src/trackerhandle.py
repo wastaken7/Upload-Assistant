@@ -38,6 +38,7 @@ async def check_mod_q_and_draft(
         "LST": {"mod_q": True, "draft": True},
         "LATTEAM": {"mod_q": True, "draft": False},
         "LUMINARR": {"mod_q": True, "draft": False},
+        "ZENITH": {"mod_q": True, "draft": False},
     }
 
     modq, draft = None, None
@@ -254,11 +255,11 @@ async def process_trackers(
                         upload_duration = time.time() - upload_start_time
                         meta[f"{tracker}_upload_duration"] = upload_duration
                     except Exception as e:
-                        logger.info(f"[red]Upload failed: {e}")
-                        logger.info(traceback.format_exc())
+                        logger.info(f"[red]Upload failed: {escape(str(e))}[/red]")
+                        logger.info(traceback.format_exc(), extra={"markup": False})
                         return
                 except Exception:
-                    logger.info(traceback.format_exc())
+                    logger.info(traceback.format_exc(), extra={"markup": False})
                     return
 
                 if is_uploaded is None:
@@ -294,11 +295,11 @@ async def process_trackers(
                         upload_duration = time.time() - upload_start_time
                         meta[f"{tracker}_upload_duration"] = upload_duration
                     except Exception as e:
-                        logger.info(f"[red]Upload failed: {e}")
-                        logger.info(traceback.format_exc())
+                        logger.info(f"[red]Upload failed: {escape(str(e))}[/red]")
+                        logger.info(traceback.format_exc(), extra={"markup": False})
                         return
                 except Exception:
-                    logger.info(traceback.format_exc())
+                    logger.info(traceback.format_exc(), extra={"markup": False})
                     return
                 # Detect and handle None return value from upload method
                 if is_uploaded is None:
@@ -369,8 +370,8 @@ async def process_trackers(
                         upload_duration = time.time() - upload_start_time
                         meta[f"{tracker}_upload_duration"] = upload_duration
                     except Exception as e:
-                        logger.info(f"[red]Upload failed: {e}")
-                        logger.info(traceback.format_exc())
+                        logger.info(f"[red]Upload failed: {escape(str(e))}[/red]")
+                        logger.info(traceback.format_exc(), extra={"markup": False})
                         return
                     status = meta.tracker_status.setdefault(ptp.tracker, {})
                     if is_uploaded and "data error" not in str(status.get("status_message", "")):
@@ -382,7 +383,7 @@ async def process_trackers(
                         print_tracker_result(tracker, ptp, status, False)
                         logger.info(f"[red]{tracker} upload failed or returned data error.[/red]")
                 except Exception:
-                    logger.info(traceback.format_exc())
+                    logger.info(traceback.format_exc(), extra={"markup": False})
                     return
 
     multi_screens = int(config["DEFAULT"].get("multiScreens", 2))
@@ -406,8 +407,8 @@ async def process_trackers(
         # Log any exceptions that occurred
         for (tracker, _), result in zip(tasks, results, strict=False):
             if isinstance(result, Exception):
-                logger.info(f"[red]{tracker} encountered an error: {result}[/red]")
-                logger.debug("".join(traceback.format_exception(type(result), result, result.__traceback__)))
+                logger.info(f"[red]{tracker} encountered an error: {escape(str(result))}[/red]")
+                logger.debug("".join(traceback.format_exception(type(result), result, result.__traceback__)), extra={"markup": False})
     else:
         # Process each tracker sequentially
         for tracker in enabled_trackers:
