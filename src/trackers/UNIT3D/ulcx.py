@@ -82,10 +82,6 @@ class ULCX(UNIT3D):
     async def get_additional_checks(self, meta: Meta) -> bool:
         keywords = [k.lower() for k in (meta.keywords or [])]
         genres = [g.lower() for g in (meta.genres if isinstance(meta.genres, list) else [])]
-        forbidden_keywords = ("concert", "live performance", "music video", "musical")
-        if any(any(kw in item for item in keywords + genres) for kw in forbidden_keywords):
-            logger.info(f"{self.tracker}: [bold red]Concerts, live performances, and music videos are forbidden.[/bold red]")
-            return False
 
         if meta.adult_media or meta.tmdb_adult_media:
             logger.info(f"{self.tracker}: [bold red]Adult / pornographic content is forbidden.[/bold red]")
