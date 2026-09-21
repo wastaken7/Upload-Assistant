@@ -155,17 +155,53 @@ test("file-browser persistence, restoration, refresh and execution outcomes", as
   assert.equal(searches.length, 1);
 
   context.fileBrowserSearchTimer = { current: null };
+  context.fileBrowserSearchId = { current: 0 };
   context.setFileBrowserSearch = () => {};
-  context.setFileBrowserSearchLoading = () => {};
+  let searchLoading = false;
+  context.setFileBrowserSearchLoading = (value) => {
+    searchLoading = value;
+  };
   context.setFileBrowserSearchResults = () => {};
+  context.clearTimeout = () => {};
   load("handleFileBrowserSearch");
   const duringDebounce = new AbortController();
   context.handleFileBrowserSearch("movie", duringDebounce.signal);
   assert.equal(delay, 300);
+  assert.equal(searchLoading, true);
   duringDebounce.abort();
+  assert.equal(searchLoading, false);
   delayResolve();
   await Promise.resolve();
   assert.equal(requests.length, 0);
+
+  let finishSearch;
+  context.apiFetch = () =>
+    new Promise((resolve) => {
+      finishSearch = () =>
+        resolve({ ok: true, json: async () => ({ success: true }) });
+    });
+  const duringRequest = new AbortController();
+  context.handleFileBrowserSearch("movie", duringRequest.signal);
+  const searchWork = delayResolve();
+  assert.equal(searchLoading, true);
+  duringRequest.abort();
+  assert.equal(searchLoading, false);
+  finishSearch();
+  await searchWork;
+
+  const olderSearch = new AbortController();
+  context.handleFileBrowserSearch("movie", olderSearch.signal);
+  const olderWork = delayResolve();
+  const finishOlderSearch = finishSearch;
+  const newerSearch = new AbortController();
+  context.handleFileBrowserSearch("movie", newerSearch.signal);
+  olderSearch.abort();
+  assert.equal(searchLoading, true);
+  finishOlderSearch();
+  await olderWork;
+  assert.equal(searchLoading, true);
+  newerSearch.abort();
+  assert.equal(searchLoading, false);
 
   let finishFirstFolder;
   let firstFolderRequested;

@@ -2495,6 +2495,7 @@ function AudionutsUAGUI() {
     useState(false);
   const fileBrowserSearchTimer = useRef(null);
   const fileBrowserSearchQuery = useRef("");
+  const fileBrowserSearchId = useRef(0);
 
   // Preserve the desktop file browser scroll position while the
   // browser is temporarily unmounted or rerendered.
@@ -4388,6 +4389,7 @@ function AudionutsUAGUI() {
   // File Browser search
   const handleFileBrowserSearch = (value, signal) => {
     if (signal?.aborted) return;
+    const searchId = ++fileBrowserSearchId.current;
     setFileBrowserSearch(value);
     const searchQuery = value.trim();
     fileBrowserSearchQuery.current = searchQuery;
@@ -4400,6 +4402,13 @@ function AudionutsUAGUI() {
       return;
     }
     setFileBrowserSearchLoading(true);
+    const onAbort = () => {
+      if (fileBrowserSearchId.current === searchId) {
+        clearTimeout(fileBrowserSearchTimer.current);
+        setFileBrowserSearchLoading(false);
+      }
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
     fileBrowserSearchTimer.current = setTimeout(async () => {
       if (signal?.aborted) return;
       try {
@@ -4414,7 +4423,7 @@ function AudionutsUAGUI() {
         const data = await response.json();
         if (signal?.aborted) return;
         // Early return if the search has changed since this request
-        if (fileBrowserSearchQuery.current !== searchQuery) return;
+        if (fileBrowserSearchId.current !== searchId) return;
         if (data.success) {
           setFileBrowserSearchResults(data);
         } else {
@@ -4427,7 +4436,7 @@ function AudionutsUAGUI() {
       } catch (error) {
         if (signal?.aborted) return;
         console.error("File browser search failed:", error);
-        if (fileBrowserSearchQuery.current === searchQuery) {
+        if (fileBrowserSearchId.current === searchId) {
           setFileBrowserSearchResults({
             items: [],
             query: searchQuery,
@@ -4435,10 +4444,8 @@ function AudionutsUAGUI() {
           });
         }
       } finally {
-        if (
-          !signal?.aborted &&
-          fileBrowserSearchQuery.current === searchQuery
-        ) {
+        signal?.removeEventListener("abort", onAbort);
+        if (!signal?.aborted && fileBrowserSearchId.current === searchId) {
           setFileBrowserSearchLoading(false);
         }
       }
