@@ -484,7 +484,7 @@ class Zenith(UNIT3D):
         return {"resolution_id": resolution_id.get(meta.resolution, "10")}
 
     async def get_additional_data(self, meta: Meta) -> dict[str, str]:
-        data: dict[str, str] = {}
+        data: dict[str, str] = {"mod_queue_opt_in": await self.get_flag(meta, "modq")}
         if meta.category == "MUSIC":
             release = cast(dict[str, Any], meta.music_release) if isinstance(meta.music_release, dict) else {}
             external_ids_raw = release.get("external_ids")

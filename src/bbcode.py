@@ -642,6 +642,19 @@ class BBCODE:
 
         return re.sub(r"\[size=(\d+)\]", clamp, desc, flags=re.IGNORECASE)
 
+    def convert_headings_to_sizes(self, desc: str) -> str:
+        """Convert BBCode h1-h6 tags to tracker-compatible size markup."""
+        heading_sizes = {"1": 8, "2": 6, "3": 4, "4": 2, "5": 1, "6": 1}
+
+        def convert(match: re.Match[str]) -> str:
+            level = match.group(1)
+            content = match.group(2)
+            if level == "6":
+                return f"[size=1][b][color=grey]{content}[/color][/b][/size]"
+            return f"[size={heading_sizes[level]}][b]{content}[/b][/size]"
+
+        return re.sub(r"\[h([1-6])\](.*?)\[/h\1\]", convert, desc, flags=re.IGNORECASE | re.DOTALL)
+
     def remove_extra_lines(self, desc: str) -> str:
         """
         Removes more than 2 consecutive newlines

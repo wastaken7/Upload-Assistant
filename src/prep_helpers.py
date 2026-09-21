@@ -29,6 +29,7 @@ from src.languages import languages_manager
 from src.media_extensions import VIDEO_EXTENSIONS
 from src.meta import Meta
 from src.region import get_distributor, get_region, get_service
+from src.sports import detect_sports
 from src.tags import get_tag, tag_override
 from src.tvmaze import tvmaze_manager
 from src.video import video_manager
@@ -1828,4 +1829,5 @@ async def finalize_metadata(
         except Exception as e:
             logger.error(f"[red]Error pre-fetching TMDB localized data: {e}[/red]")
 
+    meta.is_sports = detect_sports(meta)
     meta.pre_release = check_pre_release(meta)

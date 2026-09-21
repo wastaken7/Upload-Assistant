@@ -525,7 +525,7 @@ async def disc_screenshots(
     total_existing = len(existing_screens) + len(existing_images)
     num_screens = max(0, screens - total_existing) if not force_screenshots else num_screens
     is_hdr = any(marker in meta.hdr for marker in ("HDR", "DV", "HLG"))
-    if tone_map and is_hdr:
+    if (tone_map or meta.force_tonemap) and is_hdr:
         hdr_tonemap = True
         meta.tonemapped = True
     else:
@@ -2564,7 +2564,7 @@ async def determine_tonemapping(w_sar: float, h_sar: float, width: float, height
     """Select a verified tonemapping path and record its actual metadata state."""
     meta.libplacebo = False
     meta.tonemapped = False
-    if not tone_map or not any(marker in meta.hdr for marker in ("HDR", "DV", "HLG")):
+    if not (tone_map or meta.force_tonemap) or not any(marker in meta.hdr for marker in ("HDR", "DV", "HLG")):
         return False
 
     if use_libplacebo and not meta.frame_overlay:

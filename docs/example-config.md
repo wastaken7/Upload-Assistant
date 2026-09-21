@@ -177,6 +177,8 @@ These can be [overridden per-tracker](#tracker-overridable-settings) by adding t
 - `disc_menu_header` (str): BBCode header added above disc menu screenshots (discs only).
 - `audio_spectrogram_header` (str): BBCode header added above audio spectrograms.
 - `dynamic_hdr_plot_header` (str): BBCode header added above dynamic HDR metadata plots.
+- `image_tag_whitelist` (list[str]): Tracker-specific screenshot attributes required by this tracker. Every listed tag must be present; this setting is read from the tracker block and is not inherited from `DEFAULT`.
+- `image_tag_blacklist` (list[str]): Tracker-specific screenshot attributes rejected by this tracker. Any listed tag excludes the image; this setting is read from the tracker block and is not inherited from `DEFAULT`.
 - `tonemapped_header` (str): BBCode header added for tone-mapped releases.
 - `custom_signature` (str): BBCode signature appended at bottom of description.
 - `tag_overrides` (dict): Per-release-group overrides for these text fields. The

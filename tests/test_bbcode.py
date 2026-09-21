@@ -45,6 +45,28 @@ def test_clamp_size_tags_preserves_malformed_or_non_integer_values() -> None:
     assert BBCODE().clamp_size_tags(description) == description
 
 
+def test_convert_headings_to_sizes_maps_h1_through_h6() -> None:
+    description = "\n".join(f"[h{level}]Texto com h{level}[/h{level}]" for level in range(1, 7))
+    expected = "\n".join(
+        (
+            "[size=8][b]Texto com h1[/b][/size]",
+            "[size=6][b]Texto com h2[/b][/size]",
+            "[size=4][b]Texto com h3[/b][/size]",
+            "[size=2][b]Texto com h4[/b][/size]",
+            "[size=1][b]Texto com h5[/b][/size]",
+            "[size=1][b][color=grey]Texto com h6[/color][/b][/size]",
+        )
+    )
+
+    assert BBCODE().convert_headings_to_sizes(description) == expected
+
+
+def test_convert_headings_to_sizes_handles_case_and_multiline_content() -> None:
+    description = "[H3]Primeira linha\nSegunda linha[/H3]"
+
+    assert BBCODE().convert_headings_to_sizes(description) == "[size=4][b]Primeira linha\nSegunda linha[/b][/size]"
+
+
 def test_convert_named_colors_to_hex() -> None:
     description = "[color=SkyBlue]Text[/color] [color=red]Red[/color]"
 
@@ -83,7 +105,19 @@ def test_tracker_specific_formats_converts_colors_for_gazelle_trackers() -> None
     for tracker in ("ANTHELION", "BJSHARE", "BRASILTRACKER", "GREATPOSTERWALL"):
         assert builder.tracker_specific_formats(tracker, description) == "[color=#87ceeb]Text[/color]"
 
+    assert builder.tracker_specific_formats("AMIGOSSHARE", description) == description
     assert builder.tracker_specific_formats("HDTORRENTS", description) == description
+
+
+def test_tracker_specific_formats_converts_headings_for_selected_trackers() -> None:
+    builder = object.__new__(DescriptionBuilder)
+    description = "[h1]Título[/h1] [h6]Observação[/h6]"
+    expected = "[size=8][b]Título[/b][/size] [size=1][b][color=grey]Observação[/color][/b][/size]"
+
+    for tracker in ("AMIGOSSHARE", "ANTHELION", "BJSHARE", "BRASILTRACKER", "GREATPOSTERWALL"):
+        assert builder.tracker_specific_formats(tracker, description) == expected
+
+    assert builder.tracker_specific_formats("HDBITS", description) == description
 
 
 def test_tracker_specific_formats_converts_colors_for_hdspace() -> None:

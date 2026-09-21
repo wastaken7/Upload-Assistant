@@ -255,6 +255,9 @@ class BrasilTracker:
                 return "11"
             return "12"
 
+        if meta.is_sports:
+            return "13"
+
         category_map = {
             "TV": "1",
             "MOVIE": "0",
@@ -1148,7 +1151,7 @@ class BrasilTracker:
     def build_book_desc(self, meta: Meta) -> str:
         """Build the BBCode table for BOOK-category uploads."""
         builder = DescriptionBuilder(self.tracker, self.config, "pt-BR")
-        return builder._build_book_desc_section(meta, header_size=3, table=False)
+        return builder._build_book_desc_section(meta, table=False)
 
     async def get_book_cover(self, meta: Meta) -> str:
         covers = meta.hosted_artwork

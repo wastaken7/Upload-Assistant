@@ -756,6 +756,8 @@ config: dict[str, Any] = {
             # If True, the script performs a basic rules compliance check (e.g., codecs, region).
             # This does not cover all tracker rules. Set to False to disable.
             "check_for_rules": True,
+            # AvistaZ does not allow frame overlays; use cached non-overlay images or recapture them.
+            "image_tag_blacklist": ["overlay"],
             # The configurations below override the DEFAULT configuration
             "thumbnail_size": "",
             "screens_per_row": "",
@@ -1065,6 +1067,8 @@ config: dict[str, Any] = {
             # If True, the script performs a basic rules compliance check (e.g., codecs, region).
             # This does not cover all tracker rules. Set to False to disable.
             "check_for_rules": True,
+            # CinemaZ does not allow frame overlays.
+            "image_tag_blacklist": ["overlay"],
             # The configurations below override the DEFAULT configuration
             "thumbnail_size": "",
             "screens_per_row": "",
@@ -2379,6 +2383,8 @@ config: dict[str, Any] = {
             # If True, the script performs a basic rules compliance check (e.g., codecs, region).
             # This does not cover all tracker rules. Set to False to disable.
             "check_for_rules": True,
+            # PrivateHD does not allow frame overlays.
+            "image_tag_blacklist": ["overlay"],
             # The configurations below override the DEFAULT configuration
             "thumbnail_size": "",
             "screens_per_row": "",
@@ -3409,6 +3415,8 @@ config: dict[str, Any] = {
             "use_for_search": False,
             "api_key": "",
             "anon": True,
+            # Send uploads to ZENITH modq for staff approval
+            "modq": False,
             # For authorized users only. Do not change this unless you know what you are doing
             # Upload as featured
             "featured": False,
