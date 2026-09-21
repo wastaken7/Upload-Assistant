@@ -108,6 +108,7 @@ def test_formats_titles_to_crt_conventions():
 
 def test_uses_the_image_hosts_approved_by_crt():
     site = tracker()
+    assert site.requires_tonemapped_hdr_screenshots is True  # noqa: S101
     assert site.approved_image_hosts == ("ptpimg", "catbox", "imgbb", "postimages", "freeimage", "imgbox")  # noqa: S101
     assert site.image_host_policy.url_host_mapping["catbox.moe"] == "catbox"  # noqa: S101
     assert site.image_host_policy.url_host_mapping["postimg.cc"] == "postimages"  # noqa: S101
