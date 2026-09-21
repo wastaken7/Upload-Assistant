@@ -4338,18 +4338,22 @@ function AudionutsUAGUI() {
     }
   };
 
-  const loadFolderContents = async (path) => {
+  const loadFolderContents = async (path, signal) => {
+    if (signal?.aborted) return;
     try {
       const response = await apiFetch(
         `${API_BASE}/browse?path=${encodeURIComponent(path)}`,
+        { signal },
       );
+      if (signal?.aborted) return;
       const data = await response.json();
+      if (signal?.aborted) return;
 
       if (data.success && data.items) {
         updateDirectoryTree(path, data.items);
       }
     } catch (error) {
-      console.error("Failed to load folder:", error);
+      if (!signal?.aborted) console.error("Failed to load folder:", error);
     }
   };
 
@@ -4382,7 +4386,8 @@ function AudionutsUAGUI() {
   };
 
   // File Browser search
-  const handleFileBrowserSearch = (value) => {
+  const handleFileBrowserSearch = (value, signal) => {
+    if (signal?.aborted) return;
     setFileBrowserSearch(value);
     const searchQuery = value.trim();
     fileBrowserSearchQuery.current = searchQuery;
@@ -4396,14 +4401,18 @@ function AudionutsUAGUI() {
     }
     setFileBrowserSearchLoading(true);
     fileBrowserSearchTimer.current = setTimeout(async () => {
+      if (signal?.aborted) return;
       try {
         const response = await apiFetch(
           `${API_BASE}/browse_search?q=${encodeURIComponent(searchQuery)}`,
+          { signal },
         );
+        if (signal?.aborted) return;
         if (!response.ok) {
           throw new Error(`Search request failed (${response.status})`);
         }
         const data = await response.json();
+        if (signal?.aborted) return;
         // Early return if the search has changed since this request
         if (fileBrowserSearchQuery.current !== searchQuery) return;
         if (data.success) {
@@ -4416,6 +4425,7 @@ function AudionutsUAGUI() {
           });
         }
       } catch (error) {
+        if (signal?.aborted) return;
         console.error("File browser search failed:", error);
         if (fileBrowserSearchQuery.current === searchQuery) {
           setFileBrowserSearchResults({
@@ -4425,7 +4435,10 @@ function AudionutsUAGUI() {
           });
         }
       } finally {
-        if (fileBrowserSearchQuery.current === searchQuery) {
+        if (
+          !signal?.aborted &&
+          fileBrowserSearchQuery.current === searchQuery
+        ) {
           setFileBrowserSearchLoading(false);
         }
       }
@@ -4437,11 +4450,13 @@ function AudionutsUAGUI() {
     await new Promise((resolve) => setTimeout(resolve, 500));
     if (signal?.aborted) return;
     if (fileBrowserSearchQuery.current) {
-      handleFileBrowserSearch(fileBrowserSearchQuery.current);
+      handleFileBrowserSearch(fileBrowserSearchQuery.current, signal);
     }
     for (const path of sortFolderPathsByDepth(expandedFoldersRef.current)) {
+      if (signal?.aborted) return;
       if (expandedFoldersRef.current.has(path)) {
-        await loadFolderContents(path);
+        await loadFolderContents(path, signal);
+        if (signal?.aborted) return;
       }
     }
   };

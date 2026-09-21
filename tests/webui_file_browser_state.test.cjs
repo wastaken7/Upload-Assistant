@@ -154,6 +154,47 @@ test("file-browser persistence, restoration, refresh and execution outcomes", as
   assert.equal(requests.length, 0);
   assert.equal(searches.length, 1);
 
+  context.fileBrowserSearchTimer = { current: null };
+  context.setFileBrowserSearch = () => {};
+  context.setFileBrowserSearchLoading = () => {};
+  context.setFileBrowserSearchResults = () => {};
+  load("handleFileBrowserSearch");
+  const duringDebounce = new AbortController();
+  context.handleFileBrowserSearch("movie", duringDebounce.signal);
+  assert.equal(delay, 300);
+  duringDebounce.abort();
+  delayResolve();
+  await Promise.resolve();
+  assert.equal(requests.length, 0);
+
+  let finishFirstFolder;
+  let firstFolderRequested;
+  const firstFolderStarted = new Promise((resolve) => {
+    firstFolderRequested = resolve;
+  });
+  context.fileBrowserSearchQuery.current = "";
+  context.expandedFoldersRef.current = new Set(["/data", "/data/a"]);
+  context.apiFetch = (url) => {
+    requests.push(url);
+    firstFolderRequested();
+    return new Promise((resolve) => {
+      finishFirstFolder = () => resolve({ json: async () => responses[url] });
+    });
+  };
+  const duringFolder = new AbortController();
+  const interruptedRefresh = context.refreshFileBrowserAfterUpload(
+    duringFolder.signal,
+  );
+  delayResolve();
+  await firstFolderStarted;
+  assert.deepEqual(requests, ["/api/browse?path=%2Fdata"]);
+  const treeBeforeAbort = JSON.stringify(tree);
+  duringFolder.abort();
+  finishFirstFolder();
+  await interruptedRefresh;
+  assert.deepEqual(requests, ["/api/browse?path=%2Fdata"]);
+  assert.equal(JSON.stringify(tree), treeBeforeAbort);
+
   const layout = nodes.find(
     (n) =>
       n.type === "CallExpression" &&
