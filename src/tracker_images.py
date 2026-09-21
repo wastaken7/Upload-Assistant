@@ -16,7 +16,9 @@ def normalize_image_tags(value: Any) -> list[str]:
     result: list[str] = []
     for tag in value:
         normalized = str(tag).strip().lower()
-        if normalized and normalized not in result:
+        if not normalized:
+            normalized = f"__invalid__:{tag!r}"
+        if normalized not in result:
             result.append(normalized)
     return result
 

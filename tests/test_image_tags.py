@@ -45,6 +45,12 @@ def test_legacy_images_are_unknown_when_policy_is_enabled() -> None:
     assert image_matches_tag_policy({"raw_url": "https://example.test/legacy.png"}, [], [])
 
 
+def test_invalid_whitelist_entries_fail_closed() -> None:
+    whitelist, blacklist = image_tag_policy({"TRACKERS": {"TEST": {"image_tag_whitelist": [" "]}}}, "TEST")
+    assert whitelist
+    assert not image_matches_tag_policy({"tags": []}, whitelist, blacklist)
+
+
 def test_tracker_collections_copy_and_normalize_tags() -> None:
     meta = Meta()
     source = [{"raw_url": "https://example.test/screen.png", "tags": [" Overlay ", "overlay"]}]
