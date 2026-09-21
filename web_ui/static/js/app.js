@@ -7,6 +7,8 @@ const FILE_BROWSER_CUSTOM_ORDER_KEY = "ua_webui_file_browser_custom_order";
 const FILE_BROWSER_EXPANDED_KEY = "ua_webui_file_browser_expanded";
 const FILE_BROWSER_SCROLL_KEY = "ua_webui_file_browser_scroll_top";
 const FILE_BROWSER_SORT_KEY = "ua_webui_file_browser_sort";
+const SHOW_AUDIO_TRACKS_KEY = "ua_webui_show_audio_tracks";
+const SHOW_SUBTITLE_TRACKS_KEY = "ua_webui_show_subtitle_tracks";
 const DEFAULT_LEFT_SIDEBAR_WIDTH = 256;
 const DEFAULT_RIGHT_SIDEBAR_WIDTH = 320;
 const APPLICATION_RAIL_WIDTH = 80;
@@ -2104,6 +2106,12 @@ function AudionutsUAGUI() {
     () => new Set(getStoredCollapsedSections()),
   );
   const [executionPreview, setExecutionPreview] = useState(null);
+  const [showAudioTracks, setShowAudioTracks] = useState(
+    () => storage.get(SHOW_AUDIO_TRACKS_KEY) === "true",
+  );
+  const [showSubtitleTracks, setShowSubtitleTracks] = useState(
+    () => storage.get(SHOW_SUBTITLE_TRACKS_KEY) === "true",
+  );
   const [executionScreenshots, setExecutionScreenshots] = useState([]);
   const [executionDescription, setExecutionDescription] = useState(null);
   const [descriptionDraft, setDescriptionDraft] = useState("");
@@ -2209,6 +2217,17 @@ function AudionutsUAGUI() {
     setIsUpdateStatusOpen(false);
     setIsChangelogOpen(true);
   };
+
+  useEffect(() => {
+    storage.set(SHOW_AUDIO_TRACKS_KEY, showAudioTracks ? "true" : "false");
+  }, [showAudioTracks]);
+
+  useEffect(() => {
+    storage.set(
+      SHOW_SUBTITLE_TRACKS_KEY,
+      showSubtitleTracks ? "true" : "false",
+    );
+  }, [showSubtitleTracks]);
 
   useEffect(() => {
     storage.set(
@@ -5982,6 +6001,62 @@ function AudionutsUAGUI() {
         )
       : [];
 
+    const audioTracks = Array.isArray(media?.audio_tracks)
+      ? media.audio_tracks
+      : [];
+    const subtitleTracks = Array.isArray(media?.subtitle_tracks)
+      ? media.subtitle_tracks
+      : [];
+
+    const renderMediaTrack = (track, kind) => {
+      const badges = [];
+
+      if (track.format) badges.push(track.format);
+      if (kind === "audio" && track.channels) badges.push(track.channels);
+      if (kind === "audio" && track.bitrate) badges.push(track.bitrate);
+      if (track.default) badges.push("Default");
+      if (track.forced) badges.push("Forced");
+      if (track.hearing_impaired) badges.push("SDH/HI");
+      if (track.commentary) badges.push("Commentary");
+
+      return (
+        <div
+          key={`${kind}-${track.index}`}
+          className={`rounded-lg border px-3 py-2 ${
+            isDarkMode
+              ? "border-gray-700 bg-gray-900/60"
+              : "border-gray-200 bg-gray-50"
+          }`}
+        >
+          <div className="flex items-start gap-2">
+            <span className="ua-processing-muted shrink-0 font-mono text-xs">
+              {track.index}.
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm font-semibold">
+                  {track.language || "Unknown language"}
+                </span>
+                {badges.map((badge, index) => (
+                  <span
+                    key={`${badge}-${index}`}
+                    className="ua-accent-chip rounded border px-1.5 py-0.5 text-[10px]"
+                  >
+                    {badge}
+                  </span>
+                ))}
+              </div>
+              {track.title && (
+                <p className="ua-processing-muted mt-1 break-words text-xs">
+                  {track.title}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    };
+
     const renderPreviewSection = (section) => (
       <section key={section.key} className="ua-processing-section">
         <h4 className="ua-processing-section-title">{section.label}</h4>
@@ -6169,6 +6244,103 @@ function AudionutsUAGUI() {
                     {overviewText ||
                       "Upload Assistant is analyzing this item. Metadata will appear as soon as the first snapshot is ready."}
                   </p>
+                </section>
+              )}
+
+              {media?.status !== "waiting" && (
+                <section className="ua-processing-section">
+                  <h4 className="ua-processing-section-title">Track Details</h4>
+                  <div className="space-y-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowAudioTracks((value) => !value)}
+                      aria-pressed={showAudioTracks}
+                      className="flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-2 text-left"
+                    >
+                      <span>
+                        <span className="block text-sm font-medium">
+                          Show audio tracks
+                        </span>
+                        <span className="ua-processing-muted block text-xs">
+                          {audioTracks.length} track
+                          {audioTracks.length === 1 ? "" : "s"} detected
+                        </span>
+                      </span>
+                      <span
+                        className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+                          showAudioTracks
+                            ? "ua-accent-indicator"
+                            : isDarkMode
+                              ? "bg-gray-700"
+                              : "bg-gray-300"
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${
+                            showAudioTracks ? "translate-x-6" : "translate-x-1"
+                          }`}
+                        />
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowSubtitleTracks((value) => !value)}
+                      aria-pressed={showSubtitleTracks}
+                      className="flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-2 text-left"
+                    >
+                      <span>
+                        <span className="block text-sm font-medium">
+                          Show subtitle tracks
+                        </span>
+                        <span className="ua-processing-muted block text-xs">
+                          {subtitleTracks.length} track
+                          {subtitleTracks.length === 1 ? "" : "s"} detected
+                        </span>
+                      </span>
+                      <span
+                        className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+                          showSubtitleTracks
+                            ? "ua-accent-indicator"
+                            : isDarkMode
+                              ? "bg-gray-700"
+                              : "bg-gray-300"
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${
+                            showSubtitleTracks ? "translate-x-6" : "translate-x-1"
+                          }`}
+                        />
+                      </span>
+                    </button>
+                  </div>
+                </section>
+              )}
+
+              {showAudioTracks && audioTracks.length > 0 && (
+                <section className="ua-processing-section">
+                  <h4 className="ua-processing-section-title">
+                    Audio Tracks ({audioTracks.length})
+                  </h4>
+                  <div className="space-y-2">
+                    {audioTracks.map((track) =>
+                      renderMediaTrack(track, "audio"),
+                    )}
+                  </div>
+                </section>
+              )}
+
+              {showSubtitleTracks && subtitleTracks.length > 0 && (
+                <section className="ua-processing-section">
+                  <h4 className="ua-processing-section-title">
+                    Subtitle Tracks ({subtitleTracks.length})
+                  </h4>
+                  <div className="space-y-2">
+                    {subtitleTracks.map((track) =>
+                      renderMediaTrack(track, "subtitle"),
+                    )}
+                  </div>
                 </section>
               )}
 
