@@ -1,10 +1,14 @@
-const { useState, useRef, useEffect, useCallback } = React;
+const { useState, useRef, useEffect, useLayoutEffect, useCallback } = React;
 const THEME_KEY = "ua_config_theme";
 const LEFT_SIDEBAR_WIDTH_KEY = "ua_webui_left_sidebar_width_v2";
 const RIGHT_SIDEBAR_WIDTH_KEY = "ua_webui_right_sidebar_width";
 const COLLAPSED_ARGUMENT_SECTIONS_KEY = "ua_webui_collapsed_argument_sections";
 const FILE_BROWSER_CUSTOM_ORDER_KEY = "ua_webui_file_browser_custom_order";
+const FILE_BROWSER_EXPANDED_KEY = "ua_webui_file_browser_expanded";
+const FILE_BROWSER_SCROLL_KEY = "ua_webui_file_browser_scroll_top";
 const FILE_BROWSER_SORT_KEY = "ua_webui_file_browser_sort";
+const SHOW_AUDIO_TRACKS_KEY = "ua_webui_show_audio_tracks";
+const SHOW_SUBTITLE_TRACKS_KEY = "ua_webui_show_subtitle_tracks";
 const DEFAULT_LEFT_SIDEBAR_WIDTH = 256;
 const DEFAULT_RIGHT_SIDEBAR_WIDTH = 320;
 const APPLICATION_RAIL_WIDTH = 80;
@@ -221,6 +225,49 @@ const getStoredFileBrowserCustomOrder = () => {
   }
 };
 
+const getStoredExpandedFolders = () => {
+  try {
+    const paths = JSON.parse(storage.get(FILE_BROWSER_EXPANDED_KEY) || "[]");
+    return new Set(
+      Array.isArray(paths)
+        ? paths.filter((path) => typeof path === "string" && path)
+        : [],
+    );
+  } catch (_error) {
+    return new Set();
+  }
+};
+
+const sortFolderPathsByDepth = (paths) =>
+  [...paths].sort(
+    (a, b) =>
+      a.split(/[\\/]/).filter(Boolean).length -
+      b.split(/[\\/]/).filter(Boolean).length,
+  );
+
+const getFileBrowserRestorePaths = (paths, roots) => {
+  const restorePaths = new Set();
+  for (const path of paths) {
+    for (const root of roots) {
+      const prefix = root.path.replace(/[\\/]+$/, "");
+      const suffix = path.slice(prefix.length);
+      if (
+        path !== root.path &&
+        (!path.startsWith(prefix) || !/^[\\/]/.test(suffix))
+      )
+        continue;
+      restorePaths.add(root.path);
+      // A collapsed ancestor may still contain a previously open descendant.
+      for (const separator of suffix.matchAll(/[\\/]/g)) {
+        const parent = path.slice(0, prefix.length + separator.index);
+        if (parent.length > prefix.length) restorePaths.add(parent);
+      }
+      restorePaths.add(path);
+    }
+  }
+  return sortFolderPathsByDepth(restorePaths);
+};
+
 const getStoredFileBrowserSort = () => {
   const storedSort = storage.get(FILE_BROWSER_SORT_KEY) || "name-asc";
   const [by, order] = storedSort.split("-");
@@ -284,6 +331,27 @@ const apiFetch =
   });
 
 const sanitizeHtml = window.sanitizeHtml;
+
+const createUploadOutputFragment = (html) => {
+  const wrapper = document.createElement("div");
+  wrapper.innerHTML = sanitizeHtml(html);
+  // Rich output is dynamic HTML; apply targets after the sanitizer strips them.
+  wrapper.querySelectorAll("a[href]").forEach((link) => {
+    try {
+      const url = new URL(link.getAttribute("href"), window.location.href);
+      if (
+        (url.protocol === "http:" || url.protocol === "https:") &&
+        url.origin !== window.location.origin
+      ) {
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+      }
+    } catch (_error) {
+      // Leave malformed and non-HTTP links to the existing sanitizer.
+    }
+  });
+  return wrapper;
+};
 
 // Argument categories for the right sidebar (placeholders shown for info only)
 const argumentCategories = [
@@ -2004,7 +2072,7 @@ function AudionutsUAGUI() {
   const [isExecuting, setIsExecuting] = useState(false);
   const [isOutputExpanded, setIsOutputExpanded] = useState(false);
   const [expandedFolders, setExpandedFolders] = useState(
-    new Set(["/data", "/torrent_storage_dir"]),
+    getStoredExpandedFolders,
   );
   const [sessionId, setSessionId] = useState("");
   const [sidebarWidth, setSidebarWidth] = useState(() =>
@@ -2044,6 +2112,12 @@ function AudionutsUAGUI() {
     () => new Set(getStoredCollapsedSections()),
   );
   const [executionPreview, setExecutionPreview] = useState(null);
+  const [showAudioTracks, setShowAudioTracks] = useState(
+    () => storage.get(SHOW_AUDIO_TRACKS_KEY) === "true",
+  );
+  const [showSubtitleTracks, setShowSubtitleTracks] = useState(
+    () => storage.get(SHOW_SUBTITLE_TRACKS_KEY) === "true",
+  );
   const [executionScreenshots, setExecutionScreenshots] = useState([]);
   const [executionDescription, setExecutionDescription] = useState(null);
   const [descriptionDraft, setDescriptionDraft] = useState("");
@@ -2149,6 +2223,17 @@ function AudionutsUAGUI() {
     setIsUpdateStatusOpen(false);
     setIsChangelogOpen(true);
   };
+
+  useEffect(() => {
+    storage.set(SHOW_AUDIO_TRACKS_KEY, showAudioTracks ? "true" : "false");
+  }, [showAudioTracks]);
+
+  useEffect(() => {
+    storage.set(
+      SHOW_SUBTITLE_TRACKS_KEY,
+      showSubtitleTracks ? "true" : "false",
+    );
+  }, [showSubtitleTracks]);
 
   useEffect(() => {
     storage.set(
@@ -2435,10 +2520,32 @@ function AudionutsUAGUI() {
     useState(false);
   const fileBrowserSearchTimer = useRef(null);
   const fileBrowserSearchQuery = useRef("");
+  const fileBrowserSearchId = useRef(0);
 
   // Preserve the desktop file browser scroll position while the
   // browser is temporarily unmounted or rerendered.
-  const fileBrowserScrollTopRef = useRef(0);
+  const [fileBrowserRestoring, setFileBrowserRestoring] = useState(true);
+  const [fileBrowserScrollTop] = useState(() => {
+    const saved = Number(storage.get(FILE_BROWSER_SCROLL_KEY));
+    return Number.isFinite(saved) && saved >= 0 ? saved : 0;
+  });
+  const fileBrowserScrollTopRef = useRef(fileBrowserScrollTop);
+  const fileBrowserRef = useRef(null);
+  const expandedFoldersRef = useRef(expandedFolders);
+
+  useEffect(() => {
+    expandedFoldersRef.current = expandedFolders;
+    storage.set(
+      FILE_BROWSER_EXPANDED_KEY,
+      JSON.stringify([...expandedFolders]),
+    );
+  }, [expandedFolders]);
+
+  useLayoutEffect(() => {
+    if (fileBrowserRef.current && !fileBrowserRestoring) {
+      fileBrowserRef.current.scrollTop = fileBrowserScrollTopRef.current;
+    }
+  });
 
   // Folder loading states
   const [loadingFolders, setLoadingFolders] = useState(new Set());
@@ -3526,9 +3633,7 @@ function AudionutsUAGUI() {
   const appendHtmlFragment = (rawHtml) => {
     const container = richOutputRef.current;
     if (container) {
-      const clean = sanitizeHtml((rawHtml || "").trim());
-      const wrapper = document.createElement("div");
-      wrapper.innerHTML = clean;
+      const wrapper = createUploadOutputFragment((rawHtml || "").trim());
       container.appendChild(wrapper);
       // Use scrollIntoView to avoid clipping of the last line
       setTimeout(() => {
@@ -3596,10 +3701,18 @@ function AudionutsUAGUI() {
 
       if (data.success && data.items) {
         setDirectories(data.items);
-        setExpandedFolders(new Set());
+        // Parents must be populated before their saved descendants can be found.
+        for (const path of getFileBrowserRestorePaths(
+          expandedFoldersRef.current,
+          data.items,
+        )) {
+          await loadFolderContents(path);
+        }
       }
     } catch (error) {
       console.error("Failed to load browse roots:", error);
+    } finally {
+      setFileBrowserRestoring(false);
     }
   };
 
@@ -4251,18 +4364,22 @@ function AudionutsUAGUI() {
     }
   };
 
-  const loadFolderContents = async (path) => {
+  const loadFolderContents = async (path, signal) => {
+    if (signal?.aborted) return;
     try {
       const response = await apiFetch(
         `${API_BASE}/browse?path=${encodeURIComponent(path)}`,
+        { signal },
       );
+      if (signal?.aborted) return;
       const data = await response.json();
+      if (signal?.aborted) return;
 
       if (data.success && data.items) {
         updateDirectoryTree(path, data.items);
       }
     } catch (error) {
-      console.error("Failed to load folder:", error);
+      if (!signal?.aborted) console.error("Failed to load folder:", error);
     }
   };
 
@@ -4270,7 +4387,20 @@ function AudionutsUAGUI() {
     const updateTree = (nodes) => {
       return nodes.map((node) => {
         if (node.path === path) {
-          return { ...node, children: items };
+          // Keep loaded descendants while refreshing a parent to avoid
+          // collapsing the visible tree (and clamping its scroll position).
+          const previousChildren = new Map(
+            (node.children || []).map((child) => [child.path, child]),
+          );
+          return {
+            ...node,
+            children: items.map((item) => {
+              const previous = previousChildren.get(item.path);
+              return item.type === "folder" && previous?.type === "folder"
+                ? { ...item, children: previous.children || item.children }
+                : item;
+            }),
+          };
         } else if (node.children) {
           return { ...node, children: updateTree(node.children) };
         }
@@ -4282,7 +4412,9 @@ function AudionutsUAGUI() {
   };
 
   // File Browser search
-  const handleFileBrowserSearch = (value) => {
+  const handleFileBrowserSearch = (value, signal) => {
+    if (signal?.aborted) return;
+    const searchId = ++fileBrowserSearchId.current;
     setFileBrowserSearch(value);
     const searchQuery = value.trim();
     fileBrowserSearchQuery.current = searchQuery;
@@ -4295,17 +4427,28 @@ function AudionutsUAGUI() {
       return;
     }
     setFileBrowserSearchLoading(true);
+    const onAbort = () => {
+      if (fileBrowserSearchId.current === searchId) {
+        clearTimeout(fileBrowserSearchTimer.current);
+        setFileBrowserSearchLoading(false);
+      }
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
     fileBrowserSearchTimer.current = setTimeout(async () => {
+      if (signal?.aborted) return;
       try {
         const response = await apiFetch(
           `${API_BASE}/browse_search?q=${encodeURIComponent(searchQuery)}`,
+          { signal },
         );
+        if (signal?.aborted) return;
         if (!response.ok) {
           throw new Error(`Search request failed (${response.status})`);
         }
         const data = await response.json();
+        if (signal?.aborted) return;
         // Early return if the search has changed since this request
-        if (fileBrowserSearchQuery.current !== searchQuery) return;
+        if (fileBrowserSearchId.current !== searchId) return;
         if (data.success) {
           setFileBrowserSearchResults(data);
         } else {
@@ -4316,8 +4459,9 @@ function AudionutsUAGUI() {
           });
         }
       } catch (error) {
+        if (signal?.aborted) return;
         console.error("File browser search failed:", error);
-        if (fileBrowserSearchQuery.current === searchQuery) {
+        if (fileBrowserSearchId.current === searchId) {
           setFileBrowserSearchResults({
             items: [],
             query: searchQuery,
@@ -4325,11 +4469,28 @@ function AudionutsUAGUI() {
           });
         }
       } finally {
-        if (fileBrowserSearchQuery.current === searchQuery) {
+        signal?.removeEventListener("abort", onAbort);
+        if (!signal?.aborted && fileBrowserSearchId.current === searchId) {
           setFileBrowserSearchLoading(false);
         }
       }
     }, 300); //300ms debounce so we dont spam requests for every keystroke
+  };
+
+  const refreshFileBrowserAfterUpload = async (signal) => {
+    // Give the completed process's filesystem changes time to settle.
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    if (signal?.aborted) return;
+    if (fileBrowserSearchQuery.current) {
+      handleFileBrowserSearch(fileBrowserSearchQuery.current, signal);
+    }
+    for (const path of sortFolderPathsByDepth(expandedFoldersRef.current)) {
+      if (signal?.aborted) return;
+      if (expandedFoldersRef.current.has(path)) {
+        await loadFolderContents(path, signal);
+        if (signal?.aborted) return;
+      }
+    }
   };
 
   const renderSearchResults = (results) => {
@@ -4842,8 +5003,7 @@ function AudionutsUAGUI() {
                 const key = `${clean.length}:${shortSample}`;
                 if (lastFullHashRef.current !== key) {
                   lastFullHashRef.current = key;
-                  const wrapper = document.createElement("div");
-                  wrapper.innerHTML = clean;
+                  const wrapper = createUploadOutputFragment(clean);
                   if (rootContainer) rootContainer.appendChild(wrapper);
                   setTimeout(() => {
                     const last =
@@ -4902,6 +5062,9 @@ function AudionutsUAGUI() {
       if (!(localController && localController.signal.aborted)) {
         appendSystemMessage("✓ Execution completed");
         appendSystemMessage("");
+        if (exitCode === 0) {
+          await refreshFileBrowserAfterUpload(localController.signal);
+        }
         return exitCode === 0 || exitCode === null;
       }
       return false;
@@ -5844,6 +6007,62 @@ function AudionutsUAGUI() {
         )
       : [];
 
+    const audioTracks = Array.isArray(media?.audio_tracks)
+      ? media.audio_tracks
+      : [];
+    const subtitleTracks = Array.isArray(media?.subtitle_tracks)
+      ? media.subtitle_tracks
+      : [];
+
+    const renderMediaTrack = (track, kind) => {
+      const badges = [];
+
+      if (track.format) badges.push(track.format);
+      if (kind === "audio" && track.channels) badges.push(track.channels);
+      if (kind === "audio" && track.bitrate) badges.push(track.bitrate);
+      if (track.default) badges.push("Default");
+      if (track.forced) badges.push("Forced");
+      if (track.hearing_impaired) badges.push("SDH/HI");
+      if (track.commentary) badges.push("Commentary");
+
+      return (
+        <div
+          key={`${kind}-${track.index}`}
+          className={`rounded-lg border px-3 py-2 ${
+            isDarkMode
+              ? "border-gray-700 bg-gray-900/60"
+              : "border-gray-200 bg-gray-50"
+          }`}
+        >
+          <div className="flex items-start gap-2">
+            <span className="ua-processing-muted shrink-0 font-mono text-xs">
+              {track.index}.
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm font-semibold">
+                  {track.language || "Unknown language"}
+                </span>
+                {badges.map((badge, index) => (
+                  <span
+                    key={`${badge}-${index}`}
+                    className="ua-accent-chip rounded border px-1.5 py-0.5 text-[10px]"
+                  >
+                    {badge}
+                  </span>
+                ))}
+              </div>
+              {track.title && (
+                <p className="ua-processing-muted mt-1 break-words text-xs">
+                  {track.title}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    };
+
     const renderPreviewSection = (section) => (
       <section key={section.key} className="ua-processing-section">
         <h4 className="ua-processing-section-title">{section.label}</h4>
@@ -5982,7 +6201,7 @@ function AudionutsUAGUI() {
                             key={`${source.key}-${source.value}`}
                             href={source.url}
                             target="_blank"
-                            rel="noreferrer"
+                            rel="noopener noreferrer"
                             className={`${sharedClassName} hover:brightness-105`}
                             title={`${source.label || source.key}: ${source.value}`}
                           >
@@ -6031,6 +6250,103 @@ function AudionutsUAGUI() {
                     {overviewText ||
                       "Upload Assistant is analyzing this item. Metadata will appear as soon as the first snapshot is ready."}
                   </p>
+                </section>
+              )}
+
+              {media?.status !== "waiting" && (
+                <section className="ua-processing-section">
+                  <h4 className="ua-processing-section-title">Track Details</h4>
+                  <div className="space-y-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowAudioTracks((value) => !value)}
+                      aria-pressed={showAudioTracks}
+                      className="flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-2 text-left"
+                    >
+                      <span>
+                        <span className="block text-sm font-medium">
+                          Show audio tracks
+                        </span>
+                        <span className="ua-processing-muted block text-xs">
+                          {audioTracks.length} track
+                          {audioTracks.length === 1 ? "" : "s"} detected
+                        </span>
+                      </span>
+                      <span
+                        className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+                          showAudioTracks
+                            ? "ua-accent-indicator"
+                            : isDarkMode
+                              ? "bg-gray-700"
+                              : "bg-gray-300"
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${
+                            showAudioTracks ? "translate-x-6" : "translate-x-1"
+                          }`}
+                        />
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowSubtitleTracks((value) => !value)}
+                      aria-pressed={showSubtitleTracks}
+                      className="flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-2 text-left"
+                    >
+                      <span>
+                        <span className="block text-sm font-medium">
+                          Show subtitle tracks
+                        </span>
+                        <span className="ua-processing-muted block text-xs">
+                          {subtitleTracks.length} track
+                          {subtitleTracks.length === 1 ? "" : "s"} detected
+                        </span>
+                      </span>
+                      <span
+                        className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+                          showSubtitleTracks
+                            ? "ua-accent-indicator"
+                            : isDarkMode
+                              ? "bg-gray-700"
+                              : "bg-gray-300"
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${
+                            showSubtitleTracks ? "translate-x-6" : "translate-x-1"
+                          }`}
+                        />
+                      </span>
+                    </button>
+                  </div>
+                </section>
+              )}
+
+              {showAudioTracks && audioTracks.length > 0 && (
+                <section className="ua-processing-section">
+                  <h4 className="ua-processing-section-title">
+                    Audio Tracks ({audioTracks.length})
+                  </h4>
+                  <div className="space-y-2">
+                    {audioTracks.map((track) =>
+                      renderMediaTrack(track, "audio"),
+                    )}
+                  </div>
+                </section>
+              )}
+
+              {showSubtitleTracks && subtitleTracks.length > 0 && (
+                <section className="ua-processing-section">
+                  <h4 className="ua-processing-section-title">
+                    Subtitle Tracks ({subtitleTracks.length})
+                  </h4>
+                  <div className="space-y-2">
+                    {subtitleTracks.map((track) =>
+                      renderMediaTrack(track, "subtitle"),
+                    )}
+                  </div>
                 </section>
               )}
 
@@ -6999,15 +7315,15 @@ function AudionutsUAGUI() {
                 </div>
                 {renderSelectAllBar()}
                 <div
-                  ref={(node) => {
-                    if (!node) return;
-                    requestAnimationFrame(() => {
-                      node.scrollTop = fileBrowserScrollTopRef.current;
-                    });
-                  }}
+                  ref={fileBrowserRef}
                   onScroll={(event) => {
+                    if (fileBrowserRestoring) return;
                     fileBrowserScrollTopRef.current =
                       event.currentTarget.scrollTop;
+                    storage.set(
+                      FILE_BROWSER_SCROLL_KEY,
+                      String(fileBrowserScrollTopRef.current),
+                    );
                   }}
                   className={`${hasDescFile && !descBrowserCollapsed ? "flex-1 max-h-[50%]" : "flex-1"} overflow-y-auto`}
                 >

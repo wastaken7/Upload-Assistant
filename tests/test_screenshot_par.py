@@ -1,8 +1,15 @@
-from src.takescreens import round_to_even, screenshot_par_scale_factors, should_scale_screenshots_for_par
+from src.takescreens import round_to_even, screenshot_par_scale_factors, should_scale_dvd_screenshots_for_par, should_scale_screenshots_for_par
 
 
 def test_screenshot_par_scaling_is_disabled_by_default() -> None:
     assert should_scale_screenshots_for_par({}) is False
+
+
+def test_dvd_par_scaling_defaults_on_and_can_be_overridden() -> None:
+    assert should_scale_dvd_screenshots_for_par({}) is True
+    assert should_scale_dvd_screenshots_for_par({"scale_screenshots_for_par": False}) is True
+    assert should_scale_dvd_screenshots_for_par({"scale_screenshots_for_par": False, "scale_dvd_screenshots_for_par": True}) is True
+    assert should_scale_dvd_screenshots_for_par({"scale_screenshots_for_par": True, "scale_dvd_screenshots_for_par": False}) is False
 
 
 def test_screenshot_par_scaling_preserves_coded_dimensions_when_disabled() -> None:

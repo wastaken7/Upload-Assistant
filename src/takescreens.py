@@ -432,6 +432,12 @@ def should_scale_screenshots_for_par(config: Mapping[str, Any] | None = None) ->
     return _as_bool(settings.get("scale_screenshots_for_par"), default=False)
 
 
+def should_scale_dvd_screenshots_for_par(config: Mapping[str, Any] | None = None) -> bool:
+    """Return whether DVD screenshots should use display-corrected dimensions."""
+    settings = default_config if config is None else config
+    return _as_bool(settings.get("scale_dvd_screenshots_for_par"), default=True)
+
+
 def screenshot_par_scale_factors(
     width: float,
     height: float,
@@ -851,7 +857,7 @@ async def dvd_screenshots(
             height = float(track.height)
             frame_rate = float(track.frame_rate)
     meta.frame_rate = frame_rate
-    w_sar, h_sar = screenshot_par_scale_factors(width, height, par, dar)
+    w_sar, h_sar = screenshot_par_scale_factors(width, height, par, dar, should_scale_dvd_screenshots_for_par())
 
     main_set = meta.discs[disc_num]["main_set"]
     content_vobs = [vob for vob in main_set if not vob.upper().endswith("_0.VOB")] or main_set
@@ -952,21 +958,16 @@ async def dvd_screenshots(
 
         if retake:
             retry_attempts = 3
+            retry_image = str(Path(image).with_name(f"{Path(image).stem}-retry.png"))
             for attempt in range(1, retry_attempts + 1):
                 logger.info(f"[yellow]Retaking screenshot for: {image} (Attempt {attempt}/{retry_attempts})[/yellow]")
 
                 index = int(image.rsplit("-", 1)[-1].split(".")[0])
                 adjusted_time = random.uniform(0, voblength)  # nosec B311 - Random screenshot timing, not cryptographic  # noqa: S311
 
-                if Path(image).exists():  # Prevent unnecessary deletion error
-                    try:
-                        Path(image).unlink()
-                    except Exception as e:
-                        logger.error(f"[red]Failed to delete {image}: {e}[/red]")
-                        break
-
                 try:
-                    screenshot_response = await capture_dvd_screenshot((index, input_file, image, str(adjusted_time), meta, width, height, w_sar, h_sar))
+                    Path(retry_image).unlink(missing_ok=True)
+                    screenshot_response = await capture_dvd_screenshot((index, input_file, retry_image, str(adjusted_time), meta, width, height, w_sar, h_sar))
 
                     index, screenshot_result = screenshot_response  # Safe unpacking
 
@@ -976,12 +977,15 @@ async def dvd_screenshots(
 
                     retaken_size = Path(screenshot_result).stat().st_size
                     if retaken_size > 75000:
-                        logger.info(f"[green]Successfully retaken screenshot for: {screenshot_result} ({retaken_size} bytes)[/green]")
-                        valid_results.append(screenshot_result)
+                        Path(screenshot_result).replace(image)
+                        logger.info(f"[green]Successfully retaken screenshot for: {image} ({retaken_size} bytes)[/green]")
+                        valid_results.append(image)
                         break
                     logger.info(f"[red]Retaken image {screenshot_result} is still too small. Retrying...[/red]")
                 except Exception as e:
                     logger.error(f"[red]Error capturing screenshot for {input_file} at {adjusted_time}: {e}[/red]")
+                finally:
+                    Path(retry_image).unlink(missing_ok=True)
 
             else:
                 logger.info(f"[red]All retry attempts failed for {image}. Skipping.[/red]")
@@ -2004,6 +2008,7 @@ async def screenshots(
         if retake:
             retry_attempts = 5
             retry_offsets = [5.0, 10.0, -10.0, 100.0, -100.0]
+            retry_image = str(Path(image_path).with_name(f"{Path(image_path).stem}-retry.png"))
             frame_rate = meta.frame_rate if meta.frame_rate is not None else 24.0
             original_index = int(image_path.rsplit("-", 1)[-1].split(".")[0])
             original_time = ss_times[original_index] if original_index < len(ss_times) else None
@@ -2016,11 +2021,10 @@ async def screenshots(
                             f"[yellow]Retaking screenshot for: {image_path} (Attempt {attempt}/{retry_attempts}) at {adjusted_time:.2f}s (offset {offset:+.2f}s)[/yellow]"
                         )
                         try:
-                            if Path(image_path).exists():
-                                Path(image_path).unlink()
+                            Path(retry_image).unlink(missing_ok=True)
 
                             screenshot_response = await capture_screenshot(
-                                (original_index, path, adjusted_time, image_path, width, height, w_sar, h_sar, loglevel, hdr_tonemap, meta)
+                                (original_index, path, adjusted_time, retry_image, width, height, w_sar, h_sar, loglevel, hdr_tonemap, meta)
                             )
 
                             if not isinstance(screenshot_response, tuple) or len(screenshot_response) != 2:
@@ -2056,10 +2060,13 @@ async def screenshots(
                                 valid_image = True
 
                             if valid_image:
-                                valid_results.append(screenshot_path)
+                                Path(screenshot_path).replace(image_path)
+                                valid_results.append(image_path)
                                 break
                         except Exception as e:
                             logger.error(f"[red]Error retaking screenshot for {image_path} at {adjusted_time:.2f}s: {e}[/red]")
+                        finally:
+                            Path(retry_image).unlink(missing_ok=True)
                     else:
                         continue
                     break
@@ -2067,10 +2074,9 @@ async def screenshots(
                 random_time = random.uniform(0, length)  # nosec B311 - Random screenshot timing, not cryptographic  # noqa: S311
                 logger.info(f"[yellow]Retaking screenshot for: {image_path} (Attempt {attempt}/{retry_attempts}) at random time {random_time:.2f}s[/yellow]")
                 try:
-                    if Path(image_path).exists():
-                        Path(image_path).unlink()
+                    Path(retry_image).unlink(missing_ok=True)
 
-                    screenshot_response = await capture_screenshot((original_index, path, random_time, image_path, width, height, w_sar, h_sar, loglevel, hdr_tonemap, meta))
+                    screenshot_response = await capture_screenshot((original_index, path, random_time, retry_image, width, height, w_sar, h_sar, loglevel, hdr_tonemap, meta))
 
                     if not isinstance(screenshot_response, tuple) or len(screenshot_response) != 2:
                         continue
@@ -2101,10 +2107,13 @@ async def screenshots(
                         valid_image = True
 
                     if valid_image:
-                        valid_results.append(screenshot_path)
+                        Path(screenshot_path).replace(image_path)
+                        valid_results.append(image_path)
                         break
                 except Exception as e:
                     logger.error(f"[red]Error retaking screenshot for {image_path} at random time {random_time:.2f}s: {e}[/red]")
+                finally:
+                    Path(retry_image).unlink(missing_ok=True)
             else:
                 logger.info(f"[red]All retry attempts failed for {image_path}. Skipping.[/red]")
                 remaining_retakes.append(image_path)

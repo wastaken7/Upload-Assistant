@@ -67,6 +67,7 @@ DEFAULT_KEY_TYPES: dict[str, tuple[type, ...]] = {
     "tone_map": (bool,),
     "auto_dvd_menus": (bool,),
     "scale_screenshots_for_par": (bool,),
+    "scale_dvd_screenshots_for_par": (bool,),
     "use_libplacebo": (bool,),
     "ffmpeg_is_good": (bool,),
     "ffmpeg_warmup": (bool,),

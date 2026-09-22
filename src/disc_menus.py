@@ -13,7 +13,7 @@ from src.binaries import configured_binary
 from src.console import logger
 from src.mediainfo import MediaInfo
 from src.meta import Meta
-from src.takescreens import screenshot_par_scale_factors, should_scale_screenshots_for_par
+from src.takescreens import screenshot_par_scale_factors, should_scale_dvd_screenshots_for_par
 from src.temp_paths import menu_screenshots_dir
 from src.uploadscreens import UploadScreensManager
 
@@ -95,7 +95,7 @@ class DiscMenus:
         except ValueError, TypeError:
             max_menu_screens = 6
         screenshot_config = cast(Mapping[str, Any], default_section) if isinstance(default_section, Mapping) else {}
-        scale_for_par = should_scale_screenshots_for_par(screenshot_config)
+        scale_for_par = should_scale_dvd_screenshots_for_par(screenshot_config)
 
         captured_images = []
         output_dir = menu_screenshots_dir(meta.base_dir, meta.uuid)
