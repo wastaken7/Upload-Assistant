@@ -19,6 +19,13 @@ def test_midnightscene_music_category_and_format_type_ids():
     assert asyncio.run(tracker.get_type_id(Meta(category="MUSIC", format="MP3"))) == {"type_id": "7"}
 
 
+def test_midnightscene_video_type_takes_precedence_over_flac_audio():
+    tracker = _tracker()
+
+    assert asyncio.run(tracker.get_type_id(Meta(type="REMUX", audio="FLAC"))) == {"type_id": "2"}
+    assert asyncio.run(tracker.get_type_id(Meta(type="ENCODE", audio="FLAC"))) == {"type_id": "3"}
+
+
 def test_midnightscene_scene_music_name_replaces_only_underscores():
     meta = Meta(
         category="MUSIC",

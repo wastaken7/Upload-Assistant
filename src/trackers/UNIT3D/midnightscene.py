@@ -182,13 +182,16 @@ class MidnightScene(UNIT3D):
             format_field = fields.get("format", {}) if isinstance(fields.get("format"), dict) else {}
             music_format = str(meta.format or format_field.get("value", "") or meta.type or "").upper().strip().lstrip(".")
             val = type_id.get(music_format, "0")
-        elif "FLAC" in (meta.audio or "").upper():
-            val = "8"
-        elif "MP3" in (meta.audio or "").upper():
-            val = "7"
         else:
             meta_type = (meta.type or "").upper().strip().lstrip(".")
-            val = type_id.get(meta_type, "0")
+            if meta_type in type_id:
+                val = type_id[meta_type]
+            elif "FLAC" in (meta.audio or "").upper():
+                val = "8"
+            elif "MP3" in (meta.audio or "").upper():
+                val = "7"
+            else:
+                val = "0"
 
         return {"type_id": val}
 
