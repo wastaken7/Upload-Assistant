@@ -50,7 +50,7 @@ class NzbNest:
         return build_newznab_search_query(meta)
 
     def _parse_dupes_from_response(self, response_text: str) -> list[dict[str, Any]]:
-        return parse_newznab_dupes(response_text, self.torrent_url)
+        return parse_newznab_dupes(response_text, self.torrent_url, use_title_as_file=True)
 
     async def search_existing(self, meta: Meta) -> list[Any]:
         release_name = await self.get_name(meta)

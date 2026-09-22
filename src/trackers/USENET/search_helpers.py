@@ -86,6 +86,7 @@ def parse_newznab_dupes(
     torrent_url: str | None = None,
     *,
     use_guid_attr_as_id: bool = False,
+    use_title_as_file: bool = False,
 ) -> list[dict[str, Any]]:
     dupes: list[dict[str, Any]] = []
     response_xml = ElementTree.fromstring(response_text)
@@ -118,7 +119,10 @@ def parse_newznab_dupes(
         dupes.append(
             {
                 "name": title,
-                "files": title,
+                # Newznab search results do not expose the NZB's file list.
+                # Some trackers historically use the release title as a
+                # compatibility fallback for this field.
+                "files": title if use_title_as_file else [],
                 "size": int(size_text) if size_text.isdigit() else 0,
                 "link": item_link,
             }

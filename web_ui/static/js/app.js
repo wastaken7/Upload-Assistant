@@ -1066,6 +1066,12 @@ const argumentCategories = [
         description: "Override the Usenet 7z archive password for this run",
       },
       {
+        label: "--usenet-episodes-only",
+        placeholder: "CURUPIRA,NZBNEST",
+        description:
+          "Send episode NZBs, but not the final season pack, to these Usenet indexers",
+      },
+      {
         label: "--unattended",
         description: "Unattended (no prompts (AT ALL))",
       },

@@ -42,6 +42,27 @@ def test_suio_incomplete_candidate_is_not_exact_without_file_list():
     assert result is False  # noqa: S101
 
 
+def test_pesto_episode_allows_other_group_but_blocks_exact_usenet_release():
+    meta = Meta(
+        name="Example.Show.S01E01.1080p.WEB-DL.DDP2.0.H.264-GROUPA",
+        category="TV",
+        season="S01",
+        episode="E01",
+        resolution="1080p",
+        type="WEBDL",
+        tag="-GROUPA",
+        usenet_is_episode_submission=True,
+    )
+    candidates = [
+        {"name": "Example.Show.S01E01.1080p.WEB-DL.DDP2.0.H.264-GROUPB", "size": 100, "files": []},
+        {"name": meta.name, "size": 200, "files": []},
+    ]
+
+    result = asyncio.run(DupeChecker({"TRACKERS": {"SUIO": {"exact_match_only": False}}}).filter_dupes(candidates, meta, "SUIO"))
+
+    assert [entry["name"] for entry in result] == [meta.name]  # noqa: S101
+
+
 def test_tracker_config_ignores_exact_match_only_when_tracker_does_not_support_it(monkeypatch):
     warning = Mock()
     monkeypatch.setattr(dupe_checking.logger, "warning", warning)
