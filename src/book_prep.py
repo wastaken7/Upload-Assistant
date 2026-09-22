@@ -269,6 +269,10 @@ async def gather_book_prep(
         "keywords": bool(meta.keywords),
         "overview": bool(meta.overview),
     }
+    recorded_year: int | None = None
+    release_name = meta.basename_no_ext or Path(meta.path or videopath).name
+    release_year_match = re.search(r"(?:^|[-_. ])((?:18|19|20)\d{2})[-_. ]+AUDIOBOOK(?=[-_. ]|$)", release_name, re.IGNORECASE) if meta.audiobook else None
+    release_year = int(release_year_match.group(1)) if release_year_match else None
 
     # Extract EPUB metadata directly if the file is an EPUB
     if videopath.lower().endswith(".epub") and Path(videopath).is_file():
@@ -461,11 +465,13 @@ async def gather_book_prep(
 
                 # 7. Year (extract 4-digit number)
                 rec_date = _unescape_meta_val(general_track.get("Recorded_Date") or general_track.get("recorded_date"))
-                if rec_date and not meta.year:
-                    match = re.search(r"\b\d{4}\b", rec_date)
+                if rec_date:
+                    match = re.search(r"\b(?:18|19|20)\d{2}\b", rec_date)
                     if match:
-                        meta.year = int(match.group(0))
-                        meta.search_year = int(match.group(0))
+                        recorded_year = int(match.group(0))
+                        if not meta.audiobook and not meta.year:
+                            meta.year = recorded_year
+                            meta.search_year = recorded_year
 
                 # 8. Genre -> Keywords
                 genre = _unescape_meta_val(general_track.get("Genre") or general_track.get("genre"))
@@ -516,6 +522,12 @@ async def gather_book_prep(
                                     break
         except Exception as ex:
             logger.debug(f"[yellow]Warning: Error extracting embedded book metadata: {ex}[/yellow]")
+
+    if meta.audiobook:
+        selected_year = int(meta.manual_year) if cli_overrides["year"] else release_year or recorded_year or meta.year
+        if selected_year:
+            meta.year = selected_year
+            meta.search_year = selected_year
 
     # Series fallback from filename (embedded Calibre/MediaInfo tags take precedence)
     if not meta.book_series:
