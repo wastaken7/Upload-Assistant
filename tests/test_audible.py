@@ -1,7 +1,9 @@
 # ruff: noqa: S101
+from types import SimpleNamespace
 
 import pytest
 
+from src import prep_helpers
 from src.args import Args
 from src.audible import build_audible_url, normalize_audible_domain, normalize_audible_url
 from src.get_desc import DescriptionBuilder
@@ -67,3 +69,17 @@ def test_asin_remains_plain_text_without_user_provided_marketplace():
 
     assert "[url=" not in description
     assert "B01N5AX3TQ" in description
+
+
+@pytest.mark.asyncio
+async def test_book_service_argument_sets_longname(tmp_path, monkeypatch):
+    meta, _, _ = Args({"DEFAULT": {"screens": 1}}).parse([str(tmp_path), "--service", "Audible"], Meta(category="BOOK", tag=""))
+
+    async def keep_meta(current_meta):
+        return current_meta
+
+    monkeypatch.setattr(prep_helpers, "tag_override", keep_meta)
+    await prep_helpers.finalize_metadata(SimpleNamespace(config={"DEFAULT": {}}), meta, "book.m4b", {}, None, "book.m4b", "", "book.m4b")
+
+    assert meta.service == "Audible"
+    assert meta.service_longname == "Audible"

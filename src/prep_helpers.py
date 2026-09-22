@@ -1719,6 +1719,10 @@ async def finalize_metadata(
     meta.tvmaze = meta.tvmaze_id
 
     if meta.category == "BOOK":
+        if meta.service and not meta.service_longname:
+            services = cast(dict[str, str], await get_service(get_services_only=True))
+            service_code = services.get(meta.service, meta.service)
+            meta.service_longname = max((name for name, code in services.items() if code == service_code), key=len, default=meta.service)
         meta.container = Path(videopath).suffix.lstrip(".").lower()
         meta.audio = ""
         meta.channels = ""

@@ -2188,7 +2188,6 @@ def _music_preview_from_meta(meta_data: Mapping[str, object]) -> dict[str, objec
     }
 
 
-
 def _preview_media_track_value(track: Mapping[str, object], *keys: str) -> str:
     """Return the first useful MediaInfo value across common key variants."""
     for key in keys:
@@ -2310,6 +2309,7 @@ def _extract_preview_media_tracks(
         )
 
     return audio_tracks, subtitle_tracks
+
 
 def _extract_execution_preview(meta_data: Mapping[str, object], fallback_path: str, preview_session_id: str = "") -> ExecutionPreview:
     title = _stringify_preview_value(meta_data.get("title")) or _stringify_preview_value(meta_data.get("name"))
