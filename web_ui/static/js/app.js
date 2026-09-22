@@ -592,7 +592,7 @@ const argumentCategories = [
       {
         label: "--service",
         placeholder: "SERVICE",
-        description: "Streaming service",
+        description: "Video or book service",
       },
       { label: "--region", placeholder: "REGION", description: "Disc Region" },
       {

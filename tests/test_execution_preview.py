@@ -107,11 +107,12 @@ def test_execution_preview_prefers_current_tv_artwork_url():
                 "book_translator": "Translator",
                 "book_series": "Series",
                 "book_series_index": "3",
+                "service_longname": "Storytel",
                 "isbn": "9781234567890",
                 "audiobook": True,
             },
             "book",
-            {"author": "Writer", "translator": "Translator", "series": "Series #3", "isbn": "9781234567890", "format": "Audiobook"},
+            {"author": "Writer", "translator": "Translator", "series": "Series #3", "service": "Storytel", "isbn": "9781234567890", "format": "Audiobook"},
         ),
         (
             "MUSIC",
@@ -172,6 +173,13 @@ def test_execution_preview_omits_empty_and_zero_media_details():
     preview = _extract_execution_preview({"category": "MOVIE", "title": "Example", "source_size": 0, "filelist": []}, "C:/media/Example")
 
     assert preview["detail_sections"] == []  # noqa: S101
+
+
+def test_book_preview_uses_service_when_longname_is_unavailable():
+    preview = _extract_execution_preview({"category": "BOOK", "service": "Skeelo"}, "book.epub")
+
+    assert preview["service"] == "Skeelo"  # noqa: S101
+    assert _detail_items(preview, "book")["service"] == "Skeelo"  # noqa: S101
 
 
 @pytest.mark.parametrize(
