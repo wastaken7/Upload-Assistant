@@ -16,7 +16,7 @@ import guessit
 from torf import Torrent
 
 from src.bluray_com import get_bluray_releases
-from src.book_prep import AUDIOBOOK_EXTENSIONS, BOOK_EXTENSIONS
+from src.book_prep import AUDIOBOOK_EXTENSIONS, BOOK_EXTENSIONS, BOOK_SERVICES
 from src.cleanup import cleanup_manager
 from src.clients import Clients
 from src.console import logger
@@ -1720,9 +1720,7 @@ async def finalize_metadata(
 
     if meta.category == "BOOK":
         if meta.service and not meta.service_longname:
-            services = cast(dict[str, str], await get_service(get_services_only=True))
-            service_code = services.get(meta.service, meta.service)
-            meta.service_longname = max((name for name, code in services.items() if code == service_code), key=len, default=meta.service)
+            meta.service_longname = BOOK_SERVICES.get(meta.service.casefold(), meta.service)
         meta.container = Path(videopath).suffix.lstrip(".").lower()
         meta.audio = ""
         meta.channels = ""

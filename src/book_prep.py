@@ -49,6 +49,19 @@ from src.exportmi import export_info
 from src.genre_map import map_audiobook_keywords
 from src.meta import Meta
 
+BOOK_SERVICES = {
+    "audible": "Audible",
+    "bookbeat": "BookBeat",
+    "everand": "Everand",
+    "kindle unlimited": "Kindle Unlimited",
+    "kobo plus": "Kobo Plus",
+    "nextory": "Nextory",
+    "skeelo": "Skeelo",
+    "storytel": "Storytel",
+    "tocalivros": "Tocalivros",
+    "ubook": "Ubook",
+}
+
 # ---------------------------------------------------------------------------
 # File-list resolution
 # ---------------------------------------------------------------------------

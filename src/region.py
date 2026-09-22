@@ -2066,7 +2066,6 @@ async def get_service(
         "ATV": "ATV",
         "ATVP": "ATVP",
         "AUBC": "AUBC",
-        "Audible": "Audible",
         "BB": "BB",
         "BBC iPlayer": "iP",
         "BCORE": "BCORE",

@@ -8,6 +8,7 @@ from src.args import Args
 from src.audible import build_audible_url, normalize_audible_domain, normalize_audible_url
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
+from src.region import get_service
 
 
 def test_audible_url_argument_sets_asin_and_canonical_url(tmp_path):
@@ -71,9 +72,20 @@ def test_asin_remains_plain_text_without_user_provided_marketplace():
     assert "B01N5AX3TQ" in description
 
 
+@pytest.mark.parametrize(
+    ("service", "longname"),
+    [
+        ("Audible", "Audible"),
+        ("bookbeat", "BookBeat"),
+        ("Kindle Unlimited", "Kindle Unlimited"),
+        ("KOBO PLUS", "Kobo Plus"),
+        ("Tocalivros", "Tocalivros"),
+        ("Custom Books", "Custom Books"),
+    ],
+)
 @pytest.mark.asyncio
-async def test_book_service_argument_sets_longname(tmp_path, monkeypatch):
-    meta, _, _ = Args({"DEFAULT": {"screens": 1}}).parse([str(tmp_path), "--service", "Audible"], Meta(category="BOOK", tag=""))
+async def test_book_service_argument_sets_longname(tmp_path, monkeypatch, service, longname):
+    meta, _, _ = Args({"DEFAULT": {"screens": 1}}).parse([str(tmp_path), "--service", service], Meta(category="BOOK", tag=""))
 
     async def keep_meta(current_meta):
         return current_meta
@@ -81,5 +93,10 @@ async def test_book_service_argument_sets_longname(tmp_path, monkeypatch):
     monkeypatch.setattr(prep_helpers, "tag_override", keep_meta)
     await prep_helpers.finalize_metadata(SimpleNamespace(config={"DEFAULT": {}}), meta, "book.m4b", {}, None, "book.m4b", "", "book.m4b")
 
-    assert meta.service == "Audible"
-    assert meta.service_longname == "Audible"
+    assert meta.service == service
+    assert meta.service_longname == longname
+
+
+@pytest.mark.asyncio
+async def test_audible_is_not_a_video_streaming_service():
+    assert "Audible" not in await get_service(get_services_only=True)

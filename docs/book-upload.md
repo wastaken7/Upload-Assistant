@@ -106,6 +106,8 @@ You can override auto-detected values using the following command-line flags:
 | `-magazine`  | `--magazine`      | Identifies the book upload as a Magazine                                                            |
 | `-newspaper` | `--newspaper`     | Identifies the book upload as a Newspaper                                                           |
 
+`--service` accepts Audible, BookBeat, Everand, Kindle Unlimited, Kobo Plus, Nextory, Skeelo, Storytel, Tocalivros, and Ubook for book and audiobook uploads. Names are matched without regard to letter case; other values remain unchanged.
+
 ---
 
 ## 7. Configuration Options
