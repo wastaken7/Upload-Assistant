@@ -644,7 +644,14 @@ class BBCODE:
 
     def convert_headings_to_sizes(self, desc: str) -> str:
         """Convert BBCode h1-h6 tags to tracker-compatible size markup."""
-        heading_sizes = {"1": 8, "2": 6, "3": 4, "4": 2, "5": 1, "6": 1}
+        heading_sizes = {
+            "1": 6,
+            "2": 5,
+            "3": 4,
+            "4": 3,
+            "5": 2,
+            "6": 1,
+        }
 
         def convert(match: re.Match[str]) -> str:
             level = match.group(1)

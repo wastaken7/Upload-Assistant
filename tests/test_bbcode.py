@@ -49,11 +49,11 @@ def test_convert_headings_to_sizes_maps_h1_through_h6() -> None:
     description = "\n".join(f"[h{level}]Texto com h{level}[/h{level}]" for level in range(1, 7))
     expected = "\n".join(
         (
-            "[size=8][b]Texto com h1[/b][/size]",
-            "[size=6][b]Texto com h2[/b][/size]",
+            "[size=6][b]Texto com h1[/b][/size]",
+            "[size=5][b]Texto com h2[/b][/size]",
             "[size=4][b]Texto com h3[/b][/size]",
-            "[size=2][b]Texto com h4[/b][/size]",
-            "[size=1][b]Texto com h5[/b][/size]",
+            "[size=3][b]Texto com h4[/b][/size]",
+            "[size=2][b]Texto com h5[/b][/size]",
             "[size=1][b][color=grey]Texto com h6[/color][/b][/size]",
         )
     )
@@ -112,7 +112,7 @@ def test_tracker_specific_formats_converts_colors_for_gazelle_trackers() -> None
 def test_tracker_specific_formats_converts_headings_for_selected_trackers() -> None:
     builder = object.__new__(DescriptionBuilder)
     description = "[h1]Título[/h1] [h6]Observação[/h6]"
-    expected = "[size=8][b]Título[/b][/size] [size=1][b][color=grey]Observação[/color][/b][/size]"
+    expected = "[size=6][b]Título[/b][/size] [size=1][b][color=grey]Observação[/color][/b][/size]"
 
     for tracker in ("AMIGOSSHARE", "ANTHELION", "BJSHARE", "BRASILTRACKER", "GREATPOSTERWALL"):
         assert builder.tracker_specific_formats(tracker, description) == expected
