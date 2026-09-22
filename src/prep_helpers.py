@@ -1445,7 +1445,9 @@ async def finalize_metadata(
     base_dir = meta.base_dir
     folder_id = Path(str(meta.path)).name
 
-    if meta.category in ("TV", "MOVIE"):
+    if meta.category == "BOOK" and meta.service:
+        meta.service_longname = BOOK_SERVICES.get(meta.service.casefold(), meta.service)
+    elif meta.category in ("TV", "MOVIE"):
         meta.container = await video_manager.get_container(meta)
 
         meta.audio, meta.channels, meta.has_commentary = await prep_instance.audio_manager.get_audio_v2(mi_data, meta, bdinfo)
@@ -1719,8 +1721,6 @@ async def finalize_metadata(
     meta.tvmaze = meta.tvmaze_id
 
     if meta.category == "BOOK":
-        if meta.service and not meta.service_longname:
-            meta.service_longname = BOOK_SERVICES.get(meta.service.casefold(), meta.service)
         meta.container = Path(videopath).suffix.lstrip(".").lower()
         meta.audio = ""
         meta.channels = ""
