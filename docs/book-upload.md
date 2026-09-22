@@ -96,6 +96,9 @@ You can override auto-detected values using the following command-line flags:
 | `-pub`       | `--publisher`     | Overrides the book publisher metadata                                                               |
 | `-btitle`    | `--book-title`    | Overrides the book title                                                                            |
 | `-author`    | `--author`        | Overrides the book author                                                                           |
+|              | `--book-narrator` | Overrides the audiobook narrator                                                                    |
+|              | `--genres`        | Overrides genres with a comma-separated list                                                        |
+| `-ov`        | `--overview`      | Overrides the book or audiobook synopsis                                                            |
 | `-isbn`      | `--isbn`          | Overrides the ISBN number                                                                           |
 | `-asin`      | `--asin`          | Overrides the ASIN number                                                                           |
 |              | `--audible-url`   | Audible product URL; sets the ASIN and overrides the configured Audible marketplace                 |
@@ -105,6 +108,8 @@ You can override auto-detected values using the following command-line flags:
 | `-manga`     | `--manga`         | Identifies the book upload as a Manga                                                               |
 | `-magazine`  | `--magazine`      | Identifies the book upload as a Magazine                                                            |
 | `-newspaper` | `--newspaper`     | Identifies the book upload as a Newspaper                                                           |
+
+`--service` accepts Audible, BookBeat, Everand, Kindle Unlimited, Kobo Plus, Nextory, Skeelo, Storytel, Tocalivros, and Ubook for book and audiobook uploads. Names are matched without regard to letter case; other values remain unchanged.
 
 ---
 

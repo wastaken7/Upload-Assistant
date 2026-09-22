@@ -1535,6 +1535,7 @@ class BJShare:
                     {
                         "bitrateTypes": audiobook_bitrate,
                         "bitrate": audiobook_bitrate,
+                        "release": meta.service_longname,
                     }
                 )
 

@@ -16,7 +16,7 @@ import guessit
 from torf import Torrent
 
 from src.bluray_com import get_bluray_releases
-from src.book_prep import AUDIOBOOK_EXTENSIONS, BOOK_EXTENSIONS
+from src.book_prep import AUDIOBOOK_EXTENSIONS, BOOK_EXTENSIONS, BOOK_SERVICES
 from src.cleanup import cleanup_manager
 from src.clients import Clients
 from src.console import logger
@@ -1445,7 +1445,9 @@ async def finalize_metadata(
     base_dir = meta.base_dir
     folder_id = Path(str(meta.path)).name
 
-    if meta.category in ("TV", "MOVIE"):
+    if meta.category == "BOOK" and meta.service:
+        meta.service_longname = BOOK_SERVICES.get(meta.service.casefold(), meta.service)
+    elif meta.category in ("TV", "MOVIE"):
         meta.container = await video_manager.get_container(meta)
 
         meta.audio, meta.channels, meta.has_commentary = await prep_instance.audio_manager.get_audio_v2(mi_data, meta, bdinfo)

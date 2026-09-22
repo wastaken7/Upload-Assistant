@@ -353,34 +353,29 @@ const createUploadOutputFragment = (html) => {
   return wrapper;
 };
 
-// Argument categories for the right sidebar (placeholders shown for info only)
-const argumentCategories = [
+// The CLI parser owns option names and help text. Keep only WebUI grouping and examples here.
+let argumentCategories = [
   {
     title: "Modes / Workflows",
     args: [
       {
         label: "--queue",
         placeholder: "QUEUE_NAME",
-        description: "Process a named queue from a folder path",
       },
       {
         label: "--limit-queue",
         placeholder: "N",
-        description: "Limit queue successful uploads",
       },
-      { label: "--site-check", description: "Site check (can it be uploaded)" },
+      { label: "--site-check" },
       {
         label: "--site-upload",
         placeholder: "TRACKER",
-        description: "Site upload (process site check content)",
       },
       {
         label: "--search_requests",
-        description: "Search supported site for matching requests (config)",
       },
       {
         label: "--unit3d",
-        description: "Upload from UNIT3D-Upload-Checker results",
       },
     ],
   },
@@ -391,54 +386,49 @@ const argumentCategories = [
       {
         label: "--poster",
         placeholder: "URL_OR_PATH",
-        description: "Artwork URL or local poster path for any category",
       },
       {
         label: "--banner",
         placeholder: "URL_OR_PATH",
-        description: "Artwork URL or local banner path for any category",
       },
       {
         label: "--category",
         placeholder: "MOVIE",
-        description: "Override detected category",
       },
       {
         label: "--cast",
         placeholder: "NAME1,NAME2",
-        description: "Override cast or XXX performers",
+      },
+      {
+        label: "--genres",
+        placeholder: "GENRE1,GENRE2",
       },
       {
         label: "--publisher",
         placeholder: "NAME",
-        description: "Override book publisher or XXX studio",
       },
       {
         label: "--type",
         placeholder: "REMUX",
-        description: "Override detected type",
       },
       {
         label: "--source",
         placeholder: "Blu-ray",
-        description: "Override detected source",
       },
       {
         label: "--resolution",
         placeholder: "2160p",
-        description: "Override detected resolution",
       },
-      { label: "--tmdb", placeholder: "movie/123", description: "TMDb id" },
-      { label: "--imdb", placeholder: "tt0111161", description: "IMDb id" },
-      { label: "--mal", placeholder: "ID", description: "MAL id" },
-      { label: "--tvmaze", placeholder: "ID", description: "TVMaze id" },
-      { label: "--tvdb", placeholder: "ID", description: "TVDB id" },
-      { label: "--douban", placeholder: "ID", description: "Douban id" },
-      { label: "--igdb", placeholder: "ID", description: "IGDB id" },
+      { label: "--tmdb", placeholder: "movie/123" },
+      { label: "--imdb", placeholder: "tt0111161" },
+      { label: "--mal", placeholder: "ID" },
+      { label: "--tvmaze", placeholder: "ID" },
+      { label: "--tvdb", placeholder: "ID" },
+      { label: "--douban", placeholder: "ID" },
+      { label: "--igdb", placeholder: "ID" },
       {
         label: "--steam",
         placeholder: "APP_ID_OR_URL",
-        description: "Steam app id or URL",
       },
     ],
   },
@@ -448,75 +438,59 @@ const argumentCategories = [
       {
         label: "--music-artist",
         placeholder: "ARTIST",
-        description: "Override the main artist(s)",
       },
       {
         label: "--music-album",
         placeholder: "TITLE",
-        description: "Override the album or release title",
       },
       {
         label: "--music-media",
         placeholder: "MEDIUM",
-        description:
-          "Source medium (CD, WEB, Vinyl, DVD, BD, Soundboard, SACD, DAT, Cassette)",
       },
       {
         label: "--music-release-type",
         placeholder: "ALBUM / EP / SINGLE",
-        description: "Release type",
       },
       {
         label: "--music-release-year",
         placeholder: "YYYY",
-        description: "Concrete release or pressing year",
       },
       {
         label: "--music-edition-year",
         placeholder: "YYYY",
-        description: "Remaster, reissue, or edition year",
       },
       {
         label: "--music-label",
         placeholder: "LABEL",
-        description: "Record label",
       },
       {
         label: "--music-catalogue-number",
         placeholder: "CATALOGUE",
-        description: "Catalogue number",
       },
       {
         label: "--music-genre",
         placeholder: "GENRE1,GENRE2",
-        description: "Comma-separated genre override",
       },
       {
         label: "--music-discogs-id",
         placeholder: "ID_OR_URL",
-        description: "Discogs release or master reference",
       },
       {
         label: "--music-discogs-release-id",
         placeholder: "ID_OR_URL",
-        description: "Exact Discogs release reference",
       },
       {
         label: "--music-discogs-master-id",
         placeholder: "ID_OR_URL",
-        description: "Exact Discogs master reference",
       },
       {
         label: "--no-music-discogs",
-        description: "Disable Discogs lookup and metadata",
       },
       {
         label: "--music-enrich",
-        description: "Enable bounded MusicBrainz enrichment",
       },
       {
         label: "--no-music-enrich",
-        description: "Disable MusicBrainz enrichment",
       },
     ],
   },
@@ -526,101 +500,91 @@ const argumentCategories = [
       {
         label: "--screens",
         placeholder: "N",
-        description: "Number of screenshots to use",
       },
       {
         label: "--manual_frames",
         placeholder: '"1,250,500"',
-        description: "Manual frame numbers for screenshots",
       },
       {
         label: "--comparison",
         placeholder: "PATH",
-        description: "Comparison images folder",
       },
       {
         label: "--comparison_index",
         placeholder: "N",
-        description: "Comparison main index",
       },
       {
         label: "--imghost",
         placeholder: "HOST",
-        description: "Specific image host to use",
       },
       {
         label: "--skip-imagehost-upload",
-        description: "Skip uploading screenshots",
       },
     ],
   },
   {
     title: "TV Fields",
     args: [
-      { label: "--season", placeholder: "S01", description: "Season number" },
-      { label: "--episode", placeholder: "E01", description: "Episode number" },
+      { label: "--season", placeholder: "S01" },
+      { label: "--episode", placeholder: "E01" },
       {
         label: "--manual-episode-title",
         placeholder: "TITLE",
-        description: "Manual episode title",
       },
       {
         label: "--daily",
         placeholder: "YYYY-MM-DD",
-        description: "Air date for daily shows",
       },
     ],
   },
   {
     title: "Title Shaping",
     args: [
-      { label: "--year", placeholder: "YYYY", description: "Override year" },
+      { label: "--year", placeholder: "YYYY" },
       {
         label: "--name",
         placeholder: "RELEASE_NAME",
-        description: "Override the generated release name",
       },
-      { label: "--no-season", description: "Remove season" },
-      { label: "--no-year", description: "Remove year" },
-      { label: "--no-aka", description: "Remove AKA" },
-      { label: "--no-dub", description: "Remove Dubbed" },
-      { label: "--no-dual", description: "Remove Dual-Audio" },
-      { label: "--no-tag", description: "Remove group tag" },
-      { label: "--no-edition", description: "Remove edition" },
-      { label: "--dual-audio", description: "Add Dual-Audio" },
-      { label: "--tag", placeholder: "GROUP", description: "Group tag" },
+      { label: "--no-season" },
+      { label: "--no-year" },
+      { label: "--no-aka" },
+      { label: "--no-dub" },
+      { label: "--no-dual" },
+      { label: "--no-tag" },
+      { label: "--no-edition" },
+      { label: "--dual-audio" },
+      { label: "--tag", placeholder: "GROUP" },
       {
         label: "--service",
         placeholder: "SERVICE",
-        description: "Streaming service",
       },
-      { label: "--region", placeholder: "REGION", description: "Disc Region" },
+      { label: "--region", placeholder: "REGION" },
       {
         label: "--edition",
         placeholder: "TEXT",
-        description: "Edition marker",
       },
-      { label: "--repack", placeholder: "TEXT", description: "Repack" },
+      { label: "--repack", placeholder: "TEXT" },
     ],
   },
   {
     title: "Description / NFO",
     args: [
       {
+        label: "--overview",
+        placeholder: "SYNOPSIS",
+      },
+      {
         label: "--desclink",
         placeholder: "URL",
-        description: "Link to pastebin/hastebin with description",
       },
       {
         label: "--descfile",
         placeholder: "PATH",
-        description: "Path to description file (.txt, .nfo, .md)",
       },
-      { label: "--nfo", description: "Use .nfo for description" },
+      { label: "--nfo" },
       {
         label: "--keywords",
         placeholder: "keyword1,keyword2",
-        description: "Comma-separated keywords",
       },
     ],
   },
@@ -630,50 +594,41 @@ const argumentCategories = [
       {
         label: "--original-language",
         placeholder: "en",
-        description: "Original language of content",
       },
       {
         label: "--only-if-languages",
         placeholder: "en,fr",
-        description:
-          "Only proceed with upload if the content has these languages",
       },
     ],
   },
   {
     title: "Misc Metadata Flags",
     args: [
-      { label: "--commentary", description: "Commentary" },
-      { label: "--sfx-subtitles", description: "SFX subtitles" },
-      { label: "--extras", description: "Extras included" },
+      { label: "--commentary" },
+      { label: "--sfx-subtitles" },
+      { label: "--extras" },
       {
         label: "--distributor",
         placeholder: "NAME",
-        description: "Disc distributor",
       },
       {
         label: "--disctype",
         placeholder: "BD50",
-        description: "Disc type override",
       },
-      { label: "--untouched", description: "Mark as untouched disc" },
-      { label: "--menus", description: "Path to menus screenshots (PNGs)" },
+      { label: "--untouched" },
+      { label: "--menus" },
       {
         label: "--manual_dvds",
         placeholder: "2xDVD9+DVD5",
-        description: "Override the default number of DVDs",
       },
       {
         label: "--sorted-filelist",
-        description: "Sorted filelist (handles typical anime nonsense)",
       },
       {
         label: "--keep-folder",
-        description: "Keep top folder with single file uploads",
       },
       {
         label: "--keep-nfo",
-        description: "Keep nfo (extremely site specific)",
       },
     ],
   },
@@ -683,39 +638,32 @@ const argumentCategories = [
       {
         label: "--author",
         placeholder: "AUTHOR",
-        description: "Override detected book author",
       },
       {
         label: "--book-title",
         placeholder: "TITLE",
-        description: "Override detected book title",
       },
       {
-        label: "--book-overview",
-        placeholder: "SYNOPSIS",
-        description:
-          "Book/Audiobook overview/synopsis (overrides auto-detected value)",
+        label: "--book-narrator",
+        placeholder: "NAME",
       },
-      { label: "--comic", description: "Mark upload as comic" },
-      { label: "--manga", description: "Mark upload as manga" },
-      { label: "--magazine", description: "Mark upload as magazine" },
-      { label: "--newspaper", description: "Mark upload as newspaper" },
+      { label: "--comic" },
+      { label: "--manga" },
+      { label: "--magazine" },
+      { label: "--newspaper" },
       {
         label: "--book-translator",
         placeholder: "NAME",
-        description: "Book translator",
       },
       {
         label: "--book-language",
         placeholder: "LANG",
-        description: "Book language",
       },
-      { label: "--isbn", placeholder: "ISBN", description: "ISBN identifier" },
-      { label: "--asin", placeholder: "ASIN", description: "Amazon ASIN" },
+      { label: "--isbn", placeholder: "ISBN" },
+      { label: "--asin", placeholder: "ASIN" },
       {
         label: "--openlibrary",
         placeholder: "ID",
-        description: "OpenLibrary id",
       },
     ],
   },
@@ -723,26 +671,30 @@ const argumentCategories = [
     title: "Games",
     args: [
       {
+        label: "--game-title",
+        placeholder: "TITLE",
+      },
+      {
+        label: "--developer",
+        placeholder: "NAME",
+      },
+      {
         label: "--platform",
         placeholder: "PC",
-        description: "Primary platform override",
       },
       {
         label: "--platforms",
         placeholder: "PC,PS5",
-        description: "Platforms list",
       },
       {
         label: "--game-version",
         placeholder: "v1.0",
-        description: "Game version",
       },
       {
         label: "--game-subcategory",
         placeholder: "dlc",
-        description: "Game subcategory",
       },
-      { label: "--multi", description: "Force a MULTI language tag" },
+      { label: "--multi" },
     ],
   },
   {
@@ -752,39 +704,41 @@ const argumentCategories = [
     args: [
       {
         label: "--onlyID",
-        description: "Only grab meta ids, not descriptions",
-      },
-      { label: "--ptp", placeholder: "ID_OR_URL", description: "PTP id/link" },
-      { label: "--blu", placeholder: "ID_OR_URL", description: "BLU id/link" },
-      {
-        label: "--aither",
-        placeholder: "ID_OR_URL",
-        description: "Aither id/link",
-      },
-      { label: "--lst", placeholder: "ID_OR_URL", description: "LST id/link" },
-      { label: "--oe", placeholder: "ID_OR_URL", description: "OE id/link" },
-      { label: "--hdb", placeholder: "ID_OR_URL", description: "HDB id/link" },
-      { label: "--btn", placeholder: "ID_OR_URL", description: "BTN id/link" },
-      { label: "--bhd", placeholder: "ID_OR_URL", description: "BHD id/link" },
-      {
-        label: "--orpheus",
-        placeholder: "ID_OR_URL",
-        description: "Orpheus id/link for music metadata enrichment",
       },
       {
-        label: "--huno",
-        placeholder: "ID_OR_URL",
-        description: "HUNO id/link",
+        label: "--tracker-id",
+        placeholder: "TRACKER=ID or URL",
+      },
+      { label: "PTP reference", insert: "--tracker-id PTP=", description: "PTP torrent ID" },
+      { label: "BLU reference", insert: "--tracker-id BLU=", description: "BLU torrent ID" },
+      {
+        label: "Aither reference",
+        insert: "--tracker-id AITHER=",
+        description: "Aither torrent ID",
+      },
+      { label: "LST reference", insert: "--tracker-id LST=", description: "LST torrent ID" },
+      { label: "OE reference", insert: "--tracker-id OE=", description: "OE torrent ID" },
+      { label: "HDB reference", insert: "--tracker-id HDB=", description: "HDB torrent ID" },
+      { label: "BTN reference", insert: "--tracker-id BTN=", description: "BTN torrent ID" },
+      { label: "BHD reference", insert: "--tracker-id BHD=", description: "BHD torrent ID" },
+      {
+        label: "Orpheus reference",
+        insert: "--tracker-id ORPHEUS=",
+        description: "Orpheus torrent ID for music metadata enrichment",
       },
       {
-        label: "--ulcx",
-        placeholder: "ID_OR_URL",
-        description: "ULCX id/link",
+        label: "HUNO reference",
+        insert: "--tracker-id HUNO=",
+        description: "HUNO torrent ID",
+      },
+      {
+        label: "ULCX reference",
+        insert: "--tracker-id ULCX=",
+        description: "ULCX torrent ID",
       },
       {
         label: "--torrenthash",
         placeholder: "HASH",
-        description: "(qBittorrent only) Get site id from Torrent hash",
       },
     ],
   },
@@ -794,50 +748,38 @@ const argumentCategories = [
       {
         label: "--trackers",
         placeholder: "aither,blutopia,lst,etc",
-        description: "Specific Trackers list for uploading",
       },
       {
         label: "--trackers-remove",
         placeholder: "blutopia,xyz,etc",
-        description:
-          "Remove these trackers from the default list for this upload",
       },
       {
         label: "--trackers-pass",
         placeholder: "N",
-        description:
-          "How many trackers need to pass all checks for upload to proceed",
       },
       {
         label: "--skip_auto_torrent",
-        description: "Skip auto torrent searching",
       },
-      { label: "--skip-dupe-check", description: "Skip dupe check" },
+      { label: "--skip-dupe-check" },
       {
         label: "--skip-dupe-asking",
-        description: "Accept any reported dupes without prompting about it",
       },
       {
         label: "--double-dupe-check",
-        description: "Run another dupe check right before upload",
       },
       {
         label: "--dupe-size-difference-tolerance",
         placeholder: "PERCENTAGE",
-        description: "Ignore dupes with size difference >= percentage",
       },
       {
         label: "--draft",
-        description: "Send to Draft at supported sites (config)",
       },
       {
         label: "--modq",
-        description: "Send to modQ at supported sites (config)",
       },
       {
         label: "--freeleech",
         placeholder: "25%",
-        description: "Mark upload as Freeleech (percentage)",
       },
     ],
   },
@@ -846,51 +788,43 @@ const argumentCategories = [
     args: [
       {
         label: "--anon",
-        description: "Anon upload at supported sites (config)",
       },
-      { label: "--no-seed", description: "Don't send torrents to client" },
-      { label: "--stream", description: "Stream" },
-      { label: "--webdv", description: "Dolby Vision hybrid" },
+      { label: "--no-seed" },
+      { label: "--stream" },
+      { label: "--webdv" },
       {
         label: "--hardcoded-subs",
-        description: "Release contains hardcoded subs",
       },
-      { label: "--personalrelease", description: "Personal release" },
+      { label: "--personalrelease" },
     ],
   },
   {
     title: "Tracker / Site Specific",
     args: [
-      { label: "--foreign", description: "CINEMATIK foreign category" },
-      { label: "--opera", description: "CINEMATIK opera and musical category" },
-      { label: "--asian", description: "CINEMATIK Asian category" },
+      { label: "--foreign" },
+      { label: "--opera" },
+      { label: "--asian" },
       {
         label: "--exclusive",
         placeholder: "1",
-        description: "Set exclusive flag where supported",
       },
-      { label: "--featured", description: "Mark upload as Featured (UNIT3D)" },
+      { label: "--featured" },
       {
         label: "--double-upload",
-        description: "Mark upload as Double Upload (UNIT3D)",
       },
       {
         label: "--double-upload-until",
         placeholder: "N",
-        description: "Double upload duration in days (UNIT3D)",
       },
       {
         label: "--freeleech-until",
         placeholder: "N",
-        description: "Freeleech duration in days (UNIT3D)",
       },
       {
         label: "--refundable",
-        description: "Mark upload as Refundable (UNIT3D)",
       },
       {
         label: "--sticky",
-        description: "Mark upload as Sticky / pinned (UNIT3D)",
       },
     ],
   },
@@ -900,36 +834,27 @@ const argumentCategories = [
       {
         label: "--max-piece-size",
         placeholder: "N",
-        description: "Max piece size (in MiB) of created torrent (1 <> 128)",
       },
       {
         label: "--nohash",
-        description: "Don't rehash torrent even if it was needed",
       },
       {
         label: "--rehash",
-        description:
-          "Create a fresh torrent from the actual data, not an existing .torrent file",
       },
       {
         label: "--mkbrr",
-        description: "Use mkbrr for torrent creation (config)",
       },
       {
         label: "--vapoursynth",
-        description: "Use VapourSynth for screenshots",
       },
-      { label: "--entropy", placeholder: "N", description: "Entropy" },
-      { label: "--randomized", placeholder: "N", description: "Randomized" },
+      { label: "--entropy", placeholder: "N" },
+      { label: "--randomized", placeholder: "N" },
       {
         label: "--infohash",
         placeholder: "HASH",
-        description: "Use this Infohash as the existing torrent from client",
       },
       {
         label: "--force-recheck",
-        description:
-          "(qBittorrent only) Force recheck the file in client before upload",
       },
     ],
   },
@@ -939,36 +864,29 @@ const argumentCategories = [
       {
         label: "--client",
         placeholder: "NAME",
-        description: "Client name (config)",
       },
       {
         label: "--qbit-tag",
         placeholder: "TAG",
-        description: "qBittorrent tag (config)",
       },
       {
         label: "--qbit-cat",
         placeholder: "CATEGORY",
-        description: "qBittorrent category (config)",
       },
       {
         label: "--qbit-bw-control",
-        description: "Enable qBittorrent bandwidth control",
       },
       {
         label: "--qbit-bw-threshold",
         placeholder: "KiB/s",
-        description: "qBittorrent bandwidth threshold",
       },
       {
         label: "--qbit-bw-time",
         placeholder: "SECONDS",
-        description: "qBittorrent bandwidth wait time",
       },
       {
         label: "--rtorrent-label",
         placeholder: "LABEL",
-        description: "rTorrent label (config)",
       },
     ],
   },
@@ -977,27 +895,23 @@ const argumentCategories = [
     args: [
       {
         label: "--delete-meta",
-        description: "Delete only meta.json from tmp folder",
       },
       {
         label: "--delete-tmp",
-        description: "Delete the tmp folder associated with this upload",
       },
-      { label: "--cleanup", description: "Cleanup the entire UA tmp folder" },
+      { label: "--cleanup" },
     ],
   },
   {
     title: "Debug / Output",
     args: [
-      { label: "--debug", description: "Debug mode" },
-      { label: "--ffdebug", description: "FFmpeg debug" },
+      { label: "--debug" },
+      { label: "--ffdebug" },
       {
         label: "--upload-order",
         placeholder: "tracker1,tracker2",
-        description: "Preferred upload order",
       },
-      { label: "--webui", description: "Launch the WebUI mode" },
-      { label: "--upload-timer", description: "Upload timer (config)" },
+      { label: "--upload-timer" },
     ],
   },
   {
@@ -1018,15 +932,11 @@ const argumentCategories = [
       },
       {
         label: "--audio-spectrogram",
-        description:
-          "Generate spectrograms; without a stream selection, the workflow will ask which streams to use.",
       },
       {
         label: "--audio-spectrogram-tracks",
         placeholder: "0,1 or all",
         insert: "--audio-spectrogram --audio-spectrogram-tracks all",
-        description:
-          "Preset inserts a valid selection. Replace 'all' with zero-based positions in the command field if needed.",
       },
     ],
   },
@@ -1037,8 +947,6 @@ const argumentCategories = [
     args: [
       {
         label: "--dynamic-hdr-plot",
-        description:
-          "Generate and upload Dolby Vision and HDR10+ metadata plots. Required tools download automatically on first use.",
       },
     ],
   },
@@ -1047,29 +955,23 @@ const argumentCategories = [
     args: [
       {
         label: "--not-anime",
-        description: "Can speed up tv data extraction when not anime content",
       },
       {
         label: "--channel",
         placeholder: "ID_OR_TAG",
-        description: "SPD channel",
       },
-      { label: "--usenet", description: "Upload files to Usenet (NNTP)" },
+      { label: "--usenet" },
       {
         label: "--usenet-subject",
         placeholder: "TEXT",
-        description: "Custom Usenet subject line",
       },
       {
         label: "--archive-password",
         placeholder: "PASSWORD or random",
-        description: "Override the Usenet 7z archive password for this run",
       },
       {
         label: "--usenet-episodes-only",
         placeholder: "CURUPIRA,NZBNEST",
-        description:
-          "Send episode NZBs, but not the final season pack, to these Usenet indexers",
       },
       {
         label: "--unattended",
@@ -1083,6 +985,35 @@ const argumentCategories = [
     ],
   },
 ];
+
+const cliArguments = Array.isArray(window.UA_CLI_ARGUMENTS)
+  ? window.UA_CLI_ARGUMENTS
+  : [];
+if (cliArguments.length > 0) {
+  const cliByLabel = new Map(cliArguments.map((arg) => [arg.label, arg]));
+  const listedFlags = new Set();
+  argumentCategories = argumentCategories.map((category) => ({
+    ...category,
+    args: category.args
+      .filter((item) => !item.label.startsWith("--") || cliByLabel.has(item.label))
+      .map((item) => {
+        const cli = cliByLabel.get(item.label);
+        if (!cli) return item; // WebUI command presets have their own instructions.
+        listedFlags.add(item.label);
+        return {
+          ...item,
+          description: cli.description || item.description,
+          placeholder: item.placeholder || cli.placeholder,
+        };
+      }),
+  }));
+  const remaining = cliArguments.filter(
+    (arg) => !listedFlags.has(arg.label) && arg.description,
+  );
+  if (remaining.length > 0) {
+    argumentCategories.push({ title: "Other CLI options", args: remaining });
+  }
+}
 
 // Icon components
 const WebUiIcon = ({ name, className = "w-5 h-5" }) => (
@@ -6315,7 +6246,9 @@ function AudionutsUAGUI() {
                       >
                         <span
                           className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${
-                            showSubtitleTracks ? "translate-x-6" : "translate-x-1"
+                            showSubtitleTracks
+                              ? "translate-x-6"
+                              : "translate-x-1"
                           }`}
                         />
                       </span>

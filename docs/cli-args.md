@@ -2,6 +2,8 @@
 
 This document describes the command-line arguments parsed in `src/args.py`.
 
+The WebUI argument picker reads available flags and help text from that same parser. `web_ui/static/js/app.js` only defines their grouping, example placeholders, and command presets. CLI options without a dedicated group appear under **Other CLI options** automatically. CLI startup flags such as `--webui` and `--paths-from-stdin` are excluded from the picker.
+
 ## Help output
 
 - `-h` shows a short/curated help (common options only).
@@ -115,12 +117,21 @@ Note: if a manual TMDb or IMDb id is present in the incoming `meta` before parsi
 - `-isbn`, `--isbn ISBN`: Override the detected ISBN.
 - `-author`, `--author NAME`: Override the detected author.
 - `-btitle`, `--book-title TITLE`: Override the detected book title.
+- `--book-narrator NAME`: Override the detected audiobook narrator.
+- `--genres GENRE[,GENRE...]`: Override the detected genres for any category.
+- `-ov`, `--overview TEXT`: Override the detected overview or synopsis for any category (`--book-overview` remains an alias).
+
+### Game metadata
+
+- `--game-title TITLE`: Override the detected game title.
+- `--developer NAME`: Override the detected game developer.
+- `-pub`, `--publisher NAME`: Override the game publisher.
 
 ### Tags / edition / language
 
 - `--name RELEASE_NAME`: Override the generated release name, including XXX release titles.
 - `--cast NAME[,NAME...]`: Override cast or XXX performers with a comma-separated list. This takes priority over detected metadata.
-- `-pub`, `--publisher NAME`: Override the book/audiobook publisher or XXX studio.
+- `-pub`, `--publisher NAME`: Override the book/audiobook or game publisher, or XXX studio.
 - `-g`, `--tag [GROUP ...]`: Group tag.
   - Stored with a leading dash, e.g. `-g NTb` → `-NTb`.
 - `-serv`, `--service [SERVICE ...]`: Streaming service.
@@ -172,7 +183,7 @@ Note: if a manual TMDb or IMDb id is present in the incoming `meta` before parsi
 These accept either an id or a full URL; when a URL is provided, the parser attempts to extract the id.
 These will parse the torrent descriptions from supported sites, and grab metadata ids to assist with accuracy.
 
-- `--tracker-id TRACKER=ID_OR_URL`: Generic tracker torrent ID; repeat for multiple trackers. Also accepts a tracker torrent URL directly, for example `--tracker-id https://aither.cc/torrents/1234`.
+- `--tracker-id TRACKER=ID_OR_URL`: Generic tracker torrent ID; repeat for multiple trackers. Example: `--tracker-id AITHER=1234`. It also accepts a tracker torrent URL directly, for example `--tracker-id https://aither.cc/torrents/1234`.
 
 Thise will use the specified hash to get tracker ids from qBitTorrent or rTorrent.
 

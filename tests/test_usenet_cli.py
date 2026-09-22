@@ -54,7 +54,8 @@ def test_book_overview_cli_override_short_flag(tmp_path):
 
 
 def test_overview_cli_override_alias_flag(tmp_path):
-    meta, _, _ = Args({"DEFAULT": {"screens": 1}}).parse([str(tmp_path), "--overview", "Alias synopsis"], Meta())
+    meta, _, _ = Args({"DEFAULT": {"screens": 1}}).parse([str(tmp_path), "--overview", "Alias synopsis"], Meta(category="GAME"))
 
     assert meta.overview == "Alias synopsis"
+    assert meta.manual_overview == "Alias synopsis"
     assert meta.book_overview == "Alias synopsis"

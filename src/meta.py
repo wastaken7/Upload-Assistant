@@ -80,6 +80,7 @@ class Meta:
     book_isbn: str | None = None
     book_language_iso: str = ""
     book_language: str = ""
+    book_narrator: str | None = None
     book_overview: str | None = None
     book_publisher: str | None = None
     book_series_index: str = ""
@@ -201,6 +202,8 @@ class Meta:
     game_subcategory: str = ""
     game_system: str = ""
     game_status: str = ""
+    game_title: str | None = None
+    game_developer: str | None = None
     game_themes: list[str] = field(default_factory=list)
     game_time_to_beat: dict[str, int] = field(default_factory=dict)
     game_type: str = ""
@@ -208,6 +211,8 @@ class Meta:
     genre_ids: int | None = None
     genre: str = ""
     genres: list[str] = field(default_factory=list)
+    manual_genres: str | None = None
+    manual_overview: str | None = None
     hardcoded_subs: bool = False
     hardcoded_subs_language: str | None = None
     has_commentary: bool = False

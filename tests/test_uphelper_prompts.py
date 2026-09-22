@@ -192,3 +192,93 @@ async def test_book_confirmation_explains_how_to_add_missing_audible_marketplace
     assert "Audible URL" in messages[0]
     assert "--audible-url" in messages[0]
     assert "DEFAULT.audible_domain" in messages[0]
+
+
+@pytest.mark.parametrize(
+    ("service_longname", "expected"),
+    [("Storytel", "Storytel"), ("", "⚠️ Missing")],
+)
+@pytest.mark.asyncio
+async def test_book_confirmation_shows_service_or_missing(monkeypatch: pytest.MonkeyPatch, service_longname: str, expected: str) -> None:
+    messages: list[str] = []
+    monkeypatch.setattr("src.uphelper.logger.info", lambda message, **_kwargs: messages.append(message))
+
+    meta = Meta(category="BOOK", service_longname=service_longname, unattended=True)
+
+    assert await UploadHelper({"DEFAULT": {}}).get_confirmation(meta) is True
+    service_line = next(line for line in messages[0].splitlines() if "[bold cyan]Service[/bold cyan]" in line)
+    assert expected in service_line
+
+
+@pytest.mark.parametrize(
+    ("category", "hints"),
+    [
+        ("BOOK", {"Title": "--book-title", "Author": "--author", "Language": "--book-language", "Service": "--service", "Genre": "--genres", "Cover": "--poster"}),
+        (
+            "GAME",
+            {
+                "Title": "--game-title",
+                "Subcategory": "--game-subcategory",
+                "Version": "--game-version",
+                "Developer": "--developer",
+                "Publisher": "--publisher",
+                "Overview": "--overview",
+                "Genre": "--genres",
+                "Platform": "--platform",
+                "Cover": "--poster",
+            },
+        ),
+        (
+            "MUSIC",
+            {
+                "Title": "--music-album",
+                "Artist": "--music-artist",
+                "Album": "--music-album",
+                "Original Year": "--year",
+                "Release Type": "--music-release-type",
+                "Media": "--music-media",
+                "Genre": "--genres",
+            },
+        ),
+        ("TV", {"Title": "--tmdb", "Resolution": "--resolution", "Source": "--source", "Type": "--type", "Genre": "--genres"}),
+        ("MOVIE", {"Title": "--tmdb", "Resolution": "--resolution", "Source": "--source", "Type": "--type", "Genre": "--genres"}),
+        ("XXX", {"Title": "release filename", "Resolution": "--resolution", "Source": "--source", "Type": "--type"}),
+    ],
+)
+@pytest.mark.asyncio
+async def test_confirmation_gives_category_specific_hints_for_missing_fields(monkeypatch: pytest.MonkeyPatch, category: str, hints: dict[str, str]) -> None:
+    messages: list[str] = []
+    monkeypatch.setattr("src.uphelper.logger.info", lambda message, **_kwargs: messages.append(message))
+
+    assert await UploadHelper({"DEFAULT": {}}).get_confirmation(Meta(category=category, unattended=True)) is True
+
+    for label, hint in hints.items():
+        line = next(line for line in messages[0].splitlines() if f"[bold cyan]{label}[/bold cyan]" in line)
+        assert "⚠️ Missing" in line
+        assert hint in line
+
+
+@pytest.mark.asyncio
+async def test_disc_confirmation_explains_missing_region_and_distributor(monkeypatch: pytest.MonkeyPatch) -> None:
+    messages: list[str] = []
+    monkeypatch.setattr("src.uphelper.logger.info", lambda message, **_kwargs: messages.append(message))
+
+    assert await UploadHelper({"DEFAULT": {}}).get_confirmation(Meta(category="MOVIE", is_disc="BDMV", unattended=True)) is True
+
+    assert "--region" in next(line for line in messages[0].splitlines() if "[bold cyan]Region[/bold cyan]" in line)
+    assert "--distributor" in next(line for line in messages[0].splitlines() if "[bold cyan]Distributor[/bold cyan]" in line)
+
+
+@pytest.mark.asyncio
+async def test_book_confirmation_gives_discreet_hints_for_optional_fields(monkeypatch: pytest.MonkeyPatch) -> None:
+    messages: list[str] = []
+    monkeypatch.setattr("src.uphelper.logger.info", lambda message, **_kwargs: messages.append(message))
+
+    assert await UploadHelper({"DEFAULT": {}}).get_confirmation(Meta(category="BOOK", unattended=True)) is True
+
+    for label, hint in {"Publisher": "--publisher", "ISBN": "--isbn", "ASIN": "--asin", "Keywords": "--keywords", "Edition": "--edition"}.items():
+        line = next(line for line in messages[0].splitlines() if f"[bold cyan]{label}[/bold cyan]" in line)
+        assert "Not set" in line
+        assert hint in line
+        assert "⚠️ Missing" not in line
+    assert "Audible URL" not in messages[0]

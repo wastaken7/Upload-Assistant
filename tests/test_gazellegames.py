@@ -389,6 +389,22 @@ def test_gazelle_enrichment_works_without_twitch_credentials(tmp_path, monkeypat
     assert meta.localized_overviews == {"brazilian": "Descrição Steam"}  # noqa: S101
     gazellegames_manager.search_groups.assert_not_awaited()  # type: ignore[attr-defined]
 
+    manual_meta = Meta(
+        path=str(tmp_path / "The.Troma.Project-HI2U"),
+        filename="The Troma Project",
+        filelist=[],
+        torrent_comments=[{"comment": "https://gazellegames.net/torrents.php?torrentid=46720"}],
+        unattended=True,
+        trackers=["BJSHARE"],
+        manual_overview="Manual overview",
+        localized_overviews={"brazilian": "Stale overview"},
+    )
+    asyncio.run(gather_game_prep(manual_meta, str(manual_meta.path), str(tmp_path), config))
+
+    assert manual_meta.overview == "Manual overview"  # noqa: S101
+    assert manual_meta.localized_overviews == {}  # noqa: S101
+    assert manual_meta.requirements_minimum == "Minimum specs"  # noqa: S101
+
 
 def test_exact_comment_lookup_does_not_require_a_search_title(tmp_path, monkeypatch):
     payload = {"group": {"name": "Comment Match", "year": 2000, "platform": "Windows"}, "torrent": {"releaseType": "Full ISO"}}
@@ -469,7 +485,14 @@ def test_igdb_search_hydrates_selected_game_and_time_to_beat(tmp_path, monkeypat
 
         async def fetch_game_by_id(self, game_id):
             assert game_id == "7"  # noqa: S101
-            return {"id": 7, "name": "Game", "url": "https://www.igdb.com/games/game", "summary": "Detailed overview", "game_modes": [{"name": "Single player"}], "platforms": [{"name": "PC (Microsoft Windows)"}]}
+            return {
+                "id": 7,
+                "name": "Game",
+                "url": "https://www.igdb.com/games/game",
+                "summary": "Detailed overview",
+                "game_modes": [{"name": "Single player"}],
+                "platforms": [{"name": "PC (Microsoft Windows)"}],
+            }
 
         async def fetch_game_by_steam_id(self, _steam_id):
             return None
