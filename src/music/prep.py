@@ -333,6 +333,10 @@ def _sync_release_to_meta(meta: Meta, release: MusicRelease) -> None:
     meta.source = str(release.get("media", meta.source or "")) or meta.source
     meta.scene = bool(release.get("scene", meta.scene))
     meta.genres = list(release.get("genres", meta.genres)) if isinstance(release.get("genres", meta.genres), list) else meta.genres
+    if meta.manual_genres:
+        meta.genres = [genre.strip() for genre in meta.manual_genres.split(",") if genre.strip()]
+    if meta.manual_overview:
+        meta.overview = meta.manual_overview.strip()
     meta.audio = f"{meta.format} / {release.get('disc_count', 1)} disc(s) / {release.get('track_count', 0)} track(s)"
     meta.filelist = [track.path for track in release.tracks]
     meta.name_notag = _music_name(release)

@@ -7,6 +7,7 @@ import re
 import sys
 import urllib.parse
 from collections.abc import Mapping, Sequence
+from functools import lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, TextIO
 
@@ -40,6 +41,7 @@ MUSIC_RELEASE_TYPE_CHOICES = (
 )
 
 PATHS_FROM_STDIN_OPTION = "--paths-from-stdin"
+WEBUI_UNSUPPORTED_OPTIONS = {"--help", "--webui", PATHS_FROM_STDIN_OPTION}
 TRACKER_CONFIGURATION_KEYS = ("api_key", "auth_key", "username", "password", "passkey", "cookie_file", "cookies", "ApiUser", "bioma_api_key", "ptgen_api")
 
 
@@ -172,7 +174,9 @@ Common options:
   -mf, --manual_frames       Comma-separated list of frame numbers to use for screenshots
   --description              Inline custom description block
   -df, --descfile            Path to custom description file
-  -boverview, --book-overview  Book/Audiobook overview/synopsis (overrides auto-detected value)
+  -ov, --overview            Overview/synopsis override for any category
+  --genres                   Comma-separated genre override for any category
+  --tracker-id               Tracker torrent ID (example: --tracker-id AITHER=1234)
   -serv, --service           Streaming service
   --no-aka                   Remove AKA from title
   -daily, --daily            Air date of a daily type episode (YYYY-MM-DD)
@@ -202,6 +206,24 @@ class CustomArgumentParser(argparse.ArgumentParser):
         else:
             short_parser = argparse.ArgumentParser(formatter_class=ShortHelpFormatter, add_help=False, usage="upload.py [path...] [options]")
             short_parser.print_help(file)
+
+
+@lru_cache(maxsize=1)
+def cli_argument_catalog() -> tuple[dict[str, str], ...]:
+    """Expose the parser's actual long options and help text to the WebUI."""
+    from src.meta import Meta
+
+    _, parser, _ = Args({"DEFAULT": {"screens": 1}}).parse(["--webui"], Meta())
+    catalog = []
+    for action in parser._actions:
+        for option in action.option_strings:
+            if not option.startswith("--") or option in WEBUI_UNSUPPORTED_OPTIONS:
+                continue
+            item = {"label": option, "description": "" if action.help == argparse.SUPPRESS else str(action.help or "")}
+            if action.nargs != 0:
+                item["placeholder"] = str(action.metavar or action.dest).upper()
+            catalog.append(item)
+    return tuple(catalog)
 
 
 class Args:
@@ -552,6 +574,8 @@ class Args:
         parser.add_argument("-year", "--year", dest="manual_year", nargs=1, required=False, help="Override the year found", default=0)
         parser.add_argument("-author", "--author", nargs="*", required=False, help="Book/Audiobook author name (overrides auto-detected value)", type=str, dest="book_author")
         parser.add_argument("-btitle", "--book-title", nargs="*", required=False, help="Book/Audiobook title (overrides auto-detected value)", type=str, dest="book_title")
+        parser.add_argument("--book-narrator", nargs="*", required=False, help="Book/Audiobook narrator (overrides auto-detected value)", dest="book_narrator")
+        parser.add_argument("--genres", nargs="*", required=False, help="Genres, comma-separated (overrides auto-detected values for any category)", dest="manual_genres")
         parser.add_argument("--comic", "-comic", action="store_true", required=False, help="Identify the book upload as a Comic", dest="comic", default=False)
         parser.add_argument("--manga", "-manga", action="store_true", required=False, help="Identify the book upload as a Manga", dest="manga", default=False)
         parser.add_argument("--magazine", "-magazine", action="store_true", required=False, help="Identify the book upload as a Magazine", dest="magazine", default=False)
@@ -614,7 +638,7 @@ class Args:
             "--publisher",
             nargs="*",
             required=False,
-            help="Book/Audiobook publisher or XXX studio (overrides auto-detected value)",
+            help="Book/Audiobook or GAME publisher, or XXX studio (overrides auto-detected value)",
             type=str,
             dest="book_publisher",
         )
@@ -630,6 +654,8 @@ class Args:
             dest="manual_platform",
         )
         action_plat.completer = platform_completer
+        parser.add_argument("--game-title", nargs="*", required=False, help="GAME title (overrides auto-detected value)", dest="game_title")
+        parser.add_argument("--developer", nargs="*", required=False, help="GAME developer (overrides auto-detected value)", dest="game_developer")
         parser.add_argument(
             "-gv",
             "--game-version",
@@ -681,7 +707,7 @@ class Args:
             "--tracker-id",
             action="append",
             metavar="TRACKER=ID|URL",
-            help="Tracker torrent ID, as TRACKER=ID, TRACKER=URL, or a tracker torrent URL. May be repeated.",
+            help="Tracker torrent ID, as TRACKER=ID, TRACKER=URL, or a tracker torrent URL. May be repeated. Example: --tracker-id AITHER=1234",
         )
         parser.add_argument("-req", "--search_requests", action="store_true", required=False, help="Search for matching requests on supported trackers", default=None)
         parser.add_argument("-sat", "--skip_auto_torrent", action="store_true", required=False, help="Skip automated qbittorrent client torrent searching", default=None)
@@ -744,10 +770,10 @@ class Args:
             "--book-overview",
             "-ov",
             "--overview",
-            dest="book_overview",
+            dest="manual_overview",
             nargs="*",
             required=False,
-            help="Book/Audiobook overview/synopsis (overrides auto-detected value)",
+            help="Overview/synopsis (overrides the auto-detected value for any category)",
             type=str,
         )
         parser.add_argument(
@@ -1299,7 +1325,7 @@ class Args:
         # used by trackers like CAPYBARABR when constructing the torrent name for BOOK category.
         self._apply_book_meta_overrides(meta)
 
-        # Apply game metadata overrides: --platform maps to platforms key
+        # Apply game metadata overrides to the fields used by trackers.
         self._apply_game_meta_overrides(meta)
 
         return meta, parser, before_args
@@ -1314,7 +1340,7 @@ class Args:
         *langcodes* so both a human-readable name and the ISO 639-3 code are stored.
         Falls back gracefully when *langcodes* is unavailable or the code is unknown.
         """
-        book_overview_arg = meta.book_overview or meta.overview
+        book_overview_arg = meta.manual_overview or meta.book_overview or meta.overview
         if book_overview_arg not in (None, "", []):
             overview_str = " ".join(str(x) for x in book_overview_arg if str(x)).strip() if isinstance(book_overview_arg, list) else str(book_overview_arg).strip()
             meta.overview = overview_str
@@ -1330,6 +1356,12 @@ class Args:
         book_title_arg = meta.book_title
         if book_title_arg not in (None, ""):
             meta.title = str(book_title_arg).strip()
+
+        if meta.book_narrator:
+            meta.narrator = meta.book_narrator.strip()
+
+        if meta.manual_genres:
+            meta.genres = [genre.strip() for genre in meta.manual_genres.split(",") if genre.strip()]
 
         book_isbn_arg = meta.book_isbn
         if book_isbn_arg not in (None, ""):
@@ -1403,7 +1435,14 @@ class Args:
 
     @staticmethod
     def _apply_game_meta_overrides(meta: Meta) -> None:
-        """Normalise CLI game arguments (--platform) into *meta*."""
+        """Normalise CLI game arguments into the fields used by trackers."""
+        if meta.game_title:
+            meta.title = meta.game_title.strip()
+        if meta.game_developer:
+            meta.developer = meta.game_developer.strip()
+        if meta.manual_overview:
+            meta.overview = meta.manual_overview.strip()
+
         manual_platform_arg = meta.manual_platform
         if manual_platform_arg not in (None, ""):
             plat = str(manual_platform_arg).strip().lower()

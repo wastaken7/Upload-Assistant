@@ -241,6 +241,13 @@ class Prep:
 
         await languages_manager.process_desc_language(meta)
 
+        if meta.manual_overview:
+            meta.overview = meta.manual_overview.strip()
+            if meta.category == "GAME":
+                meta.localized_overviews = {}
+        if meta.manual_genres:
+            meta.genres = [genre.strip() for genre in meta.manual_genres.split(",") if genre.strip()]
+
         # Ensure the background capture is complete before the upload stage
         # starts consuming the generated files. Any error is logged by the
         # helper; the existing upload-stage capture remains the fallback.

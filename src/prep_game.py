@@ -273,7 +273,7 @@ def apply_gazelle_metadata(meta: Meta, metadata: dict[str, Any], manual: dict[st
     set_field("game_version", protected_by="version", transform=lambda value: normalize_version(str(value)))
     set_field("game_subcategory", protected_by="subcategory")
     for field in ("overview", "genres", "keywords", "developer", "publisher", "languages"):
-        set_field(field)
+        set_field(field, protected_by=field)
     set_field("steam_url", protected_by="steam")
     for field in (
         "game_official_url",
@@ -606,7 +606,7 @@ async def enrich_game_from_steam(
                 desc = app_data.get("short_description") or app_data.get("about_the_game") or app_data.get("detailed_description") or ""
                 desc_clean = re.sub(r"<[^>]+>", "", desc).strip()
                 desc_unescaped = html.unescape(desc_clean)
-                if desc_unescaped:
+                if desc_unescaped and not meta.manual_overview:
                     meta.localized_overviews = {"brazilian": desc_unescaped}
 
             pc_reqs = app_data.get("pc_requirements", {})
@@ -803,6 +803,18 @@ async def gather_game_prep(
     meta.sd = 0
     meta.valid_mi_settings = True
 
+    if meta.game_title:
+        meta.title = meta.game_title.strip()
+    if meta.game_developer:
+        meta.developer = meta.game_developer.strip()
+    if meta.manual_overview:
+        meta.overview = meta.manual_overview.strip()
+        meta.localized_overviews = {}
+    if meta.manual_genres:
+        meta.genres = [genre.strip() for genre in meta.manual_genres.split(",") if genre.strip()]
+    if meta.book_publisher:
+        meta.publisher = meta.book_publisher.strip()
+
     cli_overrides = {
         "title": bool(meta.title),
         "year": bool(meta.manual_year or 0),
@@ -810,6 +822,10 @@ async def gather_game_prep(
         "version": bool(meta.game_version),
         "subcategory": bool(meta.game_subcategory),
         "steam": bool(meta.steam_manual),
+        "overview": bool(meta.manual_overview),
+        "genres": bool(meta.manual_genres),
+        "developer": bool(meta.game_developer),
+        "publisher": bool(meta.book_publisher),
     }
 
     # Run platform auto-detection early if platform is not manually specified
@@ -1102,7 +1118,7 @@ async def gather_game_prep(
     summary = selected_game.get("summary")
     storyline = selected_game.get("storyline")
     overview = summary or storyline or ""
-    if overview and "overview" not in ggn_fields:
+    if overview and not cli_overrides["overview"] and "overview" not in ggn_fields:
         meta.overview = overview
 
     # Cover image (poster)
@@ -1116,7 +1132,7 @@ async def gather_game_prep(
 
     # Genres
     genres = [g.get("name") for g in selected_game.get("genres", []) if g.get("name")]
-    if genres and "genres" not in ggn_fields:
+    if genres and not cli_overrides["genres"] and "genres" not in ggn_fields:
         meta.genres = genres
 
     # Platforms
@@ -1189,9 +1205,9 @@ async def gather_game_prep(
             if comp_info.get("publisher"):
                 publishers.append(comp_name)
 
-    if developers and "developer" not in ggn_fields:
+    if developers and not cli_overrides["developer"] and "developer" not in ggn_fields:
         meta.developer = ", ".join(developers)
-    if publishers and "publisher" not in ggn_fields:
+    if publishers and not cli_overrides["publisher"] and "publisher" not in ggn_fields:
         meta.publisher = ", ".join(publishers)
 
     # Extract Steam URL

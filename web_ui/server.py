@@ -36,6 +36,7 @@ import web_ui.auth as auth_mod
 from src.webui_progress import PROGRESS_STDOUT_PREFIX
 from src.prompt_sound import PROMPT_SOUND_STDOUT_MARKER
 from src.app_paths import CODE_DIR, DATA_DIR, STATE_DIR
+from src.args import cli_argument_catalog
 from src.external_tools import EXTERNAL_TOOL_KEYS, check_external_tools
 from src.meta import Meta
 from src.version import __version__
@@ -3882,6 +3883,7 @@ def index():
             "index.html",
             app_version=APP_VERSION,
             csrf_token=_ensure_csrf_token(),
+            cli_arguments=cli_argument_catalog(),
         )
     except Exception as e:
         console.print(f"Error loading template: {e}", markup=False)

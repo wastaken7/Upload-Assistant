@@ -238,6 +238,11 @@ async def gather_book_prep(
     meta.sd = 0
     meta.valid_mi_settings = True
 
+    if meta.book_narrator:
+        meta.narrator = meta.book_narrator.strip()
+    if meta.manual_genres:
+        meta.genres = [genre.strip() for genre in meta.manual_genres.split(",") if genre.strip()]
+
     # Warn if Google Books API key is missing
     api_key = ""
     if config and "DEFAULT" in config:
@@ -254,6 +259,8 @@ async def gather_book_prep(
     cli_overrides = {
         "title": bool(meta.book_title),
         "author": bool(meta.book_author),
+        "narrator": bool(meta.book_narrator),
+        "genres": bool(meta.manual_genres),
         "publisher": bool(meta.book_publisher),
         "isbn": bool(meta.book_isbn),
         "asin": bool(meta.book_asin),
@@ -580,6 +587,8 @@ async def gather_book_prep(
                         if (
                             (key == "title" and cli_overrides["title"])
                             or (key == "author" and cli_overrides["author"])
+                            or (key == "narrator" and cli_overrides["narrator"])
+                            or (key == "genres" and cli_overrides["genres"])
                             or (key == "publisher" and cli_overrides["publisher"])
                             or (key == "isbn" and cli_overrides["isbn"])
                             or (key == "asin" and cli_overrides["asin"])
@@ -619,6 +628,8 @@ async def gather_book_prep(
                         if (
                             (key == "title" and cli_overrides["title"])
                             or (key == "author" and cli_overrides["author"])
+                            or (key == "narrator" and cli_overrides["narrator"])
+                            or (key == "genres" and cli_overrides["genres"])
                             or (key == "publisher" and cli_overrides["publisher"])
                             or (key == "isbn" and cli_overrides["isbn"])
                             or (key == "asin" and cli_overrides["asin"])
@@ -667,6 +678,8 @@ async def gather_book_prep(
                 if (
                     (key == "title" and cli_overrides["title"])
                     or (key == "author" and cli_overrides["author"])
+                    or (key == "narrator" and cli_overrides["narrator"])
+                    or (key == "genres" and cli_overrides["genres"])
                     or (key == "publisher" and cli_overrides["publisher"])
                     or (key == "isbn" and cli_overrides["isbn"])
                     or (key == "asin" and cli_overrides["asin"])
