@@ -565,6 +565,7 @@ class UploadHelper:
         # BOOK
         if meta.category == "BOOK":
             author = meta.author or missing_warning
+            service = meta.service_longname or meta.service or missing_warning
             book_translator = meta.book_translator or ""
             publisher = meta.publisher or ""  # not essential
             book_language = meta.book_language or missing_warning
@@ -586,6 +587,7 @@ class UploadHelper:
                 lines.append(("Translator", book_translator))
             lines.append(("Publisher", publisher))
             lines.append(("Language", book_language))
+            lines.append(("Service", service))
             lines.append(("ISBN", isbn))
             lines.append(("ASIN", asin))
             if asin:

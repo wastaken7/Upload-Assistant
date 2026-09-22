@@ -72,6 +72,24 @@ def test_asin_remains_plain_text_without_user_provided_marketplace():
     assert "B01N5AX3TQ" in description
 
 
+@pytest.mark.parametrize(("language", "label"), [("en", "Service"), ("pt-BR", "Serviço")])
+def test_book_technical_details_include_service(language, label):
+    builder = DescriptionBuilder("TEST", {"DEFAULT": {}, "TRACKERS": {"TEST": {}}}, language=language)
+    meta = Meta(category="BOOK", author="Example Author", service_longname="Kobo Plus")
+
+    description = builder._build_book_desc_section(meta)
+
+    assert f"[tr][td][b]{label}[/b][/td][td]Kobo Plus[/td][/tr]" in description
+
+
+def test_book_technical_details_omit_unknown_service():
+    builder = DescriptionBuilder("TEST", {"DEFAULT": {}, "TRACKERS": {"TEST": {}}})
+
+    description = builder._build_book_desc_section(Meta(category="BOOK", author="Example Author"))
+
+    assert "[b]Service[/b]" not in description
+
+
 @pytest.mark.parametrize(
     ("service", "longname"),
     [

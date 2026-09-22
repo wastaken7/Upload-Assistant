@@ -192,3 +192,19 @@ async def test_book_confirmation_explains_how_to_add_missing_audible_marketplace
     assert "Audible URL" in messages[0]
     assert "--audible-url" in messages[0]
     assert "DEFAULT.audible_domain" in messages[0]
+
+
+@pytest.mark.parametrize(
+    ("service_longname", "expected"),
+    [("Storytel", "Storytel"), ("", "⚠️ Missing")],
+)
+@pytest.mark.asyncio
+async def test_book_confirmation_shows_service_or_missing(monkeypatch: pytest.MonkeyPatch, service_longname: str, expected: str) -> None:
+    messages: list[str] = []
+    monkeypatch.setattr("src.uphelper.logger.info", lambda message, **_kwargs: messages.append(message))
+
+    meta = Meta(category="BOOK", service_longname=service_longname, unattended=True)
+
+    assert await UploadHelper({"DEFAULT": {}}).get_confirmation(meta) is True
+    service_line = next(line for line in messages[0].splitlines() if "[bold cyan]Service[/bold cyan]" in line)
+    assert expected in service_line

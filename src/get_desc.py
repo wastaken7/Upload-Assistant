@@ -861,6 +861,7 @@ class DescriptionBuilder:
         str_narrator = labels["narrator"]
         str_overview = labels["overview"]
         str_publisher = labels["publisher"]
+        str_service = labels["service"]
         str_technical_details = labels["technical_details"]
         str_year = labels["year"]
 
@@ -879,6 +880,9 @@ class DescriptionBuilder:
             fields.append((str_narrator, narrator))
         if publisher:
             fields.append((str_publisher, publisher))
+        service = meta.service_longname or meta.service
+        if service:
+            fields.append((str_service, service))
         if isbn:
             fields.append((str_isbn, isbn))
         if asin:
