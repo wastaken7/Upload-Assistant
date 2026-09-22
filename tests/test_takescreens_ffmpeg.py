@@ -193,6 +193,7 @@ async def test_dvd_screenshots_uses_complete_title_set(monkeypatch, tmp_path):
     main_set = ["01_0.VOB", "01_1.VOB", "01_2.VOB", "01_3.VOB"]
     durations = {"01_1.VOB": 1200.0, "01_2.VOB": 1200.0, "01_3.VOB": 600.0}
     captured: list[tuple[int, str, str]] = []
+    scaling_choices = []
 
     def parse_stub(path, output=None, **_kwargs):
         if output == "JSON":
@@ -218,7 +219,13 @@ async def test_dvd_screenshots_uses_complete_title_set(monkeypatch, tmp_path):
     monkeypatch.setattr(takescreens, "valid_ss_time", valid_times_stub)
     monkeypatch.setattr(takescreens, "capture_dvd_screenshot", capture_stub)
     monkeypatch.setattr(takescreens, "register_screenshots", lambda *_args: [])
-    monkeypatch.setattr(takescreens, "screenshot_par_scale_factors", lambda *_args: (1.0, 1.0))
+    monkeypatch.setattr(takescreens, "default_config", {"scale_screenshots_for_par": False, "scale_dvd_screenshots_for_par": True})
+
+    def scale_stub(_width, _height, _par, _dar, enabled):
+        scaling_choices.append(enabled)
+        return 1.0, 1.0
+
+    monkeypatch.setattr(takescreens, "screenshot_par_scale_factors", scale_stub)
 
     meta = Meta(
         base_dir=str(tmp_path),
@@ -237,3 +244,121 @@ async def test_dvd_screenshots_uses_complete_title_set(monkeypatch, tmp_path):
     expected_source = "concat:" + "|".join(str(disc_path / f"VTS_{vob}") for vob in main_set[1:])
     assert [source for _index, source, _time in captured] == [expected_source] * 3
     assert [time for _index, _source, time in captured] == ["100", "1500", "2700"]
+    assert scaling_choices == [True]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("retry_succeeds", [False, True])
+async def test_dvd_retake_preserves_original_until_replacement_is_valid(monkeypatch, tmp_path, retry_succeeds):
+    disc_path = tmp_path / "VIDEO_TS"
+    disc_path.mkdir()
+    original = tmp_path / "tmp" / "dvd-retake" / "screenshots" / "DVD-0.png"
+    original.parent.mkdir(parents=True)
+    attempts = []
+    registered = []
+
+    def parse_stub(_path, output=None, **_kwargs):
+        if output == "JSON":
+            return json.dumps({"media": {"track": [{"Duration": 600, "Width": 720, "Height": 480}]}})
+        return SimpleNamespace(
+            tracks=[SimpleNamespace(track_type="Video", duration="600000", pixel_aspect_ratio="1", display_aspect_ratio="1.5", width="720", height="480", frame_rate="24")]
+        )
+
+    async def capture_stub(task):
+        index, _source, image, *_rest = task
+        if image.endswith("-retry.png"):
+            assert original.read_bytes() == b"x" * 100000
+            attempts.append(image)
+            if retry_succeeds:
+                Path(image).write_bytes(b"y" * 80000)
+                return index, image
+            return index, None
+        Path(image).write_bytes(b"x" * (100000 if index == 0 else 50000))
+        return index, image
+
+    async def valid_times_stub(*_args, **_kwargs):
+        return ["100", "200"]
+
+    def register_stub(_base_dir, _uuid, paths, _group):
+        registered.extend(paths)
+        return []
+
+    monkeypatch.setattr(takescreens.MediaInfo, "parse", parse_stub)
+    monkeypatch.setattr(takescreens, "valid_ss_time", valid_times_stub)
+    monkeypatch.setattr(takescreens, "capture_dvd_screenshot", capture_stub)
+    monkeypatch.setattr(takescreens, "register_screenshots", register_stub)
+    monkeypatch.setattr(takescreens, "screenshot_par_scale_factors", lambda *_args: (1.0, 1.0))
+
+    meta = Meta(
+        base_dir=str(tmp_path),
+        uuid="dvd-retake",
+        screens=1,
+        discs=[{"name": "DVD", "path": str(disc_path), "main_set": ["01_1.VOB"]}],
+        image_list=[],
+        retake=False,
+        frame_overlay=False,
+        tv_pack=False,
+        debug=False,
+        ffdebug=False,
+    )
+    await takescreens.dvd_screenshots(meta, 0, cleanup_after_capture=False)
+
+    assert len(attempts) == (1 if retry_succeeds else 3)
+    assert original.read_bytes() == (b"y" * 80000 if retry_succeeds else b"x" * 100000)
+    assert not Path(attempts[0]).exists()
+    assert registered == ([str(original)] if retry_succeeds else [])
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("retry_succeeds", [False, True])
+async def test_video_retake_preserves_original_until_replacement_is_valid(monkeypatch, tmp_path, retry_succeeds):
+    release_dir = tmp_path / "tmp" / "video-retake"
+    screenshot_dir = release_dir / "screenshots"
+    screenshot_dir.mkdir(parents=True)
+    (release_dir / "MediaInfo.json").write_text(
+        json.dumps({"media": {"track": [{"Duration": 600}, {"Duration": 600, "Width": 720, "Height": 480, "FrameRate": 24}]}}), encoding="utf-8"
+    )
+    source = tmp_path / "source.mkv"
+    source.write_bytes(b"video")
+    original = screenshot_dir / "Video-0.png"
+    attempts = []
+    registered = []
+
+    async def image_host_stub(_meta):
+        return "imgbb"
+
+    async def valid_times_stub(*_args, **_kwargs):
+        return ["100"]
+
+    async def tonemapping_stub(*_args):
+        return False
+
+    async def capture_stub(args):
+        index, _source, _time, image, *_rest = args
+        if image.endswith("-retry.png"):
+            assert original.read_bytes() == b"x" * 50000
+            attempts.append(image)
+            if retry_succeeds:
+                Path(image).write_bytes(b"y" * 80000)
+                return index, image
+            return index, None
+        Path(image).write_bytes(b"x" * 50000)
+        return index, image
+
+    def register_stub(_base_dir, _uuid, paths, _group):
+        registered.extend(paths)
+        return []
+
+    monkeypatch.setattr(takescreens, "get_image_host", image_host_stub)
+    monkeypatch.setattr(takescreens, "valid_ss_time", valid_times_stub)
+    monkeypatch.setattr(takescreens, "determine_tonemapping", tonemapping_stub)
+    monkeypatch.setattr(takescreens, "capture_screenshot", capture_stub)
+    monkeypatch.setattr(takescreens, "register_screenshots", register_stub)
+
+    meta = Meta(category="MOVIE", base_dir=str(tmp_path), uuid="video-retake", screens=1, image_list=[], retake=False, debug=False, ffdebug=False)
+    await takescreens.screenshots(str(source), "Video", "video-retake", str(tmp_path), meta, cleanup_after_capture=False)
+
+    assert len(attempts) == (1 if retry_succeeds else 25)
+    assert original.read_bytes() == (b"y" * 80000 if retry_succeeds else b"x" * 50000)
+    assert not Path(attempts[0]).exists()
+    assert registered == ([str(original)] if retry_succeeds else [])

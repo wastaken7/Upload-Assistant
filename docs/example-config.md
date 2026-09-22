@@ -116,6 +116,7 @@ Implementation notes:
 - `overlay_position` (str, default `"left"`): Place labels at the top-left (`"left"`) or top-right (`"right"`).
 - `overlay_layout` (str, default `"stacked"`): Use separate lines (`"stacked"`) or a compact row separated by bullets (`"single_line"`).
 - `scale_screenshots_for_par` (bool): When `False` (the default), preserve MediaInfo's coded dimensions. Set to `True` only to apply pixel-aspect-ratio correction for non-square-pixel sources; this can change a PNG from `1920x1040` to `1924x1040`.
+- `scale_dvd_screenshots_for_par` (bool): Apply PAR scaling to DVD screenshots and automatically captured DVD menus. Defaults to `True` for display-corrected dimensions; set to `False` to preserve coded dimensions. This setting is independent of `scale_screenshots_for_par`.
 
 See the [frame and screenshot overlay guide](screenshot-overlays.md) for help configuring **Frame Number, Frame Type, Timestamp and Tonemapped labels**. It includes images of stacked and single-line overlays, a copyable config example and guidance for existing configs.
 

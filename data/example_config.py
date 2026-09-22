@@ -269,6 +269,9 @@ config: dict[str, Any] = {
         # Set to True only to convert non-square-pixel video to its display geometry.
         # This can change dimensions such as 1920x1040 to 1924x1040.
         "scale_screenshots_for_par": False,
+        # Apply PAR scaling to DVD screenshots and DVD menu captures by default.
+        # Set to False to keep their coded dimensions instead.
+        "scale_dvd_screenshots_for_par": True,
         # Maximum number of FFmpeg processes that can run at once.
         # The effective limit is the lower of this value and the number of screenshots.
         "process_limit": "4",

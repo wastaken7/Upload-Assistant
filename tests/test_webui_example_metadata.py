@@ -195,6 +195,30 @@ def test_config_update_removes_all_optional_arr_instance_keys(
     assert updated_config == {"DEFAULT": {}}
 
 
+def test_config_update_accepts_dvd_par_boolean(tmp_path: Path, monkeypatch) -> None:
+    code_dir = tmp_path / "code"
+    state_dir = tmp_path / "state"
+    (code_dir / "data").mkdir(parents=True)
+    (state_dir / "data").mkdir(parents=True)
+    (code_dir / "data" / "example_config.py").write_text("config = {'DEFAULT': {'scale_dvd_screenshots_for_par': True}}\n", encoding="utf-8")
+    config_path = state_dir / "data" / "config.py"
+    config_path.write_text("config = {'DEFAULT': {}}\n", encoding="utf-8")
+    monkeypatch.setattr(server, "CODE_DIR", code_dir)
+    monkeypatch.setattr(server, "STATE_DIR", state_dir)
+    monkeypatch.setattr(server, "_is_authenticated", lambda: True)
+    monkeypatch.setattr(server, "_verify_csrf_header", lambda: True)
+    monkeypatch.setattr(server, "_verify_same_origin", lambda: True)
+    monkeypatch.setattr(server, "_write_audit_log", lambda *_args, **_kwargs: None)
+
+    for value, expected in ((True, True), (False, False)):
+        with server.app.test_request_context(
+            "/api/config_update", method="POST", json={"path": ["DEFAULT", "scale_dvd_screenshots_for_par"], "value": value}
+        ):
+            response = server.config_update()
+        assert response.get_json()["success"] is True
+        assert server._load_config_from_file(config_path)["DEFAULT"]["scale_dvd_screenshots_for_par"] is expected
+
+
 def test_torrent_client_template_prefers_primary_qbittorrent_example() -> None:
     example_clients = {
         "qbittorrent_searching": {"torrent_client": "qbit", "host": "searching"},
