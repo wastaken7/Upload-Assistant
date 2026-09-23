@@ -163,44 +163,34 @@ async def prepare_usenet_episode_screenshots(meta: Meta, config: dict[str, Any])
     from src.takescreens import TakeScreensManager
     from src.uploadscreens import UploadScreensManager
 
-    try:
-        previous_cwd = Path.cwd()
-    except OSError:
-        previous_cwd = Path(meta.base_dir)
+    logger.info(f"[cyan]{meta.name}: capturing {requested} episode screenshot(s)...[/cyan]")
+    captured = await TakeScreensManager(config).screenshots(
+        str(media_source),
+        media_source.name,
+        meta.uuid,
+        meta.base_dir,
+        meta,
+        num_screens=requested,
+        cleanup_after_capture=False,
+    )
+    capture_paths = list(captured or [])
+    if len(capture_paths) < requested:
+        raise RuntimeError(f"Only {len(capture_paths)}/{requested} screenshots were captured for {meta.name}")
 
-    try:
-        logger.info(f"[cyan]{meta.name}: capturing {requested} episode screenshot(s)...[/cyan]")
-        captured = await TakeScreensManager(config).screenshots(
-            str(media_source),
-            media_source.name,
-            meta.uuid,
-            meta.base_dir,
-            meta,
-            num_screens=requested,
-            cleanup_after_capture=False,
-        )
-        capture_paths = list(captured or [])
-        if len(capture_paths) < requested:
-            raise RuntimeError(f"Only {len(capture_paths)}/{requested} screenshots were captured for {meta.name}")
-
-        uploaded, uploaded_count = await UploadScreensManager(config).upload_screens(
-            meta,
-            requested,
-            1,
-            0,
-            requested,
-            capture_paths[:requested],
-            {},
-        )
-        if uploaded_count < requested:
-            raise RuntimeError(f"Only {uploaded_count}/{requested} screenshots were hosted for {meta.name}")
-        meta.image_list = uploaded[:requested]
-        logger.info(f"[green]{meta.name}: {requested} episode screenshot(s) hosted successfully.[/green]")
-        return requested
-    finally:
-        restore_cwd = previous_cwd if previous_cwd.is_dir() else Path(meta.base_dir)
-        with contextlib.suppress(OSError):
-            os.chdir(restore_cwd)
+    uploaded, uploaded_count = await UploadScreensManager(config).upload_screens(
+        meta,
+        requested,
+        1,
+        0,
+        requested,
+        capture_paths[:requested],
+        {},
+    )
+    if uploaded_count < requested:
+        raise RuntimeError(f"Only {uploaded_count}/{requested} screenshots were hosted for {meta.name}")
+    meta.image_list = uploaded[:requested]
+    logger.info(f"[green]{meta.name}: {requested} episode screenshot(s) hosted successfully.[/green]")
+    return requested
 
 
 def select_usenet_indexers_for_submission(trackers: list[str], episodes_only_trackers: set[str], *, is_pack: bool) -> list[str]:

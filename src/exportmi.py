@@ -164,7 +164,7 @@ async def mi_resolution(
 
 async def export_info(
     video: str,
-    isdir: bool,
+    isdir: bool,  # noqa: ARG001 - retained for existing callers
     folder_id: str,
     base_dir: str,
     is_dvd: bool = False,
@@ -415,9 +415,6 @@ async def export_info(
             logger.debug(f"[yellow]DVD processing on {current_platform} not supported with specialized MediaInfo[/yellow]")
 
     logger.debug("[bold yellow]Exporting MediaInfo...")
-    if not isdir:
-        os.chdir(Path(video).parent)
-
     media_info_json = ""
     if mediainfo_cmd and is_dvd:
         result: subprocess.CompletedProcess[str] | None = None

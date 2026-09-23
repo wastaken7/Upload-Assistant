@@ -432,7 +432,7 @@ async def test_episode_screenshots_capture_and_host_configured_count(tmp_path: P
 
 
 @pytest.mark.asyncio
-async def test_episode_screenshots_restore_working_directory(tmp_path: Path, monkeypatch) -> None:
+async def test_episode_screenshots_keep_working_directory(tmp_path: Path, monkeypatch) -> None:
     starting_dir = tmp_path / "working"
     screenshot_dir = tmp_path / "tmp" / "episode-screens" / "screenshots"
     starting_dir.mkdir()
@@ -444,7 +444,6 @@ async def test_episode_screenshots_restore_working_directory(tmp_path: Path, mon
     monkeypatch.chdir(starting_dir)
 
     async def upload_from_screenshot_dir(*_args, **_kwargs):
-        os.chdir(screenshot_dir)
         return ([{"img_url": "thumb", "raw_url": "raw", "web_url": "web"}], 1)
 
     monkeypatch.setattr("src.takescreens.TakeScreensManager.screenshots", AsyncMock(return_value=[str(capture)]))
