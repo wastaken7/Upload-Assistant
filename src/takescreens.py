@@ -964,13 +964,17 @@ async def dvd_screenshots(
 
         if not dvd_screenshot_has_content(image):
             logger.info(f"[yellow]Image {image} is blank or unreadable, retaking.[/yellow]")
-            retry_attempts = 3
+            retry_attempts = 8
+            retry_times = [
+                random.uniform(voblength * (0.05 + 0.85 * i / retry_attempts), voblength * (0.05 + 0.85 * (i + 1) / retry_attempts))  # nosec B311  # noqa: S311
+                for i in range(retry_attempts)
+            ]
+            random.shuffle(retry_times)  # nosec B311 - Random screenshot timing, not cryptographic
             retry_image = str(Path(image).with_name(f"{Path(image).stem}-retry.png"))
-            for attempt in range(1, retry_attempts + 1):
+            for attempt, adjusted_time in enumerate(retry_times, start=1):
                 logger.info(f"[yellow]Retaking screenshot for: {image} (Attempt {attempt}/{retry_attempts})[/yellow]")
 
                 index = int(image.rsplit("-", 1)[-1].split(".")[0])
-                adjusted_time = random.uniform(0, voblength)  # nosec B311 - Random screenshot timing, not cryptographic  # noqa: S311
 
                 try:
                     Path(retry_image).unlink(missing_ok=True)

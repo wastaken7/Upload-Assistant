@@ -294,10 +294,10 @@ async def test_dvd_retake_uses_only_valid_replacement(monkeypatch, tmp_path, ret
         )
 
     async def capture_stub(task):
-        index, _source, image, *_rest = task
+        index, _source, image, seek_time, *_rest = task
         if image.endswith("-retry.png"):
             assert original.read_bytes() == blank_bytes
-            attempts.append(image)
+            attempts.append(float(seek_time))
             if retry_succeeds:
                 Path(image).write_bytes(visible_bytes)
                 return index, image
@@ -319,6 +319,7 @@ async def test_dvd_retake_uses_only_valid_replacement(monkeypatch, tmp_path, ret
     monkeypatch.setattr(takescreens, "capture_dvd_screenshot", capture_stub)
     monkeypatch.setattr(takescreens, "register_screenshots", register_stub)
     monkeypatch.setattr(takescreens, "screenshot_par_scale_factors", lambda *_args: (1.0, 1.0))
+    monkeypatch.setattr(takescreens.random, "uniform", lambda low, high: (low + high) / 2)
 
     meta = Meta(
         base_dir=str(tmp_path),
@@ -334,12 +335,17 @@ async def test_dvd_retake_uses_only_valid_replacement(monkeypatch, tmp_path, ret
     )
     await takescreens.dvd_screenshots(meta, 0, cleanup_after_capture=False)
 
-    assert len(attempts) == (1 if retry_succeeds else 3)
+    assert len(attempts) == (1 if retry_succeeds else 8)
+    assert len(set(attempts)) == len(attempts)
+    assert all(30 < time < 540 for time in attempts)
+    if not retry_succeeds:
+        assert min(attempts) < 90
+        assert max(attempts) > 480
     if retry_succeeds:
         assert original.read_bytes() == visible_bytes
     else:
         assert not original.exists()
-    assert not Path(attempts[0]).exists()
+    assert not original.with_name("DVD-0-retry.png").exists()
     assert registered == ([str(original)] if retry_succeeds else [])
 
 
