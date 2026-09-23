@@ -8,6 +8,7 @@ replaces the locally-created torrent with BTN's registered torrent afterwards.
 """
 
 import asyncio
+import json
 import re
 import unicodedata
 from pathlib import Path
@@ -554,15 +555,32 @@ class BroadcasTheNet:
         except (httpx.HTTPError, KeyError, ValueError, TypeError) as exc:
             raise UploadError(f"BTN duplicate lookup failed: {exc}", "red") from exc
 
-    async def _uploaded_torrent_id(self, release_name: str, group_id: str) -> str:
+    async def _uploaded_torrent_id(self, release_name: str, group_id: str, diagnostics: dict[str, Any] | None = None) -> str:
         if not self.api_key:
             raise UploadError("BTN needs an API key to identify the uploaded torrent on a group page", "red")
         for attempt in range(4):
             if attempt:
                 await asyncio.sleep(2)
-            result = await self._api("getTorrents", {"search": {"group_id": group_id, "release": release_name}, "results": 1000, "offset": 0})
+            result = await self._api("getTorrents", {"search": {"group_id": group_id}, "results": 1000, "offset": 0})
             payload = result.get("result")
             torrents = payload.get("torrents") if isinstance(payload, dict) else None
+            if diagnostics is not None:
+                diagnostics.setdefault("api_attempts", []).append(
+                    {
+                        "result_count": payload.get("results") if isinstance(payload, dict) else None,
+                        "candidates": [
+                            {
+                                "torrent_id": str(torrent_id),
+                                "group_id": str(item.get("GroupID") or item.get("groupId") or ""),
+                                "release_name": str(item.get("ReleaseName") or item.get("releaseName") or ""),
+                            }
+                            for torrent_id, item in list(torrents.items())[:20]
+                            if isinstance(item, dict)
+                        ]
+                        if isinstance(torrents, dict)
+                        else [],
+                    }
+                )
             if not isinstance(torrents, dict):
                 continue
             matches = [
@@ -576,7 +594,7 @@ class BroadcasTheNet:
                 return matches[0]
             if len(matches) > 1:
                 raise UploadError("BTN returned multiple torrents matching the uploaded release", "red")
-        raise UploadError("BTN did not return the uploaded torrent ID after four API checks", "red")
+        raise UploadError("BTN did not return the uploaded torrent ID after four API checks")
 
     @staticmethod
     def _upload_ids(response_url: str, response_html: str) -> tuple[str, str]:
@@ -749,7 +767,19 @@ class BroadcasTheNet:
                     raise UploadError(f"BTN upload did not return a registered torrent ID. See {failure_path}", "red")
 
                 if not torrent_id:
-                    torrent_id = await self._uploaded_torrent_id(release_name, group_id)
+                    diagnostics: dict[str, Any] = {
+                        "upload_status": response.status_code,
+                        "upload_path": urlparse(str(response.url)).path,
+                        "group_id": group_id,
+                        "expected_release": release_name,
+                    }
+                    try:
+                        torrent_id = await self._uploaded_torrent_id(release_name, group_id, diagnostics)
+                    except UploadError as exc:
+                        diagnostic_path = work_dir / f"[{self.tracker}]BTN_upload_diagnostics.json"
+                        async with aiofiles.open(diagnostic_path, "w", encoding="utf-8") as handle:
+                            await handle.write(json.dumps(diagnostics, indent=2, ensure_ascii=False))
+                        raise UploadError(f"{exc.args[0]}. See {diagnostic_path}") from exc
 
                 download = await client.get(f"{self.base_url}/torrents.php?action=download&id={torrent_id}")
                 download.raise_for_status()

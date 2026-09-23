@@ -105,7 +105,7 @@ def test_btn_group_page_does_not_identify_an_older_torrent() -> None:
 def test_btn_finds_uploaded_release_in_its_group(monkeypatch) -> None:
     async def fake_api(method: str, params: dict[str, object]) -> dict[str, object]:
         assert method == "getTorrents"  # noqa: S101
-        assert params == {"search": {"group_id": "123", "release": "Show.S01E01.1080p-GRP"}, "results": 1000, "offset": 0}  # noqa: S101
+        assert params == {"search": {"group_id": "123"}, "results": 1000, "offset": 0}  # noqa: S101
         return {
             "result": {
                 "torrents": {
@@ -120,6 +120,40 @@ def test_btn_finds_uploaded_release_in_its_group(monkeypatch) -> None:
     monkeypatch.setattr(btn, "_api", fake_api)
 
     assert asyncio.run(btn._uploaded_torrent_id("Show.S01E01.1080p-GRP", "123")) == "456"  # noqa: S101
+
+
+def test_btn_failed_id_lookup_captures_only_safe_api_fields(monkeypatch) -> None:
+    async def fake_api(_method: str, params: dict[str, object]) -> dict[str, object]:
+        assert params["search"] == {"group_id": "123"}  # noqa: S101
+        return {
+            "result": {
+                "results": "1",
+                "torrents": {
+                    "789": {
+                        "GroupID": "123",
+                        "ReleaseName": "Show.S01E01.720p-GRP",
+                        "DownloadURL": "https://btn.example/download?passkey=secret",
+                        "InfoHash": "secret-hash",
+                    }
+                },
+            }
+        }
+
+    btn = tracker()
+    monkeypatch.setattr(btn, "_api", fake_api)
+
+    async def no_sleep(_seconds: int) -> None:
+        pass
+
+    monkeypatch.setattr(asyncio, "sleep", no_sleep)
+    diagnostics: dict[str, object] = {}
+    with pytest.raises(UploadError, match="four API checks"):
+        asyncio.run(btn._uploaded_torrent_id("Show.S01E01.1080p-GRP", "123", diagnostics))
+
+    serialized = json.dumps(diagnostics)
+    assert len(diagnostics["api_attempts"]) == 4  # noqa: S101
+    assert "Show.S01E01.720p-GRP" in serialized  # noqa: S101
+    assert "secret" not in serialized  # noqa: S101
 
 
 def test_btn_api_sends_named_search_parameters(monkeypatch) -> None:
