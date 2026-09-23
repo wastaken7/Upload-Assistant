@@ -9,6 +9,7 @@ from types import SimpleNamespace
 
 import ffmpeg
 import pytest
+from PIL import Image
 
 from src import takescreens
 from src.meta import Meta
@@ -211,7 +212,7 @@ async def test_dvd_screenshots_uses_complete_title_set(monkeypatch, tmp_path):
 
     async def capture_stub(task):
         index, source, image, seek_time, *_rest = task
-        Path(image).write_bytes(b"x" * 120001)
+        Image.linear_gradient("L").resize((720, 480)).save(image)
         captured.append((index, source, seek_time))
         return index, image
 
@@ -248,12 +249,37 @@ async def test_dvd_screenshots_uses_complete_title_set(monkeypatch, tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_dvd_capture_marks_png_as_single_image(monkeypatch, tmp_path):
+    output = tmp_path / "frame.png"
+    commands = []
+
+    async def run_stub(command):
+        commands.append(takescreens.compile_ffmpeg_command(command))
+        output.write_bytes(b"png")
+        return 0, b"", b""
+
+    monkeypatch.setattr(takescreens, "run_ffmpeg", run_stub)
+    monkeypatch.setattr(takescreens, "overlay_filters", lambda *_args, **_kwargs: [])
+
+    result = await takescreens.capture_dvd_screenshot((0, "concat:part1.vob|part2.vob", str(output), "10", Meta(ffdebug=False), 720, 480, 1, 1))
+
+    assert result == (0, str(output))
+    assert commands[0][commands[0].index("-update") + 1] == "1"
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("retry_succeeds", [False, True])
 async def test_dvd_retake_preserves_original_until_replacement_is_valid(monkeypatch, tmp_path, retry_succeeds):
     disc_path = tmp_path / "VIDEO_TS"
     disc_path.mkdir()
     original = tmp_path / "tmp" / "dvd-retake" / "screenshots" / "DVD-0.png"
     original.parent.mkdir(parents=True)
+    blank_image = tmp_path / "blank.png"
+    visible_image = tmp_path / "visible.png"
+    Image.new("L", (720, 480), 0).save(blank_image)
+    Image.linear_gradient("L").resize((720, 480)).save(visible_image)
+    blank_bytes = blank_image.read_bytes()
+    visible_bytes = visible_image.read_bytes()
     attempts = []
     registered = []
 
@@ -267,13 +293,15 @@ async def test_dvd_retake_preserves_original_until_replacement_is_valid(monkeypa
     async def capture_stub(task):
         index, _source, image, *_rest = task
         if image.endswith("-retry.png"):
-            assert original.read_bytes() == b"x" * 100000
+            assert original.read_bytes() == blank_bytes
             attempts.append(image)
             if retry_succeeds:
-                Path(image).write_bytes(b"y" * 80000)
+                Path(image).write_bytes(visible_bytes)
                 return index, image
             return index, None
-        Path(image).write_bytes(b"x" * (100000 if index == 0 else 50000))
+        if index == 1:
+            return index, None
+        Path(image).write_bytes(blank_bytes)
         return index, image
 
     async def valid_times_stub(*_args, **_kwargs):
@@ -304,7 +332,7 @@ async def test_dvd_retake_preserves_original_until_replacement_is_valid(monkeypa
     await takescreens.dvd_screenshots(meta, 0, cleanup_after_capture=False)
 
     assert len(attempts) == (1 if retry_succeeds else 3)
-    assert original.read_bytes() == (b"y" * 80000 if retry_succeeds else b"x" * 100000)
+    assert original.read_bytes() == (visible_bytes if retry_succeeds else blank_bytes)
     assert not Path(attempts[0]).exists()
     assert registered == ([str(original)] if retry_succeeds else [])
 

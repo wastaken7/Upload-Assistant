@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import ffmpeg
+from PIL import Image
 
 from data import config as data_config
 from src.artwork import is_public_http_url, is_valid_cover_image, is_valid_image_bytes
@@ -338,6 +339,16 @@ def discard_smallest_capture_result(capture_results: list[str]) -> str | None:
     Path(smallest).unlink()
     capture_results.remove(smallest)
     return smallest
+
+
+def dvd_screenshot_has_content(path: str | Path) -> bool:
+    """Reject unreadable and near-uniform DVD frames regardless of PNG size."""
+    try:
+        with Image.open(path) as image:
+            low, high = image.convert("L").getextrema()
+            return high >= 10 and high - low >= 10
+    except OSError, ValueError:
+        return False
 
 
 async def run_ffmpeg(command: Any) -> tuple[int | None, bytes, bytes]:
@@ -939,9 +950,6 @@ async def dvd_screenshots(
     filtered_results.sort(key=lambda x: x[0])  # Ensure order is preserved
     capture_results = [r[1] for r in filtered_results if r[1] is not None]
 
-    if capture_results and len(capture_results) > num_screens:
-        discard_smallest_capture_result(capture_results)
-
     valid_results: list[str] = []
     remaining_retakes: list[str] = []
 
@@ -950,13 +958,8 @@ async def dvd_screenshots(
             logger.info(f"[red]{image}")
             continue
 
-        retake = False
-        image_size = Path(image).stat().st_size
-        if image_size <= 120000:
-            logger.info(f"[yellow]Image {image} is incredibly small, retaking.")
-            retake = True
-
-        if retake:
+        if not dvd_screenshot_has_content(image):
+            logger.info(f"[yellow]Image {image} is blank or unreadable, retaking.[/yellow]")
             retry_attempts = 3
             retry_image = str(Path(image).with_name(f"{Path(image).stem}-retry.png"))
             for attempt in range(1, retry_attempts + 1):
@@ -975,13 +978,13 @@ async def dvd_screenshots(
                         logger.error(f"[red]Failed to capture screenshot for {image}. Retrying...[/red]")
                         continue
 
-                    retaken_size = Path(screenshot_result).stat().st_size
-                    if retaken_size > 75000:
+                    if dvd_screenshot_has_content(screenshot_result):
+                        retaken_size = Path(screenshot_result).stat().st_size
                         Path(screenshot_result).replace(image)
                         logger.info(f"[green]Successfully retaken screenshot for: {image} ({retaken_size} bytes)[/green]")
                         valid_results.append(image)
                         break
-                    logger.info(f"[red]Retaken image {screenshot_result} is still too small. Retrying...[/red]")
+                    logger.info(f"[red]Retaken image {screenshot_result} is blank or unreadable. Retrying...[/red]")
                 except Exception as e:
                     logger.error(f"[red]Error capturing screenshot for {input_file} at {adjusted_time}: {e}[/red]")
                 finally:
@@ -992,6 +995,8 @@ async def dvd_screenshots(
                 remaining_retakes.append(image)
         else:
             valid_results.append(image)
+    if len(valid_results) > num_screens:
+        discard_smallest_capture_result(valid_results)
     if remaining_retakes:
         logger.info(f"[red]The following images could not be retaken successfully: {remaining_retakes}[/red]")
 
@@ -1055,7 +1060,7 @@ async def capture_dvd_screenshot(task: tuple[int, str, str, str, Meta, float, fl
         info_command: Any = (
             cast(Any, ffmpeg)
             .input(input_file, ss=str(seek_time), accurate_seek=None)
-            .output(image, vframes=1, vf=vf_chain, compression_level=ffmpeg_compression, pred="mixed")
+            .output(image, vframes=1, vf=vf_chain, compression_level=ffmpeg_compression, pred="mixed", update=1)
             .global_args("-y", "-loglevel", loglevel, "-hide_banner")
         )
 

@@ -1,6 +1,8 @@
 # ruff: noqa: S101
 
-from src.takescreens import discard_smallest_capture_result
+from PIL import Image
+
+from src.takescreens import discard_smallest_capture_result, dvd_screenshot_has_content
 
 
 def test_discard_smallest_capture_result_only_removes_current_batch(tmp_path) -> None:
@@ -19,3 +21,14 @@ def test_discard_smallest_capture_result_only_removes_current_batch(tmp_path) ->
     assert captured_large.exists()
     assert not captured_small.exists()
     assert capture_results == [str(captured_large)]
+
+
+def test_dvd_content_check_uses_pixels_instead_of_png_file_size(tmp_path) -> None:
+    visible = tmp_path / "visible.png"
+    blank = tmp_path / "blank.png"
+    Image.linear_gradient("L").resize((854, 480)).save(visible)
+    Image.new("L", (854, 480), 0).save(blank)
+
+    assert visible.stat().st_size < 75_000
+    assert dvd_screenshot_has_content(visible)
+    assert not dvd_screenshot_has_content(blank)
