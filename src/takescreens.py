@@ -897,6 +897,10 @@ async def dvd_screenshots(
     for i in range(num_screens + 1):
         image = str(screenshot_dir / f"{sanitized_disc_name}-{i}.png")
         if Path(image).exists() and not meta.retake:
+            if not dvd_screenshot_has_content(image):
+                logger.info(f"[yellow]Removing blank or unreadable DVD screenshot: {image}[/yellow]")
+                Path(image).unlink(missing_ok=True)
+                continue
             existing_images_count += 1
             existing_image_paths.append(image)
 
@@ -992,6 +996,7 @@ async def dvd_screenshots(
 
             else:
                 logger.info(f"[red]All retry attempts failed for {image}. Skipping.[/red]")
+                Path(image).unlink(missing_ok=True)
                 remaining_retakes.append(image)
         else:
             valid_results.append(image)

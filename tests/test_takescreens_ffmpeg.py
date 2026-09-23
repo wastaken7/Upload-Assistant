@@ -269,7 +269,8 @@ async def test_dvd_capture_marks_png_as_single_image(monkeypatch, tmp_path):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("retry_succeeds", [False, True])
-async def test_dvd_retake_preserves_original_until_replacement_is_valid(monkeypatch, tmp_path, retry_succeeds):
+@pytest.mark.parametrize("existing_blank", [False, True])
+async def test_dvd_retake_uses_only_valid_replacement(monkeypatch, tmp_path, retry_succeeds, existing_blank):
     disc_path = tmp_path / "VIDEO_TS"
     disc_path.mkdir()
     original = tmp_path / "tmp" / "dvd-retake" / "screenshots" / "DVD-0.png"
@@ -280,6 +281,8 @@ async def test_dvd_retake_preserves_original_until_replacement_is_valid(monkeypa
     Image.linear_gradient("L").resize((720, 480)).save(visible_image)
     blank_bytes = blank_image.read_bytes()
     visible_bytes = visible_image.read_bytes()
+    if existing_blank:
+        original.write_bytes(blank_bytes)
     attempts = []
     registered = []
 
@@ -332,7 +335,10 @@ async def test_dvd_retake_preserves_original_until_replacement_is_valid(monkeypa
     await takescreens.dvd_screenshots(meta, 0, cleanup_after_capture=False)
 
     assert len(attempts) == (1 if retry_succeeds else 3)
-    assert original.read_bytes() == (visible_bytes if retry_succeeds else blank_bytes)
+    if retry_succeeds:
+        assert original.read_bytes() == visible_bytes
+    else:
+        assert not original.exists()
     assert not Path(attempts[0]).exists()
     assert registered == ([str(original)] if retry_succeeds else [])
 
