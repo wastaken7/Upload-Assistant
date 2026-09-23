@@ -11,6 +11,20 @@ def test_health_endpoint_is_not_rate_limited() -> None:
         assert response.status_code == 200
 
 
+def test_screenshot_preview_images_are_not_default_rate_limited() -> None:
+    client = server.app.test_client()
+
+    # Accept: text/html keeps these unauthenticated requests on the auth
+    # gate's login-redirect path, so no failed-auth bookkeeping is recorded
+    # while the per-route limiter still decides whether the reply is a 429.
+    for _ in range(80):
+        response = client.get(
+            "/api/execution_screenshots/local-00000000000000000000000000000000/image?session_id=session-test",
+            headers={"Accept": "text/html"},
+        )
+        assert response.status_code == 302
+
+
 @pytest.mark.parametrize(
     ("raw_value", "expected"),
     [(None, 0), ("", 0), ("0", 0), ("1", 1), (" 2 ", 2), ("10", 10)],

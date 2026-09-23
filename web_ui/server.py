@@ -6509,6 +6509,7 @@ def reset_execution_description():
 
 
 @app.route("/api/execution_screenshots/<screenshot_id>/image")
+@limiter.limit("7200 per hour", key_func=_rate_limit_key_func, override_defaults=True)
 def execution_screenshot_image(screenshot_id: str):
     """Serve one reviewed local screenshot after resolving it through its session."""
     session_id = str(request.args.get("session_id", "")).strip()
