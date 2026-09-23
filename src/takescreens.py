@@ -32,6 +32,7 @@ from src.mediainfo import MediaInfo
 from src.meta import Meta
 from src.screenshot_manifest import clear_group as clear_screenshot_group
 from src.screenshot_manifest import files as manifest_files
+from src.screenshot_manifest import forget_file as forget_screenshot_file
 from src.screenshot_manifest import register as register_screenshots
 from src.screenshot_overlays import overlay_filters, overlay_fontfile, overlay_options
 from src.temp_paths import artwork_dir, screenshots_dir
@@ -840,7 +841,14 @@ async def dvd_screenshots(
     sanitized_disc_name = await sanitize_filename(meta.discs[disc_num]["name"])
     screenshot_dir = screenshots_dir(meta.base_dir, meta.uuid)
     existing_screens = [str(p) for p in manifest_files(meta.base_dir, meta.uuid, sanitized_disc_name)]
-    normal_screens = existing_screens
+    normal_screens = []
+    for image in existing_screens:
+        if dvd_screenshot_has_content(image):
+            normal_screens.append(image)
+            continue
+        logger.info(f"[yellow]Removing blank or unreadable registered DVD screenshot: {image}[/yellow]")
+        Path(image).unlink(missing_ok=True)
+        forget_screenshot_file(meta.base_dir, meta.uuid, Path(image))
     if len(normal_screens) >= num_screens:
         i = num_screens
         logger.info("[bold green]Reusing screenshots")
