@@ -16,11 +16,11 @@ class BtnIdManager:
 
     @staticmethod
     async def get_btn_torrents(btn_api: str, btn_id: str, api_url: str = "https://api.broadcasthe.net/") -> tuple[int, int]:
-        imdb_id = 0
-        tvdb_id = 0
+        if not str(btn_id).strip().isdigit():
+            return 0, 0
         logger.debug("Fetching BTN data...", extra={"markup": False})
         post_query_url = api_url
-        post_data = {"jsonrpc": "2.0", "id": (await BtnIdManager.generate_guid())[:8], "method": "getTorrentsSearch", "params": [btn_api, {"id": btn_id}, 50]}
+        post_data = {"id": (await BtnIdManager.generate_guid())[:8], "method": "getTorrentById", "params": {"key": btn_api, "id": str(btn_id).strip()}}
         headers = {"Content-Type": "application/json"}
 
         try:
@@ -28,7 +28,7 @@ class BtnIdManager:
                 response = await client.post(post_query_url, headers=headers, json=post_data, timeout=10)
                 response.raise_for_status()
                 try:
-                    data = cast(dict[str, Any], response.json())
+                    data = response.json()
                 except ValueError as e:
                     logger.info(f"[ERROR] Failed to parse BTN response as JSON: {e}", extra={"markup": False})
                     logger.info(f"Response content: {response.text[:200]}...", extra={"markup": False})
@@ -37,7 +37,7 @@ class BtnIdManager:
             logger.info(f"[ERROR] Failed to fetch BTN data: {e}", extra={"markup": False})
             return 0, 0
 
-        if not data:
+        if not isinstance(data, dict):
             logger.info("[ERROR] BTN API response is empty or invalid.", extra={"markup": False})
             return 0, 0
 
@@ -46,9 +46,9 @@ class BtnIdManager:
             error_map = cast(dict[str, Any], error)
             code = error_map.get("code", "unknown")
             message = str(error_map.get("message", "Unknown BTN API error"))
-            if "unauthorized ip" in message.lower():
+            if code == -32004:
                 logger.info(f"[red]BTN API error: Unauthorized IP address (code {code}).[/red]")
-                logger.info("[yellow]Your current public IP isn't whitelisted for your BTN API key.[/yellow]")
+                logger.info("[yellow]Approve this host IP in your BTN notices, then retry.[/yellow]")
             else:
                 logger.info(f"[red]BTN API error (code {code}): {message}[/red]")
             logger.debug(data)
@@ -57,15 +57,11 @@ class BtnIdManager:
         logger.debug(f"[green]BTN data fetched successfully for BTN ID {data.get('id')}[/green]")
 
         result = data.get("result")
-        if isinstance(result, dict) and "torrents" in result:
-            torrents = cast(dict[str, dict[str, Any]], result["torrents"])
-            first_torrent = next(iter(torrents.values()), None)
-            if first_torrent:
-                imdb_id = first_torrent.get("ImdbID")
-                tvdb_id = first_torrent.get("TvdbID")
-
-                if imdb_id or tvdb_id:
-                    return int(imdb_id or 0), int(tvdb_id or 0)
+        if isinstance(result, dict):
+            try:
+                return int(result.get("ImdbID") or 0), int(result.get("TvdbID") or 0)
+            except TypeError, ValueError:
+                logger.info("[ERROR] BTN returned invalid IMDb or TVDB IDs.", extra={"markup": False})
         logger.debug("[red]No IMDb or TVDb ID found.")
         return 0, 0
 
