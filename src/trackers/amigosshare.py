@@ -1275,8 +1275,10 @@ class AmigosShare:
         if not self.config["TRACKERS"][self.tracker].get("uploader_status", False):
             return False
 
+        config_flag = self.config["TRACKERS"][self.tracker].get("modq")
         if meta.modq:
-            logger.info(f"{self.tracker}: Sending to the moderation queue.")
+            return False
+        if config_flag is True:
             return False
 
         return True
