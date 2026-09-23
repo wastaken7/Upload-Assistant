@@ -4,7 +4,6 @@ import base64
 import contextlib
 import gc
 import math
-import os
 import re
 import time
 from collections.abc import Awaitable, Callable, Sequence
@@ -643,7 +642,7 @@ async def _upload_screens(
     if meta.debug:
         upload_start_time = time.time()
 
-    os.chdir(screenshots_dir(meta.base_dir, meta.uuid))
+    screenshot_path = screenshots_dir(meta.base_dir, meta.uuid)
 
     initial_img_host = default_config[f"img_host_{img_host_num}"]
     img_host = meta.imghost
@@ -709,7 +708,7 @@ async def _upload_screens(
     # Handle image selection
 
     if using_custom_img_list:
-        image_glob: list[str] = custom_img_list
+        image_glob: list[str] = [str(screenshot_path / image) for image in custom_img_list]
         existing_images: list[ImageDict] = []
         existing_count = 0
     else:
@@ -724,17 +723,17 @@ async def _upload_screens(
             image_patterns = ["*.png", ".[!.]*.png"]
             image_glob = []
             for pattern in image_patterns:
-                glob_results = await asyncio.to_thread(lambda p=pattern: [str(path.relative_to(Path.cwd())) for path in Path.cwd().glob(p)])
+                glob_results = await asyncio.to_thread(lambda p=pattern: [str(path) for path in screenshot_path.glob(p)])
                 image_glob.extend(glob_results)
 
             unwanted_patterns = ["FILE*", "PLAYLIST*", "POSTER*"]
             unwanted_files: set[str] = set()
             for pattern in unwanted_patterns:
-                glob_results = await asyncio.to_thread(lambda p=pattern: [str(path.relative_to(Path.cwd())) for path in Path.cwd().glob(p)])
+                glob_results = await asyncio.to_thread(lambda p=pattern: [str(path) for path in screenshot_path.glob(p)])
                 unwanted_files.update(glob_results)
                 if pattern.startswith("FILE") or pattern.startswith("PLAYLIST") or pattern.startswith("POSTER"):
                     hidden_pattern = "." + pattern
-                    hidden_glob_results = await asyncio.to_thread(lambda hp=hidden_pattern: [str(path.relative_to(Path.cwd())) for path in Path.cwd().glob(hp)])
+                    hidden_glob_results = await asyncio.to_thread(lambda hp=hidden_pattern: [str(path) for path in screenshot_path.glob(hp)])
                     unwanted_files.update(hidden_glob_results)
 
             image_glob = [file for file in image_glob if file not in unwanted_files]
@@ -1004,7 +1003,6 @@ async def imgbox_upload(
 ) -> list[dict[str, str]]:
     """Upload images to Imgbox and store their returned URLs."""
     try:
-        os.chdir(chdir)
         image_list: list[dict[str, str]] = []
 
         async with pyimgbox.Gallery(thumb_width=350, square_thumbs=False) as gallery:
@@ -1029,7 +1027,7 @@ async def imgbox_upload(
                     logger.error(f"[red]Error during upload for {image}: {e!s}")
 
             for image in image_glob:
-                await process_image(image)
+                await process_image(str(Path(chdir) / image))
 
         return_dict["image_list"] = image_list
         return image_list
