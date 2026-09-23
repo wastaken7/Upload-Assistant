@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import ffmpeg
+from PIL import Image
 
 from data import config as data_config
 from src.artwork import is_public_http_url, is_valid_cover_image, is_valid_image_bytes
@@ -31,6 +32,7 @@ from src.mediainfo import MediaInfo
 from src.meta import Meta
 from src.screenshot_manifest import clear_group as clear_screenshot_group
 from src.screenshot_manifest import files as manifest_files
+from src.screenshot_manifest import forget_file as forget_screenshot_file
 from src.screenshot_manifest import register as register_screenshots
 from src.screenshot_overlays import overlay_filters, overlay_fontfile, overlay_options
 from src.temp_paths import artwork_dir, screenshots_dir
@@ -338,6 +340,18 @@ def discard_smallest_capture_result(capture_results: list[str]) -> str | None:
     Path(smallest).unlink()
     capture_results.remove(smallest)
     return smallest
+
+
+def dvd_screenshot_has_content(path: str | Path) -> bool:
+    """Reject unusually small, unreadable, and near-uniform DVD frames."""
+    try:
+        if Path(path).stat().st_size < 20 * 1024:
+            return False
+        with Image.open(path) as image:
+            low, high = image.convert("L").getextrema()
+            return high >= 10 and high - low >= 10
+    except OSError, ValueError:
+        return False
 
 
 async def run_ffmpeg(command: Any) -> tuple[int | None, bytes, bytes]:
@@ -827,7 +841,14 @@ async def dvd_screenshots(
     sanitized_disc_name = await sanitize_filename(meta.discs[disc_num]["name"])
     screenshot_dir = screenshots_dir(meta.base_dir, meta.uuid)
     existing_screens = [str(p) for p in manifest_files(meta.base_dir, meta.uuid, sanitized_disc_name)]
-    normal_screens = existing_screens
+    normal_screens = []
+    for image in existing_screens:
+        if dvd_screenshot_has_content(image):
+            normal_screens.append(image)
+            continue
+        logger.info(f"[yellow]Removing blank or unreadable registered DVD screenshot: {image}[/yellow]")
+        Path(image).unlink(missing_ok=True)
+        forget_screenshot_file(meta.base_dir, meta.uuid, Path(image))
     if len(normal_screens) >= num_screens:
         i = num_screens
         logger.info("[bold green]Reusing screenshots")
@@ -886,6 +907,10 @@ async def dvd_screenshots(
     for i in range(num_screens + 1):
         image = str(screenshot_dir / f"{sanitized_disc_name}-{i}.png")
         if Path(image).exists() and not meta.retake:
+            if not dvd_screenshot_has_content(image):
+                logger.info(f"[yellow]Removing blank or unreadable DVD screenshot: {image}[/yellow]")
+                Path(image).unlink(missing_ok=True)
+                continue
             existing_images_count += 1
             existing_image_paths.append(image)
 
@@ -939,9 +964,6 @@ async def dvd_screenshots(
     filtered_results.sort(key=lambda x: x[0])  # Ensure order is preserved
     capture_results = [r[1] for r in filtered_results if r[1] is not None]
 
-    if capture_results and len(capture_results) > num_screens:
-        discard_smallest_capture_result(capture_results)
-
     valid_results: list[str] = []
     remaining_retakes: list[str] = []
 
@@ -950,20 +972,19 @@ async def dvd_screenshots(
             logger.info(f"[red]{image}")
             continue
 
-        retake = False
-        image_size = Path(image).stat().st_size
-        if image_size <= 120000:
-            logger.info(f"[yellow]Image {image} is incredibly small, retaking.")
-            retake = True
-
-        if retake:
-            retry_attempts = 3
+        if not dvd_screenshot_has_content(image):
+            logger.info(f"[yellow]Image {image} is blank or unreadable, retaking.[/yellow]")
+            retry_attempts = 8
+            retry_times = [
+                random.uniform(voblength * (0.05 + 0.85 * i / retry_attempts), voblength * (0.05 + 0.85 * (i + 1) / retry_attempts))  # nosec B311  # noqa: S311
+                for i in range(retry_attempts)
+            ]
+            random.shuffle(retry_times)  # nosec B311 - Random screenshot timing, not cryptographic
             retry_image = str(Path(image).with_name(f"{Path(image).stem}-retry.png"))
-            for attempt in range(1, retry_attempts + 1):
+            for attempt, adjusted_time in enumerate(retry_times, start=1):
                 logger.info(f"[yellow]Retaking screenshot for: {image} (Attempt {attempt}/{retry_attempts})[/yellow]")
 
                 index = int(image.rsplit("-", 1)[-1].split(".")[0])
-                adjusted_time = random.uniform(0, voblength)  # nosec B311 - Random screenshot timing, not cryptographic  # noqa: S311
 
                 try:
                     Path(retry_image).unlink(missing_ok=True)
@@ -975,13 +996,13 @@ async def dvd_screenshots(
                         logger.error(f"[red]Failed to capture screenshot for {image}. Retrying...[/red]")
                         continue
 
-                    retaken_size = Path(screenshot_result).stat().st_size
-                    if retaken_size > 75000:
+                    if dvd_screenshot_has_content(screenshot_result):
+                        retaken_size = Path(screenshot_result).stat().st_size
                         Path(screenshot_result).replace(image)
                         logger.info(f"[green]Successfully retaken screenshot for: {image} ({retaken_size} bytes)[/green]")
                         valid_results.append(image)
                         break
-                    logger.info(f"[red]Retaken image {screenshot_result} is still too small. Retrying...[/red]")
+                    logger.info(f"[red]Retaken image {screenshot_result} is blank or unreadable. Retrying...[/red]")
                 except Exception as e:
                     logger.error(f"[red]Error capturing screenshot for {input_file} at {adjusted_time}: {e}[/red]")
                 finally:
@@ -989,9 +1010,12 @@ async def dvd_screenshots(
 
             else:
                 logger.info(f"[red]All retry attempts failed for {image}. Skipping.[/red]")
+                Path(image).unlink(missing_ok=True)
                 remaining_retakes.append(image)
         else:
             valid_results.append(image)
+    if len(valid_results) > num_screens:
+        discard_smallest_capture_result(valid_results)
     if remaining_retakes:
         logger.info(f"[red]The following images could not be retaken successfully: {remaining_retakes}[/red]")
 
@@ -1055,7 +1079,7 @@ async def capture_dvd_screenshot(task: tuple[int, str, str, str, Meta, float, fl
         info_command: Any = (
             cast(Any, ffmpeg)
             .input(input_file, ss=str(seek_time), accurate_seek=None)
-            .output(image, vframes=1, vf=vf_chain, compression_level=ffmpeg_compression, pred="mixed")
+            .output(image, vframes=1, vf=vf_chain, compression_level=ffmpeg_compression, pred="mixed", update=1)
             .global_args("-y", "-loglevel", loglevel, "-hide_banner")
         )
 

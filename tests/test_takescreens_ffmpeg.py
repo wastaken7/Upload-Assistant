@@ -9,6 +9,7 @@ from types import SimpleNamespace
 
 import ffmpeg
 import pytest
+from PIL import Image
 
 from src import takescreens
 from src.meta import Meta
@@ -211,7 +212,7 @@ async def test_dvd_screenshots_uses_complete_title_set(monkeypatch, tmp_path):
 
     async def capture_stub(task):
         index, source, image, seek_time, *_rest = task
-        Path(image).write_bytes(b"x" * 120001)
+        Image.effect_noise((720, 480), 20).save(image)
         captured.append((index, source, seek_time))
         return index, image
 
@@ -248,12 +249,40 @@ async def test_dvd_screenshots_uses_complete_title_set(monkeypatch, tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_dvd_capture_marks_png_as_single_image(monkeypatch, tmp_path):
+    output = tmp_path / "frame.png"
+    commands = []
+
+    async def run_stub(command):
+        commands.append(takescreens.compile_ffmpeg_command(command))
+        output.write_bytes(b"png")
+        return 0, b"", b""
+
+    monkeypatch.setattr(takescreens, "run_ffmpeg", run_stub)
+    monkeypatch.setattr(takescreens, "overlay_filters", lambda *_args, **_kwargs: [])
+
+    result = await takescreens.capture_dvd_screenshot((0, "concat:part1.vob|part2.vob", str(output), "10", Meta(ffdebug=False), 720, 480, 1, 1))
+
+    assert result == (0, str(output))
+    assert commands[0][commands[0].index("-update") + 1] == "1"
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("retry_succeeds", [False, True])
-async def test_dvd_retake_preserves_original_until_replacement_is_valid(monkeypatch, tmp_path, retry_succeeds):
+@pytest.mark.parametrize("existing_blank", [False, True])
+async def test_dvd_retake_uses_only_valid_replacement(monkeypatch, tmp_path, retry_succeeds, existing_blank):
     disc_path = tmp_path / "VIDEO_TS"
     disc_path.mkdir()
     original = tmp_path / "tmp" / "dvd-retake" / "screenshots" / "DVD-0.png"
     original.parent.mkdir(parents=True)
+    blank_image = tmp_path / "blank.png"
+    visible_image = tmp_path / "visible.png"
+    Image.new("L", (720, 480), 0).save(blank_image)
+    Image.effect_noise((720, 480), 20).save(visible_image)
+    blank_bytes = blank_image.read_bytes()
+    visible_bytes = visible_image.read_bytes()
+    if existing_blank:
+        original.write_bytes(blank_bytes)
     attempts = []
     registered = []
 
@@ -265,15 +294,17 @@ async def test_dvd_retake_preserves_original_until_replacement_is_valid(monkeypa
         )
 
     async def capture_stub(task):
-        index, _source, image, *_rest = task
+        index, _source, image, seek_time, *_rest = task
         if image.endswith("-retry.png"):
-            assert original.read_bytes() == b"x" * 100000
-            attempts.append(image)
+            assert original.read_bytes() == blank_bytes
+            attempts.append(float(seek_time))
             if retry_succeeds:
-                Path(image).write_bytes(b"y" * 80000)
+                Path(image).write_bytes(visible_bytes)
                 return index, image
             return index, None
-        Path(image).write_bytes(b"x" * (100000 if index == 0 else 50000))
+        if index == 1:
+            return index, None
+        Path(image).write_bytes(blank_bytes)
         return index, image
 
     async def valid_times_stub(*_args, **_kwargs):
@@ -288,6 +319,7 @@ async def test_dvd_retake_preserves_original_until_replacement_is_valid(monkeypa
     monkeypatch.setattr(takescreens, "capture_dvd_screenshot", capture_stub)
     monkeypatch.setattr(takescreens, "register_screenshots", register_stub)
     monkeypatch.setattr(takescreens, "screenshot_par_scale_factors", lambda *_args: (1.0, 1.0))
+    monkeypatch.setattr(takescreens.random, "uniform", lambda low, high: (low + high) / 2)
 
     meta = Meta(
         base_dir=str(tmp_path),
@@ -303,10 +335,72 @@ async def test_dvd_retake_preserves_original_until_replacement_is_valid(monkeypa
     )
     await takescreens.dvd_screenshots(meta, 0, cleanup_after_capture=False)
 
-    assert len(attempts) == (1 if retry_succeeds else 3)
-    assert original.read_bytes() == (b"y" * 80000 if retry_succeeds else b"x" * 100000)
-    assert not Path(attempts[0]).exists()
+    assert len(attempts) == (1 if retry_succeeds else 8)
+    assert len(set(attempts)) == len(attempts)
+    assert all(30 < time < 540 for time in attempts)
+    if not retry_succeeds:
+        assert min(attempts) < 90
+        assert max(attempts) > 480
+    if retry_succeeds:
+        assert original.read_bytes() == visible_bytes
+    else:
+        assert not original.exists()
+    assert not original.with_name("DVD-0-retry.png").exists()
     assert registered == ([str(original)] if retry_succeeds else [])
+
+
+@pytest.mark.asyncio
+async def test_dvd_replaces_blank_registered_screenshot(monkeypatch, tmp_path):
+    disc_path = tmp_path / "VIDEO_TS"
+    disc_path.mkdir()
+    screenshot_dir = takescreens.screenshots_dir(tmp_path, "dvd-manifest")
+    blank = screenshot_dir / "blank.png"
+    Image.new("L", (720, 480), 0).save(blank, compress_level=0)
+    old_image = takescreens.register_screenshots(tmp_path, "dvd-manifest", [blank], "DVD")[0]
+    captured = []
+
+    def parse_stub(_path, output=None, **_kwargs):
+        if output == "JSON":
+            return json.dumps({"media": {"track": [{"Duration": 600, "Width": 720, "Height": 480}]}})
+        return SimpleNamespace(
+            tracks=[SimpleNamespace(track_type="Video", duration="600000", pixel_aspect_ratio="1", display_aspect_ratio="1.5", width="720", height="480", frame_rate="24")]
+        )
+
+    async def capture_stub(task):
+        index, _source, image, *_rest = task
+        Image.effect_noise((720, 480), 20).save(image)
+        captured.append(image)
+        return index, image
+
+    async def valid_times_stub(*_args, **_kwargs):
+        return ["100", "200"]
+
+    monkeypatch.setattr(takescreens.MediaInfo, "parse", parse_stub)
+    monkeypatch.setattr(takescreens, "valid_ss_time", valid_times_stub)
+    monkeypatch.setattr(takescreens, "capture_dvd_screenshot", capture_stub)
+    monkeypatch.setattr(takescreens, "screenshot_par_scale_factors", lambda *_args: (1.0, 1.0))
+
+    meta = Meta(
+        base_dir=str(tmp_path),
+        uuid="dvd-manifest",
+        screens=1,
+        discs=[{"name": "DVD", "path": str(disc_path), "main_set": ["01_1.VOB"]}],
+        image_list=[],
+        retake=False,
+        frame_overlay=False,
+        tv_pack=False,
+        debug=False,
+        ffdebug=False,
+    )
+    await takescreens.dvd_screenshots(meta, 0, cleanup_after_capture=False)
+
+    registered = takescreens.manifest_files(tmp_path, "dvd-manifest", "DVD")
+    assert len(captured) == 2
+    assert not old_image.exists()
+    assert len(registered) == 1
+    assert takescreens.dvd_screenshot_has_content(registered[0])
+    manifest = json.loads((screenshot_dir.parent / "screenshot_manifest.json").read_text(encoding="utf-8"))
+    assert len(manifest["screenshots"]) == 1
 
 
 @pytest.mark.asyncio
