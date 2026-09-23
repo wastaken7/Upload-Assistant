@@ -56,8 +56,6 @@ def test_upload_screens_does_not_reupload_source_on_fallback(tmp_path: Path) -> 
         shared_return_dict: dict[str, object] = {}
         with (
             patch("src.uploadscreens.screenshots_dir", return_value=tmp_path),
-            patch("src.uploadscreens.os.chdir"),
-            patch("src.uploadscreens.Path.cwd", return_value=tmp_path),
             patch("src.uploadscreens.upload_image_task", new=fake_upload),
         ):
             await _upload_screens(config, meta, 1, 1, 0, 1, [], shared_return_dict)
@@ -65,8 +63,10 @@ def test_upload_screens_does_not_reupload_source_on_fallback(tmp_path: Path) -> 
             meta.imghost = "ptscreens"
             await _upload_screens(config, meta, 1, 2, 0, 1, [], shared_return_dict)
 
+    starting_directory = Path.cwd()
     asyncio.run(exercise())
-    assert calls == ["image-1.png"]
+    assert Path.cwd() == starting_directory
+    assert calls == [str(tmp_path / "image-1.png")]
 
 
 def test_upload_screens_accepts_manifest_paths_outside_working_directory(tmp_path: Path) -> None:
@@ -94,8 +94,6 @@ def test_upload_screens_accepts_manifest_paths_outside_working_directory(tmp_pat
 
         with (
             patch("src.uploadscreens.screenshots_dir", return_value=source_screenshots),
-            patch("src.uploadscreens.os.chdir"),
-            patch("src.uploadscreens.Path.cwd", return_value=source_screenshots),
             patch("src.uploadscreens.manifest_files", return_value=[screenshot]),
             patch("src.uploadscreens.upload_image_task", new=fake_upload),
         ):
@@ -139,8 +137,6 @@ def test_upload_screens_preserves_partial_successes_across_fallback(tmp_path: Pa
         }
         with (
             patch("src.uploadscreens.screenshots_dir", return_value=tmp_path),
-            patch("src.uploadscreens.os.chdir"),
-            patch("src.uploadscreens.Path.cwd", return_value=tmp_path),
             patch("src.uploadscreens.upload_image_task", new=fake_upload),
         ):
             return await _upload_screens(config, meta, 1, 1, 0, 2, [], {})
@@ -172,7 +168,6 @@ def test_upload_screens_handles_infinite_concurrency(tmp_path: Path) -> None:
         }
         with (
             patch("src.uploadscreens.screenshots_dir", return_value=tmp_path),
-            patch("src.uploadscreens.os.chdir"),
             patch("src.uploadscreens.upload_image_task", new=fake_upload),
         ):
             return await _upload_screens(config, meta, 1, 1, 0, 1, ["image.png"], {})
@@ -225,7 +220,6 @@ def test_upload_screens_normalizes_image_upload_delay_before_limiter(
 
         with (
             patch("src.uploadscreens.screenshots_dir", return_value=tmp_path),
-            patch("src.uploadscreens.os.chdir"),
             patch("src.uploadscreens.upload_image_task", new=fake_upload),
             patch("src.uploadscreens._build_image_start_limiter", side_effect=fake_build_image_start_limiter),
         ):

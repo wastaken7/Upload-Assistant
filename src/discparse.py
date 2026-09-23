@@ -622,8 +622,8 @@ class DiscParse:
             path = each.get("path")
             if not isinstance(path, str) or not path:
                 continue
-            os.chdir(path)
-            files = [p.name for p in Path.cwd().glob("VTS_*.VOB")]
+            disc_path = Path(path).resolve()
+            files = [p.name for p in disc_path.glob("VTS_*.VOB")]
             files.sort()
             filesdict: OrderedDict[str, list[str]] = OrderedDict()
             main_set: list[str] = []
@@ -641,7 +641,7 @@ class DiscParse:
                     try:
                         if mediainfo_binary:
                             process = await asyncio.create_subprocess_exec(
-                                mediainfo_binary, "--Output=JSON", ifo_file, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, env=mediainfo_env
+                                mediainfo_binary, "--Output=JSON", ifo_file, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, env=mediainfo_env, cwd=disc_path
                             )
                             stdout, stderr = await process.communicate()
 
@@ -651,14 +651,14 @@ class DiscParse:
                                 logger.info(f"[yellow]Specialized MediaInfo failed for {ifo_file}, falling back to standard[/yellow]")
                                 if stderr:
                                     logger.info(f"[red]MediaInfo stderr: {stderr.decode()}[/red]")
-                                vob_set_mi = MediaInfo.parse(ifo_file, output="JSON")
+                                vob_set_mi = MediaInfo.parse(str(disc_path / ifo_file), output="JSON")
                         else:
-                            vob_set_mi = MediaInfo.parse(ifo_file, output="JSON")
+                            vob_set_mi = MediaInfo.parse(str(disc_path / ifo_file), output="JSON")
 
                     except Exception as e:
                         logger.info(f"[yellow]Error with DVD MediaInfo binary for JSON: {e!s}")
                         # Fall back to standard MediaInfo
-                        vob_set_mi = MediaInfo.parse(ifo_file, output="JSON")
+                        vob_set_mi = MediaInfo.parse(str(disc_path / ifo_file), output="JSON")
 
                     vob_set_mi = json.loads(vob_set_mi)
                     tracks = vob_set_mi.get("media", {}).get("track", [])
@@ -686,8 +686,8 @@ class DiscParse:
 
             each["main_set"] = main_set
             set = main_set[0][:2]
-            each["vob"] = vob = f"{path}/VTS_{set}_1.VOB"
-            each["ifo"] = ifo = f"{path}/VTS_{set}_0.IFO"
+            each["vob"] = vob = str(disc_path / f"VTS_{set}_1.VOB")
+            each["ifo"] = ifo = str(disc_path / f"VTS_{set}_0.IFO")
 
             # Use basenames for mediainfo processing to avoid full paths in output
             vob_basename = Path(vob).name
@@ -698,7 +698,7 @@ class DiscParse:
                 try:
                     if mediainfo_binary:
                         process = await asyncio.create_subprocess_exec(
-                            mediainfo_binary, vob_basename, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, env=mediainfo_env
+                            mediainfo_binary, vob_basename, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, env=mediainfo_env, cwd=disc_path
                         )
                         stdout, stderr = await process.communicate()
 
@@ -708,12 +708,12 @@ class DiscParse:
                             logger.info("[yellow]Specialized MediaInfo failed for VOB, falling back[/yellow]")
                             if stderr:
                                 logger.info(f"[red]MediaInfo stderr: {stderr.decode()}[/red]")
-                            vob_mi_output = MediaInfo.parse(vob_basename, output="STRING", full=False).replace("\r\n", "\n")
+                            vob_mi_output = MediaInfo.parse(vob, output="STRING", full=False).replace("\r\n", "\n")
                     else:
-                        vob_mi_output = MediaInfo.parse(vob_basename, output="STRING", full=False).replace("\r\n", "\n")
+                        vob_mi_output = MediaInfo.parse(vob, output="STRING", full=False).replace("\r\n", "\n")
                 except Exception as e:
                     logger.info(f"[yellow]Error with DVD MediaInfo binary for VOB: {e!s}")
-                    vob_mi_output = MediaInfo.parse(vob_basename, output="STRING", full=False).replace("\r\n", "\n")
+                    vob_mi_output = MediaInfo.parse(vob, output="STRING", full=False).replace("\r\n", "\n")
 
                 # Store VOB mediainfo (same output for both keys)
                 each["vob_mi"] = vob_mi_output
@@ -723,7 +723,7 @@ class DiscParse:
                 try:
                     if mediainfo_binary:
                         process = await asyncio.create_subprocess_exec(
-                            mediainfo_binary, ifo_basename, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, env=mediainfo_env
+                            mediainfo_binary, ifo_basename, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, env=mediainfo_env, cwd=disc_path
                         )
                         stdout, stderr = await process.communicate()
 
@@ -733,12 +733,12 @@ class DiscParse:
                             logger.info("[yellow]Specialized MediaInfo failed for IFO, falling back[/yellow]")
                             if stderr:
                                 logger.info(f"[red]MediaInfo stderr: {stderr.decode()}[/red]")
-                            ifo_mi_output = MediaInfo.parse(ifo_basename, output="STRING", full=False).replace("\r\n", "\n")
+                            ifo_mi_output = MediaInfo.parse(ifo, output="STRING", full=False).replace("\r\n", "\n")
                     else:
-                        ifo_mi_output = MediaInfo.parse(ifo_basename, output="STRING", full=False).replace("\r\n", "\n")
+                        ifo_mi_output = MediaInfo.parse(ifo, output="STRING", full=False).replace("\r\n", "\n")
                 except Exception as e:
                     logger.info(f"[yellow]Error with DVD MediaInfo binary for IFO: {e!s}")
-                    ifo_mi_output = MediaInfo.parse(ifo_basename, output="STRING", full=False).replace("\r\n", "\n")
+                    ifo_mi_output = MediaInfo.parse(ifo, output="STRING", full=False).replace("\r\n", "\n")
 
                 each["ifo_mi"] = ifo_mi_output
                 each["ifo_mi_full"] = ifo_mi_output
@@ -746,14 +746,17 @@ class DiscParse:
             except Exception as e:
                 logger.info(f"[yellow]Error using DVD MediaInfo binary, falling back to standard: {e}")
                 # Fallback to standard MediaInfo using basenames
-                vob_mi_output = MediaInfo.parse(vob_basename, output="STRING", full=False).replace("\r\n", "\n")
-                ifo_mi_output = MediaInfo.parse(ifo_basename, output="STRING", full=False).replace("\r\n", "\n")
+                vob_mi_output = MediaInfo.parse(vob, output="STRING", full=False).replace("\r\n", "\n")
+                ifo_mi_output = MediaInfo.parse(ifo, output="STRING", full=False).replace("\r\n", "\n")
                 each["vob_mi"] = vob_mi_output
                 each["ifo_mi"] = ifo_mi_output
                 each["vob_mi_full"] = vob_mi_output
                 each["ifo_mi_full"] = ifo_mi_output
 
-            size = sum(f.stat().st_size for f in Path().iterdir() if f.is_file()) / float(1 << 30)
+            for key in ("vob_mi", "ifo_mi", "vob_mi_full", "ifo_mi_full"):
+                each[key] = each[key].replace(str(disc_path) + os.sep, "")
+
+            size = sum(f.stat().st_size for f in disc_path.iterdir() if f.is_file()) / float(1 << 30)
             each["disc_size"] = round(size, 2)
             dvd_size = "DVD9"
             if size <= 4.37:
@@ -767,7 +770,7 @@ class DiscParse:
             path = each.get("path")
             if not isinstance(path, str) or not path:
                 continue
-            os.chdir(path)
+            disc_path = Path(path).resolve()
 
             try:
                 # Define the playlist path
@@ -994,7 +997,7 @@ class DiscParse:
                 logger.info(f"Playlist processing failed: {e}. Falling back to largest EVO file detection.")
 
                 # Fallback to largest .EVO file
-                files = [p.name for p in Path.cwd().glob("*.EVO")]
+                files = [p.name for p in disc_path.glob("*.EVO")]
                 if not files:
                     logger.info("No EVO files found in the directory.")
                     continue
@@ -1004,14 +1007,14 @@ class DiscParse:
 
                 # Get largest file from files
                 for file in files:
-                    file_size = Path(file).stat().st_size
+                    file_size = (disc_path / file).stat().st_size
                     if file_size > size:
                         largest = file
                         size = file_size
 
                 # Generate MediaInfo for the largest EVO file
-                each["evo_mi"] = MediaInfo.parse(Path(largest).name, output="STRING", full=False)
-                each["largest_evo"] = str(Path(f"{path}/{largest}").resolve())
+                each["evo_mi"] = MediaInfo.parse(str(disc_path / largest), output="STRING", full=False)
+                each["largest_evo"] = str(disc_path / largest)
 
         return discs
 
