@@ -588,7 +588,7 @@ config: dict[str, Any] = {
             "use_for_search": False,
             "api_key": "",
             "anon": True,
-            # Send uploads to AITHER modq for staff approval
+            # Send uploads to the moderation queue for staff review and approval
             "modq": False,
             # For authorized users only. Do not change this unless you know what you are doing
             # Upload as featured
@@ -656,6 +656,8 @@ config: dict[str, Any] = {
             "announce_url": "",
             # Set this to True if you want to allow external subtitles to be included in the upload
             "allow_ext_subtitles": True,
+            # Send uploads to the moderation queue for staff review and approval
+            "modq": False,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
             "logo_size": "",
@@ -897,6 +899,8 @@ config: dict[str, Any] = {
             "use_for_search": False,
             "api_key": "",
             "anon": True,
+            # Send uploads to the moderation queue for staff review and approval
+            "modq": False,
             # For authorized users only. Do not change this unless you know what you are doing
             # Upload as featured
             "featured": False,
@@ -977,7 +981,7 @@ config: dict[str, Any] = {
             "anon": True,
             # BiOMA Zipline API key/token for rehosting screenshots when uploading releases with tag 'BiOMA' (Host: https://img.thebioma.space/)
             "bioma_api_key": "",
-            # Send uploads to CAPYBARABR modq for staff approval
+            # Send uploads to the moderation queue for staff review and approval
             "modq": False,
             # Set this to True if you want to allow external subtitles to be included in the upload
             "allow_ext_subtitles": True,
@@ -1101,7 +1105,7 @@ config: dict[str, Any] = {
             "use_for_search": False,
             "api_key": "",
             "anon": True,
-            # Send uploads to DARKPEERS modq for staff approval
+            # Send uploads to the moderation queue for staff review and approval
             "modq": False,
             # For authorized users only. Do not change this unless you know what you are doing
             # Upload as featured
@@ -1775,7 +1779,7 @@ config: dict[str, Any] = {
             "use_for_search": False,
             "api_key": "",
             "anon": True,
-            # Send uploads to LATTEAM modq for staff approval
+            # Send uploads to the moderation queue for staff review and approval
             "modq": False,
             # For authorized users only. Do not change this unless you know what you are doing
             # Upload as featured
@@ -1920,7 +1924,7 @@ config: dict[str, Any] = {
             "use_for_search": False,
             "api_key": "",
             "anon": True,
-            # Send uploads to LST modq for staff approval
+            # Send uploads to the moderation queue for staff review and approval
             "modq": False,
             # Send uploads to LST drafts
             "draft": False,
@@ -1964,7 +1968,7 @@ config: dict[str, Any] = {
             "use_for_search": False,
             "api_key": "",
             "anon": True,
-            # Send uploads to LUMINARR modq for staff approval
+            # Send uploads to the moderation queue for staff review and approval
             "modq": False,
             # For authorized users only. Do not change this unless you know what you are doing
             # Upload as featured
@@ -2018,7 +2022,7 @@ config: dict[str, Any] = {
             "use_for_search": False,
             "api_key": "",
             "anon": True,
-            # Send uploads to MIDNIGHTSCENE modq for staff approval
+            # Send uploads to the moderation queue for staff review and approval
             "modq": False,
             # For authorized users only. Do not change this unless you know what you are doing
             # Upload as featured
@@ -2154,7 +2158,7 @@ config: dict[str, Any] = {
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
             "use_for_search": False,
             "api_key": "",
-            # Send uploads to OLDTOONSWORLD modq for staff approval
+            # Send uploads to the moderation queue for staff review and approval
             "modq": False,
             "anon": True,
             # For authorized users only. Do not change this unless you know what you are doing
@@ -2261,7 +2265,7 @@ config: dict[str, Any] = {
             "anon": True,
             # Only block uploads when the existing release exactly matches files and size.
             "exact_match_only": True,
-            # Send uploads to PEERGARDEN modq for staff approval
+            # Send uploads to the moderation queue for staff review and approval
             "modq": False,
             # For authorized users only. Do not change this unless you know what you are doing
             # Upload as featured
@@ -2753,7 +2757,7 @@ config: dict[str, Any] = {
             "use_for_search": False,
             "api_key": "",
             "anon": True,
-            # Send uploads to Retro Movies Club modq for staff approval
+            # Send uploads to the moderation queue for staff review and approval
             "modq": False,
             # For authorized users only. Do not change this unless you know what you are doing
             # Upload as featured
@@ -3122,7 +3126,7 @@ config: dict[str, Any] = {
             "use_for_search": False,
             "api_key": "",
             "anon": True,
-            # Send to modq for staff approval
+            # Send uploads to the moderation queue for staff review and approval
             "modq": False,
             # For authorized users only. Do not change this unless you know what you are doing
             # Upload as featured
@@ -3264,7 +3268,7 @@ config: dict[str, Any] = {
             "use_for_search": False,
             "api_key": "",
             "anon": True,
-            # Send to modq for staff approval
+            # Send uploads to the moderation queue for staff review and approval
             "modq": False,
             # For authorized users only. Do not change this unless you know what you are doing
             # Upload as featured
@@ -3418,7 +3422,7 @@ config: dict[str, Any] = {
             "use_for_search": False,
             "api_key": "",
             "anon": True,
-            # Send uploads to ZENITH modq for staff approval
+            # Send uploads to the moderation queue for staff review and approval
             "modq": False,
             # For authorized users only. Do not change this unless you know what you are doing
             # Upload as featured

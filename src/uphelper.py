@@ -776,6 +776,7 @@ class UploadHelper:
                 logger.info("[bold red]Aborting...[/bold red]")
                 exit()
         tracker_release_names: dict[str, str] = {}
+        modq_enabled_in_config_trackers: list[str] = []
         for tracker_name in meta.trackers:
             if tracker_name in ("MANUAL", "USENET"):
                 continue
@@ -802,6 +803,15 @@ class UploadHelper:
 
                 if display_name:
                     tracker_release_names[tracker_name] = display_name
+
+                # Get modq trackers
+                if self.config["TRACKERS"][tracker_name].get("modq") is True:
+                    modq_enabled_in_config_trackers.append(tracker_name)
+
+        if meta.modq:
+            logger.info("[green]Will be sent to the moderation queue, if available.[/green]")
+        elif modq_enabled_in_config_trackers:
+            logger.info(f"[green]Will be sent to the moderation queue: {', '.join(modq_enabled_in_config_trackers)}[/green]")
 
         if tracker_release_names:
             logger.info(f"[bold]Base Name:[/bold] {meta.name}\n", extra={"highlighter": None})
