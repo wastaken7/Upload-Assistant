@@ -24,7 +24,7 @@ from src.edition import get_edition
 from src.exceptions import NoAudioMediaError
 from src.exportmi import export_info, get_conformance_error, mi_resolution, validate_mediainfo
 from src.get_source import get_source
-from src.imdb import imdb_manager
+from src.imdb import imdb_manager, imdb_match_rejection
 from src.languages import languages_manager
 from src.media_extensions import VIDEO_EXTENSIONS
 from src.meta import Meta
@@ -837,6 +837,32 @@ def _clear_imdb_metadata(meta: Meta) -> None:
     meta.imdb_rating = ""
 
 
+def _reject_invalid_automatic_imdb(meta: Meta, filename: str) -> None:
+    if meta.no_imdb or meta.imdb_manual or not meta.imdb_id or meta.category not in ("MOVIE", "TV"):
+        return
+
+    info = meta.imdb_info if isinstance(meta.imdb_info, dict) else {}
+    info_id = str(info.get("imdbID") or "").removeprefix("tt")
+    if not info_id:
+        reason = "IMDb details are unavailable"
+    elif not info_id.isdigit() or int(info_id) != int(meta.imdb_id):
+        reason = "IMDb details refer to a different ID"
+    else:
+        titles = [filename, meta.filename, meta.title, meta.original_title, meta.secondary_title or ""]
+        reason = imdb_match_rejection(meta.category, meta.year or meta.search_year, titles, info, int(meta.tmdb_imdb_id or 0))
+    if not reason:
+        return
+
+    imdb_titles = {str(info.get(key) or "").casefold().strip() for key in ("title", "aka")}
+    if meta.aka and meta.aka.removeprefix("AKA ").casefold().strip() in imdb_titles:
+        meta.aka = ""
+    logger.warning(f"[yellow]Ignoring automatic IMDb tt{meta.imdb_id}: {reason}. Continuing without IMDb.[/yellow]")
+    _clear_imdb_metadata(meta)
+    meta.no_imdb = True
+    meta.imdb_mismatch = False
+    meta.mismatched_imdb_id = 0
+
+
 def _should_fetch_bluray_info(meta: Meta, get_bluray_info: bool) -> bool:
     return bool(
         meta.is_disc in ("BDMV", "DVD") and get_bluray_info and (not meta.distributor or not meta.region) and meta.imdb_id != 0 and not meta.edit and not meta.site_check
@@ -1204,6 +1230,7 @@ async def search_metadata(
                 attempted=0,
                 duration=duration,
                 unattended=unattended,
+                on_manual_selection=lambda selected_id: setattr(meta, "imdb_manual", selected_id),
             )
         except Exception as e:
             logger.error(f"[red]Error searching IMDb: {e}[/red]")
@@ -1242,6 +1269,8 @@ async def search_metadata(
     if not meta.no_imdb and not meta.imdb_info and imdb_id_value != 0 and meta.category not in ("BOOK", "GAME", "XXX"):
         imdb_info = await imdb_manager.get_imdb_info_api(imdb_id_value, manual_language=meta.manual_language, base_dir=meta.base_dir, config=prep_instance.config)
         meta.imdb_info = imdb_info
+
+    _reject_invalid_automatic_imdb(meta, filename)
 
     meta.populate_cast()
 
@@ -1357,7 +1386,7 @@ async def finalize_metadata(
         if meta.category == "TV" and meta.tv_pack:
             await prep_instance.season_episode_manager.check_season_pack_completeness(meta)
 
-        if meta.tvdb_imdb_id and not meta.no_imdb:
+        if meta.tvdb_imdb_id and not meta.no_imdb and not meta.imdb_manual:
             imdb = meta.tvdb_imdb_id.replace("tt", "")
             if imdb.isdigit() and imdb != meta.imdb_id:
                 episode_info = await imdb_manager.get_imdb_from_episode(imdb)
@@ -1372,6 +1401,7 @@ async def finalize_metadata(
                                 meta.imdb_id, manual_language=meta.manual_language, base_dir=meta.base_dir, config=prep_instance.config
                             )
                             meta.imdb_info = imdb_info
+                            _reject_invalid_automatic_imdb(meta, filename)
                             check_valid_data = meta.imdb_info.get("title", "")
                             if check_valid_data:
                                 title_val = meta.title.strip()
