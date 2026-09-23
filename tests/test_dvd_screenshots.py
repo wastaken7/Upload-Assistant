@@ -23,12 +23,17 @@ def test_discard_smallest_capture_result_only_removes_current_batch(tmp_path) ->
     assert capture_results == [str(captured_large)]
 
 
-def test_dvd_content_check_uses_pixels_instead_of_png_file_size(tmp_path) -> None:
+def test_dvd_content_check_requires_size_and_visible_pixels(tmp_path) -> None:
     visible = tmp_path / "visible.png"
     blank = tmp_path / "blank.png"
-    Image.linear_gradient("L").resize((854, 480)).save(visible)
-    Image.new("L", (854, 480), 0).save(blank)
+    small_visible = tmp_path / "small-visible.png"
+    Image.effect_noise((854, 480), 20).save(visible)
+    Image.new("L", (854, 480), 0).save(blank, compress_level=0)
+    Image.linear_gradient("L").resize((854, 480)).save(small_visible)
 
-    assert visible.stat().st_size < 75_000
+    assert visible.stat().st_size >= 20 * 1024
+    assert blank.stat().st_size >= 20 * 1024
+    assert small_visible.stat().st_size < 20 * 1024
     assert dvd_screenshot_has_content(visible)
     assert not dvd_screenshot_has_content(blank)
+    assert not dvd_screenshot_has_content(small_visible)

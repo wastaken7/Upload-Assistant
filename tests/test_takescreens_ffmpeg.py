@@ -212,7 +212,7 @@ async def test_dvd_screenshots_uses_complete_title_set(monkeypatch, tmp_path):
 
     async def capture_stub(task):
         index, source, image, seek_time, *_rest = task
-        Image.linear_gradient("L").resize((720, 480)).save(image)
+        Image.effect_noise((720, 480), 20).save(image)
         captured.append((index, source, seek_time))
         return index, image
 
@@ -278,7 +278,7 @@ async def test_dvd_retake_uses_only_valid_replacement(monkeypatch, tmp_path, ret
     blank_image = tmp_path / "blank.png"
     visible_image = tmp_path / "visible.png"
     Image.new("L", (720, 480), 0).save(blank_image)
-    Image.linear_gradient("L").resize((720, 480)).save(visible_image)
+    Image.effect_noise((720, 480), 20).save(visible_image)
     blank_bytes = blank_image.read_bytes()
     visible_bytes = visible_image.read_bytes()
     if existing_blank:

@@ -342,8 +342,10 @@ def discard_smallest_capture_result(capture_results: list[str]) -> str | None:
 
 
 def dvd_screenshot_has_content(path: str | Path) -> bool:
-    """Reject unreadable and near-uniform DVD frames regardless of PNG size."""
+    """Reject unusually small, unreadable, and near-uniform DVD frames."""
     try:
+        if Path(path).stat().st_size < 20 * 1024:
+            return False
         with Image.open(path) as image:
             low, high = image.convert("L").getextrema()
             return high >= 10 and high - low >= 10
