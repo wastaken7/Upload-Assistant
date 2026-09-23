@@ -484,7 +484,7 @@ class BroadcasTheNet:
         return name
 
     async def _api(self, method: str, params: dict[str, Any]) -> dict[str, Any]:
-        payload: dict[str, Any] = {"jsonrpc": "2.0", "id": "upload-assistant-btn", "method": method, "params": {"key": self.api_key, **params}}
+        payload: dict[str, Any] = {"id": "upload-assistant-btn", "method": method, "params": {"key": self.api_key, **params}}
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(self.api_url, json=payload)
         response.raise_for_status()
@@ -508,7 +508,7 @@ class BroadcasTheNet:
         elif int(meta.imdb_id or 0):
             filters["imdb"] = str(meta.imdb_id)
         else:
-            filters["searchstr"] = str(meta.title)
+            filters["search"] = str(meta.title)
         try:
             result = await self._api("getTorrents", {"search": filters, "results": 100, "offset": 0})
         except (httpx.HTTPError, ValueError, UploadError) as exc:

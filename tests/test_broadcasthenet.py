@@ -133,4 +133,19 @@ def test_btn_api_sends_named_search_parameters(monkeypatch) -> None:
 
     asyncio.run(tracker().search_existing(Meta(category="TV", tvdb_id=42)))
 
+    assert requests[0]["id"] == "upload-assistant-btn"  # noqa: S101
+    assert requests[0]["method"] == "getTorrents"  # noqa: S101
+    assert "jsonrpc" not in requests[0]  # noqa: S101
     assert requests[0]["params"] == {"key": "token", "search": {"category": "Episode", "tvdb": "42"}, "results": 100, "offset": 0}  # noqa: S101
+
+
+def test_btn_dupe_search_uses_documented_text_filter(monkeypatch) -> None:
+    async def fake_api(method: str, params: dict[str, object]) -> dict[str, object]:
+        assert method == "getTorrents"  # noqa: S101
+        assert params["search"] == {"category": "Episode", "search": "Example Show"}  # noqa: S101
+        return {"result": {"torrents": {}}}
+
+    btn = tracker()
+    monkeypatch.setattr(btn, "_api", fake_api)
+
+    assert asyncio.run(btn.search_existing(Meta(category="TV", title="Example Show"))) == []  # noqa: S101
