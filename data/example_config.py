@@ -962,8 +962,8 @@ config: dict[str, Any] = {
         },
         "BROADCASTHENET": {
             # BTN accepts TV only. An API key is required for dupe searching and
-            # downloading BTN's registered torrent; upload authentication uses
-            # browser-exported cookies in data/cookies/BROADCASTHENET.txt.
+            # resolving uploads that return a group page. Upload authentication
+            # uses browser-exported cookies in data/cookies/BROADCASTHENET.txt.
             "link_dir_name": "",
             "use_for_search": False,
             "api_key": "",
