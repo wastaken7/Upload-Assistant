@@ -809,9 +809,9 @@ class UploadHelper:
                     modq_enabled_in_config_trackers.append(tracker_name)
 
         if meta.modq:
-            logger.info("[green]Will be sent to the moderation queue, if available.[/green]")
+            logger.info("[green]Will be sent to the moderation queue, if available.[/green]\n")
         elif modq_enabled_in_config_trackers:
-            logger.info(f"[green]Will be sent to the moderation queue:[/green] {', '.join(modq_enabled_in_config_trackers)}")
+            logger.info(f"[green]Will be sent to the moderation queue:[/green] {', '.join(modq_enabled_in_config_trackers)}\n")
 
         if tracker_release_names:
             logger.info(f"[bold]Base Name:[/bold] {meta.name}\n", extra={"highlighter": None})
