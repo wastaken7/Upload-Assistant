@@ -1,4 +1,7 @@
 import asyncio
+import json
+
+import httpx
 
 from src.meta import Meta
 from src.trackers.broadcasthenet import BroadcasTheNet
@@ -49,8 +52,8 @@ def test_btn_form_fields_keeps_autofilled_values() -> None:
 
 
 def test_btn_dupe_search_projects_api_rows(monkeypatch) -> None:
-    async def fake_api(method: str, params: list[object]) -> dict[str, object]:
-        if method != "getTorrents" or params[0] != {"category": "Episode", "tvdb": "123"}:
+    async def fake_api(method: str, params: dict[str, object]) -> dict[str, object]:
+        if method != "getTorrents" or params != {"search": {"category": "Episode", "tvdb": "123"}, "results": 100, "offset": 0}:
             raise AssertionError("unexpected BTN API request")
         return {"result": {"torrents": {"456": {"GroupID": "789", "ReleaseName": "Show.S01E01", "Size": "1024", "FileCount": "2"}}}}
 
@@ -68,8 +71,8 @@ def test_btn_requires_tvdb_or_imdb_id_before_upload() -> None:
 
 
 def test_btn_dupe_search_uses_season_category_for_packs(monkeypatch) -> None:
-    async def fake_api(method: str, params: list[object]) -> dict[str, object]:
-        if method != "getTorrents" or params[0] != {"category": "Season", "tvdb": "123"}:
+    async def fake_api(method: str, params: dict[str, object]) -> dict[str, object]:
+        if method != "getTorrents" or params != {"search": {"category": "Season", "tvdb": "123"}, "results": 100, "offset": 0}:
             raise AssertionError("unexpected BTN API request")
         return {"result": {"torrents": {}}}
 
@@ -86,3 +89,48 @@ def test_btn_preserves_legacy_default_api_key_during_tracker_filtering() -> None
     setup.trackers_enabled(meta)
 
     assert meta.trackers == ["BROADCASTHENET"]  # noqa: S101
+
+
+def test_btn_group_page_does_not_identify_an_older_torrent() -> None:
+    group_id, torrent_id = tracker()._upload_ids(
+        "https://backup.landof.tv/torrents.php?id=123",
+        '<a href="torrents.php?id=123&amp;torrentid=789">Older 720p torrent</a>',
+    )
+
+    assert (group_id, torrent_id) == ("123", "")  # noqa: S101
+
+
+def test_btn_finds_uploaded_release_in_its_group(monkeypatch) -> None:
+    async def fake_api(method: str, params: dict[str, object]) -> dict[str, object]:
+        assert method == "getTorrents"  # noqa: S101
+        assert params == {"search": {"tvdb": "42"}, "results": 1000, "offset": 0}  # noqa: S101
+        return {
+            "result": {
+                "torrents": {
+                    "789": {"GroupID": "123", "ReleaseName": "Show.S01E01.720p-GRP"},
+                    "456": {"GroupID": "123", "ReleaseName": "Show.S01E01.1080p-GRP"},
+                    "999": {"GroupID": "999", "ReleaseName": "Show.S01E01.1080p-GRP"},
+                }
+            }
+        }
+
+    btn = tracker()
+    monkeypatch.setattr(btn, "_api", fake_api)
+
+    assert asyncio.run(btn._uploaded_torrent_id("Show.S01E01.1080p-GRP", "123", Meta(tvdb_id=42))) == "456"  # noqa: S101
+
+
+def test_btn_api_sends_named_search_parameters(monkeypatch) -> None:
+    requests: list[dict[str, object]] = []
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        requests.append(json.loads(request.content))
+        return httpx.Response(200, json={"result": {"torrents": {}}})
+
+    original_client = httpx.AsyncClient
+    transport = httpx.MockTransport(respond)
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: original_client(transport=transport, **kwargs))
+
+    asyncio.run(tracker().search_existing(Meta(category="TV", tvdb_id=42)))
+
+    assert requests[0]["params"] == {"key": "token", "search": {"category": "Episode", "tvdb": "42"}, "results": 100, "offset": 0}  # noqa: S101

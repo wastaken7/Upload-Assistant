@@ -7,10 +7,12 @@ This adapter keeps that transaction on one authenticated cookie session and
 replaces the locally-created torrent with BTN's registered torrent afterwards.
 """
 
+import asyncio
 import re
 import unicodedata
 from pathlib import Path
 from typing import Any, ClassVar, cast
+from urllib.parse import parse_qs, urlparse
 
 import aiofiles
 import httpx
@@ -481,8 +483,8 @@ class BroadcasTheNet:
             name += "-NOGRP"
         return name
 
-    async def _api(self, method: str, params: list[Any]) -> dict[str, Any]:
-        payload: dict[str, Any] = {"jsonrpc": "2.0", "id": "upload-assistant-btn", "method": method, "params": [self.api_key, *params]}
+    async def _api(self, method: str, params: dict[str, Any]) -> dict[str, Any]:
+        payload: dict[str, Any] = {"jsonrpc": "2.0", "id": "upload-assistant-btn", "method": method, "params": {"key": self.api_key, **params}}
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(self.api_url, json=payload)
         response.raise_for_status()
@@ -508,7 +510,7 @@ class BroadcasTheNet:
         else:
             filters["searchstr"] = str(meta.title)
         try:
-            result = await self._api("getTorrents", [filters, 100, 0])
+            result = await self._api("getTorrents", {"search": filters, "results": 100, "offset": 0})
         except (httpx.HTTPError, ValueError, UploadError) as exc:
             logger.warning(f"{self.tracker}: duplicate lookup failed: {exc}")
             return []
@@ -532,6 +534,43 @@ class BroadcasTheNet:
                 }
             )
         return dupes
+
+    async def _uploaded_torrent_id(self, release_name: str, group_id: str, meta: Meta) -> str:
+        if not self.api_key:
+            raise UploadError("BTN needs an API key to identify the uploaded torrent on a group page", "red")
+        search = {"tvdb": str(meta.tvdb_id)} if int(meta.tvdb_id or 0) else {}
+        for attempt in range(4):
+            if attempt:
+                await asyncio.sleep(2)
+            result = await self._api("getTorrents", {"search": search, "results": 1000, "offset": 0})
+            payload = result.get("result")
+            torrents = payload.get("torrents") if isinstance(payload, dict) else None
+            if not isinstance(torrents, dict):
+                continue
+            matches = [
+                str(torrent_id)
+                for torrent_id, item in torrents.items()
+                if isinstance(item, dict)
+                and str(item.get("GroupID") or item.get("groupId") or "") == group_id
+                and str(item.get("ReleaseName") or item.get("releaseName") or "").casefold() == release_name.casefold()
+            ]
+            if len(matches) == 1:
+                return matches[0]
+            if len(matches) > 1:
+                raise UploadError("BTN returned multiple torrents matching the uploaded release", "red")
+        raise UploadError("BTN did not return the uploaded torrent ID after four API checks", "red")
+
+    @staticmethod
+    def _upload_ids(response_url: str, response_html: str) -> tuple[str, str]:
+        parsed = urlparse(response_url)
+        if parsed.path.endswith("/torrents.php"):
+            query = parse_qs(parsed.query)
+            group_id = query.get("id", [""])[0]
+            torrent_id = query.get("torrentid", [""])[0]
+            if group_id.isdigit():
+                return group_id, torrent_id if torrent_id.isdigit() else ""
+        match = re.search(r"torrents\.php\?id=(\d+)", response_html)
+        return (match.group(1), "") if match else ("", "")
 
     @staticmethod
     def _mapping(meta: Meta) -> tuple[str, str, str, str]:
@@ -676,64 +715,15 @@ class BroadcasTheNet:
                 data = {key: value for key, value in data.items() if value or key == "release_desc"}
                 response = await client.post(self.upload_url, data=data, files={"file_input": ("upload.torrent", torrent, "application/x-bittorrent")})
                 response.raise_for_status()
-                match = re.search(r"torrents\.php\?id=(\d+)(?:&(?:amp;)?torrentid=(\d+))?", str(response.url) + response.text)
-
-                if not match:
+                group_id, torrent_id = self._upload_ids(str(response.url), response.text)
+                if not group_id:
                     failure_path = work_dir / f"[{self.tracker}]BTN_upload_failure.html"
                     async with aiofiles.open(failure_path, "w", encoding="utf-8") as f:
                         await f.write(response.text)
                     raise UploadError(f"BTN upload did not return a registered torrent ID. See {failure_path}", "red")
 
-                group_id = match.group(1)
-                torrent_id = match.group(2)
-
                 if not torrent_id:
-                    # Fetch the intermediate page link to get the full URL/body with torrentid
-                    detail_url = f"{self.base_url}/torrents.php?id={group_id}"
-                    detail_response = await client.get(detail_url)
-                    detail_response.raise_for_status()
-
-                    # Iterate through all matches in the body to find one that includes the torrentid
-                    for detail_match in re.finditer(r"torrents\.php\?id=(\d+)(?:&(?:amp;)?torrentid=(\d+))?", detail_response.text):
-                        if detail_match.group(1) == group_id and detail_match.group(2):
-                            torrent_id = detail_match.group(2)
-                            break
-
-                    if not torrent_id:
-                        dl_match = re.search(r"torrents\.php\?action=download(?:&amp;|&)id=(\d+)", detail_response.text)
-                        if dl_match:
-                            torrent_id = dl_match.group(1)
-
-                    if not torrent_id:
-                        if not self.api_key:
-                            raise UploadError(
-                                "BTN upload reached intermediate page but failed to resolve torrent_id via HTML. Set an api_key in your BTN config to enable API fallback.",
-                                "red",
-                            )
-
-                        logger.info("BTN HTML parsing failed. Falling back to API search...")
-                        filters = {"searchstr": release_name}
-                        if group_id:
-                            filters["group"] = group_id
-
-                        search_results = await self._api("getTorrentsSearch", [filters, 5])
-                        search_payload: Any = search_results.get("result", {})
-                        search_payload = cast(dict[str, Any], search_payload) if isinstance(search_payload, dict) else {}
-                        torrents: dict[str, dict[str, Any]] = (
-                            cast(dict[str, dict[str, Any]], search_payload.get("torrents")) if isinstance(search_payload.get("torrents"), dict) else {}
-                        )
-
-                        if isinstance(torrents, dict):
-                            for tid, tdata in torrents.items():
-                                if str(tdata.get("ReleaseName", "")) == release_name:
-                                    torrent_id = str(tid)
-                                    break
-
-                    if not torrent_id:
-                        debug_path = work_dir / f"[{self.tracker}]BTN_intermediate_debug.html"
-                        async with aiofiles.open(debug_path, "w", encoding="utf-8") as f:
-                            await f.write(detail_response.text)
-                        raise UploadError(f"BTN upload reached intermediate page but failed to resolve torrent_id. Saved HTML to {debug_path}", "red")
+                    torrent_id = await self._uploaded_torrent_id(release_name, group_id, meta)
 
                 download = await client.get(f"{self.base_url}/torrents.php?action=download&id={torrent_id}")
                 download.raise_for_status()
