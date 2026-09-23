@@ -1279,7 +1279,7 @@ class AmigosShare:
         if meta.modq:
             return False
         if config_flag is True:
-            return config_flag
+            return False
 
         return True
 
