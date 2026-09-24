@@ -188,7 +188,7 @@ async def test_capture_screenshot_applies_selected_libplacebo_tonemapping(monkey
 
 
 @pytest.mark.asyncio
-async def test_dvd_screenshots_uses_complete_title_set(monkeypatch, tmp_path):
+async def test_dvd_screenshots_uses_complete_title_set_and_ifo_duration(monkeypatch, tmp_path):
     disc_path = tmp_path / "VIDEO_TS"
     disc_path.mkdir()
     main_set = ["01_0.VOB", "01_1.VOB", "01_2.VOB", "01_3.VOB"]
@@ -201,12 +201,12 @@ async def test_dvd_screenshots_uses_complete_title_set(monkeypatch, tmp_path):
             duration = durations[Path(path).name.removeprefix("VTS_")]
             return json.dumps({"media": {"track": [{"Duration": duration, "Width": 720, "Height": 480}]}})
         return SimpleNamespace(
-            tracks=[SimpleNamespace(track_type="Video", duration="3000000", pixel_aspect_ratio="1", display_aspect_ratio="1.5", width="720", height="480", frame_rate="24")]
+            tracks=[SimpleNamespace(track_type="Video", duration="5000000", pixel_aspect_ratio="1", display_aspect_ratio="1.5", width="720", height="480", frame_rate="24")]
         )
 
     async def valid_times_stub(_times, num_screens, length, _frame_rate, _meta, retake=False):
         assert num_screens == 2
-        assert length == 3000.0
+        assert length == 5000.0
         assert retake is False
         return ["100", "1500", "2700"]
 
@@ -265,6 +265,87 @@ async def test_dvd_capture_marks_png_as_single_image(monkeypatch, tmp_path):
 
     assert result == (0, str(output))
     assert commands[0][commands[0].index("-update") + 1] == "1"
+    assert commands[0].index("-ss") > commands[0].index("-i")
+
+
+@pytest.mark.asyncio
+async def test_dvd_capture_seeks_with_dvdvideo_title(monkeypatch, tmp_path):
+    output = tmp_path / "frame.png"
+    source = tmp_path / "VIDEO_TS" / "VTS_01_1.VOB"
+    commands = []
+
+    async def run_stub(command):
+        commands.append(takescreens.compile_ffmpeg_command(command))
+        output.write_bytes(b"png")
+        return 0, b"", b""
+
+    monkeypatch.setattr(takescreens, "run_ffmpeg", run_stub)
+    monkeypatch.setattr(takescreens, "overlay_filters", lambda *_args, **_kwargs: [])
+
+    result = await takescreens.capture_dvd_screenshot((0, str(source), str(output), "100", Meta(ffdebug=False), 720, 480, 1, 1, 2))
+
+    assert result == (0, str(output))
+    assert commands[0][commands[0].index("-f") + 1] == "dvdvideo"
+    assert commands[0][commands[0].index("-title") + 1] == "2"
+    assert commands[0][commands[0].index("-i") + 1] == str(source.parent)
+    assert commands[0].index("-ss") < commands[0].index("-i")
+
+
+@pytest.mark.asyncio
+async def test_dvd_capture_falls_back_when_dvdvideo_is_unavailable(monkeypatch, tmp_path):
+    output = tmp_path / "frame.png"
+    source = tmp_path / "VIDEO_TS" / "VTS_01_1.VOB"
+    commands = []
+
+    async def run_stub(command):
+        commands.append(takescreens.compile_ffmpeg_command(command))
+        if len(commands) == 1:
+            return 1, b"", b"Unknown input format: dvdvideo"
+        output.write_bytes(b"png")
+        return 0, b"", b""
+
+    monkeypatch.setattr(takescreens, "run_ffmpeg", run_stub)
+    monkeypatch.setattr(takescreens, "overlay_filters", lambda *_args, **_kwargs: [])
+
+    result = await takescreens.capture_dvd_screenshot((0, str(source), str(output), "100", Meta(ffdebug=False), 720, 480, 1, 1, 1))
+
+    assert result == (0, str(output))
+    assert len(commands) == 2
+    assert "dvdvideo" not in commands[1]
+    assert commands[1].index("-ss") > commands[1].index("-i")
+
+
+@pytest.mark.asyncio
+async def test_matching_dvd_title_uses_ifo_duration(monkeypatch, tmp_path):
+    (tmp_path / "VIDEO_TS.IFO").write_bytes(b"ifo")
+    titles = []
+
+    def probe_stub(_path, **kwargs):
+        titles.append(kwargs["title"])
+        return {"format": {"duration": "100" if kwargs["title"] == 1 else "1200"}}
+
+    monkeypatch.setattr(takescreens.ffmpeg, "probe", probe_stub)
+
+    assert await takescreens.matching_dvd_title(tmp_path, 1200) == 2
+    assert titles == [1, 2]
+
+
+@pytest.mark.asyncio
+async def test_dvd_frame_info_uses_absolute_time_after_title_seek(monkeypatch, tmp_path):
+    source = tmp_path / "VIDEO_TS" / "VTS_01_1.VOB"
+    commands = []
+
+    async def run_stub(command):
+        commands.append(takescreens.compile_ffmpeg_command(command))
+        return 0, b"", b"pict_type:I pts_time:0.050000"
+
+    monkeypatch.setattr(takescreens, "run_ffmpeg", run_stub)
+
+    result = await takescreens.get_frame_info(str(source), 100, Meta(frame_rate=30), dvd_title=1)
+
+    assert result == {"frame_type": "I", "frame_number": 3001, "pts_time": 100.05}
+    assert commands[0][commands[0].index("-f") + 1] == "dvdvideo"
+    assert commands[0][commands[0].index("-i") + 1] == str(source.parent)
 
 
 @pytest.mark.asyncio
