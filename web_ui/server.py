@@ -2657,6 +2657,8 @@ class ExecutionPreview(TypedDict, total=False):
     name: str
     status: str
     audio: str
+    audio_tracks: list[dict[str, object]]
+    subtitle_tracks: list[dict[str, object]]
     service: str
     networks: list[str]
     season: str
