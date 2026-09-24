@@ -7,14 +7,15 @@ import unicodedata
 from src.meta import Meta
 
 _SPORTS_RELEASE_PATTERN = re.compile(
-    r"\b(?:aew|efl|fifa|formula ?1|formula one|mlb|motogp|moto[23]|nascar|nba|nfl|nhl|olympics?|olimpiadas|ppv|ufc|uefa|"
-    r"ultimate fighting championship|wrc|wwe|copa libertadores|copa sudamericana|africa cup of nations|australian open|"
-    r"davis cup|billie jean king cup|ryder cup|solheim cup|world snooker championship|pdc world darts championship)\b|\bgrand prix\b",
+    r"^(?:(?P<numbered>ufc|ultimate fighting championship)|"
+    r"(?P<formula>f1|formula ?1|formula one)|"
+    r"aew|efl|epl|fifa|mlb|motogp|moto[23]|nascar|nba|nfl|nhl|olympics?|olimpiadas|ppv|uefa|"
+    r"wrc|wwe|copa libertadores|copa sudamericana|africa cup of nations|australian open|"
+    r"davis cup|billie jean king cup|ryder cup|solheim cup|world snooker championship|pdc world darts championship|grand prix)\b",
     re.IGNORECASE,
 )
 _SPORTS_EVENT_PATTERN = re.compile(
-    r"\b(?:boxing|boxe|combat sports?|mixed martial arts|artes marciais mistas|motorsports?|sporting|sports?|esportivo|esportiva|wrestling) "
-    r"(?:event|evento)\b",
+    r"\b(?:round \d{1,2}|(?:semi ?|quarter ?)?finals?|qualifying)\b|\b\w+ (?:vs|versus) \w+\b",
     re.IGNORECASE,
 )
 
@@ -37,11 +38,19 @@ def detect_sports(meta: Meta) -> bool:
     if category == "game":
         return False
 
-    # Genres, keywords, synopses and producers can describe a sports-themed
-    # series or movie. Require event naming rather than subject matter alone.
+    # Require a competition prefix and event details in the same title.
+    # Competition mentions, years and sports subject metadata are insufficient.
     for field_name in ("title", "original_title", "name", "name_notag", "regex_title"):
         value = _normalize(str(getattr(meta, field_name, "") or ""))
-        if _SPORTS_RELEASE_PATTERN.search(value) or _SPORTS_EVENT_PATTERN.search(value):
+        competition = _SPORTS_RELEASE_PATTERN.match(value)
+        if not competition:
+            continue
+        details = value[competition.end():]
+        if competition.group("numbered") and re.match(r" \d{1,3}\b", details):
+            return True
+        if competition.group("formula") and re.search(r"\bgrand prix\b", details):
+            return True
+        if _SPORTS_EVENT_PATTERN.search(details):
             return True
 
     return False

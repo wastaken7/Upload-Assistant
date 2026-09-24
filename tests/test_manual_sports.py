@@ -17,9 +17,11 @@ from src.trackers.UNIT3D.aither import Aither
 @pytest.mark.parametrize("title,flags,override,is_sports", [
     ("Example Tournament", [], None, False),
     ("Example Tournament", ["--category", "sports"], "sports", True),
-    ("Example Boxing Event", [], None, True),
-    ("Example Boxing Event", ["--category", "tv"], "tv", False),
-    ("Example Boxing Event", ["--category", "movie"], "movie", False),
+    ("Example Boxing Event", [], None, False),
+    ("UFC 123 Example Event", [], None, True),
+    ("UFC 123 Example Event", ["--category", "tv"], "tv", False),
+    ("UFC 123 Example Event", ["--category", "movie"], "movie", False),
+    ("Example The Impossible Formula 1 Story", [], None, False),
 ])
 async def test_cli_sports_override_reaches_aither_payload(tmp_path, monkeypatch, title, flags, override, is_sports):
     video = tmp_path / "Example.Release.S01E03.mkv"

@@ -64,7 +64,7 @@ def test_aither_moves_aka_before_a_present_year() -> None:
 @pytest.mark.parametrize("sports_event", [False, True])
 async def test_aither_upload_category_and_tv_fields_agree(monkeypatch, episode, tv_pack, sports_event):
     tracker = Aither({"DEFAULT": {}, "TRACKERS": {"AITHER": {}}})
-    title = "Example Boxing Event" if sports_event else "Example Sports Family"
+    title = "UFC 123 Example Event" if sports_event else "Example Sports Family"
     meta = Meta(
         category="TV", title=title, name=f"{title} S01 1080p WEB-DL-GROUP",
         genres=["Reality", "Sport"], keywords=["baseball"],
