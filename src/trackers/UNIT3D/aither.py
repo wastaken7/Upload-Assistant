@@ -55,6 +55,16 @@ class Aither(UNIT3D):
         resolved_category = "SPORTS" if meta.is_sports else category or meta.category
         return {"category_id": category_id.get(resolved_category, "0")}
 
+    async def get_season_number(self, meta: Meta) -> dict[str, str]:
+        if (await self.get_category_id(meta))["category_id"] != "2":
+            return {}
+        return await super().get_season_number(meta)
+
+    async def get_episode_number(self, meta: Meta) -> dict[str, str]:
+        if (await self.get_category_id(meta))["category_id"] != "2":
+            return {}
+        return await super().get_episode_number(meta)
+
     async def get_additional_checks(self, meta: Meta):
         should_continue = True
 
