@@ -30,10 +30,10 @@ def test_midnightscene_scene_music_name_replaces_only_underscores():
     meta = Meta(
         category="MUSIC",
         scene=True,
-        scene_name="The_Longing_Ghost-Estuary-(TLG03)-WEB-2025-BABAS",
+        scene_name="Example_Band-Sample_Album-(TLG03)-WEB-2025-BABAS",
     )
 
-    assert asyncio.run(_tracker().get_name(meta)) == {"name": "The Longing Ghost-Estuary-(TLG03)-WEB-2025-BABAS"}
+    assert asyncio.run(_tracker().get_name(meta)) == {"name": "Example Band-Sample Album-(TLG03)-WEB-2025-BABAS"}
 
 
 def test_midnightscene_non_scene_music_name_uses_directory_style():
@@ -41,8 +41,8 @@ def test_midnightscene_non_scene_music_name_uses_directory_style():
         category="MUSIC",
         music_release={
             "fields": {
-                "artist": {"value": "Björk"},
-                "album": {"value": "Vespertine"},
+                "artist": {"value": "Example Artist"},
+                "album": {"value": "Sample Album"},
                 "release_year": {"value": "2001"},
                 "release_catalogue_number": {"value": "TPLP101CD"},
                 "media": {"value": "CD"},
@@ -51,7 +51,7 @@ def test_midnightscene_non_scene_music_name_uses_directory_style():
         },
     )
 
-    assert asyncio.run(_tracker().get_name(meta)) == {"name": "Björk - Vespertine (2001) [TPLP101CD] [CD - FLAC]"}
+    assert asyncio.run(_tracker().get_name(meta)) == {"name": "Example Artist - Sample Album (2001) [TPLP101CD] [CD - FLAC]"}
 
 
 def test_midnightscene_removes_dual_audio_without_english_audio():

@@ -7,12 +7,12 @@ from src.meta import Meta
 
 
 def test_xxx_name_preserves_release_and_only_replaces_dots():
-    release_name = "OnlyFans.2026.19yo.Lilibet.Saunders.Fucks.Lucky.Older.Fan.Big.Naturals.XXX.MP4-P0RNL0V3RSD"
-    meta = Meta(category="XXX", basename_no_ext=release_name, tag="-P0RNL0V3RSD")
+    release_name = "OnlyFans.2026.19yo.Example.Performer.Sample.Clip.XXX.MP4-EXAMPLEGRP"
+    meta = Meta(category="XXX", basename_no_ext=release_name, tag="-EXAMPLEGRP")
 
     name_notag, name, clean_name, potential_missing = asyncio.run(NameManager({}).get_name(meta))
 
-    expected = "OnlyFans 2026 19yo Lilibet Saunders Fucks Lucky Older Fan Big Naturals XXX MP4-P0RNL0V3RSD"
+    expected = "OnlyFans 2026 19yo Example Performer Sample Clip XXX MP4-EXAMPLEGRP"
     assert name_notag == expected
     assert name == expected
     assert clean_name == expected

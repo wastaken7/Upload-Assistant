@@ -40,16 +40,16 @@ def test_uses_aither_torrent_comment_id():
 
 def test_matches_single_file_inside_folder_torrent_content_path():
     client = Clients({"TRACKERS": {}})
-    media = r"F:\Filmes\Heat\Heat.mkv"
-    torrent = SimpleNamespace(name="Heat", content_path=media)
+    media = r"F:\Filmes\SampleFilm\SampleFilm.mkv"
+    torrent = SimpleNamespace(name="SampleFilm", content_path=media)
 
-    assert client._matches_qbit_content_path(torrent, Meta({"path": media, "uuid": "Heat.mkv"}))  # noqa: S101
+    assert client._matches_qbit_content_path(torrent, Meta({"path": media, "uuid": "SampleFilm.mkv"}))  # noqa: S101
 
 
 def test_matches_torrent_name_when_content_path_is_unavailable():
     client = Clients({"TRACKERS": {}})
-    media = r"F:\Filmes\Heat\Heat.mkv"
-    torrent = SimpleNamespace(name="Heat.mkv", content_path="")
+    media = r"F:\Filmes\SampleFilm\SampleFilm.mkv"
+    torrent = SimpleNamespace(name="SampleFilm.mkv", content_path="")
 
     assert client._matches_qbit_content_path(torrent, Meta({"path": media, "filelist": [media], "uuid": "different"}))  # noqa: S101
 

@@ -52,7 +52,7 @@ def test_execute_preserves_shell_punctuation_in_path_and_option_value(tmp_path, 
         "/api/execute",
         json={
             "path": str(release_path),
-            "args": '--music-artist "Simon & Garfunkel"',
+            "args": '--music-artist "Artist One & Artist Two"',
             "session_id": session_id,
         },
     )
@@ -63,7 +63,7 @@ def test_execute_preserves_shell_punctuation_in_path_and_option_value(tmp_path, 
         assert len(spawned_commands) == 1
         command = spawned_commands[0]
         assert command[3] == str(release_path)
-        assert command[4:] == ["--music-artist", "Simon & Garfunkel"]
+        assert command[4:] == ["--music-artist", "Artist One & Artist Two"]
     finally:
         response.close()
         with server.active_processes_lock:

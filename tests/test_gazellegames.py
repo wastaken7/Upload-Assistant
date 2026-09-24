@@ -33,7 +33,7 @@ def test_extracts_only_canonical_gazellegames_torrent_urls():
 def test_normalizes_group_and_exact_torrent_metadata():
     payload = {
         "group": {
-            "name": "The Troma Project",
+            "name": "Invented Strategy Game",
             "year": 2015,
             "platform": "Windows",
             "Artists": [{"name": "Linux"}],
@@ -44,7 +44,7 @@ def test_normalizes_group_and_exact_torrent_metadata():
             "trailer": "[inlineurl]https://www.youtube.com/watch?v=abc123[/inlineurl]",
             "metaRating": {"score": "81", "link": "https%3A%2F%2Fexample.com%2Freview"},
             "weblinks": {
-                "Steam": "[inlineurl]https%3A%2F%2Fstore.steampowered.com%2Fapp%2F279640%2F[/inlineurl]",
+                "Steam": "[inlineurl]https%3A%2F%2Fstore.steampowered.com%2Fapp%2F987654%2F[/inlineurl]",
                 "GamesWebsite": "https://example.com/game",
             },
             "specialCollections": {
@@ -74,14 +74,14 @@ def test_normalizes_group_and_exact_torrent_metadata():
 
     metadata = GazelleGamesManager.normalize_metadata(payload, exact_torrent=True)
 
-    assert metadata["title"] == "The Troma Project"  # noqa: S101
+    assert metadata["title"] == "Invented Strategy Game"  # noqa: S101
     assert metadata["platform"] == "Windows"  # noqa: S101
     assert metadata["available_platforms"] == ["Windows", "Linux"]  # noqa: S101
     assert metadata["genres"] == ["Turn Based", "Comedy"]  # noqa: S101
     assert metadata["keywords"] == ["Controller Support"]  # noqa: S101
     assert metadata["developer"] == "Studio One, Studio Two"  # noqa: S101
     assert metadata["publisher"] == "Publisher"  # noqa: S101
-    assert metadata["steam_url"] == "https://store.steampowered.com/app/279640/"  # noqa: S101
+    assert metadata["steam_url"] == "https://store.steampowered.com/app/987654/"  # noqa: S101
     assert metadata["game_age_ratings"] == {"ESRB": "M"}  # noqa: S101
     assert metadata["game_ratings"]["Metacritic"] == {"score": 81.0, "max": 100, "url": "https://example.com/review"}  # noqa: S101
     assert metadata["game_official_url"] == "https://example.com/game"  # noqa: S101
@@ -234,11 +234,11 @@ def test_rate_limiter_waits_after_five_requests(monkeypatch):
 
 def test_unattended_selection_requires_one_nonconflicting_exact_match():
     meta = Meta(unattended=True, year=2015, platform="PC")
-    exact = {"ID": "1", "Name": "The Troma Project", "Year": "2015", "Artists": [{"name": "Windows"}]}
-    wrong_year = {"ID": "2", "Name": "The Troma Project", "Year": "2024", "Artists": [{"name": "Windows"}]}
+    exact = {"ID": "1", "Name": "Invented Strategy Game", "Year": "2015", "Artists": [{"name": "Windows"}]}
+    wrong_year = {"ID": "2", "Name": "Invented Strategy Game", "Year": "2024", "Artists": [{"name": "Windows"}]}
 
-    assert select_gazelle_candidate([wrong_year, exact], "The Troma Project", meta) == exact  # noqa: S101
-    assert select_gazelle_candidate([exact, {**exact, "ID": "3"}], "The Troma Project", meta) is None  # noqa: S101
+    assert select_gazelle_candidate([wrong_year, exact], "Invented Strategy Game", meta) == exact  # noqa: S101
+    assert select_gazelle_candidate([exact, {**exact, "ID": "3"}], "Invented Strategy Game", meta) is None  # noqa: S101
 
 
 def test_attended_selection_prompts_for_ambiguous_matches(monkeypatch):
@@ -331,12 +331,12 @@ def test_merges_rich_igdb_metadata_without_replacing_gazelle_values():
 def test_gazelle_enrichment_works_without_twitch_credentials(tmp_path, monkeypatch):
     payload = {
         "group": {
-            "name": "The Troma Project",
+            "name": "Invented Strategy Game",
             "year": 2015,
             "platform": "Windows",
             "wikiBody": "GGN overview",
             "tags": ["strategy"],
-            "weblinks": {"Steam": "https://store.steampowered.com/app/279640/"},
+            "weblinks": {"Steam": "https://store.steampowered.com/app/987654/"},
         },
         "torrent": {"releaseType": "Full ISO", "language": "English"},
     }
@@ -355,7 +355,7 @@ def test_gazelle_enrichment_works_without_twitch_credentials(tmp_path, monkeypat
 
         async def get(self, *_args, **_kwargs):
             data = {
-                "279640": {
+                "987654": {
                     "success": True,
                     "data": {
                         "short_description": "<b>Descrição Steam</b>",
@@ -367,8 +367,8 @@ def test_gazelle_enrichment_works_without_twitch_credentials(tmp_path, monkeypat
 
     monkeypatch.setattr("src.prep_game.httpx.AsyncClient", FakeSteamClient)
     meta = Meta(
-        path=str(tmp_path / "The.Troma.Project-HI2U"),
-        filename="The Troma Project",
+        path=str(tmp_path / "Invented.Strategy.Game-HI2U"),
+        filename="Invented Strategy Game",
         filelist=[],
         torrent_comments=[{"comment": "https://gazellegames.net/torrents.php?torrentid=46720"}],
         unattended=True,
@@ -378,7 +378,7 @@ def test_gazelle_enrichment_works_without_twitch_credentials(tmp_path, monkeypat
 
     asyncio.run(gather_game_prep(meta, str(meta.path), str(tmp_path), config))
 
-    assert meta.title == "The Troma Project"  # noqa: S101
+    assert meta.title == "Invented Strategy Game"  # noqa: S101
     assert meta.year == 2015  # noqa: S101
     assert meta.platform == "PC"  # noqa: S101
     assert meta.overview == "GGN overview"  # noqa: S101
@@ -390,8 +390,8 @@ def test_gazelle_enrichment_works_without_twitch_credentials(tmp_path, monkeypat
     gazellegames_manager.search_groups.assert_not_awaited()  # type: ignore[attr-defined]
 
     manual_meta = Meta(
-        path=str(tmp_path / "The.Troma.Project-HI2U"),
-        filename="The Troma Project",
+        path=str(tmp_path / "Invented.Strategy.Game-HI2U"),
+        filename="Invented Strategy Game",
         filelist=[],
         torrent_comments=[{"comment": "https://gazellegames.net/torrents.php?torrentid=46720"}],
         unattended=True,
@@ -420,17 +420,17 @@ def test_exact_comment_lookup_does_not_require_a_search_title(tmp_path, monkeypa
 
 
 def test_title_fallback_fetches_selected_gazelle_group(tmp_path, monkeypatch):
-    candidate = {"ID": "21390", "Name": "The Troma Project", "Year": "2015", "Artists": [{"name": "Windows"}], "CategoryID": "1"}
-    group = {"id": 21390, "name": "The Troma Project", "year": 2015, "platform": "Windows", "wikiBody": "Group overview"}
+    candidate = {"ID": "21390", "Name": "Invented Strategy Game", "Year": "2015", "Artists": [{"name": "Windows"}], "CategoryID": "1"}
+    group = {"id": 21390, "name": "Invented Strategy Game", "year": 2015, "platform": "Windows", "wikiBody": "Group overview"}
     search = AsyncMock(return_value=[candidate])
     fetch_group = AsyncMock(return_value=group)
     monkeypatch.setattr(gazellegames_manager, "search_groups", search)
     monkeypatch.setattr(gazellegames_manager, "fetch_group", fetch_group)
-    meta = Meta(path=str(tmp_path / "The.Troma.Project-HI2U"), filename="The Troma Project", filelist=[], unattended=True, skip_auto_torrent=True)
+    meta = Meta(path=str(tmp_path / "Invented.Strategy.Game-HI2U"), filename="Invented Strategy Game", filelist=[], unattended=True, skip_auto_torrent=True)
 
     asyncio.run(gather_game_prep(meta, str(meta.path), str(tmp_path), {"DEFAULT": {"ggn_api_key": "secret"}}))
 
-    assert (meta.title, meta.year, meta.platform, meta.overview) == ("The Troma Project", 2015, "PC", "Group overview")  # noqa: S101
+    assert (meta.title, meta.year, meta.platform, meta.overview) == ("Invented Strategy Game", 2015, "PC", "Group overview")  # noqa: S101
     search.assert_awaited_once()
     fetch_group.assert_awaited_once_with("21390", base_dir=str(tmp_path), api_key="secret", config={"DEFAULT": {"ggn_api_key": "secret"}})
 
@@ -557,7 +557,7 @@ def test_igdb_fills_missing_artwork_without_overwriting_gazelle(tmp_path, monkey
             "platform": "Windows",
             "wikiBody": "GGN overview",
             "tags": ["strategy"],
-            "weblinks": {"Steam": "https://store.steampowered.com/app/279640/"},
+            "weblinks": {"Steam": "https://store.steampowered.com/app/987654/"},
             "specialCollections": {"Developer": [{"Name": "GGN Dev"}], "Publisher": [{"Name": "GGN Pub"}]},
         },
         "torrent": {"releaseType": "Full ISO", "language": "English"},
@@ -572,7 +572,7 @@ def test_igdb_fills_missing_artwork_without_overwriting_gazelle(tmp_path, monkey
             return None
 
         async def fetch_game_by_steam_id(self, steam_id):
-            assert steam_id == "279640"  # noqa: S101
+            assert steam_id == "987654"  # noqa: S101
             return {
                 "id": 99,
                 "name": "IGDB Name",
@@ -629,7 +629,7 @@ def test_igdb_fills_missing_artwork_without_overwriting_gazelle(tmp_path, monkey
     assert meta.genres == ["Action"]  # noqa: S101
     assert meta.keywords == ["Strategy"]  # noqa: S101
     assert meta.languages == {"English": []}  # noqa: S101
-    assert meta.steam_url == "https://store.steampowered.com/app/279640/"  # noqa: S101
+    assert meta.steam_url == "https://store.steampowered.com/app/987654/"  # noqa: S101
     assert meta.artwork_url == "https://images.igdb.com/t_cover_big/cover.jpg"  # noqa: S101
     assert meta.image_list[0]["raw_url"] == "https://images.igdb.com/t_1080p/screen.jpg"  # noqa: S101
     assert meta.igdb_rating == 88.1  # noqa: S101

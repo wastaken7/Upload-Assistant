@@ -101,8 +101,8 @@ def test_xxx_category_is_always_marked_as_adult_media():
 @pytest.mark.parametrize(
     ("name", "date", "year", "title"),
     [
-        ("OnlyFans.2026.Sophia.Isabella.XXX.MP4-P0RNL0V3RSD", "2026", 2026, "Sophia Isabella"),
-        ("Bellesa.26.08.21.Addison.Vodka.720p.XXX.MP4-P0RNL0V3RSD", "2026-08-21", 2026, "Addison Vodka"),
+        ("OnlyFans.2026.Example.Performer.XXX.MP4-EXAMPLEGRP", "2026", 2026, "Example Performer"),
+        ("Bellesa.26.08.21.Sample.Performer.720p.XXX.MP4-EXAMPLEGRP", "2026-08-21", 2026, "Sample Performer"),
     ],
 )
 def test_xxx_release_name_extracts_metadata(name, date, year, title):
