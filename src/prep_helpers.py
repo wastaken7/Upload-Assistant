@@ -239,7 +239,10 @@ async def detect_disc_and_category(prep_instance: Any, meta: Meta) -> tuple[str,
     # automatic detection.  Content-specific preparation below routes on
     # ``meta.category``, so normalise the manual value before that routing.
     if isinstance(meta.manual_category, str) and meta.manual_category.strip():
-        meta.category = meta.manual_category.strip().upper()
+        manual_category = meta.manual_category.strip().upper()
+        # Sports is a tracker classification; metadata still needs TV/MOVIE.
+        if manual_category != "SPORTS":
+            meta.category = manual_category
 
     # If category is manually set to BOOK, ensure meta.audiobook is set if audio files are present
     if meta.category == "BOOK" and not meta.audiobook:

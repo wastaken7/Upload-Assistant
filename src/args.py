@@ -180,7 +180,7 @@ Common options:
   -serv, --service           Streaming service
   --no-aka                   Remove AKA from title
   -daily, --daily            Air date of a daily type episode (YYYY-MM-DD)
-  -c, --category             Category (movie, tv, fanres, book, game, music, xxx)
+  -c, --category             Category (movie, tv, sports, fanres, book, game, music, xxx)
   -t, --type                 Type (disc, remux, encode, webdl, etc.)
   --source                   Source (Blu-ray, BluRay, DVD, WEBDL, etc.)
   -comps, --comparison       Use comparison images from a folder (input folder path): see -comps_index
@@ -250,6 +250,7 @@ class Args:
             {
                 "movie": "Movie",
                 "tv": "TV Show",
+                "sports": "Sports Event",
                 "fanres": "Fan Restoration",
                 "book": "E-Book or Audiobook",
                 "game": "Video Game",
@@ -438,8 +439,8 @@ class Args:
             "--category",
             nargs=1,
             required=False,
-            help="Category [movie, tv, fanres, book, game, music, xxx]",
-            choices=["movie", "tv", "fanres", "book", "game", "music", "xxx"],
+            help="Category [movie, tv, sports, fanres, book, game, music, xxx]",
+            choices=["movie", "tv", "sports", "fanres", "book", "game", "music", "xxx"],
             dest="manual_category",
         )
         action_c.completer = category_completer

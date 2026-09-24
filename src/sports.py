@@ -7,8 +7,9 @@ import unicodedata
 from src.meta import Meta
 
 _SPORTS_RELEASE_PATTERN = re.compile(
-    r"\b(?:aew|efl|fifa|formula 1|formula one|mlb|motogp|moto[23]|nascar|nba|nfl|nhl|olympics?|olimpiadas|ppv|ufc|uefa|"
-    r"ultimate fighting championship|wrc|wwe)\b|\bgrand prix\b",
+    r"\b(?:aew|efl|fifa|formula ?1|formula one|mlb|motogp|moto[23]|nascar|nba|nfl|nhl|olympics?|olimpiadas|ppv|ufc|uefa|"
+    r"ultimate fighting championship|wrc|wwe|copa libertadores|copa sudamericana|africa cup of nations|australian open|"
+    r"davis cup|billie jean king cup|ryder cup|solheim cup|world snooker championship|pdc world darts championship)\b|\bgrand prix\b",
     re.IGNORECASE,
 )
 _SPORTS_EVENT_PATTERN = re.compile(
@@ -27,6 +28,9 @@ def _normalize(value: str) -> str:
 
 def detect_sports(meta: Meta) -> bool:
     """Detect sports events without classifying stories about sports as events."""
+    if meta.manual_category:
+        return _normalize(meta.manual_category) in {"sport", "sports", "esporte", "esportes"}
+
     category = _normalize(str(meta.category or ""))
     if category in {"sport", "sports", "esporte", "esportes"}:
         return True
