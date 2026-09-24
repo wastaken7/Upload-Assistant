@@ -550,6 +550,8 @@ config: dict[str, Any] = {
         # Only add the trackers you want to upload to on a regular basis
         "default_trackers": "",
         "1PTBA": {
+            # Alias used to select this tracker with -tk/--trackers; case-insensitive.
+            "cli_alias": "1PT",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # Cookies required (export from https://1ptba.com/ to data/cookies/1PTBA.txt).
@@ -582,6 +584,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "AITHER": {
+            "cli_alias": "ATH",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -633,6 +636,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "ALPHARATIO": {
+            "cli_alias": "AR",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # anon is not an option when uploading you need to change your privacy settings.
@@ -642,6 +646,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "AMIGOSSHARE": {
+            "cli_alias": "ASC",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # Set uploader_status to True if you have uploader permissions to automatically approve your uploads
@@ -682,6 +687,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "ANTHELION": {
+            "cli_alias": "ANT",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
@@ -712,6 +718,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "ASIANCINEMA": {
+            "cli_alias": "ACM",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -752,6 +759,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "AVISTAZ": {
+            "cli_alias": "AZ",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # Cookies required (export from https://avistaz.to to data/cookies/AVISTAZ.txt).
@@ -776,6 +784,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "BEYONDHD": {
+            "cli_alias": "BHD",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -810,6 +819,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "BITHDTV": {
+            "cli_alias": "BHDTV",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # found under https://www.bit-hdtv.com/my.php
@@ -821,6 +831,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "BITPORN": {
+            "cli_alias": "BP",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
@@ -859,6 +870,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "BJSHARE": {
+            "cli_alias": "BJS",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # Cookies required (export from https://bj-share.info to data/cookies/BJSHARE.txt).
@@ -893,6 +905,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "BLUTOPIA": {
+            "cli_alias": "BLU",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -935,6 +948,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "BRASILTRACKER": {
+            "cli_alias": "BT",
             "link_dir_name": "",
             # Cookies required (export from https://brasiltracker.org/ to data/cookies/BRASILTRACKER.txt).
             # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md#how-to-export-cookies
@@ -961,6 +975,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "BROADCASTHENET": {
+            "cli_alias": "BTN",
             # BTN accepts TV only. An API key is required for dupe searching and
             # resolving uploads that return a group page. Upload authentication
             # uses browser-exported cookies in data/cookies/BROADCASTHENET.txt.
@@ -973,6 +988,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "CAPYBARABR": {
+            "cli_alias": "CBR",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -1019,12 +1035,14 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "CATHODERAYTUBE": {
+            "cli_alias": "CRT",
             # Cookies required (export from https://www.cathode-ray.tube/ to data/cookies/CATHODERAYTUBE.txt).
             # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md#how-to-export-cookies
             "announce_url": "",
             "anon": True,
         },
         "CINEMATIK": {
+            "cli_alias": "TIK",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -1065,6 +1083,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "CINEMAZ": {
+            "cli_alias": "CZ",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # Cookies required (export from https://cinemaz.to to data/cookies/CINEMAZ.txt).
@@ -1089,6 +1108,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "CURUPIRA": {
+            "cli_alias": "CRP",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # Your API Key, obtained from Perfil -> API Key
@@ -1099,6 +1119,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "DARKPEERS": {
+            "cli_alias": "DP",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -1142,6 +1163,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "DESITORRENTS": {
+            "cli_alias": "DT",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -1182,6 +1204,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "DIGITALCORE": {
+            "cli_alias": "DC",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # You can find your api key at Settings -> Security -> API Key -> Generate API Key
@@ -1215,6 +1238,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "DREADVAULT": {
+            "cli_alias": "DVL",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -1257,6 +1281,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "DRUNKENSLUG": {
+            "cli_alias": "DS",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # Provide the DRUNKENSLUG API key here, can be found at https://drunkenslug.com/profile
@@ -1269,6 +1294,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "EMUWAREZ": {
+            "cli_alias": "EMUW",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -1311,6 +1337,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "FILELIST": {
+            "cli_alias": "FL",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "username": "",
@@ -1320,6 +1347,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "FLOOD": {
+            "cli_alias": "FLD",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
@@ -1327,6 +1355,7 @@ config: dict[str, Any] = {
             "anon": False,
         },
         "FUNFILE": {
+            "cli_alias": "FF",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "username": "",
@@ -1360,6 +1389,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "GREATPOSTERWALL": {
+            "cli_alias": "GPW",
             "link_dir_name": "",
             # You can find your API key in Profile Settings -> Access Settings -> API Key. If there is no API, click "Reset your api key" and Save Profile.
             "api_key": "",
@@ -1392,6 +1422,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "HAWKEUNO": {
+            "cli_alias": "HUNO",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "use_for_search": False,
@@ -1433,6 +1464,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "HDBITS": {
+            "cli_alias": "HDB",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -1447,6 +1479,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "HDSPACE": {
+            "cli_alias": "HDS",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # Cookies required (export from https://hd-space.org/ to data/cookies/HDSPACE.txt).
@@ -1478,6 +1511,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "HDTORRENTS": {
+            "cli_alias": "HDT",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # Cookies required (export to data/cookies/HDTORRENTS.txt).
@@ -1517,6 +1551,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "HOMIEHELPDESK": {
+            "cli_alias": "HHD",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
@@ -1555,6 +1590,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "IMMORTALSEED": {
+            "cli_alias": "IS",
             # Cookies required (export from https://immortalseed.me/ to data/cookies/IMMORTALSEED.txt).
             # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md#how-to-export-cookies
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -1587,6 +1623,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "INFINITYHD": {
+            "cli_alias": "IHD",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -1627,6 +1664,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "IPTORRENTS": {
+            "cli_alias": "IPT",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # Cookies required (export to data/cookies/IPTORRENTS.txt).
@@ -1663,6 +1701,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "ITATORRENTS": {
+            "cli_alias": "ITT",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -1703,6 +1742,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "LAJIDUI": {
+            "cli_alias": "LAJIDUI",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # Cookies required (export from https://pt.lajidui.top/ to data/cookies/LAJIDUI.txt).
@@ -1733,6 +1773,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "LASTDIGITALUNDERGROUND": {
+            "cli_alias": "LDU",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -1773,6 +1814,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "LATTEAM": {
+            "cli_alias": "LT",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -1815,6 +1857,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "LEMONHD": {
+            "cli_alias": "LHD",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # Cookies required (export from https://lemonhd.net/ to data/cookies/LEMONHD.txt).
@@ -1846,6 +1889,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "LOCADORA": {
+            "cli_alias": "LCD",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -1888,6 +1932,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "LONGPT": {
+            "cli_alias": "LPT",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # Cookies required (export from https://longpt.org/ to data/cookies/LONGPT.txt).
@@ -1918,6 +1963,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "LST": {
+            "cli_alias": "LST",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -1962,6 +2008,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "LUMINARR": {
+            "cli_alias": "LUME",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -2004,6 +2051,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "MAKINGOFF": {
+            "cli_alias": "MKO",
             # Cookies required (export from https://www.makingoff.org/ to data/cookies/MAKINGOFF.txt).
             # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md#how-to-export-cookies
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -2016,6 +2064,7 @@ config: dict[str, Any] = {
             "allow_ext_subtitles": True,
         },
         "MIDNIGHTSCENE": {
+            "cli_alias": "MS",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -2058,6 +2107,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "MTEAM": {
+            "cli_alias": "MTEAM",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
@@ -2087,6 +2137,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "NEBULANCE": {
+            "cli_alias": "NBL",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
@@ -2094,6 +2145,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "NORDICQUALITY": {
+            "cli_alias": "NQ",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -2134,6 +2186,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "NZBGEEK": {
+            "cli_alias": "NZBG",
             "api_key": "",
             # Maximum number of API hits the script may make within 24 hours for duplicate search.
             # Set to 0 to disable duplicate search via API.
@@ -2143,6 +2196,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "NZBNEST": {
+            "cli_alias": "NZBN",
             # NzbNest API key
             "api_key": "",
             # Maximum number of API hits the script may make within 24 hours for duplicate search.
@@ -2153,6 +2207,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "OLDTOONSWORLD": {
+            "cli_alias": "OTW",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -2195,6 +2250,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "ONLYENCODES": {
+            "cli_alias": "OE",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -2237,6 +2293,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "ORPHEUS": {
+            "cli_alias": "OPS",
             # Orpheus Gazelle API token. Do not commit a real token.
             "api_key": "",
             # Obtain from https://orpheus.network/upload.php
@@ -2244,6 +2301,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "PASSTHEPOPCORN": {
+            "cli_alias": "PTP",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -2257,6 +2315,7 @@ config: dict[str, Any] = {
             "inject_delay": 5,
         },
         "PEERGARDEN": {
+            "cli_alias": "PG",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -2301,6 +2360,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "POLISHTORRENT": {
+            "cli_alias": "PTT",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -2341,6 +2401,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "PORTUGAS": {
+            "cli_alias": "PT",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -2381,6 +2442,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "PRIVATEHD": {
+            "cli_alias": "PHD",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # Cookies required (export from https://privatehd.to/ to data/cookies/PRIVATEHD.txt).
@@ -2405,6 +2467,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "PTCAFE": {
+            "cli_alias": "PTCAFE",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # Cookies required (export from https://ptcafe.club/ to data/cookies/PTCAFE.txt).
@@ -2436,6 +2499,7 @@ config: dict[str, Any] = {
         },
         # PTERCLUB support is currently experimental and may not work reliably.
         "PTERCLUB": {
+            "cli_alias": "PTER",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "passkey": "passkey",
@@ -2447,6 +2511,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "PTFANS": {
+            "cli_alias": "PTFANS",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # Cookies required (export from https://ptfans.cc/ to data/cookies/PTFANS.txt).
@@ -2477,6 +2542,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "PTGTK": {
+            "cli_alias": "PTGTK",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # Cookies required (export from https://pt.gtkpw.xyz to data/cookies/PTGTK.txt).
@@ -2507,6 +2573,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "PTSKIT": {
+            "cli_alias": "PTS",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # Cookies required (export from https://www.ptskit.org to data/cookies/PTSKIT.txt).
@@ -2536,6 +2603,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "PTZONE": {
+            "cli_alias": "PTZ",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # Cookies required (export from https://ptzone.xyz/ to data/cookies/PTZONE.txt).
@@ -2568,6 +2636,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "RACING4EVERYONE": {
+            "cli_alias": "R4E",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -2609,6 +2678,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "RAILGUNPT": {
+            "cli_alias": "RPT",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # Cookies required (export from https://bilibili.download to data/cookies/RAILGUNPT.txt).
@@ -2639,6 +2709,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "RASTASTUGAN": {
+            "cli_alias": "RAS",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -2679,6 +2750,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "REELFLIX": {
+            "cli_alias": "RF",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -2719,6 +2791,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "RETROFLIX": {
+            "cli_alias": "RTF",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "username": "",
@@ -2751,6 +2824,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "RETROMOVIESCLUB": {
+            "cli_alias": "RMC",
             # Instead of using the tracker name for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if you want to use Retro Movies Club for automatic ID searching or description parsing
@@ -2793,6 +2867,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "ROCKETHD": {
+            "cli_alias": "RHD",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if you want to use RocketHD for automatic ID searching or description parsing
@@ -2803,6 +2878,7 @@ config: dict[str, Any] = {
             "use_german_title": False,
         },
         "SAMARITANO": {
+            "cli_alias": "SAM",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -2845,6 +2921,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "SEEDPOOL": {
+            "cli_alias": "SP",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -2887,6 +2964,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "SHAREISLAND": {
+            "cli_alias": "SHRI",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -2929,6 +3007,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "SKIPTHECOMMERCIALS": {
+            "cli_alias": "STC",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -2969,6 +3048,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "SPEEDAPP": {
+            "cli_alias": "SPD",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # You can create an API key here https://speedapp.io/profile/api-tokens. Required Permission: Upload torrents
@@ -3001,6 +3081,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "SUIO": {
+            "cli_alias": "SUIO",
             # Secret Usenet Indexer: o[redacted]nzbs
             # Please do not share, discuss or mention this indexer's real name in issues or pull requests; nor should you ask what it is.
             # Paste the indexer's base url below (e.g., https://indexer.com)
@@ -3028,6 +3109,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "SWARMAZON": {
+            "cli_alias": "SN",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
@@ -3035,6 +3117,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "THELEACHZONE": {
+            "cli_alias": "TLZ",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -3075,6 +3158,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "THEOLDSCHOOL": {
+            "cli_alias": "TOS",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # Mon profil > Réglages > Clé API
@@ -3120,6 +3204,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "TORRENTEROS": {
+            "cli_alias": "TTR",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -3162,6 +3247,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "TORRENTHR": {
+            "cli_alias": "THR",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -3202,6 +3288,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "TORRENTLEECH": {
+            "cli_alias": "TL",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # Set to False if you don't have access to the API (e.g., if you're a trial uploader). Note: this may not work sometimes due to Cloudflare restrictions.
@@ -3240,6 +3327,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "TOTHEGLORY": {
+            "cli_alias": "TTG",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "username": "",
@@ -3252,6 +3340,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "TVCHAOSUK": {
+            "cli_alias": "TVC",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # 2 is listed as max images in rules. Please do not change unless you have permission
@@ -3262,6 +3351,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "ULCX": {
+            "cli_alias": "ULCX",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -3304,6 +3394,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "UTOPIA": {
+            "cli_alias": "UTP",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -3344,6 +3435,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "XINGYUNGEPT": {
+            "cli_alias": "XYPT",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # Cookies required (export from https://pt.xingyungept.org/ to data/cookies/XINGYUNGEPT.txt).
@@ -3376,6 +3468,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "YUSCENE": {
+            "cli_alias": "YUS",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -3416,6 +3509,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "ZENITH": {
+            "cli_alias": "ZNTH",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -3458,6 +3552,7 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "MANUAL": {
+            "cli_alias": "MANUAL",
             # Replace link with filebrowser (https://github.com/filebrowser/filebrowser) link to the Upload-Assistant directory, this will link to your filebrowser instead of uploading to uguu.se
             "filebrowser": "",
         },

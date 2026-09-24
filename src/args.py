@@ -234,6 +234,37 @@ class Args:
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
 
+    def tracker_cli_aliases(self, parser: CustomArgumentParser) -> dict[str, str]:
+        """Resolve configured aliases only for -tk/--trackers input."""
+        from src.meta import Meta
+        from src.trackersetup import tracker_class_map
+
+        trackers = self.config.get("TRACKERS", {})
+        if not isinstance(trackers, Mapping):
+            return {}
+
+        canonical_names = set(tracker_class_map) | {"MANUAL", "USENET"}
+        aliases: dict[str, str] = {}
+        for name, options in trackers.items():
+            if not isinstance(options, Mapping):
+                continue
+            canonical = str(name).upper()
+            alias_value = options.get("cli_alias")
+            if not isinstance(alias_value, str) or not alias_value.strip():
+                continue
+            alias = alias_value.strip().upper()
+            if "," in alias or any(char.isspace() for char in alias):
+                parser.error(f"Invalid cli_alias for {canonical}: use one tracker identifier without spaces or commas")
+            if alias in canonical_names and alias != canonical:
+                parser.error(f"cli_alias {alias} for {canonical} conflicts with a canonical tracker name")
+            existing_target = Meta.canonical_tracker_name(alias)
+            if existing_target != alias and existing_target != canonical:
+                parser.error(f"cli_alias {alias} for {canonical} already selects {existing_target}")
+            if alias in aliases and aliases[alias] != canonical:
+                parser.error(f"cli_alias {alias} is configured for both {aliases[alias]} and {canonical}")
+            aliases[alias] = canonical
+        return aliases
+
     def parse(self, argv: Sequence[str], meta: Meta) -> tuple[Meta, CustomArgumentParser, list[str]]:
         input = list(argv)
         parser = CustomArgumentParser(
@@ -1272,6 +1303,7 @@ class Args:
                     meta[key] = value
             if key == "trackers":
                 if value:
+                    aliases = self.tracker_cli_aliases(parser)
                     # Extract from list if it's a single-item list (from nargs=1)
                     if isinstance(value, list):
                         value_list = value
@@ -1299,6 +1331,7 @@ class Args:
                         meta[key] = expanded
                     else:
                         meta[key] = [(str(tracker_value)).upper()]
+                    meta[key] = [aliases.get(name.strip(), name) for name in meta[key]]
                 else:
                     meta[key] = []
             else:
