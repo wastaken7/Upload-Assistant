@@ -104,6 +104,26 @@ def test_valid_derived_series_id_replaces_existing_imdb():
     assert (meta.imdb_id, meta.imdb_info) == (7654321, derived_info)
 
 
+def test_tvdb_id_can_recover_from_rejected_automatic_imdb():
+    meta = Meta(category="TV", filename="Example", title="Example", year=2023, imdb_id=1234567)
+    meta.imdb_info = {"imdbID": "tt1234567", "title": "Unrelated Podcast", "year": 2023, "type": "podcastEpisode"}
+
+    _reject_invalid_automatic_imdb(meta, meta.filename)
+
+    assert (meta.imdb_id, meta.no_imdb, meta.automatic_imdb_rejected) == (0, True, True)
+    derived_info = {"imdbID": "tt7654321", "title": "Example", "year": 2023, "type": "tvSeries"}
+    assert _apply_derived_imdb_id(meta, meta.filename, 7654321, derived_info) is True
+    assert (meta.imdb_id, meta.no_imdb, meta.automatic_imdb_rejected) == (7654321, False, False)
+
+
+def test_explicit_no_imdb_still_blocks_tvdb_id():
+    meta = Meta(category="TV", filename="Example", title="Example", year=2023, no_imdb=True)
+    derived_info = {"imdbID": "tt7654321", "title": "Example", "year": 2023, "type": "tvSeries"}
+
+    assert _apply_derived_imdb_id(meta, meta.filename, 7654321, derived_info) is False
+    assert (meta.imdb_id, meta.no_imdb, meta.automatic_imdb_rejected) == (None, True, False)
+
+
 class _Response:
     def __init__(self, candidates):
         self.candidates = candidates

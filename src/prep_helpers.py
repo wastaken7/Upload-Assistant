@@ -835,6 +835,7 @@ def _clear_imdb_metadata(meta: Meta) -> None:
     meta.imdb = "0"
     meta.imdb_tt = ""
     meta.imdb_rating = ""
+    meta.automatic_imdb_rejected = False
 
 
 def _automatic_imdb_rejection(meta: Meta, filename: str, imdb_id: int, info: dict[str, Any]) -> str | None:
@@ -862,17 +863,22 @@ def _reject_invalid_automatic_imdb(meta: Meta, filename: str) -> None:
     logger.warning(f"[yellow]Ignoring automatic IMDb tt{meta.imdb_id}: {reason}. Continuing without IMDb.[/yellow]")
     _clear_imdb_metadata(meta)
     meta.no_imdb = True
+    meta.automatic_imdb_rejected = True
     meta.imdb_mismatch = False
     meta.mismatched_imdb_id = 0
 
 
 def _apply_derived_imdb_id(meta: Meta, filename: str, imdb_id: int, info: dict[str, Any]) -> bool:
+    if meta.no_imdb and not meta.automatic_imdb_rejected:
+        return False
     reason = _automatic_imdb_rejection(meta, filename, imdb_id, info)
     if reason:
         logger.warning(f"[yellow]Ignoring derived IMDb tt{imdb_id}: {reason}. Keeping tt{meta.imdb_id}.[/yellow]")
         return False
     meta.imdb_id = imdb_id
     meta.imdb_info = info
+    meta.no_imdb = False
+    meta.automatic_imdb_rejected = False
     return True
 
 
@@ -1399,7 +1405,7 @@ async def finalize_metadata(
         if meta.category == "TV" and meta.tv_pack:
             await prep_instance.season_episode_manager.check_season_pack_completeness(meta)
 
-        if meta.tvdb_imdb_id and not meta.no_imdb and not meta.imdb_manual:
+        if meta.tvdb_imdb_id and (not meta.no_imdb or meta.automatic_imdb_rejected) and not meta.imdb_manual:
             imdb = meta.tvdb_imdb_id.replace("tt", "")
             if imdb.isdigit() and imdb != meta.imdb_id:
                 episode_info = await imdb_manager.get_imdb_from_episode(imdb)
