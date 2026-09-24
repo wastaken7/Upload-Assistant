@@ -32,7 +32,10 @@ def _normalized_title(value: str) -> str:
 def imdb_match_rejection(category: str, year: int | str | None, titles: list[str], imdb_info: dict[str, Any], tmdb_imdb_id: int = 0) -> str | None:
     """Explain why an automatically found IMDb title cannot identify this work."""
     title_type = re.sub(r"[^a-z]", "", str(imdb_info.get("type") or "").lower())
-    valid_types = {"MOVIE": {"movie", "short", "shortfilm", "featurefilm", "tvmovie"}, "TV": {"tvseries", "tvminiseries", "tvshow"}}
+    valid_types = {
+        "MOVIE": {"movie", "short", "shortfilm", "featurefilm", "tvmovie", "video", "tvspecial", "tvshort"},
+        "TV": {"tvseries", "tvminiseries", "tvshow"},
+    }
     if category in valid_types and title_type not in valid_types[category]:
         return f"incompatible or missing IMDb type: {imdb_info.get('type') or 'unknown'}"
 

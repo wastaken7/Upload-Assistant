@@ -4,9 +4,9 @@ import asyncio
 
 import pytest
 
-from src.imdb import imdb_manager
+from src.imdb import imdb_manager, imdb_match_rejection
 from src.meta import Meta
-from src.prep_helpers import _reject_invalid_automatic_imdb
+from src.prep_helpers import _apply_derived_imdb_id, _reject_invalid_automatic_imdb
 from src.trackers.UNIT3D import UNIT3D
 
 
@@ -69,6 +69,39 @@ def test_explicit_manual_imdb_is_preserved():
     _reject_invalid_automatic_imdb(meta, meta.filename)
 
     assert meta.imdb_id == 1234567
+
+
+@pytest.mark.parametrize("title_type", ["video", "tvSpecial", "tvShort"])
+def test_movie_compatible_imdb_types_are_kept(title_type):
+    meta = Meta(category="MOVIE", filename="Example", title="Example", year=2023, imdb_id=1234567)
+    meta.imdb_info = {"imdbID": "tt1234567", "title": "Example", "year": 2023, "type": title_type}
+
+    _reject_invalid_automatic_imdb(meta, meta.filename)
+
+    assert meta.imdb_id == 1234567
+
+
+def test_tmdb_link_does_not_override_incompatible_type():
+    candidate = {"imdbID": "tt1234567", "title": "Example", "year": 2023, "type": "podcastEpisode"}
+
+    assert imdb_match_rejection("MOVIE", 2023, ["Example"], candidate, tmdb_imdb_id=1234567)
+
+
+def test_invalid_derived_series_id_preserves_existing_imdb():
+    original_info = {"imdbID": "tt1234567", "title": "Example", "year": 2023, "type": "tvSeries"}
+    meta = Meta(category="TV", filename="Example", title="Example", year=2023, imdb_id=1234567, imdb_info=original_info, aka="AKA Existing")
+    derived_info = {"imdbID": "tt7654321", "title": "Other", "year": 2018, "type": "podcastEpisode"}
+
+    assert _apply_derived_imdb_id(meta, meta.filename, 7654321, derived_info) is False
+    assert (meta.imdb_id, meta.imdb_info, meta.aka, meta.no_imdb) == (1234567, original_info, "AKA Existing", False)
+
+
+def test_valid_derived_series_id_replaces_existing_imdb():
+    meta = Meta(category="TV", filename="Example", title="Example", year=2023, imdb_id=1234567, imdb_info={})
+    derived_info = {"imdbID": "tt7654321", "title": "Example", "year": 2023, "type": "tvSeries"}
+
+    assert _apply_derived_imdb_id(meta, meta.filename, 7654321, derived_info) is True
+    assert (meta.imdb_id, meta.imdb_info) == (7654321, derived_info)
 
 
 class _Response:
