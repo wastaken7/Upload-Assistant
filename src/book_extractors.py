@@ -17,7 +17,7 @@ from src.console import logger
 
 def normalize_book_title_separators(title: str) -> str:
     """Use a colon for the first book title separator and en dashes thereafter."""
-    parts = re.split(r":(?!\d)\s*|\s+–\s+", title)  # noqa: RUF001
+    parts = [part.strip() for part in re.split(r":(?!\d)\s*|\s+–\s+", title)]  # noqa: RUF001
     if len(parts) >= 3 and all(parts):
         return f"{parts[0]}: {parts[1]} – {' – '.join(parts[2:])}"  # noqa: RUF001
     return title
