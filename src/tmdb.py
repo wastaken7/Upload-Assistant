@@ -1024,6 +1024,7 @@ async def tmdb_other_meta(
     title = None
     year = None
     original_imdb_id = imdb_id
+    tmdb_imdb_id = 0
 
     cache = cache_for(base_dir, config)
     async with httpx.AsyncClient() as client:
@@ -1052,6 +1053,9 @@ async def tmdb_other_meta(
             original_title = media_data.get("original_title", title)
             year = datetime.strptime(media_data["release_date"], "%Y-%m-%d").replace(tzinfo=UTC).year if media_data["release_date"] else search_year
             runtime = media_data.get("runtime", 60)
+            main_imdb_id = str(media_data.get("imdb_id") or "").removeprefix("tt")
+            if main_imdb_id.isdigit():
+                tmdb_imdb_id = int(main_imdb_id)
             if media_data.get("release_date"):
                 release_date = media_data["release_date"]
             if quickie_search or not imdb_id:
@@ -1134,6 +1138,9 @@ async def tmdb_other_meta(
         else:
             try:
                 external = typing_cast(dict[str, Any], external_data.json())  # type: ignore
+                linked_imdb_id = str(external.get("imdb_id") or "").removeprefix("tt")
+                if linked_imdb_id.isdigit():
+                    tmdb_imdb_id = int(linked_imdb_id)
                 # Process IMDB ID
                 if quickie_search or imdb_id == 0:
                     external_imdb_id = external.get("imdb_id", None)
@@ -1274,6 +1281,7 @@ async def tmdb_other_meta(
         "first_air_date": first_air_date,
         "last_air_date": last_air_date,
         "imdb_id": imdb_id,
+        "tmdb_imdb_id": tmdb_imdb_id,
         "tvdb_id": tvdb_id,
         "origin_country": origin_country,
         "original_language": original_language,

@@ -1,7 +1,9 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
 import json
+import re
 import sys
+import unicodedata
 from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
 from difflib import SequenceMatcher
@@ -20,6 +22,46 @@ anitopy_parse_fn: Any = cast(Any, anitopy).parse
 guessit_module: Any = cast(Any, guessit)
 GuessitFn = Callable[[str, dict[str, Any] | None], dict[str, Any]]
 IMDB_GRAPHQL_HEADERS = {"Content-Type": "application/json", "Referer": "https://www.imdb.com/"}
+
+
+def _normalized_title(value: str) -> str:
+    value = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii").lower()
+    return " ".join(re.findall(r"[a-z0-9]+", value))
+
+
+def imdb_match_rejection(category: str, year: int | str | None, titles: list[str], imdb_info: dict[str, Any], tmdb_imdb_id: int = 0) -> str | None:
+    """Explain why an automatically found IMDb title cannot identify this work."""
+    title_type = re.sub(r"[^a-z]", "", str(imdb_info.get("type") or "").lower())
+    valid_types = {
+        "MOVIE": {"movie", "short", "shortfilm", "featurefilm", "tvmovie", "video", "tvspecial", "tvshort"},
+        "TV": {"tvseries", "tvminiseries", "tvshow"},
+    }
+    if category in valid_types and title_type not in valid_types[category]:
+        return f"incompatible or missing IMDb type: {imdb_info.get('type') or 'unknown'}"
+
+    try:
+        imdb_year = int(imdb_info.get("year") or 0)
+        expected_year = int(year or 0)
+    except TypeError, ValueError:
+        imdb_year = expected_year = 0
+    if not imdb_year or not expected_year or abs(imdb_year - expected_year) > 2:
+        return f"IMDb year {imdb_year or 'unknown'} does not match {expected_year or 'unknown'}"
+
+    imdb_id = str(imdb_info.get("imdbID") or imdb_info.get("id") or "").removeprefix("tt")
+    if tmdb_imdb_id and imdb_id.isdigit() and int(imdb_id) == tmdb_imdb_id:
+        return None
+
+    imdb_titles = [imdb_info.get("title"), imdb_info.get("aka")]
+    imdb_titles.extend(aka.get("title") for aka in imdb_info.get("akas", []) if isinstance(aka, dict))
+    normalized_expected = [_normalized_title(title) for title in titles if isinstance(title, str) and title.strip()]
+    normalized_imdb = [_normalized_title(title) for title in imdb_titles if isinstance(title, str) and title.strip()]
+    if (
+        not normalized_expected
+        or not normalized_imdb
+        or not any(SequenceMatcher(None, expected, candidate).ratio() >= 0.8 for expected in normalized_expected for candidate in normalized_imdb)
+    ):
+        return "IMDb title does not match the release or TMDb titles"
+    return None
 
 
 def guessit_fn(value: str, options: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -483,6 +525,7 @@ class ImdbManager:
         attempted: int | None = 0,
         duration: str | int | None = None,
         unattended: bool = False,
+        on_manual_selection: Callable[[int], None] | None = None,
     ) -> int:
         search_results: list[dict[str, Any]] = []
         imdb_id_result = imdb_id = 0
@@ -678,44 +721,39 @@ class ImdbManager:
                 logger.info(f"[bold red]Further reduced name search error:[/bold red] {e}")
 
         if quickie:
-            if search_results:
-                first_result = search_results[0]
-                logger.debug(f"[cyan]Quickie search result: {first_result}[/cyan]")
-                node = self.safe_get(first_result, ["node"], {})
-                title = self.safe_get(node, ["title"], {})
-                type_info = self.safe_get(title, ["titleType"], {})
-                year = self.safe_get(title, ["releaseYear", "year"], None)
-                imdb_id = self.safe_get(title, ["id"], "")
-                year_int = int(year) if year else None
-                search_year_int = int(search_year) if search_year else None
-
-                type_matches = False
-                if type_info:
-                    title_type = type_info.get("text", "").lower()
-                    is_tv = bool(category and category.lower() == "tv" and "tv series" in title_type)
-                    is_movie = bool(category and category.lower() == "movie" and "tv series" not in title_type)
-                    type_matches = is_tv or is_movie
-
-                if imdb_id and type_matches:
-                    if year_int and search_year_int:
-                        if year_int == search_year_int:
-                            return int(imdb_id.replace("tt", "").strip())
-                        logger.debug(f"[yellow]Year mismatch: found {year_int}, expected {search_year_int}[/yellow]")
-                        return 0
-                    return int(imdb_id.replace("tt", "").strip())
-                if not imdb_id:
-                    logger.debug("[yellow]No IMDb ID found in quickie result[/yellow]")
-                if not type_matches:
-                    logger.debug(f"[yellow]Type mismatch: found {type_info.get('text', '')}, expected {category}[/yellow]")
-                imdb_id_result = 0
-
-            return imdb_id_result if imdb_id_result else 0
+            for result in search_results:
+                title = self.safe_get(result, ["node", "title"], {})
+                imdb_id = title.get("id", "")
+                candidate = {
+                    "id": imdb_id,
+                    "title": self.safe_get(title, ["titleText", "text"], ""),
+                    "type": self.safe_get(title, ["titleType", "text"], ""),
+                    "year": self.safe_get(title, ["releaseYear", "year"], None),
+                }
+                reason = imdb_match_rejection(category or "", search_year, [filename, secondary_title or ""], candidate)
+                if reason:
+                    logger.debug(f"[yellow]Skipping IMDb candidate {imdb_id}: {reason}[/yellow]")
+                    continue
+                if imdb_id and str(imdb_id).removeprefix("tt").isdigit():
+                    return int(str(imdb_id).removeprefix("tt"))
+            return 0
 
         if len(search_results) == 1:
-            imdb_id = self.safe_get(search_results[0], ["node", "title", "id"], "")
-            if imdb_id:
-                return int(imdb_id.replace("tt", "").strip())
-        elif len(search_results) > 1:
+            title = self.safe_get(search_results[0], ["node", "title"], {})
+            candidate = {
+                "id": title.get("id", ""),
+                "title": self.safe_get(title, ["titleText", "text"], ""),
+                "type": self.safe_get(title, ["titleType", "text"], ""),
+                "year": self.safe_get(title, ["releaseYear", "year"], None),
+            }
+            reason = imdb_match_rejection(category or "", search_year, [filename, secondary_title or ""], candidate)
+            if reason:
+                logger.info(f"[yellow]IMDb candidate {candidate['id']} requires review: {reason}[/yellow]")
+                if unattended:
+                    return 0
+            elif candidate["id"]:
+                return int(str(candidate["id"]).removeprefix("tt"))
+        if search_results:
             # Calculate similarity for all results
             results_with_similarity: list[tuple[dict[str, Any], float]] = []
             filename_norm = filename.lower().strip()
@@ -738,6 +776,18 @@ class ImdbManager:
 
                 results_with_similarity.append((r, similarity))
 
+            valid_results = []
+            for result, similarity in results_with_similarity:
+                title = self.safe_get(result, ["node", "title"], {})
+                candidate = {
+                    "id": title.get("id", ""),
+                    "title": self.safe_get(title, ["titleText", "text"], ""),
+                    "type": self.safe_get(title, ["titleType", "text"], ""),
+                    "year": self.safe_get(title, ["releaseYear", "year"], None),
+                }
+                if not imdb_match_rejection(category or "", search_year, [filename, secondary_title or ""], candidate):
+                    valid_results.append((result, similarity))
+
             # Sort by similarity (highest first)
             results_with_similarity.sort(key=lambda x: x[1], reverse=True)
 
@@ -755,7 +805,7 @@ class ImdbManager:
             best_similarity = results_with_similarity[0][1]
             similarity_threshold = 0.85
 
-            if best_similarity >= similarity_threshold:
+            if valid_results and best_similarity >= similarity_threshold and results_with_similarity[0] in valid_results:
                 second_best = results_with_similarity[1][1] if len(results_with_similarity) > 1 else 0.0
 
                 if best_similarity - second_best >= 0.10:
@@ -767,11 +817,14 @@ class ImdbManager:
                         return int(imdb_id.replace("tt", "").strip())
 
             if unattended:
-                imdb_id = self.safe_get(sorted_results[0], ["node", "title", "id"], "")
+                valid_results.sort(key=lambda x: x[1], reverse=True)
+                imdb_id = self.safe_get(valid_results[0][0], ["node", "title", "id"], "") if valid_results else ""
                 if imdb_id:
                     imdb_id_result = int(imdb_id.replace("tt", "").strip())
                     logger.debug(f"[green]Unattended mode: auto-selected IMDb ID {imdb_id_result}[/green]")
                     return imdb_id_result
+                logger.info("[yellow]No reliable IMDb candidate found; continuing without IMDb.[/yellow]")
+                return 0
 
             # Show sorted results to user
             logger.info("[bold yellow]Multiple IMDb results found. Please select the correct entry:[/bold yellow]")
@@ -810,7 +863,10 @@ class ImdbManager:
                                 manual_imdb_id = selection.lower().replace("tt", "").strip()
                                 if manual_imdb_id.isdigit():
                                     logger.info(f"[green]Using manual IMDb ID: {selection}[/green]")
-                                    return int(manual_imdb_id)
+                                    selected_id = int(manual_imdb_id)
+                                    if on_manual_selection:
+                                        on_manual_selection(selected_id)
+                                    return selected_id
                                 logger.info("[bold red]Invalid IMDb ID format. Please try again.[/bold red]")
                                 continue
                             except Exception as e:
@@ -823,7 +879,10 @@ class ImdbManager:
                             selected = sorted_results[selection_int - 1]
                             imdb_id = self.safe_get(selected, ["node", "title", "id"], "")
                             if imdb_id:
-                                return int(imdb_id.replace("tt", "").strip())
+                                selected_id = int(imdb_id.replace("tt", "").strip())
+                                if on_manual_selection:
+                                    on_manual_selection(selected_id)
+                                return selected_id
                         elif selection_int == 0:
                             logger.info("[bold red]Skipping IMDb[/bold red]")
                             return 0
@@ -846,7 +905,10 @@ class ImdbManager:
                         manual_imdb_id = selection.lower().replace("tt", "").strip()
                         if manual_imdb_id.isdigit():
                             logger.info(f"[green]Using manual IMDb ID: {selection}[/green]")
-                            return int(manual_imdb_id)
+                            selected_id = int(manual_imdb_id)
+                            if on_manual_selection:
+                                on_manual_selection(selected_id)
+                            return selected_id
                         logger.info("[bold red]Invalid IMDb ID format. Please try again.[/bold red]")
                     except Exception as e:
                         logger.info(f"[bold red]Error parsing IMDb ID: {e}. Please try again.[/bold red]")
