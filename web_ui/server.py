@@ -2194,14 +2194,15 @@ def _preview_media_track_value(track: Mapping[str, object], *keys: str) -> str:
     """Return the first useful MediaInfo value across common key variants."""
     for key in keys:
         value = track.get(key)
-        text = _stringify_preview_value(value)
+        # Missing MediaInfo fields may be saved as empty dictionaries.
+        text = _stringify_preview_value(value) if isinstance(value, (str, int, float)) else ""
         if text:
             return text
 
     folded = {str(key).casefold(): value for key, value in track.items()}
     for key in keys:
         value = folded.get(key.casefold())
-        text = _stringify_preview_value(value)
+        text = _stringify_preview_value(value) if isinstance(value, (str, int, float)) else ""
         if text:
             return text
 
@@ -2656,6 +2657,8 @@ class ExecutionPreview(TypedDict, total=False):
     name: str
     status: str
     audio: str
+    audio_tracks: list[dict[str, object]]
+    subtitle_tracks: list[dict[str, object]]
     service: str
     networks: list[str]
     season: str
