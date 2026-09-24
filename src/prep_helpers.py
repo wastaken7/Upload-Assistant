@@ -311,7 +311,6 @@ async def detect_disc_and_category(prep_instance: Any, meta: Meta) -> tuple[str,
     # Fallback auto-detect BOOK category if category/manual_category is not already set and it's not a disc
     if not meta.category and not meta.manual_category and not meta.is_disc:
         is_book = False
-        video_extensions = {".mkv", ".mp4", ".ts"}
 
         path_to_check = meta.path
         if path_to_check and Path(path_to_check).exists():
@@ -326,7 +325,7 @@ async def detect_disc_and_category(prep_instance: Any, meta: Meta) -> tuple[str,
                             has_books = True
                         elif ext in AUDIOBOOK_EXTENSIONS:
                             has_audio = True
-                        elif ext in video_extensions:
+                        elif ext in VIDEO_EXTENSIONS:
                             has_video = True
                 # If we have books/audio files and NO video files, classify as BOOK
                 if (has_books or has_audio) and not has_video:
@@ -375,7 +374,6 @@ async def detect_disc_and_category(prep_instance: Any, meta: Meta) -> tuple[str,
             ".xcz",
             ".xex",
         }
-        video_extensions = {".mkv", ".mp4", ".ts"}
         game_groups = {"tenoke", "rune", "flt", "plaza", "codex", "skidrow", "prophet", "gog", "darkzer0", "doge", "tinyiso", "razor1911", "outlaws", "alias", "simplex"}
 
         path_to_check = meta.path
@@ -398,7 +396,7 @@ async def detect_disc_and_category(prep_instance: Any, meta: Meta) -> tuple[str,
                         ext = Path(file_lower).suffix
                         if ext in game_extensions:
                             has_game_ext = True
-                        elif ext in video_extensions:
+                        elif ext in VIDEO_EXTENSIONS:
                             has_video = True
                         elif ext == ".nfo":
                             nfo_path = Path(root) / file
@@ -572,6 +570,8 @@ async def process_media_files(prep_instance: Any, meta: Meta, videoloc: str, bdi
             video = videopath
         else:
             videopath, meta.filelist = await video_manager.get_video(videoloc, meta.sorted_filelist)
+            if not videopath or not meta.filelist:
+                raise ValueError(f"No video files found in {videoloc}")
             filelist = meta.filelist
             meta.filelist = filelist
             search_term = Path(filelist[0]).name if filelist else ""
