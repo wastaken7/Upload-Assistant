@@ -66,6 +66,7 @@ def test_alias_does_not_change_other_tracker_options_or_defaults(tmp_path):
     [
         ({"AITHER": {"cli_alias": "X"}, "BEYONDHD": {"cli_alias": "x"}}, "configured for both"),
         ({"AITHER": {"cli_alias": "BEYONDHD"}}, "conflicts with a canonical tracker name"),
+        ({"AITHER": {"cli_alias": "bhd"}}, "already selects BEYONDHD"),
         ({"AITHER": {"cli_alias": "two words"}}, "without spaces or commas"),
     ],
 )

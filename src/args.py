@@ -236,6 +236,7 @@ class Args:
 
     def tracker_cli_aliases(self, parser: CustomArgumentParser) -> dict[str, str]:
         """Resolve configured aliases only for -tk/--trackers input."""
+        from src.meta import Meta
         from src.trackersetup import tracker_class_map
 
         trackers = self.config.get("TRACKERS", {})
@@ -256,6 +257,9 @@ class Args:
                 parser.error(f"Invalid cli_alias for {canonical}: use one tracker identifier without spaces or commas")
             if alias in canonical_names and alias != canonical:
                 parser.error(f"cli_alias {alias} for {canonical} conflicts with a canonical tracker name")
+            existing_target = Meta.canonical_tracker_name(alias)
+            if existing_target != alias and existing_target != canonical:
+                parser.error(f"cli_alias {alias} for {canonical} already selects {existing_target}")
             if alias in aliases and aliases[alias] != canonical:
                 parser.error(f"cli_alias {alias} is configured for both {aliases[alias]} and {canonical}")
             aliases[alias] = canonical
