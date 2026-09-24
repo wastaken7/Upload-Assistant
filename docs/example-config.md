@@ -28,6 +28,7 @@ Notes:
 
 - Many numeric values are stored as strings (e.g. `"4"`, `"14000"`). Keep the same type unless you know a specific option is numeric.
 - Tracker lists are usually a comma-separated string using tracker identifiers (e.g. `"BEYONDHD, AITHER"`).
+- Each `TRACKERS.<NAME>.cli_alias` is a customizable, case-insensitive shorthand used only by `-tk` and `--trackers`. For example, `"CAPYBARABR": {"cli_alias": "cbr", ...}` lets you use `--trackers CBR`. Default tracker lists and other CLI options continue to use their existing names.
 
 ## How Upload Assistant uses this config (implementation context)
 

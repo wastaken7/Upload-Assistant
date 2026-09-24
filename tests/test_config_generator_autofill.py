@@ -44,3 +44,13 @@ def test_autofill_missing_keys_backfills_tracker_anon(config_generator_module) -
 
     for tracker in ("SEEDPOOL", "TORRENTHR"):
         assert user["TRACKERS"][tracker]["anon"] == example["TRACKERS"][tracker]["anon"]
+
+
+def test_autofill_adds_missing_cli_alias_and_preserves_custom_value(config_generator_module) -> None:
+    example = load_example_config()
+    user = {"TRACKERS": {"CAPYBARABR": {"cli_alias": "MYCBR"}, "BEYONDHD": {"api_key": "key"}}}
+
+    config_generator_module.autofill_missing_keys(user, deepcopy(example))
+
+    assert user["TRACKERS"]["CAPYBARABR"]["cli_alias"] == "MYCBR"
+    assert user["TRACKERS"]["BEYONDHD"]["cli_alias"] == "BHD"
