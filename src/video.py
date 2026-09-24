@@ -13,6 +13,7 @@ import cli_ui
 from src.cleanup import cleanup_manager
 from src.console import logger
 from src.exportmi import mi_resolution
+from src.media_extensions import VIDEO_EXTENSIONS
 from src.meta import Meta
 
 
@@ -46,8 +47,8 @@ class VideoManager:
                 if "Dolby Vision" in hdr_mi:
                     dv = "DV"
         else:
-            mi_dict = cast(dict[str, Any], mi)
-            video_track = mi_dict["media"]["track"][1]
+            mi_dict = cast(dict[str, Any], mi or {})
+            video_track = next((track for track in mi_dict.get("media", {}).get("track", []) if track.get("@type") == "Video"), {})
             with contextlib.suppress(Exception):
                 hdr_mi = video_track["colour_primaries"]
                 if hdr_mi in ("BT.2020", "REC.2020"):
@@ -137,11 +138,10 @@ class VideoManager:
             except Exception:
                 entries = []
 
-            video_exts = {".mkv", ".mp4", ".ts"}
             for file in entries:
                 fname_lower = file.lower()
                 ext = Path(file).suffix.lower()
-                if ext not in video_exts:
+                if ext not in VIDEO_EXTENSIONS:
                     continue
 
                 # Skip obvious sample files unless explicitly marked with !sample
