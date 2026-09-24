@@ -1314,6 +1314,30 @@ html.ua-upload-document #root {
   margin-top: 0.4rem;
 }
 
+.ua-processing-track-controls,
+.ua-processing-track-list {
+  margin-top: 0.4rem;
+}
+
+.ua-processing-track-toggle:hover {
+  background: var(--ua-upload-hover);
+}
+
+.ua-processing-track-toggle:focus-visible {
+  outline: 2px solid var(--ua-gold) !important;
+  outline-offset: 2px;
+}
+
+.ua-processing-track {
+  background: color-mix(
+    in srgb,
+    var(--ua-upload-bg) 45%,
+    var(--ua-upload-surface)
+  );
+  border-color: var(--ua-upload-border);
+  overflow-wrap: anywhere;
+}
+
 .ua-processing-detail-row {
   align-items: start;
   display: grid;

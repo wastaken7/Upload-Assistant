@@ -7841,9 +7841,12 @@ function ItemList({
     }
     if (isScreenshotCaptureProcessingSection) {
       if (
-        ["screens", "cutoff_screens", "scale_screenshots_for_par"].includes(
-          it.key,
-        )
+        [
+          "screens",
+          "cutoff_screens",
+          "scale_screenshots_for_par",
+          "scale_dvd_screenshots_for_par",
+        ].includes(it.key)
       ) {
         grouped["Screenshot Capture"].push(it);
       } else {
