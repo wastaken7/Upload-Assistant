@@ -196,10 +196,10 @@ async def test_book_confirmation_explains_how_to_add_missing_audible_marketplace
 
 @pytest.mark.parametrize(
     ("service_longname", "expected"),
-    [("Storytel", "Storytel"), ("", "⚠️ Missing")],
+    [("Storytel", "Storytel"), ("", "Not set. Use --service if applicable.")],
 )
 @pytest.mark.asyncio
-async def test_book_confirmation_shows_service_or_missing(monkeypatch: pytest.MonkeyPatch, service_longname: str, expected: str) -> None:
+async def test_book_confirmation_shows_service_or_optional_hint(monkeypatch: pytest.MonkeyPatch, service_longname: str, expected: str) -> None:
     messages: list[str] = []
     monkeypatch.setattr("src.uphelper.logger.info", lambda message, **_kwargs: messages.append(message))
 
@@ -213,7 +213,7 @@ async def test_book_confirmation_shows_service_or_missing(monkeypatch: pytest.Mo
 @pytest.mark.parametrize(
     ("category", "hints"),
     [
-        ("BOOK", {"Title": "--book-title", "Author": "--author", "Language": "--book-language", "Service": "--service", "Genre": "--genres", "Cover": "--poster"}),
+        ("BOOK", {"Title": "--book-title", "Author": "--author", "Language": "--book-language", "Cover": "--poster"}),
         (
             "GAME",
             {
@@ -223,7 +223,6 @@ async def test_book_confirmation_shows_service_or_missing(monkeypatch: pytest.Mo
                 "Developer": "--developer",
                 "Publisher": "--publisher",
                 "Overview": "--overview",
-                "Genre": "--genres",
                 "Platform": "--platform",
                 "Cover": "--poster",
             },
@@ -237,11 +236,10 @@ async def test_book_confirmation_shows_service_or_missing(monkeypatch: pytest.Mo
                 "Original Year": "--year",
                 "Release Type": "--music-release-type",
                 "Media": "--music-media",
-                "Genre": "--genres",
             },
         ),
-        ("TV", {"Title": "--tmdb", "Resolution": "--resolution", "Source": "--source", "Type": "--type", "Genre": "--genres"}),
-        ("MOVIE", {"Title": "--tmdb", "Resolution": "--resolution", "Source": "--source", "Type": "--type", "Genre": "--genres"}),
+        ("TV", {"Title": "--tmdb", "Resolution": "--resolution", "Source": "--source", "Type": "--type"}),
+        ("MOVIE", {"Title": "--tmdb", "Resolution": "--resolution", "Source": "--source", "Type": "--type"}),
         ("XXX", {"Title": "release filename", "Resolution": "--resolution", "Source": "--source", "Type": "--type"}),
     ],
 )
@@ -256,6 +254,11 @@ async def test_confirmation_gives_category_specific_hints_for_missing_fields(mon
         line = next(line for line in messages[0].splitlines() if f"[bold cyan]{label}[/bold cyan]" in line)
         assert "⚠️ Missing" in line
         assert hint in line
+
+    genre_line = next(line for line in messages[0].splitlines() if "[bold cyan]Genre[/bold cyan]" in line)
+    assert "Not set" in genre_line
+    assert "--genres" in genre_line
+    assert "⚠️ Missing" not in genre_line
 
 
 @pytest.mark.asyncio
@@ -276,7 +279,7 @@ async def test_book_confirmation_gives_discreet_hints_for_optional_fields(monkey
 
     assert await UploadHelper({"DEFAULT": {}}).get_confirmation(Meta(category="BOOK", unattended=True)) is True
 
-    for label, hint in {"Publisher": "--publisher", "ISBN": "--isbn", "ASIN": "--asin", "Keywords": "--keywords", "Edition": "--edition"}.items():
+    for label, hint in {"Service": "--service", "Publisher": "--publisher", "ISBN": "--isbn", "ASIN": "--asin", "Keywords": "--keywords", "Edition": "--edition"}.items():
         line = next(line for line in messages[0].splitlines() if f"[bold cyan]{label}[/bold cyan]" in line)
         assert "Not set" in line
         assert hint in line
