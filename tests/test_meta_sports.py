@@ -112,7 +112,7 @@ def test_competition_requires_event_context(event, field, competition) -> None:
 
 def test_detects_sports_from_ufc_metadata() -> None:
     meta = Meta(
-        title="UFC 331: Van vs. Pantoja 2",
+        title="UFC 331: Fighter A vs. Fighter B",
         genres=["Action"],
         keywords=["mixed martial arts (mma)", "combat sports", "ufc"],
         overview="A mixed martial arts event produced by the Ultimate Fighting Championship.",
@@ -146,7 +146,7 @@ def test_game_category_does_not_use_sports_metadata() -> None:
 
 
 def test_detects_sports_from_release_title() -> None:
-    assert detect_sports(Meta(name="Formula 1 2026 Round 08 Monaco Grand Prix 1080p"))
+    assert detect_sports(Meta(name="Formula 1 2026 Round 08 Example Grand Prix 1080p"))
 
 
 def test_generic_event_phrase_does_not_identify_sports() -> None:
@@ -202,7 +202,7 @@ def test_generic_competition_words_do_not_identify_sports(title) -> None:
 def test_does_not_classify_unrelated_action_movie_as_sports() -> None:
     meta = Meta(
         category="MOVIE",
-        title="The Fighter",
+        title="Example Drama",
         genres=["Action", "Drama"],
         keywords=["competition", "training"],
         overview="A retired soldier enters a dangerous underground competition.",

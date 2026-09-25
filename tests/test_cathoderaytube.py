@@ -131,10 +131,10 @@ def test_cover_uses_only_an_approved_image_host():
 
 def test_extracts_matching_upload_from_site_log():
     html = """
-    <table><tr><td>2 mins ago</td><td>Torrent 22015 (A Beautiful Mind (2001)) (41 GiB) was uploaded by User</td>
+    <table><tr><td>2 mins ago</td><td>Torrent 22015 (An Invented Film (2001)) (41 GiB) was uploaded by User</td>
     <td><a href="/details.php?id=22015">22015</a></td></tr></table>
     """
-    assert CathodeRayTube._log_upload_url(html, "A Beautiful Mind (2001)") == "https://www.cathode-ray.tube/torrents.php?id=22015"  # noqa: S101
+    assert CathodeRayTube._log_upload_url(html, "An Invented Film (2001)") == "https://www.cathode-ray.tube/torrents.php?id=22015"  # noqa: S101
 
 
 def test_hosts_local_cover_on_an_approved_image_host(tmp_path):
@@ -303,10 +303,10 @@ def test_content_name_uses_the_file_for_single_file_torrents():
     <div id="files_22000"><table>
       <tr class="smallhead"><td colspan="2">/</td></tr>
       <tr class="rowa"><td><strong>File Name</strong></td><td><strong>Size</strong></td></tr>
-      <tr><td>The.Abominable.DrPhibes.1971.mkv</td><td>23.90 GiB</td></tr>
+      <tr><td>Invented.Archive.Film.1971.mkv</td><td>23.90 GiB</td></tr>
     </table></div>
     """
-    assert CathodeRayTube._content_name(html) == "The.Abominable.DrPhibes.1971.mkv"  # noqa: S101
+    assert CathodeRayTube._content_name(html) == "Invented.Archive.Film.1971.mkv"  # noqa: S101
 
 
 def test_enforces_known_archive_rules():

@@ -51,7 +51,7 @@ def test_tlzdigital_tv_pack_takes_priority_over_pre_release_type():
 
 
 def test_tlzdigital_does_not_infer_type_from_movie_title():
-    meta = Meta(category="MOVIE", title="The Line", name="The.Line.2024.1080p.WEB-DL", type="WEBDL", source="WEB")
+    meta = Meta(category="MOVIE", title="Sample Film", name="Sample.Film.2024.1080p.WEB-DL", type="WEBDL", source="WEB")
 
     assert asyncio.run(_tracker().get_type_id(meta)) == {"type_id": "1"}  # noqa: S101
 

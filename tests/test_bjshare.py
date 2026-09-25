@@ -109,7 +109,7 @@ def test_get_database_overview_extracts_synopsis():
     html = """
     <div class="box torrent_description">
         <div class="body">
-            <blockquote>Em busca de uma vida melhor, Lu Xiao Fan deixa o interior...</blockquote>
+            <blockquote>Uma personagem inventada chega a uma cidade fictícia...</blockquote>
             <blockquote class="center"><iframe class="youtube" src="http://example.com"></iframe></blockquote>
         </div>
     </div>
@@ -117,21 +117,21 @@ def test_get_database_overview_extracts_synopsis():
     soup = BeautifulSoup(html, "html.parser")
     tracker = object.__new__(BJShare)
     overview = tracker.get_database_overview(soup)
-    assert overview == "Em busca de uma vida melhor, Lu Xiao Fan deixa o interior..."  # noqa: S101
+    assert overview == "Uma personagem inventada chega a uma cidade fictícia..."  # noqa: S101
 
 
 def test_get_database_credits_extracts_creator_and_cast():
     soup = BeautifulSoup(
         '<div class="box"><div class="head">InformaÃ§Ãµes</div><table>'
-        '<tr><td><b>Criador:</b></td><td>Ron Howard</td></tr>'
-        '<tr><td><b>Elenco:</b></td><td>Russell Crowe, RenÃ©e Zellweger</td></tr>'
+        '<tr><td><b>Criador:</b></td><td>Creator Example</td></tr>'
+        '<tr><td><b>Elenco:</b></td><td>Actor One, Actor Two</td></tr>'
         "</table></div>",
         "html.parser",
     )
     tracker = object.__new__(BJShare)
 
-    assert tracker.get_database_credits(soup, "creator") == "Ron Howard"  # noqa: S101
-    assert tracker.get_database_credits(soup, "cast") == "Russell Crowe, RenÃ©e Zellweger"  # noqa: S101
+    assert tracker.get_database_credits(soup, "creator") == "Creator Example"  # noqa: S101
+    assert tracker.get_database_credits(soup, "cast") == "Actor One, Actor Two"  # noqa: S101
 
 
 def test_get_overview_returns_database_overview_when_already_has_the_info():

@@ -5959,11 +5959,7 @@ function AudionutsUAGUI() {
       return (
         <div
           key={`${kind}-${track.index}`}
-          className={`rounded-lg border px-3 py-2 ${
-            isDarkMode
-              ? "border-gray-700 bg-gray-900/60"
-              : "border-gray-200 bg-gray-50"
-          }`}
+          className="ua-processing-track rounded-lg border px-3 py-2"
         >
           <div className="flex items-start gap-2">
             <span className="ua-processing-muted shrink-0 font-mono text-xs">
@@ -6187,12 +6183,12 @@ function AudionutsUAGUI() {
               {media?.status !== "waiting" && (
                 <section className="ua-processing-section">
                   <h4 className="ua-processing-section-title">Track Details</h4>
-                  <div className="space-y-2">
+                  <div className="ua-processing-track-controls space-y-2">
                     <button
                       type="button"
                       onClick={() => setShowAudioTracks((value) => !value)}
                       aria-pressed={showAudioTracks}
-                      className="flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-2 text-left"
+                      className="ua-processing-track-toggle flex w-full items-center justify-between gap-3 rounded-lg py-2 text-left transition-colors"
                     >
                       <span>
                         <span className="block text-sm font-medium">
@@ -6224,7 +6220,7 @@ function AudionutsUAGUI() {
                       type="button"
                       onClick={() => setShowSubtitleTracks((value) => !value)}
                       aria-pressed={showSubtitleTracks}
-                      className="flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-2 text-left"
+                      className="ua-processing-track-toggle flex w-full items-center justify-between gap-3 rounded-lg py-2 text-left transition-colors"
                     >
                       <span>
                         <span className="block text-sm font-medium">
@@ -6262,7 +6258,7 @@ function AudionutsUAGUI() {
                   <h4 className="ua-processing-section-title">
                     Audio Tracks ({audioTracks.length})
                   </h4>
-                  <div className="space-y-2">
+                  <div className="ua-processing-track-list space-y-2">
                     {audioTracks.map((track) =>
                       renderMediaTrack(track, "audio"),
                     )}
@@ -6275,7 +6271,7 @@ function AudionutsUAGUI() {
                   <h4 className="ua-processing-section-title">
                     Subtitle Tracks ({subtitleTracks.length})
                   </h4>
-                  <div className="space-y-2">
+                  <div className="ua-processing-track-list space-y-2">
                     {subtitleTracks.map((track) =>
                       renderMediaTrack(track, "subtitle"),
                     )}

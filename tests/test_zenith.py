@@ -12,8 +12,8 @@ def test_zenith_supports_music_and_uses_its_music_naming_guide():
         tag="-FiVE0",
         music_release={
             "fields": {
-                "artist": {"value": "Salem"},
-                "album": {"value": "King Night"},
+                "artist": {"value": "Example Band"},
+                "album": {"value": "Sample Single"},
                 "release_year": {"value": "2010"},
                 "media": {"value": "WEB"},
                 "format": {"value": "FLAC"},
@@ -26,7 +26,7 @@ def test_zenith_supports_music_and_uses_its_music_naming_guide():
     tracker = Zenith({"DEFAULT": {}, "TRACKERS": {"ZENITH": {}}})
 
     assert "MUSIC" in tracker.supported_categories
-    assert asyncio.run(tracker.get_name(meta))["name"] == "Salem - King Night (2010) - [WEB FLAC 24bit-44.1kHz Single]-FiVE0"
+    assert asyncio.run(tracker.get_name(meta))["name"] == "Example Band - Sample Single (2010) - [WEB FLAC 24bit-44.1kHz Single]-FiVE0"
 
 
 def test_zenith_music_name_omits_calculated_lossless_bitrate():
@@ -34,8 +34,8 @@ def test_zenith_music_name_omits_calculated_lossless_bitrate():
         category="MUSIC",
         music_release={
             "fields": {
-                "artist": {"value": "Kanye West"},
-                "album": {"value": "808s & Heartbreak"},
+                "artist": {"value": "Example Rapper"},
+                "album": {"value": "Invented Album"},
                 "release_year": {"value": "2008"},
                 "media": {"value": "CD"},
                 "format": {"value": "FLAC"},
@@ -46,7 +46,7 @@ def test_zenith_music_name_omits_calculated_lossless_bitrate():
 
     name = asyncio.run(Zenith({"DEFAULT": {}, "TRACKERS": {"ZENITH": {}}}).get_name(meta))["name"]
 
-    assert name == "Kanye West - 808s & Heartbreak (2008) - [CD FLAC 16bit-44.1kHz]"
+    assert name == "Example Rapper - Invented Album (2008) - [CD FLAC 16bit-44.1kHz]"
 
 
 def test_zenith_music_additional_data_sends_valid_external_ids():

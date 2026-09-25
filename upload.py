@@ -2805,7 +2805,8 @@ async def do_the_thing(base_dir: str) -> None:
                                             episode_usenet_trackers,
                                             meta.usenet_pack_nzb_path,
                                         )
-                                        logger.info(f"[yellow]Processing {len(indexer_metas)} NZB upload(s) to Usenet indexers: {', '.join(selected_usenet_trackers)}.....")
+                                        if meta.tv_pack:
+                                            logger.info(f"[yellow]Processing {len(indexer_metas)} NZB upload(s) to Usenet indexers: {', '.join(selected_usenet_trackers)}.....")
                                         failed_episode_nzbs: dict[str, list[str]] = {tracker.upper(): [] for tracker in episode_usenet_trackers}
                                         uploaded_episode_counts: dict[str, int] = {tracker.upper(): 0 for tracker in episode_usenet_trackers}
                                         duplicate_episode_counts: dict[str, int] = {tracker.upper(): 0 for tracker in episode_usenet_trackers}

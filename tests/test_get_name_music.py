@@ -12,8 +12,8 @@ def test_default_music_name_uses_lst_naming_convention():
         tag="-FiVE0",
         music_release={
             "fields": {
-                "artist": {"value": "Taylor Swift"},
-                "album": {"value": "Red"},
+                "artist": {"value": "Example Artist"},
+                "album": {"value": "Sample Album"},
                 "release_year": {"value": "2012"},
                 "media": {"value": "WEB"},
             },
@@ -23,8 +23,8 @@ def test_default_music_name_uses_lst_naming_convention():
 
     name_notag, name, clean_name, potential_missing = asyncio.run(NameManager({}).get_name(meta))
 
-    assert name_notag == "Taylor Swift - Red 2012 WEB FLAC 16-bit 44.1 kHz"
-    assert name == "Taylor Swift - Red 2012 WEB FLAC 16-bit 44.1 kHz-FiVE0"
+    assert name_notag == "Example Artist - Sample Album 2012 WEB FLAC 16-bit 44.1 kHz"
+    assert name == "Example Artist - Sample Album 2012 WEB FLAC 16-bit 44.1 kHz-FiVE0"
     assert clean_name == name
     assert potential_missing == []
 

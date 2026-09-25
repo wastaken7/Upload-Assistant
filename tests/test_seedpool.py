@@ -19,7 +19,7 @@ def test_seedpool_supports_music_game_and_book_categories():
     assert asyncio.run(tracker.get_category_id(Meta(category="GAME"))) == {"category_id": "3"}
     assert asyncio.run(tracker.get_category_id(Meta(category="BOOK"))) == {"category_id": "7"}
     assert asyncio.run(tracker.get_category_id(Meta(category="BOOK", audiobook=True))) == {"category_id": "9"}
-    assert asyncio.run(tracker.get_category_id(Meta(category="GAME", name="FIFA 26"))) == {"category_id": "3"}
+    assert asyncio.run(tracker.get_category_id(Meta(category="GAME", name="Sample Game 26"))) == {"category_id": "3"}
 
 
 def test_seedpool_maps_music_book_and_game_types_to_current_site_ids():

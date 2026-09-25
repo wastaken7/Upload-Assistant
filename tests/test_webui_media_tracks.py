@@ -1,4 +1,6 @@
 # ruff: noqa: S101
+import pytest
+
 from web_ui.server import _extract_preview_media_tracks
 
 
@@ -103,3 +105,51 @@ def test_extract_preview_media_tracks_supports_alternate_track_layout_and_flags(
     assert subtitles[0]["language"] == "Spanish"
     assert subtitles[0]["format"] == "UTF-8"
     assert subtitles[0]["default"] is True
+
+
+@pytest.mark.parametrize("track_type", ["Audio", "Text"])
+@pytest.mark.parametrize("title_key", ["Title", "TITLE"])
+@pytest.mark.parametrize("empty_title", [None, "", "  ", {}, []])
+def test_extract_preview_media_tracks_omits_empty_titles(track_type, title_key, empty_title) -> None:
+    meta = {"mediainfo": {"tracks": [{"@type": track_type, title_key: empty_title, "Language": "en"}]}}
+
+    audio, subtitles = _extract_preview_media_tracks(meta)
+
+    track = (audio or subtitles)[0]
+    assert track["title"] == ""
+    assert track["language"] == "en"
+
+
+def test_extract_preview_media_tracks_skips_empty_placeholders_for_fallback_values() -> None:
+    meta = {
+        "mediainfo": {
+            "tracks": [
+                {
+                    "@type": "Audio",
+                    "Title": {},
+                    "TrackTitle": "Director Commentary",
+                    "Language_String": {},
+                    "Language": "English",
+                    "Format_Commercial_IfAny": {},
+                    "Format": "AC-3",
+                    "ChannelLayout": {},
+                    "Channels": 2,
+                    "BitRate_String": {},
+                    "BitRate": 256000,
+                    "Default": True,
+                },
+                {"@type": "Text", "Title": {}, "TRACKTITLE": "SDH", "Format": "UTF-8"},
+            ]
+        }
+    }
+
+    audio, subtitles = _extract_preview_media_tracks(meta)
+
+    assert audio[0]["title"] == "Director Commentary"
+    assert audio[0]["commentary"] is True
+    assert audio[0]["language"] == "English"
+    assert audio[0]["format"] == "AC-3"
+    assert audio[0]["channels"] == "2"
+    assert audio[0]["bitrate"] == "256 kbps"
+    assert audio[0]["default"] is True
+    assert subtitles[0]["title"] == "SDH"

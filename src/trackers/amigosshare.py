@@ -1278,10 +1278,7 @@ class AmigosShare:
         config_flag = self.config["TRACKERS"][self.tracker].get("modq")
         if meta.modq:
             return False
-        if config_flag is True:
-            return False
-
-        return True
+        return config_flag is not True
 
     async def set_internal_flag(self, meta: Meta) -> None:
         if meta.debug:

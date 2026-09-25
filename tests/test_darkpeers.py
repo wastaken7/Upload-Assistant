@@ -17,8 +17,8 @@ def test_darkpeers_music_name_uses_required_folder_style():
         category="MUSIC",
         music_release={
             "fields": {
-                "artist": {"value": "Taylor Swift"},
-                "album": {"value": "Red"},
+                "artist": {"value": "Example Artist"},
+                "album": {"value": "Sample Album"},
                 "release_year": {"value": "2012"},
                 "media": {"value": "WEB"},
             },
@@ -26,7 +26,7 @@ def test_darkpeers_music_name_uses_required_folder_style():
         },
     )
 
-    assert _name(meta) == "Taylor Swift - Red (2012) - WEB FLAC 16-44.1"
+    assert _name(meta) == "Example Artist - Sample Album (2012) - WEB FLAC 16-44.1"
 
 
 def test_darkpeers_only_includes_audio_spectrograms_for_music():
@@ -57,33 +57,33 @@ def test_darkpeers_only_includes_audio_spectrograms_for_music():
 def test_darkpeers_ebook_name_includes_book_elements():
     meta = Meta(
         category="BOOK",
-        author="Liu Cixin",
-        title="The Three-Body Problem",
+        author="Example Author",
+        title="Fictional Book",
         edition="Revised Edition",
         year=2008,
         type="EPUB",
-        isbn="978-0765377067",
+        isbn="978-0123456472",
         source="RETAIL",
         ocr=True,
     )
 
-    assert _name(meta) == "Liu Cixin - The Three-Body Problem 2008 Revised Edition EPUB 9780765377067 Retail OCR"
+    assert _name(meta) == "Example Author - Fictional Book 2008 Revised Edition EPUB 9780123456472 Retail OCR"
 
 
 def test_darkpeers_audiobook_name_includes_format_bitrate_isbn_and_tag():
     meta = Meta(
         category="BOOK",
         audiobook=True,
-        author="Ernest Cline",
-        title="Ready Player One",
+        author="Sample Author",
+        title="Invented Audiobook",
         year=2011,
         type="MP3",
         audiobook_bitrate=64,
-        isbn="978-0-307-88743-6",
+        isbn="978-0-123-45647-2",
         tag="GROUP",
     )
 
-    assert _name(meta) == "Ernest Cline - Ready Player One 2011 MP3 64 9780307887436-GROUP"
+    assert _name(meta) == "Sample Author - Invented Audiobook 2011 MP3 64 9780123456472-GROUP"
 
 
 def test_darkpeers_book_name_never_uses_publisher_as_author():
@@ -105,19 +105,19 @@ def test_darkpeers_replaces_generic_dual_audio_with_rule_matrix_label():
 
 
 def test_darkpeers_tv_name_omits_year_without_an_exact_title_match():
-    meta = Meta(category="TV", title="BLACK TORCH", year=2026, name="BLACK TORCH 2026 S01E05 1080p CR WEB-DL DD+ 2.0 H.264-AnoZu")
+    meta = Meta(category="TV", title="SHADOW LANTERN", year=2026, name="SHADOW LANTERN 2026 S01E05 1080p CR WEB-DL DD+ 2.0 H.264-AnoZu")
     adapter = DarkPeers({"DEFAULT": {"tmdb_api": "test-key"}, "TRACKERS": {"DARKPEERS": {}}})
     adapter._tv_title_needs_year = AsyncMock(return_value=False)
 
-    assert asyncio.run(adapter.get_name(meta))["name"] == "BLACK TORCH S01E05 1080p CR WEB-DL DD+ 2.0 H.264-AnoZu"
+    assert asyncio.run(adapter.get_name(meta))["name"] == "SHADOW LANTERN S01E05 1080p CR WEB-DL DD+ 2.0 H.264-AnoZu"
 
 
 def test_darkpeers_tv_name_keeps_year_for_an_exact_title_match():
-    meta = Meta(category="TV", title="The Flash", year=2014, name="The Flash 2014 S01E01 1080p WEB-DL")
+    meta = Meta(category="TV", title="Example Series", year=2014, name="Example Series 2014 S01E01 1080p WEB-DL")
     adapter = DarkPeers({"DEFAULT": {"tmdb_api": "test-key"}, "TRACKERS": {"DARKPEERS": {}}})
     adapter._tv_title_needs_year = AsyncMock(return_value=True)
 
-    assert asyncio.run(adapter.get_name(meta))["name"] == "The Flash 2014 S01E01 1080p WEB-DL"
+    assert asyncio.run(adapter.get_name(meta))["name"] == "Example Series 2014 S01E01 1080p WEB-DL"
 
 
 def test_darkpeers_tv_year_rule_preserves_aka():
@@ -129,13 +129,13 @@ def test_darkpeers_tv_year_rule_preserves_aka():
 
 
 def test_darkpeers_tv_year_rule_detects_a_distinct_exact_tmdb_title():
-    meta = Meta(category="TV", title="The Flash", tmdb_id=60735)
+    meta = Meta(category="TV", title="Example Series", tmdb_id=60735)
     adapter = DarkPeers({"DEFAULT": {"tmdb_api": "test-key"}, "TRACKERS": {"DARKPEERS": {}}})
     response = Mock()
     response.json.return_value = {
         "results": [
-            {"id": 60735, "name": "The Flash", "original_name": "The Flash"},
-            {"id": 236, "name": "The Flash", "original_name": "The Flash"},
+            {"id": 60735, "name": "Example Series", "original_name": "Example Series"},
+            {"id": 236, "name": "Example Series", "original_name": "Example Series"},
         ]
     }
 
@@ -144,10 +144,10 @@ def test_darkpeers_tv_year_rule_detects_a_distinct_exact_tmdb_title():
 
 
 def test_darkpeers_tv_year_rule_does_not_count_the_only_tmdb_result_as_a_duplicate():
-    meta = Meta(category="TV", title="BLACK TORCH")
+    meta = Meta(category="TV", title="SHADOW LANTERN")
     adapter = DarkPeers({"DEFAULT": {"tmdb_api": "test-key"}, "TRACKERS": {"DARKPEERS": {}}})
     response = Mock()
-    response.json.return_value = {"results": [{"id": 279807, "name": "BLACK TORCH", "original_name": "BLACK TORCH"}]}
+    response.json.return_value = {"results": [{"id": 279807, "name": "SHADOW LANTERN", "original_name": "SHADOW LANTERN"}]}
 
     with patch("src.trackers.UNIT3D.darkpeers.httpx.AsyncClient.get", new=AsyncMock(return_value=response)):
         assert asyncio.run(adapter._tv_title_needs_year(meta)) is False

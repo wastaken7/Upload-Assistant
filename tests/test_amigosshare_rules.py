@@ -119,7 +119,7 @@ def test_movie_does_not_treat_unidentified_external_subtitles_as_portuguese():
 
 
 def test_movie_does_not_treat_title_words_as_language_markers():
-    meta = make_meta(subtitle_files=["Amor.Por.Acaso.srt"], unattended=True)
+    meta = make_meta(subtitle_files=["Titulo.De.Teste.srt"], unattended=True)
 
     assert not asyncio.run(run_checks(meta))
 

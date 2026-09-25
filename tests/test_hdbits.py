@@ -6,13 +6,13 @@ from src.trackers.hdbits import HDBits
 
 def make_meta(**overrides):
     values = {
-        "name": "The Hateful Eight 2015 1080p WEB-DL DD+ 5.1 H.264-GROUP",
+        "name": "Invented Western 2015 1080p WEB-DL DD+ 5.1 H.264-GROUP",
         "audio": "DD+ 5.1",
         "service": None,
         "hdr": "",
         "aka": "",
         "imdb_info": {},
-        "title": "The Hateful Eight",
+        "title": "Invented Western",
         "year": 2015,
         "type": "WEBDL",
     }
@@ -23,4 +23,4 @@ def make_meta(**overrides):
 def test_hdbits_preserves_title_spacing_without_service():
     name = asyncio.run(HDBits({}).get_name(make_meta()))
 
-    assert name.startswith("The Hateful Eight 2015")  # noqa: S101
+    assert name.startswith("Invented Western 2015")  # noqa: S101

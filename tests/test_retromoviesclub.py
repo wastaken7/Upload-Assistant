@@ -39,9 +39,9 @@ def test_retromoviesclub_uses_tracker_specific_type_ids():
 
 
 def test_retromoviesclub_sanitizes_upload_name_and_removes_aka():
-    meta = Meta(name="Le Fabuleux Amélie [Amélie] (2001)!", aka="[Amélie]")
+    meta = Meta(name="Fábula Exemplo [Fábula] (2001)!", aka="[Fábula]")
 
-    assert asyncio.run(_tracker().get_name(meta)) == {"name": "Le Fabuleux Amlie 2001"}  # noqa: S101
+    assert asyncio.run(_tracker().get_name(meta)) == {"name": "Fbula Exemplo 2001"}  # noqa: S101
 
 
 def test_retromoviesclub_includes_mod_queue_flag():

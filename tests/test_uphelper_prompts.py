@@ -105,7 +105,7 @@ async def test_dupe_check_rejects_episode_when_tracker_prefers_existing_season_p
 
     helper = UploadHelper({"DEFAULT": {}})
     helper.tracker_class_map = {"DARKPEERS": lambda config: SeasonPackTracker()}
-    meta = Meta(category="TV", name="Yowayowa Sensei S01E01", season_pack_exists=True, season_pack_name="Yowayowa Sensei S01 1080p WEB-DL")
+    meta = Meta(category="TV", name="Example Show S01E01", season_pack_exists=True, season_pack_name="Example Show S01 1080p WEB-DL")
     dupes: list[DupeEntry | str] = [meta.season_pack_name]
 
     is_dupe, result_meta = await helper.dupe_check(dupes, meta, "DARKPEERS")
@@ -124,7 +124,7 @@ async def test_dupe_check_honors_skip_dupe_check_for_existing_season_pack() -> N
 
     helper = UploadHelper({"DEFAULT": {}})
     helper.tracker_class_map = {"DARKPEERS": lambda **_kwargs: SeasonPackTracker()}
-    meta = Meta(category="TV", name="Yowayowa Sensei S01E01", dupe=True, season_pack_exists=True, season_pack_name="Yowayowa Sensei S01 1080p WEB-DL")
+    meta = Meta(category="TV", name="Example Show S01E01", dupe=True, season_pack_exists=True, season_pack_name="Example Show S01 1080p WEB-DL")
 
     is_dupe, result_meta = await helper.dupe_check([meta.season_pack_name], meta, "DARKPEERS")
 
@@ -173,19 +173,19 @@ async def test_dupe_filter_resets_season_pack_state_between_trackers() -> None:
 async def test_book_confirmation_shows_audible_url_that_will_be_used(monkeypatch: pytest.MonkeyPatch) -> None:
     messages: list[str] = []
     monkeypatch.setattr("src.uphelper.logger.info", lambda message, **_kwargs: messages.append(message))
-    meta = Meta(category="BOOK", asin="B01N5AX3TQ", unattended=True)
+    meta = Meta(category="BOOK", asin="B0TEST1234", unattended=True)
 
     assert await UploadHelper({"DEFAULT": {"audible_domain": "audible.com.br"}}).get_confirmation(meta) is True
 
     assert "Audible URL" in messages[0]
-    assert "https://www.audible.com.br/pd/B01N5AX3TQ" in messages[0]
+    assert "https://www.audible.com.br/pd/B0TEST1234" in messages[0]
 
 
 @pytest.mark.asyncio
 async def test_book_confirmation_explains_how_to_add_missing_audible_marketplace(monkeypatch: pytest.MonkeyPatch) -> None:
     messages: list[str] = []
     monkeypatch.setattr("src.uphelper.logger.info", lambda message, **_kwargs: messages.append(message))
-    meta = Meta(category="BOOK", asin="B01N5AX3TQ", unattended=True)
+    meta = Meta(category="BOOK", asin="B0TEST1234", unattended=True)
 
     assert await UploadHelper({"DEFAULT": {"audible_domain": ""}}).get_confirmation(meta) is True
 
