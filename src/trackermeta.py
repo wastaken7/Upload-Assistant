@@ -309,7 +309,7 @@ async def update_meta_with_unit3d_data(meta: Meta, tracker_data: Sequence[Any], 
     if desc and mode.imports_text:
         meta.description = desc
         meta.saved_description = True
-    if category and not meta.manual_category:
+    if category and (not meta.manual_category or meta.manual_category.strip().upper() == "SPORTS"):
         cat_upper = category.upper()
         if "MOVIE" in cat_upper:
             meta.category = "MOVIE"

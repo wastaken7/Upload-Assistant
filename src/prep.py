@@ -385,7 +385,7 @@ class Prep:
         return any(re.search(rf"(^|,\s*){re.escape(keyword)}(\s*,|$)", searchable, re.IGNORECASE) for keyword in adult_keywords)
 
     async def get_cat(self, _video: str, meta: Meta) -> str | None:
-        if meta.manual_category:
+        if meta.manual_category and meta.manual_category.strip().upper() != "SPORTS":
             manual_category = meta.manual_category
             return manual_category.upper() if isinstance(manual_category, str) else None
 

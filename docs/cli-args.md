@@ -92,7 +92,7 @@ If you pass a `.txt` file as the main positional input path (without specifying 
 
 ### Category / type / source / resolution
 
-- `-c`, `--category {movie,tv,fanres,book,game,music,xxx}`: Override the category.
+- `-c`, `--category {movie,tv,sports,fanres,book,game,music,xxx}`: Override the category.
 - `-t`, `--type {disc,remux,encode,webdl,web-dl,webrip,hdtv,dvdrip}`: Override release type.
   - Stored as uppercase with `-` removed (e.g. `web-dl` → `WEBDL`).
 - `--source {Blu-ray,BluRay,DVD,DVD5,DVD9,HDDVD,WEB,HDTV,UHDTV,LaserDisc,DCP}`: Override the source string.
