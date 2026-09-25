@@ -1,4 +1,5 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+import re
 from typing import Any, ClassVar
 
 from src.console import logger
@@ -143,13 +144,18 @@ class Aither(UNIT3D):
         if not meta.language_checked:
             await languages_manager.process_desc_language(meta, tracker=self.tracker)
         audio_languages: list[str] = [] if not meta.audio_languages else meta.audio_languages
+        language_label_pattern = re.compile(rf"(?<!\S)MULTIPLE(?:\s+LANGUAGES)?(?=\s+{re.escape(resolution)}(?:\s|$))", re.IGNORECASE) if resolution else None
         if audio_languages and not await languages_manager.has_english_language(audio_languages):
-            foreign_lang = audio_languages[0].upper()
-            if name_type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD"):
-                if year:
-                    aither_name = aither_name.replace(year, f"{year} {foreign_lang}", 1)
-            elif meta.is_disc != "BDMV":
-                aither_name = aither_name.replace(meta.resolution, f"{foreign_lang} {meta.resolution}", 1)
+            foreign_lang = "MULTIPLE LANGUAGES" if audio_languages[0].casefold() in ("multiple", "multiple languages") else audio_languages[0].upper()
+            existing_multiple_label = bool(language_label_pattern and language_label_pattern.search(aither_name))
+            if not existing_multiple_label and name_type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD"):
+                existing_multiple_label = bool(re.search(rf"(?<!\S)MULTIPLE(?:\s+LANGUAGES)?(?=\s+{re.escape(source)}(?:\s|$))", aither_name, re.IGNORECASE))
+            if foreign_lang != "MULTIPLE LANGUAGES" or not existing_multiple_label:
+                if name_type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD"):
+                    if year:
+                        aither_name = aither_name.replace(year, f"{year} {foreign_lang}", 1)
+                elif meta.is_disc != "BDMV":
+                    aither_name = aither_name.replace(meta.resolution, f"{foreign_lang} {meta.resolution}", 1)
 
         if name_type == "DVDRIP":
             source = "DVDRip"
@@ -175,4 +181,6 @@ class Aither(UNIT3D):
         if alt_title and year:
             aither_name = aither_name.replace(f"{year} {alt_title}", f"{alt_title} {year}", 1)
 
+        if language_label_pattern:
+            aither_name = language_label_pattern.sub("MULTIPLE LANGUAGES", aither_name)
         return {"name": add_incomplete_pack_marker(aither_name, meta, self.tracker)}

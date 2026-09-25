@@ -53,3 +53,80 @@ def test_aither_moves_aka_before_a_present_year() -> None:
     )
 
     assert _name(meta) == "Example Movie AKA Alternate Movie Title 2024 1080p Blu-ray"
+
+
+def test_aither_expands_multiple_audio_language_from_mediainfo() -> None:
+    meta = Meta(
+        name="Synthetic Feature 2024 1080p WEB-DL AAC 2.0 H.264-TESTGROUP",
+        resolution="1080p",
+        audio_languages=["Multiple"],
+        language_checked=True,
+    )
+
+    assert _name(meta) == "Synthetic Feature 2024 MULTIPLE LANGUAGES 1080p WEB-DL AAC 2.0 H.264-TESTGROUP"
+
+
+def test_aither_expands_existing_multiple_tag_without_duplication() -> None:
+    meta = Meta(
+        name="Synthetic Feature 2024 MULTIPLE 1080p WEB-DL AAC 2.0 H.264-TESTGROUP",
+        resolution="1080p",
+        audio_languages=["Multiple"],
+        language_checked=True,
+    )
+
+    assert _name(meta) == "Synthetic Feature 2024 MULTIPLE LANGUAGES 1080p WEB-DL AAC 2.0 H.264-TESTGROUP"
+
+
+def test_aither_preserves_existing_multiple_languages_tag() -> None:
+    meta = Meta(
+        name="Imaginary Short 2024 MULTIPLE LANGUAGES 1080p WEB-DL AAC 2.0 H.264-TESTGROUP",
+        resolution="1080p",
+        audio_languages=["Multiple languages"],
+        language_checked=True,
+    )
+
+    assert _name(meta) == "Imaginary Short 2024 MULTIPLE LANGUAGES 1080p WEB-DL AAC 2.0 H.264-TESTGROUP"
+
+
+def test_aither_preserves_other_language_and_release_group() -> None:
+    meta = Meta(
+        name="Synthetic Feature 2024 1080p WEB-DL-TESTMULTiPLY",
+        resolution="1080p",
+        audio_languages=["French"],
+        language_checked=True,
+    )
+
+    assert _name(meta) == "Synthetic Feature 2024 FRENCH 1080p WEB-DL-TESTMULTiPLY"
+
+
+def test_aither_normalizes_mixed_case_language_label_without_duplication() -> None:
+    meta = Meta(
+        name="Synthetic Feature 2024 Multiple 1080p WEB-DL-TESTGROUP",
+        resolution="1080p",
+        audio_languages=["Multiple"],
+        language_checked=True,
+    )
+
+    assert _name(meta) == "Synthetic Feature 2024 MULTIPLE LANGUAGES 1080p WEB-DL-TESTGROUP"
+
+
+def test_aither_preserves_multiple_in_title_and_release_group() -> None:
+    meta = Meta(
+        name="MULTIPLE Synthetic Feature 2024 1080p WEB-DL-MULTIPLE",
+        resolution="1080p",
+        audio_languages=["Multiple"],
+        language_checked=True,
+    )
+
+    assert _name(meta) == "MULTIPLE Synthetic Feature 2024 MULTIPLE LANGUAGES 1080p WEB-DL-MULTIPLE"
+
+
+def test_aither_preserves_release_group_when_english_audio_skips_label() -> None:
+    meta = Meta(
+        name="Synthetic Feature 2024 1080p WEB-DL-MULTIPLE",
+        resolution="1080p",
+        audio_languages=["English"],
+        language_checked=True,
+    )
+
+    assert _name(meta) == "Synthetic Feature 2024 1080p WEB-DL-MULTIPLE"
