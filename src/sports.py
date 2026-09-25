@@ -45,7 +45,7 @@ def detect_sports(meta: Meta) -> bool:
         competition = _SPORTS_RELEASE_PATTERN.match(value)
         if not competition:
             continue
-        details = value[competition.end():]
+        details = value[competition.end() :]
         if competition.group("numbered") and re.match(r" \d{1,3}\b", details):
             return True
         if competition.group("formula") and re.search(r"\bgrand prix\b", details):

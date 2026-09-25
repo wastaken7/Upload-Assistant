@@ -709,18 +709,46 @@ let argumentCategories = [
         label: "--tracker-id",
         placeholder: "TRACKER=ID or URL",
       },
-      { label: "PTP reference", insert: "--tracker-id PTP=", description: "PTP torrent ID" },
-      { label: "BLU reference", insert: "--tracker-id BLU=", description: "BLU torrent ID" },
+      {
+        label: "PTP reference",
+        insert: "--tracker-id PTP=",
+        description: "PTP torrent ID",
+      },
+      {
+        label: "BLU reference",
+        insert: "--tracker-id BLU=",
+        description: "BLU torrent ID",
+      },
       {
         label: "Aither reference",
         insert: "--tracker-id AITHER=",
         description: "Aither torrent ID",
       },
-      { label: "LST reference", insert: "--tracker-id LST=", description: "LST torrent ID" },
-      { label: "OE reference", insert: "--tracker-id OE=", description: "OE torrent ID" },
-      { label: "HDB reference", insert: "--tracker-id HDB=", description: "HDB torrent ID" },
-      { label: "BTN reference", insert: "--tracker-id BTN=", description: "BTN torrent ID" },
-      { label: "BHD reference", insert: "--tracker-id BHD=", description: "BHD torrent ID" },
+      {
+        label: "LST reference",
+        insert: "--tracker-id LST=",
+        description: "LST torrent ID",
+      },
+      {
+        label: "OE reference",
+        insert: "--tracker-id OE=",
+        description: "OE torrent ID",
+      },
+      {
+        label: "HDB reference",
+        insert: "--tracker-id HDB=",
+        description: "HDB torrent ID",
+      },
+      {
+        label: "BTN reference",
+        insert: "--tracker-id BTN=",
+        description: "BTN torrent ID",
+      },
+      {
+        label: "BHD reference",
+        insert: "--tracker-id BHD=",
+        description: "BHD torrent ID",
+      },
       {
         label: "Orpheus reference",
         insert: "--tracker-id ORPHEUS=",
@@ -995,7 +1023,9 @@ if (cliArguments.length > 0) {
   argumentCategories = argumentCategories.map((category) => ({
     ...category,
     args: category.args
-      .filter((item) => !item.label.startsWith("--") || cliByLabel.has(item.label))
+      .filter(
+        (item) => !item.label.startsWith("--") || cliByLabel.has(item.label),
+      )
       .map((item) => {
         const cli = cliByLabel.get(item.label);
         if (!cli) return item; // WebUI command presets have their own instructions.
