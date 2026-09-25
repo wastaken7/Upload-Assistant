@@ -1241,26 +1241,10 @@ html.ua-upload-document #root {
     0 0 0 1px rgba(255, 255, 255, 0.08);
 }
 
-.ua-processing-live,
 .ua-processing-cover-action {
   backdrop-filter: blur(12px);
   box-shadow: 0 6px 22px rgba(0, 0, 0, 0.2);
   z-index: 2;
-}
-
-.ua-processing-live {
-  background: rgba(12, 10, 9, 0.76);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  color: #ffffff;
-}
-
-.ua-processing-live-dot {
-  animation: ua-processing-pulse 1.8s ease-in-out infinite;
-  background: var(--ua-gold);
-  border-radius: 9999px;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ua-gold) 18%, transparent);
-  height: 0.45rem;
-  width: 0.45rem;
 }
 
 .ua-processing-placeholder-icon {
@@ -1380,25 +1364,6 @@ html.ua-upload-document #root {
 .ua-processing-cover-action:focus-visible {
   outline: 2px solid var(--ua-gold);
   outline-offset: 2px;
-}
-
-@keyframes ua-processing-pulse {
-  0%,
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-
-  50% {
-    opacity: 0.58;
-    transform: scale(0.82);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .ua-processing-live-dot {
-    animation: none;
-  }
 }
 
 .ua-upload-output-panel {

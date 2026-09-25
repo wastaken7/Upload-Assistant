@@ -6051,14 +6051,6 @@ function AudionutsUAGUI() {
                     className="ua-processing-poster max-h-full max-w-full object-contain"
                   />
                 </div>
-                <div
-                  className="ua-processing-live absolute left-3 top-3 inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.1em]"
-                  role="status"
-                  aria-live="polite"
-                >
-                  <span className="ua-processing-live-dot" aria-hidden="true" />
-                  Processing{category ? ` ${category}` : ""}
-                </div>
                 {category === "XXX" &&
                   String(media.poster_url).startsWith(
                     "/api/execution_preview_cover?",
@@ -6089,14 +6081,6 @@ function AudionutsUAGUI() {
               <div
                 className={`ua-processing-artwork relative flex w-full ${posterHeight} flex-col items-center justify-center gap-3`}
               >
-                <div
-                  className="ua-processing-live absolute left-3 top-3 inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.1em]"
-                  role="status"
-                  aria-live="polite"
-                >
-                  <span className="ua-processing-live-dot" aria-hidden="true" />
-                  Processing{category ? ` ${category}` : ""}
-                </div>
                 <span
                   className="ua-processing-placeholder-icon"
                   aria-hidden="true"
