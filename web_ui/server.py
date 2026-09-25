@@ -1922,6 +1922,7 @@ def _extract_metadata_sources(meta_data: Mapping[str, object]) -> list[MetadataS
     mal_value = _stringify_optional_id(meta_data.get("mal_id")) or _stringify_optional_id(meta_data.get("mal"))
     douban_value = _stringify_optional_id(meta_data.get("douban_id"))
     igdb_value = _stringify_optional_id(meta_data.get("igdb_id"))
+    igdb_url = _stringify_preview_value(meta_data.get("igdb_url"))
     steam_url = _stringify_preview_value(meta_data.get("steam_url"))
     openlibrary_value = (
         _stringify_preview_value(meta_data.get("openlibrary"))
@@ -2004,7 +2005,7 @@ def _extract_metadata_sources(meta_data: Mapping[str, object]) -> list[MetadataS
             "igdb",
             "IGDB",
             igdb_value,
-            f"https://www.igdb.com/search?type=1&q={quote(igdb_value)}",
+            igdb_url if _is_http_url(igdb_url) else f"https://www.igdb.com/search?type=1&q={quote(igdb_value)}",
         )
 
     if category == "GAME" and steam_url:
