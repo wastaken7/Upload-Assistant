@@ -307,7 +307,7 @@ Implementation notes:
 
 ### Logging / output
 
-- `keep_meta` (bool): Do not delete existing `meta.json` before running (NOT recommended).
+- `keep_meta` (bool): Reuse values from the existing `meta.json` when processing begins (NOT recommended). The file is preserved until processed metadata replaces it regardless of this setting.
 - `post_upload_hooks` (list[str]): Trusted Python scripts in `STATE_DIR/custom_hooks` (Docker: `/state/custom_hooks`) to run after each item's upload flow. Each receives final metadata as JSON on standard input; its output is shown in the terminal.
 - `post_upload_inprocess_hooks` (list[str]): Trusted hooks in the same folder, loaded into Upload Assistant and called as `on_upload_finished(meta, config)`. They receive deep copies and can use the project logger directly.
 - `post_upload_hook_timeout` (number): Maximum seconds for each subprocess post-upload hook; defaults to 30. A failed hook does not fail the upload.

@@ -83,6 +83,7 @@ from src.early_tasks import is_usenet_only as _is_usenet_only
 from src.get_desc import gen_desc
 from src.get_name import NameManager
 from src.get_tracker_data import TrackerDataManager
+from src.meta_file import write_meta_file
 from src.qbitwait import Wait
 from src.queuemanage import QueueManager
 from src.rehostimages import check_tracker_image_hosts
@@ -1201,8 +1202,7 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
     meta.name_notag, meta.name, meta.clean_name, meta.potential_missing = await name_manager.get_name(meta)
 
     logger.debug(f"Trackers list before editing: {meta.trackers}")
-    async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/meta.json", "w", encoding="utf-8") as f:
-        await f.write(json.dumps(meta.to_dict(), indent=4, cls=PathAwareEncoder))
+    await write_meta_file(meta)
     _publish_webui_preview_target(cast(str, meta.path or ""), meta.uuid or None)
 
     # For BOOK category, certain trackers (e.g. CAPYBARABR) require title, author, year and language.
@@ -1277,8 +1277,7 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
         meta = await prep.gather_prep(meta=meta, mode="cli")
         TrackerSetup(config=config).filter_unsupported_trackers(meta)
         meta.name_notag, meta.name, meta.clean_name, meta.potential_missing = await name_manager.get_name(meta)
-        async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/meta.json", "w", encoding="utf-8") as f:
-            await f.write(json.dumps(meta.to_dict(), indent=4, cls=PathAwareEncoder))
+        await write_meta_file(meta)
         _publish_webui_preview_target(cast(str, meta.path or ""), meta.uuid or None)
         try:
             confirm = await helper.get_confirmation(meta)
@@ -1353,8 +1352,7 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
                 status_dict["skip_upload"] = meta.unattended_audio_skip or meta.unattended_subtitle_skip
 
         await asyncio.sleep(0.2)
-        async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/meta.json", "w", encoding="utf-8") as f:
-            await f.write(json.dumps(meta.to_dict(), indent=4, cls=PathAwareEncoder))
+        await write_meta_file(meta)
         _publish_webui_preview_target(cast(str, meta.path or ""), meta.uuid or None)
         await asyncio.sleep(0.2)
 
@@ -1952,8 +1950,7 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
                         except Exception as e:
                             logger.error(f"[red]Error uploading book cover: {e}[/red]")
 
-            async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/meta.json", "w", encoding="utf-8") as f:
-                await f.write(json.dumps(meta.to_dict(), indent=4, cls=PathAwareEncoder))
+            await write_meta_file(meta)
             _publish_webui_preview_target(cast(str, meta.path or ""), meta.uuid or None)
 
             if "image_list" in meta and meta.image_list:
@@ -2040,8 +2037,7 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
     if meta.randomized >= 1 and not meta.mkbrr and not is_usenet_only:
         TORRENT_CREATOR.create_random_torrents(meta.base_dir, meta.uuid, meta.randomized, cast(str, meta.path))
 
-    async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/meta.json", "w", encoding="utf-8") as f:
-        await f.write(json.dumps(meta.to_dict(), indent=4, cls=PathAwareEncoder))
+    await write_meta_file(meta)
     _publish_webui_preview_target(cast(str, meta.path or ""), meta.uuid or None)
     return True
 
@@ -2610,14 +2606,14 @@ async def do_the_thing(base_dir: str) -> None:
 
                 keep_meta = config["DEFAULT"].get("keep_meta", False)
 
-                if (not keep_meta or meta.delete_meta) and Path(meta_file).exists():
+                if meta.delete_meta and meta_file.exists():
                     try:
                         meta_file.unlink()
                         logger.debug(f"[bold yellow]Found and deleted existing metadata file: {meta_file}")
                     except Exception as e:
                         logger.info(f"[bold red]Failed to delete metadata file {meta_file}: {e!s}")
 
-                if keep_meta and Path(meta_file).exists():
+                if keep_meta and not meta.delete_meta and meta_file.exists():
                     async with aiofiles.open(meta_file, encoding="utf-8") as f:
                         content = await f.read()
                         saved_meta = cast(dict[str, Any], json.loads(content)) if content.strip() else {}
@@ -3052,8 +3048,7 @@ async def do_the_thing(base_dir: str) -> None:
 
             # Persist and expose the completed item before user-managed hooks run.
             # Hooks may inspect the final tracker status and files have not yet been cleaned.
-            async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/meta.json", "w", encoding="utf-8") as f:
-                await f.write(json.dumps(meta.to_dict(), indent=4, cls=PathAwareEncoder))
+            await write_meta_file(meta)
             _publish_webui_preview_target(cast(str, meta.path or ""), meta.uuid or None)
             await run_post_upload_hooks(meta, config)
 
