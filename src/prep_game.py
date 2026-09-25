@@ -579,7 +579,7 @@ async def enrich_game_from_steam(
     url = "https://store.steampowered.com/api/appdetails"
     params = {"appids": steam_id}
     trackers = [t.upper() for t in meta.trackers]
-    target_trackers = {"AMIGOSSHARE", "BRASILTRACKER", "BJSHARE", "CAPYBARABR", "SAMARITANO"}
+    target_trackers = {"BRASILTRACKER", "BJSHARE", "CAPYBARABR", "SAMARITANO"}
     if any(t in target_trackers for t in trackers):
         params["l"] = "brazilian"
 

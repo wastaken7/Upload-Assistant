@@ -165,7 +165,6 @@ def migrate_old_config(config_dict: ConfigDict) -> ConfigDict:
 
     manual_mapping = {
         "AR": "ALPHARATIO",
-        "ASC": "AMIGOSSHARE",
         "ANT": "ANTHELION",
         "AZ": "AVISTAZ",
         "BHD": "BEYONDHD",

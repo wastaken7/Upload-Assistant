@@ -120,7 +120,6 @@ def get_tracker_domain(tracker: str, config: dict[str, Any] | None = None) -> st
 
     # Fallback/Hardcoded domains
     fallback_domains = {
-        "amigosshare": "amigos-share.club",
         "avistaz": "avistaz.to",
         "bjshare": "bj-share.info",
         "brasiltracker": "brasiltracker.org",

@@ -136,7 +136,6 @@ config = {
 
 The following trackers support the `BOOK` category with custom metadata mapping (e.g., custom form templates, category IDs, and naming patterns):
 
-- **AMIGOSSHARE**: Maps book-specific metadata (author, title) and structures the torrent name as `{author} - {title}`.
 - **BJSHARE**: Fully supports books, audiobooks, comics, mangas, magazines, and newspapers with detailed metadata mappings (format, page count, publisher, ISBN, cover image, description).
 - **BRASILTRACKER**: Supports standard book metadata mapping.
 - **CAPYBARABR**: Supports books, audiobooks, and comics/manga. Treats different ebook formats as duplicates since only one format is allowed per book.

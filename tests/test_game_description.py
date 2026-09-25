@@ -91,7 +91,7 @@ def test_description_builders_use_h2_for_trackers_with_legacy_header_formats():
     game_meta = Meta(category="GAME", platform="PC")
     music_meta = Meta(category="MUSIC", music_release={"fields": {"album": {"value": "Album"}}})
 
-    for tracker in ("TORRENTLEECH", "IMMORTALSEED", "IPTORRENTS", "SPEEDAPP", "BJSHARE", "BRASILTRACKER", "AMIGOSSHARE"):
+    for tracker in ("TORRENTLEECH", "IMMORTALSEED", "IPTORRENTS", "SPEEDAPP", "BJSHARE", "BRASILTRACKER"):
         builder = DescriptionBuilder(tracker, {"DEFAULT": {}, "TRACKERS": {tracker: {}}})
 
         assert "[h2]" in builder._build_book_desc_section(book_meta)  # noqa: S101

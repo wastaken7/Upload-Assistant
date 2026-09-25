@@ -105,7 +105,6 @@ def test_tracker_specific_formats_converts_colors_for_gazelle_trackers() -> None
     for tracker in ("ANTHELION", "BJSHARE", "BRASILTRACKER", "GREATPOSTERWALL"):
         assert builder.tracker_specific_formats(tracker, description) == "[color=#87ceeb]Text[/color]"
 
-    assert builder.tracker_specific_formats("AMIGOSSHARE", description) == description
     assert builder.tracker_specific_formats("HDTORRENTS", description) == description
 
 
@@ -114,7 +113,7 @@ def test_tracker_specific_formats_converts_headings_for_selected_trackers() -> N
     description = "[h1]Título[/h1] [h6]Observação[/h6]"
     expected = "[size=6][b]Título[/b][/size] [size=1][b][color=grey]Observação[/color][/b][/size]"
 
-    for tracker in ("AMIGOSSHARE", "ANTHELION", "BJSHARE", "BRASILTRACKER", "GREATPOSTERWALL"):
+    for tracker in ("ANTHELION", "BJSHARE", "BRASILTRACKER", "GREATPOSTERWALL"):
         assert builder.tracker_specific_formats(tracker, description) == expected
 
     assert builder.tracker_specific_formats("HDBITS", description) == description

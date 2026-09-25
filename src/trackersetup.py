@@ -67,7 +67,6 @@ STATIC_AUTH_TYPES = {
     "1PTBA": "cookies",
     "AITHER": "unit3d_api",
     "ALPHARATIO": "cookies",
-    "AMIGOSSHARE": "cookies",
     "ANTHELION": "other_api",
     "ASIANCINEMA": "unit3d_api",
     "AVISTAZ": "cookies",
@@ -831,7 +830,7 @@ class TrackerSetup:
             try:
                 url = tracker_instance.requests_url
             except AttributeError:
-                if tracker_name.upper() not in ("AMIGOSSHARE", "BJSHARE", "FUNFILE", "HDSPACE", "AVISTAZ", "CINEMAZ", "PRIVATEHD"):
+                if tracker_name.upper() not in ("BJSHARE", "FUNFILE", "HDSPACE", "AVISTAZ", "CINEMAZ", "PRIVATEHD"):
                     # tracker without requests url not supported
                     return False
 
@@ -839,7 +838,7 @@ class TrackerSetup:
                 if not url:
                     return False
                 requests = await self.bhd_request_check(meta, tracker_name, url)
-            elif tracker_name.upper() in ("AMIGOSSHARE", "BJSHARE", "FUNFILE", "HDSPACE", "AVISTAZ", "CINEMAZ", "PRIVATEHD", "MTEAM", "ORPHEUS"):
+            elif tracker_name.upper() in ("BJSHARE", "FUNFILE", "HDSPACE", "AVISTAZ", "CINEMAZ", "PRIVATEHD", "MTEAM", "ORPHEUS"):
                 # These trackers have custom request handling
                 requests = cast(list[JsonDict], await tracker_instance.get_requests(meta))
                 return bool(requests) if tracker_name.upper() == "ORPHEUS" else False
@@ -1419,7 +1418,6 @@ tracker_class_map: Any = LazyTrackerDict(
         "1PTBA": ("src.trackers.NEXUSPHP.oneptba", "OnePTBA"),
         "AITHER": ("src.trackers.UNIT3D.aither", "Aither"),
         "ALPHARATIO": ("src.trackers.GAZELLE.alpharatio", "AlphaRatio"),
-        "AMIGOSSHARE": ("src.trackers.amigosshare", "AmigosShare"),
         "ANTHELION": ("src.trackers.GAZELLE.anthelion", "Anthelion"),
         "ASIANCINEMA": ("src.trackers.UNIT3D.asiancinema", "AsianCinema"),
         "AVISTAZ": ("src.trackers.AVISTAZ.avistaz", "AvistaZ"),

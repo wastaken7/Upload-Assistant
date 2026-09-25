@@ -20,9 +20,9 @@ def test_qbittorrent_coerce_str_list_parses_stringified_paths() -> None:
 
 
 def test_qbittorrent_map_save_path_accepts_path_objects() -> None:
-    mapped_path = map_save_path(Path("/local/links/AMIGOSSHARE"), Path("/local"), Path("/remote"))
+    mapped_path = map_save_path(Path("/local/links/EXAMPLE"), Path("/local"), Path("/remote"))
 
-    assert mapped_path == "/remote/links/AMIGOSSHARE/"
+    assert mapped_path == "/remote/links/EXAMPLE/"
 
 
 def test_map_save_path_does_not_rewrite_sibling_paths() -> None:
@@ -105,7 +105,7 @@ def test_rtorrent_keeps_multifile_release_directory_as_base(tmp_path: Path) -> N
 
 
 def test_tracker_directory_falls_back_to_tracker_name() -> None:
-    assert tracker_directory("/links", "", "AMIGOSSHARE") == Path("/links/AMIGOSSHARE")
+    assert tracker_directory("/links", "", "EXAMPLE") == Path("/links/EXAMPLE")
 
 
 def test_tracker_directory_rejects_paths_outside_link_root() -> None:
@@ -129,7 +129,7 @@ def test_tracker_directory_rejects_paths_outside_link_root() -> None:
         "LPT9.archive.part",
     ):
         try:
-            tracker_directory("/links", directory_name, "AMIGOSSHARE")
+            tracker_directory("/links", directory_name, "EXAMPLE")
         except ValueError:
             continue
         raise AssertionError(f"accepted unsafe tracker directory: {directory_name}")
