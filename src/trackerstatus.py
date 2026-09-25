@@ -268,14 +268,6 @@ class TrackerStatusManager:
                             meta.initial_dupes = {}
                         meta.initial_dupes[tracker_name] = copy.deepcopy(dupes)
 
-                    if tracker_name == "AMIGOSSHARE" and (meta.anon if meta.anon is not None else "false"):
-                        logger.info(
-                            "PORTUGAS: [yellow]Aviso: Você solicitou um upload anônimo, mas o AMIGOSSHARE não suporta essa opção.[/yellow][red] O envio não será anônimo.[/red]"
-                        )
-                        logger.warning(
-                            "EN: [yellow]Warning: You requested an anonymous upload, but AMIGOSSHARE does not support this option.[/yellow][red] The upload will not be anonymous.[/red]"
-                        )
-
                     if ("skipping" not in local_meta or local_meta["skipping"] is None) and not local_tracker_status["skipped"]:
                         dupes = cast(list[Any], await dupe_checker.filter_dupes(dupes, local_meta, tracker_name))
 

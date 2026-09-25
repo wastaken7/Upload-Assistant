@@ -834,7 +834,7 @@ class DescriptionBuilder:
 
     def _build_book_desc_section(self, meta: Meta, table: bool = True, underline: bool = False, bullet: str = "") -> str:
         """Build the BBCode table or list for BOOK-category uploads."""
-        if self.tracker in ("TORRENTLEECH", "IMMORTALSEED", "IPTORRENTS", "SPEEDAPP", "AMIGOSSHARE"):
+        if self.tracker in ("TORRENTLEECH", "IMMORTALSEED", "IPTORRENTS", "SPEEDAPP"):
             table = False
 
         header = "[h2]"
@@ -2268,9 +2268,6 @@ class DescriptionBuilder:
         if tracker in {"ANTHELION", "BJSHARE", "BRASILTRACKER", "GREATPOSTERWALL"}:
             description = bbcode.clamp_size_tags(description)
             description = bbcode.convert_named_colors(description)
-            description = bbcode.convert_headings_to_sizes(description)
-
-        if tracker == "AMIGOSSHARE":
             description = bbcode.convert_headings_to_sizes(description)
 
         if tracker == "BRASILTRACKER":

@@ -118,7 +118,6 @@ Sequence Usenet and torrent tracker uploads while limiting contention with qBitt
 | <img src="web_ui/static/img/trackers/1ptba.png" width="16" height="16" />                     | 1PTBA                  | 1PTBA                  | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/aither.png" width="16" height="16" />                    | Aither                 | AITHER                 | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/alpharatio.png" alt="" width="16" height="16" />         | AlphaRatio             | ALPHARATIO             | MOVIE, TV                    |
-| <img src="web_ui/static/img/trackers/amigosshare.png" alt="" width="16" height="16" />        | Amigos Share Club      | AMIGOSSHARE            | MOVIE, TV, BOOK, GAME        |
 | <img src="web_ui/static/img/trackers/anthelion.png" width="16" height="16" />                 | Anthelion              | ANTHELION              | MOVIE                        |
 | <img src="web_ui/static/img/trackers/asiancinema.png" width="16" height="16" />               | AsianCinema            | ASIANCINEMA            | MOVIE, TV, MUSIC             |
 | <img src="web_ui/static/img/trackers/avistaz.png" width="16" height="16" />                   | AvistaZ                | AVISTAZ                | MOVIE, TV                    |
