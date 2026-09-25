@@ -41,6 +41,25 @@ def test_execution_preview_omits_missing_or_invalid_imdb_links(value):
     assert all(source["key"] != "imdb" for source in preview["metadata_sources"])
 
 
+@pytest.mark.parametrize(
+    ("game_url", "expected_url"),
+    [
+        ("https://www.igdb.com/games/example-adventure", "https://www.igdb.com/games/example-adventure"),
+        ("", "https://www.igdb.com/search?type=1&q=285744"),
+        ("javascript:alert(1)", "https://www.igdb.com/search?type=1&q=285744"),
+    ],
+)
+def test_execution_preview_links_igdb_id_to_game_url(game_url, expected_url):
+    preview = _extract_execution_preview(
+        {"category": "GAME", "igdb_id": 285744, "igdb_url": game_url},
+        "example-game",
+    )
+
+    source = next(source for source in preview["metadata_sources"] if source["key"] == "igdb")
+    assert source["value"] == "285744"  # noqa: S101
+    assert source["url"] == expected_url  # noqa: S101
+
+
 def _detail_items(preview, section_key):
     section = next(section for section in preview["detail_sections"] if section["key"] == section_key)
     return {item["key"]: item["value"] for item in section["items"]}
