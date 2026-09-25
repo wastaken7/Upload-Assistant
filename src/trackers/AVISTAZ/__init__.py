@@ -1036,7 +1036,7 @@ class AZTrackerBase:
 
         issue = self.check_data(meta, data)
         if issue:
-            meta.tracker_status[self.tracker] = f"data error - {issue}"
+            meta.tracker_status[self.tracker]["status_message"] = f"data error - {issue}"
             return False
         if not meta.debug:
             response = await self.session.post(self.upload_url_step2, data=data)
