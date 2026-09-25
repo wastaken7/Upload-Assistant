@@ -674,9 +674,16 @@ def dts_core_additional_check(meta: Meta) -> None:
                 if track_one_is_dts_hd_ma and track_two_is_lossy_dts:
                     hd_idx, lossy_idx = i + 1, j + 1
                     hd_track = track_one
+                    lossy_track = track_two
                 else:
                     hd_idx, lossy_idx = j + 1, i + 1
                     hd_track = track_two
+                    lossy_track = track_one
+
+                commentary_label = any("commentary" in str(lossy_track.get(field) or "").lower() for field in ("Title", "title", "TrackTitle", "ServiceKind"))
+                commentary_service = "C" in {kind.strip().upper() for kind in str(lossy_track.get("ServiceKind") or "").split("/")}
+                if commentary_label or commentary_service:
+                    continue
 
                 logger.debug(
                     f"[yellow]DEBUG: Detected potential DTS core duplicate between tracks {i + 1} and {j + 1}, matched on properties: (Duration={hd_track.get('Duration')}, FrameRate={hd_track.get('FrameRate')}, FrameCount={hd_track.get('FrameCount')}, Language={hd_track.get('Language')})[/yellow]"
