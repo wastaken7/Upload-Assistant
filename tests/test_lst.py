@@ -35,8 +35,8 @@ def test_lst_music_name_uses_technical_fields_for_lossless_releases():
         tag="-FiVE0",
         music_release={
             "fields": {
-                "artist": {"value": "Taylor Swift"},
-                "album": {"value": "Red"},
+                "artist": {"value": "Example Artist"},
+                "album": {"value": "Sample Album"},
                 "release_year": {"value": "2012"},
                 "media": {"value": "WEB"},
             },
@@ -46,7 +46,7 @@ def test_lst_music_name_uses_technical_fields_for_lossless_releases():
 
     name = asyncio.run(LST({"DEFAULT": {}, "TRACKERS": {"LST": {}}}).get_name(meta))["name"]
 
-    assert name == "Taylor Swift - Red 2012 WEB FLAC 16-bit 44.1 kHz-FiVE0"
+    assert name == "Example Artist - Sample Album 2012 WEB FLAC 16-bit 44.1 kHz-FiVE0"
 
 
 def test_lst_music_name_ignores_invalid_sample_rate():
@@ -70,26 +70,26 @@ def test_lst_music_name_ignores_invalid_sample_rate():
 
 
 def test_lst_audiobook_name_omits_lossy_technical_fields():
-    meta = Meta(category="BOOK", audiobook=True, author="Ernest Cline", title="Ready Player One", year=2011, source="WEB", type="M4B", tag="zeno")
+    meta = Meta(category="BOOK", audiobook=True, author="Sample Author", title="Invented Audiobook", year=2011, source="WEB", type="M4B", tag="zeno")
 
     name = asyncio.run(LST({"DEFAULT": {}, "TRACKERS": {"LST": {}}}).get_name(meta))["name"]
 
-    assert name == "Ernest Cline - Ready Player One 2011 WEB M4B-zeno"
+    assert name == "Sample Author - Invented Audiobook 2011 WEB M4B-zeno"
 
 
 def test_lst_ebook_name_includes_edition_type_and_isbn():
     meta = Meta(
         category="BOOK",
-        author="Liu Cixin",
-        title="The Three-Body Problem",
+        author="Example Author",
+        title="Fictional Book",
         edition="Revised Edition",
         year=2008,
         type="PDF",
         ocr=True,
-        isbn="978-0765377067",
+        isbn="978-0123456472",
         tag="-GROUP",
     )
 
     name = asyncio.run(LST({"DEFAULT": {}, "TRACKERS": {"LST": {}}}).get_name(meta))["name"]
 
-    assert name == "Liu Cixin - The Three-Body Problem Revised Edition 2008 PDF OCR 9780765377067-GROUP"
+    assert name == "Example Author - Fictional Book Revised Edition 2008 PDF OCR 9780123456472-GROUP"

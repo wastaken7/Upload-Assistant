@@ -15,6 +15,14 @@ from typing import Any
 from src.console import logger
 
 
+def normalize_book_title_separators(title: str) -> str:
+    """Use a colon for the first book title separator and en dashes thereafter."""
+    parts = [part.strip() for part in re.split(r":(?!\d)\s*|\s+–\s+", title)]  # noqa: RUF001
+    if len(parts) >= 3 and all(parts):
+        return f"{parts[0]}: {parts[1]} – {' – '.join(parts[2:])}"  # noqa: RUF001
+    return title
+
+
 def normalize_series_index(value: str) -> str:
     """Drop a trailing .0 from a series index ("5.0" -> "5"), keeping "5.5"/"0.5"."""
     try:

@@ -34,7 +34,7 @@ def test_hdbits_search_returns_six_values_for_api_error(monkeypatch: pytest.Monk
     monkeypatch.setattr("src.trackers.hdbits.httpx.AsyncClient", lambda **_kwargs: _FakeAsyncClient())
     tracker = HDBits({"TRACKERS": {"HDBITS": {}}})
 
-    result = asyncio.run(tracker.search_filename("Gladiator.2000.mkv", "file", Meta(category="MOVIE")))
+    result = asyncio.run(tracker.search_filename("Invented.Movie.2000.mkv", "file", Meta(category="MOVIE")))
 
     assert result == (None, None, None, None, None, None)
 

@@ -18,6 +18,7 @@ from langcodes.tag_parser import LanguageTagError
 from PIL import Image
 from unidecode import unidecode
 
+from src.book_extractors import normalize_book_title_separators
 from src.console import logger, prompt_in_thread
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder
@@ -616,7 +617,8 @@ class BJShare:
                     if re.fullmatch(r"\d+", normalized_index):
                         normalized_index = normalized_index.zfill(2)
                 title += f" - Vol. {normalized_index}"
-            return self.common.portuguese_title_capitalization(title), ""
+            title = self.common.portuguese_title_capitalization(title)
+            return normalize_book_title_separators(title), ""
 
         if meta.category == "GAME":
             return meta.title, ""

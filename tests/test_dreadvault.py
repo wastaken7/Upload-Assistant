@@ -421,7 +421,7 @@ def test_dreadvault_adds_foreign_audio_language_to_a_dvdrip():
     # The DVDRip template carries no resolution of its own, so a language pass that ran before the
     # DVDRip branch had nothing to anchor to and dropped the marker (kainoa 2026-09-09).
     meta = Meta(
-        name="Suicide Dolls 1999 NTSC DVD x264 DVDRip DD 2.0-GVXXI",
+        name="Imaginary Dolls 1999 NTSC DVD x264 DVDRip DD 2.0-GVXXI",
         type="DVDRIP",
         source="NTSC DVD",
         resolution="480p",
@@ -433,12 +433,12 @@ def test_dreadvault_adds_foreign_audio_language_to_a_dvdrip():
 
     name = asyncio.run(_tracker().get_name(meta))["name"]
 
-    assert name == "Suicide Dolls 1999 JAPANESE 480p DVDRip DD 2.0 x264-GVXXI"  # noqa: S101
+    assert name == "Imaginary Dolls 1999 JAPANESE 480p DVDRip DD 2.0 x264-GVXXI"  # noqa: S101
 
 
 def test_dreadvault_adds_foreign_audio_language_to_a_dvd_full_disc():
     meta = Meta(
-        name="Hausu 1977 USA NTSC DVD9 LPCM 2.0",
+        name="Sample Film 1977 USA NTSC DVD9 LPCM 2.0",
         year=1977,
         type="DISC",
         is_disc="DVD",
@@ -453,7 +453,7 @@ def test_dreadvault_adds_foreign_audio_language_to_a_dvd_full_disc():
 
     name = asyncio.run(_tracker().get_name(meta))["name"]
 
-    assert name == "Hausu 1977 JAPANESE USA NTSC DVD9 LPCM 2.0"  # noqa: S101
+    assert name == "Sample Film 1977 JAPANESE USA NTSC DVD9 LPCM 2.0"  # noqa: S101
 
 
 def test_dreadvault_adds_foreign_audio_language_after_year_for_dvd_remux():
@@ -476,7 +476,7 @@ def test_dreadvault_adds_foreign_audio_language_after_year_for_dvd_remux():
 
 def test_dreadvault_adds_dvd_remux_language_after_release_year_when_title_contains_year():
     meta = Meta(
-        title="Dracula 2000",
+        title="Imaginary Film 2000",
         year=2000,
         category="MOVIE",
         type="REMUX",
@@ -489,11 +489,11 @@ def test_dreadvault_adds_dvd_remux_language_after_release_year_when_title_contai
         language_checked=True,
     )
     meta.name = _build_name(meta)
-    assert meta.name == "Dracula 2000 2000 PAL DVD REMUX DD 2.0-GRP"  # noqa: S101
+    assert meta.name == "Imaginary Film 2000 2000 PAL DVD REMUX DD 2.0-GRP"  # noqa: S101
 
     name = asyncio.run(_tracker().get_name(meta))["name"]
 
-    assert name == "Dracula 2000 2000 JAPANESE PAL DVD REMUX DD 2.0-GRP"  # noqa: S101
+    assert name == "Imaginary Film 2000 2000 JAPANESE PAL DVD REMUX DD 2.0-GRP"  # noqa: S101
 
 
 def test_dreadvault_adds_foreign_audio_language_before_source_for_yearless_dvd_remux():

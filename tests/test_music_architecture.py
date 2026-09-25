@@ -188,16 +188,16 @@ def test_original_group_year_and_explicit_remaster_edition_are_distinct():
             relative_path="track.flac",
             format="FLAC",
             codec="FLAC",
-            artist="Led Zeppelin",
-            album_artist="Led Zeppelin",
-            album="Led Zeppelin II",
-            title="Whole Lotta Love",
+            artist="Example Band",
+            album_artist="Example Band",
+            album="Example Band II",
+            title="Sample Track",
             date="2014",
-            tags={"albumartist": ["Led Zeppelin"]},
+            tags={"albumartist": ["Example Band"]},
         )
     )
 
-    MusicReleaseAnalyzer()._derive_release_fields(release, "(1969) Led Zeppelin II [2014 Remaster]")
+    MusicReleaseAnalyzer()._derive_release_fields(release, "(1969) Example Band II [2014 Remaster]")
 
     assert release.get("year") == "1969"
     assert release.get("release_year") == "2014"
@@ -214,16 +214,16 @@ def test_edition_only_folder_does_not_promote_edition_year_to_group_year():
             relative_path="track.flac",
             format="FLAC",
             codec="FLAC",
-            artist="Led Zeppelin",
-            album_artist="Led Zeppelin",
-            album="Coda",
-            title="We're Gonna Groove",
+            artist="Example Band",
+            album_artist="Example Band",
+            album="Final Notes",
+            title="Closing Track",
             date="2015",
-            tags={"albumartist": ["Led Zeppelin"]},
+            tags={"albumartist": ["Example Band"]},
         )
     )
 
-    MusicReleaseAnalyzer()._derive_release_fields(release, "Led Zeppelin - Coda [2015 Deluxe Edition] (FLAC)")
+    MusicReleaseAnalyzer()._derive_release_fields(release, "Example Band - Final Notes [2015 Deluxe Edition] (FLAC)")
 
     assert not release.get("year")
     assert release.get("release_year") == "2015"
@@ -239,23 +239,23 @@ def test_web_directory_brackets_populate_release_not_edition_metadata():
             relative_path="track.flac",
             format="FLAC",
             codec="FLAC",
-            artist="The Carter Family",
-            album_artist="The Carter Family & Johnny Cash",
-            album="Keep On The Sunny Side",
-            title="Keep On The Sunny Side",
+            artist="The Sample Family",
+            album_artist="The Sample Family & Guest Singer",
+            album="Invented Song",
+            title="Invented Song",
             date="1963",
-            tags={"albumartist": ["The Carter Family & Johnny Cash"]},
+            tags={"albumartist": ["The Sample Family & Guest Singer"]},
         )
     )
 
     MusicReleaseAnalyzer()._derive_release_fields(
         release,
-        "1963 - The Carter Family & Johnny Cash - Keep On The Sunny Side [2014 WEB FLAC][Columbia Nashville Legacy][886444460446]",
+        "1963 - The Sample Family & Guest Singer - Invented Song [2014 WEB FLAC][Sample Label][886444460446]",
     )
 
     assert release.get("year") == "1963"
     assert release.get("release_year") == "2014"
-    assert release.get("release_label") == "Columbia Nashville Legacy"
+    assert release.get("release_label") == "Sample Label"
     assert release.get("release_catalogue_number") == "886444460446"
     assert not release.get("edition_year")
 
@@ -288,25 +288,24 @@ def test_compilation_uses_multiple_artists_not_various_artists_literal():
 def test_featured_track_artists_do_not_turn_a_stable_album_artist_into_a_compilation():
     """Guest-heavy albums must retain the release's ALBUMARTIST credit.
 
-    This mirrors Bootsy Collins - Metal Health: all tracks are credited to
-    Bootsy at album level, while individual songs add different guests.
+    All tracks share one album artist while individual songs add guests.
     """
     release = MusicRelease(root=".")
     track_artists = (
-        "Bootsy Collins",
-        "Bootsy Collins, Manou Gallo, Buckethead",
-        "Bootsy Collins, Buckethead, Victor Wooten",
-        "Bootsy Collins, Ouiwey Collins",
-        "Bootsy Collins, Buckethead",
-        "Bootsy Collins, Buckethead, Robert Trujillo",
-        "Bootsy Collins, Nate Alien8, Buckethead, Barbie T",
-        "Bootsy Collins, Robert Trujillo",
-        "Bootsy Collins, Tobotius",
-        "Bootsy Collins, Billy Sheehan",
-        "Bootsy Collins, Buckethead, Jennifer Batten",
-        "Bootsy Collins, Buckethead, Tobotius",
-        "Bootsy Collins, Samuel L. Jackson",
-        "Bootsy Collins, Eric Gales",
+        "Lead Artist",
+        "Lead Artist, Guest One, Guest Two",
+        "Lead Artist, Guest Two, Guest Three",
+        "Lead Artist, Guest Four",
+        "Lead Artist, Guest Two",
+        "Lead Artist, Guest Two, Guest Five",
+        "Lead Artist, Guest Six, Guest Two, Guest Seven",
+        "Lead Artist, Guest Five",
+        "Lead Artist, Guest Eight",
+        "Lead Artist, Guest Nine",
+        "Lead Artist, Guest Two, Guest Ten",
+        "Lead Artist, Guest Two, Guest Eight",
+        "Lead Artist, Guest Eleven",
+        "Lead Artist, Guest Twelve",
     )
     for index, artist in enumerate(track_artists, start=1):
         release.tracks.append(
@@ -316,19 +315,19 @@ def test_featured_track_artists_do_not_turn_a_stable_album_artist_into_a_compila
                 format="FLAC",
                 codec="FLAC",
                 artist=artist,
-                album_artist="Bootsy Collins",
-                album="Metal Health",
+                album_artist="Lead Artist",
+                album="Sample Album",
                 title=f"Track {index}",
                 track_number=index,
-                tags={"albumartist": ["Bootsy Collins"], "artist": [artist]},
+                tags={"albumartist": ["Lead Artist"], "artist": [artist]},
             )
         )
 
-    MusicReleaseAnalyzer()._derive_release_fields(release, "Bootsy_Collins-Metal_Health-16BIT-WEB-FLAC-2026-ENViED")
+    MusicReleaseAnalyzer()._derive_release_fields(release, "Lead_Artist-Sample_Album-16BIT-WEB-FLAC-2026-ENViED")
 
     assert release.get("release_type") == "Album"
-    assert release.get("artists") == ["Bootsy Collins"]
-    assert release.get("artist") == "Bootsy Collins"
+    assert release.get("artists") == ["Lead Artist"]
+    assert release.get("artist") == "Lead Artist"
 
 
 def test_album_title_containing_ost_letters_is_not_a_soundtrack():
@@ -360,8 +359,8 @@ def test_orpheus_preserves_multiple_artists_and_release_namespace():
         AudioTrack(path="track.flac", relative_path="track.flac", format="FLAC", codec="FLAC", bit_depth=16, sample_rate=44_100, title="No Church in the Wild", track_number=1)
     )
     for field, value in {
-        "artists": ["Jay-Z", "Kanye West"],
-        "artist": "Jay-Z & Kanye West",
+        "artists": ["Jay-Z", "Example Rapper"],
+        "artist": "Jay-Z & Example Rapper",
         "album": "Watch the Throne",
         "year": "2011",
         "media": "CD",
@@ -374,13 +373,13 @@ def test_orpheus_preserves_multiple_artists_and_release_namespace():
     adapter = Orpheus({"TRACKERS": {"ORPHEUS": {}}})
     payload = adapter.build_upload_payload(Meta(category="MUSIC", artwork_url="https://images.example/cover.jpg"), release)
 
-    assert payload["artists[]"] == ["Jay-Z", "Kanye West"]
+    assert payload["artists[]"] == ["Jay-Z", "Example Rapper"]
     assert payload["importance[]"] == [1, 1]
     assert payload["record_label"] == "Roc-A-Fella"
     assert payload["catalogue_number"] == "B0015962-02"
     assert "remaster_record_label" not in payload
     assert "remaster_catalogue_number" not in payload
-    assert [entry for entry in adapter._form_data(payload) if entry[0] == "artists[]"] == [("artists[]", "Jay-Z"), ("artists[]", "Kanye West")]
+    assert [entry for entry in adapter._form_data(payload) if entry[0] == "artists[]"] == [("artists[]", "Jay-Z"), ("artists[]", "Example Rapper")]
 
 
 def test_orpheus_additional_checks_block_prohibited_music_artists():
@@ -398,18 +397,8 @@ def test_orpheus_additional_checks_block_prohibited_music_artists():
 
 def test_orpheus_additional_checks_block_blacklisted_releases_and_labels():
     adapter = Orpheus({"TRACKERS": {"ORPHEUS": {}}})
-    for artist, album in (
-        ("Bruce Springsteen", "Odds and Sods"),
-        ("Dr. Dre", "Detox"),
-        ("Green Day", "Cigarettes and Valentines"),
-        ("Jean-Michel Jarre", "Music for Supermarkets"),
-        ("Michael Jackson", "Super Mix"),
-        ("Pink Floyd", "Tree Full of Secrets"),
-        ("The Beatles", "Carnival of Light"),
-        ("The Upholsterers", "Your Furniture Was Always Dead... I Was Just Afraid To Tell You"),
-        ("Various Artists", "The Ultimate 500 CD Jazz Collection"),
-        ("Wu-Tang Clan", "Once Upon a Time in Shaolin"),
-    ):
+    assert Orpheus.blocked_music_releases
+    for artist, album in Orpheus.blocked_music_releases:
         release = MusicRelease(root=".")
         release.set_field("artist", artist, MetadataSource.FILE_TAG, 1.0)
         release.set_field("artists", [artist], MetadataSource.FILE_TAG, 1.0)
@@ -419,7 +408,8 @@ def test_orpheus_additional_checks_block_blacklisted_releases_and_labels():
         assert not asyncio.run(adapter.get_additional_checks(meta))
         assert "blacklisted release" in meta.tracker_status["ORPHEUS"]["status_message"]
 
-    for label in ("Sandero Classic Sound", "Sip It & Trip It Records"):
+    assert Orpheus.blocked_music_labels
+    for label in Orpheus.blocked_music_labels:
         release = MusicRelease(root=".")
         release.set_field("release_label", label, MetadataSource.FILE_TAG, 1.0)
         meta = Meta(category="MUSIC", music_release=release.to_dict())
@@ -432,12 +422,12 @@ def test_orpheus_album_description_includes_track_and_total_durations():
     release = MusicRelease(root=".")
     release.tracks.extend(
         [
-            AudioTrack(path="01.flac", relative_path="01.flac", format="FLAC", codec="FLAC", title="Never Said No", track_number=1, duration=213.4),
-            AudioTrack(path="02.flac", relative_path="02.flac", format="FLAC", codec="FLAC", title="All The Beauty", track_number=2, duration=237.0),
+            AudioTrack(path="01.flac", relative_path="01.flac", format="FLAC", codec="FLAC", title="Track One", track_number=1, duration=213.4),
+            AudioTrack(path="02.flac", relative_path="02.flac", format="FLAC", codec="FLAC", title="Track Two", track_number=2, duration=237.0),
         ]
     )
 
-    assert Orpheus._album_description(release) == "[b]Tracklist[/b] (1 disc(s))\n\n1. Never Said No (03:33)\n2. All The Beauty (03:57)\n\nTotal length: 07:30"
+    assert Orpheus._album_description(release) == "[b]Tracklist[/b] (1 disc(s))\n\n1. Track One (03:33)\n2. Track Two (03:57)\n\nTotal length: 07:30"
 
 
 def test_orpheus_debug_renders_payload_without_public_cover_url():
@@ -522,12 +512,12 @@ def test_orpheus_marks_explicit_edition_metadata_as_remaster():
 
 def test_orpheus_request_match_is_title_artist_and_initial_year_aware():
     release = MusicRelease(root=".")
-    for field, value in {"artists": ["Led Zeppelin"], "artist": "Led Zeppelin", "album": "Coda", "year": "1982"}.items():
+    for field, value in {"artists": ["Example Band"], "artist": "Example Band", "album": "Final Notes", "year": "1982"}.items():
         release.set_field(field, value, MetadataSource.FILE_TAG, 1.0)
     record = {
-        "title": "Coda",
+        "title": "Final Notes",
         "year": 1982,
-        "artists": [[{"name": "Led Zeppelin"}]],
+        "artists": [[{"name": "Example Band"}]],
     }
 
     assert Orpheus._request_match_type(release, record) == "exact"
@@ -788,11 +778,11 @@ def test_discogs_catalogue_filter_preserves_hyphens_and_uses_safe_fallbacks():
 def test_directory_catalogue_and_label_are_extracted_from_braced_release_info(tmp_path):
     release = MusicRelease(root=str(tmp_path))
 
-    MusicReleaseAnalyzer._derive_from_directory(release, "Kanye West - 808s & Heartbreak (2008) [FLAC] {Roc-A-Fella Records B001219802 CD}")
+    MusicReleaseAnalyzer._derive_from_directory(release, "Example Rapper - Invented Album (2008) [FLAC] {Example Records B001219802 CD}")
 
     assert release.get("release_catalogue_number") == "B001219802"
     assert release.get("directory_catalogue_number") == "B001219802"
-    assert release.get("release_label") == "Roc-A-Fella Records"
+    assert release.get("release_label") == "Example Records"
 
 
 def test_directory_derivation_strips_only_matched_bracketed_metadata(tmp_path):
@@ -806,12 +796,12 @@ def test_directory_derivation_strips_only_matched_bracketed_metadata(tmp_path):
 
 def test_orpheus_enrichment_extracts_discogs_master_from_group_wiki(tmp_path):
     release = MusicRelease(root=str(tmp_path))
-    release.set_field("artist", "Kanye West", MetadataSource.FILE_TAG, 1.0)
-    release.set_field("album", "808s & Heartbreak", MetadataSource.FILE_TAG, 1.0)
+    release.set_field("artist", "Example Rapper", MetadataSource.FILE_TAG, 1.0)
+    release.set_field("album", "Invented Album", MetadataSource.FILE_TAG, 1.0)
     meta = Meta(category="MUSIC", tracker_ids={"ORPHEUS": "953914"}, base_dir=str(tmp_path), uuid="orpheus-master", music_release=release.to_dict())
     response = {
-        "group": {"id": 610888, "name": "808s & Heartbreak", "year": 2008, "wikiBBcode": "https://www.discogs.com/master/8489"},
-        "torrent": {"media": "CD", "encoding": "Lossless", "remasterYear": 2008, "remasterRecordLabel": "Roc-A-Fella Records", "remasterCatalogueNumber": "B001219802"},
+        "group": {"id": 610888, "name": "Invented Album", "year": 2008, "wikiBBcode": "https://www.discogs.com/master/8489"},
+        "torrent": {"media": "CD", "encoding": "Lossless", "remasterYear": 2008, "remasterRecordLabel": "Example Records", "remasterCatalogueNumber": "B001219802"},
     }
 
     with patch.object(Orpheus, "get_torrent", new=AsyncMock(return_value=response)):

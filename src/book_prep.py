@@ -41,6 +41,7 @@ from src.book_extractors import (
 from src.book_extractors import (
     get_epubmeta_output as _get_epubmeta_output,
 )
+from src.book_extractors import normalize_book_title_separators
 from src.book_extractors import (
     normalize_series_index as _normalize_series_index,
 )
@@ -735,6 +736,7 @@ async def gather_book_prep(
 
     if meta.audiobook:
         meta.title = normalize_audiobook_title(meta.title, meta.book_series, meta.book_series_index)
+    meta.title = normalize_book_title_separators(meta.title)
 
     detect_newspaper(meta)
     sanitize_book_language(meta)

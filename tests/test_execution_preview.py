@@ -185,19 +185,19 @@ def test_book_preview_uses_service_when_longname_is_unavailable():
 @pytest.mark.parametrize(
     ("audible_url", "expected_url"),
     [
-        ("https://www.audible.com/pd/example/B01N5AX3TQ", "https://www.audible.com/pd/example/B01N5AX3TQ"),
+        ("https://www.audible.com/pd/example/B0TEST1234", "https://www.audible.com/pd/example/B0TEST1234"),
         ("", None),
         ("javascript:alert(1)", None),
     ],
 )
 def test_book_preview_exposes_safe_audible_asin_link(audible_url, expected_url):
     preview = _extract_execution_preview(
-        {"category": "BOOK", "title": "Example", "asin": "B01N5AX3TQ", "audible_url": audible_url},
+        {"category": "BOOK", "title": "Example", "asin": "B0TEST1234", "audible_url": audible_url},
         "C:/media/Example",
     )
 
     audible = next(source for source in preview["metadata_sources"] if source["key"] == "audible")
-    assert audible["value"] == "B01N5AX3TQ"  # noqa: S101
+    assert audible["value"] == "B0TEST1234"  # noqa: S101
     assert audible.get("url") == expected_url  # noqa: S101
 
 

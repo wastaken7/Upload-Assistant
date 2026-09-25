@@ -13,11 +13,11 @@ from src.trackers.UNIT3D import UNIT3D
 @pytest.mark.parametrize(
     ("filename", "title", "year", "imdb_id", "imdb_title", "imdb_year", "imdb_type"),
     [
-        ("Nossa Mae era Atriz", "Our Mother was an Actress", 2023, 32345230, "157. Nossas mães", 2024, "podcastEpisode"),
-        ("Rua Ataleia", "Ataléia Street", 2021, 6868820, "Rua Augusta", 2018, "tvSeries"),
+        ("Minha Rua Imaginaria", "My Imaginary Street", 2023, 32345230, "157. Série Fictícia", 2024, "podcastEpisode"),
+        ("Vila Exemplo", "Example Village", 2021, 6868820, "Outra Série Exemplo", 2018, "tvSeries"),
     ],
 )
-def test_wrong_imdb_from_real_uploads_is_removed(filename, title, year, imdb_id, imdb_title, imdb_year, imdb_type):
+def test_wrong_imdb_match_is_removed(filename, title, year, imdb_id, imdb_title, imdb_year, imdb_type):
     meta = Meta(
         category="MOVIE",
         filename=filename,
@@ -37,8 +37,8 @@ def test_wrong_imdb_from_real_uploads_is_removed(filename, title, year, imdb_id,
 
 
 def test_valid_automatic_imdb_is_kept():
-    meta = Meta(category="MOVIE", filename="Rua Ataleia", title="Ataléia Street", year=2021, imdb_id=1234567)
-    meta.imdb_info = {"imdbID": "tt1234567", "title": "Rua Ataléia", "year": 2021, "type": "short"}
+    meta = Meta(category="MOVIE", filename="Vila Exemplo", title="Example Village", year=2021, imdb_id=1234567)
+    meta.imdb_info = {"imdbID": "tt1234567", "title": "Vila Exémplo", "year": 2021, "type": "short"}
 
     _reject_invalid_automatic_imdb(meta, meta.filename)
 
@@ -154,9 +154,9 @@ def _candidate(imdb_id, title, year, title_type):
 
 
 def test_single_incompatible_search_result_is_not_selected(monkeypatch):
-    monkeypatch.setattr("src.imdb.httpx.AsyncClient", lambda: _Client([_candidate(32345230, "157. Nossas mães", 2024, "Podcast Episode")]))
+    monkeypatch.setattr("src.imdb.httpx.AsyncClient", lambda: _Client([_candidate(32345230, "157. Série Fictícia", 2024, "Podcast Episode")]))
 
-    result = asyncio.run(imdb_manager.search_imdb("Nossa Mae era Atriz", 2023, category="MOVIE", unattended=True))
+    result = asyncio.run(imdb_manager.search_imdb("Minha Rua Imaginaria", 2023, category="MOVIE", unattended=True))
 
     assert result == 0
 
@@ -164,10 +164,10 @@ def test_single_incompatible_search_result_is_not_selected(monkeypatch):
 def test_unattended_search_skips_wrong_first_result(monkeypatch):
     monkeypatch.setattr(
         "src.imdb.httpx.AsyncClient",
-        lambda: _Client([_candidate(6868820, "Rua Augusta", 2018, "TV Series"), _candidate(1234567, "Rua Ataléia", 2021, "Short")]),
+        lambda: _Client([_candidate(6868820, "Outra Série Exemplo", 2018, "TV Series"), _candidate(1234567, "Vila Exémplo", 2021, "Short")]),
     )
 
-    result = asyncio.run(imdb_manager.search_imdb("Rua Ataleia", 2021, category="MOVIE", unattended=True))
+    result = asyncio.run(imdb_manager.search_imdb("Vila Exemplo", 2021, category="MOVIE", unattended=True))
 
     assert result == 1234567
 
@@ -175,16 +175,16 @@ def test_unattended_search_skips_wrong_first_result(monkeypatch):
 def test_quick_search_skips_wrong_first_result(monkeypatch):
     monkeypatch.setattr(
         "src.imdb.httpx.AsyncClient",
-        lambda: _Client([_candidate(6868820, "Rua Augusta", 2018, "TV Series"), _candidate(1234567, "Rua Ataléia", 2021, "Short")]),
+        lambda: _Client([_candidate(6868820, "Outra Série Exemplo", 2018, "TV Series"), _candidate(1234567, "Vila Exémplo", 2021, "Short")]),
     )
 
-    result = asyncio.run(imdb_manager.search_imdb("Rua Ataleia", 2021, category="MOVIE", quickie=True, unattended=True))
+    result = asyncio.run(imdb_manager.search_imdb("Vila Exemplo", 2021, category="MOVIE", quickie=True, unattended=True))
 
     assert result == 1234567
 
 
 def test_attended_selection_marks_incompatible_id_as_manual(monkeypatch):
-    monkeypatch.setattr("src.imdb.httpx.AsyncClient", lambda: _Client([_candidate(6868820, "Rua Augusta", 2018, "TV Series")]))
+    monkeypatch.setattr("src.imdb.httpx.AsyncClient", lambda: _Client([_candidate(6868820, "Outra Série Exemplo", 2018, "TV Series")]))
 
     async def select_first(*_args, **_kwargs):
         return "1"
@@ -192,7 +192,7 @@ def test_attended_selection_marks_incompatible_id_as_manual(monkeypatch):
     monkeypatch.setattr("src.imdb.prompt_in_thread", select_first)
     selected = []
 
-    result = asyncio.run(imdb_manager.search_imdb("Rua Ataleia", 2021, category="MOVIE", on_manual_selection=selected.append))
+    result = asyncio.run(imdb_manager.search_imdb("Vila Exemplo", 2021, category="MOVIE", on_manual_selection=selected.append))
 
     assert result == 6868820
     assert selected == [6868820]

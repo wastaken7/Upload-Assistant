@@ -13,13 +13,13 @@ from src.region import get_service
 
 def test_audible_url_argument_sets_asin_and_canonical_url(tmp_path):
     meta, _, _ = Args({"DEFAULT": {"screens": 1}}).parse(
-        [str(tmp_path), "--audible-url", "https://www.audible.co.uk/pd/Book-Title/B01N5AX3TQ?source=tracker"],
+        [str(tmp_path), "--audible-url", "https://www.audible.co.uk/pd/Book-Title/B0TEST1234?source=tracker"],
         Meta(),
     )
 
-    assert meta.asin == "B01N5AX3TQ"
-    assert meta.book_asin == "B01N5AX3TQ"
-    assert meta.audible_url == "https://www.audible.co.uk/pd/B01N5AX3TQ"
+    assert meta.asin == "B0TEST1234"
+    assert meta.book_asin == "B0TEST1234"
+    assert meta.audible_url == "https://www.audible.co.uk/pd/B0TEST1234"
 
 
 def test_audible_url_argument_rejects_conflicting_asin(tmp_path):
@@ -31,13 +31,13 @@ def test_audible_url_argument_rejects_conflicting_asin(tmp_path):
 
 
 def test_audible_helpers_support_regional_marketplaces():
-    assert build_audible_url("B01N5AX3TQ", "audible.com.br") == "https://www.audible.com.br/pd/B01N5AX3TQ"
-    assert normalize_audible_url("https://audible.co.uk/pd/Title/B01N5AX3TQ") == "https://www.audible.co.uk/pd/B01N5AX3TQ"
+    assert build_audible_url("B0TEST1234", "audible.com.br") == "https://www.audible.com.br/pd/B0TEST1234"
+    assert normalize_audible_url("https://audible.co.uk/pd/Title/B0TEST1234") == "https://www.audible.co.uk/pd/B0TEST1234"
 
 
 def test_audible_url_rejects_non_audible_host():
     with pytest.raises(ValueError):
-        normalize_audible_url("https://example.com/pd/B01N5AX3TQ")
+        normalize_audible_url("https://example.com/pd/B0TEST1234")
 
 
 def test_audible_domain_rejects_non_https_url():
@@ -47,29 +47,29 @@ def test_audible_domain_rejects_non_https_url():
 
 def test_book_description_links_asin_using_configured_marketplace():
     builder = DescriptionBuilder("TEST", {"DEFAULT": {"audible_domain": "audible.com.br"}, "TRACKERS": {"TEST": {}}})
-    meta = Meta(asin="B01N5AX3TQ", audiobook=True)
+    meta = Meta(asin="B0TEST1234", audiobook=True)
 
     description = builder._build_book_desc_section(meta)
 
-    assert "[url=https://www.audible.com.br/pd/B01N5AX3TQ]B01N5AX3TQ[/url]" in description
+    assert "[url=https://www.audible.com.br/pd/B0TEST1234]B0TEST1234[/url]" in description
 
 
 def test_explicit_audible_url_overrides_configured_marketplace():
     builder = DescriptionBuilder("TEST", {"DEFAULT": {"audible_domain": "audible.com.br"}, "TRACKERS": {"TEST": {}}})
-    meta = Meta(asin="B01N5AX3TQ", audible_url="https://www.audible.co.uk/pd/B01N5AX3TQ", audiobook=True)
+    meta = Meta(asin="B0TEST1234", audible_url="https://www.audible.co.uk/pd/B0TEST1234", audiobook=True)
 
     description = builder._build_book_desc_section(meta)
 
-    assert "[url=https://www.audible.co.uk/pd/B01N5AX3TQ]B01N5AX3TQ[/url]" in description
+    assert "[url=https://www.audible.co.uk/pd/B0TEST1234]B0TEST1234[/url]" in description
 
 
 def test_asin_remains_plain_text_without_user_provided_marketplace():
     builder = DescriptionBuilder("TEST", {"DEFAULT": {"audible_domain": ""}, "TRACKERS": {"TEST": {}}})
 
-    description = builder._build_book_desc_section(Meta(asin="B01N5AX3TQ"))
+    description = builder._build_book_desc_section(Meta(asin="B0TEST1234"))
 
     assert "[url=" not in description
-    assert "B01N5AX3TQ" in description
+    assert "B0TEST1234" in description
 
 
 @pytest.mark.parametrize(("language", "label"), [("en", "Service"), ("pt-BR", "Serviço")])
