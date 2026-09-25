@@ -125,7 +125,7 @@ def _music_confirmation_lines(meta: Meta, missing_warning: str) -> list[tuple[st
         ("Tracks / Discs", f"{track_count or _missing_with_hint(missing_warning, 'Check the music file list.')} / {disc_count or 1}"),
         ("Audio", technical or format_name or _missing_with_hint(missing_warning, "Check the audio file metadata.")),
     ]
-    lines.append(("Genre", genres or _missing_with_hint(missing_warning, "Use --genres.")))
+    lines.append(("Genre", genres or _optional_hint("Use --genres.")))
     if any((release_year, retail_date, release_label, release_catalogue)):
         release_details = " / ".join(part for part in (release_year, retail_date, release_label, release_catalogue) if part)
         lines.append(("This Release", release_details))
@@ -583,7 +583,7 @@ class UploadHelper:
         # BOOK
         if meta.category == "BOOK":
             author = meta.author or _missing_with_hint(missing_warning, "Use --author.")
-            service = meta.service_longname or meta.service or _missing_with_hint(missing_warning, "Use --service.")
+            service = meta.service_longname or meta.service or _optional_hint("Use --service if applicable.")
             book_translator = meta.book_translator or ""
             publisher = meta.publisher or _optional_hint("Use --publisher if applicable.")
             book_language = meta.book_language or _missing_with_hint(missing_warning, "Use --book-language.")
@@ -610,14 +610,11 @@ class UploadHelper:
             lines.append(("ASIN", asin))
             if meta.asin:
                 try:
-                    audible_url_display = (
-                        resolve_audible_url(
-                            asin,
-                            explicit_url=meta.audible_url,
-                            domain=str(self.default_config.get("audible_domain", "") or ""),
-                        )
-                        or "[yellow][italic]Marketplace missing. Use --audible-url or set DEFAULT.audible_domain (for example, audible.co.uk).[/italic][/yellow]"
-                    )
+                    audible_url_display = resolve_audible_url(
+                        asin,
+                        explicit_url=meta.audible_url,
+                        domain=str(self.default_config.get("audible_domain", "") or ""),
+                    ) or _optional_hint("Marketplace missing. Use --audible-url or set DEFAULT.audible_domain")
                 except ValueError:
                     audible_url_display = "[yellow][italic]Invalid Audible URL or domain. Use --audible-url or set DEFAULT.audible_domain.[/italic][/yellow]"
                 lines.append(("Audible URL", audible_url_display))
@@ -690,7 +687,7 @@ class UploadHelper:
                 lines.append(("Episode overview:", meta.overview_meta[:60] + "...."))
             genres = ", ".join(meta.genres)
             if not genres:
-                genres = _missing_with_hint(missing_warning, "Use --genres.")
+                genres = _optional_hint("Use --genres.")
             lines.append(("Genre", genres))
             if meta.category == "BOOK":
                 lines.append(("Keywords", keywords or _optional_hint("Use --keywords if applicable.")))
@@ -723,9 +720,7 @@ class UploadHelper:
             lines.append(("Resolution", resolution or (_missing_with_hint(missing_warning, "Use --resolution.") if is_video else "")))
             lines.append(("Source", str(source) if source else (_missing_with_hint(missing_warning, "Use --source.") if is_video else "")))
             lines.append(("Type", type_ or (_missing_with_hint(missing_warning, "Use --type.") if is_video else "")))
-
-            if meta.category != "BOOK":
-                lines.append(("Group Tag", tag or ("" if meta.no_tag else _optional_hint("Use --tag if applicable."))))
+            lines.append(("Group Tag", tag or ("" if meta.no_tag else _optional_hint("Use --tag if applicable."))))
 
             if meta.is_disc:
                 lines.append(("Region", region))
