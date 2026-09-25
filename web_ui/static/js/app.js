@@ -5916,6 +5916,7 @@ function AudionutsUAGUI() {
   const renderExecutionPreviewPanel = (compact = false) => {
     const media = executionPreview;
     const category = String(media?.category || "").toUpperCase();
+    const showTrackDetails = category === "MOVIE" || category === "TV";
     const baseTitle =
       media?.title ||
       media?.name ||
@@ -6194,7 +6195,7 @@ function AudionutsUAGUI() {
                 </section>
               )}
 
-              {media?.status !== "waiting" && (
+              {showTrackDetails && media?.status !== "waiting" && (
                 <section className="ua-processing-section">
                   <h4 className="ua-processing-section-title">Track Details</h4>
                   <div className="ua-processing-track-controls space-y-2">
@@ -6267,31 +6268,35 @@ function AudionutsUAGUI() {
                 </section>
               )}
 
-              {showAudioTracks && audioTracks.length > 0 && (
-                <section className="ua-processing-section">
-                  <h4 className="ua-processing-section-title">
-                    Audio Tracks ({audioTracks.length})
-                  </h4>
-                  <div className="ua-processing-track-list space-y-2">
-                    {audioTracks.map((track) =>
-                      renderMediaTrack(track, "audio"),
-                    )}
-                  </div>
-                </section>
-              )}
+              {showTrackDetails &&
+                showAudioTracks &&
+                audioTracks.length > 0 && (
+                  <section className="ua-processing-section">
+                    <h4 className="ua-processing-section-title">
+                      Audio Tracks ({audioTracks.length})
+                    </h4>
+                    <div className="ua-processing-track-list space-y-2">
+                      {audioTracks.map((track) =>
+                        renderMediaTrack(track, "audio"),
+                      )}
+                    </div>
+                  </section>
+                )}
 
-              {showSubtitleTracks && subtitleTracks.length > 0 && (
-                <section className="ua-processing-section">
-                  <h4 className="ua-processing-section-title">
-                    Subtitle Tracks ({subtitleTracks.length})
-                  </h4>
-                  <div className="ua-processing-track-list space-y-2">
-                    {subtitleTracks.map((track) =>
-                      renderMediaTrack(track, "subtitle"),
-                    )}
-                  </div>
-                </section>
-              )}
+              {showTrackDetails &&
+                showSubtitleTracks &&
+                subtitleTracks.length > 0 && (
+                  <section className="ua-processing-section">
+                    <h4 className="ua-processing-section-title">
+                      Subtitle Tracks ({subtitleTracks.length})
+                    </h4>
+                    <div className="ua-processing-track-list space-y-2">
+                      {subtitleTracks.map((track) =>
+                        renderMediaTrack(track, "subtitle"),
+                      )}
+                    </div>
+                  </section>
+                )}
 
               {renderedDetailSections}
 
