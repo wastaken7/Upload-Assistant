@@ -1,4 +1,7 @@
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
+
+import pytest
 
 from src.trackers.AVISTAZ.cinemaz import CinemaZ
 
@@ -66,3 +69,18 @@ def test_raw_remux_and_4k_uploads_require_six_screenshots():
     issue = cinema.check_data(meta, data)
 
     assert issue == "UPLOAD FAILED: CinemaZ requires at least 6 screenshots for this upload."  # noqa: S101
+
+
+@pytest.mark.asyncio
+async def test_invalid_upload_data_preserves_tracker_status(monkeypatch):
+    meta = make_meta(debug=True, tracker_status={"CINEMAZ": {"upload": True}})
+    cinema = tracker()
+    monkeypatch.setattr(cinema, "fetch_data", AsyncMock(return_value={"rip_type_id": "0", "type_id": "1", "video_quality_id": "3"}))
+
+    result = await cinema.upload(meta)
+
+    assert result is False  # noqa: S101
+    assert meta.tracker_status["CINEMAZ"] == {  # noqa: S101
+        "upload": True,
+        "status_message": "data error - UPLOAD FAILED: Unable to determine rip type for this upload.",
+    }
