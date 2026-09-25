@@ -508,7 +508,7 @@ async def _get_audio_v2(
         extra = format_extra.get(additional_str, "")
 
     format_settings = format_settings_extra.get(format_settings, "")
-    format_settings = "EX" if format_settings == "EX" and chan == "5.1" else ""
+    format_settings = "EX" if format_settings == "EX" and (chan == "5.1" or (codec == "DD+" and chan == "7.1")) else ""
 
     if codec == "":
         codec = format_str
