@@ -507,9 +507,6 @@ async def _get_audio_v2(
         codec = audio_codec_map.get(format_str, "") + audio_extra.get(additional_str, "")
         extra = format_extra.get(additional_str, "")
 
-    format_settings = format_settings_extra.get(format_settings, "")
-    format_settings = "EX" if format_settings == "EX" and (chan == "5.1" or (codec == "DD+" and chan == "7.1")) else ""
-
     if codec == "":
         codec = format_str
 
@@ -525,6 +522,9 @@ async def _get_audio_v2(
     if codec == "DD" and chan == "7.1":
         logger.info("[warning] Detected codec is DD but channel count is 7.1, correcting to DD+")
         codec = "DD+"
+
+    format_settings = format_settings_extra.get(format_settings, "")
+    format_settings = "EX" if format_settings == "EX" and (chan == "5.1" or (codec == "DD+" and chan == "7.1")) else ""
 
     if not extra and is_auro3d:
         extra = " Auro3D"
