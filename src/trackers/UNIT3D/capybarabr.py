@@ -174,7 +174,8 @@ class CapybaraBR(UNIT3D):
         if category == "BOOK":
             book_title = f"{meta.book_series.strip()}: " if meta.book_series else ""
             book_title += meta.title.strip()
-            book_title += f" {meta.book_series_index.strip()}" if meta.book_series_index else ""
+            series_index = meta.book_series_index.strip()
+            book_title += f" Vol. {series_index}" if series_index else ""
             book_title = self.common.portuguese_title_capitalization(book_title)
 
             year_str = str(meta.year) if meta.year is not None else ""
