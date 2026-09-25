@@ -97,3 +97,36 @@ def test_aither_preserves_other_language_and_release_group() -> None:
     )
 
     assert _name(meta) == "Synthetic Feature 2024 FRENCH 1080p WEB-DL-TESTMULTiPLY"
+
+
+def test_aither_normalizes_mixed_case_language_label_without_duplication() -> None:
+    meta = Meta(
+        name="Synthetic Feature 2024 Multiple 1080p WEB-DL-TESTGROUP",
+        resolution="1080p",
+        audio_languages=["Multiple"],
+        language_checked=True,
+    )
+
+    assert _name(meta) == "Synthetic Feature 2024 MULTIPLE LANGUAGES 1080p WEB-DL-TESTGROUP"
+
+
+def test_aither_preserves_multiple_in_title_and_release_group() -> None:
+    meta = Meta(
+        name="MULTIPLE Synthetic Feature 2024 1080p WEB-DL-MULTIPLE",
+        resolution="1080p",
+        audio_languages=["Multiple"],
+        language_checked=True,
+    )
+
+    assert _name(meta) == "MULTIPLE Synthetic Feature 2024 MULTIPLE LANGUAGES 1080p WEB-DL-MULTIPLE"
+
+
+def test_aither_preserves_release_group_when_english_audio_skips_label() -> None:
+    meta = Meta(
+        name="Synthetic Feature 2024 1080p WEB-DL-MULTIPLE",
+        resolution="1080p",
+        audio_languages=["English"],
+        language_checked=True,
+    )
+
+    assert _name(meta) == "Synthetic Feature 2024 1080p WEB-DL-MULTIPLE"
