@@ -32,10 +32,8 @@
   - [8. Modern Web UI & Real-Time Engine](#8-modern-web-ui--real-time-engine)
 - [Supported Sites](#supported-sites)
 - [Setup Guide](#setup-guide)
-  - [Step 1: Install Required Tools](#step-1-install-required-tools)
-  - [Step 2: Download Upload Assistant](#step-2-download-upload-assistant-linuxmacos)
-  - [Step 3: Install Python Packages](#step-3-install-python-packages-linuxmacos)
-  - [Step 4: Configure the Assistant](#step-4-configure-the-assistant)
+  - [Install](#install)
+  - [Configure the Assistant](#configure-the-assistant)
 - [Updating](#updating)
 - [CLI Usage](#cli-usage)
 - [Shell Completions](docs/shell-completions.md)
@@ -219,101 +217,30 @@ Sequence Usenet and torrent tracker uploads while limiting contention with qBitt
 
 ## **Setup Guide**
 
-Setting up Upload Assistant is straightforward, even if you are not a developer. Follow these steps to get up and running:
+These instructions cover Windows, Linux, and macOS.
 
-### Step 1: Install Required Tools
+### Install
 
-Windows users can install Upload Assistant with `uv`; see the [Windows installation guide](docs/windows-install.md).
+1. Install [`uv`](https://docs.astral.sh/uv/getting-started/installation/) for your operating system.
+2. Install Upload Assistant:
 
-For a manual Linux/macOS/Windows installation, Upload Assistant needs a few tools to process media and run:
+   ```bash
+   uv tool install upload-assistant
+   ```
 
-1. **Python (version 3.14 or newer)**:
-   - Download and install it from the [official Python website](https://www.python.org/downloads/).
-2. **MediaInfo & FFmpeg**:
-   - These are helper tools used to scan files and generate screenshots/spectrograms.
-   - The official MediaInfo CLI is downloaded and checksum-verified automatically on supported Windows, Linux, and macOS systems. Android/Termux uses its native `mediainfo` package (`pkg install mediainfo`).
-   - Install FFmpeg using your system's software manager:
-     - Debian/Ubuntu: `sudo apt install ffmpeg`
-     - Arch Linux: `sudo pacman -S ffmpeg`
-     - RedHat/Fedora: `sudo dnf install ffmpeg`
-   - _Having issues with FFmpeg? Check out our [FFmpeg troubleshooting guide](docs/ffmpeg-max-workers-issues.md)._
+`uv` creates an isolated environment and installs a compatible Python version (3.14 or newer) if needed. It makes the `ua` and `ua-config` commands available from any directory. If either command is not found, run `uv tool update-shell` and open a new terminal.
 
----
+**Linux and macOS:** Install FFmpeg through your system's package manager (for example, `sudo apt install ffmpeg` on Debian/Ubuntu, `sudo pacman -S ffmpeg` on Arch, `sudo dnf install ffmpeg` on Fedora, or `brew install ffmpeg` on macOS). See the [FFmpeg troubleshooting guide](docs/ffmpeg-max-workers-issues.md) if needed.
 
-### Install from PyPI with `uv` (Windows, Linux, or macOS)
-
-The recommended command-line installation uses the published PyPI package. It automatically manages the virtual environment and exposes the `ua` and `ua-config` commands on your system path:
-
-```bash
-uv tool install upload-assistant
-```
-
-If `uv` reports that its tool directory is not on your `PATH`, run `uv tool update-shell`, then open a new terminal.
-
-### Install the latest development version with `uv`
-
-If you have [uv](https://github.com/astral-sh/uv) installed, you can install Upload Assistant directly from the repository as a globally available standalone CLI tool. This automatically manages the virtual environment and exposes the `ua` and `ua-config` commands directly to your system path. This method resolves dependencies from `pyproject.toml`; skip Steps 2 and 3 below.
+To install the latest development version from GitHub instead of the published release, use:
 
 ```bash
 uv tool install git+https://github.com/wastaken7/Upload-Assistant.git
 ```
 
-If `uv` reports that its tool directory is not on your `PATH`, run `uv tool update-shell`, then open a new terminal.
-
 ---
 
-### Step 2: Download Upload Assistant (Linux/macOS)
-
-Choose **one** of the two options below to get the files onto your computer:
-
-#### Option A: Clone using Git (Recommended)
-
-Using Git is the recommended method because it makes updating the assistant in the future extremely easy.
-
-1. **Install Git** (if you don't already have it):
-   - **Linux:** Install it via your package manager.
-   - **macOS:** Install it via Homebrew or Xcode Command Line Tools.
-2. **Clone the project**:
-   Open your command prompt or terminal, navigate to the folder where you want to keep the assistant, and run:
-
-   ```bash
-   git clone https://github.com/wastaken7/Upload-Assistant.git
-   cd Upload-Assistant
-   ```
-
-#### Option B: Download as a ZIP file (Alternative)
-
-If you do not want to install Git, you can download a copy of the files directly:
-
-1. Go to the [GitHub Repository Page](https://github.com/wastaken7/Upload-Assistant).
-2. Click the green **Code** button near the top right, and click **Download ZIP**.
-3. Extract the ZIP file to a folder of your choice on your computer.
-
----
-
-### Step 3: Install Python Packages (Linux/macOS)
-
-On Linux/macOS, open a terminal, navigate to the folder where you downloaded Upload Assistant, and run:
-
-```bash
-pip3 install --user -U -r requirements.txt
-```
-
-> [!TIP]
-> **Getting an "externally managed environment" error?**
-> This means your system prefers keeping Python packages separated. You can set up a "Virtual Environment" (a private workspace for this tool) by running:
->
-> - **Linux / macOS:**
->
->   ```bash
->   python3 -m venv venv
->   source venv/bin/activate
->   pip install -r requirements.txt
->   ```
-
----
-
-### Step 4: Configure the Assistant
+### Configure the Assistant
 
 You need to add your API keys (like TMDb) and tracker credentials so the tool knows where to upload.
 
@@ -323,20 +250,11 @@ If you plan to use the Web UI, **your configuration file will be generated autom
 
 #### Method B: Use the Interactive Generator
 
-In your terminal, run the command for your operating system and follow the on-screen prompts:
+Run `ua-config` in a terminal and follow the on-screen prompts:
 
-- **Windows:** Install with `uv` as described in the [Windows installation guide](docs/windows-install.md), then run `ua-config` in a new terminal.
-- **Linux / macOS (Standard):**
-
-  ```bash
-  python3 config-generator.py
-  ```
-
-- **Linux / macOS (uv installation):**
-
-  ```bash
-  ua-config
-  ```
+```bash
+ua-config
+```
 
 #### Method C: Manual Configuration
 
@@ -344,8 +262,7 @@ In your terminal, run the command for your operating system and follow the on-sc
    - **Windows:** `%LOCALAPPDATA%\Upload-Assistant\data`
    - **Linux / macOS:** `$XDG_DATA_HOME/Upload-Assistant/data` (normally `~/.local/share/Upload-Assistant/data`)
    - **Custom location:** `%UA_DATA_DIR%\data` (Windows Command Prompt), `$env:UA_DATA_DIR\data` (PowerShell), or `$UA_DATA_DIR/data` (Linux/macOS) when `UA_DATA_DIR` is set
-2. **For source checkouts (git clone / ZIP download):** Copy the bundled `data/example_config.py` from the project into that directory as `config.py` (leave the original file unchanged).
-   **For PyPI or uv installs:** Run `ua-config` to generate the config file first, which will create `config.py` in the user-state directory.
+2. Run `ua-config` to create `config.py` in the user-state directory.
 3. Open the user-state `config.py` in a text editor (like Notepad, VS Code, or TextEdit) and fill in your information.
    - For detailed info on what each setting does, see [Example Config Docs](docs/example-config.md).
    - Get a free TMDb API key from [TheMovieDB API settings](https://www.themoviedb.org/settings/api).
@@ -355,42 +272,20 @@ In your terminal, run the command for your operating system and follow the on-sc
 **Additional Resources:**
 
 - Check out our [Wiki Help Page](docs/home.md).
-- Windows installation and basic commands: see [Windows Install](docs/windows-install.md).
 - Need a no-root Linux or seedbox setup? See [Seedbox / Linux Install](docs/seedbox.md).
 - Found an issue or need help? Please [open a GitHub Issue](https://github.com/wastaken7/Upload-Assistant/issues) so we can track and resolve it. If you prefer not to create a GitHub account for privacy reasons, join our [Signal group](https://signal.group/#CjQKILmkUCLe5mZULkQGI6B5knmX1ytrIBFicpJ_NZGAHmOrEhDD5F7ctp-obLeLOsa0yCoJ) instead.
 
 ## **Updating:**
 
-- To update a Git installation, navigate into the Upload-Assistant directory and pull the latest changes:
-
-  ```bash
-  cd Upload-Assistant
-  git pull
-  ```
-
-- Or, if you downloaded the ZIP file, download a fresh ZIP from GitHub and overwrite your existing files.
-- For the `uv` standalone installation, run: `uv tool upgrade upload-assistant`
-- Run the command to update dependencies:
-  - **Linux / macOS:** `python3 -m pip install --user -U -r requirements.txt`
-- Run the configuration generator to fetch any new settings:
-  - **Windows / uv installations:** run `ua-config` from any folder.
-  - **Linux / macOS (Standard):** `python3 config-generator.py`
+Run `uv tool upgrade upload-assistant` to update the published installation. If you installed the development version from GitHub, run `uv tool install --force git+https://github.com/wastaken7/Upload-Assistant.git` to fetch it again. Run `ua-config` afterward to review any new settings.
 
 ## **CLI Usage:**
 
-To run the assistant, use the command for your system:
+Run the assistant from any directory:
 
-- **Windows / uv installations:**
-
-  ```cmd
-  ua "/path/to/content" --args
-  ```
-
-- **Linux / macOS (Standard):**
-
-  ```bash
-  python3 upload.py "/path/to/content" --args
-  ```
+```bash
+ua "/path/to/content" --args
+```
 
 Arguments are optional and normally follow the path. Input modes such as `--paths-from-stdin` may omit the positional path. For a list of all available arguments, pass `--help`.
 The file/folder path works best enclosed in double quotes.
