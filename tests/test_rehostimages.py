@@ -12,6 +12,7 @@ from src.meta import Meta
 from src.rehostimages import (
     ImageHostPolicy,
     RehostImagesManager,
+    _deduplicate_image_records,
     check_tracker_image_hosts,
     has_restricted_image_hosts,
     select_common_image_host,
@@ -44,6 +45,17 @@ class _PolicyTracker:
 
     def __init__(self) -> None:
         self.rehost_images_manager = AsyncMock()
+
+
+def test_deduplicates_tagged_image_records() -> None:
+    image = {
+        "img_url": "https://images.example.test/thumb.png",
+        "raw_url": "https://images.example.test/full.png",
+        "web_url": "https://images.example.test/view/1",
+        "tags": ["tonemapped"],
+    }
+
+    assert _deduplicate_image_records([image, dict(image)]) == [image]
 
 
 def test_has_restricted_image_hosts() -> None:
