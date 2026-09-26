@@ -20,7 +20,7 @@ from src.manualpackage import ManualPackageManager
 from src.meta import Meta
 from src.qbitwait import Wait
 from src.rehostimages import check_tracker_image_hosts, has_restricted_image_hosts, select_common_image_host
-from src.stats import record_event
+from src.stats import record_event_async
 from src.torrent_provision import provision_tracker_torrents
 from src.trackers.GAZELLE.passthepopcorn import PassThePopcorn
 from src.trackersetup import TrackerSetup
@@ -394,7 +394,7 @@ async def process_trackers(
             outcome = "error"
         else:
             continue
-        record_event("upload", service=normalized, operation=destination_type, outcome=outcome, duration_ms=duration_ms)
-        record_event("api", service=normalized, operation="upload", outcome=outcome, duration_ms=duration_ms)
+        await record_event_async("upload", service=normalized, operation=destination_type, outcome=outcome, duration_ms=duration_ms)
+        await record_event_async("api", service=normalized, operation="upload", outcome=outcome, duration_ms=duration_ms)
 
     logger.info(f"[green]All {upload_target} uploads processed.[/green]")

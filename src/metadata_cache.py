@@ -10,7 +10,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from src.stats import configure_stats, record_event
+from src.stats import record_event
 
 _VERSION = 1
 _LOCKS: dict[Path, asyncio.Lock] = {}
@@ -49,7 +49,6 @@ class MetadataCache:
 
     def __init__(self, base_dir: str | Path, config: dict[str, Any] | None = None) -> None:
         config = config or _default_config()
-        configure_stats(config)
         default = config.get("DEFAULT", config) if isinstance(config, dict) else {}
         default = default if isinstance(default, dict) else {}
         self.enabled = bool(default.get("metadata_cache_enabled", True))

@@ -3,12 +3,84 @@
 import asyncio
 from itertools import pairwise
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
 from src.meta import Meta
-from src.uploadscreens import _build_image_start_limiter, _upload_screens
+from src.uploadscreens import UploadScreensManager, _build_image_start_limiter, _upload_screens
+
+
+def _image_upload_meta() -> Meta:
+    return Meta({"imghost": "imgbox", "image_list": [{"img_url": "https://img.example/existing.png"}]})
+
+
+def test_upload_screens_manager_does_not_count_a_reused_image_list() -> None:
+    async def fake_upload(*args, **kwargs):
+        meta = args[1]
+        return meta.image_list, len(meta.image_list)
+
+    async def exercise() -> None:
+        meta = _image_upload_meta()
+        recorder = AsyncMock()
+        with (
+            patch("src.uploadscreens._upload_screens", new=fake_upload),
+            patch("src.uploadscreens.record_event_async", new=recorder),
+        ):
+            await UploadScreensManager({"DEFAULT": {"img_host_1": "imgbox"}}).upload_screens(
+                meta, 1, 1, 0, 1, [], {}
+            )
+        recorder.assert_not_awaited()
+
+    asyncio.run(exercise())
+
+
+def test_upload_screens_manager_records_the_final_host_and_actual_success() -> None:
+    async def fake_upload(*args, **kwargs):
+        meta = args[1]
+        return_dict = args[7]
+        meta.imghost = "ptscreens"
+        return_dict["_stats_image_upload_attempts"] = 1
+        return_dict["_stats_image_upload_successes"] = 1
+        return meta.image_list, len(meta.image_list)
+
+    async def exercise() -> None:
+        meta = _image_upload_meta()
+        recorder = AsyncMock()
+        with (
+            patch("src.uploadscreens._upload_screens", new=fake_upload),
+            patch("src.uploadscreens.record_event_async", new=recorder),
+        ):
+            await UploadScreensManager({"DEFAULT": {"img_host_1": "imgbox"}}).upload_screens(
+                meta, 1, 1, 0, 1, [], {}
+            )
+        recorder.assert_awaited_once()
+        assert recorder.await_args.kwargs["service"] == "ptscreens"
+        assert recorder.await_args.kwargs["outcome"] == "success"
+
+    asyncio.run(exercise())
+
+
+def test_upload_screens_manager_records_an_attempted_failure() -> None:
+    async def fake_upload(*args, **kwargs):
+        meta = args[1]
+        return_dict = args[7]
+        return_dict["_stats_image_upload_attempts"] = 1
+        return meta.image_list, len(meta.image_list)
+
+    async def exercise() -> None:
+        meta = _image_upload_meta()
+        recorder = AsyncMock()
+        with (
+            patch("src.uploadscreens._upload_screens", new=fake_upload),
+            patch("src.uploadscreens.record_event_async", new=recorder),
+        ):
+            await UploadScreensManager({"DEFAULT": {"img_host_1": "imgbox"}}).upload_screens(
+                meta, 1, 1, 0, 1, [], {}
+            )
+        assert recorder.await_args.kwargs["outcome"] == "error"
+
+    asyncio.run(exercise())
 
 
 def test_image_start_limiter_staggers_concurrent_starts() -> None:

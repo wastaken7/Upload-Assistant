@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
 import re
 import sqlite3
@@ -147,6 +148,13 @@ def record_event(
             )
     except OSError, sqlite3.Error, ValueError, TypeError:
         return
+
+
+async def record_event_async(family: str, **kwargs: Any) -> None:
+    """Record an aggregate event without blocking the event loop."""
+    if not _enabled:
+        return
+    await asyncio.to_thread(record_event, family, **kwargs)
 
 
 def _range_start(period: str, today: datetime) -> str | None:
@@ -361,10 +369,9 @@ def get_stats(period: str = "30d", mode: str = "real", state_dir: str | Path | N
 
 
 def reset_stats(state_dir: str | Path | None = None) -> str:
+    """Clear all aggregate buckets and record the reset boundary."""
     reset_at = datetime.now(UTC).isoformat()
     path = _database_path(state_dir)
-    if not path.exists():
-        return reset_at
     with _record_lock, closing(_connect(path)) as db, db:
         db.execute("DELETE FROM stats_daily")
         db.execute("INSERT OR REPLACE INTO stats_meta VALUES ('reset_at', ?)", (reset_at,))

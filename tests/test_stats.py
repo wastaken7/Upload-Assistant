@@ -1,4 +1,5 @@
 import os
+import asyncio
 import sqlite3
 import subprocess
 import sys
@@ -122,6 +123,14 @@ def test_stats_reset_only_removes_aggregates(tmp_path):
         assert db.execute("SELECT value FROM stats_meta WHERE key = 'reset_at'").fetchone() == (reset_at,)
 
 
+def test_stats_reset_establishes_a_boundary_before_the_first_event(tmp_path):
+    reset_at = stats.reset_stats(tmp_path)
+
+    with sqlite3.connect(tmp_path / "data" / "stats.sqlite3") as db:
+        assert db.execute("SELECT COUNT(*) FROM stats_daily").fetchone() == (0,)
+        assert db.execute("SELECT value FROM stats_meta WHERE key = 'reset_at'").fetchone() == (reset_at,)
+
+
 def test_stats_upserts_are_thread_safe(tmp_path):
     def record_many(_worker):
         for _ in range(10):
@@ -146,6 +155,26 @@ def test_stats_upserts_are_process_safe(tmp_path):
     assert stats.get_stats("all", "real", tmp_path)["overview"]["api_operations"] == 40
 
 
+@pytest.mark.asyncio
+async def test_record_event_async_offloads_the_sqlite_write(monkeypatch):
+    calls = []
+
+    async def fake_to_thread(function, *args, **kwargs):
+        calls.append((function, args, kwargs))
+
+    monkeypatch.setattr(stats.asyncio, "to_thread", fake_to_thread)
+
+    await stats.record_event_async("api", service="fictional", operation="lookup")
+
+    assert calls == [
+        (
+            stats.record_event,
+            ("api",),
+            {"service": "fictional", "operation": "lookup"},
+        )
+    ]
+
+
 def test_corrupt_database_never_breaks_recording_or_reading(tmp_path):
     database = tmp_path / "data" / "stats.sqlite3"
     database.parent.mkdir(parents=True)
@@ -168,7 +197,7 @@ def test_invalid_filters_are_rejected(tmp_path):
 @pytest.mark.asyncio
 async def test_metadata_cache_does_not_infer_api_calls_from_cache_activity(monkeypatch, tmp_path):
     monkeypatch.setattr(stats, "_database_path", lambda _state_dir=None: tmp_path / "data" / "stats.sqlite3")
-    cache = cache_for(tmp_path, {"DEFAULT": {"metadata_cache_dir": "cache", "stats_enabled": True}})
+    cache = cache_for(tmp_path, {"DEFAULT": {"metadata_cache_dir": "cache"}})
 
     assert is_cache_miss(await cache.get("imaginarydb", "title", "fictional-key"))
     await cache.set("imaginarydb", "title", "fictional-key", {"title": "Fictional Work"})

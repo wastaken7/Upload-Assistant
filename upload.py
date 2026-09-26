@@ -2151,7 +2151,7 @@ def load_heavy_globals() -> None:
 
 async def do_the_thing(base_dir: str) -> None:
     from src.api_key_expiry import reset_api_key_expiry_warnings
-    from src.stats import completed_item_outcome, configure_stats, record_event, set_stats_context
+    from src.stats import completed_item_outcome, configure_stats, record_event_async, set_stats_context
 
     reset_api_key_expiry_warnings()
     load_heavy_globals()
@@ -2189,10 +2189,10 @@ async def do_the_thing(base_dir: str) -> None:
                 set(tracker_class_map),
             )
             applied = apply_prowlarr_credentials(config, report)
-            record_event("api", service="prowlarr", operation="credential_sync", outcome="success", duration_ms=(time.monotonic() - prowlarr_started) * 1000)
+            await record_event_async("api", service="prowlarr", operation="credential_sync", outcome="success", duration_ms=(time.monotonic() - prowlarr_started) * 1000)
             logger.debug(f"[green]Prowlarr supplied fallback credentials for {len(applied)} tracker(s).[/green]")
         except ProwlarrError as exc:
-            record_event("api", service="prowlarr", operation="credential_sync", outcome="error", duration_ms=(time.monotonic() - prowlarr_started) * 1000)
+            await record_event_async("api", service="prowlarr", operation="credential_sync", outcome="error", duration_ms=(time.monotonic() - prowlarr_started) * 1000)
             logger.warning(f"[yellow]Prowlarr credential fallback unavailable: {exc}[/yellow]")
 
     await asyncio.sleep(0.1)  # Ensure it's not racing
@@ -2484,7 +2484,7 @@ async def do_the_thing(base_dir: str) -> None:
                 meta.path = path
                 meta.uuid = ""
                 set_stats_context(debug=bool(meta.debug), category="")
-                record_event("item", operation="started", outcome="success")
+                await record_event_async("item", operation="started", outcome="success")
                 _publish_webui_preview_target(path)
 
                 if not path:
@@ -2531,7 +2531,7 @@ async def do_the_thing(base_dir: str) -> None:
                 await cancel_and_drain_early_artifact_tasks(meta.uuid)
             if not meta_success:
                 set_stats_context(debug=bool(meta.debug), category=str(meta.category or ""))
-                record_event("item", operation="completed", outcome="error")
+                await record_event_async("item", operation="completed", outcome="error")
                 if "queue" in meta and meta.queue is not None:
                     processed_files_count += 1
                     skipped_files_count += 1
@@ -2966,9 +2966,9 @@ async def do_the_thing(base_dir: str) -> None:
                     skip_reason = "ineligible"
                 else:
                     skip_reason = "rule"
-                record_event("upload", service=normalized_tracker, operation=destination_type, outcome=f"skipped:{skip_reason}")
+                await record_event_async("upload", service=normalized_tracker, operation=destination_type, outcome=f"skipped:{skip_reason}")
             item_outcome = completed_item_outcome(completed_statuses)
-            record_event("item", operation="completed", outcome=item_outcome)
+            await record_event_async("item", operation="completed", outcome=item_outcome)
             await write_meta_file(meta)
             _publish_webui_preview_target(cast(str, meta.path or ""), meta.uuid or None)
             await run_post_upload_hooks(meta, config)

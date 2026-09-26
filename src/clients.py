@@ -15,7 +15,7 @@ from torf import Torrent
 
 from src.console import logger
 from src.meta import Meta
-from src.stats import record_event
+from src.stats import record_event_async
 from src.torrent_clients import DelugeClientMixin, QbittorrentClientMixin, RtorrentClientMixin, TransmissionClientMixin
 from src.torrent_clients.path_utils import coerce_str_list, is_path_under
 from src.torrent_manifest import TorrentManifest
@@ -203,9 +203,11 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                     self.transmission(meta.path, torrent, local_path, remote_path, client, meta)
                 elif torrent_client.lower() == "watch":
                     shutil.copy(torrent_path, client["watch_folder"])
-                record_event("api", service=client_name, operation="torrent_client_add", outcome="success", duration_ms=(time.monotonic() - operation_started) * 1000)
+                await record_event_async(
+                    "api", service=client_name, operation="torrent_client_add", outcome="success", duration_ms=(time.monotonic() - operation_started) * 1000
+                )
             except Exception as e:
-                record_event("api", service=client_name, operation="torrent_client_add", outcome="error", duration_ms=(time.monotonic() - operation_started) * 1000)
+                await record_event_async("api", service=client_name, operation="torrent_client_add", outcome="error", duration_ms=(time.monotonic() - operation_started) * 1000)
                 logger.info(f"[bold red]Failed to add torrent to {client_name}: {e}")
         return
 
@@ -279,7 +281,9 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                     result = await self._search_single_client_for_torrent(meta, client_name, False, False, None, True)
                     outcome = "success"
                 finally:
-                    record_event("api", service=client_name, operation="torrent_client_search", outcome=outcome, duration_ms=(time.monotonic() - operation_started) * 1000)
+                    await record_event_async(
+                        "api", service=client_name, operation="torrent_client_search", outcome=outcome, duration_ms=(time.monotonic() - operation_started) * 1000
+                    )
                 candidates = result if isinstance(result, list) else [result] if isinstance(result, str) else []
                 for candidate in candidates:
                     if meta.subtitle_files and not self._torrent_includes_all_local_subtitles(candidate, meta) and not self._torrent_has_no_subtitles(candidate):

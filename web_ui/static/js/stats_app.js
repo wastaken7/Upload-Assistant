@@ -708,40 +708,51 @@ function StatsApp() {
     window.UAStorage.set(BREAKDOWN_VIEW_KEY, breakdownView);
   }, [breakdownView]);
 
-  const load = async () => {
+  const load = async (signal) => {
     setLoading(true);
     setError("");
     try {
       const response = await fetch(
         `${APP_BASE}/api/stats?range=${period}&mode=${mode}`,
-        { headers: { "X-CSRF-Token": window.UA_CSRF_TOKEN } },
+        {
+          headers: { "X-CSRF-Token": window.UA_CSRF_TOKEN },
+          signal,
+        },
       );
       const body = await response.json();
       if (!response.ok)
         throw new Error(body.error || "Unable to load statistics");
       setData(body);
     } catch (err) {
+      if (err?.name === "AbortError") return;
       setError(err.message);
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   };
   useEffect(() => {
-    load();
+    const controller = new AbortController();
+    load(controller.signal);
+    return () => controller.abort();
   }, [period, mode]);
 
   const reset = async () => {
-    const response = await fetch(`${APP_BASE}/api/stats`, {
-      method: "DELETE",
-      headers: {
-        "Content-Type": "application/json",
-        "X-CSRF-Token": window.UA_CSRF_TOKEN,
-      },
-      body: JSON.stringify({ confirmation }),
-    });
-    const body = await response.json();
-    if (!response.ok) {
-      setError(body.error || "Unable to reset statistics");
+    try {
+      const response = await fetch(`${APP_BASE}/api/stats`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": window.UA_CSRF_TOKEN,
+        },
+        body: JSON.stringify({ confirmation }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setError(body.error || "Unable to reset statistics");
+        return;
+      }
+    } catch (_error) {
+      setError("Unable to reset statistics");
       return;
     }
     setResetOpen(false);

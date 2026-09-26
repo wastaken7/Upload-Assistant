@@ -127,6 +127,16 @@ def test_stats_disabled_state_blurs_results_and_links_to_configuration():
     assert "href={`${APP_BASE}/config`}" in stats_app
 
 
+def test_stats_requests_cancel_stale_filters_and_report_reset_failures():
+    stats_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
+
+    assert "new AbortController()" in stats_app
+    assert "controller.abort()" in stats_app
+    assert 'err?.name === "AbortError"' in stats_app
+    assert "response.json().catch(() => ({}))" in stats_app
+    assert 'setError("Unable to reset statistics")' in stats_app
+
+
 def test_stats_api_validates_filters(monkeypatch):
     _authenticated(monkeypatch)
     response = server.app.test_client().get("/api/stats?range=invalid&mode=real")
