@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, cast
 
 from src.artwork import prepare_artwork
+from src.bluray_com import reset_release_subheader_cache
 from src.meta import Meta
 from src.meta_file import write_meta_file
 from src.metadata_cache import set_run_disabled
@@ -162,6 +163,7 @@ class Prep:
             self.publish_preview(str(meta.path or ""), meta.uuid)
 
     async def gather_prep(self, meta: Meta, mode: str) -> Meta:
+        reset_release_subheader_cache()
         meta_start_time = time.time()
         set_run_disabled(bool(getattr(meta, "no_metadata_cache", False)))
 

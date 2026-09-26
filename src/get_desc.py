@@ -20,6 +20,7 @@ from langcodes.tag_parser import LanguageTagError
 
 from src.audible import build_audible_author_url, resolve_audible_url
 from src.bbcode import BBCODE
+from src.bluray_com import ensure_release_subheader
 from src.cogs.redaction import PathAwareEncoder
 from src.console import logger
 from src.description_languages import COMMON_LABELS, GAME_LABELS, MUSIC_LABELS, get_book_labels, get_labels
@@ -776,6 +777,17 @@ class DescriptionBuilder:
 
         return custom_signature
 
+    def format_bluray_link(self, url: str, label: str) -> str:
+        if self.tracker == "IMMORTALSEED":
+            return f"{label} — {url}" if label else url
+        if self.tracker == "TORRENTLEECH":
+            return f'<a href="{html.escape(url, quote=True)}">{html.escape(label)}</a>' if label else url
+        if not label:
+            return f"[url]{url}[/url]"
+        # The subheader is text, not tracker BBCode.
+        safe_label = label.replace("[", "&#91;").replace("]", "&#93;")
+        return f"[url={url}]{safe_label}[/url]"
+
     async def get_bluray_section(self, meta: Meta) -> tuple[str, str]:
         release_url: str = ""
         cover_list: list[str] = []
@@ -787,6 +799,7 @@ class DescriptionBuilder:
 
             if meta.is_disc in ["BDMV", "DVD"] and bluray_link and meta.release_url:
                 release_url = meta.release_url
+                await ensure_release_subheader(meta)
 
             cover_data = meta.hosted_artwork
             if not cover_data and await self.common.path_exists(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/covers.json"):
@@ -1513,9 +1526,8 @@ class DescriptionBuilder:
         if bluray:
             release_url, cover_images = await self.get_bluray_section(meta)
             if release_url:
-                if self.tracker not in ("TORRENTLEECH", "IMMORTALSEED"):
-                    release_url = f"[url]{release_url}[/url]"
-                desc_parts.append(f"[center]{release_url}[/center]")
+                label = meta.release_subheader if meta.release_subheader_url == release_url else ""
+                desc_parts.append(f"[center]{self.format_bluray_link(release_url, label)}[/center]")
             if cover_images:
                 desc_parts.append(f"[center]{cover_images}[/center]\n")
 

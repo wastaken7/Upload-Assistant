@@ -404,6 +404,8 @@ class Meta:
     release_date: str = ""
     release_dates: dict[str, Any] | None = None
     release_url: str = ""
+    release_subheader: str = ""
+    release_subheader_url: str = ""
     remove_trackers: list[str] | bool = False
     repack: str = ""
     requested_trackers: list[str] | None = None
