@@ -8,11 +8,9 @@ On the first run after upgrading, a legacy `data/config.py` in the checkout is *
 
 ## How to use
 
-- Generate a config interactively:
-  - Run `python config-generator.py` from the repo root.
-- Or create your config manually:
-  - Run `config-generator.py`, or let the first start create the user config from `data/example_config.py`
-  - Edit the user-owned `config.py` with your own values
+- The Web UI creates the user config from `data/example_config.py` on first start and continues to the configuration page.
+- The first CLI upload command creates the same file and stops. Edit the generated user-owned `config.py`, then run the command again.
+- Help commands such as `ua --help` do not create configuration files.
 
 ## Config file shape
 

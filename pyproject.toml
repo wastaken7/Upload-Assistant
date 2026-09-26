@@ -96,10 +96,9 @@ build-backend = "setuptools.build_meta"
 
 [project.scripts]
 ua = "upload:run"
-ua-config = "upload:run_config_generator"
 
 [tool.setuptools]
-py-modules = ["upload", "config-generator"]
+py-modules = ["upload"]
 include-package-data = false
 
 [tool.setuptools.packages.find]

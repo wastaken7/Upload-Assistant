@@ -63,7 +63,7 @@ jobs:
           PY
 
       - name: Compile Python sources
-        run: python -m compileall src web_ui upload.py config-generator.py
+        run: python -m compileall src web_ui upload.py
 
   tests:
     name: Pytest (${{ matrix.os }})

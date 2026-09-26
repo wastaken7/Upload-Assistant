@@ -15,13 +15,7 @@ Upload Assistant uses an FFmpeg already on your PATH or downloads its verified F
 
 ## Create the configuration
 
-The configuration must be created after installing Upload Assistant. In a new terminal, run:
-
-```powershell
-ua-config
-```
-
-Follow the prompts to add your API keys and tracker credentials. Complete this step before the first upload.
+Start the Web UI with `ua --webui`. It creates the configuration on first launch; use the configuration page to add your API keys and tracker credentials before the first upload. Alternatively, the first CLI upload command creates the same file and stops so you can edit it before retrying.
 
 ## Basic commands
 
@@ -43,4 +37,4 @@ Update the installed version:
 uv tool upgrade upload-assistant
 ```
 
-If Windows does not recognize `ua` or `ua-config`, run `uv tool update-shell` and open a new terminal.
+If Windows does not recognize `ua`, run `uv tool update-shell` and open a new terminal.

@@ -27,17 +27,7 @@ docker run --rm -it --network=host \
 ghcr.io/wastaken7/upload-assistant:latest /downloads/path/to/content --help
 ```
 
-`/state` is the container's persistent, writable application-state root. It holds `data/config.py`, cookies, caches and temporary upload artifacts. Mount a directory, not a single `config.py` file. On the first run the application creates `/state/data/config.py` from the bundled example; edit it or run the generator before uploading. The paths in your config file need to refer to paths inside the docker image, same with path provided for file. May need to utilize remote path mapping for your client.
-
-## Config-generator
-
-```
-docker run --rm -it --network=host \
--v /full/path/to/appdata:/state \
--v /full/path/to/downloads:/downloads \
---entrypoint python \
-ghcr.io/wastaken7/upload-assistant:latest /Upload-Assistant/config-generator.py
-```
+`/state` is the container's persistent, writable application-state root. It holds `data/config.py`, cookies, caches and temporary upload artifacts. Mount a directory, not a single `config.py` file. On the first Web UI or CLI upload run, the application creates `/state/data/config.py` from the bundled example. A first CLI run stops so you can edit the file before retrying; the Web UI continues to its configuration page. The paths in your config file need to refer to paths inside the docker image, same with path provided for file. May need to utilize remote path mapping for your client.
 
 ## What if I want to utilize re-using torrents and I use qbit?
 
