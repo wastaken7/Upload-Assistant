@@ -2314,6 +2314,16 @@ class DescriptionBuilder:
         bbcode = BBCODE()
         from src.trackersetup import get_tracker_framework
 
+        if get_tracker_framework(tracker) == "UNIT3D":
+            # Protect comparison payloads from all formatting, including newline cleanup.
+            comparisons: list[str] = []
+
+            def preserve_comparison(match: re.Match[str]) -> str:
+                comparisons.append(match.group(0))
+                return f"\x00COMPARISON{len(comparisons) - 1}\x00"
+
+            description = re.sub(r"\[comparison=[^\]]*\].*?\[/comparison\]", preserve_comparison, description, flags=re.IGNORECASE | re.DOTALL)
+
         if get_tracker_framework(tracker) == "NEXUSPHP":
             description = bbcode.remove_img_resize(description)
 
@@ -2540,6 +2550,9 @@ class DescriptionBuilder:
             description = description.replace("[hr]", "").replace("[/hr]", "")
             description = description.replace("[ul]", "").replace("[/ul]", "")
             description = description.replace("[ol]", "").replace("[/ol]", "")
-            description = bbcode.convert_comparison_to_collapse(description, 1000)
+            description = bbcode.remove_extra_lines(description)
+            for index, comparison in enumerate(comparisons):
+                description = description.replace(f"\x00COMPARISON{index}\x00", comparison)
+            return description
 
         return bbcode.remove_extra_lines(description)
