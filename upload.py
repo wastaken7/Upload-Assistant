@@ -383,116 +383,6 @@ else:
     sys.exit(1)
 
 
-async def merge_meta(meta: Meta, saved_meta: dict[str, Any]) -> dict[str, Any]:
-    """Merges saved metadata with the current meta, respecting overwrite rules."""
-    overwrite_list = [
-        "anon",
-        "asin",
-        "audible_url",
-        "audiobook_bitrate",
-        "audiobook_duration_formatted",
-        "audiobook_duration",
-        "author",
-        "book_asin",
-        "book_author",
-        "book_isbn",
-        "book_language_iso",
-        "book_language",
-        "book_publisher",
-        "book_title",
-        "category",
-        "client",
-        "comic",
-        "debug",
-        "desc",
-        "description_file",
-        "description_link",
-        "double_upload_until",
-        "doubleup",
-        "draft",
-        "dual_audio",
-        "dupe",
-        "exclusive",
-        "featured",
-        "freeleech",
-        "freeleech_until",
-        "game_region",
-        "game_subcategory",
-        "game_system",
-        "game_version",
-        "hardcoded_subs",
-        "igdb_manual",
-        "imdb",
-        "imghost",
-        "isbn",
-        "keywords",
-        "magazine",
-        "mal",
-        "manga",
-        "manual_edition",
-        "manual_episode",
-        "manual_platform",
-        "manual_season",
-        "manual_source",
-        "manual_type",
-        "manual_year",
-        "manual",
-        "modq",
-        "narrator",
-        "newspaper",
-        "no_aka",
-        "no_dub",
-        "no_season",
-        "no_seed",
-        "no_tag",
-        "no_year",
-        "nohash",
-        "openlibrary",
-        "personalrelease",
-        "platform",
-        "qbit_cat",
-        "qbit_tag",
-        "refundable",
-        "region",
-        "screens",
-        "skip_imghost_upload",
-        "steam_manual",
-        "sticky",
-        "title",
-        "tmdb_manual",
-        "torrent_creation",
-        "trackers",
-        "tvmaze_manual",
-        "type",
-        "unattended",
-        "webdv",
-        "year",
-    ]
-    sanitized_saved_meta: dict[str, Any] = {}
-    for key, value in saved_meta.items():
-        clean_key = key.strip().strip("'").strip('"')
-        if clean_key == "tracker_ids":
-            current_tracker_ids = meta.tracker_ids
-            sanitized_saved_meta[clean_key] = current_tracker_ids if current_tracker_ids else value
-        elif clean_key in overwrite_list:
-            meta_val = getattr(meta, clean_key, None)
-            if meta_val not in (None, False, 0, "", [], {}):
-                sanitized_saved_meta[clean_key] = meta_val
-                logger.debug(f"Overriding {clean_key} with meta value: {meta_val}")
-            else:
-                sanitized_saved_meta[clean_key] = value
-        else:
-            sanitized_saved_meta[clean_key] = value
-    tracker_ids = sanitized_saved_meta.pop("tracker_ids", None)
-    meta.update(sanitized_saved_meta)
-    if isinstance(tracker_ids, dict):
-        meta.set_tracker_ids(tracker_ids)
-        sanitized_saved_meta["tracker_ids"] = dict(meta.tracker_ids)
-    sanitize_book_language(meta)
-    sanitize_book_author(meta)
-    return sanitized_saved_meta
-
-
 async def print_progress(message: str, interval: int = 10) -> None:
     """Prints a progress message every `interval` seconds until cancelled."""
     try:
@@ -2612,22 +2502,12 @@ async def do_the_thing(base_dir: str) -> None:
 
                 meta_file = Path(base_dir) / "tmp" / Path(path).name / "meta.json"
 
-                keep_meta = config["DEFAULT"].get("keep_meta", False)
-
                 if meta.delete_meta and meta_file.exists():
                     try:
                         meta_file.unlink()
                         logger.debug(f"[bold yellow]Found and deleted existing metadata file: {meta_file}")
                     except Exception as e:
                         logger.info(f"[bold red]Failed to delete metadata file {meta_file}: {e!s}")
-
-                if keep_meta and not meta.delete_meta and meta_file.exists():
-                    async with aiofiles.open(meta_file, encoding="utf-8") as f:
-                        content = await f.read()
-                        saved_meta = cast(dict[str, Any], json.loads(content)) if content.strip() else {}
-                        logger.info("[yellow]Existing metadata file found, it holds cached values")
-                        await merge_meta(meta, saved_meta)
-                        _publish_webui_preview_target(path, meta.uuid or None)
 
             except Exception as e:
                 logger.info(f"[red]Exception: '{path}': {e}")

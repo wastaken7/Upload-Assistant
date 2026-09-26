@@ -125,7 +125,6 @@ DEFAULT_KEY_TYPES: dict[str, tuple[type, ...]] = {
     "bluray_image_size": (str, int),
     "bluray_score": (float, int),
     "bluray_single_score": (float, int),
-    "keep_meta": (bool,),
     "post_upload_hooks": (list, tuple),
     "post_upload_inprocess_hooks": (list, tuple),
     "post_upload_hook_timeout": (str, int, float),
