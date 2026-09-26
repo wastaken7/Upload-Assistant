@@ -271,7 +271,7 @@ Open the generated `config.py` in a text editor (like Notepad++, VS Code, or Tex
 
 ## **Updating:**
 
-Run `uv tool upgrade upload-assistant` to update the published installation. If you installed the development version from GitHub, run `uv tool install --force git+https://github.com/wastaken7/Upload-Assistant.git` to fetch it again. Review [`data/example_config.py`](data/example_config.py) afterward for any new settings.
+Run `uv tool upgrade upload-assistant` to update the published installation. If you installed the development version from GitHub, run `uv tool install --force git+https://github.com/wastaken7/Upload-Assistant.git` to fetch it again. On the next start, Upload Assistant adds newly introduced settings from [`data/example_config.py`](data/example_config.py) without changing existing values. A timestamped backup is created beside `config.py` whenever this automatic update changes the file.
 
 ## **CLI Usage:**
 
