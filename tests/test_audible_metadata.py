@@ -70,7 +70,6 @@ async def test_catalog_uses_marketplace_and_cache_without_credentials(tmp_path, 
 
     real_client = httpx.AsyncClient
     monkeypatch.setattr(audible.httpx, "AsyncClient", lambda **_kwargs: real_client(transport=httpx.MockTransport(respond)))
-    await cache_for(str(tmp_path)).set("audible", "product", f"audible.com.br:{ASIN}", {"artwork_url": "https://example.org/old-500.jpg"})
     first = await audible.fetch_audible_metadata(ASIN, "audible.com.br", str(tmp_path))
     second = await audible.fetch_audible_metadata(ASIN, "audible.com.br", str(tmp_path))
     await audible.fetch_audible_metadata(ASIN, "audible.com", str(tmp_path))
@@ -85,6 +84,29 @@ async def test_catalog_uses_marketplace_and_cache_without_credentials(tmp_path, 
     assert calls[1].url.host == "api.audible.com"
     assert calls[0].url.params["image_sizes"] == "1215,900,500"
     assert all("cookie" not in request.headers and "authorization" not in request.headers for request in calls)
+
+
+@pytest.mark.asyncio
+async def test_legacy_cover_cache_key_is_ignored_after_image_size_upgrade(tmp_path, monkeypatch):
+    legacy_url = "https://example.org/fictional-500.jpg"
+    high_resolution_url = "https://example.org/fictional-1215.jpg"
+    await cache_for(str(tmp_path)).set("audible", "product", f"audible.com.br:{ASIN}", {"artwork_url": legacy_url})
+    product = _catalog_product()
+    product["product_images"] = {"500": legacy_url, "1215": high_resolution_url}
+    requests = []
+
+    def respond(request):
+        requests.append(request)
+        return httpx.Response(200, json={"product": product})
+
+    real_client = httpx.AsyncClient
+    monkeypatch.setattr(audible.httpx, "AsyncClient", lambda **_kwargs: real_client(transport=httpx.MockTransport(respond)))
+    first = await audible.fetch_audible_metadata(ASIN, "audible.com.br", str(tmp_path))
+    second = await audible.fetch_audible_metadata(ASIN, "audible.com.br", str(tmp_path))
+
+    assert first == second
+    assert first["artwork_url"] == high_resolution_url
+    assert len(requests) == 1
 
 
 @pytest.mark.asyncio
