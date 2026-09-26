@@ -24,7 +24,7 @@ The assistant automatically detects the subcategory or format of a book upload u
 
 To gather rich metadata with minimal manual input, Upload Assistant implements a hierarchical resolution flow:
 
-$$\text{CLI Overrides} > \text{MyAnonamouse (MAM) API} > \text{Google Books API} > \text{OpenLibrary API} > \text{Local File Metadata}$$
+$$\text{CLI Overrides} > \text{Audible (audiobooks with ASIN)} > \text{MyAnonamouse (MAM) API} > \text{Google Books API} > \text{OpenLibrary API} > \text{Local File Metadata}$$
 
 ### A. Local File Metadata
 
@@ -36,6 +36,7 @@ $$\text{CLI Overrides} > \text{MyAnonamouse (MAM) API} > \text{Google Books API}
 
 ### B. API Metadata Integrations
 
+- **Audible**: For audiobooks with a user-provided or embedded ASIN, the assistant queries the catalog for the marketplace selected by `--audible-url` or `DEFAULT.audible_domain`. Without a marketplace, it does not query Audible. The catalog provides edition-specific title, contributors, publisher, synopsis, ISBN, year, language, cover, series, edition, and aggregate rating where available. It requests cover sizes up to 1215 px and uses the largest returned image. A structured-data page lookup is used if the catalog API fails. The measured file duration takes priority over the catalog duration. Catalog lookups need no Audible account and are cached for 24 hours by marketplace and ASIN.
 - **MyAnonamouse (MAM)**: If the files being uploaded correspond to an active torrent in your local client containing `myanonamouse.net` in trackers, the assistant extracts the torrent ID (`MID=(\d+)`) from the client comments. It then queries the MAM API using your configured `mam_api_key` / `mam_id` to retrieve details like title, authors, narrators, description, ISBN, language, and cover image URL.
 - **Google Books**: If a valid ISBN is resolved locally or provided via CLI, the assistant calls the Google Books API (using `google_books_api_key` if configured) to fetch title, authors, publisher, publication year, genres/keywords, book description, and front cover URL.
 - **OpenLibrary**: If an OpenLibrary Work ID is provided via `-openlib` / `--openlibrary` CLI flag, **or** if an ISBN is available, the assistant queries the OpenLibrary API to fetch title, authors, description, cover image, publisher, publication year, and subjects/keywords. OpenLibrary results have the lowest priority among API sources — they will not override fields already populated by MAM or Google Books.
@@ -84,6 +85,8 @@ The duplicate checking module (`dupe_checking.py`) uses custom rules for books t
 ## 5. Console Prompting & Output Formatting
 
 - **Interactive Metadata Prompting**: In attended mode, if required fields (`title`, `author`, `year`, `book_language`) are missing, the console prompts the user to supply them. The release name is then automatically rebuilt.
+- **Audible authors and ratings**: Audiobook descriptions link each Audible author with an ASIN to their author page in the selected marketplace; authors without an ASIN remain plain text. When available, they also include the average score and number of ratings as plain text. The product link appears only on the ASIN. Prices and written reviews are not included.
+- **Synopsis formatting**: Book and audiobook overviews from files or metadata providers convert common HTML formatting, paragraphs, lists, and safe links to BBCode, including HTML-encoded tags. Unsupported markup is removed while its readable text is retained.
 
 ---
 
@@ -101,7 +104,7 @@ You can override auto-detected values using the following command-line flags:
 | `-ov`        | `--overview`      | Overrides the book or audiobook synopsis                                                            |
 | `-isbn`      | `--isbn`          | Overrides the ISBN number                                                                           |
 | `-asin`      | `--asin`          | Overrides the ASIN number                                                                           |
-|              | `--audible-url`   | Audible product URL; sets the ASIN and overrides the configured Audible marketplace                 |
+|              | `--audible-url`   | Audible product URL; sets the ASIN and chooses the marketplace for audiobook metadata               |
 | `-blang`     | `--book-language` | Overrides the book language (e.g. English, Portuguese)                                              |
 | `-openlib`   | `--openlibrary`   | Specifies the OpenLibrary Work ID (e.g. `OL45883W`). Accepts a full OpenLibrary URL or just the ID. |
 | `-comic`     | `--comic`         | Identifies the book upload as a Comic                                                               |
