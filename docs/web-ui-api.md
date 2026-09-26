@@ -12,6 +12,18 @@ This document summarizes the WebUI HTTP API implemented in `web_ui/server.py`. F
 - Description: basic health check
 - Response: {"status": "healthy", "success": true, "message": "..."}
 
+### /api/stats
+
+- Methods: GET, DELETE
+- Auth: authenticated browser session only; Bearer tokens are rejected
+- CSRF: valid CSRF header and same-origin request required for both methods
+- GET query: `range=7d|30d|90d|all` and `mode=real|debug`
+- GET description: returns an `enabled` flag plus the stable overview, timeline, upload destination/category, artifact, cache, logical external-operation, and execution-source shapes. When collection is disabled, every aggregate is zero-filled and stored data is not read or returned.
+- DELETE payload: `{"confirmation":"RESET"}`
+- DELETE description: clears real and debug statistics in one transaction; caches, configuration, torrents, and NZBs are unaffected
+
+Statistics contain no per-release events, names, paths, external media IDs, URLs, or credentials. The `api` section counts logical adapter operations rather than transport retries. Its `bytes` values contain known payload bytes sent through NNTP and successful image uploads; zero means the payload size was unavailable or no measured bytes were sent.
+
 ### /api/execute
 
 - Methods: POST, OPTIONS

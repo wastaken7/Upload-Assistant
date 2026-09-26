@@ -115,6 +115,11 @@ config: dict[str, Any] = {
         # "injecting_client_list": ["qbittorrent", "rtorrent"],
         # Clients searched for existing torrents:
         # "searching_client_list": ["qbittorrent", "qbittorrent_searching"],
+        # --- LOCAL STATISTICS ---
+        # Store privacy-preserving daily aggregates for the Stats Web UI. No media
+        # names, paths, external IDs, URLs, or credentials are stored. Opt in by
+        # changing this setting to True.
+        "stats_enabled": False,
         # --- METADATA CACHING ---
         # Public metadata cache
         # Cache responses from sites such as TMDB and IMDb for reuse in future runs, reducing API requests.

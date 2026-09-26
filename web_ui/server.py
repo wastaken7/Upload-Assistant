@@ -16,6 +16,7 @@ import queue
 import re
 import secrets
 import shlex
+import sqlite3
 import subprocess
 import sys
 import threading
@@ -1862,6 +1863,7 @@ def _webui_subprocess_env() -> dict[str, str]:
     env["UA_WEBUI_FORCE_COLOR"] = "1"
     env["UA_WEBUI_PROGRESS_STDOUT"] = "1"
     env["UA_WEBUI_PROMPT_SOUND_STDOUT"] = "1"
+    env["UA_STATS_SOURCE"] = "webui"
     return env
 
 
@@ -2814,7 +2816,7 @@ def _require_auth_for_webui():  # pyright: ignore[reportUnusedFunction]
         return None
     if _webui_auth_configured() and _webui_auth_ok():
         return None
-    if request.path == "/config" or request.path in ("/", "/index.html"):
+    if request.path in {"/config", "/stats", "/", "/index.html"}:
         return redirect(url_for("login_page"))
 
     return None
@@ -4154,11 +4156,50 @@ def config_page():
         return "<pre>Internal server error</pre>", 500
 
 
+@app.route("/stats")
+def stats_page():
+    """Serve the privacy-preserving statistics dashboard."""
+    if not _is_authenticated():
+        return redirect(url_for("login_page"))
+    return render_template("stats.html", app_version=APP_VERSION, csrf_token=_ensure_csrf_token())
+
+
 @app.route("/api/health")
 @limiter.exempt
 def health():
     """Health check endpoint"""
     return jsonify({"status": "healthy", "success": True, "message": "Upload-Assistant Web UI is running"})
+
+
+@app.route("/api/stats", methods=["GET", "DELETE"])
+def stats_api():
+    """Read or reset local aggregate statistics for an authenticated browser."""
+    if not _is_authenticated() or _get_bearer_from_header():
+        return jsonify({"success": False, "error": "Authentication required (web session)"}), 401
+    if not _verify_csrf_header() or not _verify_same_origin():
+        return jsonify({"success": False, "error": "CSRF/Origin validation failed"}), 403
+
+    from src.stats import get_empty_stats, get_stats, reset_stats, stats_collection_enabled
+
+    if request.method == "DELETE":
+        body = _request_json_dict()
+        if body.get("confirmation") != "RESET":
+            return jsonify({"success": False, "error": "Type RESET to confirm"}), 400
+        try:
+            return jsonify({"success": True, "reset_at": reset_stats(STATE_DIR)})
+        except OSError, sqlite3.Error:
+            return jsonify({"success": False, "error": "Unable to reset statistics"}), 500
+
+    period = str(request.args.get("range", "30d"))
+    mode = str(request.args.get("mode", "real"))
+    try:
+        config = _load_config_from_file(STATE_DIR / "data" / "config.py") or {}
+        enabled = stats_collection_enabled(config)
+        payload = get_stats(period, mode, STATE_DIR) if enabled else get_empty_stats(period, mode)
+        payload["enabled"] = enabled
+        return jsonify(payload)
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
 
 
 @app.route("/api/update_status")

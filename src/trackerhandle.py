@@ -20,6 +20,7 @@ from src.manualpackage import ManualPackageManager
 from src.meta import Meta
 from src.qbitwait import Wait
 from src.rehostimages import check_tracker_image_hosts, has_restricted_image_hosts, select_common_image_host
+from src.stats import record_event_async
 from src.torrent_provision import provision_tracker_torrents
 from src.trackers.GAZELLE.passthepopcorn import PassThePopcorn
 from src.trackersetup import TrackerSetup
@@ -212,10 +213,11 @@ async def process_trackers(
                             print_tracker_result(tracker, tracker_class, status, False)
                             return
                         await check_tracker_image_hosts(meta, tracker_class)
-                        upload_start_time = time.time()
-                        is_uploaded = await tracker_class.upload(meta)
-                        upload_duration = time.time() - upload_start_time
-                        meta[f"{tracker}_upload_duration"] = upload_duration
+                        upload_start_time = time.monotonic()
+                        try:
+                            is_uploaded = await tracker_class.upload(meta)
+                        finally:
+                            meta[f"{tracker}_upload_duration"] = time.monotonic() - upload_start_time
                     except Exception as e:
                         logger.info(f"[red]Upload failed: {escape(str(e))}[/red]")
                         logger.info(traceback.format_exc(), extra={"markup": False})
@@ -252,10 +254,11 @@ async def process_trackers(
                             print_tracker_result(tracker, tracker_class, status, False)
                             return
                         await check_tracker_image_hosts(meta, tracker_class)
-                        upload_start_time = time.time()
-                        is_uploaded = await tracker_class.upload(meta)
-                        upload_duration = time.time() - upload_start_time
-                        meta[f"{tracker}_upload_duration"] = upload_duration
+                        upload_start_time = time.monotonic()
+                        try:
+                            is_uploaded = await tracker_class.upload(meta)
+                        finally:
+                            meta[f"{tracker}_upload_duration"] = time.monotonic() - upload_start_time
                     except Exception as e:
                         logger.info(f"[red]Upload failed: {escape(str(e))}[/red]")
                         logger.info(traceback.format_exc(), extra={"markup": False})
@@ -327,10 +330,11 @@ async def process_trackers(
                     ptp_url, ptp_data = await ptp.fill_upload_form(group_id, meta)
                     is_uploaded = False
                     try:
-                        upload_start_time = time.time()
-                        is_uploaded = await ptp.upload(meta, ptp_url, ptp_data)
-                        upload_duration = time.time() - upload_start_time
-                        meta[f"{tracker}_upload_duration"] = upload_duration
+                        upload_start_time = time.monotonic()
+                        try:
+                            is_uploaded = await ptp.upload(meta, ptp_url, ptp_data)
+                        finally:
+                            meta[f"{tracker}_upload_duration"] = time.monotonic() - upload_start_time
                     except Exception as e:
                         logger.info(f"[red]Upload failed: {escape(str(e))}[/red]")
                         logger.info(traceback.format_exc(), extra={"markup": False})
@@ -375,5 +379,22 @@ async def process_trackers(
         # Process each tracker sequentially
         for tracker in enabled_trackers:
             await process_single_tracker(tracker)
+
+    for tracker_name in enabled_trackers:
+        normalized = tracker_name.replace(" ", "").upper().strip()
+        if normalized in {"MANUAL", "USENET"}:
+            continue
+        status = cast(Mapping[str, Any], meta.tracker_status.get(normalized, {}))
+        tracker_type = tracker_class_map.get(normalized)
+        destination_type = "usenet_indexer" if tracker_type and getattr(tracker_type, "is_usenet", False) else "torrent_tracker"
+        duration_ms = float(meta.get(f"{normalized}_upload_duration") or 0) * 1000
+        if "upload_success" in status:
+            outcome = "success" if status.get("upload_success") is True else "error"
+        elif status.get("upload") is True:
+            outcome = "error"
+        else:
+            continue
+        await record_event_async("upload", service=normalized, operation=destination_type, outcome=outcome, duration_ms=duration_ms)
+        await record_event_async("api", service=normalized, operation="upload", outcome=outcome, duration_ms=duration_ms)
 
     logger.info(f"[green]All {upload_target} uploads processed.[/green]")

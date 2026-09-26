@@ -17,6 +17,7 @@ import pyimgbox
 from src.console import logger
 from src.meta import Meta
 from src.screenshot_manifest import files as manifest_files
+from src.stats import record_event_async
 from src.temp_paths import screenshots_dir
 from src.tracker_images import image_tags
 
@@ -62,19 +63,47 @@ class UploadScreensManager:
         allowed_hosts: list[str] | None = None,
     ) -> tuple[list[ImageDict], int]:
         """Upload the selected screenshots and return uploaded image metadata."""
-        return await _upload_screens(
-            self.config,
-            meta,
-            screens,
-            img_host_num,
-            i,
-            total_screens,
-            custom_img_list,
-            return_dict,
-            retry_mode=retry_mode,
-            max_retries=max_retries,
-            allowed_hosts=allowed_hosts,
-        )
+        started = time.monotonic()
+        existing_image_count = len(meta.image_list or [])
+        attempts_before = int(return_dict.get("_stats_image_upload_attempts", 0) or 0)
+        successes_before = int(return_dict.get("_stats_image_upload_successes", 0) or 0)
+        bytes_before = int(return_dict.get("_stats_image_upload_bytes", 0) or 0)
+        outcome = "skipped"
+        try:
+            result = await _upload_screens(
+                self.config,
+                meta,
+                screens,
+                img_host_num,
+                i,
+                total_screens,
+                custom_img_list,
+                return_dict,
+                retry_mode=retry_mode,
+                max_retries=max_retries,
+                allowed_hosts=allowed_hosts,
+            )
+            attempted = int(return_dict.get("_stats_image_upload_attempts", 0) or 0) - attempts_before
+            uploaded = int(return_dict.get("_stats_image_upload_successes", 0) or 0) - successes_before
+            if not custom_img_list:
+                uploaded = max(uploaded, len(meta.image_list or []) - existing_image_count)
+            outcome = "success" if uploaded > 0 else "error" if attempted > 0 else "skipped"
+            return result
+        except Exception:
+            outcome = "error"
+            raise
+        finally:
+            if outcome != "skipped":
+                service = str(meta.imghost or self.config.get("DEFAULT", {}).get(f"img_host_{img_host_num}", "image_host"))
+                bytes_sent = int(return_dict.get("_stats_image_upload_bytes", 0) or 0) - bytes_before
+                await record_event_async(
+                    "api",
+                    service=service,
+                    operation="image_upload",
+                    outcome=outcome,
+                    duration_ms=(time.monotonic() - started) * 1000,
+                    bytes_count=max(0, bytes_sent),
+                )
 
 
 async def upload_image_task(args: Sequence[Any]) -> dict[str, Any]:
@@ -671,6 +700,7 @@ async def _upload_screens(
 
         if approved_host:
             img_host = approved_host
+            meta.imghost = approved_host
         else:
             logger.info(f"[red]No approved image hosts found in config. Available: {allowed_hosts}[/red]")
             return image_list, len(image_list)
@@ -797,6 +827,7 @@ async def _upload_screens(
         return image_list, len(image_list)
 
     upload_tasks: list[tuple[int, str, str, dict[str, Any], Meta]] = [(index, image, img_host, config, meta) for index, image in enumerate(image_glob[:images_needed])]
+    return_dict["_stats_image_upload_attempts"] = int(return_dict.get("_stats_image_upload_attempts", 0) or 0) + len(upload_tasks)
 
     # Concurrency Control
     default_pool_size = len(upload_tasks)
@@ -905,6 +936,12 @@ async def _upload_screens(
             logger.error(f"[red]Error during uploads: {e!s}[/red]")
 
         successfully_uploaded = [(index, result) for index, result in results if result["status"] == "success"]
+        return_dict["_stats_image_upload_successes"] = int(return_dict.get("_stats_image_upload_successes", 0) or 0) + len(successfully_uploaded)
+        uploaded_bytes = 0
+        for index, _result in successfully_uploaded:
+            with contextlib.suppress(OSError):
+                uploaded_bytes += Path(upload_tasks[index][1]).stat().st_size
+        return_dict["_stats_image_upload_bytes"] = int(return_dict.get("_stats_image_upload_bytes", 0) or 0) + uploaded_bytes
         logger.debug(f"[blue]Successfully uploaded {len(successfully_uploaded)} out of {len(upload_tasks)} attempted uploads.[/blue]")
 
         # Ensure we only switch hosts if necessary

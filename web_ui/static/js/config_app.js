@@ -314,6 +314,7 @@ const WorkspaceSwitcher = ({ activeWorkspace, isDarkMode, stretch }) => {
   const workspaces = [
     { id: "upload", label: "Upload", href: `${APP_BASE}/` },
     { id: "config", label: "Configuration", href: `${APP_BASE}/config` },
+    { id: "stats", label: "Stats", href: `${APP_BASE}/stats` },
   ];
 
   return (
@@ -353,15 +354,16 @@ const RailUploadIcon = () => (
   </svg>
 );
 
-const RailConfigIcon = () => (
-  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M12 15.5a3.5 3.5 0 100-7 3.5 3.5 0 000 7zM19.4 15a1.7 1.7 0 00.34 1.88l.06.06-2.83 2.83-.06-.06A1.7 1.7 0 0015 19.4a1.7 1.7 0 00-1 .6l-.04.08h-4l-.04-.08a1.7 1.7 0 00-1-.6 1.7 1.7 0 00-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 004.6 15a1.7 1.7 0 00-.6-1l-.08-.04v-4L4 9.92a1.7 1.7 0 00.6-1 1.7 1.7 0 00-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 009 4.6a1.7 1.7 0 001-.6l.04-.08h4l.04.08a1.7 1.7 0 001 .6 1.7 1.7 0 001.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0019.4 9c.08.38.3.73.6 1l.08.04v4L20 14.08a1.7 1.7 0 00-.6.92z"
-    />
-  </svg>
+const RailAssetIcon = ({ name }) => (
+  <span
+    aria-hidden="true"
+    className="inline-block h-5 w-5 flex-none"
+    style={{
+      backgroundColor: "currentColor",
+      mask: `url(/static/img/webui-icons/${name}.svg) center / contain no-repeat`,
+      WebkitMask: `url(/static/img/webui-icons/${name}.svg) center / contain no-repeat`,
+    }}
+  />
 );
 
 const RailHelpIcon = () => (
@@ -398,13 +400,13 @@ const RailChangelogIcon = () => (
   </svg>
 );
 
-const RailPaletteIcon = () => (
+const RailStatsIcon = () => (
   <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
     <path
       strokeLinecap="round"
       strokeLinejoin="round"
       strokeWidth={2}
-      d="M12 3a9 9 0 100 18h1.4a1.6 1.6 0 001.1-2.73 1.6 1.6 0 011.1-2.73H18A3 3 0 0021 12a9 9 0 00-9-9zM7.5 10h.01M10 6.5h.01M15 7h.01M17 11h.01"
+      d="M4 19V9m6 10V5m6 14v-7m4 7H2"
     />
   </svg>
 );
@@ -486,8 +488,12 @@ function ConfigApplicationRail({
           aria-current="page"
           onClick={(event) => event.preventDefault()}
         >
-          <RailConfigIcon />
+          <RailAssetIcon name="settings" />
           <span>Config</span>
+        </a>
+        <a href={`${APP_BASE}/stats`} className="ua-app-rail-button rounded-lg">
+          <RailStatsIcon />
+          <span>Stats</span>
         </a>
       </nav>
 
@@ -533,7 +539,7 @@ function ConfigApplicationRail({
             onClick={() => setIsAppearanceOpen((open) => !open)}
             aria-expanded={isAppearanceOpen}
           >
-            <RailPaletteIcon />
+            <RailAssetIcon name="palette" />
             <span>Appearance</span>
           </button>
           {isAppearanceOpen && (

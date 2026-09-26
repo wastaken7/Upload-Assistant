@@ -2151,6 +2151,7 @@ def load_heavy_globals() -> None:
 
 async def do_the_thing(base_dir: str) -> None:
     from src.api_key_expiry import reset_api_key_expiry_warnings
+    from src.stats import completed_item_outcome, configure_stats, record_event_async, set_stats_context
 
     reset_api_key_expiry_warnings()
     load_heavy_globals()
@@ -2174,9 +2175,12 @@ async def do_the_thing(base_dir: str) -> None:
     except Exception as exc:
         logger.warning(f"[yellow]Warning: could not reload config from disk: {exc}[/yellow]")
 
+    configure_stats(config)
+
     from src.prowlarr import ProwlarrError, apply_prowlarr_credentials, configured_prowlarr, fetch_prowlarr_credentials
 
     if prowlarr_connection := configured_prowlarr(config):
+        prowlarr_started = time.monotonic()
         try:
             report = await asyncio.to_thread(
                 fetch_prowlarr_credentials,
@@ -2185,8 +2189,10 @@ async def do_the_thing(base_dir: str) -> None:
                 set(tracker_class_map),
             )
             applied = apply_prowlarr_credentials(config, report)
+            await record_event_async("api", service="prowlarr", operation="credential_sync", outcome="success", duration_ms=(time.monotonic() - prowlarr_started) * 1000)
             logger.debug(f"[green]Prowlarr supplied fallback credentials for {len(applied)} tracker(s).[/green]")
         except ProwlarrError as exc:
+            await record_event_async("api", service="prowlarr", operation="credential_sync", outcome="error", duration_ms=(time.monotonic() - prowlarr_started) * 1000)
             logger.warning(f"[yellow]Prowlarr credential fallback unavailable: {exc}[/yellow]")
 
     await asyncio.sleep(0.1)  # Ensure it's not racing
@@ -2477,6 +2483,8 @@ async def do_the_thing(base_dir: str) -> None:
 
                 meta.path = path
                 meta.uuid = ""
+                set_stats_context(debug=bool(meta.debug), category="")
+                await record_event_async("item", operation="started", outcome="success")
                 _publish_webui_preview_target(path)
 
                 if not path:
@@ -2522,6 +2530,8 @@ async def do_the_thing(base_dir: str) -> None:
             finally:
                 await cancel_and_drain_early_artifact_tasks(meta.uuid)
             if not meta_success:
+                set_stats_context(debug=bool(meta.debug), category=str(meta.category or ""))
+                await record_event_async("item", operation="completed", outcome="error")
                 if "queue" in meta and meta.queue is not None:
                     processed_files_count += 1
                     skipped_files_count += 1
@@ -2535,6 +2545,8 @@ async def do_the_thing(base_dir: str) -> None:
                 gc.collect()
                 cleanup_manager.reset_terminal()
                 continue
+
+            set_stats_context(debug=bool(meta.debug), category=str(meta.category or ""))
 
             tracker_setup = TrackerSetup(config=config)
             if "we_are_uploading" not in meta or not meta.we_are_uploading:
@@ -2936,6 +2948,27 @@ async def do_the_thing(base_dir: str) -> None:
 
             # Persist and expose the completed item before user-managed hooks run.
             # Hooks may inspect the final tracker status and files have not yet been cleaned.
+            completed_statuses = [status for status in meta.tracker_status.values() if isinstance(status, Mapping)]
+            for tracker_name, tracker_result in meta.tracker_status.items():
+                if not isinstance(tracker_result, Mapping) or "upload_success" in tracker_result or tracker_result.get("upload") is True:
+                    continue
+                normalized_tracker = str(tracker_name).replace(" ", "").upper().strip()
+                if normalized_tracker in {"MANUAL", "USENET"}:
+                    continue
+                tracker_type = tracker_class_map.get(normalized_tracker)
+                destination_type = "usenet_indexer" if tracker_type and getattr(tracker_type, "is_usenet", False) else "torrent_tracker"
+                result_message = str(tracker_result.get("status_message", "")).lower()
+                if tracker_result.get("dupe") or "dupe" in result_message or "duplicate" in result_message:
+                    skip_reason = "dupe"
+                elif "user" in result_message or "declin" in result_message:
+                    skip_reason = "user"
+                elif "unsupported" in result_message or "eligible" in result_message:
+                    skip_reason = "ineligible"
+                else:
+                    skip_reason = "rule"
+                await record_event_async("upload", service=normalized_tracker, operation=destination_type, outcome=f"skipped:{skip_reason}")
+            item_outcome = completed_item_outcome(completed_statuses)
+            await record_event_async("item", operation="completed", outcome=item_outcome)
             await write_meta_file(meta)
             _publish_webui_preview_target(cast(str, meta.path or ""), meta.uuid or None)
             await run_post_upload_hooks(meta, config)
