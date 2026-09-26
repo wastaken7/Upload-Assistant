@@ -61,5 +61,8 @@ def ensure_user_config() -> bool:
     ensure_data_dir()
     if CONFIG_PATH.exists():
         return False
-    shutil.copy2(CODE_DIR / "data" / "example_config.py", CONFIG_PATH)
+    example_path = CODE_DIR / "data" / "example_config.py"
+    if not example_path.is_file():
+        example_path = CODE_DIR / "defaults" / "data" / "example_config.py"
+    shutil.copy2(example_path, CONFIG_PATH)
     return True

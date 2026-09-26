@@ -48,6 +48,9 @@ def test_ensure_user_config_copies_bundled_example(monkeypatch, tmp_path: Path) 
     example_path = code_dir / "data" / "example_config.py"
     example_path.parent.mkdir(parents=True)
     example_path.write_text("config = {'source': 'example'}", encoding="utf-8")
+    fallback_path = code_dir / "defaults" / "data" / "example_config.py"
+    fallback_path.parent.mkdir(parents=True)
+    fallback_path.write_text("config = {'source': 'fallback'}", encoding="utf-8")
 
     monkeypatch.setattr(app_paths, "CODE_DIR", code_dir)
     monkeypatch.setattr(app_paths, "STATE_DIR", data_dir.parent)
@@ -56,6 +59,25 @@ def test_ensure_user_config_copies_bundled_example(monkeypatch, tmp_path: Path) 
 
     assert app_paths.ensure_user_config() is True  # noqa: S101
     assert config_path.read_text(encoding="utf-8") == "config = {'source': 'example'}"  # noqa: S101
+
+
+def test_ensure_user_config_falls_back_to_defaults(monkeypatch, tmp_path: Path) -> None:
+    from src import app_paths
+
+    code_dir = tmp_path / "checkout"
+    data_dir = tmp_path / "state" / "data"
+    config_path = data_dir / "config.py"
+    fallback_path = code_dir / "defaults" / "data" / "example_config.py"
+    fallback_path.parent.mkdir(parents=True)
+    fallback_path.write_text("config = {'source': 'fallback'}", encoding="utf-8")
+
+    monkeypatch.setattr(app_paths, "CODE_DIR", code_dir)
+    monkeypatch.setattr(app_paths, "STATE_DIR", data_dir.parent)
+    monkeypatch.setattr(app_paths, "DATA_DIR", data_dir)
+    monkeypatch.setattr(app_paths, "CONFIG_PATH", config_path)
+
+    assert app_paths.ensure_user_config() is True  # noqa: S101
+    assert config_path.read_text(encoding="utf-8") == "config = {'source': 'fallback'}"  # noqa: S101
 
 
 def test_ensure_user_config_preserves_existing_file(monkeypatch, tmp_path: Path) -> None:

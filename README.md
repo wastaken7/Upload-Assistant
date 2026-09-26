@@ -253,7 +253,7 @@ If you plan to use the Web UI, **your configuration file will be generated autom
 On the first CLI upload command, Upload Assistant creates `config.py` from the bundled example and stops so you can configure it. The file is created in:
 
 - **Windows:** `%LOCALAPPDATA%\Upload-Assistant\data`
-- **Linux / macOS:** `$XDG_DATA_HOME/Upload-Assistant/data` (normally `~/.local/share/Upload-Assistant/data`)
+- **Linux / macOS:** `$XDG_DATA_HOME/Upload-Assistant/data` (normally `~/.local/share/Upload-Assistant/data`). If `Upload-Assistant` does not exist but the legacy `upload-assistant` directory does, use `$XDG_DATA_HOME/upload-assistant/data` (normally `~/.local/share/upload-assistant/data`).
 - **Custom location:** `%UA_DATA_DIR%\data` (Windows Command Prompt), `$env:UA_DATA_DIR\data` (PowerShell), or `$UA_DATA_DIR/data` (Linux/macOS) when `UA_DATA_DIR` is set
 
 Open the generated `config.py` in a text editor (like Notepad++, VS Code, or TextEdit) and fill in your information, then run the upload command again.
