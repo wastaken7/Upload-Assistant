@@ -19,8 +19,6 @@ config: dict[str, Any] = {
         "personal_release_groups": [],
         # Set to True to suppress configuration warnings at startup.
         "suppress_warnings": False,
-        # Set to True to reuse values from the previous meta.json when processing begins.
-        "keep_meta": False,
         # --- LOGGING ---
         # Console logging configuration
         # Show the time in console logs.
