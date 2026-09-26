@@ -1,12 +1,17 @@
 # Windows Installation
 
-## Install with the `.exe`
+## Install with `uv`
 
-1. Download `Upload-Assistant-Setup-<version>-x64.exe` from the [latest GitHub release](https://github.com/wastaken7/Upload-Assistant/releases).
-2. Run the installer and follow the setup wizard.
-3. Open a new PowerShell or Command Prompt window after the installation.
+1. Install Python 3.14 or newer and [`uv`](https://docs.astral.sh/uv/getting-started/installation/).
+2. In PowerShell or Command Prompt, install Upload Assistant:
 
-The installer automatically sets up the Python runtime and dependencies. On the first upload that needs it, Upload Assistant uses an FFmpeg already on your PATH or downloads its verified FFmpeg runtime into its user data `bin` directory. Windows users do not need to install Python, Git, or FFmpeg separately.
+   ```powershell
+   uv tool install upload-assistant
+   ```
+
+3. If `uv` reports that its tool directory is not on your `PATH`, run `uv tool update-shell` and open a new terminal.
+
+Upload Assistant uses an FFmpeg already on your PATH or downloads its verified FFmpeg runtime into its user data `bin` directory when needed.
 
 ## Create the configuration
 
@@ -35,7 +40,7 @@ ua --help
 Update the installed version:
 
 ```powershell
-ua-update
+uv tool upgrade upload-assistant
 ```
 
-If Windows does not recognize `ua` or `ua-config`, close and reopen the terminal so it reloads the updated `PATH`.
+If Windows does not recognize `ua` or `ua-config`, run `uv tool update-shell` and open a new terminal.
