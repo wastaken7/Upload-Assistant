@@ -223,7 +223,7 @@ Setting up Upload Assistant is straightforward, even if you are not a developer.
 
 ### Step 1: Install Required Tools
 
-Windows users should install Upload Assistant with the [Windows `.exe` installer](docs/windows-install.md). It includes everything needed to run the assistant.
+Windows users can install Upload Assistant with `uv`; see the [Windows installation guide](docs/windows-install.md).
 
 For a manual Linux/macOS/Windows installation, Upload Assistant needs a few tools to process media and run:
 
@@ -325,7 +325,7 @@ If you plan to use the Web UI, **your configuration file will be generated autom
 
 In your terminal, run the command for your operating system and follow the on-screen prompts:
 
-- **Windows:** Install with the [`.exe` installer](docs/windows-install.md), then run `ua-config` in a new terminal.
+- **Windows:** Install with `uv` as described in the [Windows installation guide](docs/windows-install.md), then run `ua-config` in a new terminal.
 - **Linux / macOS (Standard):**
 
   ```bash
@@ -345,7 +345,7 @@ In your terminal, run the command for your operating system and follow the on-sc
    - **Linux / macOS:** `$XDG_DATA_HOME/Upload-Assistant/data` (normally `~/.local/share/Upload-Assistant/data`)
    - **Custom location:** `%UA_DATA_DIR%\data` (Windows Command Prompt), `$env:UA_DATA_DIR\data` (PowerShell), or `$UA_DATA_DIR/data` (Linux/macOS) when `UA_DATA_DIR` is set
 2. **For source checkouts (git clone / ZIP download):** Copy the bundled `data/example_config.py` from the project into that directory as `config.py` (leave the original file unchanged).
-   **For PyPI, uv, or Windows .exe installs:** Run `ua-config` to generate the config file first, which will create `config.py` in the user-state directory.
+   **For PyPI or uv installs:** Run `ua-config` to generate the config file first, which will create `config.py` in the user-state directory.
 3. Open the user-state `config.py` in a text editor (like Notepad, VS Code, or TextEdit) and fill in your information.
    - For detailed info on what each setting does, see [Example Config Docs](docs/example-config.md).
    - Get a free TMDb API key from [TheMovieDB API settings](https://www.themoviedb.org/settings/api).
@@ -369,7 +369,6 @@ In your terminal, run the command for your operating system and follow the on-sc
   ```
 
 - Or, if you downloaded the ZIP file, download a fresh ZIP from GitHub and overwrite your existing files.
-- For the Windows installation, run `ua-update`.
 - For the `uv` standalone installation, run: `uv tool upgrade upload-assistant`
 - Run the command to update dependencies:
   - **Linux / macOS:** `python3 -m pip install --user -U -r requirements.txt`

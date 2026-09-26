@@ -36,13 +36,11 @@ def main():
     base_dir = BASE_DIR
     web_static_img = base_dir / "web_ui" / "static" / "img"
     web_static = base_dir / "web_ui" / "static"
-    scripts_dir = base_dir / "scripts"
 
     if not SOURCE_SVG.is_file():
         raise FileNotFoundError(f"Logo source not found: {SOURCE_SVG}")
 
     web_static_img.mkdir(parents=True, exist_ok=True)
-    scripts_dir.mkdir(parents=True, exist_ok=True)
 
     # Keep the Web UI SVG beside its rasterized variants.
     web_logo_svg = web_static_img / "logo.svg"
@@ -73,11 +71,6 @@ def main():
     favicon_path = web_static / "favicon.ico"
     master_logo.save(favicon_path, format="ICO", sizes=[(s, s) for s in sizes])
     print(f"Saved multi-resolution favicon.ico to {favicon_path}")
-
-    # Save logo.ico to scripts/ for the Windows Installer
-    installer_ico_path = scripts_dir / "logo.ico"
-    master_logo.save(installer_ico_path, format="ICO", sizes=[(s, s) for s in sizes])
-    print(f"Saved installer logo.ico to {installer_ico_path}")
 
     print("Asset generation complete!")
 

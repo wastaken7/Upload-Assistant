@@ -18,7 +18,7 @@ Create a protected GitHub environment named `pypi` as well. Requiring an environ
 
 ## Release
 
-Run the **Create release** workflow from the branch and supply a new version such as `v3.9`. The workflow updates both version declarations, builds the Windows installer and Python distributions, creates the GitHub release, and publishes the same version to PyPI.
+Run the **Create release** workflow from the branch and supply a new version such as `v3.9`. The workflow updates both version declarations, builds the Python distributions, creates the GitHub release, and publishes the same version to PyPI.
 
 To validate artifacts locally without publishing:
 

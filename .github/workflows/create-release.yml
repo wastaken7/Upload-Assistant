@@ -137,13 +137,6 @@ jobs:
           git push origin "HEAD:$TARGET_BRANCH"
           echo "release_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
-  build-windows-installer:
-    needs: prepare-release
-    uses: ./.github/workflows/windows-installer.yml
-    with:
-      ref: ${{ needs.prepare-release.outputs.release_sha }}
-      version: ${{ inputs.version }}
-
   build-python-distribution:
     needs: prepare-release
     runs-on: ubuntu-24.04
@@ -194,7 +187,7 @@ jobs:
           if-no-files-found: error
 
   publish-release:
-    needs: [prepare-release, build-windows-installer, build-python-distribution]
+    needs: [prepare-release, build-python-distribution]
     runs-on: ubuntu-24.04
     permissions:
       actions: write
@@ -205,12 +198,6 @@ jobs:
         with:
           name: release-notes-${{ inputs.version }}
           path: ${{ runner.temp }}
-
-      - name: Download Windows installer
-        uses: actions/download-artifact@v4
-        with:
-          name: Upload-Assistant-Windows-Setup-${{ inputs.version }}
-          path: ${{ runner.temp }}/windows-installer
 
       - name: Publish GitHub release
         env:
@@ -223,7 +210,6 @@ jobs:
             --target "$RELEASE_SHA" \
             --title "$NEW_VERSION" \
             --notes-file "$RUNNER_TEMP/release-notes.md" \
-            "$RUNNER_TEMP/windows-installer"/*.exe \
             --verify-tag=false
 
       - name: Start Docker release build
