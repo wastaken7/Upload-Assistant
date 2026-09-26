@@ -67,6 +67,7 @@ class UploadScreensManager:
         existing_image_count = len(meta.image_list or [])
         attempts_before = int(return_dict.get("_stats_image_upload_attempts", 0) or 0)
         successes_before = int(return_dict.get("_stats_image_upload_successes", 0) or 0)
+        bytes_before = int(return_dict.get("_stats_image_upload_bytes", 0) or 0)
         outcome = "skipped"
         try:
             result = await _upload_screens(
@@ -94,7 +95,15 @@ class UploadScreensManager:
         finally:
             if outcome != "skipped":
                 service = str(meta.imghost or self.config.get("DEFAULT", {}).get(f"img_host_{img_host_num}", "image_host"))
-                await record_event_async("api", service=service, operation="image_upload", outcome=outcome, duration_ms=(time.monotonic() - started) * 1000)
+                bytes_sent = int(return_dict.get("_stats_image_upload_bytes", 0) or 0) - bytes_before
+                await record_event_async(
+                    "api",
+                    service=service,
+                    operation="image_upload",
+                    outcome=outcome,
+                    duration_ms=(time.monotonic() - started) * 1000,
+                    bytes_count=max(0, bytes_sent),
+                )
 
 
 async def upload_image_task(args: Sequence[Any]) -> dict[str, Any]:
@@ -928,6 +937,11 @@ async def _upload_screens(
 
         successfully_uploaded = [(index, result) for index, result in results if result["status"] == "success"]
         return_dict["_stats_image_upload_successes"] = int(return_dict.get("_stats_image_upload_successes", 0) or 0) + len(successfully_uploaded)
+        uploaded_bytes = 0
+        for index, _result in successfully_uploaded:
+            with contextlib.suppress(OSError):
+                uploaded_bytes += Path(upload_tasks[index][1]).stat().st_size
+        return_dict["_stats_image_upload_bytes"] = int(return_dict.get("_stats_image_upload_bytes", 0) or 0) + uploaded_bytes
         logger.debug(f"[blue]Successfully uploaded {len(successfully_uploaded)} out of {len(upload_tasks)} attempted uploads.[/blue]")
 
         # Ensure we only switch hosts if necessary

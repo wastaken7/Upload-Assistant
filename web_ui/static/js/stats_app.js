@@ -1116,7 +1116,7 @@ function StatsApp() {
               <Section
                 icon="external-operations"
                 title="External operations"
-                subtitle="Logical adapter operations; internal redirects and retries are not counted separately."
+                subtitle="Logical adapter operations; internal redirects and retries are not counted separately. Bytes sent are available for NNTP and successful image uploads."
               >
                 {breakdownView === "chart" ? (
                   <DonutChart
@@ -1144,9 +1144,10 @@ function StatsApp() {
                         render: (r) => formatDuration(r.average_duration_ms),
                       },
                       {
-                        label: "Bytes",
+                        label: "Bytes sent",
                         sortValue: (r) => r.bytes,
-                        render: (r) => formatBytes(r.bytes),
+                        render: (r) =>
+                          r.bytes > 0 ? formatBytes(r.bytes) : "—",
                       },
                     ]}
                   />

@@ -42,6 +42,7 @@ def test_upload_screens_manager_records_the_final_host_and_actual_success() -> N
         meta.imghost = "ptscreens"
         return_dict["_stats_image_upload_attempts"] = 1
         return_dict["_stats_image_upload_successes"] = 1
+        return_dict["_stats_image_upload_bytes"] = 4096
         return meta.image_list, len(meta.image_list)
 
     async def exercise() -> None:
@@ -57,6 +58,7 @@ def test_upload_screens_manager_records_the_final_host_and_actual_success() -> N
         recorder.assert_awaited_once()
         assert recorder.await_args.kwargs["service"] == "ptscreens"
         assert recorder.await_args.kwargs["outcome"] == "success"
+        assert recorder.await_args.kwargs["bytes_count"] == 4096
 
     asyncio.run(exercise())
 
@@ -134,6 +136,7 @@ def test_upload_screens_does_not_reupload_source_on_fallback(tmp_path: Path) -> 
             meta.image_list = []
             meta.imghost = "ptscreens"
             await _upload_screens(config, meta, 1, 2, 0, 1, [], shared_return_dict)
+            assert shared_return_dict["_stats_image_upload_bytes"] == len(b"image")
 
     starting_directory = Path.cwd()
     asyncio.run(exercise())
@@ -194,7 +197,7 @@ def test_upload_screens_preserves_partial_successes_across_fallback(tmp_path: Pa
             "web_url": f"https://img.example/{filename}/{host}",
         }
 
-    async def exercise() -> tuple[list[dict[str, str]], int]:
+    async def exercise() -> tuple[list[dict[str, str]], int, dict[str, object]]:
         for filename in ("image-1.png", "image-2.png"):
             (tmp_path / filename).write_bytes(b"image")
         meta = Meta({"base_dir": str(tmp_path), "uuid": "test", "imghost": "imgbox"})
@@ -207,16 +210,19 @@ def test_upload_screens_preserves_partial_successes_across_fallback(tmp_path: Pa
             },
             "TRACKERS": {},
         }
+        shared_return_dict: dict[str, object] = {}
         with (
             patch("src.uploadscreens.screenshots_dir", return_value=tmp_path),
             patch("src.uploadscreens.upload_image_task", new=fake_upload),
         ):
-            return await _upload_screens(config, meta, 1, 1, 0, 2, [], {})
+            image_list, uploaded_count = await _upload_screens(config, meta, 1, 1, 0, 2, [], shared_return_dict)
+            return image_list, uploaded_count, shared_return_dict
 
-    image_list, uploaded_count = asyncio.run(exercise())
+    image_list, uploaded_count, stats_counters = asyncio.run(exercise())
     assert uploaded_count == 2
     assert len(image_list) == 2
     assert calls == [("image-1.png", "imgbox"), ("image-2.png", "imgbox"), ("image-2.png", "ptscreens")]
+    assert stats_counters["_stats_image_upload_bytes"] == 2 * len(b"image")
 
 
 def test_upload_screens_handles_infinite_concurrency(tmp_path: Path) -> None:

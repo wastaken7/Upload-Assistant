@@ -59,7 +59,7 @@ def test_completed_item_outcome_uses_definitive_upload_results(statuses, expecte
 
 
 def test_api_requests_fall_back_to_completed_operation_outcomes(tmp_path):
-    stats.record_event("api", service="fictional-client", operation="search", outcome="success", duration_ms=20, state_dir=tmp_path)
+    stats.record_event("api", service="fictional-client", operation="search", outcome="success", duration_ms=20, bytes_count=2048, state_dir=tmp_path)
     stats.record_event("api", service="fictional-client", operation="search", outcome="error", duration_ms=10, state_dir=tmp_path)
     stats.record_event("api", service="less-active-client", operation="add", outcome="success", state_dir=tmp_path)
 
@@ -74,7 +74,7 @@ def test_api_requests_fall_back_to_completed_operation_outcomes(tmp_path):
         "successes": 1,
         "errors": 1,
         "average_duration_ms": 15,
-        "bytes": 0,
+        "bytes": 2048,
     }
 
 

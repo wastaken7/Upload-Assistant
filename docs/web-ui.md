@@ -280,7 +280,7 @@ The local account, encrypted credentials, token metadata, 2FA state, IP controls
 
 Open **Stats** from the application workspace navigation to inspect local activity for the last 7, 30, or 90 days, or for the full recorded period. Real uploads and `--debug` simulations are stored and displayed separately.
 
-The dashboard includes upload success rates and destinations, media categories, torrents and NZBs created or reused, cache hit rates, logical external operations, transferred NNTP bytes when available, and CLI versus WebUI usage. Distribution sections can be switched between exact tables and local SVG donut charts; the preference is retained in the browser. A logical external operation represents one adapter action; redirects and internal retries do not create additional hits.
+The dashboard includes upload success rates and destinations, media categories, torrents and NZBs created or reused, cache hit rates, logical external operations, known payload bytes sent through NNTP and successful image uploads, and CLI versus WebUI usage. Operations whose payload size is not measured display an em dash instead of a misleading zero. Distribution sections can be switched between exact tables and local SVG donut charts; the preference is retained in the browser. A logical external operation represents one adapter action; redirects and internal retries do not create additional hits.
 
 Statistics are daily aggregates. Upload Assistant does not store release names, paths, external media IDs, URLs, or credentials in the statistics database. Collection begins when the feature is installed; existing cache files and logs are not scanned or backfilled, though later accesses to an existing cache count as new hits or misses.
 

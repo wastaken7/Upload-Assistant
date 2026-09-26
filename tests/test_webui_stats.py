@@ -81,6 +81,14 @@ def test_stats_tables_sort_comparable_columns():
     assert 'label: "Skip reasons"' in stats_app
 
 
+def test_external_operation_bytes_distinguish_unknown_from_zero():
+    stats_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
+
+    assert 'label: "Bytes sent"' in stats_app
+    assert 'r.bytes > 0 ? formatBytes(r.bytes) : "—"' in stats_app
+    assert "Bytes sent are available for NNTP and successful image uploads." in stats_app
+
+
 def test_stats_tables_fit_their_panels_and_theme_required_scrollbars():
     stats_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
     theme_css = (server.CODE_DIR / "web_ui" / "static" / "css" / "theme.css").read_text(encoding="utf-8")

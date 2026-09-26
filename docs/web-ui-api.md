@@ -22,7 +22,7 @@ This document summarizes the WebUI HTTP API implemented in `web_ui/server.py`. F
 - DELETE payload: `{"confirmation":"RESET"}`
 - DELETE description: clears real and debug statistics in one transaction; caches, configuration, torrents, and NZBs are unaffected
 
-Statistics contain no per-release events, names, paths, external media IDs, URLs, or credentials. The `api` section counts logical adapter operations rather than transport retries.
+Statistics contain no per-release events, names, paths, external media IDs, URLs, or credentials. The `api` section counts logical adapter operations rather than transport retries. Its `bytes` values contain known payload bytes sent through NNTP and successful image uploads; zero means the payload size was unavailable or no measured bytes were sent.
 
 ### /api/execute
 
