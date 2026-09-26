@@ -123,6 +123,12 @@ def test_stats_summary_cards_have_distinct_icons():
         "cache-by-provider",
         "external-operations",
         "execution-source",
+        "data-uploaded",
+        "average-item-size",
+        "duplicates-prevented",
+        "hashing-io-avoided",
+        "activity-heatmap",
+        "media-profile",
     )
     icon_dir = server.CODE_DIR / "web_ui" / "static" / "img" / "stats-icons"
     for icon in icons:
@@ -138,9 +144,20 @@ def test_stats_ui_exposes_volume_profiles_comparisons_and_exports():
     assert "function MediaProfile" in stats_app
     assert "function ActivityHeatmap" in stats_app
     assert "vs previous period" in stats_app
-    assert "Export CSV" in stats_app
-    assert "Export JSON" in stats_app
+    assert "function ExportMenu" in stats_app
+    assert 'aria-haspopup="menu"' in stats_app
+    assert "CSV timeline" in stats_app
+    assert "JSON details" in stats_app
     assert "ReliabilityBadge" in stats_app
+
+
+def test_activity_heatmap_fits_panel_without_horizontal_scroll():
+    stats_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
+
+    heatmap = stats_app.split("function ActivityHeatmap", 1)[1].split("const ReliabilityBadge", 1)[0]
+    assert 'className="w-full pb-1"' in heatmap
+    assert "overflow-x-auto" not in heatmap
+    assert "min-w-[760px]" not in heatmap
 
 
 def test_stats_disabled_state_blurs_results_and_links_to_configuration():

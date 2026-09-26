@@ -2294,6 +2294,22 @@ html.ua-upload-document #root {
   color: var(--ua-config-text);
 }
 
+.ua-stats-export-menu {
+  background: var(--ua-config-surface-raised);
+  border: 1px solid var(--ua-config-border);
+  color: var(--ua-config-text);
+}
+
+.ua-stats-export-menu button:hover,
+.ua-stats-export-menu button:focus-visible {
+  background: color-mix(
+    in srgb,
+    var(--ua-copper-bright) 12%,
+    var(--ua-config-surface-raised)
+  );
+  outline: none;
+}
+
 .ua-stats-chart-tooltip {
   border: 1px solid var(--ua-config-border);
 }

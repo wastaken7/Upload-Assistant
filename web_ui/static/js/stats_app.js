@@ -435,6 +435,69 @@ const Card = ({ icon, label, value, detail, trend }) => (
   </article>
 );
 
+function ExportMenu({ disabled, onCsv, onJson }) {
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef(null);
+  useEffect(() => {
+    if (!open) return undefined;
+    const closeWhenOutside = (event) => {
+      if (!menuRef.current?.contains(event.target)) setOpen(false);
+    };
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("pointerdown", closeWhenOutside);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeWhenOutside);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [open]);
+
+  const choose = (callback) => {
+    setOpen(false);
+    callback();
+  };
+  return (
+    <div ref={menuRef} className="relative">
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setOpen((current) => !current)}
+        className="ua-theme-picker rounded-lg px-3 py-2 text-sm disabled:opacity-40"
+        aria-haspopup="menu"
+        aria-expanded={open}
+      >
+        Export <span aria-hidden="true">▾</span>
+      </button>
+      {open && (
+        <div
+          className="ua-stats-export-menu absolute right-0 z-20 mt-2 min-w-36 overflow-hidden rounded-lg py-1 shadow-xl"
+          role="menu"
+          aria-label="Export statistics"
+        >
+          <button
+            type="button"
+            className="block w-full px-3 py-2 text-left text-sm"
+            role="menuitem"
+            onClick={() => choose(onCsv)}
+          >
+            CSV timeline
+          </button>
+          <button
+            type="button"
+            className="block w-full px-3 py-2 text-left text-sm"
+            role="menuitem"
+            onClick={() => choose(onJson)}
+          >
+            JSON details
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function TrendChart({ rows }) {
   const [visible, setVisible] = useState({
     items: true,
@@ -589,9 +652,9 @@ function ActivityHeatmap({ rows }) {
     ...cells.filter(Boolean).map((cell) => cell.count),
   );
   return (
-    <div className="overflow-x-auto pb-1">
+    <div className="w-full pb-1">
       <div
-        className="grid min-w-[760px] grid-flow-col grid-rows-7 gap-1"
+        className="grid w-full grid-flow-col grid-rows-7 gap-[2px] sm:gap-1"
         role="img"
         aria-label="Activity during the last 365 days"
       >
@@ -1125,22 +1188,11 @@ function StatsApp() {
               <option value="real">Real activity</option>
               <option value="debug">Debug simulations</option>
             </select>
-            <button
-              type="button"
+            <ExportMenu
               disabled={!statsEnabled || !hasData}
-              onClick={exportCsv}
-              className="ua-theme-picker rounded-lg px-3 py-2 text-sm disabled:opacity-40"
-            >
-              Export CSV
-            </button>
-            <button
-              type="button"
-              disabled={!statsEnabled || !hasData}
-              onClick={exportJson}
-              className="ua-theme-picker rounded-lg px-3 py-2 text-sm disabled:opacity-40"
-            >
-              Export JSON
-            </button>
+              onCsv={exportCsv}
+              onJson={exportJson}
+            />
             <button
               type="button"
               onClick={() => setResetOpen(true)}
@@ -1236,25 +1288,25 @@ function StatsApp() {
                   detail="Debug never affects real totals"
                 />
                 <Card
-                  icon="successful-uploads"
+                  icon="data-uploaded"
                   label="Data uploaded"
                   value={formatBytes(overview.uploaded_bytes)}
                   detail="Successful destination uploads"
                 />
                 <Card
-                  icon="items-completed"
+                  icon="average-item-size"
                   label="Average item size"
                   value={formatBytes(overview.average_item_bytes)}
                   detail={`${formatBytes(overview.processed_bytes)} processed`}
                 />
                 <Card
-                  icon="uploads-by-destination"
+                  icon="duplicates-prevented"
                   label="Duplicates prevented"
                   value={formatNumber(overview.duplicate_preventions)}
                   detail={`${overview.pioneering_rate || 0}% pioneering rate`}
                 />
                 <Card
-                  icon="artifact-activity"
+                  icon="hashing-io-avoided"
                   label="Hashing I/O avoided"
                   value={formatBytes(overview.hashing_bytes_avoided)}
                   detail="Media volume covered by reused base torrents"
@@ -1268,7 +1320,7 @@ function StatsApp() {
                 <TrendChart rows={data.timeline} />
               </Section>
               <Section
-                icon="daily-activity"
+                icon="activity-heatmap"
                 title="Activity heatmap"
                 subtitle="Completed items over the last 365 days. Darker cells indicate busier days."
               >
@@ -1422,7 +1474,7 @@ function StatsApp() {
                 </Section>
               </div>
               <Section
-                icon="categories"
+                icon="media-profile"
                 title="Media profile"
                 subtitle="Low-cardinality technical characteristics appropriate to each category."
               >
