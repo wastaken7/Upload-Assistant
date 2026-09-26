@@ -1476,7 +1476,7 @@ function StatsApp() {
               <Section
                 icon="media-profile"
                 title="Media profile"
-                subtitle="Low-cardinality technical characteristics appropriate to each category."
+                subtitle="Low-cardinality technical characteristics."
               >
                 <MediaProfile
                   media={data.media}
