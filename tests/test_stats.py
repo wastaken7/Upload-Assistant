@@ -4,11 +4,13 @@ import sqlite3
 import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
 from src import stats
 from src.metadata_cache import cache_for, is_cache_miss
+from src.meta import Meta
 
 
 @pytest.fixture(autouse=True)
@@ -19,8 +21,17 @@ def reset_stats_configuration(monkeypatch):
 
 
 def test_stats_aggregate_real_activity(tmp_path):
-    stats.record_event("item", operation="completed", outcome="success", category="MOVIE", state_dir=tmp_path)
-    stats.record_event("upload", service="FICTIONAL", operation="torrent_tracker", outcome="success", category="MOVIE", duration_ms=1250, state_dir=tmp_path)
+    stats.record_event("item", operation="completed", outcome="success", category="MOVIE", bytes_count=4_000, state_dir=tmp_path)
+    stats.record_event(
+        "upload",
+        service="FICTIONAL",
+        operation="torrent_tracker",
+        outcome="success",
+        category="MOVIE",
+        duration_ms=1250,
+        bytes_count=4_000,
+        state_dir=tmp_path,
+    )
     stats.record_event("upload", service="FICTIONAL", operation="torrent_tracker", outcome="skipped:dupe", category="MOVIE", state_dir=tmp_path)
     stats.record_event("artifact", service="torrent", operation="created", category="base", state_dir=tmp_path)
     stats.record_event("cache", service="imaginarydb", operation="title", outcome="hit", state_dir=tmp_path)
@@ -38,11 +49,18 @@ def test_stats_aggregate_real_activity(tmp_path):
         "nzbs_created": 0,
         "api_operations": 1,
         "cache_hit_rate": 50.0,
+        "uploaded_bytes": 4_000,
+        "processed_bytes": 4_000,
+        "average_item_bytes": 4_000,
+        "duplicate_preventions": 1,
+        "pioneering_rate": 50.0,
+        "hashing_bytes_avoided": 0,
     }
     destination = result["uploads"]["by_destination"][0]
     assert destination["destination"] == "FICTIONAL"
     assert destination["skip_reasons"] == {"dupe": 1}
     assert destination["average_duration_ms"] == 1250
+    assert destination["bytes"] == 4_000
     assert result["api"]["requests"] == 1
 
 
@@ -89,6 +107,75 @@ def test_stats_separate_debug_and_webui(monkeypatch, tmp_path):
     assert debug["overview"]["items_completed"] == 1
     assert debug["overview"]["nzbs_created"] == 1
     assert debug["sources"] == [{"source": "webui", "count": 1}]
+
+
+@pytest.mark.asyncio
+async def test_media_profile_records_category_appropriate_dimensions(monkeypatch, tmp_path):
+    monkeypatch.setattr(stats, "_database_path", lambda _state_dir=None: tmp_path / "data" / "stats.sqlite3")
+    meta = Meta(
+        category="MOVIE",
+        resolution="2160p",
+        type="REMUX",
+        video_codec="HEVC",
+        audio="TrueHD Atmos 7.1",
+        hdr="DV HDR",
+        source_size=85_000,
+    )
+
+    await stats.record_media_profile_async(meta)
+    result = stats.get_stats("all", "real", tmp_path)
+
+    assert result["media"]["categories"] == ["MOVIE"]
+    assert {(row["dimension"], row["value"]) for row in result["media"]["dimensions"]} == {
+        ("resolution", "2160p"),
+        ("release_type", "REMUX"),
+        ("video_codec", "HEVC"),
+        ("audio_codec", "Dolby_Atmos"),
+        ("hdr", "Dolby_Vision"),
+    }
+    assert all(row["bytes"] == 85_000 for row in result["media"]["dimensions"])
+
+
+def test_reused_torrent_reports_media_volume_as_hashing_io_avoided(tmp_path):
+    stats.record_event(
+        "artifact",
+        service="torrent",
+        operation="reused",
+        outcome="success",
+        category="base",
+        bytes_count=64_000,
+        state_dir=tmp_path,
+    )
+
+    result = stats.get_stats("all", "real", tmp_path)
+
+    assert result["overview"]["hashing_bytes_avoided"] == 64_000
+    assert result["artifacts"] == [
+        {"type": "torrent", "operation": "reused", "variant": "base", "count": 1, "bytes": 64_000}
+    ]
+
+
+def test_stats_reports_heatmap_and_previous_period_comparison(tmp_path):
+    stats.record_event("item", operation="completed", outcome="success", state_dir=tmp_path)
+    stats.record_event("upload", service="FICTIONAL", operation="tracker", outcome="success", state_dir=tmp_path)
+    stats.record_event("cache", service="fictional", operation="title", outcome="hit", state_dir=tmp_path)
+    database = tmp_path / "data" / "stats.sqlite3"
+    prior_day = (datetime.now(UTC).date() - timedelta(days=7)).isoformat()
+    with sqlite3.connect(database) as db:
+        db.execute("UPDATE stats_daily SET day = ?", (prior_day,))
+    for _ in range(2):
+        stats.record_event("item", operation="completed", outcome="success", state_dir=tmp_path)
+        stats.record_event("upload", service="FICTIONAL", operation="tracker", outcome="success", state_dir=tmp_path)
+    stats.record_event("cache", service="fictional", operation="title", outcome="miss", state_dir=tmp_path)
+
+    result = stats.get_stats("7d", "real", tmp_path)
+
+    assert result["comparison"] == {
+        "items_completed_pct": 100.0,
+        "uploads_pct": 100.0,
+        "cache_hit_rate_delta": -100.0,
+    }
+    assert result["heatmap"][-1]["count"] == 2
 
 
 def test_stats_can_be_disabled_without_hiding_existing_data(tmp_path):

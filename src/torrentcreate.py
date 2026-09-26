@@ -591,13 +591,20 @@ class TorrentCreator:
             record_event("artifact", service="torrent", operation="created", outcome="success", category="randomized")
 
     @staticmethod
-    async def create_base_from_existing_torrent(torrentpath: str, base_dir: str, uuid: str) -> str | None:
+    async def create_base_from_existing_torrent(torrentpath: str, base_dir: str, uuid: str, source_size: int = 0) -> str | None:
         if Path(torrentpath).exists():
             base_torrent = Torrent.read(torrentpath)
             has_subs = any(Path(str(f)).suffix.lower() in SUBTITLE_EXTENSIONS for f in base_torrent.files)
             manifest = TorrentManifest(base_dir, uuid)
             entry = manifest.register(torrentpath, "base_subs" if has_subs else "base", "client")
-            await record_event_async("artifact", service="torrent", operation="reused", outcome="success", category="base")
+            await record_event_async(
+                "artifact",
+                service="torrent",
+                operation="reused",
+                outcome="success",
+                category="base",
+                bytes_count=source_size,
+            )
             return str(manifest.entry_path(entry))
         return None
 
@@ -674,8 +681,8 @@ def create_random_torrents(base_dir: str, uuid: str, num: int | str, path: str) 
     TorrentCreator.create_random_torrents(base_dir, uuid, num, path)
 
 
-async def create_base_from_existing_torrent(torrentpath: str, base_dir: str, uuid: str) -> str | None:
-    return await TorrentCreator.create_base_from_existing_torrent(torrentpath, base_dir, uuid)
+async def create_base_from_existing_torrent(torrentpath: str, base_dir: str, uuid: str, source_size: int = 0) -> str | None:
+    return await TorrentCreator.create_base_from_existing_torrent(torrentpath, base_dir, uuid, source_size)
 
 
 def get_mkbrr_path(meta: Meta) -> str:

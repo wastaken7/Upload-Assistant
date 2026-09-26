@@ -18,7 +18,7 @@ This document summarizes the WebUI HTTP API implemented in `web_ui/server.py`. F
 - Auth: authenticated browser session only; Bearer tokens are rejected
 - CSRF: valid CSRF header and same-origin request required for both methods
 - GET query: `range=7d|30d|90d|all` and `mode=real|debug`
-- GET description: returns an `enabled` flag plus the stable overview, timeline, upload destination/category, artifact, cache, logical external-operation, and execution-source shapes. When collection is disabled, every aggregate is zero-filled and stored data is not read or returned.
+- GET description: returns an `enabled` flag plus the stable overview, timeline, 365-day heatmap, previous-period comparison, upload destination/category, category-specific media profile, artifact, cache, logical external-operation, and execution-source shapes. Volume fields contain media bytes rather than `.torrent` or `.nzb` file sizes. When collection is disabled, every aggregate is zero-filled and stored data is not read or returned.
 - DELETE payload: `{"confirmation":"RESET"}`
 - DELETE description: clears real and debug statistics in one transaction; caches, configuration, torrents, and NZBs are unaffected
 

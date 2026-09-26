@@ -64,6 +64,102 @@ def completed_item_outcome(statuses: Iterable[Mapping[str, Any]]) -> str:
     return "no_upload"
 
 
+def media_profile_dimensions(meta: Any) -> list[tuple[str, str]]:
+    """Return low-cardinality, privacy-safe media dimensions for one item."""
+    category = str(getattr(meta, "category", "") or "").upper()
+    dimensions: list[tuple[str, str]] = []
+
+    def add(name: str, value: object) -> None:
+        normalized = _dimension(value)
+        if normalized:
+            dimensions.append((name, normalized))
+
+    if category in {"MOVIE", "TV", "FANRES", "XXX", "SPORTS"}:
+        add("resolution", getattr(meta, "resolution", ""))
+        add("release_type", getattr(meta, "type", ""))
+        add("video_codec", _video_codec_bucket(getattr(meta, "video_codec", "") or getattr(meta, "video", "")))
+        add("audio_codec", _audio_codec_bucket(getattr(meta, "audio", "")))
+        add("hdr", _hdr_bucket(getattr(meta, "hdr", "") or getattr(meta, "HDR", "")))
+    elif category == "MUSIC":
+        add("release_type", getattr(meta, "music_release_type", ""))
+        add("media", getattr(meta, "music_media", "") or getattr(meta, "source", ""))
+        add("audio_codec", _audio_codec_bucket(getattr(meta, "audio", "") or getattr(meta, "type", "")))
+    elif category == "BOOK":
+        kind = (
+            "audiobook"
+            if getattr(meta, "audiobook", False)
+            else "comic"
+            if getattr(meta, "comic", False)
+            else "manga"
+            if getattr(meta, "manga", False)
+            else "magazine"
+            if getattr(meta, "magazine", False)
+            else "newspaper"
+            if getattr(meta, "newspaper", False)
+            else "ebook"
+        )
+        add("book_type", kind)
+        add("format", getattr(meta, "type", "") or getattr(meta, "format", ""))
+        if kind == "audiobook":
+            add("audio_codec", _audio_codec_bucket(getattr(meta, "audio", "") or getattr(meta, "type", "")))
+    elif category == "GAME":
+        add("platform", getattr(meta, "platform", ""))
+        add("release_type", getattr(meta, "game_release_type", "") or getattr(meta, "game_subcategory", ""))
+    return dimensions
+
+
+def _video_codec_bucket(value: object) -> str:
+    text = str(value or "").upper()
+    if "AV1" in text:
+        return "AV1"
+    if "HEVC" in text or "H.265" in text or "X265" in text:
+        return "HEVC"
+    if "AVC" in text or "H.264" in text or "X264" in text:
+        return "AVC"
+    if "MPEG-2" in text or "MPEG2" in text:
+        return "MPEG-2"
+    return str(value or "")
+
+
+def _audio_codec_bucket(value: object) -> str:
+    text = str(value or "").upper()
+    for marker, label in (
+        ("ATMOS", "Dolby Atmos"),
+        ("TRUEHD", "TrueHD"),
+        ("DTS-HD MA", "DTS-HD MA"),
+        ("DTS:X", "DTS:X"),
+        ("FLAC", "FLAC"),
+        ("E-AC-3", "Dolby Digital Plus"),
+        ("DD+", "Dolby Digital Plus"),
+        ("AC-3", "Dolby Digital"),
+        ("AAC", "AAC"),
+        ("OPUS", "Opus"),
+        ("MP3", "MP3"),
+    ):
+        if marker in text:
+            return label
+    return str(value or "")
+
+
+def _hdr_bucket(value: object) -> str:
+    text = str(value or "").upper()
+    if "DOLBY VISION" in text or re.search(r"(^|\W)DV($|\W)", text):
+        return "Dolby Vision"
+    if "HDR10+" in text or "HDR10PLUS" in text:
+        return "HDR10+"
+    if "HDR" in text:
+        return "HDR10"
+    return "SDR"
+
+
+async def record_media_profile_async(meta: Any) -> None:
+    """Record one item's category-appropriate technical profile."""
+    category = str(getattr(meta, "category", "") or "")
+    size = max(0, int(getattr(meta, "source_size", 0) or 0))
+    for dimension, value in media_profile_dimensions(meta):
+        await record_event_async("media", service=dimension, operation=value, category=category, bytes_count=size)
+
+
 def _dimension(value: object, *, default: str = "") -> str:
     cleaned = _DIMENSION_RE.sub("_", str(value or "").strip())[:80].strip("_")
     return cleaned or default
@@ -185,10 +281,19 @@ def _empty_payload(period: str, mode: str, generated_at: str) -> dict[str, Any]:
             "nzbs_created": 0,
             "api_operations": 0,
             "cache_hit_rate": 0.0,
+            "uploaded_bytes": 0,
+            "processed_bytes": 0,
+            "average_item_bytes": 0,
+            "duplicate_preventions": 0,
+            "pioneering_rate": 0.0,
+            "hashing_bytes_avoided": 0,
         },
         "timeline": [],
+        "heatmap": [],
+        "comparison": {"items_completed_pct": None, "uploads_pct": None, "cache_hit_rate_delta": None},
         "items": {"success": 0, "no_upload": 0, "error": 0},
         "uploads": {"by_destination": [], "by_category": []},
+        "media": {"categories": [], "dimensions": []},
         "artifacts": [],
         "cache": {"hits": 0, "misses": 0, "writes": 0, "bypasses": 0, "bytes_written": 0, "hit_rate": 0.0, "by_provider": []},
         "api": {"total": 0, "requests": 0, "successes": 0, "errors": 0, "by_service": []},
@@ -223,9 +328,33 @@ def get_stats(period: str = "30d", mode: str = "real", state_dir: str | Path | N
                 query += " AND day >= ?"
                 parameters.append(start)
             rows = db.execute(query, parameters).fetchall()
+            heatmap_start = (now.date() - timedelta(days=364)).isoformat()
+            heatmap_rows = db.execute(
+                """
+                SELECT day, SUM(count) FROM stats_daily
+                WHERE mode = ? AND family = 'item' AND operation = 'completed' AND day >= ?
+                GROUP BY day ORDER BY day
+                """,
+                (mode, heatmap_start),
+            ).fetchall()
+            prior_rows: list[tuple[str, str, str, int]] = []
+            days = {"7d": 7, "30d": 30, "90d": 90}.get(period)
+            if days:
+                current_start = now.date() - timedelta(days=days - 1)
+                prior_end = current_start - timedelta(days=1)
+                prior_start = prior_end - timedelta(days=days - 1)
+                prior_rows = db.execute(
+                    """
+                    SELECT family, operation, outcome, SUM(count) FROM stats_daily
+                    WHERE mode = ? AND day >= ? AND day <= ?
+                    GROUP BY family, operation, outcome
+                    """,
+                    (mode, prior_start.isoformat(), prior_end.isoformat()),
+                ).fetchall()
     except OSError, sqlite3.Error:
         return payload
 
+    payload["heatmap"] = [{"date": day, "count": int(count)} for day, count in heatmap_rows]
     if not rows:
         return payload
     payload["period"]["from"] = start or min(row[0] for row in rows)
@@ -233,9 +362,10 @@ def get_stats(period: str = "30d", mode: str = "real", state_dir: str | Path | N
     timeline: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
     destinations: dict[tuple[str, str], dict[str, int]] = defaultdict(lambda: defaultdict(int))
     categories: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
-    artifacts: dict[tuple[str, str, str], int] = defaultdict(int)
+    artifacts: dict[tuple[str, str, str], dict[str, int]] = defaultdict(lambda: defaultdict(int))
     cache_services: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
     api_services: dict[tuple[str, str], dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    media_dimensions: dict[tuple[str, str, str], dict[str, int]] = defaultdict(lambda: defaultdict(int))
     sources: dict[str, int] = defaultdict(int)
     overview = payload["overview"]
 
@@ -247,6 +377,8 @@ def get_stats(period: str = "30d", mode: str = "real", state_dir: str | Path | N
                 if outcome in payload["items"]:
                     payload["items"][outcome] += count
                 timeline[day]["items"] += count
+                timeline[day]["processed_bytes"] += int(bytes_count)
+                overview["processed_bytes"] += int(bytes_count)
                 sources[source] += count
         elif family == "upload":
             bucket = destinations[(service, operation)]
@@ -255,20 +387,30 @@ def get_stats(period: str = "30d", mode: str = "real", state_dir: str | Path | N
             if outcome.startswith("skipped:"):
                 bucket[f"reason:{outcome.partition(':')[2] or 'rule'}"] += count
             bucket["duration_ms"] += int(duration_ms)
+            bucket["bytes"] += int(bytes_count)
             if outcome in {"success", "error"}:
                 bucket["attempts"] += count
                 overview["upload_attempts"] += count
             if outcome == "success":
                 overview["uploads"] += count
                 timeline[day]["uploads"] += count
+                timeline[day]["uploaded_bytes"] += int(bytes_count)
+                overview["uploaded_bytes"] += int(bytes_count)
+            elif outcome == "error":
+                timeline[day]["upload_errors"] += count
             if category:
                 categories[category][normalized_outcome] += count
+                categories[category]["bytes"] += int(bytes_count)
         elif family == "artifact":
-            artifacts[(service, operation, category)] += count
+            bucket = artifacts[(service, operation, category)]
+            bucket["count"] += count
+            bucket["bytes"] += int(bytes_count)
             if service == "torrent" and operation == "created" and outcome == "success":
                 overview["torrents_created"] += count
             if service == "nzb" and operation == "created" and outcome == "success":
                 overview["nzbs_created"] += count
+            if service == "torrent" and operation == "reused" and outcome == "success":
+                overview["hashing_bytes_avoided"] += int(bytes_count)
         elif family == "cache":
             cache_services[service][outcome] += count
             cache_services[service]["bytes"] += int(bytes_count)
@@ -279,8 +421,13 @@ def get_stats(period: str = "30d", mode: str = "real", state_dir: str | Path | N
             api_services[(service, operation)]["bytes"] += int(bytes_count)
             overview["api_operations"] += count
             timeline[day]["api"] += count
+        elif family == "media":
+            bucket = media_dimensions[(category, service, operation)]
+            bucket["count"] += count
+            bucket["bytes"] += int(bytes_count)
 
     overview["upload_success_rate"] = round(100 * overview["uploads"] / overview["upload_attempts"], 1) if overview["upload_attempts"] else 0.0
+    overview["average_item_bytes"] = round(overview["processed_bytes"] / overview["items_completed"]) if overview["items_completed"] else 0
     cache_totals: defaultdict[str, int] = defaultdict(int)
     for values in cache_services.values():
         for key, value in values.items():
@@ -318,16 +465,27 @@ def get_stats(period: str = "30d", mode: str = "real", state_dir: str | Path | N
             "skipped": values["skipped"],
             "success_rate": round(100 * values["success"] / values["attempts"], 1) if values["attempts"] else 0.0,
             "average_duration_ms": round(values["duration_ms"] / values["attempts"]) if values["attempts"] else 0,
+            "bytes": values["bytes"],
             "skip_reasons": {key.removeprefix("reason:"): value for key, value in values.items() if key.startswith("reason:")},
         }
         for (service, destination_type), values in sorted(destinations.items(), key=lambda item: -item[1]["success"])
     ]
     payload["uploads"]["by_category"] = [
-        {"category": name, "successes": values["success"], "errors": values["error"], "skipped": values["skipped"]}
+        {"category": name, "successes": values["success"], "errors": values["error"], "skipped": values["skipped"], "bytes": values["bytes"]}
         for name, values in sorted(categories.items(), key=lambda item: -item[1]["success"])
     ]
     payload["artifacts"] = [
-        {"type": artifact_type, "operation": operation, "variant": variant, "count": count} for (artifact_type, operation, variant), count in sorted(artifacts.items())
+        {"type": artifact_type, "operation": operation, "variant": variant, "count": values["count"], "bytes": values["bytes"]}
+        for (artifact_type, operation, variant), values in sorted(artifacts.items())
+    ]
+    duplicate_preventions = sum(values["reason:dupe"] for values in destinations.values())
+    pioneering_total = overview["uploads"] + duplicate_preventions
+    overview["duplicate_preventions"] = duplicate_preventions
+    overview["pioneering_rate"] = round(100 * overview["uploads"] / pioneering_total, 1) if pioneering_total else 0.0
+    payload["media"]["categories"] = sorted({category for category, _dimension_name, _value in media_dimensions if category})
+    payload["media"]["dimensions"] = [
+        {"category": category, "dimension": dimension, "value": value, "count": totals["count"], "bytes": totals["bytes"]}
+        for (category, dimension, value), totals in sorted(media_dimensions.items())
     ]
     api_successes = sum(values["success"] for values in api_services.values())
     api_errors = sum(values["error"] for values in api_services.values())
@@ -367,12 +525,35 @@ def get_stats(period: str = "30d", mode: str = "real", state_dir: str | Path | N
                 "api": values["api"],
                 "cache_hit": values["cache_hit"],
                 "cache_miss": values["cache_miss"],
+                "upload_errors": values["upload_errors"],
+                "uploaded_bytes": values["uploaded_bytes"],
+                "processed_bytes": values["processed_bytes"],
             }
         )
         cursor += timedelta(days=1)
     payload["timeline"] = timeline_rows
     payload["sources"] = [{"source": source, "count": count} for source, count in sorted(sources.items())]
+    if prior_rows:
+        prior: defaultdict[tuple[str, str, str], int] = defaultdict(int)
+        for family, operation, outcome, count in prior_rows:
+            prior[(family, operation, outcome)] += int(count)
+        prior_items = sum(value for (family, operation, _outcome), value in prior.items() if family == "item" and operation == "completed")
+        prior_uploads = sum(value for (family, _operation, outcome), value in prior.items() if family == "upload" and outcome == "success")
+        prior_cache_hits = sum(value for (family, _operation, outcome), value in prior.items() if family == "cache" and outcome == "hit")
+        prior_cache_misses = sum(value for (family, _operation, outcome), value in prior.items() if family == "cache" and outcome == "miss")
+        prior_cache_reads = prior_cache_hits + prior_cache_misses
+        prior_cache_rate = 100 * prior_cache_hits / prior_cache_reads if prior_cache_reads else 0.0
+        payload["comparison"] = {
+            "items_completed_pct": _percent_change(overview["items_completed"], prior_items),
+            "uploads_pct": _percent_change(overview["uploads"], prior_uploads),
+            "cache_hit_rate_delta": round(overview["cache_hit_rate"] - prior_cache_rate, 1) if prior_cache_reads else None,
+        }
     return payload
+
+
+def _percent_change(current: int, previous: int) -> float | None:
+    """Return a bounded-period percentage change when a baseline exists."""
+    return round(100 * (current - previous) / previous, 1) if previous else None
 
 
 def reset_stats(state_dir: str | Path | None = None) -> str:

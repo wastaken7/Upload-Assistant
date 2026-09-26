@@ -130,6 +130,19 @@ def test_stats_summary_cards_have_distinct_icons():
         assert (icon_dir / f"{icon}.svg").is_file()
 
 
+def test_stats_ui_exposes_volume_profiles_comparisons_and_exports():
+    stats_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
+
+    assert 'label="Data uploaded"' in stats_app
+    assert 'label="Hashing I/O avoided"' in stats_app
+    assert "function MediaProfile" in stats_app
+    assert "function ActivityHeatmap" in stats_app
+    assert "vs previous period" in stats_app
+    assert "Export CSV" in stats_app
+    assert "Export JSON" in stats_app
+    assert "ReliabilityBadge" in stats_app
+
+
 def test_stats_disabled_state_blurs_results_and_links_to_configuration():
     stats_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
 

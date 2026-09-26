@@ -1890,7 +1890,7 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
             if not reuse_torrent or not Path(reuse_torrent).exists():
                 reuse_torrent = await client.find_existing_torrent(meta)
             if reuse_torrent is not None:
-                await TORRENT_CREATOR.create_base_from_existing_torrent(reuse_torrent, meta.base_dir, meta.uuid)
+                await TORRENT_CREATOR.create_base_from_existing_torrent(reuse_torrent, meta.base_dir, meta.uuid, meta.source_size)
 
         # 2. Re-create base torrents if rehash is True
         if meta.rehash is True and meta.nohash is False:
@@ -1906,7 +1906,7 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
                 and Path(base_reuse_torrent).exists()
                 and (not has_local_subs or client._torrent_has_no_subtitles(base_reuse_torrent))
             ):
-                await TORRENT_CREATOR.create_base_from_existing_torrent(base_reuse_torrent, meta.base_dir, meta.uuid)
+                await TORRENT_CREATOR.create_base_from_existing_torrent(base_reuse_torrent, meta.base_dir, meta.uuid, meta.source_size)
             if torrent_manifest.default_path("base") is None and meta.nohash is False:
                 await TORRENT_CREATOR.create_torrent(meta, Path(cast(str, meta.path)), "BASE")
             if has_local_subs and torrent_manifest.default_path("base_subs") is None and meta.nohash is False:
@@ -2151,7 +2151,7 @@ def load_heavy_globals() -> None:
 
 async def do_the_thing(base_dir: str) -> None:
     from src.api_key_expiry import reset_api_key_expiry_warnings
-    from src.stats import completed_item_outcome, configure_stats, record_event_async, set_stats_context
+    from src.stats import completed_item_outcome, configure_stats, record_event_async, record_media_profile_async, set_stats_context
 
     reset_api_key_expiry_warnings()
     load_heavy_globals()
@@ -2968,7 +2968,9 @@ async def do_the_thing(base_dir: str) -> None:
                     skip_reason = "rule"
                 await record_event_async("upload", service=normalized_tracker, operation=destination_type, outcome=f"skipped:{skip_reason}")
             item_outcome = completed_item_outcome(completed_statuses)
-            await record_event_async("item", operation="completed", outcome=item_outcome)
+            item_bytes = max(0, int(meta.source_size or 0))
+            await record_event_async("item", operation="completed", outcome=item_outcome, bytes_count=item_bytes)
+            await record_media_profile_async(meta)
             await write_meta_file(meta)
             _publish_webui_preview_target(cast(str, meta.path or ""), meta.uuid or None)
             await run_post_upload_hooks(meta, config)

@@ -394,7 +394,15 @@ async def process_trackers(
             outcome = "error"
         else:
             continue
-        await record_event_async("upload", service=normalized, operation=destination_type, outcome=outcome, duration_ms=duration_ms)
+        uploaded_bytes = max(0, int(meta.source_size or 0)) if outcome == "success" else 0
+        await record_event_async(
+            "upload",
+            service=normalized,
+            operation=destination_type,
+            outcome=outcome,
+            duration_ms=duration_ms,
+            bytes_count=uploaded_bytes,
+        )
         await record_event_async("api", service=normalized, operation="upload", outcome=outcome, duration_ms=duration_ms)
 
     logger.info(f"[green]All {upload_target} uploads processed.[/green]")

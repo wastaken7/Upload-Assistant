@@ -2288,6 +2288,43 @@ html.ua-upload-document #root {
   );
 }
 
+.ua-stats-chart-tooltip,
+.ua-stats-inset {
+  background: var(--ua-config-surface);
+  color: var(--ua-config-text);
+}
+
+.ua-stats-chart-tooltip {
+  border: 1px solid var(--ua-config-border);
+}
+
+.ua-stats-series-active {
+  background: color-mix(
+    in srgb,
+    var(--ua-copper-bright) 14%,
+    var(--ua-config-surface-raised)
+  );
+}
+
+.ua-stats-health {
+  font-weight: 600;
+}
+
+.ua-stats-health-good {
+  background: color-mix(in srgb, #22c55e 18%, transparent);
+  color: #22c55e;
+}
+
+.ua-stats-health-watch {
+  background: color-mix(in srgb, #f59e0b 18%, transparent);
+  color: #d97706;
+}
+
+.ua-stats-health-poor {
+  background: color-mix(in srgb, #ef4444 18%, transparent);
+  color: #ef4444;
+}
+
 .ua-stats-table-scroll {
   scrollbar-color: color-mix(in srgb, var(--ua-config-muted) 55%, transparent)
     transparent;
