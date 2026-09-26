@@ -7,6 +7,7 @@ import os
 import re
 import sqlite3
 import threading
+import time
 from collections import defaultdict
 from collections.abc import Iterable, Mapping
 from contextlib import closing
@@ -131,23 +132,29 @@ def record_event(
         _dimension(source or os.environ.get("UA_STATS_SOURCE", "cli"), default="cli"),
         "debug" if (mode or _mode.get()).lower() == "debug" else "real",
     )
-    try:
-        with _record_lock, closing(_connect(_database_path(state_dir))) as db, db:
-            db.execute(
-                """
-                INSERT INTO stats_daily
-                    (day, family, service, operation, outcome, category, source, mode, count, duration_ms, bytes)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT (day, family, service, operation, outcome, category, source, mode)
-                DO UPDATE SET
-                    count = count + excluded.count,
-                    duration_ms = duration_ms + excluded.duration_ms,
-                    bytes = bytes + excluded.bytes
-                """,
-                (*dimensions, int(count), max(0, round(duration_ms)), max(0, int(bytes_count))),
-            )
-    except OSError, sqlite3.Error, ValueError, TypeError:
-        return
+    for attempt in range(4):
+        try:
+            with _record_lock, closing(_connect(_database_path(state_dir))) as db, db:
+                db.execute(
+                    """
+                    INSERT INTO stats_daily
+                        (day, family, service, operation, outcome, category, source, mode, count, duration_ms, bytes)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT (day, family, service, operation, outcome, category, source, mode)
+                    DO UPDATE SET
+                        count = count + excluded.count,
+                        duration_ms = duration_ms + excluded.duration_ms,
+                        bytes = bytes + excluded.bytes
+                    """,
+                    (*dimensions, int(count), max(0, round(duration_ms)), max(0, int(bytes_count))),
+                )
+            return
+        except sqlite3.OperationalError as exc:
+            if attempt == 3 or not any(reason in str(exc).lower() for reason in ("busy", "locked")):
+                return
+            time.sleep(0.05 * (attempt + 1))
+        except OSError, sqlite3.Error, ValueError, TypeError:
+            return
 
 
 async def record_event_async(family: str, **kwargs: Any) -> None:

@@ -155,6 +155,25 @@ def test_stats_upserts_are_process_safe(tmp_path):
     assert stats.get_stats("all", "real", tmp_path)["overview"]["api_operations"] == 40
 
 
+def test_stats_retries_transient_sqlite_lock(monkeypatch, tmp_path):
+    real_connect = stats._connect
+    attempts = 0
+
+    def intermittently_locked(path):
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise sqlite3.OperationalError("database is locked")
+        return real_connect(path)
+
+    monkeypatch.setattr(stats, "_connect", intermittently_locked)
+
+    stats.record_event("api", service="fictional", operation="lookup", state_dir=tmp_path)
+
+    assert attempts == 2
+    assert stats.get_stats("all", "real", tmp_path)["overview"]["api_operations"] == 1
+
+
 @pytest.mark.asyncio
 async def test_record_event_async_offloads_the_sqlite_write(monkeypatch):
     calls = []
