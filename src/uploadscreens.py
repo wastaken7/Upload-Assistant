@@ -17,6 +17,7 @@ import pyimgbox
 from src.console import logger
 from src.meta import Meta
 from src.screenshot_manifest import files as manifest_files
+from src.stats import record_event
 from src.temp_paths import screenshots_dir
 from src.tracker_images import image_tags
 
@@ -62,19 +63,27 @@ class UploadScreensManager:
         allowed_hosts: list[str] | None = None,
     ) -> tuple[list[ImageDict], int]:
         """Upload the selected screenshots and return uploaded image metadata."""
-        return await _upload_screens(
-            self.config,
-            meta,
-            screens,
-            img_host_num,
-            i,
-            total_screens,
-            custom_img_list,
-            return_dict,
-            retry_mode=retry_mode,
-            max_retries=max_retries,
-            allowed_hosts=allowed_hosts,
-        )
+        started = time.monotonic()
+        service = str(meta.imghost or self.config.get("DEFAULT", {}).get(f"img_host_{img_host_num}", "image_host"))
+        outcome = "error"
+        try:
+            result = await _upload_screens(
+                self.config,
+                meta,
+                screens,
+                img_host_num,
+                i,
+                total_screens,
+                custom_img_list,
+                return_dict,
+                retry_mode=retry_mode,
+                max_retries=max_retries,
+                allowed_hosts=allowed_hosts,
+            )
+            outcome = "success" if result[1] > 0 else "error"
+            return result
+        finally:
+            record_event("api", service=service, operation="image_upload", outcome=outcome, duration_ms=(time.monotonic() - started) * 1000)
 
 
 async def upload_image_task(args: Sequence[Any]) -> dict[str, Any]:

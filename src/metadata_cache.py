@@ -10,6 +10,8 @@ import time
 from pathlib import Path
 from typing import Any
 
+from src.stats import configure_stats, record_event
+
 _VERSION = 1
 _LOCKS: dict[Path, asyncio.Lock] = {}
 _MISSING = object()
@@ -47,6 +49,7 @@ class MetadataCache:
 
     def __init__(self, base_dir: str | Path, config: dict[str, Any] | None = None) -> None:
         config = config or _default_config()
+        configure_stats(config)
         default = config.get("DEFAULT", config) if isinstance(config, dict) else {}
         default = default if isinstance(default, dict) else {}
         self.enabled = bool(default.get("metadata_cache_enabled", True))
@@ -91,16 +94,21 @@ class MetadataCache:
 
     async def get(self, provider: str, resource: str, key: str) -> Any:
         if not self.is_enabled(provider):
+            await asyncio.to_thread(record_event, "cache", service=provider, operation=resource, outcome="bypass")
             return _MISSING
         path = self._path(provider, resource, key)
+        outcome = "miss"
+        value = _MISSING
         try:
             raw = await asyncio.to_thread(path.read_text, encoding="utf-8")
             entry = json.loads(raw)
-            if not isinstance(entry, dict) or entry.get("version") != _VERSION or float(entry.get("expires_at", 0)) < time.time():
-                return _MISSING
-            return entry.get("value", _MISSING)
+            if isinstance(entry, dict) and entry.get("version") == _VERSION and float(entry.get("expires_at", 0)) >= time.time():
+                outcome = "hit"
+                value = entry.get("value", _MISSING)
         except OSError, ValueError, TypeError:
-            return _MISSING
+            pass
+        await asyncio.to_thread(record_event, "cache", service=provider, operation=resource, outcome=outcome)
+        return value
 
     async def set(self, provider: str, resource: str, key: str, value: Any, *, negative: bool = False) -> None:
         if not self.is_enabled(provider):
@@ -121,6 +129,14 @@ class MetadataCache:
                 temporary = path.with_suffix(f".tmp.{os.getpid()}")
                 await asyncio.to_thread(temporary.write_text, serialized, encoding="utf-8")
                 await asyncio.to_thread(temporary.replace, path)
+                await asyncio.to_thread(
+                    record_event,
+                    "cache",
+                    service=provider,
+                    operation=resource,
+                    outcome="write",
+                    bytes_count=len(serialized.encode("utf-8")),
+                )
             except OSError:
                 return
 
@@ -145,6 +161,7 @@ def tracker_metadata_cache_for(base_dir: str | Path, config: dict[str, Any]) -> 
     default = default_value if isinstance(default_value, dict) else {}
     cache_config = {
         "DEFAULT": {
+            "stats_enabled": default.get("stats_enabled", False),
             "metadata_cache_enabled": default.get("tracker_metadata_cache_enabled", True),
             "metadata_cache_dir": default.get("tracker_metadata_cache_dir", "data/cache/tracker_metadata"),
             "metadata_cache_default_ttl_hours": default.get("tracker_metadata_cache_ttl_hours", 24),

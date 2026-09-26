@@ -14,6 +14,8 @@ On the first run after upgrading, a legacy `data/config.py` in the checkout is *
 - On later starts, missing settings are added recursively from `data/example_config.py`. Existing values and custom keys are never replaced or removed. When settings are added, the previous file is retained beside it as a timestamped `config.py.backup-*` file.
 - Automatic updates require the `config` assignment to contain literal Python values. Configurations containing expressions continue to load normally, but are left unchanged with a warning because they cannot be migrated without executing user code.
 
+`DEFAULT.stats_enabled` controls collection of privacy-preserving daily aggregates for the Web UI Stats workspace. It defaults to `False`; setting it to `True` enables collection and display. Disabling it again hides existing statistics without deleting them.
+
 ## Config file shape
 
 The config is a Python dict named `config` with these top-level sections:

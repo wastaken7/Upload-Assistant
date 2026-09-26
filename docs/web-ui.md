@@ -13,6 +13,7 @@ For a minimal first run, see the [WebUI Quick Start](web-ui-basic.md). Docker an
 - [Monitoring and reviewing a run](#monitoring-and-reviewing-a-run)
 - [Configuration workspace](#configuration-workspace)
 - [Security and administration](#security-and-administration)
+- [Statistics](#statistics)
 - [Appearance, Help, and Changelog](#appearance-help-and-changelog)
 - [Mobile layout](#mobile-layout)
 - [Troubleshooting](#troubleshooting)
@@ -86,7 +87,7 @@ The sign-in and recovery pages use the color theme, light/dark mode, and corner 
 
 The desktop interface has three main areas:
 
-1. **Application rail:** switches between Upload and Configuration and opens Changelog, Help, Appearance, or Log out.
+1. **Application rail:** switches between Upload, Configuration, and Stats and opens Changelog, Help, Appearance, or Log out.
 2. **Workspace navigation:** File Browser on the Upload page or the settings navigation on the Configuration page.
 3. **Main workspace:** upload controls, execution output, configuration fields, or administration tools.
 
@@ -275,6 +276,16 @@ The blacklist takes precedence over the whitelist. Repeated failed API access at
 
 The local account, encrypted credentials, token metadata, 2FA state, IP controls, and access-log level are stored in `webui_auth.json`. Access events are written to `access_log.log` in the same application configuration directory. The generated `session_secret` is also stored there unless `SESSION_SECRET` or `SESSION_SECRET_FILE` overrides it.
 
+## Statistics
+
+Open **Stats** from the application workspace navigation to inspect local activity for the last 7, 30, or 90 days, or for the full recorded period. Real uploads and `--debug` simulations are stored and displayed separately.
+
+The dashboard includes upload success rates and destinations, media categories, torrents and NZBs created or reused, cache hit rates, logical external operations, transferred NNTP bytes when available, and CLI versus WebUI usage. Distribution sections can be switched between exact tables and local SVG donut charts; the preference is retained in the browser. A logical external operation represents one adapter action; redirects and internal retries do not create additional hits.
+
+Statistics are daily aggregates. Upload Assistant does not store release names, paths, external media IDs, URLs, or credentials in the statistics database. Collection begins when the feature is installed; existing cache files and logs are not scanned or backfilled, though later accesses to an existing cache count as new hits or misses.
+
+The database is stored at `data/stats.sqlite3` below the user-state directory. Collection is disabled by default; set `DEFAULT.stats_enabled` to `True` to opt in. While disabled, the dashboard is blocked and does not return or display previously collected aggregates. Stored aggregates remain intact and become visible again if collection is re-enabled. **Reset** remains available, requires typing `RESET`, and removes only statistics; it never removes cache entries, configuration, torrents, or NZBs.
+
 ## Appearance, Help, and Changelog
 
 ### Appearance
@@ -303,7 +314,7 @@ The changelog is derived from the normal Upload Assistant releases; WebUI change
 
 The same functions are reorganized for smaller screens:
 
-- Upload and Configuration are available in the compact workspace navigation.
+- Upload, Configuration, and Stats are available in the compact workspace navigation.
 - Files, Upload, and Arguments move to bottom navigation.
 - During a run, those destinations adapt to Progress, media information, Screenshots, and Description when available.
 - Help, Changelog, and Appearance open as viewport-sized dialogs with their own scrolling content.

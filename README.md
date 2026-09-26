@@ -104,6 +104,7 @@ Sequence Usenet and torrent tracker uploads while limiting contention with qBitt
 ### 8. Modern Web UI & Real-Time Engine
 
 - **Full Parity Web UI**: Modern interface providing full feature parity with CLI options (`--webui`).
+- **Private Local Statistics**: A dedicated Stats workspace tracks daily upload outcomes, cache efficiency, logical API operations, torrent/NZB creation, destinations, and categories without storing media names, paths, external IDs, URLs, or credentials.
 - **Real-Time Execution & Presets**: Live log streams, real-time preparation preview, preset saving, and interactive screenshot management.
 
 ## Supported Sites

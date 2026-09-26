@@ -3,6 +3,7 @@ import asyncio
 import copy
 import inspect
 import sys
+import time
 from collections.abc import Mapping
 from typing import Any, cast
 
@@ -14,6 +15,7 @@ from src.dupe_checking import DupeChecker
 from src.imdb import imdb_manager
 from src.meta import Meta
 from src.metadata_searching import get_douban_id
+from src.stats import record_event
 from src.trackers.AVISTAZ.routing import AvistaZNetworkRouter
 from src.trackers.GAZELLE.passthepopcorn import PassThePopcorn
 from src.trackersetup import TrackerSetup, tracker_class_map
@@ -191,14 +193,17 @@ class TrackerStatusManager:
                             local_meta.skipping = tracker_name
 
                         if not local_tracker_status["skipped"]:
+                            search_started = time.monotonic()
                             try:
                                 dupes: list[Any] = cast(list[Any], await tracker_class.search_existing(local_meta))
+                                record_event("api", service=tracker_name, operation="search", outcome="success", duration_ms=(time.monotonic() - search_started) * 1000)
                                 # set trackers here so that they are not double checked later with cross seeding
                                 async with meta_lock:
                                     meta.setdefault("dupe_checked_trackers", []).append(tracker_name)
                                 if local_meta["tracker_status"][tracker_name].get("other", False):
                                     local_tracker_status["other"] = True
                             except Exception as e:
+                                record_event("api", service=tracker_name, operation="search", outcome="error", duration_ms=(time.monotonic() - search_started) * 1000)
                                 logger.info(f"[bold red]Error searching for duplicates on {tracker_name}: {e}[/bold red]")
                                 if local_meta.get("unattended", False):
                                     local_tracker_status["skipped"] = True
@@ -232,12 +237,15 @@ class TrackerStatusManager:
                             local_meta.skipping = tracker_name
 
                         if not local_tracker_status["skipped"]:
+                            search_started = time.monotonic()
                             try:
                                 group_id = await ptp.get_group_by_imdb(local_meta["imdb"])
                                 async with meta_lock:
                                     meta.ptp_groupid = group_id
                                 dupes = cast(list[Any], await ptp.search_existing(group_id or "", cast(dict[str, Any], local_meta)))
+                                record_event("api", service=tracker_name, operation="search", outcome="success", duration_ms=(time.monotonic() - search_started) * 1000)
                             except Exception as e:
+                                record_event("api", service=tracker_name, operation="search", outcome="error", duration_ms=(time.monotonic() - search_started) * 1000)
                                 logger.info(f"[bold red]Error searching for duplicates on {tracker_name}: {e}[/bold red]")
                                 if local_meta.get("unattended", False):
                                     local_tracker_status["skipped"] = True

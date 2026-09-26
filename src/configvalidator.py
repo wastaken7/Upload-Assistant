@@ -150,6 +150,7 @@ DEFAULT_KEY_TYPES: dict[str, tuple[type, ...]] = {
     "qbit_bandwidth_time": (str, int),
     "music_enrichment_enabled": (bool,),
     "music_discogs_token": (str,),
+    "stats_enabled": (bool,),
     "metadata_cache_enabled": (bool,),
     "metadata_cache_dir": (str,),
     "metadata_cache_default_ttl_hours": (int,),

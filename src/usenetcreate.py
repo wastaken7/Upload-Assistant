@@ -9,6 +9,7 @@ import re
 import secrets
 import shutil
 import threading
+import time
 from pathlib import Path
 from typing import Any
 
@@ -20,6 +21,7 @@ from rich.progress import BarColumn, TaskID, TaskProgressColumn, TextColumn
 
 from src.console import console, logger, progress_display
 from src.meta import Meta
+from src.stats import record_event
 from src.webui_progress import complete_progress, has_progress_callback, publish_progress
 
 
@@ -1183,6 +1185,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
     if not pesto_season_upload:
         for path_to_check in [final_nzb_path, nzb_file]:
             if path_to_check and await is_valid_nzb(path_to_check):
+                record_event("artifact", service="nzb", operation="reused", outcome="success", category="single")
                 return path_to_check
     else:
         season_entries = discover_pesto_season_entries(Path(input_path))
@@ -1250,6 +1253,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
             meta.usenet_pack_nzb_path = str(reusable_pack_path)
             meta.usenet_nzb_paths.append(str(reusable_pack_path))
             logger.info("[cyan]Reusing the complete existing Pesto season NZB set; NNTP repost skipped.[/cyan]")
+            record_event("artifact", service="nzb", operation="reused", outcome="success", category="season", count=len(meta.usenet_nzb_paths))
             return reusable_pack_path
 
         # A previous season post may have completed every episode but failed
@@ -1284,9 +1288,12 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
             meta.usenet_pack_nzb_path = str(expected_pack_path)
             meta.usenet_nzb_paths.append(str(expected_pack_path))
             logger.info("[cyan]Rebuilt the missing season NZB from saved episode NZBs; NNTP repost skipped.[/cyan]")
+            record_event("artifact", service="nzb", operation="reused", outcome="success", category="episode", count=len(reusable_episode_paths))
+            record_event("artifact", service="nzb", operation="created", outcome="success", category="pack")
             return expected_pack_path
         except Exception as exc:
             logger.warning(f"[yellow]Could not rebuild the missing season NZB from saved episodes: {exc}. Continuing with episode NZBs.[/yellow]")
+            record_event("artifact", service="nzb", operation="reused", outcome="success", category="episode", count=len(reusable_episode_paths))
             return reusable_episode_paths[0]
         finally:
             with contextlib.suppress(Exception):
@@ -1644,10 +1651,14 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
             for debug_nzb in debug_nzbs:
                 async with aiofiles.open(debug_nzb, "w", encoding="utf-8") as f:
                     await f.write(mock_nzb_content)
+            record_event("api", service="pesto", operation="nntp_post", outcome="success", bytes_count=total_size)
         else:
+            post_started = time.monotonic()
             try:
                 await run_pesto_with_progress(cmd_pesto, cwd=str(upload_root), env=pesto_env)
+                record_event("api", service="pesto", operation="nntp_post", outcome="success", duration_ms=(time.monotonic() - post_started) * 1000, bytes_count=total_size)
             except Exception:
+                record_event("api", service="pesto", operation="nntp_post", outcome="error", duration_ms=(time.monotonic() - post_started) * 1000)
                 # pesto writes the NZB to --out before it knows the post-check
                 # verification failed, so a failed run can still leave a
                 # well-formed (but incomplete) .nzb behind. is_valid_nzb() only
@@ -1741,10 +1752,14 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
             logger.info(f"[yellow][DEBUG SIMULATION] Would run Nyuu upload: {' '.join(cmd_nyuu)}[/yellow]")
             async with aiofiles.open(nzb_file, "w", encoding="utf-8") as f:
                 await f.write(mock_nzb_content)
+            record_event("api", service="nyuu", operation="nntp_post", outcome="success", bytes_count=total_size)
         else:
+            post_started = time.monotonic()
             try:
                 await run_nyuu_with_progress(cmd_nyuu, cwd=str(upload_root))
+                record_event("api", service="nyuu", operation="nntp_post", outcome="success", duration_ms=(time.monotonic() - post_started) * 1000, bytes_count=total_size)
             except Exception:
+                record_event("api", service="nyuu", operation="nntp_post", outcome="error", duration_ms=(time.monotonic() - post_started) * 1000)
                 # nyuu writes the NZB progressively as files are posted, before
                 # the post-check verification (if enabled) confirms every article
                 # is actually retrievable on the server. A failed check (missing
@@ -1800,6 +1815,9 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
         with contextlib.suppress(Exception):
             if await aiofiles.ospath.exists(season_nzb_dir) and not any(season_nzb_dir.iterdir()):
                 await asyncio.to_thread(os.rmdir, season_nzb_dir)
+        for relocated_nzb in relocated_nzbs:
+            variant = "pack" if Path(relocated_nzb).name == expected_pack_name else "episode"
+            record_event("artifact", service="nzb", operation="created", outcome="success", category=variant)
         return Path(meta.usenet_pack_nzb_path or relocated_nzbs[0]) if relocated_nzbs else None
 
     if await aiofiles.ospath.exists(nzb_file):
@@ -1817,4 +1835,6 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
         if not is_debug and await aiofiles.ospath.exists(uuid_dir) and not [p.name for p in Path(uuid_dir).iterdir()]:
             await asyncio.to_thread(os.rmdir, uuid_dir)
 
+    if await is_valid_nzb(final_nzb_path):
+        record_event("artifact", service="nzb", operation="created", outcome="success", category="single")
     return final_nzb_path
