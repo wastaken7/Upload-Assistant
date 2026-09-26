@@ -824,7 +824,7 @@ function StatsApp() {
           </div>
           <div className="flex flex-wrap gap-2">
             <div
-              className="flex rounded-lg border p-1"
+              className="ua-theme-picker flex rounded-lg p-1"
               role="group"
               aria-label="Breakdown visualization"
             >

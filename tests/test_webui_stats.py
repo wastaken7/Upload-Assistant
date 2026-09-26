@@ -39,6 +39,7 @@ def test_stats_filters_use_theme_aware_selects():
     stats_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
 
     assert stats_app.count('className="ua-theme-picker rounded-lg px-3 py-2 text-sm"') >= 2
+    assert 'className="ua-theme-picker flex rounded-lg p-1"' in stats_app
 
 
 def test_config_and_stats_rails_use_the_canonical_icons():
