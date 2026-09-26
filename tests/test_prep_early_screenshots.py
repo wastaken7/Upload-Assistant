@@ -227,10 +227,7 @@ async def test_successful_screenshot_capture_preserves_unrelated_child(tmp_path:
             result = await screenshots("unused.mkv", "Release", release_id, str(tmp_path), meta, manual_frames=[100], cleanup_after_capture=False)
 
         assert len(result or []) == 1
-        for _ in range(100):
-            if unrelated.returncode is not None:
-                break
-            await asyncio.sleep(0.01)
+        await asyncio.sleep(0.05)
         assert unrelated.returncode is None, "successful screenshot capture terminated an unrelated child process"
     finally:
         if unrelated.returncode is None:
