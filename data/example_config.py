@@ -154,6 +154,8 @@ config: dict[str, Any] = {
             # Book, audiobook, and comic metadata. This data changes rarely,
             # so the default here is 30 days (720 hours).
             "google_books": {"enabled": True, "ttl_hours": 720},
+            # Audible catalog metadata and user rating counts change more often.
+            "audible": {"enabled": True, "ttl_hours": 24},
             # Work IDs, ISBNs, and author names from OpenLibrary.
             "openlibrary": {"enabled": True, "ttl_hours": 720},
             # Data fetched from a MAM account; a shorter duration reflects changes.
@@ -352,7 +354,8 @@ config: dict[str, Any] = {
         # Audible marketplace used to link ASINs in descriptions. Leave empty
         # unless you set your marketplace explicitly.
         # Examples: audible.com, audible.co.uk, audible.com.br.
-        # --audible-url overrides this value for an individual upload.
+        # --audible-url overrides this value for an individual upload. Audiobook
+        # catalog lookup requires this domain (or --audible-url) and an ASIN.
         "audible_domain": "",
         # Screenshot thumbnail width where supported. Default: 350 (for example, [img=350]).
         "thumbnail_size": "350",

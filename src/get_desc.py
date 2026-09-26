@@ -9,15 +9,16 @@ import urllib.parse
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, cast
-from urllib.parse import ParseResult
+from urllib.parse import ParseResult, urlsplit
 
 import aiofiles
 import httpx
 import langcodes
+from bs4 import BeautifulSoup, Comment, NavigableString, Tag
 from jinja2 import Template
 from langcodes.tag_parser import LanguageTagError
 
-from src.audible import resolve_audible_url
+from src.audible import build_audible_author_url, resolve_audible_url
 from src.bbcode import BBCODE
 from src.cogs.redaction import PathAwareEncoder
 from src.console import logger
@@ -141,6 +142,41 @@ def _clean_description_text(value: Any) -> str:
 
     # Handle partially escaped payloads as well (for example, ``\\"text\\"``).
     return text.replace(r"\"", '"').replace(r"\/", "/")
+
+
+def _book_overview_to_bbcode(value: str) -> str:
+    """Preserve useful HTML formatting in book synopses from any source."""
+    soup = BeautifulSoup(_clean_description_text(value), "html.parser")
+
+    def render(node: Any) -> str:
+        if isinstance(node, Comment):
+            return ""
+        if isinstance(node, NavigableString):
+            return str(node)
+        if not isinstance(node, Tag) or node.name in {"script", "style", "template", "img"}:
+            return ""
+        if node.name == "br":
+            return "\n"
+        content = "".join(render(child) for child in node.children)
+        inline_tags = {"b": "b", "strong": "b", "i": "i", "em": "i", "u": "u", "s": "s", "strike": "s", "del": "s"}
+        if node.name in inline_tags and content.strip():
+            tag = inline_tags[node.name]
+            return f"[{tag}]{content}[/{tag}]"
+        if node.name == "a":
+            href = _safe_game_url(node.get("href"))
+            return f"[url={href}]{content}[/url]" if href and content.strip() else content
+        if node.name == "li":
+            return f"* {content.strip()}\n"
+        if node.name in {"p", "div", "ul", "ol"}:
+            return f"{content.strip()}\n\n"
+        if node.name in {"h1", "h2", "h3", "h4", "h5", "h6"} and content.strip():
+            return f"[b]{content.strip()}[/b]\n\n"
+        if node.name == "blockquote" and content.strip():
+            return f"[quote]{content.strip()}[/quote]\n\n"
+        return content
+
+    converted = "".join(render(child) for child in soup.contents)
+    return re.sub(r"\n{3,}", "\n\n", converted).strip()
 
 
 def _safe_game_url(value: Any) -> str:
@@ -866,14 +902,32 @@ class DescriptionBuilder:
         str_year = labels["year"]
 
         if overview:
-            overview = html_to_bbcode(overview)
-            overview = re.sub(r"<[^>]+>", "", overview).strip()
-            overview = _clean_description_text(overview)
+            overview = _book_overview_to_bbcode(overview)
+
+        audible_url = ""
+        if asin:
+            with contextlib.suppress(ValueError):
+                audible_url = resolve_audible_url(
+                    asin,
+                    explicit_url=meta.audible_url,
+                    domain=self.config.get("DEFAULT", {}).get("audible_domain", ""),
+                )
 
         # Collect key-value pairs
         fields: list[tuple[str, str]] = []
         if author:
-            fields.append((str_author, author))
+            author_display = author
+            audible_authors = meta.audible_authors
+            author_names = [item["name"] for item in audible_authors if item.get("name")]
+            if meta.audiobook and audible_url and author_names and author in (author_names[0], ", ".join(author_names)):
+                try:
+                    domain = (urlsplit(audible_url).hostname or "").removeprefix("www.")
+                    author_display = ", ".join(
+                        f"[url={build_audible_author_url(item['asin'], domain)}]{item['name']}[/url]" if item.get("asin") else item["name"] for item in audible_authors
+                    )
+                except ValueError, KeyError:
+                    pass
+            fields.append((str_author, author_display))
         if book_translator:
             fields.append((str_book_translator, book_translator))
         if narrator:
@@ -887,17 +941,15 @@ class DescriptionBuilder:
             fields.append((str_isbn, isbn))
         if asin:
             asin_display = asin
-            try:
-                audible_url = resolve_audible_url(
-                    asin,
-                    explicit_url=meta.audible_url,
-                    domain=self.config.get("DEFAULT", {}).get("audible_domain", ""),
-                )
-                if audible_url:
-                    asin_display = f"[url={audible_url}]{asin}[/url]"
-            except ValueError:
-                pass
+            if audible_url:
+                asin_display = f"[url={audible_url}]{asin}[/url]"
             fields.append((str_asin, asin_display))
+        if meta.audiobook and meta.audible_rating_average is not None and meta.audible_rating_count:
+            score = f"{meta.audible_rating_average:.1f}"
+            if self.language == "pt-BR":
+                score = score.replace(".", ",")
+            rating_display = f"{score}/5 ({meta.audible_rating_count} {labels['audible_ratings']})"
+            fields.append((labels["audible_rating"], rating_display))
         if edition:
             fields.append((str_edition, edition))
         if year:

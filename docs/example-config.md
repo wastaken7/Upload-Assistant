@@ -95,7 +95,7 @@ Detailed documentation on how description layout settings work and affect descri
 - `add_logo` (bool): Add a TMDb logo image at the top of the description.
 - `logo_size` (str): Logo size (example default: `"300"`).
 - `logo_language` (str): ISO 639-1 language code for logo selection (fallback to English).
-- `audible_domain` (str): Optional Audible marketplace domain used to link audiobook ASINs, for example `audible.co.uk`. The per-upload `--audible-url` argument overrides it.
+- `audible_domain` (str): Optional Audible marketplace domain used to link and look up audiobook ASINs, for example `audible.com.br`. The per-upload `--audible-url` argument overrides it. Without either, Audible is not queried.
 - `episode_overview` (bool): Add episode overview text to description.
 
 Implementation notes:

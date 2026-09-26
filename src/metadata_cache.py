@@ -76,7 +76,8 @@ class MetadataCache:
         if negative:
             return self.negative_ttl
         settings = self._service_settings(provider)
-        resource_ttl = settings.get(f"{resource}_ttl_hours", settings.get("ttl_hours", self.default_ttl // 3600))
+        provider_default_hours = 24 if provider == "audible" else self.default_ttl // 3600
+        resource_ttl = settings.get(f"{resource}_ttl_hours", settings.get("ttl_hours", provider_default_hours))
         try:
             return max(0, int(resource_ttl)) * 3600
         except TypeError, ValueError:

@@ -3,6 +3,8 @@ from typing import Any
 BOOK_LABELS = {
     "en": {
         "author": "Author",
+        "audible_rating": "Audible Rating",
+        "audible_ratings": "ratings",
         "average_bitrate": "Average Bitrate",
         "book_translator": "Translator",
         "duration": "Duration",
@@ -16,6 +18,8 @@ BOOK_LABELS = {
     },
     "pt-BR": {
         "author": "Autor",
+        "audible_rating": "Avaliação na Audible",
+        "audible_ratings": "avaliações",
         "average_bitrate": "Bitrate Médio",
         "book_translator": "Tradutor",
         "duration": "Duração",

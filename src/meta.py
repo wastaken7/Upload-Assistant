@@ -53,6 +53,9 @@ class Meta:
     dynamic_hdr_plot: bool | None = None
     audio: str = ""
     audible_url: str = ""
+    audible_authors: list[dict[str, str]] = field(default_factory=list)
+    audible_rating_average: float | None = None
+    audible_rating_count: int | None = None
     audiobook_bitrate: int | None = None
     audiobook_duration_formatted: str | None = None
     audiobook_duration: float | None = None
