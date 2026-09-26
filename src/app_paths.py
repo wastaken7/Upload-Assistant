@@ -56,13 +56,18 @@ def ensure_data_dir() -> Path:
     return STATE_DIR
 
 
+def bundled_example_config_path() -> Path:
+    """Return the packaged example configuration used for new user settings."""
+    example_path = CODE_DIR / "data" / "example_config.py"
+    if not example_path.is_file():
+        example_path = CODE_DIR / "defaults" / "data" / "example_config.py"
+    return example_path
+
+
 def ensure_user_config() -> bool:
     """Create the user config from the bundled example without overwriting it."""
     ensure_data_dir()
     if CONFIG_PATH.exists():
         return False
-    example_path = CODE_DIR / "data" / "example_config.py"
-    if not example_path.is_file():
-        example_path = CODE_DIR / "defaults" / "data" / "example_config.py"
-    shutil.copy2(example_path, CONFIG_PATH)
+    shutil.copy2(bundled_example_config_path(), CONFIG_PATH)
     return True

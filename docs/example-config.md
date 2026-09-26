@@ -11,6 +11,8 @@ On the first run after upgrading, a legacy `data/config.py` in the checkout is *
 - The Web UI creates the user config from `data/example_config.py` on first start and continues to the configuration page.
 - The first CLI upload command creates the same file and stops. Edit the generated user-owned `config.py`, then run the command again.
 - Help commands such as `ua --help` do not create configuration files.
+- On later starts, missing settings are added recursively from `data/example_config.py`. Existing values and custom keys are never replaced or removed. When settings are added, the previous file is retained beside it as a timestamped `config.py.backup-*` file.
+- Automatic updates require the `config` assignment to contain literal Python values. Configurations containing expressions continue to load normally, but are left unchanged with a warning because they cannot be migrated without executing user code.
 
 ## Config file shape
 

@@ -7,7 +7,8 @@ import os
 import sys
 from pathlib import Path
 
-from src.app_paths import CONFIG_PATH, LegacyConfigLocationError, ensure_legacy_config_absent, ensure_user_config
+from src.app_paths import CONFIG_PATH, LegacyConfigLocationError, bundled_example_config_path, ensure_legacy_config_absent, ensure_user_config
+from src.config_sync import ConfigSyncError, sync_user_config
 
 _entrypoint_name = Path(sys.argv[0]).stem.lower()
 _is_uploader_entrypoint = __name__ == "__main__" or _entrypoint_name == "ua"
@@ -48,6 +49,15 @@ if _is_uploader_entrypoint:
         if not _is_webui_arg:
             print("Configure it before running an upload, then run the command again.")
             sys.exit(1)
+    else:
+        try:
+            _config_sync_result = sync_user_config(CONFIG_PATH, bundled_example_config_path())
+        except (ConfigSyncError, OSError) as exc:
+            print(f"Warning: configuration was not automatically updated: {exc}", file=sys.stderr)
+        else:
+            if _config_sync_result.changed:
+                print(f"Configuration updated with {len(_config_sync_result.added_paths)} new setting(s).")
+                print(f"Previous configuration backed up to: {_config_sync_result.backup_path}")
 
 import ast
 import asyncio
