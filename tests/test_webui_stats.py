@@ -86,8 +86,10 @@ def test_stats_tables_fit_their_panels_and_theme_required_scrollbars():
     theme_css = (server.CODE_DIR / "web_ui" / "static" / "css" / "theme.css").read_text(encoding="utf-8")
 
     assert 'className="ua-stats-table-scroll overflow-x-auto"' in stats_app
-    assert 'className="w-full text-left text-sm"' in stats_app
+    assert 'className="ua-stats-table w-full text-left text-sm"' in stats_app
     assert ".ua-stats-table-scroll::-webkit-scrollbar" in theme_css
+    assert ".ua-stats-table tbody tr:nth-child(even)" in theme_css
+    assert 'className="border-b last:border-0"' not in stats_app
 
 
 def test_stats_summary_cards_have_distinct_icons():

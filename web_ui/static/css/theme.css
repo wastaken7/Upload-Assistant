@@ -2294,6 +2294,45 @@ html.ua-upload-document #root {
   scrollbar-width: thin;
 }
 
+.ua-stats-table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.ua-stats-table thead {
+  background: color-mix(
+    in srgb,
+    var(--ua-config-surface) 72%,
+    var(--ua-config-surface-raised)
+  );
+  color: var(--ua-config-muted);
+}
+
+.ua-stats-table tbody tr {
+  background: color-mix(
+    in srgb,
+    var(--ua-config-surface) 55%,
+    var(--ua-config-surface-raised)
+  );
+  transition: background-color 120ms ease;
+}
+
+.ua-stats-table tbody tr:nth-child(even) {
+  background: color-mix(
+    in srgb,
+    var(--ua-config-muted) 8%,
+    var(--ua-config-surface-raised)
+  );
+}
+
+.ua-stats-table tbody tr:hover {
+  background: color-mix(
+    in srgb,
+    var(--ua-copper-bright) 9%,
+    var(--ua-config-surface-raised)
+  );
+}
+
 .ua-stats-table-scroll::-webkit-scrollbar {
   height: 6px;
 }

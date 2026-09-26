@@ -622,8 +622,8 @@ function Table({ headers, rows, empty = "No data in this period." }) {
     return <p className="py-5 text-center text-sm opacity-60">{empty}</p>;
   return (
     <div className="ua-stats-table-scroll overflow-x-auto">
-      <table className="w-full text-left text-sm">
-        <thead className="border-b text-xs uppercase opacity-60">
+      <table className="ua-stats-table w-full text-left text-sm">
+        <thead className="text-xs uppercase">
           <tr>
             {headers.map((header) => {
               const sortable = Boolean(header.key || header.sortValue);
@@ -667,7 +667,7 @@ function Table({ headers, rows, empty = "No data in this period." }) {
         </thead>
         <tbody>
           {sortedRows.map((row, index) => (
-            <tr className="border-b last:border-0" key={row.key || index}>
+            <tr key={row.key || index}>
               {headers.map((header) => (
                 <td className="px-2 py-2.5" key={header.label}>
                   {header.render ? header.render(row) : row[header.key]}
