@@ -185,8 +185,18 @@ async def test_mixed_tracker_reuse_preserves_generic_and_hdbits_limits(setup_rel
 @pytest.mark.asyncio
 async def test_mkbrr_gets_recommended_size_even_with_tracker_url(setup_release, monkeypatch):
     directory, meta, config = setup_release
-    with Path(meta.path).open("wb") as media:
-        media.truncate(8 * GIB + 1)
+    media_path = Path(meta.path)
+    original_stat = Path.stat
+
+    def stat_with_large_media_size(path, *args, **kwargs):
+        result = original_stat(path, *args, **kwargs)
+        if path == media_path:
+            values = list(result)
+            values[6] = 8 * GIB + 1
+            return type(result)(values)
+        return result
+
+    monkeypatch.setattr(Path, "stat", stat_with_large_media_size)
     meta.mkbrr = True
     monkeypatch.setattr(TorrentCreator, "get_mkbrr_path", lambda _: meta.path)
     commands = []

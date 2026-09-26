@@ -46,6 +46,8 @@ def test_kill_endpoint_stops_upload_controller_and_worker(monkeypatch) -> None:
     worker_pid = int(controller.stdout.readline().strip())
 
     try:
+        terminate_process_tree = server._terminate_process_tree
+        monkeypatch.setattr(server, "_terminate_process_tree", lambda process: terminate_process_tree(process, timeout=0.5))
         monkeypatch.setattr(server, "_get_bearer_from_header", lambda: None)
         monkeypatch.setattr(server, "_is_authenticated", lambda: True)
         monkeypatch.setattr(server, "_verify_csrf_header", lambda: True)
