@@ -5,6 +5,7 @@ the supported override for containers, portable installs, and test runs.
 """
 
 import os
+import shutil
 from pathlib import Path
 
 CODE_DIR = Path(__file__).resolve().parent.parent
@@ -53,3 +54,12 @@ def ensure_data_dir() -> Path:
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     return STATE_DIR
+
+
+def ensure_user_config() -> bool:
+    """Create the user config from the bundled example without overwriting it."""
+    ensure_data_dir()
+    if CONFIG_PATH.exists():
+        return False
+    shutil.copy2(CODE_DIR / "data" / "example_config.py", CONFIG_PATH)
+    return True

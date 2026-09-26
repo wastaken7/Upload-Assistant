@@ -228,7 +228,7 @@ These instructions cover Windows, Linux, and macOS.
    uv tool install upload-assistant
    ```
 
-`uv` creates an isolated environment and installs a compatible Python version (3.14 or newer) if needed. It makes the `ua` and `ua-config` commands available from any directory. If either command is not found, run `uv tool update-shell` and open a new terminal.
+`uv` creates an isolated environment and installs a compatible Python version (3.14 or newer) if needed. It makes the `ua` command available from any directory. If the command is not found, run `uv tool update-shell` and open a new terminal.
 
 **Linux and macOS:** Install FFmpeg through your system's package manager (for example, `sudo apt install ffmpeg` on Debian/Ubuntu, `sudo pacman -S ffmpeg` on Arch, `sudo dnf install ffmpeg` on Fedora, or `brew install ffmpeg` on macOS). See the [FFmpeg troubleshooting guide](docs/ffmpeg-max-workers-issues.md) if needed.
 
@@ -248,24 +248,18 @@ You need to add your API keys (like TMDb) and tracker credentials so the tool kn
 
 If you plan to use the Web UI, **your configuration file will be generated automatically** when you launch and configure it for the first time.
 
-#### Method B: Use the Interactive Generator
+#### Method B: Use the CLI
 
-Run `ua-config` in a terminal and follow the on-screen prompts:
+On the first CLI upload command, Upload Assistant creates `config.py` from the bundled example and stops so you can configure it. The file is created in:
 
-```bash
-ua-config
-```
+- **Windows:** `%LOCALAPPDATA%\Upload-Assistant\data`
+- **Linux / macOS:** `$XDG_DATA_HOME/Upload-Assistant/data` (normally `~/.local/share/Upload-Assistant/data`)
+- **Custom location:** `%UA_DATA_DIR%\data` (Windows Command Prompt), `$env:UA_DATA_DIR\data` (PowerShell), or `$UA_DATA_DIR/data` (Linux/macOS) when `UA_DATA_DIR` is set
 
-#### Method C: Manual Configuration
+Open the generated `config.py` in a text editor (like Notepad++, VS Code, or TextEdit) and fill in your information, then run the upload command again.
 
-1. Create the user-state `data` directory if it does not already exist:
-   - **Windows:** `%LOCALAPPDATA%\Upload-Assistant\data`
-   - **Linux / macOS:** `$XDG_DATA_HOME/Upload-Assistant/data` (normally `~/.local/share/Upload-Assistant/data`)
-   - **Custom location:** `%UA_DATA_DIR%\data` (Windows Command Prompt), `$env:UA_DATA_DIR\data` (PowerShell), or `$UA_DATA_DIR/data` (Linux/macOS) when `UA_DATA_DIR` is set
-2. Run `ua-config` to create `config.py` in the user-state directory.
-3. Open the user-state `config.py` in a text editor (like Notepad, VS Code, or TextEdit) and fill in your information.
-   - For detailed info on what each setting does, see [Example Config Docs](docs/example-config.md).
-   - Get a free TMDb API key from [TheMovieDB API settings](https://www.themoviedb.org/settings/api).
+- For detailed info on what each setting does, see [Example Config Docs](docs/example-config.md).
+- Get a free TMDb API key from [TheMovieDB API settings](https://www.themoviedb.org/settings/api).
 
 ---
 
@@ -277,7 +271,7 @@ ua-config
 
 ## **Updating:**
 
-Run `uv tool upgrade upload-assistant` to update the published installation. If you installed the development version from GitHub, run `uv tool install --force git+https://github.com/wastaken7/Upload-Assistant.git` to fetch it again. Run `ua-config` afterward to review any new settings.
+Run `uv tool upgrade upload-assistant` to update the published installation. If you installed the development version from GitHub, run `uv tool install --force git+https://github.com/wastaken7/Upload-Assistant.git` to fetch it again. Review [`data/example_config.py`](data/example_config.py) afterward for any new settings.
 
 ## **CLI Usage:**
 

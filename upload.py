@@ -7,7 +7,7 @@ import os
 import sys
 from pathlib import Path
 
-from src.app_paths import LegacyConfigLocationError, ensure_legacy_config_absent
+from src.app_paths import CONFIG_PATH, LegacyConfigLocationError, ensure_legacy_config_absent, ensure_user_config
 
 _entrypoint_name = Path(sys.argv[0]).stem.lower()
 _is_uploader_entrypoint = __name__ == "__main__" or _entrypoint_name == "ua"
@@ -35,6 +35,19 @@ if _is_uploader_entrypoint:
     except LegacyConfigLocationError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         sys.exit(1)
+
+    _is_webui_arg = any((arg == "-webui" or arg == "--webui" or arg.startswith("-webui=") or arg.startswith("--webui=")) for arg in sys.argv)
+    try:
+        _config_created = ensure_user_config()
+    except OSError as exc:
+        print(f"Failed to create configuration file: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+    if _config_created:
+        print(f"Configuration file created at: {CONFIG_PATH}")
+        if not _is_webui_arg:
+            print("Configure it before running an upload, then run the command again.")
+            sys.exit(1)
 
 import ast
 import asyncio
@@ -243,20 +256,6 @@ if Path(_defaults_data_dir).is_dir():
         logger.info("[yellow]  e.g. on the host: chown -R 1000:1000 /path/to/data[/yellow]")
 
 _config_path = Path(_data_dir) / "config.py"
-
-# Detect -webui or --webui forms, including --webui=host:port
-_is_webui_arg = any((arg == "-webui" or arg == "--webui" or arg.startswith("-webui=") or arg.startswith("--webui=")) for arg in sys.argv)
-# Auto-create config.py from example on first WebUI start
-if _is_webui_arg and not Path(_config_path).exists():
-    _example_config_path = Path(_data_dir) / "example_config.py"
-    if Path(_example_config_path).exists():
-        logger.info("No config.py found. Creating default config from example_config.py...", extra={"markup": False})
-        try:
-            shutil.copy2(_example_config_path, _config_path)
-            logger.info("Default config created successfully!", extra={"markup": False})
-        except Exception as e:
-            logger.info(f"Failed to create default config: {e}", extra={"markup": False})
-            logger.info("Continuing without config file...", extra={"markup": False})
 
 from src.book_prep import sanitize_book_author, sanitize_book_language
 from src.meta import Meta
@@ -3369,15 +3368,6 @@ def run() -> None:
             logger.info("[green]Shutdown complete[/green]")
 
         sys.exit(0)
-
-
-def run_config_generator() -> None:
-    import runpy
-    import sys
-
-    script_path = Path(__file__).with_name("config-generator.py")
-    sys.argv[0] = str(script_path)
-    runpy.run_path(str(script_path), run_name="__main__")
 
 
 if __name__ == "__main__":
