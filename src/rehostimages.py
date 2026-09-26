@@ -45,6 +45,15 @@ def _as_str(value: Any) -> str | None:
     return value if isinstance(value, str) else None
 
 
+def _deduplicate_image_records(images: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Return unique image records in their original order."""
+    unique_images: list[dict[str, Any]] = []
+    for image in images:
+        if image not in unique_images:
+            unique_images.append(image)
+    return unique_images
+
+
 def has_restricted_image_hosts(
     target_trackers: Iterable[str],
     tracker_class_map: Mapping[str, Any],
@@ -956,8 +965,7 @@ async def _handle_image_upload(
             except Exception:
                 existing_data = []
 
-            updated_data = existing_data + tracker_images
-            updated_data = [dict(s) for s in {tuple(d.items()) for d in updated_data}]
+            updated_data = _deduplicate_image_records(existing_data + tracker_images)
 
             if tracker == "covers" and "release_url" in meta:
                 for image in updated_data:
