@@ -300,6 +300,14 @@ def test_invalid_filters_are_rejected(tmp_path):
         stats.get_stats("7d", "combined", tmp_path)
 
 
+def test_one_year_range_contains_365_inclusive_days():
+    result = stats.get_empty_stats("1y", "real")
+
+    first_day = datetime.fromisoformat(result["period"]["from"]).date()
+    last_day = datetime.fromisoformat(result["period"]["to"]).date()
+    assert (last_day - first_day).days == 364
+
+
 @pytest.mark.asyncio
 async def test_metadata_cache_does_not_infer_api_calls_from_cache_activity(monkeypatch, tmp_path):
     monkeypatch.setattr(stats, "_database_path", lambda _state_dir=None: tmp_path / "data" / "stats.sqlite3")

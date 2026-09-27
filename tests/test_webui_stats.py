@@ -41,6 +41,16 @@ def test_stats_filters_use_theme_aware_selects():
     assert stats_app.count('className="ua-theme-picker rounded-lg px-3 py-2 text-sm"') >= 2
 
 
+def test_stats_period_selector_is_segmented_and_remembered():
+    stats_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
+
+    assert 'const STATS_PERIOD_KEY = "ua_stats_period"' in stats_app
+    assert '["1y", "1y"]' in stats_app
+    assert 'aria-label="Statistics period"' in stats_app
+    assert "aria-pressed={period === value}" in stats_app
+    assert "window.UAStorage.set(STATS_PERIOD_KEY, period)" in stats_app
+
+
 def test_config_and_stats_rails_use_the_canonical_icons():
     stats_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
     config_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "config_app.js").read_text(encoding="utf-8")
@@ -208,6 +218,14 @@ def test_stats_api_validates_filters(monkeypatch):
     response = server.app.test_client().get("/api/stats?range=invalid&mode=real")
     assert response.status_code == 400
     assert response.json["success"] is False
+
+
+def test_stats_api_accepts_one_year_range(monkeypatch):
+    _authenticated(monkeypatch)
+    response = server.app.test_client().get("/api/stats?range=1y&mode=real")
+
+    assert response.status_code == 200
+    assert response.json["range"] == "1y"
 
 
 def test_stats_reset_requires_exact_confirmation(monkeypatch):

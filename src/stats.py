@@ -19,6 +19,7 @@ from typing import Any, cast
 from src.app_paths import DATA_DIR
 
 _SCHEMA_VERSION = "1"
+_PERIOD_DAYS = {"7d": 7, "30d": 30, "90d": 90, "1y": 365}
 _DIMENSION_RE = re.compile(r"[^A-Za-z0-9_.:-]+")
 _mode: ContextVar[str] = ContextVar("ua_stats_mode", default="real")
 _category: ContextVar[str] = ContextVar("ua_stats_category", default="")
@@ -261,7 +262,7 @@ async def record_event_async(family: str, **kwargs: Any) -> None:
 
 
 def _range_start(period: str, today: datetime) -> str | None:
-    days = {"7d": 7, "30d": 30, "90d": 90}.get(period)
+    days = _PERIOD_DAYS.get(period)
     return (today.date() - timedelta(days=days - 1)).isoformat() if days else None
 
 
@@ -303,8 +304,8 @@ def _empty_payload(period: str, mode: str, generated_at: str) -> dict[str, Any]:
 
 def get_empty_stats(period: str = "30d", mode: str = "real") -> dict[str, Any]:
     """Return the stable response shape without reading stored aggregates."""
-    if period not in {"7d", "30d", "90d", "all"}:
-        raise ValueError("range must be one of: 7d, 30d, 90d, all")
+    if period not in {*_PERIOD_DAYS, "all"}:
+        raise ValueError("range must be one of: 7d, 30d, 90d, 1y, all")
     if mode not in {"real", "debug"}:
         raise ValueError("mode must be one of: real, debug")
     now = datetime.now(UTC)
@@ -338,7 +339,7 @@ def get_stats(period: str = "30d", mode: str = "real", state_dir: str | Path | N
                 (mode, heatmap_start),
             ).fetchall()
             prior_rows: list[tuple[str, str, str, int]] = []
-            days = {"7d": 7, "30d": 30, "90d": 90}.get(period)
+            days = _PERIOD_DAYS.get(period)
             if days:
                 current_start = now.date() - timedelta(days=days - 1)
                 prior_end = current_start - timedelta(days=1)

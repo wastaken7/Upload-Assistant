@@ -278,7 +278,7 @@ The local account, encrypted credentials, token metadata, 2FA state, IP controls
 
 ## Statistics
 
-Open **Stats** from the application workspace navigation to inspect local activity for the last 7, 30, or 90 days, or for the full recorded period. Real uploads and `--debug` simulations are stored and displayed separately.
+Open **Stats** from the application workspace navigation to inspect local activity for the last 7, 30, or 90 days, one year, or the full recorded period. The selected period is remembered in the current browser. Real uploads and `--debug` simulations are stored and displayed separately.
 
 The dashboard includes upload success rates and destinations, media categories and technical profiles, torrents and NZBs created or reused, cache hit rates, logical external operations, known payload bytes sent through NNTP and successful image uploads, and CLI versus WebUI usage. It also shows media volume uploaded per destination, average processed-item size, duplicate prevention, an estimate of hashing I/O avoided by reused base torrents, a 52-week activity heatmap, and comparisons with the previous equal-length period. Operations whose payload size is not measured display an em dash instead of a misleading zero. Distribution sections show local SVG donut charts with their exact sortable tables available in an expandable area directly below each chart. A logical external operation represents one adapter action; redirects and internal retries do not create additional hits.
 

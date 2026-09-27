@@ -1,5 +1,13 @@
 const { useEffect, useMemo, useRef, useState } = React;
 const APP_BASE = window.location.origin;
+const STATS_PERIOD_KEY = "ua_stats_period";
+const STATS_PERIODS = [
+  ["7d", "7d"],
+  ["30d", "30d"],
+  ["90d", "90d"],
+  ["1y", "1y"],
+  ["all", "All"],
+];
 const CHART_COLORS = [
   "#3b82f6",
   "#22c55e",
@@ -1080,7 +1088,10 @@ function Table({ headers, rows, empty = "No data in this period." }) {
 }
 
 function StatsApp() {
-  const [period, setPeriod] = useState("30d");
+  const [period, setPeriod] = useState(() => {
+    const stored = window.UAStorage.get(STATS_PERIOD_KEY);
+    return STATS_PERIODS.some(([value]) => value === stored) ? stored : "30d";
+  });
   const [mode, setMode] = useState("real");
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
@@ -1100,6 +1111,9 @@ function StatsApp() {
     window.UAStorage.set("ua_config_theme", isDarkMode ? "dark" : "light");
     document.documentElement.dataset.uaMode = isDarkMode ? "dark" : "light";
   }, [isDarkMode]);
+  useEffect(() => {
+    window.UAStorage.set(STATS_PERIOD_KEY, period);
+  }, [period]);
 
   const load = async (signal) => {
     setLoading(true);
@@ -1251,17 +1265,27 @@ function StatsApp() {
             <p className="mt-1 text-sm opacity-60">Local daily aggregates.</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <select
-              value={period}
-              onChange={(event) => setPeriod(event.target.value)}
-              className="ua-theme-picker rounded-lg px-3 py-2 text-sm"
+            <div
+              className="flex items-center gap-1"
+              role="group"
               aria-label="Statistics period"
             >
-              <option value="7d">7 days</option>
-              <option value="30d">30 days</option>
-              <option value="90d">90 days</option>
-              <option value="all">All time</option>
-            </select>
+              {STATS_PERIODS.map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setPeriod(value)}
+                  aria-pressed={period === value}
+                  className={`rounded-lg px-3 py-2 text-sm transition-colors ${
+                    period === value
+                      ? "bg-[var(--ua-config-surface-raised)] font-semibold shadow-sm"
+                      : "opacity-55 hover:opacity-100"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
             <select
               value={mode}
               onChange={(event) => setMode(event.target.value)}
