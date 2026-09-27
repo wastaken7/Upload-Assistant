@@ -459,12 +459,12 @@ function ExportMenu({ disabled, onCsv, onJson }) {
     callback();
   };
   return (
-    <div ref={menuRef} className="relative">
+    <div ref={menuRef} className="relative flex">
       <button
         type="button"
         disabled={disabled}
         onClick={() => setOpen((current) => !current)}
-        className="ua-theme-picker rounded-lg px-3 py-2 text-sm disabled:opacity-40"
+        className="ua-theme-picker h-full rounded-lg px-3 py-2 text-sm disabled:opacity-40"
         aria-haspopup="menu"
         aria-expanded={open}
       >

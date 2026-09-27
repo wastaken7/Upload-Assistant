@@ -146,6 +146,8 @@ def test_stats_ui_exposes_volume_profiles_comparisons_and_exports():
     assert "vs previous period" in stats_app
     assert "function ExportMenu" in stats_app
     assert 'aria-haspopup="menu"' in stats_app
+    assert 'ref={menuRef} className="relative flex"' in stats_app
+    assert 'className="ua-theme-picker h-full rounded-lg px-3 py-2 text-sm disabled:opacity-40"' in stats_app
     assert "CSV timeline" in stats_app
     assert "JSON details" in stats_app
     assert "ReliabilityBadge" in stats_app
