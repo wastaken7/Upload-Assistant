@@ -13,6 +13,18 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
 
+# These are user-selected instances or optional overrides, not a schema to
+# populate. Absence can mean "inherit" or "disabled", even for an existing
+# tracker/client. Keep the whole section untouched, including when absent.
+_USER_MANAGED_PATHS = frozenset(
+    {
+        ("TRACKERS",),
+        ("TORRENT_CLIENTS",),
+        ("DEFAULT", "metadata_cache_services"),
+        ("DEFAULT", "tag_overrides"),
+    }
+)
+
 
 class ConfigSyncError(RuntimeError):
     """Raised when a configuration cannot be synchronized safely."""
@@ -95,7 +107,19 @@ def _collect_additions(
 ) -> list[_Addition]:
     additions: list[_Addition] = []
     for key, template_value in template.items():
+        path = (*parent_path, key)
+        if path in _USER_MANAGED_PATHS:
+            continue
+        # Inserting these example values would defeat existing runtime
+        # compatibility fallbacks, despite preserving every explicit value.
+        if path == ("DEFAULT", "embed_links") and "embed_dupe_links" in user:
+            continue
+        if path == ("USENET", "pesto_obfuscation_mode"):
+            continue
         if key not in user:
+            if isinstance(template_value, Mapping):
+                # Apply the same policy when inserting an entire section.
+                template_value = {addition.key: addition.value for addition in _collect_additions(template_value, {}, path)}
             additions.append(_Addition(parent_path, key, template_value))
             continue
         user_value = user[key]
@@ -253,8 +277,11 @@ def _sync_lock(config_path: Path, timeout: float = 10.0) -> Iterator[None]:
 
 
 def sync_user_config(config_path: Path, example_path: Path) -> ConfigSyncResult:
-    """Add missing example keys to an existing config without changing user values.
+    """Add missing general defaults while preserving user-managed overrides.
 
+    Tracker/client configurations, cache-service and tag overrides are never
+    populated from examples. Omitted keys in those sections are intentional.
+    Known legacy fallbacks are also left intact.
     A timestamped backup is created only when the configuration changes. The
     replacement is validated and written atomically in the same directory.
     Repeated calls are idempotent.
