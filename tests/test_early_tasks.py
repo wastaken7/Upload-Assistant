@@ -142,7 +142,7 @@ def test_early_torrent_task_refreshes_layouts_after_reuse(monkeypatch, tmp_path)
         def default_path(_self, layout="base"):
             return layouts[layout]
 
-        async def register_reuse(_path, _base_dir, _uuid):
+        async def register_reuse(_path, _base_dir, _uuid, _source_size):
             layouts["base_subs"] = reusable
             return str(reusable)
 

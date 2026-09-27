@@ -1168,6 +1168,17 @@ const ChangelogIcon = () => (
   </svg>
 );
 
+const StatsIcon = () => (
+  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M4 19V9m6 10V5m6 14v-7m4 7H2"
+    />
+  </svg>
+);
+
 const UploadRailIcon = () => (
   <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
     <path
@@ -1199,6 +1210,7 @@ const WorkspaceSwitcher = ({
   const workspaces = [
     { id: "upload", label: "Upload", href: `${appBase}/` },
     { id: "config", label: "Configuration", href: `${appBase}/config` },
+    { id: "stats", label: "Stats", href: `${appBase}/stats` },
   ];
 
   return (
@@ -1249,6 +1261,12 @@ const ApplicationRail = ({
       label: "Config",
       href: `${appBase}/config`,
       icon: <SettingsIcon />,
+    },
+    {
+      id: "stats",
+      label: "Stats",
+      href: `${appBase}/stats`,
+      icon: <StatsIcon />,
     },
   ];
 
