@@ -2275,6 +2275,171 @@ html.ua-upload-document #root {
   color: var(--ua-config-text);
 }
 
+.ua-stats-summary-card,
+.ua-stats-panel {
+  background: var(--ua-config-surface-raised);
+}
+
+.ua-stats-disabled-notice {
+  background: color-mix(
+    in srgb,
+    var(--ua-config-surface-raised) 92%,
+    var(--ua-copper)
+  );
+}
+
+.ua-stats-chart-tooltip,
+.ua-stats-inset {
+  background: var(--ua-config-surface);
+  color: var(--ua-config-text);
+}
+
+.ua-stats-export-menu {
+  background: var(--ua-config-surface-raised);
+  border: 1px solid var(--ua-config-border);
+  color: var(--ua-config-text);
+}
+
+.ua-stats-export-menu button:hover,
+.ua-stats-export-menu button:focus-visible {
+  background: color-mix(
+    in srgb,
+    var(--ua-copper-bright) 12%,
+    var(--ua-config-surface-raised)
+  );
+  outline: none;
+}
+
+.ua-stats-heatmap {
+  --ua-stats-heatmap-empty: color-mix(
+    in srgb,
+    var(--ua-config-muted) 16%,
+    var(--ua-config-surface-raised)
+  );
+}
+
+.ua-stats-chart-tooltip {
+  border: 1px solid var(--ua-config-border);
+}
+
+.ua-stats-series-active {
+  background: color-mix(
+    in srgb,
+    var(--ua-copper-bright) 14%,
+    var(--ua-config-surface-raised)
+  );
+}
+
+.ua-stats-table-details > summary {
+  background: color-mix(
+    in srgb,
+    var(--ua-config-muted) 8%,
+    var(--ua-config-surface-raised)
+  );
+  color: var(--ua-config-text);
+}
+
+.ua-stats-table-details > summary:hover,
+.ua-stats-table-details > summary:focus-visible {
+  background: color-mix(
+    in srgb,
+    var(--ua-copper-bright) 10%,
+    var(--ua-config-surface-raised)
+  );
+  outline: none;
+}
+
+.ua-stats-table-details[open] .ua-stats-table-details-arrow {
+  transform: rotate(180deg);
+}
+
+.ua-stats-health {
+  font-weight: 600;
+}
+
+.ua-stats-health-good {
+  background: color-mix(in srgb, #22c55e 18%, transparent);
+  color: #22c55e;
+}
+
+.ua-stats-health-watch {
+  background: color-mix(in srgb, #f59e0b 18%, transparent);
+  color: #d97706;
+}
+
+.ua-stats-health-poor {
+  background: color-mix(in srgb, #ef4444 18%, transparent);
+  color: #ef4444;
+}
+
+.ua-stats-table-scroll {
+  scrollbar-color: color-mix(in srgb, var(--ua-config-muted) 55%, transparent)
+    transparent;
+  scrollbar-width: thin;
+}
+
+.ua-stats-table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.ua-stats-table thead {
+  background: color-mix(
+    in srgb,
+    var(--ua-config-surface) 72%,
+    var(--ua-config-surface-raised)
+  );
+  color: var(--ua-config-muted);
+}
+
+.ua-stats-table tbody tr {
+  background: color-mix(
+    in srgb,
+    var(--ua-config-surface) 55%,
+    var(--ua-config-surface-raised)
+  );
+  transition: background-color 120ms ease;
+}
+
+.ua-stats-table tbody tr:nth-child(even) {
+  background: color-mix(
+    in srgb,
+    var(--ua-config-muted) 8%,
+    var(--ua-config-surface-raised)
+  );
+}
+
+.ua-stats-table tbody tr:hover {
+  background: color-mix(
+    in srgb,
+    var(--ua-copper-bright) 9%,
+    var(--ua-config-surface-raised)
+  );
+}
+
+.ua-stats-table-scroll::-webkit-scrollbar {
+  height: 6px;
+}
+
+.ua-stats-table-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.ua-stats-table-scroll::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--ua-config-muted) 55%, transparent);
+  border-radius: 999px;
+}
+
+.ua-stats-table-scroll::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--ua-copper-bright) 70%, transparent);
+}
+
+.ua-stats-table-scroll::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
 .ua-config-sidebar,
 .ua-config-header {
   background: var(--ua-config-surface);
