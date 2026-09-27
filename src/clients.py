@@ -264,7 +264,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
         original_client = meta.client
         try:
             for client_name in client_names:
-                if client_name not in self.config["TORRENT_CLIENTS"]:
+                if client_name not in self.config.get("TORRENT_CLIENTS", {}):
                     logger.info(f"[yellow]Client '{client_name}' not found in TORRENT_CLIENTS config, skipping...")
                     continue
                 meta.client = client_name
