@@ -143,6 +143,9 @@ const DESCRIPTION_HELP_OVERRIDES = {
 };
 
 const getConfigHelpText = (item, pathParts) => {
+  if (pathParts[0] === "TRACKERS" && item.key === "cli_alias") {
+    return "Optional, case-insensitive shorthand for -tk or --trackers. The full tracker code still works. Use a unique alias without spaces or commas.";
+  }
   if (
     ["DEFAULT", "TRACKERS"].includes(pathParts[0]) &&
     Object.hasOwn(DESCRIPTION_HELP_OVERRIDES, item.key)
@@ -162,7 +165,11 @@ const getConfigHelpText = (item, pathParts) => {
     : text;
 };
 
-const TRACKER_HELP_NOTE_KEYS = new Set(["announce_url", "link_dir_name"]);
+const TRACKER_HELP_NOTE_KEYS = new Set([
+  "announce_url",
+  "cli_alias",
+  "link_dir_name",
+]);
 
 const renderAnnounceUrlHelpText = (text) =>
   text.split(/(See:\s+https?:\/\/\S+)/i).map((part, index) => {
@@ -1223,6 +1230,7 @@ const formatConfigFieldLabel = (key, pathParts = []) => {
   }
   if (pathParts.includes("TRACKERS")) {
     const trackerFieldLabels = {
+      cli_alias: "CLI Alias",
       ApiUser: "API User",
       api_key: "API Key",
       api_url: "API URL",
@@ -5474,20 +5482,14 @@ function TrackerDefaultOverrides({
   const drafts = React.useContext(OverrideDraftContext);
   const defaults = React.useContext(TrackerDefaultValuesContext);
   const [isOpen, setIsOpen] = useState(false);
-  const fieldState = (item) => {
-    const path = [...pathParts, item.key];
-    const pathKey = path.join("/");
-    const pending = pendingChanges?.get(pathKey);
-    const stored = item.source === "config";
-    return {
-      path,
-      pathKey,
-      stored,
-      enabled: pending ? !pending.removeKey : stored,
-      value: pending && !pending.removeKey ? pending.value : item.value,
-      inherited: defaults[item.key] ?? item.example_value ?? "",
-    };
-  };
+  const { fieldState, updateField, coerceFieldValue, setFieldEnabled } =
+    window.UATrackerDefaultOverrides.createEditor({
+      pathParts,
+      defaults,
+      pendingChanges,
+      drafts: drafts.current,
+      onValueChange,
+    });
   const activeCount = items.filter((item) => fieldState(item).enabled).length;
   const groups = [
     {
@@ -5529,40 +5531,6 @@ function TrackerDefaultOverrides({
     },
   ];
   const itemByKey = new Map(items.map((item) => [item.key, item]));
-  const updateField = (item, value, removeKey = false) => {
-    const state = fieldState(item);
-    onValueChange(state.path, value, {
-      originalValue: state.stored ? item.value : undefined,
-      removeKey,
-      isSensitive: false,
-      isRedacted: false,
-      readOnly: false,
-    });
-  };
-  const coerceFieldValue = (item, value) => {
-    const valueType = typeof (item.example_value ?? item.value);
-    return valueType === "boolean"
-      ? value === true || value === "true" || value === "True"
-      : valueType === "number"
-        ? Number(value)
-        : value;
-  };
-  const setFieldEnabled = (item, enabled) => {
-    const state = fieldState(item);
-    if (state.enabled === enabled) return;
-    if (enabled) {
-      updateField(
-        item,
-        coerceFieldValue(
-          item,
-          drafts.current.get(state.pathKey) ?? state.inherited,
-        ),
-      );
-    } else {
-      drafts.current.set(state.pathKey, state.value);
-      updateField(item, state.stored ? item.value : undefined, state.stored);
-    }
-  };
 
   return (
     <section
@@ -5806,7 +5774,7 @@ function TrackerSettings({
     {
       id: "advanced",
       title: "Advanced",
-      keys: ["link_dir_name", "channel", "trackers"],
+      keys: ["cli_alias", "link_dir_name", "channel", "trackers"],
     },
   ];
   const groupedKeys = new Set(groupDefinitions.flatMap((group) => group.keys));
@@ -6142,6 +6110,15 @@ function TrackerManager({
     return String(
       pendingTrackerValues.get(name)?.get("api_key") ?? saved ?? "",
     ).trim();
+  };
+  const trackerCliAliases = (tracker) => {
+    const name = String(tracker.name).toUpperCase();
+    const saved = trackerItemByName
+      .get(name)
+      ?.children?.find((item) => item.key === "cli_alias")?.value;
+    // Keep the saved alias searchable while editing so its open card stays
+    // visible. After saving, the refreshed config supplies only the new alias.
+    return [saved, pendingTrackerValues.get(name)?.get("cli_alias")];
   };
   const trackerExpiry = (tracker) => {
     const name = String(tracker.name).toUpperCase();
@@ -6737,6 +6714,7 @@ function TrackerManager({
         [
           tracker.name,
           tracker.display_name,
+          ...trackerCliAliases(tracker),
           tracker.base_url,
           getTrackerCategories(tracker)
             .map((category) => category.label)
@@ -6839,7 +6817,7 @@ function TrackerManager({
               type="search"
               value={trackerQuery}
               onChange={(event) => setTrackerQuery(event.target.value)}
-              placeholder="Search by tracker name or acronym..."
+              placeholder="Search by tracker name, code or CLI alias..."
               className="ua-config-input w-full rounded-lg border px-3 py-2"
             />
           </div>
@@ -11615,7 +11593,7 @@ function ConfigApp() {
             body: JSON.stringify({ old_name: oldName, new_name: newName }),
           },
         );
-        const data = await response.json();
+        const data = await window.UAConfigSave.readResponse(response);
         if (!data.success) {
           throw new Error(data.error || "Failed to rename torrent client");
         }
@@ -11629,7 +11607,7 @@ function ConfigApp() {
             body: JSON.stringify({ name: clientName, template: templateName }),
           },
         );
-        const data = await response.json();
+        const data = await window.UAConfigSave.readResponse(response);
         if (!data.success && response.status !== 409) {
           throw new Error(data.error || "Failed to add torrent client");
         }
@@ -11671,35 +11649,16 @@ function ConfigApp() {
         }
       }
 
-      // Create missing subsections in the user's config (as empty dicts)
-      for (const createPath of toCreate) {
-        const respCreate = await apiFetch(`${API_BASE}/config_update`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ path: createPath, value: "{}" }),
-        });
-        const dataCreate = await respCreate.json();
-        if (!dataCreate.success) {
-          throw new Error(dataCreate.error || "Failed to create subsection");
-        }
-      }
-
-      // Now save the actual pending updates
-      for (const update of pending) {
-        const response = await apiFetch(`${API_BASE}/config_update`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            path: update.path,
-            value: update.value,
-            remove: Boolean(update.removeKey),
-          }),
-        });
-        const data = await response.json();
-        if (!data.success) {
-          throw new Error(data.error || "Failed to save");
-        }
-      }
+      // Stage subsection creation and field edits together. One Save Config
+      // action uses one update request, regardless of the number of fields.
+      await window.UAConfigSave.saveUpdates(apiFetch, API_BASE, [
+        ...toCreate.map((path) => ({ path, value: "{}" })),
+        ...pending.map((update) => ({
+          path: update.path,
+          value: update.value,
+          remove: Boolean(update.removeKey),
+        })),
+      ]);
 
       for (const clientName of pendingRemovedTorrentClients) {
         const response = await apiFetch(
@@ -11712,7 +11671,7 @@ function ConfigApp() {
             }),
           },
         );
-        const data = await response.json();
+        const data = await window.UAConfigSave.readResponse(response);
         if (!data.success) {
           throw new Error(data.error || "Failed to remove torrent client");
         }
@@ -11728,7 +11687,7 @@ function ConfigApp() {
             }),
           },
         );
-        const data = await response.json();
+        const data = await window.UAConfigSave.readResponse(response);
         if (!data.success) {
           throw new Error(
             data.error || "Failed to remove tracker configuration",
@@ -11929,7 +11888,7 @@ function ConfigApp() {
       if (
         path[0] === "TRACKERS" &&
         trackerDefaultOverrideKeys.has(key) &&
-        update.removeKey
+        (update.removeKey || update.value === null)
       ) {
         return "Inherit from DEFAULT";
       }

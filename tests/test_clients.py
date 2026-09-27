@@ -3,6 +3,8 @@
 import asyncio
 from unittest.mock import patch
 
+import pytest
+
 from src import configvalidator
 from src.clients import Clients
 from src.configvalidator import DEFAULT_KEY_TYPES, validate_config
@@ -24,6 +26,19 @@ def test_empty_inject_delay_is_a_no_op() -> None:
         asyncio.run(exercise())
 
     assert sleep_calls == 0
+
+
+@pytest.mark.parametrize("tracker_settings,expected", [({}, [3]), ({"inject_delay": None}, [3]), ({"inject_delay": 0}, []), ({"inject_delay": 2}, [2])])
+def test_inject_delay_inherits_only_when_unset_or_none(tracker_settings, expected) -> None:
+    sleep_calls = []
+
+    async def fake_sleep(seconds: float) -> None:
+        sleep_calls.append(seconds)
+
+    clients = Clients({"DEFAULT": {"inject_delay": 3}, "TRACKERS": {"TEST": tracker_settings}})
+    with patch("src.clients.asyncio.sleep", new=fake_sleep):
+        asyncio.run(clients.inject_delay(Meta(), "TEST", "qbit"))
+    assert sleep_calls == expected
 
 
 def test_config_validator_declares_image_upload_types() -> None:

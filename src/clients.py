@@ -227,7 +227,8 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
         synchronization and more reliable peer discovery.
         """
         tracker_cfg = self.config.get("TRACKERS", {}).get(tracker, {})
-        has_tracker_delay = isinstance(tracker_cfg, dict) and "inject_delay" in tracker_cfg
+        # None retains the setting while inheriting DEFAULT; 0 still disables it.
+        has_tracker_delay = isinstance(tracker_cfg, dict) and tracker_cfg.get("inject_delay") is not None
         inject_delay = tracker_cfg.get("inject_delay") if has_tracker_delay else self.config["DEFAULT"].get("inject_delay", 0)
         if inject_delay is None or (isinstance(inject_delay, str) and not inject_delay.strip()):
             return
