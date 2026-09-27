@@ -135,10 +135,12 @@ async def test_media_profile_records_category_appropriate_dimensions(monkeypatch
     meta = Meta(
         category="MOVIE",
         resolution="2160p",
-        type="REMUX",
+        type="WEBDL",
         video_codec="HEVC",
         audio="TrueHD Atmos 7.1",
         hdr="DV HDR",
+        service="NF",
+        service_longname="Netflix",
         source_size=85_000,
     )
 
@@ -148,12 +150,57 @@ async def test_media_profile_records_category_appropriate_dimensions(monkeypatch
     assert result["media"]["categories"] == ["MOVIE"]
     assert {(row["dimension"], row["value"]) for row in result["media"]["dimensions"]} == {
         ("resolution", "2160p"),
-        ("release_type", "REMUX"),
+        ("release_type", "WEBDL"),
         ("video_codec", "HEVC"),
         ("audio_codec", "Dolby_Atmos"),
         ("hdr", "Dolby_Vision"),
+        ("streaming_service", "Netflix"),
     }
     assert all(row["bytes"] == 85_000 for row in result["media"]["dimensions"])
+    assert result["streaming"]["services"] == [
+        {"service": "Netflix", "items": 1, "bytes": 85_000, "average_item_bytes": 85_000}
+    ]
+
+
+def test_web_media_without_a_service_is_grouped_as_unknown():
+    dimensions = stats.media_profile_dimensions(Meta(category="TV", type="WEBRIP"))
+
+    assert ("streaming_service", "Unknown") in dimensions
+    assert ("streaming_service", "Unknown") not in stats.media_profile_dimensions(Meta(category="MOVIE", type="REMUX"))
+
+
+@pytest.mark.asyncio
+async def test_release_profiles_aggregate_personal_results_without_group_names(monkeypatch, tmp_path):
+    monkeypatch.setattr(stats, "_database_path", lambda _state_dir=None: tmp_path / "data" / "stats.sqlite3")
+    personal = Meta(category="MOVIE", personalrelease=True, tag="-FICTIONALGROUP", source_size=75_000)
+    standard = Meta(category="TV", personalrelease=False, source_size=25_000)
+
+    await stats.record_release_profile_async(personal, "success")
+    await stats.record_release_profile_async(standard, "error")
+    result = stats.get_stats("all", "real", tmp_path)
+
+    assert result["release_profiles"]["profiles"] == [
+        {
+            "profile": "personal",
+            "items": 1,
+            "successes": 1,
+            "without_upload": 0,
+            "errors": 0,
+            "bytes": 75_000,
+            "success_rate": 100.0,
+        },
+        {
+            "profile": "standard",
+            "items": 1,
+            "successes": 0,
+            "without_upload": 0,
+            "errors": 1,
+            "bytes": 25_000,
+            "success_rate": 0.0,
+        },
+    ]
+    assert result["release_profiles"]["by_category"][0]["category"] == "MOVIE"
+    assert b"FICTIONALGROUP" not in (tmp_path / "data" / "stats.sqlite3").read_bytes()
 
 
 def test_reused_torrent_reports_media_volume_as_hashing_io_avoided(tmp_path):
@@ -326,6 +373,8 @@ def test_one_year_range_contains_365_inclusive_days():
     first_day = datetime.fromisoformat(result["period"]["from"]).date()
     last_day = datetime.fromisoformat(result["period"]["to"]).date()
     assert (last_day - first_day).days == 364
+    assert result["streaming"] == {"services": []}
+    assert result["release_profiles"] == {"profiles": [], "by_category": []}
 
 
 @pytest.mark.asyncio

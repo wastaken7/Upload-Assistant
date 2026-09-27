@@ -2151,7 +2151,7 @@ def load_heavy_globals() -> None:
 
 async def do_the_thing(base_dir: str) -> None:
     from src.api_key_expiry import reset_api_key_expiry_warnings
-    from src.stats import completed_item_outcome, configure_stats, record_event_async, record_media_profile_async, set_stats_context
+    from src.stats import completed_item_outcome, configure_stats, record_event_async, record_media_profile_async, record_release_profile_async, set_stats_context
 
     reset_api_key_expiry_warnings()
     load_heavy_globals()
@@ -2532,6 +2532,7 @@ async def do_the_thing(base_dir: str) -> None:
             if not meta_success:
                 set_stats_context(debug=bool(meta.debug), category=str(meta.category or ""))
                 await record_event_async("item", operation="completed", outcome="error")
+                await record_release_profile_async(meta, "error")
                 if "queue" in meta and meta.queue is not None:
                     processed_files_count += 1
                     skipped_files_count += 1
@@ -2970,6 +2971,7 @@ async def do_the_thing(base_dir: str) -> None:
             item_outcome = completed_item_outcome(completed_statuses)
             item_bytes = max(0, int(meta.source_size or 0))
             await record_event_async("item", operation="completed", outcome=item_outcome, bytes_count=item_bytes)
+            await record_release_profile_async(meta, item_outcome)
             await record_media_profile_async(meta)
             await write_meta_file(meta)
             _publish_webui_preview_target(cast(str, meta.path or ""), meta.uuid or None)

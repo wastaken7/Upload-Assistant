@@ -51,13 +51,20 @@ def test_stats_period_selector_is_segmented_and_remembered():
     assert "window.UAStorage.set(STATS_PERIOD_KEY, period)" in stats_app
 
 
-def test_config_and_stats_rails_use_the_canonical_icons():
+def test_application_rails_use_the_supplied_icons():
+    upload_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "app.js").read_text(encoding="utf-8")
     stats_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
     config_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "config_app.js").read_text(encoding="utf-8")
 
-    assert 'name="settings"' in stats_app
+    icon_names = ("upload", "config", "stats", "changelog", "help", "logout")
+    for icon_name in icon_names:
+        assert f'name="{icon_name}"' in upload_app
+        assert f'name="{icon_name}"' in config_app
+        assert (server.CODE_DIR / "web_ui" / "static" / "img" / "webui-icons" / f"{icon_name}.svg").is_file()
+
+    assert "<AssetIcon name={id} />" in stats_app
+    assert all(f'name="{icon_name}"' in stats_app for icon_name in ("changelog", "help", "logout"))
     assert 'name="palette"' in stats_app
-    assert 'name="settings"' in config_app
     assert 'name="palette"' in config_app
 
 
@@ -66,7 +73,7 @@ def test_stats_combines_charts_with_expandable_tables():
 
     assert "function DonutChart" in stats_app
     assert "const ChartWithTable" in stats_app
-    assert stats_app.count("<ChartWithTable") == 7
+    assert stats_app.count("<ChartWithTable") == 9
     assert 'className="ua-stats-table-details mt-5"' in stats_app
     assert 'aria-label="Show or hide data table"' in stats_app
     assert 'className="ml-auto flex h-9 w-9 cursor-pointer' in stats_app
@@ -103,6 +110,19 @@ def test_external_operation_bytes_distinguish_unknown_from_zero():
     assert 'label: "Bytes sent"' in stats_app
     assert 'r.bytes > 0 ? formatBytes(r.bytes) : "—"' in stats_app
     assert "Bytes sent are available for NNTP and successful image uploads." in stats_app
+
+
+def test_stats_operations_use_friendly_labels_with_a_readable_fallback():
+    stats_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
+
+    assert 'torrent_client_add: "Add to torrent client"' in stats_app
+    assert 'torrent_client_search: "Search torrent client"' in stats_app
+    assert 'credential_sync: "Sync credentials"' in stats_app
+    assert 'nntp_post: "Post to Usenet"' in stats_app
+    assert 'image_upload: "Upload images"' in stats_app
+    assert "const formatOperation" in stats_app
+    assert '.replaceAll("_", " ")' in stats_app
+    assert stats_app.count("render: (row) => formatOperation(row.operation)") == 2
 
 
 def test_stats_tables_fit_their_panels_and_theme_required_scrollbars():
@@ -145,6 +165,8 @@ def test_stats_summary_cards_have_distinct_icons():
         "activity-heatmap",
         "media-profile",
         "unique-data-uploaded",
+        "streaming-services",
+        "personal-releases",
     )
     icon_dir = server.CODE_DIR / "web_ui" / "static" / "img" / "stats-icons"
     for icon in icons:
@@ -171,6 +193,11 @@ def test_stats_ui_exposes_volume_profiles_comparisons_and_exports():
     assert "CSV timeline" in stats_app
     assert "JSON details" in stats_app
     assert "ReliabilityBadge" in stats_app
+    assert 'title="Streaming services"' in stats_app
+    assert 'title="Personal releases"' in stats_app
+    assert "function StreamingServices" in stats_app
+    assert "function ReleaseProfiles" in stats_app
+    assert "release groups and tags are never stored" in stats_app
 
 
 def test_activity_heatmap_fits_panel_without_horizontal_scroll():
@@ -203,6 +230,21 @@ def test_daily_activity_uses_curved_paths_without_changing_data_points():
     assert " C ${controlX},${previous.y} ${controlX},${current.y}" in trend
     assert "d={curvePath(entry.key)}" in trend
     assert "<polyline" not in trend
+
+
+def test_daily_activity_labels_date_and_count_axes():
+    stats_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
+
+    trend = stats_app.split("function TrendChart", 1)[1].split("function ActivityHeatmap", 1)[0]
+    assert "const yTicks" in trend
+    assert "const xTickIndices" in trend
+    assert "const plot = { top: 12, right: 56, bottom: 44, left: 56 }" in trend
+    assert "const xTickCount = Math.min(7, rows.length)" in trend
+    assert "formatCompactNumber(value)" in trend
+    assert "formatAxisDate(rows[index].date)" in trend
+    assert "rows.length > 365" in trend
+    assert 'aria-label="Count axis"' not in trend
+    assert 'aria-label="Date axis"' not in trend
 
 
 def test_stats_disabled_state_blurs_results_and_links_to_configuration():

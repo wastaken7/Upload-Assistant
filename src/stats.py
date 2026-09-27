@@ -81,6 +81,12 @@ def media_profile_dimensions(meta: Any) -> list[tuple[str, str]]:
         add("video_codec", _video_codec_bucket(getattr(meta, "video_codec", "") or getattr(meta, "video", "")))
         add("audio_codec", _audio_codec_bucket(getattr(meta, "audio", "")))
         add("hdr", _hdr_bucket(getattr(meta, "hdr", "") or getattr(meta, "HDR", "")))
+        streaming_service = getattr(meta, "service_longname", "") or getattr(meta, "service", "")
+        release_source = f"{getattr(meta, 'type', '')} {getattr(meta, 'source', '')}".upper()
+        if streaming_service:
+            add("streaming_service", streaming_service)
+        elif "WEB" in release_source:
+            add("streaming_service", "Unknown")
     elif category == "MUSIC":
         add("release_type", getattr(meta, "music_release_type", ""))
         add("media", getattr(meta, "music_media", "") or getattr(meta, "source", ""))
@@ -159,6 +165,18 @@ async def record_media_profile_async(meta: Any) -> None:
     size = max(0, int(getattr(meta, "source_size", 0) or 0))
     for dimension, value in media_profile_dimensions(meta):
         await record_event_async("media", service=dimension, operation=value, category=category, bytes_count=size)
+
+
+async def record_release_profile_async(meta: Any, outcome: str) -> None:
+    """Record a privacy-safe personal/standard release result."""
+    await record_event_async(
+        "release_profile",
+        service="personal" if bool(getattr(meta, "personalrelease", False)) else "standard",
+        operation="completed",
+        outcome=outcome,
+        category=str(getattr(meta, "category", "") or ""),
+        bytes_count=max(0, int(getattr(meta, "source_size", 0) or 0)),
+    )
 
 
 def _dimension(value: object, *, default: str = "") -> str:
@@ -296,6 +314,8 @@ def _empty_payload(period: str, mode: str, generated_at: str) -> dict[str, Any]:
         "items": {"success": 0, "no_upload": 0, "error": 0},
         "uploads": {"by_destination": [], "by_category": []},
         "media": {"categories": [], "dimensions": []},
+        "streaming": {"services": []},
+        "release_profiles": {"profiles": [], "by_category": []},
         "artifacts": [],
         "cache": {"hits": 0, "misses": 0, "writes": 0, "bypasses": 0, "bytes_written": 0, "hit_rate": 0.0, "by_provider": []},
         "api": {"total": 0, "requests": 0, "successes": 0, "errors": 0, "by_service": []},
@@ -368,6 +388,9 @@ def get_stats(period: str = "30d", mode: str = "real", state_dir: str | Path | N
     cache_services: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
     api_services: dict[tuple[str, str], dict[str, int]] = defaultdict(lambda: defaultdict(int))
     media_dimensions: dict[tuple[str, str, str], dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    streaming_services: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    release_profiles: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    release_profile_categories: dict[tuple[str, str], dict[str, int]] = defaultdict(lambda: defaultdict(int))
     sources: dict[str, int] = defaultdict(int)
     overview = payload["overview"]
 
@@ -429,6 +452,19 @@ def get_stats(period: str = "30d", mode: str = "real", state_dir: str | Path | N
             bucket = media_dimensions[(category, service, operation)]
             bucket["count"] += count
             bucket["bytes"] += int(bytes_count)
+            if service == "streaming_service":
+                streaming_services[operation]["count"] += count
+                streaming_services[operation]["bytes"] += int(bytes_count)
+        elif family == "release_profile" and operation == "completed":
+            bucket = release_profiles[service]
+            bucket["count"] += count
+            bucket[outcome] += count
+            bucket["bytes"] += int(bytes_count)
+            if category:
+                category_bucket = release_profile_categories[(service, category)]
+                category_bucket["count"] += count
+                category_bucket[outcome] += count
+                category_bucket["bytes"] += int(bytes_count)
 
     overview["upload_success_rate"] = round(100 * overview["uploads"] / overview["upload_attempts"], 1) if overview["upload_attempts"] else 0.0
     overview["average_item_bytes"] = round(overview["processed_bytes"] / overview["items_completed"]) if overview["items_completed"] else 0
@@ -490,6 +526,40 @@ def get_stats(period: str = "30d", mode: str = "real", state_dir: str | Path | N
     payload["media"]["dimensions"] = [
         {"category": category, "dimension": dimension, "value": value, "count": totals["count"], "bytes": totals["bytes"]}
         for (category, dimension, value), totals in sorted(media_dimensions.items())
+    ]
+    payload["streaming"]["services"] = [
+        {
+            "service": service,
+            "items": totals["count"],
+            "bytes": totals["bytes"],
+            "average_item_bytes": round(totals["bytes"] / totals["count"]) if totals["count"] else 0,
+        }
+        for service, totals in sorted(streaming_services.items(), key=lambda item: -item[1]["count"])
+    ]
+    payload["release_profiles"]["profiles"] = [
+        {
+            "profile": profile,
+            "items": totals["count"],
+            "successes": totals["success"],
+            "without_upload": totals["no_upload"],
+            "errors": totals["error"],
+            "bytes": totals["bytes"],
+            "success_rate": round(100 * totals["success"] / totals["count"], 1) if totals["count"] else 0.0,
+        }
+        for profile, totals in sorted(release_profiles.items())
+    ]
+    payload["release_profiles"]["by_category"] = [
+        {
+            "profile": profile,
+            "category": category,
+            "items": totals["count"],
+            "successes": totals["success"],
+            "without_upload": totals["no_upload"],
+            "errors": totals["error"],
+            "bytes": totals["bytes"],
+            "success_rate": round(100 * totals["success"] / totals["count"], 1) if totals["count"] else 0.0,
+        }
+        for (profile, category), totals in sorted(release_profile_categories.items())
     ]
     api_successes = sum(values["success"] for values in api_services.values())
     api_errors = sum(values["error"] for values in api_services.values())
