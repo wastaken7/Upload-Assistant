@@ -81,8 +81,10 @@ def test_upload_destination_views_use_local_tracker_favicons():
 
     assert "const TrackerFavicon" in stats_app
     assert "`/static/img/trackers/${slug}.png`" in stats_app
+    assert "label: row.display_name || row.destination" in stats_app
     assert "favicon: row.destination" in stats_app
     assert "<TrackerFavicon destination={r.destination}" in stats_app
+    assert "<span>{r.display_name || r.destination}</span>" in stats_app
 
 
 def test_stats_tables_sort_comparable_columns():
@@ -129,7 +131,6 @@ def test_stats_summary_cards_have_distinct_icons():
         "api-operations",
         "cache-hit-rate",
         "cache-writes",
-        "mode",
         "daily-activity",
         "uploads-by-destination",
         "categories",
@@ -143,6 +144,7 @@ def test_stats_summary_cards_have_distinct_icons():
         "hashing-io-avoided",
         "activity-heatmap",
         "media-profile",
+        "unique-data-uploaded",
     )
     icon_dir = server.CODE_DIR / "web_ui" / "static" / "img" / "stats-icons"
     for icon in icons:
@@ -154,6 +156,10 @@ def test_stats_ui_exposes_volume_profiles_comparisons_and_exports():
     stats_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
 
     assert 'label="Data uploaded"' in stats_app
+    assert 'label="Unique data uploaded"' in stats_app
+    assert "overview.unique_uploaded_bytes" in stats_app
+    assert 'label="Mode"' not in stats_app
+    assert "Debug never affects real totals" not in stats_app
     assert 'label="Hashing I/O avoided"' in stats_app
     assert "function MediaProfile" in stats_app
     assert "function ActivityHeatmap" in stats_app
@@ -181,6 +187,10 @@ def test_activity_heatmap_fits_panel_without_horizontal_scroll():
     assert "today.getUTCDate() - 363" in heatmap
     assert "offset < 364" in heatmap
     assert all(label in heatmap for label in ("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Less", "More"))
+    assert "currentStreak = cell.count > 0 ? currentStreak + 1 : 0" in heatmap
+    assert "longestStreak = Math.max(longestStreak, currentStreak)" in heatmap
+    assert "Longest streak:" in heatmap
+    assert 'longestStreak === 1 ? "day" : "days"' in heatmap
     assert "var(--ua-stats-heatmap-empty)" in heatmap
     assert "--ua-stats-heatmap-empty:" in theme_css
 
@@ -258,6 +268,27 @@ def test_stats_api_reads_and_resets_aggregates(monkeypatch, tmp_path):
     response = client.delete("/api/stats", json={"confirmation": "RESET"})
     assert response.status_code == 200
     assert stats.get_stats("all", "real", tmp_path)["overview"]["items_completed"] == 0
+
+
+def test_stats_api_uses_canonical_destination_display_names(monkeypatch, tmp_path):
+    _authenticated(monkeypatch)
+    monkeypatch.setattr(server, "STATE_DIR", tmp_path)
+    monkeypatch.setattr(server, "_load_config_from_file", lambda _path: {"DEFAULT": {"stats_enabled": True}})
+    stats.configure_stats({"DEFAULT": {"stats_enabled": True}})
+    stats.record_event(
+        "upload",
+        service="BJSHARE",
+        operation="torrent_tracker",
+        outcome="success",
+        state_dir=tmp_path,
+    )
+
+    response = server.app.test_client().get("/api/stats?range=all&mode=real")
+
+    assert response.status_code == 200
+    destination = response.json["uploads"]["by_destination"][0]
+    assert destination["destination"] == "BJSHARE"
+    assert destination["display_name"] == "BJ-Share"
 
 
 def test_stats_api_hides_preserved_aggregates_while_collection_is_disabled(monkeypatch, tmp_path):

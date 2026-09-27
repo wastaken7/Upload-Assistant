@@ -283,6 +283,7 @@ def _empty_payload(period: str, mode: str, generated_at: str) -> dict[str, Any]:
             "api_operations": 0,
             "cache_hit_rate": 0.0,
             "uploaded_bytes": 0,
+            "unique_uploaded_bytes": 0,
             "processed_bytes": 0,
             "average_item_bytes": 0,
             "duplicate_preventions": 0,
@@ -380,6 +381,8 @@ def get_stats(period: str = "30d", mode: str = "real", state_dir: str | Path | N
                 timeline[day]["items"] += count
                 timeline[day]["processed_bytes"] += int(bytes_count)
                 overview["processed_bytes"] += int(bytes_count)
+                if outcome == "success":
+                    overview["unique_uploaded_bytes"] += int(bytes_count)
                 sources[source] += count
         elif family == "upload":
             bucket = destinations[(service, operation)]

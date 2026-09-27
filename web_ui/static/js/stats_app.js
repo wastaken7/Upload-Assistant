@@ -663,6 +663,12 @@ function ActivityHeatmap({ rows }) {
     cells.push({ date: key, count: byDate.get(key) || 0 });
   }
   const maximum = Math.max(1, ...cells.map((cell) => cell.count));
+  let currentStreak = 0;
+  let longestStreak = 0;
+  cells.forEach((cell) => {
+    currentStreak = cell.count > 0 ? currentStreak + 1 : 0;
+    longestStreak = Math.max(longestStreak, currentStreak);
+  });
   const monthMarkers = [];
   let previousMonth = "";
   cells.forEach((cell, index) => {
@@ -752,21 +758,27 @@ function ActivityHeatmap({ rows }) {
           ))}
         </div>
         <span aria-hidden="true" />
-        <div className="mt-1 flex items-center justify-end gap-1 text-xs opacity-60">
-          <span>Less</span>
-          {[0, 25, 45, 65, 85].map((intensity) => (
-            <span
-              key={intensity}
-              className="h-3 w-3 rounded-[3px]"
-              style={{
-                background: intensity
-                  ? `color-mix(in srgb, var(--ua-copper-bright) ${intensity}%, var(--ua-stats-heatmap-empty))`
-                  : "var(--ua-stats-heatmap-empty)",
-              }}
-              aria-hidden="true"
-            />
-          ))}
-          <span>More</span>
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+          <span>
+            Longest streak: {formatNumber(longestStreak)}{" "}
+            {longestStreak === 1 ? "day" : "days"}
+          </span>
+          <div className="flex items-center gap-1 opacity-60">
+            <span>Less</span>
+            {[0, 25, 45, 65, 85].map((intensity) => (
+              <span
+                key={intensity}
+                className="h-3 w-3 rounded-[3px]"
+                style={{
+                  background: intensity
+                    ? `color-mix(in srgb, var(--ua-copper-bright) ${intensity}%, var(--ua-stats-heatmap-empty))`
+                    : "var(--ua-stats-heatmap-empty)",
+                }}
+                aria-hidden="true"
+              />
+            ))}
+            <span>More</span>
+          </div>
         </div>
       </div>
     </div>
@@ -1389,16 +1401,22 @@ function StatsApp() {
                   detail={`${formatBytes(data.cache.bytes_written)} written since collection began`}
                 />
                 <Card
-                  icon="mode"
-                  label="Mode"
-                  value={mode === "real" ? "Real" : "Debug"}
-                  detail="Debug never affects real totals"
+                  icon="hashing-io-avoided"
+                  label="Hashing I/O avoided"
+                  value={formatBytes(overview.hashing_bytes_avoided)}
+                  detail="Media volume covered by reused base torrents"
                 />
                 <Card
                   icon="data-uploaded"
                   label="Data uploaded"
                   value={formatBytes(overview.uploaded_bytes)}
                   detail="Successful destination uploads"
+                />
+                <Card
+                  icon="unique-data-uploaded"
+                  label="Unique data uploaded"
+                  value={formatBytes(overview.unique_uploaded_bytes)}
+                  detail="Each successfully uploaded item counted once"
                 />
                 <Card
                   icon="average-item-size"
@@ -1411,12 +1429,6 @@ function StatsApp() {
                   label="Duplicates prevented"
                   value={formatNumber(overview.duplicate_preventions)}
                   detail={`${overview.pioneering_rate || 0}% pioneering rate`}
-                />
-                <Card
-                  icon="hashing-io-avoided"
-                  label="Hashing I/O avoided"
-                  value={formatBytes(overview.hashing_bytes_avoided)}
-                  detail="Media volume covered by reused base torrents"
                 />
               </div>
               <Section
@@ -1443,7 +1455,7 @@ function StatsApp() {
                     <DonutChart
                       ariaLabel="Upload activity by destination"
                       rows={data.uploads.by_destination.map((row) => ({
-                        label: row.destination,
+                        label: row.display_name || row.destination,
                         value: row.successes + row.errors + row.skipped,
                         favicon: row.destination,
                       }))}
@@ -1458,11 +1470,11 @@ function StatsApp() {
                       headers={[
                         {
                           label: "Destination",
-                          sortValue: (r) => r.destination,
+                          sortValue: (r) => r.display_name || r.destination,
                           render: (r) => (
                             <span className="flex items-center gap-2">
                               <TrackerFavicon destination={r.destination} />
-                              <span>{r.destination}</span>
+                              <span>{r.display_name || r.destination}</span>
                             </span>
                           ),
                         },

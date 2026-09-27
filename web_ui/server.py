@@ -4164,6 +4164,17 @@ def stats_page():
     return render_template("stats.html", app_version=APP_VERSION, csrf_token=_ensure_csrf_token())
 
 
+def _add_stats_destination_display_names(payload: dict[str, Any]) -> None:
+    """Add catalogue-backed labels without changing persisted destination keys."""
+    from src.trackersetup import tracker_class_map
+
+    rows = payload.get("uploads", {}).get("by_destination", [])
+    for row in rows:
+        destination = str(row.get("destination") or "")
+        tracker_class = tracker_class_map.get(destination.upper())
+        row["display_name"] = str(getattr(tracker_class, "display_name", destination))
+
+
 @app.route("/api/health")
 @limiter.exempt
 def health():
@@ -4196,6 +4207,7 @@ def stats_api():
         config = _load_config_from_file(STATE_DIR / "data" / "config.py") or {}
         enabled = stats_collection_enabled(config)
         payload = get_stats(period, mode, STATE_DIR) if enabled else get_empty_stats(period, mode)
+        _add_stats_destination_display_names(payload)
         payload["enabled"] = enabled
         return jsonify(payload)
     except ValueError as exc:

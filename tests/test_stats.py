@@ -50,6 +50,7 @@ def test_stats_aggregate_real_activity(tmp_path):
         "api_operations": 1,
         "cache_hit_rate": 50.0,
         "uploaded_bytes": 4_000,
+        "unique_uploaded_bytes": 4_000,
         "processed_bytes": 4_000,
         "average_item_bytes": 4_000,
         "duplicate_preventions": 1,
@@ -62,6 +63,25 @@ def test_stats_aggregate_real_activity(tmp_path):
     assert destination["average_duration_ms"] == 1250
     assert destination["bytes"] == 4_000
     assert result["api"]["requests"] == 1
+
+
+def test_unique_uploaded_bytes_counts_each_successful_item_once(tmp_path):
+    item_size = 1_000_000_000
+    stats.record_event("item", operation="completed", outcome="success", bytes_count=item_size, state_dir=tmp_path)
+    for destination in range(10):
+        stats.record_event(
+            "upload",
+            service=f"FICTIONAL{destination}",
+            operation="torrent_tracker",
+            outcome="success",
+            bytes_count=item_size,
+            state_dir=tmp_path,
+        )
+
+    result = stats.get_stats("all", "real", tmp_path)
+
+    assert result["overview"]["uploaded_bytes"] == item_size * 10
+    assert result["overview"]["unique_uploaded_bytes"] == item_size
 
 
 @pytest.mark.parametrize(
