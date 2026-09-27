@@ -235,9 +235,15 @@ Each priority selector continues to list all configured image hosts, including h
 - Use **Configured Trackers** to review, rename, edit, or remove existing tracker entries.
 - Use **Available Trackers** to add a supported tracker from its template.
 
+Configured and Available tracker searches accept names, tracker codes and CLI aliases, ignoring case. Search uses each tracker's saved alias (or its template alias if unsaved) and any pending alias edit. After saving an alias change, search uses the new alias.
+
+Each tracker's **Advanced → CLI Alias** field provides an optional shorthand for `-tk` or `--trackers`. The full tracker code still works regardless of the alias, and aliases do not rename tracker cards or change the default tracker list.
+
 Default and Configured Trackers also show the cached availability dot used by the Upload page. Choose **Check tracker status** to refresh those credential-free checks. Any detected issue is summarized above the tracker list; Available Trackers are not checked until they have been configured.
 
 New trackers and tracker edits remain pending until the configuration is saved.
+
+**Save Config** sends pending field edits together in one request, including changes across multiple trackers. All field edits in that batch are validated before the file is written. If the server rejects the save, the edits remain pending so you can correct them or retry without re-entering them.
 
 ## Security and administration
 

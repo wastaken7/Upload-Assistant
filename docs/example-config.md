@@ -357,6 +357,14 @@ Example:
 
 ### Per-tracker blocks
 
+In the WebUI's **Tracker-Specific DEFAULT Overrides**, untick a field and save to
+inherit its current `DEFAULT` value. The tracker setting stays in `config.py` as
+`None` (for example, `"add_logo": None`), so automatic configuration updates keep
+that choice. Later changes to `DEFAULT` also apply to inherited fields. Tick the
+field to save a tracker-specific value instead. `False`, `0`, and an empty text
+override are explicit values, not the `None` inheritance marker. Matching
+release-group text overrides still take precedence.
+
 Each tracker identifier (e.g. `"AITHER"`, `"BLUTOPIA"`) contains a dict of settings.
 
 Common keys you will see:
@@ -469,7 +477,7 @@ For bandwidth-control connection requirements and workflow settings, see [Upload
 
 ### Tracker overridable settings
 
-Tracker overridable settings are settings that you can add inside each tracker config dictionary; these settings override the values inside the DEFAULT config. In order for this to work, you must edit the config file, locate the tracker by name, and add your custom value.
+Tracker overridable settings are settings inside each tracker config dictionary that override the values in DEFAULT. Edit them through the WebUI's **Tracker-Specific DEFAULT Overrides** or directly in `config.py`. Set a tracker setting to `None` to inherit DEFAULT while keeping the setting in the file.
 
 Example:
 

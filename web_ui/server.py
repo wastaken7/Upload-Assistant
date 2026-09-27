@@ -2930,6 +2930,27 @@ def set_runtime_browse_roots(browse_roots: str) -> None:
     _runtime_browse_roots = browse_roots
 
 
+def _parse_config_source(source: str) -> dict[str, Any]:
+    """Read literal configuration without executing Python from the file."""
+    tree = ast.parse(source)
+    for node in ast.walk(tree):
+        config_node: ast.expr | None = None
+        if isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name) and target.id == "config":
+                    config_node = node.value
+                    break
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.target.id == "config":
+            config_node = node.value
+
+        if config_node is not None:
+            config_value = ast.literal_eval(config_node)
+            if isinstance(config_value, dict):
+                config_value_dict = cast(dict[Any, Any], config_value)
+                return {str(key): value for key, value in config_value_dict.items()}
+    raise ValueError("Config assignment not found")
+
+
 def _load_config_from_file(path: Path) -> dict[str, Any] | None:
     """Load and return the ``config`` dict from a Python config file.
 
@@ -2960,27 +2981,7 @@ def _load_config_from_file(path: Path) -> dict[str, Any] | None:
     try:
         with Path(path).open(encoding="utf-8") as f:
             content = f.read()
-        tree = ast.parse(content)
-        for node in ast.walk(tree):
-            config_node: ast.expr | None = None
-            if isinstance(node, ast.Assign):
-                for target in node.targets:
-                    if isinstance(target, ast.Name) and target.id == "config":
-                        config_node = node.value
-                        break
-            elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.target.id == "config":
-                config_node = node.value
-
-            if config_node is not None:
-                config_value = ast.literal_eval(config_node)
-                if isinstance(config_value, dict):
-                    config_value_dict = cast(dict[Any, Any], config_value)
-                    result: dict[str, Any] = {}
-                    for key, value in config_value_dict.items():
-                        result[str(key)] = value
-                    return result
-        console.print(f"[yellow]Config file {path.name} does not contain a valid 'config' dict assignment.[/yellow]")
-        return None
+        return _parse_config_source(content)
     except Exception as exc:
         console.print(f"[yellow]Failed to parse config file {path.name}: {exc}[/yellow]")
         return None
@@ -3976,7 +3977,9 @@ def login_page():
 
 @app.errorhandler(429)
 def _rate_limit_exceeded(_e: Exception) -> Any:
-    # Return a minimal plain-text 429 response to avoid heavy template rendering.
+    # API callers expect JSON; keep non-API responses lightweight as well.
+    if request.path.startswith("/api/"):
+        return jsonify({"success": False, "error": "Too many requests. Please wait before trying again."}), 429
     return Response("Too many requests", status=429, mimetype="text/plain")
 
 
@@ -5345,7 +5348,7 @@ def config_test_prowlarr():
 
 @app.route("/api/config_set_tracker_overrides", methods=["POST"])
 def config_set_tracker_overrides():
-    """Enable or remove the example-backed DEFAULT override block for a tracker."""
+    """Enable tracker DEFAULT overrides or retain their keys with inherited values."""
     if not _is_authenticated():
         return jsonify({"success": False, "error": "Authentication required (web session)"}), 401
     if not _verify_csrf_header() or not _verify_same_origin():
@@ -5367,9 +5370,6 @@ def config_set_tracker_overrides():
         return jsonify({"success": False, "error": "Unknown tracker"}), 404
     example_tracker = _as_dict(example_trackers.get(actual_example_name)) or {}
     override_keys = [key for key in _TRACKER_DEFAULT_OVERRIDE_KEYS if key in example_tracker]
-    if not override_keys:
-        return jsonify({"success": False, "error": "This tracker has no DEFAULT override block"}), 400
-
     config_path = STATE_DIR / "data" / "config.py"
     user_config = _load_config_from_file(config_path) or {}
     user_trackers = _as_dict(user_config.get("TRACKERS")) or {}
@@ -5377,23 +5377,24 @@ def config_set_tracker_overrides():
         (str(name) for name in user_trackers if str(name).upper() == tracker_name),
         actual_example_name,
     )
+    if not enabled:
+        saved_tracker = _as_dict(user_trackers.get(actual_user_name)) or {}
+        override_keys = [key for key in _TRACKER_DEFAULT_OVERRIDE_KEYS if key in example_tracker or key in saved_tracker]
+    if not override_keys:
+        return jsonify({"success": False, "error": "This tracker has no DEFAULT override block"}), 400
 
     try:
         source = config_path.read_text(encoding="utf-8")
-        if enabled:
-            if not isinstance(user_config.get("TRACKERS"), Mapping):
-                source = _replace_config_value_in_source(source, ["TRACKERS"], "{}")
-            if not isinstance(user_trackers.get(actual_user_name), Mapping):
-                source = _replace_config_value_in_source(source, ["TRACKERS", actual_user_name], "{}")
-            for key in override_keys:
-                source = _replace_config_value_in_source(
-                    source,
-                    ["TRACKERS", actual_user_name, key],
-                    _python_literal(example_tracker[key]),
-                )
-        else:
-            for key in override_keys:
-                source = _remove_config_key_in_source(source, ["TRACKERS", actual_user_name, key])
+        if not isinstance(user_config.get("TRACKERS"), Mapping):
+            source = _replace_config_value_in_source(source, ["TRACKERS"], "{}")
+        if not isinstance(user_trackers.get(actual_user_name), Mapping):
+            source = _replace_config_value_in_source(source, ["TRACKERS", actual_user_name], "{}")
+        for key in override_keys:
+            source = _replace_config_value_in_source(
+                source,
+                ["TRACKERS", actual_user_name, key],
+                _python_literal(example_tracker[key] if enabled else None),
+            )
         config_path.write_text(source, encoding="utf-8")
         try:
             _write_audit_log(
@@ -5419,36 +5420,22 @@ def config_set_tracker_overrides():
     )
 
 
-@app.route("/api/config_update", methods=["POST"])
-def config_update():
-    """Update a config value in data/config.py"""
-    # Require authenticated web session and CSRF protection; disallow bearer/basic API auth
-    if not _is_authenticated():
-        return jsonify({"success": False, "error": "Authentication required (web session)"}), 401
-    # Require CSRF + same-origin for config updates
-    if not _verify_csrf_header() or not _verify_same_origin():
-        return jsonify({"success": False, "error": "CSRF/Origin validation failed"}), 403
-    data = _request_json_dict()
+def _apply_config_update(source: str, example_config: dict[str, Any], data: dict[str, Any]) -> tuple[str, dict[str, Any]]:
+    """Validate and stage one edit without writing any changes to disk."""
+    prior_config = _parse_config_source(source)
     path_raw = data.get("path", [])
     path: list[str] = []
-    if isinstance(path_raw, Sequence) and not isinstance(path_raw, (str, bytes, bytearray)):
-        path_items: Sequence[Any] = cast(Sequence[Any], path_raw)
-        path.extend(p for p in path_items if isinstance(p, str) and p)
+    if isinstance(path_raw, list) and all(isinstance(part, str) and part for part in path_raw):
+        path = list(path_raw)
     raw_value = data.get("value")
 
     if not path:
-        return jsonify({"success": False, "error": "Invalid path"}), 400
+        raise ValueError("Invalid path")
 
-    base_dir = STATE_DIR
-    example_path = CODE_DIR / "data" / "example_config.py"
-    config_path = base_dir / "data" / "config.py"
-
-    example_config = _load_config_from_file(example_path) or {}
     example_value = _get_nested_value(example_config, path)
 
     if example_value is None and len(path) >= 3 and path[0] == "TORRENT_CLIENTS":
-        user_config_for_template = _load_config_from_file(config_path) or {}
-        user_client = _get_nested_value(user_config_for_template, path[:2])
+        user_client = _get_nested_value(prior_config, path[:2])
         example_clients = _as_dict(example_config.get("TORRENT_CLIENTS")) or {}
         user_client_config = _as_dict(user_client)
         if user_client_config:
@@ -5465,12 +5452,13 @@ def config_update():
     is_optional_arr_field = len(path) == 2 and path[0] == "DEFAULT" and re.fullmatch(r"(?:sonarr|radarr)_(?:url|api_key)_[1-3]", key) is not None
     force_remove_optional_arr_field = is_optional_arr_field and data.get("remove") is True
     is_tracker_default_override = len(path) == 3 and path[0] == "TRACKERS" and key in _TRACKER_DEFAULT_OVERRIDE_KEYS
-    force_remove_tracker_override = is_tracker_default_override and data.get("remove") is True
+    # Retain an explicit inheritance marker so startup sync cannot restore an
+    # example override. Accept removal requests from older WebUI tabs as well.
+    inherit_tracker_override = is_tracker_default_override and (raw_value is None or data.get("remove") is True)
     if is_tracker_default_override and example_value is None and isinstance(_get_nested_value(example_config, path[:2]), Mapping):
         # Existing overrides may outlive a field's entry in the tracker template.
-        # Keep those displayed fields editable/removable without adding new ones.
-        saved_config = _load_config_from_file(config_path) or {}
-        saved_tracker = _as_dict(_get_nested_value(saved_config, path[:2])) or {}
+        # Keep those displayed fields editable/inheritable without adding new ones.
+        saved_tracker = _as_dict(_get_nested_value(prior_config, path[:2])) or {}
         if key in saved_tracker:
             example_value = _get_nested_value(example_config, ["DEFAULT", key])
             if example_value is None:
@@ -5478,62 +5466,34 @@ def config_update():
     is_release_group_override = _is_release_group_override_path(path)
     if is_release_group_override:
         if not isinstance(_get_nested_value(example_config, path[:-1]), Mapping):
-            return jsonify({"success": False, "error": "Unknown release group override scope"}), 400
+            raise ValueError("Unknown release group override scope")
         example_value = {}
     elif key in ["injecting_client_list", "searching_client_list"]:
         example_value = []  # Default to empty list
     elif is_optional_arr_field:
         example_value = ""
     elif example_value is None:
-        return jsonify({"success": False, "error": "Path not found in example config"}), 400
+        raise ValueError("Path not found in example config")
 
-    coerced_value = _coerce_config_value(raw_value, example_value)
+    coerced_value = None if inherit_tracker_override else _coerce_config_value(raw_value, example_value)
     overlay_choices = {"overlay_position": {"left", "right"}, "overlay_layout": {"stacked", "single_line"}}
     if path[:1] == ["DEFAULT"] and len(path) == 2 and key in overlay_choices and (not isinstance(coerced_value, str) or coerced_value not in overlay_choices[key]):
-        return jsonify({"success": False, "error": f"Invalid {key} value"}), 400
+        raise ValueError(f"Invalid {key} value")
     if is_release_group_override:
-        try:
-            _validate_release_group_overrides(coerced_value)
-        except ValueError as error:
-            return jsonify({"success": False, "error": str(error)}), 400
+        _validate_release_group_overrides(coerced_value)
     new_value_literal = _python_literal(coerced_value)
 
-    # Remove unchecked tracker overrides so subsequent DEFAULT changes are inherited.
-    # Also keep optional WebUI-managed values out of config.py when they are unused.
+    # Keep optional WebUI-managed values out of config.py when they are unused.
+    # Tracker overrides instead retain None to inherit subsequent DEFAULT changes.
     key = path[-1] if path else ""
     should_remove_empty_value = (
         (key in ["injecting_client_list", "searching_client_list"] and coerced_value == [])
         or (is_optional_arr_field and (coerced_value == "" or force_remove_optional_arr_field))
-        or force_remove_tracker_override
     )
+    prior_value = _get_nested_value(prior_config, path)
     if should_remove_empty_value:
-        # Remove the key from config if it exists
-        try:
-            # Load prior value for audit
-            prior_config = _load_config_from_file(config_path) or {}
-            prior_value = _get_nested_value(prior_config, path)
-
-            source = config_path.read_text(encoding="utf-8")
-            updated_source = _remove_config_key_in_source(source, path)
-            config_path.write_text(updated_source, encoding="utf-8")
-            # Audit record for removal
-            try:
-                _write_audit_log("remove_key", path, prior_value, None, True)
-            except Exception as ae:
-                console.print(f"Failed to write config audit record: {ae}", markup=False)
-        except Exception:
-            return jsonify({"success": False, "error": "An error occurred while updating the configuration"}), 500
-        return jsonify({"success": True, "value": _json_safe(coerced_value)})
-    # Else proceed with normal update
-
-    # Ensure prior_value is defined for the exception path below
-    prior_value = None
-    try:
-        # Load prior value for audit
-        prior_config = _load_config_from_file(config_path) or {}
-        prior_value = _get_nested_value(prior_config, path)
-
-        source = config_path.read_text(encoding="utf-8")
+        updated_source = _remove_config_key_in_source(source, path)
+    else:
         if len(path) == 2 and path[0] == "DEFAULT":
             from src.screenshot_overlays import OVERLAY_KEYS, overlay_enabled, overlay_options
 
@@ -5549,21 +5509,59 @@ def config_update():
                 # including configs that have never saved an explicit master.
                 source = _replace_config_value_in_source(source, ["DEFAULT", "frame_overlay"], _python_literal(overlay_enabled(prior_defaults)))
         updated_source = _replace_config_value_in_source(source, path, new_value_literal)
-        config_path.write_text(updated_source, encoding="utf-8")
-        # Audit record for update
+    return updated_source, {
+        "path": path,
+        "value": coerced_value,
+        "prior_value": prior_value,
+        "action": "remove_key" if should_remove_empty_value else "update_value",
+    }
+
+
+def _audit_config_updates(records: list[dict[str, Any]], success: bool, error: str | None = None) -> None:
+    for record in records:
         try:
-            _write_audit_log("update_value", path, prior_value, coerced_value, True)
-        except Exception as ae:
-            console.print(f"Failed to write config audit record: {ae}", markup=False)
-    except Exception as e:
-        # Attempt to log failed update attempt
-        try:
-            _write_audit_log("update_value", path, prior_value if prior_value is not None else None, coerced_value, False, str(e))
-        except Exception as ae:
-            console.print(f"Failed to write config audit failure record: {ae}", markup=False)
+            _write_audit_log(
+                record["action"], record["path"], record["prior_value"],
+                None if record["action"] == "remove_key" else record["value"], success, error,
+            )
+        except Exception as audit_error:
+            console.print(f"Failed to write config audit record: {audit_error}", markup=False)
+
+
+@app.route("/api/config_update", methods=["POST"])
+def config_update():
+    """Save one field or a batch of field edits after staging every change."""
+    if not _is_authenticated():
+        return jsonify({"success": False, "error": "Authentication required (web session)"}), 401
+    if not _verify_csrf_header() or not _verify_same_origin():
+        return jsonify({"success": False, "error": "CSRF/Origin validation failed"}), 403
+
+    data = _request_json_dict()
+    is_batch = "updates" in data
+    updates = data.get("updates") if is_batch else [data]
+    if not isinstance(updates, list) or not 1 <= len(updates) <= 1000 or not all(isinstance(update, dict) for update in updates):
+        return jsonify({"success": False, "error": "Provide between 1 and 1000 configuration updates"}), 400
+
+    config_path = STATE_DIR / "data" / "config.py"
+    example_config = _load_config_from_file(CODE_DIR / "data" / "example_config.py") or {}
+    records: list[dict[str, Any]] = []
+    try:
+        source = config_path.read_text(encoding="utf-8")
+        for update in cast(list[dict[str, Any]], updates):
+            source, record = _apply_config_update(source, example_config, update)
+            records.append(record)
+        # A bad edit anywhere in the batch leaves the original file untouched.
+        config_path.write_text(source, encoding="utf-8")
+    except (ValueError, TypeError) as error:
+        return jsonify({"success": False, "error": str(error)}), 400
+    except Exception as error:
+        _audit_config_updates(records, False, str(error))
         return jsonify({"success": False, "error": "An error occurred while updating the configuration"}), 500
 
-    return jsonify({"success": True, "value": _json_safe(coerced_value)})
+    _audit_config_updates(records, True)
+    if is_batch:
+        return jsonify({"success": True, "values": [_json_safe(record["value"]) for record in records]})
+    return jsonify({"success": True, "value": _json_safe(records[0]["value"])})
 
 
 @app.route("/api/config_remove_subsection", methods=["POST"])

@@ -105,6 +105,17 @@ test("example-only and null tracker values do not become active overrides", () =
   );
 });
 
+test("pending null tracker values inherit DEFAULT before saving", () => {
+  const inherited = resolve({
+    ...trackerScope,
+    pendingChanges: new Map([
+      ["TRACKERS/AITHER/custom_signature", { value: null }],
+    ]),
+  });
+  assert.equal(inherited.value, "Default signature");
+  assert.equal(inherited.inheritedLabel, "Inherits DEFAULT");
+});
+
 test("group matching ignores case and leading hyphens, including expanded case variants", () => {
   for (const [left, right] of [
     [" --MyGroup ", "myGROUP"],
