@@ -19,18 +19,6 @@ const CHART_COLORS = [
   "#64748b",
 ];
 
-const Icon = ({ children }) => (
-  <svg
-    className="h-5 w-5"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-    aria-hidden="true"
-  >
-    {children}
-  </svg>
-);
-
 const AssetIcon = ({ name }) => (
   <span
     aria-hidden="true"
@@ -43,65 +31,12 @@ const AssetIcon = ({ name }) => (
   />
 );
 
-const NavIcon = ({ type }) => {
-  if (type === "upload")
-    return (
-      <Icon>
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth="2"
-          d="M12 16V4m0 0L7 9m5-5 5 5M5 20h14"
-        />
-      </Icon>
-    );
-  if (type === "changelog")
-    return (
-      <Icon>
-        <circle cx="12" cy="12" r="9" strokeWidth="2" />
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth="2"
-          d="M12 7v5l3 2"
-        />
-      </Icon>
-    );
-  if (type === "help")
-    return (
-      <Icon>
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth="2"
-          d="M12 6.75c-2.5-1.5-5.5-1.5-8-.5v11c2.5-1 5.5-1 8 .5m0-11c2.5-1.5 5.5-1.5 8-.5v11c-2.5-1-5.5-1-8 .5m0-11v11"
-        />
-      </Icon>
-    );
-  if (type === "logout")
-    return (
-      <Icon>
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth="2"
-          d="M10 17l5-5-5-5m5 5H3m10-8h5a2 2 0 012 2v12a2 2 0 01-2 2h-5"
-        />
-      </Icon>
-    );
-  return (
-    <Icon>
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="2"
-        d="M4 19V9m6 10V5m6 14v-7m4 7H2"
-      />
-    </Icon>
-  );
-};
-
 const formatNumber = (value) => new Intl.NumberFormat().format(value || 0);
+const formatCompactNumber = (value) =>
+  new Intl.NumberFormat(undefined, {
+    notation: "compact",
+    maximumFractionDigits: 1,
+  }).format(value || 0);
 const formatDuration = (value) =>
   value >= 1000 ? `${(value / 1000).toFixed(1)}s` : `${value || 0}ms`;
 const formatBytes = (value) => {
@@ -115,6 +50,27 @@ const formatBytes = (value) => {
 };
 const formatDimensionValue = (value) =>
   String(value || "Unknown").replaceAll("_", " ");
+const OPERATION_LABELS = {
+  credential_sync: "Sync credentials",
+  image_upload: "Upload images",
+  nntp_post: "Post to Usenet",
+  search: "Search existing releases",
+  torrent_client_add: "Add to torrent client",
+  torrent_client_search: "Search torrent client",
+  upload: "Upload release",
+};
+const formatOperation = (value) => {
+  const key = String(value || "")
+    .trim()
+    .toLowerCase();
+  if (!key) return "Unknown";
+  return (
+    OPERATION_LABELS[key] ||
+    key
+      .replaceAll("_", " ")
+      .replace(/\b\w/g, (character) => character.toUpperCase())
+  );
+};
 const formatTrend = (value, suffix = "%") => {
   if (value == null) return "";
   if (value === 0) return `• 0${suffix}`;
@@ -214,11 +170,7 @@ function WorkspaceNav({
               data-active={id === "stats" ? "true" : "false"}
               aria-current={id === "stats" ? "page" : undefined}
             >
-              {id === "config" ? (
-                <AssetIcon name="settings" />
-              ) : (
-                <NavIcon type={id} />
-              )}
+              <AssetIcon name={id} />
               <span>{label}</span>
             </a>
           ))}
@@ -231,7 +183,7 @@ function WorkspaceNav({
             onClick={onOpenChangelog}
             aria-haspopup="dialog"
           >
-            <NavIcon type="changelog" />
+            <AssetIcon name="changelog" />
             <span>Changelog</span>
           </button>
           <button
@@ -240,7 +192,7 @@ function WorkspaceNav({
             onClick={onOpenHelp}
             aria-haspopup="dialog"
           >
-            <NavIcon type="help" />
+            <AssetIcon name="help" />
             <span>Help</span>
           </button>
           <div ref={appearanceRef} className="relative min-w-0 w-full">
@@ -309,7 +261,7 @@ function WorkspaceNav({
             className="ua-app-rail-button rounded-lg text-red-500"
             onClick={onLogout}
           >
-            <NavIcon type="logout" />
+            <AssetIcon name="logout" />
             <span>Log out</span>
           </button>
         </div>
@@ -514,8 +466,10 @@ function TrendChart({ rows }) {
   });
   const [hovered, setHovered] = useState(null);
   const width = 760,
-    height = 190,
-    padding = 28;
+    height = 220;
+  const plot = { top: 12, right: 56, bottom: 44, left: 56 };
+  const plotWidth = width - plot.left - plot.right;
+  const plotHeight = height - plot.top - plot.bottom;
   const series = [
     { key: "items", label: "Items", color: "#8b5cf6" },
     { key: "uploads", label: "Uploads", color: "#22c55e" },
@@ -530,9 +484,33 @@ function TrendChart({ rows }) {
   const xFor = (index) =>
     rows.length <= 1
       ? width / 2
-      : padding + (index * (width - padding * 2)) / (rows.length - 1);
-  const yFor = (key, row) =>
-    height - padding - ((row[key] || 0) * (height - padding * 2)) / maximum;
+      : plot.left + (index * plotWidth) / (rows.length - 1);
+  const yForValue = (value) => plot.top + (1 - value / maximum) * plotHeight;
+  const yFor = (key, row) => yForValue(row[key] || 0);
+  const yStepCount = Math.min(4, maximum);
+  const yTicks = Array.from(
+    new Set(
+      Array.from({ length: yStepCount + 1 }, (_, index) =>
+        Math.round((maximum * index) / yStepCount),
+      ),
+    ),
+  );
+  const xTickCount = Math.min(7, rows.length);
+  const xTickIndices = Array.from(
+    new Set(
+      Array.from({ length: xTickCount }, (_, index) =>
+        xTickCount === 1
+          ? 0
+          : Math.round((index * (rows.length - 1)) / (xTickCount - 1)),
+      ),
+    ),
+  );
+  const formatAxisDate = (date) =>
+    new Date(`${date}T00:00:00Z`).toLocaleDateString(undefined, {
+      month: "short",
+      ...(rows.length > 365 ? { year: "2-digit" } : { day: "numeric" }),
+      timeZone: "UTC",
+    });
   const curvePath = (key) => {
     const coordinates = rows.map((row, index) => ({
       x: xFor(index),
@@ -561,16 +539,63 @@ function TrendChart({ rows }) {
           aria-label="Daily activity trend"
           onMouseLeave={() => setHovered(null)}
         >
-          {[0, 0.25, 0.5, 0.75, 1].map((ratio) => (
-            <line
-              key={ratio}
-              x1={padding}
-              x2={width - padding}
-              y1={padding + ratio * (height - padding * 2)}
-              y2={padding + ratio * (height - padding * 2)}
-              stroke="currentColor"
-              opacity="0.12"
-            />
+          {yTicks.map((value) => (
+            <React.Fragment key={value}>
+              <line
+                x1={plot.left}
+                x2={width - plot.right}
+                y1={yForValue(value)}
+                y2={yForValue(value)}
+                stroke="currentColor"
+                opacity="0.12"
+              />
+              <text
+                x={plot.left - 8}
+                y={yForValue(value)}
+                fill="currentColor"
+                fontSize="10"
+                textAnchor="end"
+                dominantBaseline="middle"
+                opacity="0.65"
+              >
+                {formatCompactNumber(value)}
+              </text>
+            </React.Fragment>
+          ))}
+          <line
+            x1={plot.left}
+            x2={plot.left}
+            y1={plot.top}
+            y2={height - plot.bottom}
+            stroke="currentColor"
+            opacity="0.28"
+          />
+          <line
+            x1={plot.left}
+            x2={width - plot.right}
+            y1={height - plot.bottom}
+            y2={height - plot.bottom}
+            stroke="currentColor"
+            opacity="0.28"
+          />
+          {xTickIndices.map((index) => (
+            <text
+              key={rows[index].date}
+              x={xFor(index)}
+              y={height - 24}
+              fill="currentColor"
+              fontSize="10"
+              textAnchor={
+                index === 0
+                  ? "start"
+                  : index === rows.length - 1
+                    ? "end"
+                    : "middle"
+              }
+              opacity="0.65"
+            >
+              {formatAxisDate(rows[index].date)}
+            </text>
           ))}
           {activeSeries.map((entry) => (
             <path
@@ -587,22 +612,21 @@ function TrendChart({ rows }) {
             <line
               x1={xFor(hovered)}
               x2={xFor(hovered)}
-              y1={padding}
-              y2={height - padding}
+              y1={plot.top}
+              y2={height - plot.bottom}
               stroke="currentColor"
               opacity="0.35"
             />
           )}
           {rows.map((row, index) => {
-            const segmentWidth =
-              (width - padding * 2) / Math.max(1, rows.length - 1);
+            const segmentWidth = plotWidth / Math.max(1, rows.length - 1);
             return (
               <rect
                 key={row.date}
-                x={Math.max(0, xFor(index) - segmentWidth / 2)}
-                y="0"
+                x={Math.max(plot.left, xFor(index) - segmentWidth / 2)}
+                y={plot.top}
                 width={segmentWidth}
-                height={height}
+                height={plotHeight}
                 fill="transparent"
                 onMouseEnter={() => setHovered(index)}
               />
@@ -804,7 +828,7 @@ const ReliabilityBadge = ({ rate, attempts }) => {
 
 function MediaProfile({ media, category, onCategoryChange }) {
   const rows = (media?.dimensions || []).filter(
-    (row) => row.category === category,
+    (row) => row.category === category && row.dimension !== "streaming_service",
   );
   const groups = rows.reduce((result, row) => {
     (result[row.dimension] ||= []).push(row);
@@ -879,6 +903,99 @@ function MediaProfile({ media, category, onCategoryChange }) {
         }
       />
     </div>
+  );
+}
+
+function StreamingServices({ services }) {
+  const rows = services || [];
+  return (
+    <ChartWithTable
+      chart={
+        <DonutChart
+          ariaLabel="Processed items by streaming service"
+          rows={rows.map((row) => ({
+            label: formatDimensionValue(row.service),
+            value: row.items,
+          }))}
+        />
+      }
+      table={
+        <Table
+          rows={rows}
+          headers={[
+            {
+              label: "Service",
+              sortValue: (row) => row.service,
+              render: (row) => formatDimensionValue(row.service),
+            },
+            { label: "Items", key: "items" },
+            {
+              label: "Unique volume",
+              sortValue: (row) => row.bytes,
+              render: (row) => formatBytes(row.bytes),
+            },
+            {
+              label: "Average size",
+              sortValue: (row) => row.average_item_bytes,
+              render: (row) => formatBytes(row.average_item_bytes),
+            },
+          ]}
+        />
+      }
+    />
+  );
+}
+
+function ReleaseProfiles({ releaseProfiles }) {
+  const profiles = releaseProfiles?.profiles || [];
+  const personal = profiles.find((row) => row.profile === "personal");
+  const personalCategories = (releaseProfiles?.by_category || []).filter(
+    (row) => row.profile === "personal",
+  );
+  const tableRows = personal
+    ? [
+        { ...personal, category: "All categories", key: "personal:all" },
+        ...personalCategories.map((row) => ({
+          ...row,
+          key: `personal:${row.category}`,
+        })),
+      ]
+    : [];
+  return (
+    <ChartWithTable
+      chart={
+        <DonutChart
+          ariaLabel="Personal and standard releases"
+          rows={profiles.map((row) => ({
+            label: row.profile === "personal" ? "Personal" : "Standard",
+            value: row.items,
+          }))}
+        />
+      }
+      table={
+        <Table
+          rows={tableRows}
+          empty="No personal releases in this period."
+          headers={[
+            { label: "Category", key: "category" },
+            { label: "Items", key: "items" },
+            { label: "With upload", key: "successes" },
+            { label: "Without upload", key: "without_upload" },
+            { label: "Errors", key: "errors" },
+            {
+              label: "Success rate",
+              sortValue: (row) => row.success_rate,
+              render: (row) => `${row.success_rate}%`,
+            },
+            {
+              label: "Unique volume",
+              sortValue: (row) => row.bytes,
+              render: (row) => formatBytes(row.bytes),
+            },
+          ]}
+        />
+      }
+    />
   );
 }
 
@@ -1572,7 +1689,7 @@ function StatsApp() {
                       <DonutChart
                         ariaLabel="Artifact activity"
                         rows={data.artifacts.map((row) => ({
-                          label: `${row.type} · ${row.operation} · ${row.variant}`,
+                          label: `${formatDimensionValue(row.type)} · ${formatOperation(row.operation)} · ${formatDimensionValue(row.variant)}`,
                           value: row.count,
                         }))}
                       />
@@ -1582,7 +1699,11 @@ function StatsApp() {
                         rows={data.artifacts}
                         headers={[
                           { label: "Type", key: "type" },
-                          { label: "Operation", key: "operation" },
+                          {
+                            label: "Operation",
+                            sortValue: (row) => formatOperation(row.operation),
+                            render: (row) => formatOperation(row.operation),
+                          },
                           { label: "Variant", key: "variant" },
                           {
                             label: "Count",
@@ -1612,6 +1733,22 @@ function StatsApp() {
                   onCategoryChange={setMediaCategory}
                 />
               </Section>
+              <div className="grid gap-5 lg:grid-cols-2">
+                <Section
+                  icon="streaming-services"
+                  title="Streaming services"
+                  subtitle="Processed WEB items grouped by their identified source."
+                >
+                  <StreamingServices services={data.streaming.services} />
+                </Section>
+                <Section
+                  icon="personal-releases"
+                  title="Personal releases"
+                  subtitle="Aggregate results only; release groups and tags are never stored."
+                >
+                  <ReleaseProfiles releaseProfiles={data.release_profiles} />
+                </Section>
+              </div>
               <Section icon="cache-by-provider" title="Cache by provider">
                 <ChartWithTable
                   chart={
@@ -1658,7 +1795,7 @@ function StatsApp() {
                     <DonutChart
                       ariaLabel="External operations by service"
                       rows={data.api.by_service.map((row) => ({
-                        label: `${row.service} · ${row.operation}`,
+                        label: `${row.service} · ${formatOperation(row.operation)}`,
                         value: row.requests,
                       }))}
                     />
@@ -1671,7 +1808,11 @@ function StatsApp() {
                       }))}
                       headers={[
                         { label: "Service", key: "service" },
-                        { label: "Operation", key: "operation" },
+                        {
+                          label: "Operation",
+                          sortValue: (row) => formatOperation(row.operation),
+                          render: (row) => formatOperation(row.operation),
+                        },
                         { label: "Requests", key: "requests" },
                         { label: "Success", key: "successes" },
                         { label: "Errors", key: "errors" },

@@ -18,11 +18,11 @@ This document summarizes the WebUI HTTP API implemented in `web_ui/server.py`. F
 - Auth: authenticated browser session only; Bearer tokens are rejected
 - CSRF: valid CSRF header and same-origin request required for both methods
 - GET query: `range=7d|30d|90d|1y|all` and `mode=real|debug`
-- GET description: returns an `enabled` flag plus the stable overview, timeline, 365-day heatmap, previous-period comparison, upload destination/category, category-specific media profile, artifact, cache, logical external-operation, and execution-source shapes. Volume fields contain media bytes rather than `.torrent` or `.nzb` file sizes. When collection is disabled, every aggregate is zero-filled and stored data is not read or returned.
+- GET description: returns an `enabled` flag plus the stable overview, timeline, 365-day heatmap, previous-period comparison, upload destination/category, category-specific media profile, streaming-service, personal/standard release-profile, artifact, cache, logical external-operation, and execution-source shapes. Volume fields contain media bytes rather than `.torrent` or `.nzb` file sizes. When collection is disabled, every aggregate is zero-filled and stored data is not read or returned.
 - DELETE payload: `{"confirmation":"RESET"}`
 - DELETE description: clears real and debug statistics in one transaction; caches, configuration, torrents, and NZBs are unaffected
 
-Statistics contain no per-release events, names, paths, external media IDs, URLs, or credentials. The `api` section counts logical adapter operations rather than transport retries. Its `bytes` values contain known payload bytes sent through NNTP and successful image uploads; zero means the payload size was unavailable or no measured bytes were sent.
+Statistics contain no per-release events, names, paths, release-group names or tags, external media IDs, URLs, or credentials. The release profile stores only the aggregate `personal` or `standard` classification. The `api` section counts logical adapter operations rather than transport retries. Its `bytes` values contain known payload bytes sent through NNTP and successful image uploads; zero means the payload size was unavailable or no measured bytes were sent.
 
 ### /api/execute
 
