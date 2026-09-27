@@ -153,9 +153,10 @@ def test_stats_ui_exposes_volume_profiles_comparisons_and_exports():
 
 def test_activity_heatmap_fits_panel_without_horizontal_scroll():
     stats_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
+    theme_css = (server.CODE_DIR / "web_ui" / "static" / "css" / "theme.css").read_text(encoding="utf-8")
 
     heatmap = stats_app.split("function ActivityHeatmap", 1)[1].split("const ReliabilityBadge", 1)[0]
-    assert 'className="w-full pb-1"' in heatmap
+    assert 'className="ua-stats-heatmap w-full pb-1"' in heatmap
     assert "overflow-x-auto" not in heatmap
     assert "min-w-[760px]" not in heatmap
     assert 'gridTemplateColumns: "repeat(52, minmax(0, 1fr))"' in heatmap
@@ -163,7 +164,9 @@ def test_activity_heatmap_fits_panel_without_horizontal_scroll():
     assert "monthMarkers.slice(1)" in heatmap
     assert "today.getUTCDate() - 363" in heatmap
     assert "offset < 364" in heatmap
-    assert all(label in heatmap for label in ("Mon", "Wed", "Fri", "Less", "More"))
+    assert all(label in heatmap for label in ("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Less", "More"))
+    assert "var(--ua-stats-heatmap-empty)" in heatmap
+    assert "--ua-stats-heatmap-empty:" in theme_css
 
 
 def test_stats_disabled_state_blurs_results_and_links_to_configuration():

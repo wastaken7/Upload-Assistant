@@ -671,9 +671,13 @@ function ActivityHeatmap({ rows }) {
       ? monthMarkers.slice(1)
       : monthMarkers;
   const weekdayLabels = [
+    { label: "Sun", weekday: 0 },
     { label: "Mon", weekday: 1 },
+    { label: "Tue", weekday: 2 },
     { label: "Wed", weekday: 3 },
+    { label: "Thu", weekday: 4 },
     { label: "Fri", weekday: 5 },
+    { label: "Sat", weekday: 6 },
   ].map((entry) => ({
     ...entry,
     row: ((entry.weekday - start.getUTCDay() + 7) % 7) + 1,
@@ -682,7 +686,7 @@ function ActivityHeatmap({ rows }) {
     gridTemplateColumns: "repeat(52, minmax(0, 1fr))",
   };
   return (
-    <div className="w-full pb-1">
+    <div className="ua-stats-heatmap w-full pb-1">
       <div className="grid grid-cols-[2.5rem_minmax(0,1fr)] gap-x-2 gap-y-1">
         <span aria-hidden="true" />
         <div
@@ -725,8 +729,8 @@ function ActivityHeatmap({ rows }) {
               className="aspect-square rounded-[3px]"
               style={{
                 background: cell.count
-                  ? `color-mix(in srgb, var(--ua-copper-bright) ${25 + Math.round((cell.count / maximum) * 70)}%, var(--ua-config-surface))`
-                  : "var(--ua-config-surface)",
+                  ? `color-mix(in srgb, var(--ua-copper-bright) ${25 + Math.round((cell.count / maximum) * 70)}%, var(--ua-stats-heatmap-empty))`
+                  : "var(--ua-stats-heatmap-empty)",
               }}
               title={`${cell.date}: ${formatNumber(cell.count)} completed`}
             />
@@ -741,8 +745,8 @@ function ActivityHeatmap({ rows }) {
               className="h-3 w-3 rounded-[3px]"
               style={{
                 background: intensity
-                  ? `color-mix(in srgb, var(--ua-copper-bright) ${intensity}%, var(--ua-config-surface))`
-                  : "var(--ua-config-surface)",
+                  ? `color-mix(in srgb, var(--ua-copper-bright) ${intensity}%, var(--ua-stats-heatmap-empty))`
+                  : "var(--ua-stats-heatmap-empty)",
               }}
               aria-hidden="true"
             />

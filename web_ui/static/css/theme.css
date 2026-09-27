@@ -2310,6 +2310,14 @@ html.ua-upload-document #root {
   outline: none;
 }
 
+.ua-stats-heatmap {
+  --ua-stats-heatmap-empty: color-mix(
+    in srgb,
+    var(--ua-config-muted) 16%,
+    var(--ua-config-surface-raised)
+  );
+}
+
 .ua-stats-chart-tooltip {
   border: 1px solid var(--ua-config-border);
 }
