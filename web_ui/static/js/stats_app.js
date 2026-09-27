@@ -639,22 +639,18 @@ function ActivityHeatmap({ rows }) {
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
   const start = new Date(today);
-  start.setUTCDate(today.getUTCDate() - 364);
-  const cells = Array.from({ length: start.getUTCDay() }, () => null);
-  for (let offset = 0; offset < 365; offset += 1) {
+  start.setUTCDate(today.getUTCDate() - 363);
+  const cells = [];
+  for (let offset = 0; offset < 364; offset += 1) {
     const date = new Date(start);
     date.setUTCDate(start.getUTCDate() + offset);
     const key = date.toISOString().slice(0, 10);
     cells.push({ date: key, count: byDate.get(key) || 0 });
   }
-  const maximum = Math.max(
-    1,
-    ...cells.filter(Boolean).map((cell) => cell.count),
-  );
+  const maximum = Math.max(1, ...cells.map((cell) => cell.count));
   const monthMarkers = [];
   let previousMonth = "";
   cells.forEach((cell, index) => {
-    if (!cell) return;
     const date = new Date(`${cell.date}T00:00:00Z`);
     const month = cell.date.slice(0, 7);
     if (month !== previousMonth) {
@@ -669,8 +665,21 @@ function ActivityHeatmap({ rows }) {
       previousMonth = month;
     }
   });
+  const visibleMonthMarkers =
+    monthMarkers.length > 1 &&
+    monthMarkers[1].column - monthMarkers[0].column <= 1
+      ? monthMarkers.slice(1)
+      : monthMarkers;
+  const weekdayLabels = [
+    { label: "Mon", weekday: 1 },
+    { label: "Wed", weekday: 3 },
+    { label: "Fri", weekday: 5 },
+  ].map((entry) => ({
+    ...entry,
+    row: ((entry.weekday - start.getUTCDay() + 7) % 7) + 1,
+  }));
   const columnStyle = {
-    gridTemplateColumns: "repeat(53, minmax(0, 1fr))",
+    gridTemplateColumns: "repeat(52, minmax(0, 1fr))",
   };
   return (
     <div className="w-full pb-1">
@@ -681,7 +690,7 @@ function ActivityHeatmap({ rows }) {
           style={columnStyle}
           aria-hidden="true"
         >
-          {monthMarkers.map((marker, index) => (
+          {visibleMonthMarkers.map((marker, index) => (
             <span
               key={marker.key}
               className={`whitespace-nowrap ${index % 2 ? "hidden sm:block" : ""}`}
@@ -695,37 +704,33 @@ function ActivityHeatmap({ rows }) {
           className="grid grid-rows-7 gap-[2px] text-xs opacity-60 sm:gap-1"
           aria-hidden="true"
         >
-          <span className="self-center" style={{ gridRowStart: 2 }}>
-            Mon
-          </span>
-          <span className="self-center" style={{ gridRowStart: 4 }}>
-            Wed
-          </span>
-          <span className="self-center" style={{ gridRowStart: 6 }}>
-            Fri
-          </span>
+          {weekdayLabels.map((entry) => (
+            <span
+              key={entry.label}
+              className="self-center"
+              style={{ gridRowStart: entry.row }}
+            >
+              {entry.label}
+            </span>
+          ))}
         </div>
         <div
           className="grid w-full grid-flow-col grid-rows-7 gap-[2px] sm:gap-1"
           role="img"
-          aria-label="Activity during the last 365 days"
+          aria-label="Activity during the last 52 weeks"
         >
-          {cells.map((cell, index) =>
-            cell ? (
-              <span
-                key={cell.date}
-                className="aspect-square rounded-[3px]"
-                style={{
-                  background: cell.count
-                    ? `color-mix(in srgb, var(--ua-copper-bright) ${25 + Math.round((cell.count / maximum) * 70)}%, var(--ua-config-surface))`
-                    : "var(--ua-config-surface)",
-                }}
-                title={`${cell.date}: ${formatNumber(cell.count)} completed`}
-              />
-            ) : (
-              <span key={`empty-${index}`} />
-            ),
-          )}
+          {cells.map((cell) => (
+            <span
+              key={cell.date}
+              className="aspect-square rounded-[3px]"
+              style={{
+                background: cell.count
+                  ? `color-mix(in srgb, var(--ua-copper-bright) ${25 + Math.round((cell.count / maximum) * 70)}%, var(--ua-config-surface))`
+                  : "var(--ua-config-surface)",
+              }}
+              title={`${cell.date}: ${formatNumber(cell.count)} completed`}
+            />
+          ))}
         </div>
         <span aria-hidden="true" />
         <div className="mt-1 flex items-center justify-end gap-1 text-xs opacity-60">
@@ -1392,7 +1397,7 @@ function StatsApp() {
               <Section
                 icon="activity-heatmap"
                 title="Activity heatmap"
-                subtitle="Completed items over the last 365 days. Darker cells indicate busier days."
+                subtitle="Completed items over the last 52 weeks. Darker cells indicate busier days."
               >
                 <ActivityHeatmap rows={data.heatmap} />
               </Section>
