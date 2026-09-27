@@ -651,29 +651,99 @@ function ActivityHeatmap({ rows }) {
     1,
     ...cells.filter(Boolean).map((cell) => cell.count),
   );
+  const monthMarkers = [];
+  let previousMonth = "";
+  cells.forEach((cell, index) => {
+    if (!cell) return;
+    const date = new Date(`${cell.date}T00:00:00Z`);
+    const month = cell.date.slice(0, 7);
+    if (month !== previousMonth) {
+      monthMarkers.push({
+        key: month,
+        label: date.toLocaleString("en-US", {
+          month: "short",
+          timeZone: "UTC",
+        }),
+        column: Math.floor(index / 7) + 1,
+      });
+      previousMonth = month;
+    }
+  });
+  const columnStyle = {
+    gridTemplateColumns: "repeat(53, minmax(0, 1fr))",
+  };
   return (
     <div className="w-full pb-1">
-      <div
-        className="grid w-full grid-flow-col grid-rows-7 gap-[2px] sm:gap-1"
-        role="img"
-        aria-label="Activity during the last 365 days"
-      >
-        {cells.map((cell, index) =>
-          cell ? (
+      <div className="grid grid-cols-[2.5rem_minmax(0,1fr)] gap-x-2 gap-y-1">
+        <span aria-hidden="true" />
+        <div
+          className="grid min-h-4 gap-[2px] text-[0.65rem] opacity-60 sm:gap-1 sm:text-xs"
+          style={columnStyle}
+          aria-hidden="true"
+        >
+          {monthMarkers.map((marker, index) => (
             <span
-              key={cell.date}
-              className="aspect-square rounded-[3px]"
+              key={marker.key}
+              className={`whitespace-nowrap ${index % 2 ? "hidden sm:block" : ""}`}
+              style={{ gridColumnStart: marker.column, gridRowStart: 1 }}
+            >
+              {marker.label}
+            </span>
+          ))}
+        </div>
+        <div
+          className="grid grid-rows-7 gap-[2px] text-xs opacity-60 sm:gap-1"
+          aria-hidden="true"
+        >
+          <span className="self-center" style={{ gridRowStart: 2 }}>
+            Mon
+          </span>
+          <span className="self-center" style={{ gridRowStart: 4 }}>
+            Wed
+          </span>
+          <span className="self-center" style={{ gridRowStart: 6 }}>
+            Fri
+          </span>
+        </div>
+        <div
+          className="grid w-full grid-flow-col grid-rows-7 gap-[2px] sm:gap-1"
+          role="img"
+          aria-label="Activity during the last 365 days"
+        >
+          {cells.map((cell, index) =>
+            cell ? (
+              <span
+                key={cell.date}
+                className="aspect-square rounded-[3px]"
+                style={{
+                  background: cell.count
+                    ? `color-mix(in srgb, var(--ua-copper-bright) ${25 + Math.round((cell.count / maximum) * 70)}%, var(--ua-config-surface))`
+                    : "var(--ua-config-surface)",
+                }}
+                title={`${cell.date}: ${formatNumber(cell.count)} completed`}
+              />
+            ) : (
+              <span key={`empty-${index}`} />
+            ),
+          )}
+        </div>
+        <span aria-hidden="true" />
+        <div className="mt-1 flex items-center justify-end gap-1 text-xs opacity-60">
+          <span>Less</span>
+          {[0, 25, 45, 65, 85].map((intensity) => (
+            <span
+              key={intensity}
+              className="h-3 w-3 rounded-[3px]"
               style={{
-                background: cell.count
-                  ? `color-mix(in srgb, var(--ua-copper-bright) ${25 + Math.round((cell.count / maximum) * 70)}%, var(--ua-config-surface))`
+                background: intensity
+                  ? `color-mix(in srgb, var(--ua-copper-bright) ${intensity}%, var(--ua-config-surface))`
                   : "var(--ua-config-surface)",
               }}
-              title={`${cell.date}: ${formatNumber(cell.count)} completed`}
+              aria-hidden="true"
             />
-          ) : (
-            <span key={`empty-${index}`} />
-          ),
-        )}
+          ))}
+          <span>More</span>
+        </div>
       </div>
     </div>
   );
@@ -1476,7 +1546,7 @@ function StatsApp() {
               <Section
                 icon="media-profile"
                 title="Media profile"
-                subtitle="Low-cardinality technical characteristics."
+                subtitle="Low-cardinality technical characteristics appropriate to each category."
               >
                 <MediaProfile
                   media={data.media}

@@ -158,6 +158,9 @@ def test_activity_heatmap_fits_panel_without_horizontal_scroll():
     assert 'className="w-full pb-1"' in heatmap
     assert "overflow-x-auto" not in heatmap
     assert "min-w-[760px]" not in heatmap
+    assert 'gridTemplateColumns: "repeat(53, minmax(0, 1fr))"' in heatmap
+    assert "monthMarkers.map" in heatmap
+    assert all(label in heatmap for label in ("Mon", "Wed", "Fri", "Less", "More"))
 
 
 def test_stats_disabled_state_blurs_results_and_links_to_configuration():
