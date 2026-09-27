@@ -2330,6 +2330,29 @@ html.ua-upload-document #root {
   );
 }
 
+.ua-stats-table-details > summary {
+  background: color-mix(
+    in srgb,
+    var(--ua-config-muted) 8%,
+    var(--ua-config-surface-raised)
+  );
+  color: var(--ua-config-text);
+}
+
+.ua-stats-table-details > summary:hover,
+.ua-stats-table-details > summary:focus-visible {
+  background: color-mix(
+    in srgb,
+    var(--ua-copper-bright) 10%,
+    var(--ua-config-surface-raised)
+  );
+  outline: none;
+}
+
+.ua-stats-table-details[open] .ua-stats-table-details-arrow {
+  transform: rotate(180deg);
+}
+
 .ua-stats-health {
   font-weight: 600;
 }

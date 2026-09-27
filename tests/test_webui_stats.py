@@ -39,7 +39,6 @@ def test_stats_filters_use_theme_aware_selects():
     stats_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
 
     assert stats_app.count('className="ua-theme-picker rounded-lg px-3 py-2 text-sm"') >= 2
-    assert 'className="ua-theme-picker flex rounded-lg p-1"' in stats_app
 
 
 def test_config_and_stats_rails_use_the_canonical_icons():
@@ -52,13 +51,16 @@ def test_config_and_stats_rails_use_the_canonical_icons():
     assert 'name="palette"' in config_app
 
 
-def test_stats_offers_persistent_table_and_donut_views():
+def test_stats_combines_charts_with_expandable_tables():
     stats_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
 
-    assert 'const BREAKDOWN_VIEW_KEY = "ua_stats_breakdown_view"' in stats_app
     assert "function DonutChart" in stats_app
-    assert 'aria-label="Breakdown visualization"' in stats_app
-    assert 'view === "table" ? "Tables" : "Charts"' in stats_app
+    assert "const ChartWithTable" in stats_app
+    assert stats_app.count("<ChartWithTable") == 7
+    assert 'className="ua-stats-table-details mt-5"' in stats_app
+    assert "<summary" in stats_app
+    assert "BREAKDOWN_VIEW_KEY" not in stats_app
+    assert 'aria-label="Breakdown visualization"' not in stats_app
     assert 'label: "Other"' in stats_app
 
 

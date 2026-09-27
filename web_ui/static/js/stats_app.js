@@ -1,6 +1,5 @@
 const { useEffect, useMemo, useRef, useState } = React;
 const APP_BASE = window.location.origin;
-const BREAKDOWN_VIEW_KEY = "ua_stats_breakdown_view";
 const CHART_COLORS = [
   "#3b82f6",
   "#22c55e",
@@ -783,7 +782,7 @@ const ReliabilityBadge = ({ rate, attempts }) => {
   );
 };
 
-function MediaProfile({ media, category, onCategoryChange, view }) {
+function MediaProfile({ media, category, onCategoryChange }) {
   const rows = (media?.dimensions || []).filter(
     (row) => row.category === category,
   );
@@ -813,49 +812,52 @@ function MediaProfile({ media, category, onCategoryChange, view }) {
           ))}
         </select>
       </label>
-      {view === "chart" ? (
-        <div className="grid gap-4 xl:grid-cols-2">
-          {Object.entries(groups).map(([dimension, values]) => (
-            <div className="ua-stats-inset rounded-xl p-4" key={dimension}>
-              <h3 className="mb-3 text-sm font-semibold capitalize">
-                {formatDimensionValue(dimension)}
-              </h3>
-              <DonutChart
-                ariaLabel={`${formatDimensionValue(dimension)} distribution`}
-                rows={values.map((row) => ({
-                  label: formatDimensionValue(row.value),
-                  value: row.count,
-                }))}
-              />
-            </div>
-          ))}
-        </div>
-      ) : (
-        <Table
-          rows={rows.map((row) => ({
-            ...row,
-            key: `${row.dimension}:${row.value}`,
-          }))}
-          headers={[
-            {
-              label: "Dimension",
-              sortValue: (row) => row.dimension,
-              render: (row) => formatDimensionValue(row.dimension),
-            },
-            {
-              label: "Value",
-              sortValue: (row) => row.value,
-              render: (row) => formatDimensionValue(row.value),
-            },
-            { label: "Items", key: "count" },
-            {
-              label: "Volume",
-              sortValue: (row) => row.bytes,
-              render: (row) => formatBytes(row.bytes),
-            },
-          ]}
-        />
-      )}
+      <ChartWithTable
+        chart={
+          <div className="grid gap-4 xl:grid-cols-2">
+            {Object.entries(groups).map(([dimension, values]) => (
+              <div className="ua-stats-inset rounded-xl p-4" key={dimension}>
+                <h3 className="mb-3 text-sm font-semibold capitalize">
+                  {formatDimensionValue(dimension)}
+                </h3>
+                <DonutChart
+                  ariaLabel={`${formatDimensionValue(dimension)} distribution`}
+                  rows={values.map((row) => ({
+                    label: formatDimensionValue(row.value),
+                    value: row.count,
+                  }))}
+                />
+              </div>
+            ))}
+          </div>
+        }
+        table={
+          <Table
+            rows={rows.map((row) => ({
+              ...row,
+              key: `${row.dimension}:${row.value}`,
+            }))}
+            headers={[
+              {
+                label: "Dimension",
+                sortValue: (row) => row.dimension,
+                render: (row) => formatDimensionValue(row.dimension),
+              },
+              {
+                label: "Value",
+                sortValue: (row) => row.value,
+                render: (row) => formatDimensionValue(row.value),
+              },
+              { label: "Items", key: "count" },
+              {
+                label: "Volume",
+                sortValue: (row) => row.bytes,
+                render: (row) => formatBytes(row.bytes),
+              },
+            ]}
+          />
+        }
+      />
     </div>
   );
 }
@@ -968,6 +970,24 @@ const Section = ({ icon, title, subtitle, children }) => (
   </section>
 );
 
+const ChartWithTable = ({ chart, table }) => (
+  <>
+    {chart}
+    <details className="ua-stats-table-details mt-5">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm font-semibold">
+        <span>Table</span>
+        <span
+          className="ua-stats-table-details-arrow transition-transform"
+          aria-hidden="true"
+        >
+          ▾
+        </span>
+      </summary>
+      <div className="mt-3">{table}</div>
+    </details>
+  </>
+);
+
 function Table({ headers, rows, empty = "No data in this period." }) {
   const [sort, setSort] = useState({ label: "", direction: "ascending" });
   const sortedRows = useMemo(() => {
@@ -1071,18 +1091,12 @@ function StatsApp() {
   );
   const [helpOpen, setHelpOpen] = useState(false);
   const [changelogOpen, setChangelogOpen] = useState(false);
-  const [breakdownView, setBreakdownView] = useState(() =>
-    window.UAStorage.get(BREAKDOWN_VIEW_KEY) === "chart" ? "chart" : "table",
-  );
   const [mediaCategory, setMediaCategory] = useState("");
 
   useEffect(() => {
     window.UAStorage.set("ua_config_theme", isDarkMode ? "dark" : "light");
     document.documentElement.dataset.uaMode = isDarkMode ? "dark" : "light";
   }, [isDarkMode]);
-  useEffect(() => {
-    window.UAStorage.set(BREAKDOWN_VIEW_KEY, breakdownView);
-  }, [breakdownView]);
 
   const load = async (signal) => {
     setLoading(true);
@@ -1234,27 +1248,6 @@ function StatsApp() {
             <p className="mt-1 text-sm opacity-60">Local daily aggregates.</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <div
-              className="ua-theme-picker flex rounded-lg p-1"
-              role="group"
-              aria-label="Breakdown visualization"
-            >
-              {["table", "chart"].map((view) => (
-                <button
-                  key={view}
-                  type="button"
-                  onClick={() => setBreakdownView(view)}
-                  aria-pressed={breakdownView === view}
-                  className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
-                    breakdownView === view
-                      ? "bg-[var(--ua-copper)] text-white"
-                      : "opacity-60 hover:opacity-100"
-                  }`}
-                >
-                  {view === "table" ? "Tables" : "Charts"}
-                </button>
-              ))}
-            </div>
             <select
               value={period}
               onChange={(event) => setPeriod(event.target.value)}
@@ -1418,107 +1411,82 @@ function StatsApp() {
                 title="Uploads by destination"
                 subtitle="One release uploaded to several sites counts once for each destination."
               >
-                {breakdownView === "chart" ? (
-                  <DonutChart
-                    ariaLabel="Upload activity by destination"
-                    rows={data.uploads.by_destination.map((row) => ({
-                      label: row.destination,
-                      value: row.successes + row.errors + row.skipped,
-                      favicon: row.destination,
-                    }))}
-                  />
-                ) : (
-                  <Table
-                    rows={data.uploads.by_destination.map((row) => ({
-                      ...row,
-                      key: `${row.destination}:${row.type}`,
-                    }))}
-                    headers={[
-                      {
-                        label: "Destination",
-                        sortValue: (r) => r.destination,
-                        render: (r) => (
-                          <span className="flex items-center gap-2">
-                            <TrackerFavicon destination={r.destination} />
-                            <span>{r.destination}</span>
-                          </span>
-                        ),
-                      },
-                      { label: "Type", key: "type" },
-                      {
-                        label: "Attempts",
-                        sortValue: (r) => r.attempts,
-                        render: (r) => formatNumber(r.attempts),
-                      },
-                      {
-                        label: "Success",
-                        sortValue: (r) => r.successes,
-                        render: (r) => formatNumber(r.successes),
-                      },
-                      {
-                        label: "Errors",
-                        sortValue: (r) => r.errors,
-                        render: (r) => formatNumber(r.errors),
-                      },
-                      {
-                        label: "Skipped",
-                        sortValue: (r) => r.skipped,
-                        render: (r) => formatNumber(r.skipped),
-                      },
-                      {
-                        label: "Skip reasons",
-                        render: (r) =>
-                          Object.entries(r.skip_reasons || {})
-                            .map(([reason, count]) => `${reason}: ${count}`)
-                            .join(", ") || "—",
-                      },
-                      {
-                        label: "Rate",
-                        sortValue: (r) => r.success_rate,
-                        render: (r) => `${r.success_rate}%`,
-                      },
-                      {
-                        label: "Health",
-                        sortValue: (r) => r.success_rate,
-                        render: (r) => (
-                          <ReliabilityBadge
-                            rate={r.success_rate}
-                            attempts={r.attempts}
-                          />
-                        ),
-                      },
-                      {
-                        label: "Avg time",
-                        sortValue: (r) => r.average_duration_ms,
-                        render: (r) => formatDuration(r.average_duration_ms),
-                      },
-                      {
-                        label: "Volume",
-                        sortValue: (r) => r.bytes,
-                        render: (r) => formatBytes(r.bytes),
-                      },
-                    ]}
-                  />
-                )}
-              </Section>
-              <div className="grid gap-5 lg:grid-cols-2">
-                <Section icon="categories" title="Categories">
-                  {breakdownView === "chart" ? (
+                <ChartWithTable
+                  chart={
                     <DonutChart
-                      ariaLabel="Upload activity by category"
-                      rows={data.uploads.by_category.map((row) => ({
-                        label: row.category,
+                      ariaLabel="Upload activity by destination"
+                      rows={data.uploads.by_destination.map((row) => ({
+                        label: row.destination,
                         value: row.successes + row.errors + row.skipped,
+                        favicon: row.destination,
                       }))}
                     />
-                  ) : (
+                  }
+                  table={
                     <Table
-                      rows={data.uploads.by_category}
+                      rows={data.uploads.by_destination.map((row) => ({
+                        ...row,
+                        key: `${row.destination}:${row.type}`,
+                      }))}
                       headers={[
-                        { label: "Category", key: "category" },
-                        { label: "Success", key: "successes" },
-                        { label: "Errors", key: "errors" },
-                        { label: "Skipped", key: "skipped" },
+                        {
+                          label: "Destination",
+                          sortValue: (r) => r.destination,
+                          render: (r) => (
+                            <span className="flex items-center gap-2">
+                              <TrackerFavicon destination={r.destination} />
+                              <span>{r.destination}</span>
+                            </span>
+                          ),
+                        },
+                        { label: "Type", key: "type" },
+                        {
+                          label: "Attempts",
+                          sortValue: (r) => r.attempts,
+                          render: (r) => formatNumber(r.attempts),
+                        },
+                        {
+                          label: "Success",
+                          sortValue: (r) => r.successes,
+                          render: (r) => formatNumber(r.successes),
+                        },
+                        {
+                          label: "Errors",
+                          sortValue: (r) => r.errors,
+                          render: (r) => formatNumber(r.errors),
+                        },
+                        {
+                          label: "Skipped",
+                          sortValue: (r) => r.skipped,
+                          render: (r) => formatNumber(r.skipped),
+                        },
+                        {
+                          label: "Skip reasons",
+                          render: (r) =>
+                            Object.entries(r.skip_reasons || {})
+                              .map(([reason, count]) => `${reason}: ${count}`)
+                              .join(", ") || "—",
+                        },
+                        {
+                          label: "Rate",
+                          sortValue: (r) => r.success_rate,
+                          render: (r) => `${r.success_rate}%`,
+                        },
+                        {
+                          label: "Health",
+                          sortValue: (r) => r.success_rate,
+                          render: (r) => (
+                            <ReliabilityBadge
+                              rate={r.success_rate}
+                              attempts={r.attempts}
+                            />
+                          ),
+                        },
+                        {
+                          label: "Avg time",
+                          sortValue: (r) => r.average_duration_ms,
+                          render: (r) => formatDuration(r.average_duration_ms),
+                        },
                         {
                           label: "Volume",
                           sortValue: (r) => r.bytes,
@@ -1526,38 +1494,72 @@ function StatsApp() {
                         },
                       ]}
                     />
-                  )}
+                  }
+                />
+              </Section>
+              <div className="grid gap-5 lg:grid-cols-2">
+                <Section icon="categories" title="Categories">
+                  <ChartWithTable
+                    chart={
+                      <DonutChart
+                        ariaLabel="Upload activity by category"
+                        rows={data.uploads.by_category.map((row) => ({
+                          label: row.category,
+                          value: row.successes + row.errors + row.skipped,
+                        }))}
+                      />
+                    }
+                    table={
+                      <Table
+                        rows={data.uploads.by_category}
+                        headers={[
+                          { label: "Category", key: "category" },
+                          { label: "Success", key: "successes" },
+                          { label: "Errors", key: "errors" },
+                          { label: "Skipped", key: "skipped" },
+                          {
+                            label: "Volume",
+                            sortValue: (r) => r.bytes,
+                            render: (r) => formatBytes(r.bytes),
+                          },
+                        ]}
+                      />
+                    }
+                  />
                 </Section>
                 <Section icon="artifact-activity" title="Artifact activity">
-                  {breakdownView === "chart" ? (
-                    <DonutChart
-                      ariaLabel="Artifact activity"
-                      rows={data.artifacts.map((row) => ({
-                        label: `${row.type} · ${row.operation} · ${row.variant}`,
-                        value: row.count,
-                      }))}
-                    />
-                  ) : (
-                    <Table
-                      rows={data.artifacts}
-                      headers={[
-                        { label: "Type", key: "type" },
-                        { label: "Operation", key: "operation" },
-                        { label: "Variant", key: "variant" },
-                        {
-                          label: "Count",
-                          sortValue: (r) => r.count,
-                          render: (r) => formatNumber(r.count),
-                        },
-                        {
-                          label: "Media volume",
-                          sortValue: (r) => r.bytes,
-                          render: (r) =>
-                            r.bytes > 0 ? formatBytes(r.bytes) : "—",
-                        },
-                      ]}
-                    />
-                  )}
+                  <ChartWithTable
+                    chart={
+                      <DonutChart
+                        ariaLabel="Artifact activity"
+                        rows={data.artifacts.map((row) => ({
+                          label: `${row.type} · ${row.operation} · ${row.variant}`,
+                          value: row.count,
+                        }))}
+                      />
+                    }
+                    table={
+                      <Table
+                        rows={data.artifacts}
+                        headers={[
+                          { label: "Type", key: "type" },
+                          { label: "Operation", key: "operation" },
+                          { label: "Variant", key: "variant" },
+                          {
+                            label: "Count",
+                            sortValue: (r) => r.count,
+                            render: (r) => formatNumber(r.count),
+                          },
+                          {
+                            label: "Media volume",
+                            sortValue: (r) => r.bytes,
+                            render: (r) =>
+                              r.bytes > 0 ? formatBytes(r.bytes) : "—",
+                          },
+                        ]}
+                      />
+                    }
+                  />
                 </Section>
               </div>
               <Section
@@ -1569,103 +1571,112 @@ function StatsApp() {
                   media={data.media}
                   category={mediaCategory}
                   onCategoryChange={setMediaCategory}
-                  view={breakdownView}
                 />
               </Section>
               <Section icon="cache-by-provider" title="Cache by provider">
-                {breakdownView === "chart" ? (
-                  <DonutChart
-                    ariaLabel="Cache activity by provider"
-                    rows={data.cache.by_provider.map((row) => ({
-                      label: row.provider,
-                      value: row.hits + row.misses + row.writes + row.bypasses,
-                    }))}
-                  />
-                ) : (
-                  <Table
-                    rows={data.cache.by_provider}
-                    headers={[
-                      { label: "Provider", key: "provider" },
-                      { label: "Hits", key: "hits" },
-                      { label: "Misses", key: "misses" },
-                      { label: "Writes", key: "writes" },
-                      { label: "Bypasses", key: "bypasses" },
-                      {
-                        label: "Written",
-                        sortValue: (r) => r.bytes_written,
-                        render: (r) => formatBytes(r.bytes_written),
-                      },
-                      {
-                        label: "Hit rate",
-                        sortValue: (r) => r.hit_rate,
-                        render: (r) => `${r.hit_rate}%`,
-                      },
-                    ]}
-                  />
-                )}
+                <ChartWithTable
+                  chart={
+                    <DonutChart
+                      ariaLabel="Cache activity by provider"
+                      rows={data.cache.by_provider.map((row) => ({
+                        label: row.provider,
+                        value:
+                          row.hits + row.misses + row.writes + row.bypasses,
+                      }))}
+                    />
+                  }
+                  table={
+                    <Table
+                      rows={data.cache.by_provider}
+                      headers={[
+                        { label: "Provider", key: "provider" },
+                        { label: "Hits", key: "hits" },
+                        { label: "Misses", key: "misses" },
+                        { label: "Writes", key: "writes" },
+                        { label: "Bypasses", key: "bypasses" },
+                        {
+                          label: "Written",
+                          sortValue: (r) => r.bytes_written,
+                          render: (r) => formatBytes(r.bytes_written),
+                        },
+                        {
+                          label: "Hit rate",
+                          sortValue: (r) => r.hit_rate,
+                          render: (r) => `${r.hit_rate}%`,
+                        },
+                      ]}
+                    />
+                  }
+                />
               </Section>
               <Section
                 icon="external-operations"
                 title="External operations"
                 subtitle="Logical adapter operations; internal redirects and retries are not counted separately. Bytes sent are available for NNTP and successful image uploads."
               >
-                {breakdownView === "chart" ? (
-                  <DonutChart
-                    ariaLabel="External operations by service"
-                    rows={data.api.by_service.map((row) => ({
-                      label: `${row.service} · ${row.operation}`,
-                      value: row.requests,
-                    }))}
-                  />
-                ) : (
-                  <Table
-                    rows={data.api.by_service.map((row) => ({
-                      ...row,
-                      key: `${row.service}:${row.operation}`,
-                    }))}
-                    headers={[
-                      { label: "Service", key: "service" },
-                      { label: "Operation", key: "operation" },
-                      { label: "Requests", key: "requests" },
-                      { label: "Success", key: "successes" },
-                      { label: "Errors", key: "errors" },
-                      {
-                        label: "Avg time",
-                        sortValue: (r) => r.average_duration_ms,
-                        render: (r) => formatDuration(r.average_duration_ms),
-                      },
-                      {
-                        label: "Bytes sent",
-                        sortValue: (r) => r.bytes,
-                        render: (r) =>
-                          r.bytes > 0 ? formatBytes(r.bytes) : "—",
-                      },
-                    ]}
-                  />
-                )}
+                <ChartWithTable
+                  chart={
+                    <DonutChart
+                      ariaLabel="External operations by service"
+                      rows={data.api.by_service.map((row) => ({
+                        label: `${row.service} · ${row.operation}`,
+                        value: row.requests,
+                      }))}
+                    />
+                  }
+                  table={
+                    <Table
+                      rows={data.api.by_service.map((row) => ({
+                        ...row,
+                        key: `${row.service}:${row.operation}`,
+                      }))}
+                      headers={[
+                        { label: "Service", key: "service" },
+                        { label: "Operation", key: "operation" },
+                        { label: "Requests", key: "requests" },
+                        { label: "Success", key: "successes" },
+                        { label: "Errors", key: "errors" },
+                        {
+                          label: "Avg time",
+                          sortValue: (r) => r.average_duration_ms,
+                          render: (r) => formatDuration(r.average_duration_ms),
+                        },
+                        {
+                          label: "Bytes sent",
+                          sortValue: (r) => r.bytes,
+                          render: (r) =>
+                            r.bytes > 0 ? formatBytes(r.bytes) : "—",
+                        },
+                      ]}
+                    />
+                  }
+                />
               </Section>
               <Section icon="execution-source" title="Execution source">
-                {breakdownView === "chart" ? (
-                  <DonutChart
-                    ariaLabel="Completed items by execution source"
-                    rows={data.sources.map((row) => ({
-                      label: row.source,
-                      value: row.count,
-                    }))}
-                  />
-                ) : (
-                  <Table
-                    rows={data.sources}
-                    headers={[
-                      { label: "Source", key: "source" },
-                      {
-                        label: "Completed items",
-                        sortValue: (r) => r.count,
-                        render: (r) => formatNumber(r.count),
-                      },
-                    ]}
-                  />
-                )}
+                <ChartWithTable
+                  chart={
+                    <DonutChart
+                      ariaLabel="Completed items by execution source"
+                      rows={data.sources.map((row) => ({
+                        label: row.source,
+                        value: row.count,
+                      }))}
+                    />
+                  }
+                  table={
+                    <Table
+                      rows={data.sources}
+                      headers={[
+                        { label: "Source", key: "source" },
+                        {
+                          label: "Completed items",
+                          sortValue: (r) => r.count,
+                          render: (r) => formatNumber(r.count),
+                        },
+                      ]}
+                    />
+                  }
+                />
               </Section>
             </div>
             {!statsEnabled && (
