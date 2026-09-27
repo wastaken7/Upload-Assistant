@@ -1401,7 +1401,7 @@ function StatsApp() {
               <Section
                 icon="activity-heatmap"
                 title="Activity heatmap"
-                subtitle="Completed items over the last 52 weeks. Darker cells indicate busier days."
+                subtitle="Uploads in the last year."
               >
                 <ActivityHeatmap rows={data.heatmap} />
               </Section>
@@ -1555,7 +1555,7 @@ function StatsApp() {
               <Section
                 icon="media-profile"
                 title="Media profile"
-                subtitle="Low-cardinality technical characteristics appropriate to each category."
+                subtitle="Low-cardinality technical characteristics."
               >
                 <MediaProfile
                   media={data.media}
