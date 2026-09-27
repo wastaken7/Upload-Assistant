@@ -1401,7 +1401,7 @@ function StatsApp() {
               <Section
                 icon="activity-heatmap"
                 title="Activity heatmap"
-                subtitle="Uploads in the last year."
+                subtitle="Completed items in the last year."
               >
                 <ActivityHeatmap rows={data.heatmap} />
               </Section>
