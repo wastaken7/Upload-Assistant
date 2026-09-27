@@ -171,6 +171,16 @@ def test_activity_heatmap_fits_panel_without_horizontal_scroll():
     assert "--ua-stats-heatmap-empty:" in theme_css
 
 
+def test_daily_activity_uses_curved_paths_without_changing_data_points():
+    stats_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
+
+    trend = stats_app.split("function TrendChart", 1)[1].split("function ActivityHeatmap", 1)[0]
+    assert "const curvePath" in trend
+    assert " C ${controlX},${previous.y} ${controlX},${current.y}" in trend
+    assert "d={curvePath(entry.key)}" in trend
+    assert "<polyline" not in trend
+
+
 def test_stats_disabled_state_blurs_results_and_links_to_configuration():
     stats_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
 

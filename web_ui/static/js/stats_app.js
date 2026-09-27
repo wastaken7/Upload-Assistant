@@ -526,12 +526,18 @@ function TrendChart({ rows }) {
       : padding + (index * (width - padding * 2)) / (rows.length - 1);
   const yFor = (key, row) =>
     height - padding - ((row[key] || 0) * (height - padding * 2)) / maximum;
-  const points = (key) =>
-    rows
-      .map((row, index) => {
-        return `${xFor(index)},${yFor(key, row)}`;
-      })
-      .join(" ");
+  const curvePath = (key) => {
+    const coordinates = rows.map((row, index) => ({
+      x: xFor(index),
+      y: yFor(key, row),
+    }));
+    if (!coordinates.length) return "";
+    return coordinates.slice(1).reduce((path, current, index) => {
+      const previous = coordinates[index];
+      const controlX = (previous.x + current.x) / 2;
+      return `${path} C ${controlX},${previous.y} ${controlX},${current.y} ${current.x},${current.y}`;
+    }, `M ${coordinates[0].x},${coordinates[0].y}`);
+  };
   if (!rows.length)
     return (
       <p className="py-12 text-center text-sm opacity-60">
@@ -560,12 +566,14 @@ function TrendChart({ rows }) {
             />
           ))}
           {activeSeries.map((entry) => (
-            <polyline
+            <path
               key={entry.key}
-              points={points(entry.key)}
+              d={curvePath(entry.key)}
               fill="none"
               stroke={entry.color}
               strokeWidth="3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
             />
           ))}
           {hovered !== null && (
