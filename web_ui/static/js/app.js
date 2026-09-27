@@ -2021,6 +2021,8 @@ function AudionutsUAGUI() {
   const [trackers, setTrackers] = useState([]);
   const [defaultTrackers, setDefaultTrackers] = useState(new Set());
   const [selectedTrackers, setSelectedTrackers] = useState(new Set());
+  const [trackerAliases, setTrackerAliases] = useState({});
+  const [trackerAliasError, setTrackerAliasError] = useState("");
   const [trackerStatuses, setTrackerStatuses] = useState({});
   const [isCheckingTrackerStatuses, setIsCheckingTrackerStatuses] =
     useState(false);
@@ -2867,7 +2869,11 @@ function AudionutsUAGUI() {
     }
   };
 
-  const parseTrackersFromArgs = (argsString, defaultTrackersSet) => {
+  const parseTrackersFromArgs = (
+    argsString,
+    defaultTrackersSet,
+    aliases = trackerAliases,
+  ) => {
     const hasTk = /(?:^|\s)(-tk|--trackers)(?=$|=|\s)/i.test(argsString);
     if (!hasTk) {
       return new Set(defaultTrackersSet);
@@ -2882,6 +2888,7 @@ function AudionutsUAGUI() {
       const list = val
         .split(",")
         .map((t) => t.trim().toUpperCase())
+        .map((name) => (Object.hasOwn(aliases, name) ? aliases[name] : name))
         .filter(Boolean);
       return new Set(list);
     }
@@ -3115,6 +3122,16 @@ function AudionutsUAGUI() {
             </div>
           </div>
         </div>
+        {trackerAliasError && (
+          <div
+            className="ua-tracker-status-advisory rounded-md border px-3 py-2 text-xs"
+            data-tone="danger"
+            role="alert"
+          >
+            {trackerAliasError}. Update CLI Alias in tracker configuration
+            before using -tk or --trackers.
+          </div>
+        )}
         {trackerStatusError && (
           <div
             className="ua-tracker-status-advisory rounded-md border px-3 py-2 text-xs"
@@ -3302,7 +3319,7 @@ function AudionutsUAGUI() {
     if (isDifferent) {
       setSelectedTrackers(newSet);
     }
-  }, [customArgs, defaultTrackers]);
+  }, [customArgs, defaultTrackers, trackerAliases]);
 
   // Get current values from args
   const descFilePath = extractArgValue(customArgs, "--descfile");
@@ -3805,8 +3822,14 @@ function AudionutsUAGUI() {
           setTrackers(data.trackers);
           const defaultSet = new Set(data.default_trackers || []);
           setDefaultTrackers(defaultSet);
-
-          const initialSet = parseTrackersFromArgs(customArgs, defaultSet);
+          const aliases = data.tracker_aliases || {};
+          setTrackerAliases(aliases);
+          setTrackerAliasError(data.alias_error || "");
+          const initialSet = parseTrackersFromArgs(
+            customArgs,
+            defaultSet,
+            aliases,
+          );
           setSelectedTrackers(initialSet);
 
           if (window.loadUATrackerStatuses) {

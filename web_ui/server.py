@@ -24,6 +24,7 @@ import urllib.parse
 import weakref
 from contextlib import suppress
 from datetime import datetime, timedelta, UTC
+from functools import wraps
 from types import ModuleType
 from pathlib import Path
 from typing import Any, Literal, Protocol, TypedDict, cast
@@ -36,7 +37,8 @@ import web_ui.auth as auth_mod
 from src.webui_progress import PROGRESS_STDOUT_PREFIX
 from src.prompt_sound import PROMPT_SOUND_STDOUT_MARKER
 from src.app_paths import CODE_DIR, DATA_DIR, STATE_DIR
-from src.args import cli_argument_catalog
+from src.args import cli_argument_catalog, tracker_cli_aliases
+from src.config_sync import ConfigSyncError, ConfigWriteConflict, config_write_lock, replace_config_source
 from src.external_tools import EXTERNAL_TOOL_KEYS, check_external_tools
 from src.meta import Meta
 from src.version import __version__
@@ -3249,7 +3251,13 @@ def _replace_config_value_in_source(source: str, key_path: list[str], new_value:
 
                 # Reconstruct the source with the new key using proper formatting
                 return _format_config_tree(tree)
-            raise ValueError(f"Key not found in config: {key}")
+            # Sparse user configs may omit an entire example-backed section.
+            # Build its parents in the staged AST, without replacing scalars.
+            new_dict_node = ast.Dict(keys=[], values=[])
+            current_dict.keys.append(ast.Constant(value=key))
+            current_dict.values.append(new_dict_node)
+            current_dict = new_dict_node
+            continue
 
         if target_node is not None and i < len(key_path) - 1:
             raise ValueError("Invalid path for config update")
@@ -5148,6 +5156,7 @@ def get_trackers():
         default_trackers_list = [t.strip().upper() for t in default_trackers_val.split(",") if t.strip()]
     elif isinstance(default_trackers_val, list):
         default_trackers_list = [str(t).strip().upper() for t in default_trackers_val if str(t).strip()]
+    default_trackers_list = [Meta.canonical_tracker_name(name) for name in default_trackers_list]
 
     cookie_trackers: set[str] = set()
     try:
@@ -5212,7 +5221,14 @@ def get_trackers():
 
     trackers_data.sort(key=lambda x: x["display_name"].lower())
 
-    return jsonify({"success": True, "default_trackers": default_trackers_list, "trackers": trackers_data})
+    aliases = Meta.tracker_name_aliases()
+    alias_error = ""
+    try:
+        aliases.update({alias: Meta.canonical_tracker_name(name) for alias, name in tracker_cli_aliases(user_config).items()})
+    except ValueError as error:
+        # A malformed manual edit must not hide the configuration/selector UI.
+        alias_error = str(error)
+    return jsonify({"success": True, "default_trackers": default_trackers_list, "trackers": trackers_data, "tracker_aliases": aliases, "alias_error": alias_error})
 
 
 @app.route("/api/tracker_api_key_status", methods=["POST"])
@@ -5346,14 +5362,29 @@ def config_test_prowlarr():
     )
 
 
+def _config_write_route(view: Callable[..., Any]) -> Callable[..., Any]:
+    """Guard and serialize every WebUI config writer with startup synchronization."""
+    @wraps(view)
+    def guarded(*args: Any, **kwargs: Any) -> Any:
+        if not _is_authenticated():
+            return jsonify({"success": False, "error": "Authentication required (web session)"}), 401
+        if not _verify_csrf_header() or not _verify_same_origin():
+            return jsonify({"success": False, "error": "CSRF/Origin validation failed"}), 403
+        try:
+            with config_write_lock(STATE_DIR / "data" / "config.py"):
+                return view(*args, **kwargs)
+        except ConfigWriteConflict as error:
+            return jsonify({"success": False, "error": str(error)}), 409
+        except (ConfigSyncError, OSError) as error:
+            console.print(f"Failed to save configuration safely: {error}", markup=False)
+            return jsonify({"success": False, "error": "Unable to save configuration safely. Pending changes are kept; please try again."}), 500
+    return guarded
+
+
 @app.route("/api/config_set_tracker_overrides", methods=["POST"])
+@_config_write_route
 def config_set_tracker_overrides():
     """Enable tracker DEFAULT overrides or retain their keys with inherited values."""
-    if not _is_authenticated():
-        return jsonify({"success": False, "error": "Authentication required (web session)"}), 401
-    if not _verify_csrf_header() or not _verify_same_origin():
-        return jsonify({"success": False, "error": "CSRF/Origin validation failed"}), 403
-
     data = _request_json_dict()
     tracker_name = str(data.get("tracker", "")).strip().upper()
     enabled = data.get("enabled")
@@ -5371,7 +5402,9 @@ def config_set_tracker_overrides():
     example_tracker = _as_dict(example_trackers.get(actual_example_name)) or {}
     override_keys = [key for key in _TRACKER_DEFAULT_OVERRIDE_KEYS if key in example_tracker]
     config_path = STATE_DIR / "data" / "config.py"
-    user_config = _load_config_from_file(config_path) or {}
+    original_bytes = config_path.read_bytes()
+    source = original_bytes.decode("utf-8")
+    user_config = _parse_config_source(source)
     user_trackers = _as_dict(user_config.get("TRACKERS")) or {}
     actual_user_name = next(
         (str(name) for name in user_trackers if str(name).upper() == tracker_name),
@@ -5384,7 +5417,6 @@ def config_set_tracker_overrides():
         return jsonify({"success": False, "error": "This tracker has no DEFAULT override block"}), 400
 
     try:
-        source = config_path.read_text(encoding="utf-8")
         if not isinstance(user_config.get("TRACKERS"), Mapping):
             source = _replace_config_value_in_source(source, ["TRACKERS"], "{}")
         if not isinstance(user_trackers.get(actual_user_name), Mapping):
@@ -5395,7 +5427,7 @@ def config_set_tracker_overrides():
                 ["TRACKERS", actual_user_name, key],
                 _python_literal(example_tracker[key] if enabled else None),
             )
-        config_path.write_text(source, encoding="utf-8")
+        replace_config_source(config_path, source, original_bytes)
         try:
             _write_audit_log(
                 "set_tracker_default_overrides",
@@ -5406,6 +5438,8 @@ def config_set_tracker_overrides():
             )
         except Exception as audit_error:
             console.print(f"Failed to write config audit record: {audit_error}", markup=False)
+    except ConfigSyncError:
+        raise
     except Exception as error:
         console.print(f"Failed to update tracker DEFAULT overrides: {error}", markup=False)
         return jsonify({"success": False, "error": "An error occurred while updating tracker overrides"}), 500
@@ -5529,13 +5563,9 @@ def _audit_config_updates(records: list[dict[str, Any]], success: bool, error: s
 
 
 @app.route("/api/config_update", methods=["POST"])
+@_config_write_route
 def config_update():
     """Save one field or a batch of field edits after staging every change."""
-    if not _is_authenticated():
-        return jsonify({"success": False, "error": "Authentication required (web session)"}), 401
-    if not _verify_csrf_header() or not _verify_same_origin():
-        return jsonify({"success": False, "error": "CSRF/Origin validation failed"}), 403
-
     data = _request_json_dict()
     is_batch = "updates" in data
     updates = data.get("updates") if is_batch else [data]
@@ -5543,17 +5573,24 @@ def config_update():
         return jsonify({"success": False, "error": "Provide between 1 and 1000 configuration updates"}), 400
 
     config_path = STATE_DIR / "data" / "config.py"
+    original_bytes = config_path.read_bytes()
+    source = original_bytes.decode("utf-8")
     example_config = _load_config_from_file(CODE_DIR / "data" / "example_config.py") or {}
     records: list[dict[str, Any]] = []
     try:
-        source = config_path.read_text(encoding="utf-8")
         for update in cast(list[dict[str, Any]], updates):
             source, record = _apply_config_update(source, example_config, update)
             records.append(record)
+        if any(record["path"][0] == "TRACKERS" and (len(record["path"]) <= 2 or record["path"][2] == "cli_alias") for record in records):
+            # Validate the final batch, so two aliases can be swapped together.
+            tracker_cli_aliases(_parse_config_source(source))
         # A bad edit anywhere in the batch leaves the original file untouched.
-        config_path.write_text(source, encoding="utf-8")
+        replace_config_source(config_path, source, original_bytes)
     except (ValueError, TypeError) as error:
         return jsonify({"success": False, "error": str(error)}), 400
+    except ConfigSyncError as error:
+        _audit_config_updates(records, False, str(error))
+        raise
     except Exception as error:
         _audit_config_updates(records, False, str(error))
         return jsonify({"success": False, "error": "An error occurred while updating the configuration"}), 500
@@ -5565,15 +5602,10 @@ def config_update():
 
 
 @app.route("/api/config_remove_subsection", methods=["POST"])
+@_config_write_route
 def config_remove_subsection():
     """Remove a subsection (top-level key) from the user's config.py if present"""
     # Require authenticated web session and CSRF protection; disallow bearer/basic API auth
-    if not _is_authenticated():
-        return jsonify({"success": False, "error": "Authentication required (web session)"}), 401
-    # Require CSRF + same-origin for config removal
-    if not _verify_csrf_header() or not _verify_same_origin():
-        return jsonify({"success": False, "error": "CSRF/Origin validation failed"}), 403
-
     data = _request_json_dict()
     path_raw = data.get("path", [])
     path: list[str] = []
@@ -5586,27 +5618,26 @@ def config_remove_subsection():
 
     base_dir = STATE_DIR
     config_path = base_dir / "data" / "config.py"
+    original_bytes = config_path.read_bytes()
+    source = original_bytes.decode("utf-8")
 
     try:
-        source = config_path.read_text(encoding="utf-8")
         updated = _remove_config_key_in_source(source, path)
         if updated == source:
             # Nothing changed
             return jsonify({"success": True, "value": None})
-        config_path.write_text(updated, encoding="utf-8")
+        replace_config_source(config_path, updated, original_bytes)
         return jsonify({"success": True})
+    except ConfigSyncError:
+        raise
     except Exception:
         return jsonify({"success": False, "error": "An error occurred while removing the configuration subsection"}), 500
 
 
 @app.route("/api/config_add_torrent_client", methods=["POST"])
+@_config_write_route
 def config_add_torrent_client():
     """Create a custom-named torrent client from an example template."""
-    if not _is_authenticated():
-        return jsonify({"success": False, "error": "Authentication required (web session)"}), 401
-    if not _verify_csrf_header() or not _verify_same_origin():
-        return jsonify({"success": False, "error": "CSRF/Origin validation failed"}), 403
-
     data = _request_json_dict()
     client_name = str(data.get("name", "")).strip()
     template_name = str(data.get("template", "")).strip()
@@ -5625,13 +5656,14 @@ def config_add_torrent_client():
         return jsonify({"success": False, "error": "Unknown torrent client template"}), 400
 
     config_path = STATE_DIR / "data" / "config.py"
-    user_config = _load_config_from_file(config_path) or {}
+    original_bytes = config_path.read_bytes()
+    source = original_bytes.decode("utf-8")
+    user_config = _parse_config_source(source)
     user_clients = _as_dict(user_config.get("TORRENT_CLIENTS")) or {}
     if client_name.casefold() in {str(name).casefold() for name in user_clients}:
         return jsonify({"success": False, "error": "A client with that name already exists"}), 409
 
     try:
-        source = config_path.read_text(encoding="utf-8")
         if not isinstance(user_config.get("TORRENT_CLIENTS"), Mapping):
             source = _replace_config_value_in_source(source, ["TORRENT_CLIENTS"], "{}")
         updated = _replace_config_value_in_source(
@@ -5639,7 +5671,7 @@ def config_add_torrent_client():
             ["TORRENT_CLIENTS", client_name],
             _python_literal(dict(template)),
         )
-        config_path.write_text(updated, encoding="utf-8")
+        replace_config_source(config_path, updated, original_bytes)
         try:
             _write_audit_log(
                 "add_subsection",
@@ -5650,6 +5682,8 @@ def config_add_torrent_client():
             )
         except Exception as audit_error:
             console.print(f"Failed to write config audit record: {audit_error}", markup=False)
+    except ConfigSyncError:
+        raise
     except Exception as error:
         console.print(f"Failed to add torrent client: {error}", markup=False)
         return jsonify({"success": False, "error": "An error occurred while adding the torrent client"}), 500
@@ -5664,13 +5698,9 @@ def config_add_torrent_client():
 
 
 @app.route("/api/config_rename_torrent_client", methods=["POST"])
+@_config_write_route
 def config_rename_torrent_client():
     """Rename a torrent-client block and its DEFAULT client references."""
-    if not _is_authenticated():
-        return jsonify({"success": False, "error": "Authentication required (web session)"}), 401
-    if not _verify_csrf_header() or not _verify_same_origin():
-        return jsonify({"success": False, "error": "CSRF/Origin validation failed"}), 403
-
     data = _request_json_dict()
     old_name = str(data.get("old_name", "")).strip()
     new_name = str(data.get("new_name", "")).strip()
@@ -5685,7 +5715,9 @@ def config_rename_torrent_client():
         return jsonify({"success": False, "error": "Choose a different client name"}), 400
 
     config_path = STATE_DIR / "data" / "config.py"
-    user_config = _load_config_from_file(config_path) or {}
+    original_bytes = config_path.read_bytes()
+    source = original_bytes.decode("utf-8")
+    user_config = _parse_config_source(source)
     user_clients = _as_dict(user_config.get("TORRENT_CLIENTS")) or {}
     actual_old_name = next(
         (str(name) for name in user_clients if str(name).casefold() == old_name.casefold()),
@@ -5709,7 +5741,6 @@ def config_rename_torrent_client():
         return jsonify({"success": False, "error": "Torrent client configuration is invalid"}), 400
 
     try:
-        source = config_path.read_text(encoding="utf-8")
         updated = _replace_config_value_in_source(
             source,
             ["TORRENT_CLIENTS", new_name],
@@ -5735,7 +5766,7 @@ def config_rename_torrent_client():
                 updated = _replace_config_value_in_source(updated, ["DEFAULT", key], _python_literal(next_value))
                 updated_references.append(key)
 
-        config_path.write_text(updated, encoding="utf-8")
+        replace_config_source(config_path, updated, original_bytes)
         try:
             _write_audit_log(
                 "rename_subsection",
@@ -5746,6 +5777,8 @@ def config_rename_torrent_client():
             )
         except Exception as audit_error:
             console.print(f"Failed to write config audit record: {audit_error}", markup=False)
+    except ConfigSyncError:
+        raise
     except Exception as error:
         console.print(f"Failed to rename torrent client: {error}", markup=False)
         return jsonify({"success": False, "error": "An error occurred while renaming the torrent client"}), 500

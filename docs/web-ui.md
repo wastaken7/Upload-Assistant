@@ -239,11 +239,15 @@ Configured and Available tracker searches accept names, tracker codes and CLI al
 
 Each tracker's **Advanced → CLI Alias** field provides an optional shorthand for `-tk` or `--trackers`. The full tracker code still works regardless of the alias, and aliases do not rename tracker cards or change the default tracker list.
 
+On the Upload page, entering an alias such as `-tk ATH` highlights the corresponding tracker card. Alias matching ignores case and uses the saved configuration. Conflicting aliases are rejected when saving, using the same rules as the CLI; a batch can swap two aliases because validation uses the final values.
+
 Default and Configured Trackers also show the cached availability dot used by the Upload page. Choose **Check tracker status** to refresh those credential-free checks. Any detected issue is summarized above the tracker list; Available Trackers are not checked until they have been configured.
 
 New trackers and tracker edits remain pending until the configuration is saved.
 
 **Save Config** sends pending field edits together in one request, including changes across multiple trackers. All field edits in that batch are validated before the file is written. If the server rejects the save, the edits remain pending so you can correct them or retry without re-entering them.
+
+WebUI configuration writes share a lock with startup synchronization and replace the file atomically. Missing parent sections in sparse configurations are created during staging. External changes detected before replacement cause the save to be rejected, preserving the newer file and the pending WebUI edits.
 
 ## Security and administration
 
