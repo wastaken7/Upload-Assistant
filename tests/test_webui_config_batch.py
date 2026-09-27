@@ -42,6 +42,27 @@ def post_updates(updates):
         return response.get_json(), status
 
 
+@pytest.mark.parametrize(
+    "invalid_source",
+    [b"not_config = {}\n", b"config = {\n", b"config = \xff\n"],
+)
+def test_config_parse_failures_return_json_400(batch_config, invalid_source):
+    config_path, _, _, _ = batch_config
+    config_path.write_bytes(invalid_source)
+
+    with server.app.test_request_context(
+        "/api/config_set_tracker_overrides",
+        method="POST",
+        json={"tracker": "AITHER", "enabled": False},
+    ):
+        response, status = server.config_set_tracker_overrides()
+
+    assert status == 400
+    assert response.is_json
+    assert response.get_json()["error"].startswith("Configuration file could not be parsed:")
+    assert config_path.read_bytes() == invalid_source
+
+
 def test_66_overrides_use_one_rate_limit_slot_and_one_file_write(batch_config, monkeypatch):
     config_path, example_path, keys, records = batch_config
     writes = []

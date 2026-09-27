@@ -5428,6 +5428,8 @@ def _config_write_route(view: Callable[..., Any]) -> Callable[..., Any]:
                 return view(*args, **kwargs)
         except ConfigWriteConflict as error:
             return jsonify({"success": False, "error": str(error)}), 409
+        except (ValueError, SyntaxError, UnicodeError) as error:
+            return jsonify({"success": False, "error": f"Configuration file could not be parsed: {error}"}), 400
         except (ConfigSyncError, OSError) as error:
             console.print(f"Failed to save configuration safely: {error}", markup=False)
             return jsonify({"success": False, "error": "Unable to save configuration safely. Pending changes are kept; please try again."}), 500
