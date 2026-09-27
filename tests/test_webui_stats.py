@@ -58,7 +58,9 @@ def test_stats_combines_charts_with_expandable_tables():
     assert "const ChartWithTable" in stats_app
     assert stats_app.count("<ChartWithTable") == 7
     assert 'className="ua-stats-table-details mt-5"' in stats_app
-    assert "<summary" in stats_app
+    assert 'aria-label="Show or hide data table"' in stats_app
+    assert 'className="ml-auto flex h-9 w-9 cursor-pointer' in stats_app
+    assert "<span>Table</span>" not in stats_app
     assert "BREAKDOWN_VIEW_KEY" not in stats_app
     assert 'aria-label="Breakdown visualization"' not in stats_app
     assert 'label: "Other"' in stats_app

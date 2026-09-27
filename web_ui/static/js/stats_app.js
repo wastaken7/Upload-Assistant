@@ -974,8 +974,11 @@ const ChartWithTable = ({ chart, table }) => (
   <>
     {chart}
     <details className="ua-stats-table-details mt-5">
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm font-semibold">
-        <span>Table</span>
+      <summary
+        className="ml-auto flex h-9 w-9 cursor-pointer list-none items-center justify-center rounded-lg"
+        aria-label="Show or hide data table"
+        title="Show or hide data table"
+      >
         <span
           className="ua-stats-table-details-arrow transition-transform"
           aria-hidden="true"
