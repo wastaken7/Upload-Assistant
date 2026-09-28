@@ -3413,6 +3413,9 @@ def _build_config_items(
         subsection_items = []
 
     for key in merged_keys:
+        # Legacy configs can retain removed settings after default synchronization.
+        if path == ["DEFAULT"] and key == "keep_meta":
+            continue
         example_value = example_section.get(key)
         user_value = user_dict.get(key)
         key_path = [*path, key]
@@ -3544,6 +3547,16 @@ def _prepare_default_webui_section(
             prepared[client_key] = default_value
             comments_map.setdefault(f"DEFAULT/{client_key}", help_text)
             subsection_map[f"DEFAULT/{client_key}"] = "CLIENT SELECTION"
+
+    if "stats_enabled" in prepared:
+        # Group statistics with Main Settings only for WebUI presentation.
+        # Keep the fields together so the builder emits a single subsection.
+        subsection_map["DEFAULT/stats_enabled"] = "MAIN SETTINGS"
+        main_settings = {
+            key: value for key, value in prepared.items()
+            if subsection_map.get(f"DEFAULT/{key}") == "MAIN SETTINGS"
+        }
+        prepared = {**main_settings, **prepared}
 
     return prepared
 
