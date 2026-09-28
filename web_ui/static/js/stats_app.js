@@ -116,17 +116,8 @@ const CHART_COLORS = [
   "#64748b",
 ];
 
-const AssetIcon = ({ name }) => (
-  <span
-    aria-hidden="true"
-    className="inline-block h-5 w-5 flex-none"
-    style={{
-      backgroundColor: "currentColor",
-      mask: `url(/static/img/webui-icons/${name}.svg) center / contain no-repeat`,
-      WebkitMask: `url(/static/img/webui-icons/${name}.svg) center / contain no-repeat`,
-    }}
-  />
-);
+const LucideIcon = window.UALucideIcon;
+const AssetIcon = ({ name }) => <LucideIcon name={name} className="h-5 w-5" />;
 
 const formatNumber = (value) => new Intl.NumberFormat().format(value || 0);
 const formatCompactNumber = (value) =>
@@ -401,7 +392,10 @@ function WorkspaceNav({
                   aria-pressed={isDarkMode}
                 >
                   <span>{isDarkMode ? "Dark mode" : "Light mode"}</span>
-                  <span aria-hidden="true">{isDarkMode ? "●" : "○"}</span>
+                  <LucideIcon
+                    name={isDarkMode ? "moon" : "sun"}
+                    className="h-4 w-4"
+                  />
                 </button>
               </div>
             )}
@@ -473,7 +467,7 @@ function HelpResourcesModal({ onClose }) {
             aria-label="Close help and resources"
             data-ua-modal-initial-focus
           >
-            ×
+            <LucideIcon name="x" className="h-4 w-4" />
           </button>
         </header>
         <div className="grid min-h-0 gap-4 overflow-y-auto p-5 md:grid-cols-2">
@@ -489,8 +483,12 @@ function HelpResourcesModal({ onClose }) {
                     rel="noopener noreferrer"
                     className="block rounded-lg border px-3 py-2.5"
                   >
-                    <span className="block text-sm font-semibold">
-                      {link.label} ↗
+                    <span className="flex items-center gap-1 text-sm font-semibold">
+                      {link.label}
+                      <LucideIcon
+                        name="external-link"
+                        className="h-3.5 w-3.5"
+                      />
                     </span>
                     <span className="mt-1 block text-xs opacity-60">
                       {link.description}
@@ -507,15 +505,7 @@ function HelpResourcesModal({ onClose }) {
 }
 
 const StatsIcon = ({ name, className = "h-5 w-5" }) => (
-  <span
-    className={`inline-block flex-none ${className}`}
-    aria-hidden="true"
-    style={{
-      backgroundColor: "currentColor",
-      mask: `url(/static/img/stats-icons/${name}.svg) center / contain no-repeat`,
-      WebkitMask: `url(/static/img/stats-icons/${name}.svg) center / contain no-repeat`,
-    }}
-  />
+  <LucideIcon name={name} className={className} />
 );
 
 const SettingsToggle = ({ checked, label, onChange, nested = false }) => (
@@ -579,7 +569,7 @@ function StatsSettingsModal({
             aria-label="Close stats display"
             data-ua-modal-initial-focus
           >
-            ×
+            <LucideIcon name="x" className="h-4 w-4" />
           </button>
         </header>
         <div className="min-h-0 space-y-5 overflow-y-auto p-5">
@@ -767,7 +757,7 @@ function StatsActionsMenu({ exportsDisabled, onCsv, onJson, onReset }) {
         aria-label="Statistics actions"
         title="Statistics actions"
       >
-        <span aria-hidden="true">⋯</span>
+        <LucideIcon name="ellipsis" className="h-5 w-5" />
       </button>
       {open && (
         <div
@@ -2164,17 +2154,7 @@ function StatsApp() {
                 <summary
                   className={`ua-stats-custom-summary flex h-full cursor-pointer list-none items-center gap-2 rounded-lg px-3 text-sm ${period === "custom" ? "ua-stats-period-button-active font-semibold shadow-sm" : ""}`}
                 >
-                  <svg
-                    aria-hidden="true"
-                    viewBox="0 0 24 24"
-                    className="h-4 w-4"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                  >
-                    <path d="M7 2v3M17 2v3M3.5 9h17M5 4h14a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" />
-                    <path d="M7 13h3M14 13h3M7 17h3M14 17h3" />
-                  </svg>
+                  <LucideIcon name="calendar-days" className="h-4 w-4" />
                   Custom dates
                 </summary>
                 <div className="ua-stats-chart-tooltip absolute right-0 z-20 mt-3 grid min-w-64 gap-3 rounded-lg p-3 shadow-xl">
@@ -2240,11 +2220,12 @@ function StatsApp() {
           {activeTracker && (
             <button
               type="button"
-              className="ua-stats-series-active rounded-full px-3 py-1"
+              className="ua-stats-series-active inline-flex items-center gap-1 rounded-full px-3 py-1"
               onClick={() => setActiveTracker("")}
               aria-label="Clear tracker filter"
             >
-              {activeTrackerRow?.display_name || activeTracker} ×
+              <span>{activeTrackerRow?.display_name || activeTracker}</span>
+              <LucideIcon name="x" className="h-3 w-3" />
             </button>
           )}
         </div>
@@ -2849,20 +2830,10 @@ function StatsApp() {
                   className="ua-stats-disabled-notice w-full max-w-lg rounded-xl p-6 text-center shadow-2xl sm:p-8"
                   role="status"
                 >
-                  <svg
+                  <LucideIcon
+                    name="triangle-alert"
                     className="mx-auto h-9 w-9 opacity-60"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                    aria-hidden="true"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="1.8"
-                      d="M12 9v4m0 4h.01M10.3 4.4 2.6 18a2 2 0 001.74 3h15.32a2 2 0 001.74-3L13.7 4.4a2 2 0 00-3.4 0z"
-                    />
-                  </svg>
+                  />
                   <h2 className="mt-4 text-lg font-semibold">
                     Statistics collection is disabled
                   </h2>

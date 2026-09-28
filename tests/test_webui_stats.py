@@ -59,7 +59,7 @@ def test_stats_period_selector_is_segmented_and_remembered():
 def test_stats_settings_are_persistent_and_control_the_requested_views():
     stats_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
     theme_css = (server.CODE_DIR / "web_ui" / "static" / "css" / "theme.css").read_text(encoding="utf-8")
-    settings_icon = server.CODE_DIR / "web_ui" / "static" / "img" / "stats-icons" / "settings.svg"
+    settings_icon = server.CODE_DIR / "web_ui" / "static" / "img" / "lucide-icons" / "sliders-horizontal.svg"
 
     assert 'const STATS_SETTINGS_KEY = "ua_stats_settings_v1"' in stats_app
     assert 'name="settings"' in stats_app
@@ -103,16 +103,28 @@ def test_application_rails_use_the_supplied_icons():
     stats_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
     config_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "config_app.js").read_text(encoding="utf-8")
 
+    shared_utils = (server.CODE_DIR / "web_ui" / "static" / "js" / "shared_utils.js").read_text(encoding="utf-8")
     icon_names = ("upload", "config", "stats", "changelog", "help", "logout")
     for icon_name in icon_names:
         assert f'name="{icon_name}"' in upload_app
         assert f'name="{icon_name}"' in config_app
-        assert (server.CODE_DIR / "web_ui" / "static" / "img" / "webui-icons" / f"{icon_name}.svg").is_file()
 
     assert "<AssetIcon name={id} />" in stats_app
     assert all(f'name="{icon_name}"' in stats_app for icon_name in ("changelog", "help", "logout"))
     assert 'name="palette"' in stats_app
     assert 'name="palette"' in config_app
+    assert "const WEB_UI_ICON_MAP = Object.freeze({" in shared_utils
+    assert 'class="ua-lucide-icon"' in (server.CODE_DIR / "web_ui" / "templates" / "login.html").read_text(encoding="utf-8")
+
+
+def test_ui_icon_assets_are_lucide_only():
+    icon_root = server.CODE_DIR / "web_ui" / "static" / "img"
+    lucide_icons = tuple((icon_root / "lucide-icons").glob("*.svg"))
+
+    assert lucide_icons
+    assert not tuple((icon_root / "webui-icons").glob("*.svg"))
+    assert not tuple((icon_root / "stats-icons").glob("*.svg"))
+    assert all("@license lucide-static" in icon.read_text(encoding="utf-8") for icon in lucide_icons)
 
 
 def test_stats_combines_charts_with_expandable_tables():
@@ -220,10 +232,11 @@ def test_stats_summary_cards_have_distinct_icons():
         "personal-releases",
         "pioneering-rate",
     )
-    icon_dir = server.CODE_DIR / "web_ui" / "static" / "img" / "stats-icons"
     for icon in icons:
         assert f'icon="{icon}"' in stats_app
-        assert (icon_dir / f"{icon}.svg").is_file()
+    shared_utils = (server.CODE_DIR / "web_ui" / "static" / "js" / "shared_utils.js").read_text(encoding="utf-8")
+    assert "const STATS_ICON_MAP = Object.freeze({" in shared_utils
+    assert "@license lucide-static" in (server.CODE_DIR / "web_ui" / "static" / "img" / "lucide-icons" / "circle-play.svg").read_text(encoding="utf-8")
 
 
 def test_stats_ui_exposes_volume_profiles_comparisons_and_actions():
@@ -242,7 +255,7 @@ def test_stats_ui_exposes_volume_profiles_comparisons_and_actions():
     assert "function StatsActionsMenu" in stats_app
     assert 'aria-haspopup="menu"' in stats_app
     assert 'aria-label="Statistics actions"' in stats_app
-    assert '<span aria-hidden="true">⋯</span>' in stats_app
+    assert '<LucideIcon name="ellipsis" className="h-5 w-5" />' in stats_app
     assert "exportsDisabled={!statsEnabled || !hasData}" in stats_app
     assert "CSV timeline" in stats_app
     assert "JSON details" in stats_app

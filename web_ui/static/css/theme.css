@@ -933,7 +933,8 @@ html[data-ua-mode="light"] .ua-auth-page {
   gap: 0.4rem;
 }
 
-.ua-auth-footer svg {
+.ua-auth-footer svg,
+.ua-auth-footer .ua-lucide-icon {
   height: 0.9rem;
   width: 0.9rem;
 }
@@ -2863,7 +2864,7 @@ html.ua-upload-document #root {
 select {
   -webkit-appearance: none;
   appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none'%3E%3Cpath d='m4 6 4 4 4-4' stroke='%23a8a29e' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-image: url("/static/img/lucide-icons/chevron-down-muted.svg");
   background-position: right 0.75rem center;
   background-repeat: no-repeat;
   background-size: 1rem;
@@ -3570,4 +3571,9 @@ html[data-ua-shape="square"]
     .ua-auth-submit
   ) {
   border-radius: 0.125rem !important;
+}
+.ua-lucide-icon {
+  background-color: currentColor;
+  mask: var(--ua-lucide-icon) center / contain no-repeat;
+  -webkit-mask: var(--ua-lucide-icon) center / contain no-repeat;
 }
