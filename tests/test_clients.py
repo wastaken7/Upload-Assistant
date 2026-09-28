@@ -33,6 +33,32 @@ def test_find_existing_torrents_skips_unconfigured_client_after_config_sync(tmp_
     assert meta.client is None
 
 
+@pytest.mark.parametrize(
+    "selected_client,defaults",
+    [
+        ("qbittorrent", {}),
+        (None, {"default_torrent_client": "qbittorrent"}),
+        (None, {"injecting_client_list": ["qbittorrent"]}),
+    ],
+)
+@pytest.mark.parametrize("client_section", [{}, {"TORRENT_CLIENTS": {}}])
+def test_add_to_client_skips_unconfigured_client(tmp_path: Path, selected_client, defaults, client_section) -> None:
+    clients = Clients({"DEFAULT": defaults, "TRACKERS": {"TEST": {}}, **client_section})
+    meta = Meta(base_dir=str(tmp_path), uuid="no-client", path=str(tmp_path / "video.mkv"), client=selected_client)
+    torrent_path = tmp_path / "tmp" / meta.uuid / "[TEST].torrent"
+    torrent_path.parent.mkdir(parents=True)
+    torrent_path.touch()
+
+    with (
+        patch("src.clients.Torrent.read"),
+        patch("src.clients.logger.info") as log,
+        patch.object(clients, "remote_path_map", new_callable=AsyncMock) as path_map,
+    ):
+        asyncio.run(clients.add_to_client(meta, "TEST"))
+        log.assert_called_once_with("[bold red]Torrent client 'qbittorrent' not found in config.")
+        path_map.assert_not_awaited()
+
+
 def test_empty_inject_delay_is_a_no_op() -> None:
     sleep_calls = 0
 

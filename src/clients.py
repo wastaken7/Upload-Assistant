@@ -170,6 +170,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
 
         logger.debug(f"[cyan]DEBUG: Clients to inject into: {inject_clients}[/cyan]")
 
+        clients_config = self.config.get("TORRENT_CLIENTS", {})
         for client_name in inject_clients:
             client_to_skip = self.config["TRACKERS"][tracker].get("client_to_skip", [])
             if client_name in client_to_skip:
@@ -178,11 +179,11 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
             if client_name == "none" or not client_name:
                 continue
 
-            if client_name not in self.config["TORRENT_CLIENTS"]:
+            if client_name not in clients_config:
                 logger.info(f"[bold red]Torrent client '{client_name}' not found in config.")
                 continue
 
-            client = self.config["TORRENT_CLIENTS"][client_name]
+            client = clients_config[client_name]
             torrent_client = client["torrent_client"]
             await self.inject_delay(meta, tracker, client_name)
 
