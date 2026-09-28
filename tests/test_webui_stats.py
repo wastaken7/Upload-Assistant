@@ -37,9 +37,13 @@ def test_stats_desktop_rail_has_shared_controls_without_desktop_switcher():
 
 def test_stats_filters_use_theme_aware_selects():
     stats_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
+    theme = (server.CODE_DIR / "web_ui" / "static" / "css" / "theme.css").read_text(encoding="utf-8")
 
     assert 'className="ua-stats-control rounded-xl px-4 text-sm"' in stats_app
     assert 'className="ua-theme-picker rounded-lg px-3 py-2 text-sm"' in stats_app
+    focus_styles = theme.split(".ua-stats-custom-summary:focus-visible {", 1)[1].split("}", 1)[0]
+    assert "outline: 2px solid var(--ua-copper-bright)" in focus_styles
+    assert "outline-offset: 2px" in focus_styles
 
 
 def test_stats_period_selector_is_segmented_and_remembered():

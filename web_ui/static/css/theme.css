@@ -2349,7 +2349,11 @@ html.ua-upload-document #root {
 .ua-stats-custom-summary:focus-visible,
 .ua-stats-custom-dates[open] > .ua-stats-custom-summary {
   opacity: 1;
-  outline: none;
+}
+
+.ua-stats-custom-summary:focus-visible {
+  outline: 2px solid var(--ua-copper-bright);
+  outline-offset: 2px;
 }
 
 .ua-stats-control {

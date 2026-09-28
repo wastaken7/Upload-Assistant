@@ -571,7 +571,7 @@ def get_stats(
                     """,
                     (mode, heatmap_start),
                 ).fetchall()
-            prior_rows: list[tuple[str, str, str, int, str]] = []
+            prior_rows: list[tuple[str, str, str, str, int, str]] = []
             if start:
                 current_start = datetime.fromisoformat(start).date()
                 current_end = datetime.fromisoformat(end).date()
@@ -580,9 +580,9 @@ def get_stats(
                 prior_start = prior_end - timedelta(days=days - 1)
                 prior_rows = db.execute(
                     """
-                    SELECT family, service, outcome, SUM(count), destination FROM stats_daily
+                    SELECT family, service, operation, outcome, SUM(count), destination FROM stats_daily
                     WHERE mode = ? AND day >= ? AND day <= ?
-                    GROUP BY family, service, outcome, destination
+                    GROUP BY family, service, operation, outcome, destination
                     """,
                     (mode, prior_start.isoformat(), prior_end.isoformat()),
                 ).fetchall()
@@ -901,7 +901,7 @@ def get_stats(
         prior_uploads = 0
         prior_cache_hits = 0
         prior_cache_misses = 0
-        for family, service, outcome, count, destination in prior_rows:
+        for family, service, operation, outcome, count, destination in prior_rows:
             value = int(count)
             effective_destination = destination or (service if family == "upload" else "")
             if active_tracker:
@@ -910,7 +910,7 @@ def get_stats(
                     if outcome == "success":
                         prior_uploads += value
             else:
-                if family == "item" and service == "" and destination == "":
+                if family == "item" and service == "" and operation == "completed" and destination == "":
                     prior_items += value
                 if family == "upload" and outcome == "success":
                     prior_uploads += value

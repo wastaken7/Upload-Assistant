@@ -8,8 +8,8 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from src import stats
-from src.metadata_cache import cache_for, is_cache_miss
 from src.meta import Meta
+from src.metadata_cache import cache_for, is_cache_miss
 
 
 @pytest.fixture(autouse=True)
@@ -354,6 +354,7 @@ def test_reused_torrent_reports_media_volume_as_hashing_io_avoided(tmp_path):
 
 
 def test_stats_reports_heatmap_and_previous_period_comparison(tmp_path):
+    stats.record_event("item", operation="started", outcome="success", state_dir=tmp_path)
     stats.record_event("item", operation="completed", outcome="success", state_dir=tmp_path)
     stats.record_event("upload", service="FICTIONAL", operation="tracker", outcome="success", state_dir=tmp_path)
     stats.record_event("cache", service="fictional", operation="title", outcome="hit", state_dir=tmp_path)
