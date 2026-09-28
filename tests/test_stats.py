@@ -1,5 +1,4 @@
 import os
-import asyncio
 import sqlite3
 import subprocess
 import sys
@@ -96,6 +95,100 @@ def test_completed_item_outcome_uses_definitive_upload_results(statuses, expecte
     assert stats.completed_item_outcome(statuses) == expected
 
 
+@pytest.mark.parametrize(
+    ("status", "expected"),
+    [
+        ({"upload_success": True}, "success"),
+        ({"dupe": True, "upload_success": False}, "skipped:dupe"),
+        ({"upload": True, "upload_success": False}, "error"),
+        ({"status_message": "Skipped by a fictional rule"}, "skipped:no_upload"),
+    ],
+)
+def test_tracker_route_outcome_has_stable_precedence(status, expected):
+    assert stats.tracker_route_outcome(status) == expected
+
+
+@pytest.mark.asyncio
+async def test_completed_item_records_one_route_per_tracker_and_supports_filtering(monkeypatch, tmp_path):
+    monkeypatch.setattr(stats, "_database_path", lambda _state_dir=None: tmp_path / "data" / "stats.sqlite3")
+
+    class TorrentTracker:
+        is_usenet = False
+
+    meta = Meta(
+        category="MOVIE",
+        resolution="2160p",
+        video_codec="HEVC",
+        hdr="HDR10+",
+        source_size=50_000,
+        tracker_status={
+            "FICTIONAL": {"upload_success": True},
+            "IMAGINARY": {"dupe": True, "status_message": "Duplicate found"},
+        },
+    )
+    await stats.record_completed_item_stats_async(meta, {"FICTIONAL": TorrentTracker, "IMAGINARY": TorrentTracker})
+    stats.record_event("cache", service="imaginarydb", outcome="hit", state_dir=tmp_path)
+
+    global_result = stats.get_stats("all", "real", tmp_path)
+    filtered = stats.get_stats("all", "real", tmp_path, tracker="FICTIONAL")
+
+    assert global_result["overview"]["items_completed"] == 1
+    assert global_result["overview"]["uploads"] == 1
+    assert global_result["overview"]["duplicate_preventions"] == 1
+    assert global_result["overview"]["pioneering_rate"] == 50.0
+    assert global_result["sankey"]["nodes"][0]["total"] == 2
+    assert filtered["overview"]["items_completed"] == 1
+    assert filtered["overview"]["processed_bytes"] == 50_000
+    assert filtered["overview"]["uploaded_bytes"] == 50_000
+    assert filtered["cache"]["hits"] == 1
+    assert filtered["media"]["matrix"][0]["resolution"] == "2160p"
+    assert filtered["uploads"]["by_destination"][0]["pioneering_rate"] == 100.0
+
+
+@pytest.mark.asyncio
+async def test_duplicate_only_item_is_not_classified_as_an_error(monkeypatch, tmp_path):
+    monkeypatch.setattr(stats, "_database_path", lambda _state_dir=None: tmp_path / "data" / "stats.sqlite3")
+    meta = Meta(
+        category="TV",
+        source_size=10_000,
+        tracker_status={"FICTIONAL": {"dupe": True, "upload_success": False}},
+    )
+
+    await stats.record_completed_item_stats_async(meta, {"FICTIONAL": object})
+    result = stats.get_stats("all", "real", tmp_path)
+
+    assert result["items"] == {"success": 0, "no_upload": 1, "error": 0}
+    assert result["overview"]["duplicate_preventions"] == 1
+
+
+def test_schema_v2_recreates_unreleased_v1_aggregates(tmp_path):
+    database = tmp_path / "data" / "stats.sqlite3"
+    database.parent.mkdir(parents=True)
+    with sqlite3.connect(database) as db:
+        db.execute("CREATE TABLE stats_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+        db.execute("INSERT INTO stats_meta VALUES ('schema_version', '1')")
+        db.execute("CREATE TABLE stats_daily (legacy TEXT)")
+
+    stats.record_event("item", operation="completed", state_dir=tmp_path)
+
+    with sqlite3.connect(database) as db:
+        columns = {row[1] for row in db.execute("PRAGMA table_info(stats_daily)")}
+        assert "destination" in columns
+        assert db.execute("SELECT value FROM stats_meta WHERE key = 'schema_version'").fetchone() == ("2",)
+
+
+def test_calendar_ranges_use_inclusive_utc_boundaries():
+    today = stats.get_empty_stats("today", "real")
+    this_month = stats.get_empty_stats("this_month", "real")
+    last_month = stats.get_empty_stats("last_month", "real")
+
+    assert today["period"]["from"] == today["period"]["to"]
+    assert this_month["period"]["from"].endswith("-01")
+    assert last_month["period"]["from"].endswith("-01")
+    assert last_month["period"]["to"] < this_month["period"]["from"]
+    assert today["period"]["timezone"] == "UTC"
+
+
 def test_api_requests_fall_back_to_completed_operation_outcomes(tmp_path):
     stats.record_event("api", service="fictional-client", operation="search", outcome="success", duration_ms=20, bytes_count=2048, state_dir=tmp_path)
     stats.record_event("api", service="fictional-client", operation="search", outcome="error", duration_ms=10, state_dir=tmp_path)
@@ -153,13 +246,20 @@ async def test_media_profile_records_category_appropriate_dimensions(monkeypatch
         ("release_type", "WEBDL"),
         ("video_codec", "HEVC"),
         ("audio_codec", "Dolby_Atmos"),
-        ("hdr", "Dolby_Vision"),
+        ("hdr", "Dolby_Vision_-_profile_unknown_HDR10"),
         ("streaming_service", "Netflix"),
     }
     assert all(row["bytes"] == 85_000 for row in result["media"]["dimensions"])
-    assert result["streaming"]["services"] == [
-        {"service": "Netflix", "items": 1, "bytes": 85_000, "average_item_bytes": 85_000}
+    assert result["media"]["matrix"] == [
+        {
+            "category": "MOVIE",
+            "resolution": "2160p",
+            "profile": "HEVC · Dolby_Vision_-_profile_unknown_HDR10",
+            "count": 1,
+            "bytes": 85_000,
+        }
     ]
+    assert result["streaming"]["services"] == [{"service": "Netflix", "items": 1, "bytes": 85_000, "average_item_bytes": 85_000}]
 
 
 def test_web_media_without_a_service_is_grouped_as_unknown():
@@ -167,6 +267,39 @@ def test_web_media_without_a_service_is_grouped_as_unknown():
 
     assert ("streaming_service", "Unknown") in dimensions
     assert ("streaming_service", "Unknown") not in stats.media_profile_dimensions(Meta(category="MOVIE", type="REMUX"))
+
+
+@pytest.mark.parametrize(
+    ("hdr", "profile", "compatibility", "expected"),
+    [
+        ("DV", "dvhe.05.06", "", "Dolby Vision Profile 5"),
+        ("DV HDR", "dvhe.07.06", "HDR10", "Dolby Vision Profile 7 + HDR10"),
+        ("DV", "dvhe.08.06", "HDR10", "Dolby Vision Profile 8 + HDR10"),
+        ("DV", "", "", "Dolby Vision - profile unknown"),
+        ("HDR10+", "", "HDR10+ Profile B", "HDR10+"),
+        ("HDR", "", "HDR10", "HDR10"),
+        ("HLG", "", "HLG", "HLG"),
+        ("", "", "", "SDR"),
+    ],
+)
+def test_hdr_bucket_preserves_dolby_vision_depth(hdr, profile, compatibility, expected):
+    meta = Meta(
+        hdr=hdr,
+        mediainfo={
+            "media": {
+                "track": [
+                    {"@type": "General"},
+                    {
+                        "@type": "Video",
+                        "HDR_Format_Profile": profile,
+                        "HDR_Format_Compatibility": compatibility,
+                    },
+                ]
+            }
+        },
+    )
+
+    assert stats._hdr_bucket(meta) == expected
 
 
 @pytest.mark.asyncio
@@ -217,9 +350,7 @@ def test_reused_torrent_reports_media_volume_as_hashing_io_avoided(tmp_path):
     result = stats.get_stats("all", "real", tmp_path)
 
     assert result["overview"]["hashing_bytes_avoided"] == 64_000
-    assert result["artifacts"] == [
-        {"type": "torrent", "operation": "reused", "variant": "base", "count": 1, "bytes": 64_000}
-    ]
+    assert result["artifacts"] == [{"type": "torrent", "operation": "reused", "variant": "base", "count": 1, "bytes": 64_000}]
 
 
 def test_stats_reports_heatmap_and_previous_period_comparison(tmp_path):
@@ -365,6 +496,10 @@ def test_invalid_filters_are_rejected(tmp_path):
         stats.get_stats("yesterday", "real", tmp_path)
     with pytest.raises(ValueError, match="mode"):
         stats.get_stats("7d", "combined", tmp_path)
+    with pytest.raises(ValueError, match="YYYY-MM-DD"):
+        stats.get_stats("custom", "real", tmp_path, date_from="bad", date_to="2026-01-01")
+    with pytest.raises(ValueError, match="on or before"):
+        stats.get_stats("custom", "real", tmp_path, date_from="2026-01-02", date_to="2026-01-01")
 
 
 def test_one_year_range_contains_365_inclusive_days():

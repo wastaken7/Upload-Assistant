@@ -7,13 +7,20 @@ const vm = require("node:vm");
 const context = { window: {} };
 vm.runInNewContext(
   fs.readFileSync(
-    path.join(__dirname, "../web_ui/static/js/config_tracker_default_overrides.js"),
+    path.join(
+      __dirname,
+      "../web_ui/static/js/config_tracker_default_overrides.js",
+    ),
     "utf8",
   ),
   context,
 );
 const { createEditor } = context.window.UATrackerDefaultOverrides;
-const defaults = { add_logo: true, multiScreens: 4, custom_signature: "Global" };
+const defaults = {
+  add_logo: true,
+  multiScreens: 4,
+  custom_signature: "Global",
+};
 const pathKey = (item) => `TRACKERS/AITHER/${item.key}`;
 const item = (key, value, source = "config") => ({
   key,
@@ -65,7 +72,10 @@ test("Disable all stages null values, keeps the keys on save and reloads uncheck
     item("custom_signature", ""),
   ];
   items.forEach((entry) => editor.setFieldEnabled(entry, false));
-  assert.equal(items.filter((entry) => editor.fieldState(entry).enabled).length, 0);
+  assert.equal(
+    items.filter((entry) => editor.fieldState(entry).enabled).length,
+    0,
+  );
   assert.equal(editor.pendingChanges.size, 3);
   for (const entry of items) {
     const update = editor.pendingChanges.get(pathKey(entry));
@@ -113,7 +123,10 @@ test("Enable all starts saved inherited fields from current DEFAULT values", () 
     const entry = item(key, null);
     editor.setFieldEnabled(entry, true);
     assert.equal(editor.fieldState(entry).enabled, true);
-    assert.equal(editor.pendingChanges.get(pathKey(entry)).value, defaults[key]);
+    assert.equal(
+      editor.pendingChanges.get(pathKey(entry)).value,
+      defaults[key],
+    );
   }
 });
 

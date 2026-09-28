@@ -4180,10 +4180,16 @@ def _add_stats_destination_display_names(payload: dict[str, Any]) -> None:
     from src.trackersetup import tracker_class_map
 
     rows = payload.get("uploads", {}).get("by_destination", [])
-    for row in rows:
+    filter_rows = payload.get("filters", {}).get("destinations", [])
+    for row in [*rows, *filter_rows]:
         destination = str(row.get("destination") or "")
         tracker_class = tracker_class_map.get(destination.upper())
         row["display_name"] = str(getattr(tracker_class, "display_name", destination))
+    for node in payload.get("sankey", {}).get("nodes", []):
+        destination = str(node.get("destination") or "")
+        if destination:
+            tracker_class = tracker_class_map.get(destination.upper())
+            node["label"] = str(getattr(tracker_class, "display_name", destination))
 
 
 @app.route("/api/health")
@@ -4214,10 +4220,14 @@ def stats_api():
 
     period = str(request.args.get("range", "30d"))
     mode = str(request.args.get("mode", "real"))
+    date_from = request.args.get("from")
+    date_to = request.args.get("to")
+    tracker = str(request.args.get("tracker", ""))
     try:
         config = _load_config_from_file(STATE_DIR / "data" / "config.py") or {}
         enabled = stats_collection_enabled(config)
-        payload = get_stats(period, mode, STATE_DIR) if enabled else get_empty_stats(period, mode)
+        stats_kwargs = {"date_from": date_from, "date_to": date_to, "tracker": tracker}
+        payload = get_stats(period, mode, STATE_DIR, **stats_kwargs) if enabled else get_empty_stats(period, mode, **stats_kwargs)
         _add_stats_destination_display_names(payload)
         payload["enabled"] = enabled
         return jsonify(payload)
@@ -5417,6 +5427,7 @@ def config_test_prowlarr():
 
 def _config_write_route(view: Callable[..., Any]) -> Callable[..., Any]:
     """Guard and serialize every WebUI config writer with startup synchronization."""
+
     @wraps(view)
     def guarded(*args: Any, **kwargs: Any) -> Any:
         if not _is_authenticated():
@@ -5433,6 +5444,7 @@ def _config_write_route(view: Callable[..., Any]) -> Callable[..., Any]:
         except (ConfigSyncError, OSError) as error:
             console.print(f"Failed to save configuration safely: {error}", markup=False)
             return jsonify({"success": False, "error": "Unable to save configuration safely. Pending changes are kept; please try again."}), 500
+
     return guarded
 
 
@@ -5575,9 +5587,8 @@ def _apply_config_update(source: str, example_config: dict[str, Any], data: dict
     # Keep optional WebUI-managed values out of config.py when they are unused.
     # Tracker overrides instead retain None to inherit subsequent DEFAULT changes.
     key = path[-1] if path else ""
-    should_remove_empty_value = (
-        (key in ["injecting_client_list", "searching_client_list"] and coerced_value == [])
-        or (is_optional_arr_field and (coerced_value == "" or force_remove_optional_arr_field))
+    should_remove_empty_value = (key in ["injecting_client_list", "searching_client_list"] and coerced_value == []) or (
+        is_optional_arr_field and (coerced_value == "" or force_remove_optional_arr_field)
     )
     prior_value = _get_nested_value(prior_config, path)
     if should_remove_empty_value:
@@ -5610,8 +5621,12 @@ def _audit_config_updates(records: list[dict[str, Any]], success: bool, error: s
     for record in records:
         try:
             _write_audit_log(
-                record["action"], record["path"], record["prior_value"],
-                None if record["action"] == "remove_key" else record["value"], success, error,
+                record["action"],
+                record["path"],
+                record["prior_value"],
+                None if record["action"] == "remove_key" else record["value"],
+                success,
+                error,
             )
         except Exception as audit_error:
             console.print(f"Failed to write config audit record: {audit_error}", markup=False)
