@@ -12,6 +12,99 @@ const STATS_PERIODS = [
   ["all", "All"],
 ];
 const TREND_VIEW_KEY = "ua_stats_trend_view";
+const STATS_SETTINGS_KEY = "ua_stats_settings_v1";
+const DEFAULT_STATS_SETTINGS = Object.freeze({
+  timezone: "utc",
+  dateFormat: "YYYY-MM-DD",
+  chartGradient: false,
+  showFavicons: true,
+  visibility: {
+    throughput: true,
+    itemsCompleted: true,
+    successfulUploads: true,
+    dataUploaded: true,
+    uniqueDataUploaded: true,
+    efficiency: true,
+    duplicatesPrevented: true,
+    pioneeringRate: true,
+    hashingAvoided: true,
+    health: true,
+    cacheHitRate: true,
+    cacheWrites: true,
+    apiOperations: true,
+    artifactsSummary: true,
+    torrentsCreated: true,
+    nzbsCreated: true,
+    screenshotsCreated: true,
+    dailyActivity: true,
+    uploadFlow: true,
+    activityHeatmap: true,
+    uploadsByDestination: true,
+    categories: true,
+    contentTime: true,
+    artifactActivity: true,
+    mediaProfile: true,
+    streamingServices: true,
+    personalReleases: true,
+    cacheByProvider: true,
+    externalOperations: true,
+    executionSource: true,
+  },
+});
+const SUMMARY_VISIBILITY = [
+  {
+    key: "throughput",
+    label: "Throughput & scale",
+    children: [
+      ["itemsCompleted", "Items completed"],
+      ["successfulUploads", "Successful uploads"],
+      ["dataUploaded", "Data uploaded"],
+      ["uniqueDataUploaded", "Unique data uploaded"],
+    ],
+  },
+  {
+    key: "efficiency",
+    label: "Efficiency & intelligence",
+    children: [
+      ["duplicatesPrevented", "Duplicates prevented"],
+      ["pioneeringRate", "Pioneering rate"],
+      ["hashingAvoided", "Hashing I/O avoided"],
+    ],
+  },
+  {
+    key: "health",
+    label: "Health & infrastructure",
+    children: [
+      ["cacheHitRate", "Cache hit rate"],
+      ["cacheWrites", "Cache writes"],
+      ["apiOperations", "API operations"],
+    ],
+  },
+  {
+    key: "artifactsSummary",
+    label: "Generated artifacts",
+    children: [
+      ["torrentsCreated", "Torrents created"],
+      ["nzbsCreated", "NZBs created"],
+      ["screenshotsCreated", "Screenshots created"],
+    ],
+  },
+];
+const SECTION_VISIBILITY = [
+  ["dailyActivity", "Daily activity"],
+  ["uploadFlow", "Upload flow"],
+  ["activityHeatmap", "Activity heatmap"],
+  ["uploadsByDestination", "Uploads by destination"],
+  ["categories", "Categories"],
+  ["contentTime", "Successful media time"],
+  ["artifactActivity", "Artifact activity"],
+  ["mediaProfile", "Media profile"],
+  ["streamingServices", "Streaming services"],
+  ["personalReleases", "Personal releases"],
+  ["cacheByProvider", "Cache by provider"],
+  ["externalOperations", "External operations"],
+  ["executionSource", "Execution source"],
+];
 const CHART_COLORS = [
   "#3b82f6",
   "#22c55e",
@@ -23,17 +116,8 @@ const CHART_COLORS = [
   "#64748b",
 ];
 
-const AssetIcon = ({ name }) => (
-  <span
-    aria-hidden="true"
-    className="inline-block h-5 w-5 flex-none"
-    style={{
-      backgroundColor: "currentColor",
-      mask: `url(/static/img/webui-icons/${name}.svg) center / contain no-repeat`,
-      WebkitMask: `url(/static/img/webui-icons/${name}.svg) center / contain no-repeat`,
-    }}
-  />
-);
+const LucideIcon = window.UALucideIcon;
+const AssetIcon = ({ name }) => <LucideIcon name={name} className="h-5 w-5" />;
 
 const formatNumber = (value) => new Intl.NumberFormat().format(value || 0);
 const formatCompactNumber = (value) =>
@@ -43,6 +127,18 @@ const formatCompactNumber = (value) =>
   }).format(value || 0);
 const formatDuration = (value) =>
   value >= 1000 ? `${(value / 1000).toFixed(1)}s` : `${value || 0}ms`;
+const formatMediaHours = (seconds) => {
+  const hours = Math.max(0, Number(seconds) || 0) / 3600;
+  return `${new Intl.NumberFormat(undefined, {
+    maximumFractionDigits: hours >= 100 ? 0 : 1,
+  }).format(hours)} h`;
+};
+const formatMediaTime = (seconds) => {
+  const totalMinutes = Math.round(Math.max(0, Number(seconds) || 0) / 60);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return hours ? `${formatNumber(hours)}h ${minutes}m` : `${minutes}m`;
+};
 const formatBytes = (value) => {
   if (!value || value <= 0) return "0 B";
   const units = ["B", "KB", "MB", "GB", "TB"];
@@ -53,6 +149,46 @@ const formatBytes = (value) => {
   return `${(value / 1024 ** power).toFixed(power ? 1 : 0)} ${units[power]}`;
 };
 const isoTodayUtc = () => new Date().toISOString().slice(0, 10);
+const isoTodayLocal = () => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+const browserTimeZone = () =>
+  Intl.DateTimeFormat().resolvedOptions().timeZone || "this browser";
+const loadStatsSettings = () => {
+  try {
+    const stored = JSON.parse(window.UAStorage.get(STATS_SETTINGS_KEY) || "{}");
+    return {
+      ...DEFAULT_STATS_SETTINGS,
+      ...stored,
+      timezone: stored.timezone === "browser" ? "browser" : "utc",
+      visibility: {
+        ...DEFAULT_STATS_SETTINGS.visibility,
+        ...(stored.visibility || {}),
+      },
+    };
+  } catch (_error) {
+    return {
+      ...DEFAULT_STATS_SETTINGS,
+      visibility: { ...DEFAULT_STATS_SETTINGS.visibility },
+    };
+  }
+};
+const formatStatsDate = (value, pattern = "YYYY-MM-DD", short = false) => {
+  const [year, month, day] = String(value || "").split("-");
+  if (!year || !month || !day) return value || "";
+  const separator = pattern.includes("/") ? "/" : "-";
+  const parts = pattern.split(/[-/]/);
+  const values = { YYYY: year, MM: month, DD: day };
+  if (short) {
+    const shortParts = parts.filter((part) => part !== "YYYY");
+    return shortParts.map((part) => values[part]).join(separator);
+  }
+  return parts.map((part) => values[part]).join(separator);
+};
 const formatDimensionValue = (value) =>
   String(value || "Unknown").replaceAll("_", " ");
 const OPERATION_LABELS = {
@@ -256,7 +392,10 @@ function WorkspaceNav({
                   aria-pressed={isDarkMode}
                 >
                   <span>{isDarkMode ? "Dark mode" : "Light mode"}</span>
-                  <span aria-hidden="true">{isDarkMode ? "●" : "○"}</span>
+                  <LucideIcon
+                    name={isDarkMode ? "moon" : "sun"}
+                    className="h-4 w-4"
+                  />
                 </button>
               </div>
             )}
@@ -328,7 +467,7 @@ function HelpResourcesModal({ onClose }) {
             aria-label="Close help and resources"
             data-ua-modal-initial-focus
           >
-            ×
+            <LucideIcon name="x" className="h-4 w-4" />
           </button>
         </header>
         <div className="grid min-h-0 gap-4 overflow-y-auto p-5 md:grid-cols-2">
@@ -344,8 +483,12 @@ function HelpResourcesModal({ onClose }) {
                     rel="noopener noreferrer"
                     className="block rounded-lg border px-3 py-2.5"
                   >
-                    <span className="block text-sm font-semibold">
-                      {link.label} ↗
+                    <span className="flex items-center gap-1 text-sm font-semibold">
+                      {link.label}
+                      <LucideIcon
+                        name="external-link"
+                        className="h-3.5 w-3.5"
+                      />
                     </span>
                     <span className="mt-1 block text-xs opacity-60">
                       {link.description}
@@ -362,16 +505,183 @@ function HelpResourcesModal({ onClose }) {
 }
 
 const StatsIcon = ({ name, className = "h-5 w-5" }) => (
-  <span
-    className={`inline-block flex-none ${className}`}
-    aria-hidden="true"
-    style={{
-      backgroundColor: "currentColor",
-      mask: `url(/static/img/stats-icons/${name}.svg) center / contain no-repeat`,
-      WebkitMask: `url(/static/img/stats-icons/${name}.svg) center / contain no-repeat`,
-    }}
-  />
+  <LucideIcon name={name} className={className} />
 );
+
+const SettingsToggle = ({ checked, label, onChange, nested = false }) => (
+  <label
+    className={`ua-stats-settings-option flex cursor-pointer items-center justify-between gap-4 rounded-lg border px-3 py-2 text-sm ${nested ? "ml-5" : ""}`}
+  >
+    <span className={nested ? "opacity-75" : "font-medium"}>{label}</span>
+    <input
+      type="checkbox"
+      checked={checked}
+      onChange={(event) => onChange(event.target.checked)}
+      className="h-4 w-4 accent-[var(--ua-copper-bright)]"
+    />
+  </label>
+);
+
+function StatsSettingsModal({
+  mode,
+  onModeChange,
+  settings,
+  onChange,
+  onClose,
+  localTimeLabel,
+}) {
+  const dialogRef = window.useUAModalFocus(onClose);
+  const updateSetting = (key, value) => onChange({ ...settings, [key]: value });
+  const updateVisibility = (key, value) =>
+    onChange({
+      ...settings,
+      visibility: { ...settings.visibility, [key]: value },
+    });
+  return (
+    <div
+      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <section
+        ref={dialogRef}
+        className="ua-config-modal ua-stats-settings-modal flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl border shadow-2xl"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="stats-settings-title"
+        tabIndex="-1"
+      >
+        <header className="ua-config-section-heading flex items-center justify-between border-b px-5 py-4">
+          <div>
+            <h2 id="stats-settings-title" className="text-lg font-semibold">
+              Stats display
+            </h2>
+            <p className="mt-1 text-sm opacity-60">
+              These preferences are saved in this browser.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="ua-config-icon-button h-9 w-9"
+            onClick={onClose}
+            aria-label="Close stats display"
+            data-ua-modal-initial-focus
+          >
+            <LucideIcon name="x" className="h-4 w-4" />
+          </button>
+        </header>
+        <div className="min-h-0 space-y-5 overflow-y-auto p-5">
+          <section className="ua-stats-settings-group grid gap-3 rounded-xl border p-4 sm:grid-cols-2 md:grid-cols-3">
+            <label className="grid min-w-0 gap-1 text-sm">
+              <span className="font-medium">Activity source</span>
+              <select
+                value={mode}
+                onChange={(event) => onModeChange(event.target.value)}
+                className="ua-stats-control w-full min-w-0 rounded-xl px-4 text-sm"
+                aria-label="Statistics mode"
+              >
+                <option value="real">Real activity</option>
+                <option value="debug">Debug simulations</option>
+              </select>
+            </label>
+            <label className="grid min-w-0 gap-1 text-sm">
+              <span className="font-medium">Date &amp; time</span>
+              <select
+                value={settings.timezone}
+                onChange={(event) =>
+                  updateSetting("timezone", event.target.value)
+                }
+                className="ua-theme-picker w-full min-w-0 rounded-lg px-3 py-2 text-sm"
+              >
+                <option value="utc">UTC</option>
+                <option value="browser">{localTimeLabel}</option>
+              </select>
+            </label>
+            <label className="grid min-w-0 gap-1 text-sm">
+              <span className="font-medium">Date format</span>
+              <select
+                value={settings.dateFormat}
+                onChange={(event) =>
+                  updateSetting("dateFormat", event.target.value)
+                }
+                className="ua-theme-picker w-full min-w-0 rounded-lg px-3 py-2 text-sm"
+              >
+                <option value="YYYY-MM-DD">YYYY-MM-DD</option>
+                <option value="DD-MM-YYYY">DD-MM-YYYY</option>
+                <option value="MM-DD-YYYY">MM-DD-YYYY</option>
+                <option value="YYYY/MM/DD">YYYY/MM/DD</option>
+                <option value="DD/MM/YYYY">DD/MM/YYYY</option>
+                <option value="MM/DD/YYYY">MM/DD/YYYY</option>
+              </select>
+            </label>
+            {settings.timezone === "browser" && (
+              <p className="ua-stats-settings-note rounded-lg border px-3 py-2 text-xs opacity-70 sm:col-span-2 md:col-span-3">
+                Historical statistics are stored in UTC calendar-day buckets.
+                Activity near midnight remains assigned to its original UTC day.
+              </p>
+            )}
+          </section>
+
+          <section>
+            <h3 className="mb-2 text-sm font-semibold">Chart &amp; icons</h3>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <SettingsToggle
+                checked={settings.chartGradient}
+                label="Daily activity color gradient"
+                onChange={(value) => updateSetting("chartGradient", value)}
+              />
+              <SettingsToggle
+                checked={settings.showFavicons}
+                label="Tracker and indexer favicons"
+                onChange={(value) => updateSetting("showFavicons", value)}
+              />
+            </div>
+          </section>
+
+          <section>
+            <h3 className="mb-2 text-sm font-semibold">Summary blocks</h3>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {SUMMARY_VISIBILITY.map((group) => (
+                <div key={group.key} className="space-y-2">
+                  <SettingsToggle
+                    checked={settings.visibility[group.key]}
+                    label={group.label}
+                    onChange={(value) => updateVisibility(group.key, value)}
+                  />
+                  {group.children.map(([key, label]) => (
+                    <SettingsToggle
+                      key={key}
+                      checked={settings.visibility[key]}
+                      label={label}
+                      nested
+                      onChange={(value) => updateVisibility(key, value)}
+                    />
+                  ))}
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section>
+            <h3 className="mb-2 text-sm font-semibold">Detail blocks</h3>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {SECTION_VISIBILITY.map(([key, label]) => (
+                <SettingsToggle
+                  key={key}
+                  checked={settings.visibility[key]}
+                  label={label}
+                  onChange={(value) => updateVisibility(key, value)}
+                />
+              ))}
+            </div>
+          </section>
+        </div>
+      </section>
+    </div>
+  );
+}
 
 const MetricIcon = ({ type }) => (
   <span className="ua-stats-metric-icon flex h-8 w-8 flex-none items-center justify-center">
@@ -413,7 +723,7 @@ const MetricGroup = ({ title, global = false, children }) => (
   </section>
 );
 
-function ExportMenu({ disabled, onCsv, onJson }) {
+function StatsActionsMenu({ exportsDisabled, onCsv, onJson, onReset }) {
   const [open, setOpen] = useState(false);
   const menuRef = useRef(null);
   useEffect(() => {
@@ -437,26 +747,28 @@ function ExportMenu({ disabled, onCsv, onJson }) {
     callback();
   };
   return (
-    <div ref={menuRef} className="relative flex">
+    <div ref={menuRef} className="ua-stats-actions relative flex">
       <button
         type="button"
-        disabled={disabled}
         onClick={() => setOpen((current) => !current)}
-        className="ua-stats-export-trigger h-full rounded-xl px-4 text-sm font-medium disabled:opacity-40"
+        className="ua-stats-actions-trigger flex h-11 w-11 items-center justify-center rounded-xl text-xl font-medium"
         aria-haspopup="menu"
         aria-expanded={open}
+        aria-label="Statistics actions"
+        title="Statistics actions"
       >
-        Export <span aria-hidden="true">▾</span>
+        <LucideIcon name="ellipsis" className="h-5 w-5" />
       </button>
       {open && (
         <div
-          className="ua-stats-export-menu absolute right-0 z-20 mt-2 min-w-36 overflow-hidden rounded-lg py-1 shadow-xl"
+          className="ua-stats-actions-menu absolute right-0 z-20 mt-2 min-w-48 overflow-hidden rounded-lg py-1 shadow-xl"
           role="menu"
-          aria-label="Export statistics"
+          aria-label="Statistics actions"
         >
           <button
             type="button"
-            className="block w-full px-3 py-2 text-left text-sm"
+            disabled={exportsDisabled}
+            className="block w-full px-3 py-2 text-left text-sm disabled:cursor-not-allowed disabled:opacity-40"
             role="menuitem"
             onClick={() => choose(onCsv)}
           >
@@ -464,11 +776,20 @@ function ExportMenu({ disabled, onCsv, onJson }) {
           </button>
           <button
             type="button"
-            className="block w-full px-3 py-2 text-left text-sm"
+            disabled={exportsDisabled}
+            className="block w-full px-3 py-2 text-left text-sm disabled:cursor-not-allowed disabled:opacity-40"
             role="menuitem"
             onClick={() => choose(onJson)}
           >
             JSON details
+          </button>
+          <button
+            type="button"
+            className="ua-stats-actions-danger mt-1 block w-full border-t px-3 py-2 text-left text-sm"
+            role="menuitem"
+            onClick={() => choose(onReset)}
+          >
+            Reset statistics
           </button>
         </div>
       )}
@@ -476,7 +797,12 @@ function ExportMenu({ disabled, onCsv, onJson }) {
   );
 }
 
-function TrendChart({ rows, trackerActive = false }) {
+function TrendChart({
+  rows,
+  trackerActive = false,
+  dateFormat = "YYYY-MM-DD",
+  gradient = false,
+}) {
   const [view, setView] = useState(() => {
     const stored = window.UAStorage.get(TREND_VIEW_KEY);
     return ["count", "volume", "both"].includes(stored) ? stored : "count";
@@ -574,11 +900,7 @@ function TrendChart({ rows, trackerActive = false }) {
     ),
   );
   const formatAxisDate = (date) =>
-    new Date(`${date}T00:00:00Z`).toLocaleDateString(undefined, {
-      month: "short",
-      ...(rows.length > 365 ? { year: "2-digit" } : { day: "numeric" }),
-      timeZone: "UTC",
-    });
+    formatStatsDate(date, dateFormat, !(rows.length > 365));
   const curvePath = (entry) => {
     const coordinates = rows.map((row, index) => ({
       x: xFor(index),
@@ -590,6 +912,12 @@ function TrendChart({ rows, trackerActive = false }) {
       const controlX = (previous.x + current.x) / 2;
       return `${path} C ${controlX},${previous.y} ${controlX},${current.y} ${current.x},${current.y}`;
     }, `M ${coordinates[0].x},${coordinates[0].y}`);
+  };
+  const areaPath = (entry) => {
+    const line = curvePath(entry);
+    if (!line) return "";
+    const baseline = height - plot.bottom;
+    return `${line} L ${xFor(rows.length - 1)},${baseline} L ${xFor(0)},${baseline} Z`;
   };
   if (!rows.length)
     return (
@@ -607,6 +935,40 @@ function TrendChart({ rows, trackerActive = false }) {
           aria-label="Daily activity trend"
           onMouseLeave={() => setHovered(null)}
         >
+          {gradient && (
+            <defs>
+              {activeSeries.map((entry) => (
+                <linearGradient
+                  key={entry.key}
+                  id={`daily-activity-gradient-${entry.key}`}
+                  x1="0"
+                  y1="0"
+                  x2="0"
+                  y2="1"
+                >
+                  <stop
+                    offset="0%"
+                    stopColor={entry.color}
+                    stopOpacity="0.34"
+                  />
+                  <stop
+                    offset="100%"
+                    stopColor={entry.color}
+                    stopOpacity="0.03"
+                  />
+                </linearGradient>
+              ))}
+            </defs>
+          )}
+          {gradient &&
+            activeSeries.map((entry) => (
+              <path
+                key={`${entry.key}-gradient`}
+                d={areaPath(entry)}
+                fill={`url(#daily-activity-gradient-${entry.key})`}
+                stroke="none"
+              />
+            ))}
           {yTicks.map((value) => (
             <React.Fragment key={value}>
               <line
@@ -726,10 +1088,7 @@ function TrendChart({ rows, trackerActive = false }) {
             }}
           >
             <p className="font-semibold">
-              {new Date(`${rows[hovered].date}T00:00:00Z`).toLocaleDateString(
-                undefined,
-                { timeZone: "UTC" },
-              )}
+              {formatStatsDate(rows[hovered].date, dateFormat)}
             </p>
             <p className="mt-1">{formatNumber(rows[hovered].items)} items</p>
             <p>{formatNumber(rows[hovered].uploads)} uploads</p>
@@ -782,9 +1141,13 @@ function TrendChart({ rows, trackerActive = false }) {
   );
 }
 
-function ActivityHeatmap({ rows }) {
+function ActivityHeatmap({
+  rows,
+  today: todayValue,
+  dateFormat = "YYYY-MM-DD",
+}) {
   const byDate = new Map((rows || []).map((row) => [row.date, row.count]));
-  const today = new Date();
+  const today = new Date(`${todayValue || isoTodayUtc()}T00:00:00Z`);
   today.setUTCHours(0, 0, 0, 0);
   const start = new Date(today);
   start.setUTCDate(today.getUTCDate() - 363);
@@ -887,7 +1250,7 @@ function ActivityHeatmap({ rows }) {
                   ? `color-mix(in srgb, var(--ua-copper-bright) ${25 + Math.round((cell.count / maximum) * 70)}%, var(--ua-stats-heatmap-empty))`
                   : "var(--ua-stats-heatmap-empty)",
               }}
-              title={`${cell.date}: ${formatNumber(cell.count)} completed`}
+              title={`${formatStatsDate(cell.date, dateFormat)}: ${formatNumber(cell.count)} completed`}
             />
           ))}
         </div>
@@ -1278,7 +1641,15 @@ function ReleaseProfiles({ releaseProfiles }) {
   );
 }
 
-function DonutChart({ rows, ariaLabel, onSelect, activeLabel = "" }) {
+function DonutChart({
+  rows,
+  ariaLabel,
+  onSelect,
+  activeLabel = "",
+  showFavicons = true,
+  valueFormatter = formatNumber,
+  centerLabel = "Total",
+}) {
   const normalizedRows = rows
     .map((row) => ({
       label: String(row.label || "Unknown"),
@@ -1343,8 +1714,8 @@ function DonutChart({ rows, ariaLabel, onSelect, activeLabel = "" }) {
           ))}
         </svg>
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-2xl font-bold">{formatNumber(total)}</span>
-          <span className="text-xs opacity-60">Total</span>
+          <span className="text-2xl font-bold">{valueFormatter(total)}</span>
+          <span className="text-xs opacity-60">{centerLabel}</span>
         </div>
       </div>
       <ul className="grid gap-2 text-sm">
@@ -1368,7 +1739,7 @@ function DonutChart({ rows, ariaLabel, onSelect, activeLabel = "" }) {
                 style={{ backgroundColor: segment.color }}
                 aria-hidden="true"
               />
-              {segment.favicon && (
+              {showFavicons && segment.favicon && (
                 <TrackerFavicon
                   destination={segment.favicon}
                   className="h-5 w-5"
@@ -1379,7 +1750,7 @@ function DonutChart({ rows, ariaLabel, onSelect, activeLabel = "" }) {
               </span>
             </span>
             <span className="shrink-0 tabular-nums">
-              {formatNumber(segment.value)} · {segment.percentage.toFixed(1)}%
+              {valueFormatter(segment.value)} · {segment.percentage.toFixed(1)}%
             </span>
           </li>
         ))}
@@ -1534,11 +1905,15 @@ function StatsApp() {
     return STATS_PERIODS.some(([value]) => value === stored) ? stored : "30d";
   });
   const [mode, setMode] = useState("real");
-  const [customFrom, setCustomFrom] = useState(isoTodayUtc);
-  const [customTo, setCustomTo] = useState(isoTodayUtc);
+  const [settings, setSettings] = useState(loadStatsSettings);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const initialToday = () =>
+    settings.timezone === "browser" ? isoTodayLocal() : isoTodayUtc();
+  const [customFrom, setCustomFrom] = useState(initialToday);
+  const [customTo, setCustomTo] = useState(initialToday);
   const [customRange, setCustomRange] = useState(() => ({
-    from: isoTodayUtc(),
-    to: isoTodayUtc(),
+    from: initialToday(),
+    to: initialToday(),
   }));
   const [activeTracker, setActiveTracker] = useState("");
   const [data, setData] = useState(null);
@@ -1554,6 +1929,7 @@ function StatsApp() {
   const [helpOpen, setHelpOpen] = useState(false);
   const [changelogOpen, setChangelogOpen] = useState(false);
   const [mediaCategory, setMediaCategory] = useState("");
+  const [todayRefresh, setTodayRefresh] = useState(0);
 
   useEffect(() => {
     window.UAStorage.set("ua_config_theme", isDarkMode ? "dark" : "light");
@@ -1562,12 +1938,31 @@ function StatsApp() {
   useEffect(() => {
     window.UAStorage.set(STATS_PERIOD_KEY, period);
   }, [period]);
+  useEffect(() => {
+    window.UAStorage.set(STATS_SETTINGS_KEY, JSON.stringify(settings));
+  }, [settings]);
+  useEffect(() => {
+    if (period !== "today" || settings.timezone !== "browser") return undefined;
+    const now = new Date();
+    const nextMidnight = new Date(now);
+    nextMidnight.setHours(24, 0, 0, 0);
+    const timer = window.setTimeout(
+      () => setTodayRefresh((value) => value + 1),
+      nextMidnight.getTime() - now.getTime(),
+    );
+    return () => window.clearTimeout(timer);
+  }, [period, settings.timezone, todayRefresh]);
 
   const load = async (signal) => {
     setLoading(true);
     setError("");
     try {
-      const query = new URLSearchParams({ range: period, mode });
+      const query = new URLSearchParams({
+        range: period,
+        mode,
+        timezone: settings.timezone,
+      });
+      if (settings.timezone === "browser") query.set("today", isoTodayLocal());
       if (period === "custom") {
         query.set("from", customRange.from);
         query.set("to", customRange.to);
@@ -1595,7 +1990,14 @@ function StatsApp() {
     const controller = new AbortController();
     load(controller.signal);
     return () => controller.abort();
-  }, [period, mode, customRange, activeTracker]);
+  }, [
+    period,
+    mode,
+    customRange,
+    activeTracker,
+    settings.timezone,
+    todayRefresh,
+  ]);
   useEffect(() => {
     const categories = data?.media?.categories || [];
     if (!categories.includes(mediaCategory))
@@ -1635,11 +2037,22 @@ function StatsApp() {
       current === destination ? "" : destination || "",
     );
   const statsEnabled = data?.enabled !== false;
+  const visible = settings.visibility;
+  const localTimeLabel = `Local time · ${browserTimeZone()}`;
   const artifactMap = useMemo(
     () =>
       (data?.artifacts || []).reduce((totals, row) => {
         const key = `${row.type}:${row.operation}`;
         totals[key] = (totals[key] || 0) + row.count;
+        return totals;
+      }, {}),
+    [data],
+  );
+  const screenshotArtifactMap = useMemo(
+    () =>
+      (data?.artifacts || []).reduce((totals, row) => {
+        if (row.type === "screenshot" && row.operation === "created")
+          totals[row.variant] = (totals[row.variant] || 0) + row.count;
         return totals;
       }, {}),
     [data],
@@ -1687,6 +2100,16 @@ function StatsApp() {
       className={`ua-config-page min-h-screen md:pl-20 ${isDarkMode ? "ua-mode-dark" : "ua-mode-light"}`}
     >
       {helpOpen && <HelpResourcesModal onClose={() => setHelpOpen(false)} />}
+      {settingsOpen && (
+        <StatsSettingsModal
+          mode={mode}
+          onModeChange={setMode}
+          settings={settings}
+          onChange={setSettings}
+          onClose={() => setSettingsOpen(false)}
+          localTimeLabel={localTimeLabel}
+        />
+      )}
       {changelogOpen && (
         <window.UAChangelogModal onClose={() => setChangelogOpen(false)} />
       )}
@@ -1750,22 +2173,12 @@ function StatsApp() {
                 <summary
                   className={`ua-stats-custom-summary flex h-full cursor-pointer list-none items-center gap-2 rounded-lg px-3 text-sm ${period === "custom" ? "ua-stats-period-button-active font-semibold shadow-sm" : ""}`}
                 >
-                  <svg
-                    aria-hidden="true"
-                    viewBox="0 0 24 24"
-                    className="h-4 w-4"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                  >
-                    <path d="M7 2v3M17 2v3M3.5 9h17M5 4h14a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" />
-                    <path d="M7 13h3M14 13h3M7 17h3M14 17h3" />
-                  </svg>
+                  <LucideIcon name="calendar-days" className="h-4 w-4" />
                   Custom dates
                 </summary>
                 <div className="ua-stats-chart-tooltip absolute right-0 z-20 mt-3 grid min-w-64 gap-3 rounded-lg p-3 shadow-xl">
                   <label className="grid gap-1 text-xs">
-                    <span>From (UTC)</span>
+                    <span>From ({data?.period?.timezone || "UTC"})</span>
                     <input
                       type="date"
                       value={customFrom}
@@ -1775,12 +2188,12 @@ function StatsApp() {
                     />
                   </label>
                   <label className="grid gap-1 text-xs">
-                    <span>To (UTC)</span>
+                    <span>To ({data?.period?.timezone || "UTC"})</span>
                     <input
                       type="date"
                       value={customTo}
                       min={customFrom}
-                      max={isoTodayUtc()}
+                      max={data?.time_context?.today || initialToday()}
                       onChange={(event) => setCustomTo(event.target.value)}
                       className="ua-theme-picker rounded-lg px-3 py-2"
                     />
@@ -1798,41 +2211,40 @@ function StatsApp() {
                 </div>
               </details>
             </div>
-            <select
-              value={mode}
-              onChange={(event) => setMode(event.target.value)}
-              className="ua-stats-control rounded-xl px-4 text-sm"
-              aria-label="Statistics mode"
-            >
-              <option value="real">Real activity</option>
-              <option value="debug">Debug simulations</option>
-            </select>
-            <ExportMenu
-              disabled={!statsEnabled || !hasData}
-              onCsv={exportCsv}
-              onJson={exportJson}
-            />
             <button
               type="button"
-              onClick={() => setResetOpen(true)}
-              className="ua-stats-reset rounded-xl px-4 text-sm font-medium"
+              onClick={() => setSettingsOpen(true)}
+              className="ua-stats-settings-trigger flex min-h-11 items-center gap-2 rounded-xl px-4 text-sm font-medium"
+              aria-haspopup="dialog"
             >
-              Reset
+              <StatsIcon name="settings" className="h-4 w-4" />
+              Display
             </button>
+            <StatsActionsMenu
+              exportsDisabled={!statsEnabled || !hasData}
+              onCsv={exportCsv}
+              onJson={exportJson}
+              onReset={() => setResetOpen(true)}
+            />
           </div>
         </header>
         <div className="mt-5 flex flex-wrap items-center gap-2 text-xs">
           <span className="ua-stats-range-chip inline-flex items-center rounded-full px-4 py-2">
-            UTC: {data?.period?.from || "first event"} → {data?.period?.to}
+            {data?.period?.timezone || "UTC"}:{" "}
+            {data?.period?.from
+              ? formatStatsDate(data.period.from, settings.dateFormat)
+              : "first event"}{" "}
+            → {formatStatsDate(data?.period?.to, settings.dateFormat)}
           </span>
           {activeTracker && (
             <button
               type="button"
-              className="ua-stats-series-active rounded-full px-3 py-1"
+              className="ua-stats-series-active inline-flex items-center gap-1 rounded-full px-3 py-1"
               onClick={() => setActiveTracker("")}
               aria-label="Clear tracker filter"
             >
-              {activeTrackerRow?.display_name || activeTracker} ×
+              <span>{activeTrackerRow?.display_name || activeTracker}</span>
+              <LucideIcon name="x" className="h-3 w-3" />
             </button>
           )}
         </div>
@@ -1867,284 +2279,531 @@ function StatsApp() {
                 </div>
               )}
               <div className="grid gap-4 xl:grid-cols-2">
-                <MetricGroup title="Throughput & scale">
-                  <Card
-                    icon="items-completed"
-                    label="Items completed"
-                    value={formatNumber(overview.items_completed)}
-                    detail={`${formatNumber(data.items.success)} with upload · ${formatNumber(data.items.no_upload)} without upload · ${formatNumber(data.items.error)} errors`}
-                    trend={formatTrend(data.comparison?.items_completed_pct)}
-                  />
-                  <Card
-                    icon="successful-uploads"
-                    label="Successful uploads"
-                    value={formatNumber(overview.uploads)}
-                    detail={`${overview.upload_success_rate || 0}% of ${formatNumber(overview.upload_attempts)} attempts`}
-                    trend={formatTrend(data.comparison?.uploads_pct)}
-                  />
-                  <Card
-                    icon="data-uploaded"
-                    label="Data uploaded"
-                    value={formatBytes(overview.uploaded_bytes)}
-                    detail="Successful destination uploads"
-                  />
-                  <Card
-                    icon="unique-data-uploaded"
-                    label="Unique data uploaded"
-                    value={formatBytes(overview.unique_uploaded_bytes)}
-                    detail="Each successful item counted once"
-                  />
-                </MetricGroup>
-                <MetricGroup title="Efficiency & intelligence">
-                  <Card
-                    icon="duplicates-prevented"
-                    label="Duplicates prevented"
-                    value={formatNumber(overview.duplicate_preventions)}
-                    detail="Routes stopped before upload"
-                  />
-                  <Card
-                    icon="pioneering-rate"
-                    label="Pioneering rate"
-                    value={`${overview.pioneering_rate || 0}%`}
-                    detail="Uploads ÷ uploads plus duplicates"
-                  />
-                  <Card
-                    icon="hashing-io-avoided"
-                    label="Hashing I/O avoided"
-                    value={formatBytes(overview.hashing_bytes_avoided)}
-                    detail="Media volume covered by reused base torrents"
-                  />
-                </MetricGroup>
-                <MetricGroup
-                  title="Health & infrastructure"
-                  global={Boolean(activeTracker)}
-                >
-                  <Card
-                    icon="cache-hit-rate"
-                    label="Cache hit rate"
-                    value={`${overview.cache_hit_rate || 0}%`}
-                    detail={`${formatNumber(data.cache.hits)} hits · ${formatNumber(data.cache.misses)} misses`}
-                    trend={formatTrend(
-                      data.comparison?.cache_hit_rate_delta,
-                      " pts",
+                {visible.throughput && (
+                  <MetricGroup title="Throughput & scale">
+                    {visible.itemsCompleted && (
+                      <Card
+                        icon="items-completed"
+                        label="Items completed"
+                        value={formatNumber(overview.items_completed)}
+                        detail={`${formatNumber(data.items.success)} with upload · ${formatNumber(data.items.no_upload)} without upload · ${formatNumber(data.items.error)} errors`}
+                        trend={formatTrend(
+                          data.comparison?.items_completed_pct,
+                        )}
+                      />
                     )}
-                  />
-                  <Card
-                    icon="cache-writes"
-                    label="Cache writes"
-                    value={formatNumber(data.cache.writes)}
-                    detail={`${formatBytes(data.cache.bytes_written)} written since collection began`}
-                  />
-                  <Card
-                    icon="api-operations"
-                    label="API operations"
-                    value={formatNumber(overview.api_operations)}
-                    detail={`${formatNumber(data.api.errors)} errors`}
-                  />
-                </MetricGroup>
-                <MetricGroup title="Generated artifacts">
-                  <Card
-                    icon="torrents-created"
-                    label="Torrents created"
-                    value={formatNumber(overview.torrents_created)}
-                    detail={`${formatNumber(artifactMap["torrent:reused"])} reused`}
-                  />
-                  <Card
-                    icon="nzbs-created"
-                    label="NZBs created"
-                    value={formatNumber(overview.nzbs_created)}
-                    detail={`${formatNumber(artifactMap["nzb:reused"])} reused`}
-                  />
-                </MetricGroup>
+                    {visible.successfulUploads && (
+                      <Card
+                        icon="successful-uploads"
+                        label="Successful uploads"
+                        value={formatNumber(overview.uploads)}
+                        detail={`${overview.upload_success_rate || 0}% of ${formatNumber(overview.upload_attempts)} attempts`}
+                        trend={formatTrend(data.comparison?.uploads_pct)}
+                      />
+                    )}
+                    {visible.dataUploaded && (
+                      <Card
+                        icon="data-uploaded"
+                        label="Data uploaded"
+                        value={formatBytes(overview.uploaded_bytes)}
+                        detail="Successful destination uploads"
+                      />
+                    )}
+                    {visible.uniqueDataUploaded && (
+                      <Card
+                        icon="unique-data-uploaded"
+                        label="Unique data uploaded"
+                        value={formatBytes(overview.unique_uploaded_bytes)}
+                        detail="Each successful item counted once"
+                      />
+                    )}
+                  </MetricGroup>
+                )}
+                {visible.efficiency && (
+                  <MetricGroup title="Efficiency & intelligence">
+                    {visible.duplicatesPrevented && (
+                      <Card
+                        icon="duplicates-prevented"
+                        label="Duplicates prevented"
+                        value={formatNumber(overview.duplicate_preventions)}
+                        detail="Routes stopped before upload"
+                      />
+                    )}
+                    {visible.pioneeringRate && (
+                      <Card
+                        icon="pioneering-rate"
+                        label="Pioneering rate"
+                        value={`${overview.pioneering_rate || 0}%`}
+                        detail="Uploads ÷ uploads plus duplicates"
+                      />
+                    )}
+                    {visible.hashingAvoided && (
+                      <Card
+                        icon="hashing-io-avoided"
+                        label="Hashing I/O avoided"
+                        value={formatBytes(overview.hashing_bytes_avoided)}
+                        detail="Media volume covered by reused base torrents"
+                      />
+                    )}
+                  </MetricGroup>
+                )}
+                {visible.health && (
+                  <MetricGroup
+                    title="Health & infrastructure"
+                    global={Boolean(activeTracker)}
+                  >
+                    {visible.cacheHitRate && (
+                      <Card
+                        icon="cache-hit-rate"
+                        label="Cache hit rate"
+                        value={`${overview.cache_hit_rate || 0}%`}
+                        detail={`${formatNumber(data.cache.hits)} hits · ${formatNumber(data.cache.misses)} misses`}
+                        trend={formatTrend(
+                          data.comparison?.cache_hit_rate_delta,
+                          " pts",
+                        )}
+                      />
+                    )}
+                    {visible.cacheWrites && (
+                      <Card
+                        icon="cache-writes"
+                        label="Cache writes"
+                        value={formatNumber(data.cache.writes)}
+                        detail={`${formatBytes(data.cache.bytes_written)} written since collection began`}
+                      />
+                    )}
+                    {visible.apiOperations && (
+                      <Card
+                        icon="api-operations"
+                        label="API operations"
+                        value={formatNumber(overview.api_operations)}
+                        detail={`${formatNumber(data.api.errors)} errors`}
+                      />
+                    )}
+                  </MetricGroup>
+                )}
+                {visible.artifactsSummary && (
+                  <MetricGroup title="Generated artifacts">
+                    {visible.torrentsCreated && (
+                      <Card
+                        icon="torrents-created"
+                        label="Torrents created"
+                        value={formatNumber(overview.torrents_created)}
+                        detail={`${formatNumber(artifactMap["torrent:reused"])} reused`}
+                      />
+                    )}
+                    {visible.nzbsCreated && (
+                      <Card
+                        icon="nzbs-created"
+                        label="NZBs created"
+                        value={formatNumber(overview.nzbs_created)}
+                        detail={`${formatNumber(artifactMap["nzb:reused"])} reused`}
+                      />
+                    )}
+                    {visible.screenshotsCreated && (
+                      <Card
+                        icon="screenshots-created"
+                        label="Screenshots created"
+                        value={formatNumber(overview.screenshots_created)}
+                        detail={`${formatNumber(screenshotArtifactMap.standard)} standard · ${formatNumber(screenshotArtifactMap.menu)} menus · ${formatNumber(screenshotArtifactMap.spectrogram)} spectrograms · ${formatNumber((screenshotArtifactMap.dovi_plot || 0) + (screenshotArtifactMap.hdr10plus_plot || 0))} HDR plots`}
+                      />
+                    )}
+                  </MetricGroup>
+                )}
               </div>
-              <Section
-                icon="daily-activity"
-                title="Daily activity"
-                subtitle="The three lines are separate measures and are not intended to be added together."
-              >
-                <TrendChart
-                  rows={data.timeline}
-                  trackerActive={Boolean(activeTracker)}
-                />
-              </Section>
-              <Section
-                icon="upload-flow"
-                title="Upload flow"
-                subtitle="Each unit is one processed item × target tracker route."
-              >
-                <SankeyDiagram sankey={data.sankey} />
-              </Section>
-              <Section
-                icon="activity-heatmap"
-                title="Activity heatmap"
-                subtitle="Completed items in the last year."
-              >
-                <ActivityHeatmap rows={data.heatmap} />
-              </Section>
-              <Section
-                icon="uploads-by-destination"
-                title="Uploads by destination"
-                subtitle="One release uploaded to several sites counts once for each destination."
-              >
-                <ChartWithTable
-                  chart={
-                    <DonutChart
-                      ariaLabel="Upload activity by destination"
-                      rows={data.uploads.by_destination.map((row) => ({
-                        label: row.display_name || row.destination,
-                        value: row.successes + row.errors + row.skipped,
-                        favicon: row.destination,
-                        id: row.destination,
-                      }))}
-                      activeLabel={activeTracker}
-                      onSelect={toggleTracker}
-                    />
-                  }
-                  table={
-                    <Table
-                      rows={data.uploads.by_destination.map((row) => ({
-                        ...row,
-                        key: `${row.destination}:${row.type}`,
-                      }))}
-                      headers={[
-                        {
-                          label: "Destination",
-                          sortValue: (r) => r.display_name || r.destination,
-                          render: (r) => (
-                            <span className="flex items-center gap-2">
-                              <TrackerFavicon destination={r.destination} />
-                              <span>{r.display_name || r.destination}</span>
-                            </span>
-                          ),
-                        },
-                        { label: "Type", key: "type" },
-                        {
-                          label: "Attempts",
-                          sortValue: (r) => r.attempts,
-                          render: (r) => formatNumber(r.attempts),
-                        },
-                        {
-                          label: "Success",
-                          sortValue: (r) => r.successes,
-                          render: (r) => formatNumber(r.successes),
-                        },
-                        {
-                          label: "Errors",
-                          sortValue: (r) => r.errors,
-                          render: (r) => formatNumber(r.errors),
-                        },
-                        {
-                          label: "Skipped",
-                          sortValue: (r) => r.skipped,
-                          render: (r) => formatNumber(r.skipped),
-                        },
-                        {
-                          label: "Skip reasons",
-                          render: (r) =>
-                            Object.entries(r.skip_reasons || {})
-                              .map(([reason, count]) => `${reason}: ${count}`)
-                              .join(", ") || "—",
-                        },
-                        {
-                          label: "Rate",
-                          sortValue: (r) => r.success_rate,
-                          render: (r) => `${r.success_rate}%`,
-                        },
-                        {
-                          label: "Pioneering",
-                          sortValue: (r) => r.pioneering_rate,
-                          render: (r) => `${r.pioneering_rate}%`,
-                        },
-                        {
-                          label: "Health",
-                          sortValue: (r) => r.success_rate,
-                          render: (r) => (
-                            <ReliabilityBadge
-                              rate={r.success_rate}
-                              attempts={r.attempts}
-                            />
-                          ),
-                        },
-                        {
-                          label: "Avg time",
-                          sortValue: (r) => r.average_duration_ms,
-                          render: (r) => formatDuration(r.average_duration_ms),
-                        },
-                        {
-                          label: "Volume",
-                          sortValue: (r) => r.bytes,
-                          render: (r) => formatBytes(r.bytes),
-                        },
-                      ]}
-                      activeKey={
-                        activeTracker
-                          ? `${activeTracker}:${data.uploads.by_destination.find((row) => row.destination === activeTracker)?.type || ""}`
-                          : ""
-                      }
-                      onRowClick={(row) => toggleTracker(row.destination)}
-                    />
-                  }
-                />
-              </Section>
-              <div className="grid gap-5 lg:grid-cols-2">
-                <Section icon="categories" title="Categories">
+              {visible.dailyActivity && (
+                <Section
+                  icon="daily-activity"
+                  title="Daily activity"
+                  subtitle="The three lines are separate measures and are not intended to be added together."
+                >
+                  <TrendChart
+                    rows={data.timeline}
+                    trackerActive={Boolean(activeTracker)}
+                    dateFormat={settings.dateFormat}
+                    gradient={settings.chartGradient}
+                  />
+                </Section>
+              )}
+              {visible.uploadFlow && (
+                <Section
+                  icon="upload-flow"
+                  title="Upload flow"
+                  subtitle="Each unit is one processed item × target tracker route."
+                >
+                  <SankeyDiagram sankey={data.sankey} />
+                </Section>
+              )}
+              {visible.activityHeatmap && (
+                <Section
+                  icon="activity-heatmap"
+                  title="Activity heatmap"
+                  subtitle="Completed items in the last year."
+                >
+                  <ActivityHeatmap
+                    rows={data.heatmap}
+                    today={data.time_context?.today}
+                    dateFormat={settings.dateFormat}
+                  />
+                </Section>
+              )}
+              {visible.uploadsByDestination && (
+                <Section
+                  icon="uploads-by-destination"
+                  title="Uploads by destination"
+                  subtitle="One release uploaded to several sites counts once for each destination."
+                >
                   <ChartWithTable
                     chart={
                       <DonutChart
-                        ariaLabel="Upload activity by category"
-                        rows={data.uploads.by_category.map((row) => ({
-                          label: row.category,
+                        ariaLabel="Upload activity by destination"
+                        rows={data.uploads.by_destination.map((row) => ({
+                          label: row.display_name || row.destination,
                           value: row.successes + row.errors + row.skipped,
+                          favicon: row.destination,
+                          id: row.destination,
                         }))}
+                        activeLabel={activeTracker}
+                        onSelect={toggleTracker}
+                        showFavicons={settings.showFavicons}
                       />
                     }
                     table={
                       <Table
-                        rows={data.uploads.by_category}
+                        rows={data.uploads.by_destination.map((row) => ({
+                          ...row,
+                          key: `${row.destination}:${row.type}`,
+                        }))}
                         headers={[
-                          { label: "Category", key: "category" },
-                          { label: "Success", key: "successes" },
-                          { label: "Errors", key: "errors" },
-                          { label: "Skipped", key: "skipped" },
+                          {
+                            label: "Destination",
+                            sortValue: (r) => r.display_name || r.destination,
+                            render: (r) => (
+                              <span className="flex items-center gap-2">
+                                {settings.showFavicons && (
+                                  <TrackerFavicon destination={r.destination} />
+                                )}
+                                <span>{r.display_name || r.destination}</span>
+                              </span>
+                            ),
+                          },
+                          { label: "Type", key: "type" },
+                          {
+                            label: "Attempts",
+                            sortValue: (r) => r.attempts,
+                            render: (r) => formatNumber(r.attempts),
+                          },
+                          {
+                            label: "Success",
+                            sortValue: (r) => r.successes,
+                            render: (r) => formatNumber(r.successes),
+                          },
+                          {
+                            label: "Errors",
+                            sortValue: (r) => r.errors,
+                            render: (r) => formatNumber(r.errors),
+                          },
+                          {
+                            label: "Skipped",
+                            sortValue: (r) => r.skipped,
+                            render: (r) => formatNumber(r.skipped),
+                          },
+                          {
+                            label: "Skip reasons",
+                            render: (r) =>
+                              Object.entries(r.skip_reasons || {})
+                                .map(([reason, count]) => `${reason}: ${count}`)
+                                .join(", ") || "—",
+                          },
+                          {
+                            label: "Rate",
+                            sortValue: (r) => r.success_rate,
+                            render: (r) => `${r.success_rate}%`,
+                          },
+                          {
+                            label: "Pioneering",
+                            sortValue: (r) => r.pioneering_rate,
+                            render: (r) => `${r.pioneering_rate}%`,
+                          },
+                          {
+                            label: "Health",
+                            sortValue: (r) => r.success_rate,
+                            render: (r) => (
+                              <ReliabilityBadge
+                                rate={r.success_rate}
+                                attempts={r.attempts}
+                              />
+                            ),
+                          },
+                          {
+                            label: "Avg time",
+                            sortValue: (r) => r.average_duration_ms,
+                            render: (r) =>
+                              formatDuration(r.average_duration_ms),
+                          },
                           {
                             label: "Volume",
                             sortValue: (r) => r.bytes,
                             render: (r) => formatBytes(r.bytes),
                           },
                         ]}
+                        activeKey={
+                          activeTracker
+                            ? `${activeTracker}:${data.uploads.by_destination.find((row) => row.destination === activeTracker)?.type || ""}`
+                            : ""
+                        }
+                        onRowClick={(row) => toggleTracker(row.destination)}
                       />
                     }
                   />
                 </Section>
-                <Section icon="artifact-activity" title="Artifact activity">
+              )}
+              {(visible.categories || visible.artifactActivity) && (
+                <div className="grid gap-5 lg:grid-cols-2">
+                  {visible.categories && (
+                    <Section icon="categories" title="Categories">
+                      <ChartWithTable
+                        chart={
+                          <DonutChart
+                            ariaLabel="Upload activity by category"
+                            rows={data.uploads.by_category.map((row) => ({
+                              label: row.category,
+                              value: row.successes + row.errors + row.skipped,
+                            }))}
+                          />
+                        }
+                        table={
+                          <Table
+                            rows={data.uploads.by_category}
+                            headers={[
+                              { label: "Category", key: "category" },
+                              { label: "Success", key: "successes" },
+                              { label: "Errors", key: "errors" },
+                              { label: "Skipped", key: "skipped" },
+                              {
+                                label: "Volume",
+                                sortValue: (r) => r.bytes,
+                                render: (r) => formatBytes(r.bytes),
+                              },
+                            ]}
+                          />
+                        }
+                      />
+                    </Section>
+                  )}
+                  {visible.artifactActivity && (
+                    <Section icon="artifact-activity" title="Artifact activity">
+                      <ChartWithTable
+                        chart={
+                          <DonutChart
+                            ariaLabel="Artifact activity"
+                            rows={data.artifacts.map((row) => ({
+                              label: `${formatDimensionValue(row.type)} · ${formatOperation(row.operation)} · ${formatDimensionValue(row.variant)}`,
+                              value: row.count,
+                            }))}
+                          />
+                        }
+                        table={
+                          <Table
+                            rows={data.artifacts}
+                            headers={[
+                              { label: "Type", key: "type" },
+                              {
+                                label: "Operation",
+                                sortValue: (row) =>
+                                  formatOperation(row.operation),
+                                render: (row) => formatOperation(row.operation),
+                              },
+                              { label: "Variant", key: "variant" },
+                              {
+                                label: "Count",
+                                sortValue: (r) => r.count,
+                                render: (r) => formatNumber(r.count),
+                              },
+                              {
+                                label: "Media volume",
+                                sortValue: (r) => r.bytes,
+                                render: (r) =>
+                                  r.bytes > 0 ? formatBytes(r.bytes) : "—",
+                              },
+                            ]}
+                          />
+                        }
+                      />
+                    </Section>
+                  )}
+                </div>
+              )}
+              {visible.contentTime && (
+                <Section
+                  icon="content-time"
+                  title="Successful media time"
+                  subtitle="Each successfully processed item is counted once, regardless of destination. Unknown runtimes are excluded."
+                >
                   <ChartWithTable
                     chart={
                       <DonutChart
-                        ariaLabel="Artifact activity"
-                        rows={data.artifacts.map((row) => ({
-                          label: `${formatDimensionValue(row.type)} · ${formatOperation(row.operation)} · ${formatDimensionValue(row.variant)}`,
-                          value: row.count,
+                        ariaLabel="Successfully uploaded media time by category"
+                        rows={(data.content_time?.by_category || []).map(
+                          (row) => ({
+                            label: row.category,
+                            value: row.seconds,
+                          }),
+                        )}
+                        valueFormatter={formatMediaHours}
+                        centerLabel="uploaded"
+                      />
+                    }
+                    table={
+                      <Table
+                        rows={data.content_time?.by_category || []}
+                        empty="No successful media duration in this period."
+                        headers={[
+                          { label: "Category", key: "category" },
+                          {
+                            label: "Items",
+                            sortValue: (row) => row.items,
+                            render: (row) => formatNumber(row.items),
+                          },
+                          {
+                            label: "Media time",
+                            sortValue: (row) => row.seconds,
+                            render: (row) => formatMediaTime(row.seconds),
+                          },
+                          {
+                            label: "Hours",
+                            sortValue: (row) => row.seconds,
+                            render: (row) => formatMediaHours(row.seconds),
+                          },
+                        ]}
+                      />
+                    }
+                  />
+                </Section>
+              )}
+              {visible.mediaProfile && (
+                <Section
+                  icon="media-profile"
+                  title="Media profile"
+                  subtitle="Low-cardinality technical characteristics."
+                >
+                  <MediaProfile
+                    media={data.media}
+                    category={mediaCategory}
+                    onCategoryChange={setMediaCategory}
+                  />
+                </Section>
+              )}
+              {(visible.streamingServices || visible.personalReleases) && (
+                <div className="grid gap-5 lg:grid-cols-2">
+                  {visible.streamingServices && (
+                    <Section
+                      icon="streaming-services"
+                      title="Streaming services"
+                      subtitle="Processed WEB items grouped by their identified source."
+                    >
+                      <StreamingServices services={data.streaming.services} />
+                    </Section>
+                  )}
+                  {visible.personalReleases && (
+                    <Section
+                      icon="personal-releases"
+                      title="Personal releases"
+                      subtitle="Aggregate results only; release groups and tags are never stored."
+                    >
+                      <ReleaseProfiles
+                        releaseProfiles={data.release_profiles}
+                      />
+                    </Section>
+                  )}
+                </div>
+              )}
+              {visible.cacheByProvider && (
+                <Section
+                  icon="cache-by-provider"
+                  title="Cache by provider"
+                  subtitle={
+                    activeTracker
+                      ? "Global · not affected by the tracker filter."
+                      : ""
+                  }
+                >
+                  <ChartWithTable
+                    chart={
+                      <DonutChart
+                        ariaLabel="Cache activity by provider"
+                        rows={data.cache.by_provider.map((row) => ({
+                          label: row.provider,
+                          value:
+                            row.hits + row.misses + row.writes + row.bypasses,
                         }))}
                       />
                     }
                     table={
                       <Table
-                        rows={data.artifacts}
+                        rows={data.cache.by_provider}
                         headers={[
-                          { label: "Type", key: "type" },
+                          { label: "Provider", key: "provider" },
+                          { label: "Hits", key: "hits" },
+                          { label: "Misses", key: "misses" },
+                          { label: "Writes", key: "writes" },
+                          { label: "Bypasses", key: "bypasses" },
+                          {
+                            label: "Written",
+                            sortValue: (r) => r.bytes_written,
+                            render: (r) => formatBytes(r.bytes_written),
+                          },
+                          {
+                            label: "Hit rate",
+                            sortValue: (r) => r.hit_rate,
+                            render: (r) => `${r.hit_rate}%`,
+                          },
+                        ]}
+                      />
+                    }
+                  />
+                </Section>
+              )}
+              {visible.externalOperations && (
+                <Section
+                  icon="external-operations"
+                  title="External operations"
+                  subtitle={`${activeTracker ? "Global · not affected by the tracker filter. " : ""}Logical adapter operations; internal redirects and retries are not counted separately. Bytes sent are available for NNTP and successful image uploads.`}
+                >
+                  <ChartWithTable
+                    chart={
+                      <DonutChart
+                        ariaLabel="External operations by service"
+                        rows={data.api.by_service.map((row) => ({
+                          label: `${row.service} · ${formatOperation(row.operation)}`,
+                          value: row.requests,
+                        }))}
+                      />
+                    }
+                    table={
+                      <Table
+                        rows={data.api.by_service.map((row) => ({
+                          ...row,
+                          key: `${row.service}:${row.operation}`,
+                        }))}
+                        headers={[
+                          { label: "Service", key: "service" },
                           {
                             label: "Operation",
                             sortValue: (row) => formatOperation(row.operation),
                             render: (row) => formatOperation(row.operation),
                           },
-                          { label: "Variant", key: "variant" },
+                          { label: "Requests", key: "requests" },
+                          { label: "Success", key: "successes" },
+                          { label: "Errors", key: "errors" },
                           {
-                            label: "Count",
-                            sortValue: (r) => r.count,
-                            render: (r) => formatNumber(r.count),
+                            label: "Avg time",
+                            sortValue: (r) => r.average_duration_ms,
+                            render: (r) =>
+                              formatDuration(r.average_duration_ms),
                           },
                           {
-                            label: "Media volume",
+                            label: "Bytes sent",
                             sortValue: (r) => r.bytes,
                             render: (r) =>
                               r.bytes > 0 ? formatBytes(r.bytes) : "—",
@@ -2154,151 +2813,35 @@ function StatsApp() {
                     }
                   />
                 </Section>
-              </div>
-              <Section
-                icon="media-profile"
-                title="Media profile"
-                subtitle="Low-cardinality technical characteristics."
-              >
-                <MediaProfile
-                  media={data.media}
-                  category={mediaCategory}
-                  onCategoryChange={setMediaCategory}
-                />
-              </Section>
-              <div className="grid gap-5 lg:grid-cols-2">
-                <Section
-                  icon="streaming-services"
-                  title="Streaming services"
-                  subtitle="Processed WEB items grouped by their identified source."
-                >
-                  <StreamingServices services={data.streaming.services} />
+              )}
+              {visible.executionSource && (
+                <Section icon="execution-source" title="Execution source">
+                  <ChartWithTable
+                    chart={
+                      <DonutChart
+                        ariaLabel="Completed items by execution source"
+                        rows={data.sources.map((row) => ({
+                          label: row.source,
+                          value: row.count,
+                        }))}
+                      />
+                    }
+                    table={
+                      <Table
+                        rows={data.sources}
+                        headers={[
+                          { label: "Source", key: "source" },
+                          {
+                            label: "Completed items",
+                            sortValue: (r) => r.count,
+                            render: (r) => formatNumber(r.count),
+                          },
+                        ]}
+                      />
+                    }
+                  />
                 </Section>
-                <Section
-                  icon="personal-releases"
-                  title="Personal releases"
-                  subtitle="Aggregate results only; release groups and tags are never stored."
-                >
-                  <ReleaseProfiles releaseProfiles={data.release_profiles} />
-                </Section>
-              </div>
-              <Section
-                icon="cache-by-provider"
-                title="Cache by provider"
-                subtitle={
-                  activeTracker
-                    ? "Global · not affected by the tracker filter."
-                    : ""
-                }
-              >
-                <ChartWithTable
-                  chart={
-                    <DonutChart
-                      ariaLabel="Cache activity by provider"
-                      rows={data.cache.by_provider.map((row) => ({
-                        label: row.provider,
-                        value:
-                          row.hits + row.misses + row.writes + row.bypasses,
-                      }))}
-                    />
-                  }
-                  table={
-                    <Table
-                      rows={data.cache.by_provider}
-                      headers={[
-                        { label: "Provider", key: "provider" },
-                        { label: "Hits", key: "hits" },
-                        { label: "Misses", key: "misses" },
-                        { label: "Writes", key: "writes" },
-                        { label: "Bypasses", key: "bypasses" },
-                        {
-                          label: "Written",
-                          sortValue: (r) => r.bytes_written,
-                          render: (r) => formatBytes(r.bytes_written),
-                        },
-                        {
-                          label: "Hit rate",
-                          sortValue: (r) => r.hit_rate,
-                          render: (r) => `${r.hit_rate}%`,
-                        },
-                      ]}
-                    />
-                  }
-                />
-              </Section>
-              <Section
-                icon="external-operations"
-                title="External operations"
-                subtitle={`${activeTracker ? "Global · not affected by the tracker filter. " : ""}Logical adapter operations; internal redirects and retries are not counted separately. Bytes sent are available for NNTP and successful image uploads.`}
-              >
-                <ChartWithTable
-                  chart={
-                    <DonutChart
-                      ariaLabel="External operations by service"
-                      rows={data.api.by_service.map((row) => ({
-                        label: `${row.service} · ${formatOperation(row.operation)}`,
-                        value: row.requests,
-                      }))}
-                    />
-                  }
-                  table={
-                    <Table
-                      rows={data.api.by_service.map((row) => ({
-                        ...row,
-                        key: `${row.service}:${row.operation}`,
-                      }))}
-                      headers={[
-                        { label: "Service", key: "service" },
-                        {
-                          label: "Operation",
-                          sortValue: (row) => formatOperation(row.operation),
-                          render: (row) => formatOperation(row.operation),
-                        },
-                        { label: "Requests", key: "requests" },
-                        { label: "Success", key: "successes" },
-                        { label: "Errors", key: "errors" },
-                        {
-                          label: "Avg time",
-                          sortValue: (r) => r.average_duration_ms,
-                          render: (r) => formatDuration(r.average_duration_ms),
-                        },
-                        {
-                          label: "Bytes sent",
-                          sortValue: (r) => r.bytes,
-                          render: (r) =>
-                            r.bytes > 0 ? formatBytes(r.bytes) : "—",
-                        },
-                      ]}
-                    />
-                  }
-                />
-              </Section>
-              <Section icon="execution-source" title="Execution source">
-                <ChartWithTable
-                  chart={
-                    <DonutChart
-                      ariaLabel="Completed items by execution source"
-                      rows={data.sources.map((row) => ({
-                        label: row.source,
-                        value: row.count,
-                      }))}
-                    />
-                  }
-                  table={
-                    <Table
-                      rows={data.sources}
-                      headers={[
-                        { label: "Source", key: "source" },
-                        {
-                          label: "Completed items",
-                          sortValue: (r) => r.count,
-                          render: (r) => formatNumber(r.count),
-                        },
-                      ]}
-                    />
-                  }
-                />
-              </Section>
+              )}
             </div>
             {!statsEnabled && (
               <div className="absolute inset-x-0 top-12 z-10 flex justify-center px-4">
@@ -2306,20 +2849,10 @@ function StatsApp() {
                   className="ua-stats-disabled-notice w-full max-w-lg rounded-xl p-6 text-center shadow-2xl sm:p-8"
                   role="status"
                 >
-                  <svg
+                  <LucideIcon
+                    name="triangle-alert"
                     className="mx-auto h-9 w-9 opacity-60"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                    aria-hidden="true"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="1.8"
-                      d="M12 9v4m0 4h.01M10.3 4.4 2.6 18a2 2 0 001.74 3h15.32a2 2 0 001.74-3L13.7 4.4a2 2 0 00-3.4 0z"
-                    />
-                  </svg>
+                  />
                   <h2 className="mt-4 text-lg font-semibold">
                     Statistics collection is disabled
                   </h2>

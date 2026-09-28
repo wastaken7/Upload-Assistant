@@ -4233,10 +4233,18 @@ def stats_api():
     date_from = request.args.get("from")
     date_to = request.args.get("to")
     tracker = str(request.args.get("tracker", ""))
+    time_basis = str(request.args.get("timezone", "utc"))
+    local_date = request.args.get("today")
     try:
         config = _load_config_from_file(STATE_DIR / "data" / "config.py") or {}
         enabled = stats_collection_enabled(config)
-        stats_kwargs = {"date_from": date_from, "date_to": date_to, "tracker": tracker}
+        stats_kwargs = {
+            "date_from": date_from,
+            "date_to": date_to,
+            "tracker": tracker,
+            "time_basis": time_basis,
+            "local_date": local_date,
+        }
         payload = get_stats(period, mode, STATE_DIR, **stats_kwargs) if enabled else get_empty_stats(period, mode, **stats_kwargs)
         _add_stats_destination_display_names(payload)
         payload["enabled"] = enabled

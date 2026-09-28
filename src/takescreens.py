@@ -35,6 +35,7 @@ from src.screenshot_manifest import files as manifest_files
 from src.screenshot_manifest import forget_file as forget_screenshot_file
 from src.screenshot_manifest import register as register_screenshots
 from src.screenshot_overlays import overlay_filters, overlay_fontfile, overlay_options
+from src.stats import record_event_async
 from src.temp_paths import artwork_dir, screenshots_dir
 from src.webui_progress import complete_progress, publish_progress
 
@@ -182,7 +183,9 @@ async def xxx_contact_sheets(paths: list[str], folder_id: str, base_dir: str, me
             except Exception as error:
                 logger.warning(f"[yellow]Unable to create XXX contact sheet for {video_path.name}: {error}[/yellow]")
 
-        sheets = [str(path) for path in register_screenshots(base_dir, folder_id, results, capture_group)] if results else []
+        registered = register_screenshots(base_dir, folder_id, results, capture_group) if results else []
+        await record_event_async("artifact", service="screenshot", operation="created", category="standard", count=len(registered))
+        sheets = [str(path) for path in registered]
     normal_screens = xxx_single_file_screens()
     if len(video_paths) == 1 and normal_screens:
         existing_in_group = len(manifest_files(base_dir, folder_id, capture_group))
@@ -757,6 +760,7 @@ async def disc_screenshots(
     # The temporary descriptive names above are only used while capture is in
     # progress.  Publish completed frames under opaque UUID filenames.
     registered = register_screenshots(base_dir, folder_id, valid_results, capture_group or sanitized_filename) if valid_results else []
+    await record_event_async("artifact", service="screenshot", operation="created", category="standard", count=len(registered))
 
     multi_screens = int(default_config.get("multiScreens", 2))
     discs = meta.discs
@@ -1047,7 +1051,8 @@ async def dvd_screenshots(
         logger.info(f"[red]The following images could not be retaken successfully: {remaining_retakes}[/red]")
 
     if valid_results:
-        register_screenshots(meta.base_dir, meta.uuid, valid_results, sanitized_disc_name)
+        registered = register_screenshots(meta.base_dir, meta.uuid, valid_results, sanitized_disc_name)
+        await record_event_async("artifact", service="screenshot", operation="created", category="standard", count=len(registered))
 
     if not retry_cap and meta.debug:
         logger.info(f"[green]Successfully captured {len(valid_results)} screenshots.")
@@ -1754,6 +1759,7 @@ async def generate_ebook_screenshots(
 
             logger.info(traceback.format_exc())
 
+    await record_event_async("artifact", service="screenshot", operation="created", category="standard", count=len(screenshots))
     return screenshots
 
 
@@ -2208,6 +2214,7 @@ async def screenshots(
     )
 
     new_screens = register_screenshots(base_dir, folder_id, valid_results, group) if valid_results else []
+    await record_event_async("artifact", service="screenshot", operation="created", category="standard", count=len(new_screens))
     if not force_screenshots and not meta.retake:
         return [str(screen) for screen in manifest_files(base_dir, folder_id, group)[:requested_screens]]
     return [str(screen) for screen in new_screens] or None

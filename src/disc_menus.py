@@ -13,6 +13,7 @@ from src.binaries import configured_binary
 from src.console import logger
 from src.mediainfo import MediaInfo
 from src.meta import Meta
+from src.stats import record_event_async
 from src.takescreens import screenshot_par_scale_factors, should_scale_dvd_screenshots_for_par
 from src.temp_paths import menu_screenshots_dir
 from src.uploadscreens import UploadScreensManager
@@ -345,6 +346,8 @@ class DiscMenus:
         if not captured_images:
             logger.info("[yellow]No disc menu images could be auto-captured.[/yellow]")
             return
+
+        await record_event_async("artifact", service="screenshot", operation="created", category="menu", count=len(captured_images))
 
         # Upload captured images
         logger.info(f"[cyan]Uploading {len(captured_images)} auto-captured disc menu screenshots...[/cyan]")

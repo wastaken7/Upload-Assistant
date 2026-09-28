@@ -44,6 +44,7 @@ async def test_xxx_contact_sheets_create_one_grid_per_video_up_to_configured_lim
 
     takescreens._apply_config({"DEFAULT": {"xxx_contact_sheet_rows": 2, "xxx_contact_sheet_columns": 3, "xxx_contact_sheet_max_videos": 2}})
     commands = []
+    recorded = []
 
     def fake_probe(_path):
         return {"format": {"duration": "60"}, "streams": [{"codec_type": "video"}]}
@@ -55,9 +56,13 @@ async def test_xxx_contact_sheets_create_one_grid_per_video_up_to_configured_lim
         output.write_bytes(b"contact sheet")
         return 0, b"", b""
 
+    async def fake_record_event(family, **values):
+        recorded.append((family, values))
+
     monkeypatch.setattr(takescreens.ffmpeg, "probe", fake_probe)
     monkeypatch.setattr(takescreens, "run_ffmpeg", fake_run_ffmpeg)
     monkeypatch.setattr(takescreens, "_xxx_contact_sheet_fontfile", lambda: "C:/Windows/Fonts/arial.ttf")
+    monkeypatch.setattr(takescreens, "record_event_async", fake_record_event)
     meta = Meta(base_dir=str(tmp_path), uuid="xxx-release", category="XXX")
 
     sheets = await takescreens.xxx_contact_sheets(videos, meta.uuid, meta.base_dir, meta)
@@ -69,6 +74,7 @@ async def test_xxx_contact_sheets_create_one_grid_per_video_up_to_configured_lim
     assert all("drawtext" in command for command in commands)
     assert all("fontfile" in command for command in commands)
     assert all("pts" in command for command in commands)
+    assert recorded == [("artifact", {"service": "screenshot", "operation": "created", "category": "standard", "count": 2})]
 
 
 @pytest.mark.asyncio

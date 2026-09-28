@@ -7,10 +7,12 @@ from typing import Any, cast
 
 from src.artwork import prepare_artwork
 from src.bluray_com import reset_release_subheader_cache
+from src.content_duration import populate_content_duration
 from src.meta import Meta
 from src.meta_file import write_meta_file
 from src.metadata_cache import set_run_disabled
 from src.screenshot_manifest import files as manifest_files
+from src.stats import stats_collection_enabled
 
 console: Any = None
 
@@ -186,6 +188,8 @@ class Prep:
             await _enrich_music_from_orpheus_fn(meta, self.config)
             await _enrich_music_from_discogs_fn(meta, self.config)
             await prepare_artwork(meta)
+            if stats_collection_enabled(self.config):
+                await populate_content_duration(meta, self.config)
             logger.debug(f"Music metadata processed in {time.time() - meta_start_time:.2f} seconds")
             return meta
 
@@ -269,6 +273,9 @@ class Prep:
             await self.rehost_images_manager.takescreens_manager.prepare_book_cover(videopath, meta.uuid, meta.base_dir, meta)
             await prepare_artwork(meta)
             await write_meta_file(meta)
+
+        if stats_collection_enabled(self.config):
+            await populate_content_duration(meta, self.config)
 
         logger.debug(f"Metadata processed in {time.time() - meta_start_time:.2f} seconds")
 
