@@ -5,6 +5,7 @@ import pytest
 
 from src.configvalidator import _validate_trackers_section
 from src.meta import Meta
+from src.screenshot_manifest import register as register_screenshots
 from src.trackers.UNIT3D.capybarabr import CapybaraBR
 from src.trackers.UNIT3D.samaritano import Samaritano
 
@@ -130,6 +131,44 @@ def test_samaritano_force_rehost_is_atomic_on_failure(tmp_path) -> None:
         asyncio.run(tracker.check_image_hosts(meta))
 
     assert "SAMARITANO" not in meta.tracker_image_collections  # noqa: S101
+
+
+def test_samaritano_rehost_downloads_the_matching_image_instead_of_using_manifest_position(tmp_path) -> None:
+    release_id = "fictional-release"
+    screenshot_dir = tmp_path / "tmp" / release_id / "screenshots"
+    screenshot_dir.mkdir(parents=True)
+    unrelated_screenshot = screenshot_dir / "unrelated-screen.png"
+    unrelated_screenshot.write_bytes(b"unrelated")
+    register_screenshots(tmp_path, release_id, [unrelated_screenshot], "main")
+
+    downloaded_screenshot = tmp_path / "downloaded-matching-screen.png"
+    downloaded_screenshot.write_bytes(b"matching")
+    meta = Meta(
+        base_dir=str(tmp_path),
+        uuid=release_id,
+        category="MOVIE",
+        image_list=[{"raw_url": "https://global.example/reordered-screen.png"}],
+    )
+    uploaded_paths: list[str] = []
+
+    async def fake_upload(args: object) -> dict[str, str]:
+        uploaded_paths.append(str(args[0]))
+        return {
+            "status": "success",
+            "img_url": "https://img.samaritano.cc/thumbnails/reordered-screen.png",
+            "raw_url": "https://img.samaritano.cc/uploads/reordered-screen.png",
+            "web_url": "https://img.samaritano.cc/uploads/reordered-screen.png",
+        }
+
+    tracker = Samaritano(_samaritano_config())
+    with (
+        patch("src.trackers.UNIT3D.samaritano._local_image_path", new=AsyncMock(return_value=None)),
+        patch("src.trackers.UNIT3D.samaritano._download_image_for_rehost", new=AsyncMock(return_value=downloaded_screenshot)),
+        patch("src.trackers.UNIT3D.samaritano.upload_image_task", new=fake_upload),
+    ):
+        asyncio.run(tracker.check_image_hosts(meta))
+
+    assert uploaded_paths == [str(downloaded_screenshot)]  # noqa: S101
 
 
 @pytest.mark.parametrize(

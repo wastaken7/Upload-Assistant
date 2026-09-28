@@ -5,7 +5,6 @@ from src.console import logger
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
 from src.rehostimages import _download_image_for_rehost, _local_image_path
-from src.screenshot_manifest import files as manifest_files
 from src.tracker_images import ImageCollection, set_tracker_image_collection
 from src.trackers.common import Common
 from src.trackers.UNIT3D import UNIT3D
@@ -188,7 +187,6 @@ class Samaritano(UNIT3D):
         if not items:
             return []
 
-        manifest = manifest_files(meta.base_dir, meta.uuid, "main") if collection_name == "screenshots" and meta.base_dir and meta.uuid else []
         rehosted_items: list[dict[str, Any]] = []
 
         for index, item in enumerate(items):
@@ -197,8 +195,6 @@ class Samaritano(UNIT3D):
 
             raw_url = item.get("raw_url", "")
             local_path = await _local_image_path(meta, collection_name, item)
-            if local_path is None and index < len(manifest) and manifest[index].is_file():
-                local_path = manifest[index]
             if local_path is None and isinstance(raw_url, str) and raw_url:
                 local_path = await _download_image_for_rehost(meta, collection_name, raw_url)
 
