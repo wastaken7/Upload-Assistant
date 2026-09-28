@@ -11,8 +11,10 @@ On the first run after upgrading, a legacy `data/config.py` in the checkout is *
 - The Web UI creates the user config from `data/example_config.py` on first start and continues to the configuration page.
 - The first CLI upload command creates the same file and stops. Edit the generated user-owned `config.py`, then run the command again.
 - Help commands such as `ua --help` do not create configuration files.
-- On later starts, missing settings are added recursively from `data/example_config.py`. Existing values and custom keys are never replaced or removed. When settings are added, the previous file is retained beside it as a timestamped `config.py.backup-*` file.
+- On later starts, missing general settings are added from `data/example_config.py`. Existing values and custom keys are never replaced or removed. `TRACKERS`, `TORRENT_CLIENTS`, `DEFAULT.metadata_cache_services`, and `DEFAULT.tag_overrides` are left untouched, including omitted sections and options. These contain user-selected entries and optional overrides; copying examples into them could change inherited behavior. Add new tracker/client options manually when needed. The legacy `embed_dupe_links` setting and omitted `USENET.pesto_obfuscation_mode` also retain their existing fallback behavior. When settings are added, the previous file is retained beside it as a timestamped `config.py.backup-*` file.
 - Automatic updates require the `config` assignment to contain literal Python values. Configurations containing expressions continue to load normally, but are left unchanged with a warning because they cannot be migrated without executing user code.
+
+If an earlier automatic update restored options you deliberately removed, restore the last good `config.py.backup-*` after installing the fix, preserving any later edits you want to keep. The updater does not remove existing entries automatically because it cannot distinguish restored examples from settings you chose yourself.
 
 `DEFAULT.stats_enabled` controls collection of privacy-preserving daily aggregates for the Web UI Stats workspace. It defaults to `False`; setting it to `True` enables collection and display. Disabling it again hides existing statistics without deleting them.
 

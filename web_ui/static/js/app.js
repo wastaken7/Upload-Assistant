@@ -1046,17 +1046,8 @@ if (cliArguments.length > 0) {
 }
 
 // Icon components
-const WebUiIcon = ({ name, className = "w-5 h-5" }) => (
-  <span
-    aria-hidden="true"
-    className={`inline-block flex-none ${className}`}
-    style={{
-      backgroundColor: "currentColor",
-      mask: `url(/static/img/webui-icons/${name}.svg) center / contain no-repeat`,
-      WebkitMask: `url(/static/img/webui-icons/${name}.svg) center / contain no-repeat`,
-    }}
-  />
-);
+const LucideIcon = window.UALucideIcon;
+const WebUiIcon = LucideIcon;
 
 const FolderIcon = () => (
   <WebUiIcon name="file-structure" className="w-4 h-4" />
@@ -1065,51 +1056,13 @@ const FolderIcon = () => (
 const ScreenshotsIcon = () => <WebUiIcon name="screenshots" />;
 
 const FolderOpenIcon = () => (
-  <svg
-    className="w-4 h-4"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z"
-    />
-  </svg>
+  <LucideIcon name="folder-open" className="w-4 h-4" />
 );
 
-const FileIcon = () => (
-  <svg
-    className="w-4 h-4"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-    />
-  </svg>
-);
+const FileIcon = () => <LucideIcon name="file-text" className="w-4 h-4" />;
 
 const TerminalIcon = () => (
-  <svg
-    className="w-5 h-5"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-    />
-  </svg>
+  <LucideIcon name="square-terminal" className="w-5 h-5" />
 );
 
 const PaletteIcon = () => <WebUiIcon name="palette" />;
@@ -1118,22 +1071,7 @@ const SettingsIcon = () => <WebUiIcon name="config" />;
 
 const HelpIcon = () => <WebUiIcon name="help" />;
 
-const UpdateIcon = () => (
-  <svg
-    className="h-5 w-5"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-    aria-hidden="true"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14"
-    />
-  </svg>
-);
+const UpdateIcon = () => <LucideIcon name="download" className="h-5 w-5" />;
 
 const ChangelogIcon = () => <WebUiIcon name="changelog" />;
 
@@ -1404,19 +1342,7 @@ function UploadHelpResourcesModal({
             data-ua-modal-initial-focus
             onClick={onClose}
           >
-            <svg
-              className="h-4 w-4"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              aria-hidden="true"
-            >
-              <path
-                d="M6 6l12 12M18 6L6 18"
-                strokeWidth="2"
-                strokeLinecap="round"
-              />
-            </svg>
+            <LucideIcon name="x" className="h-4 w-4" />
           </button>
         </div>
 
@@ -1472,9 +1398,10 @@ function UploadHelpResourcesModal({
                           {link.description}
                         </span>
                       </span>
-                      <span className="shrink-0 text-sm" aria-hidden="true">
-                        ↗
-                      </span>
+                      <LucideIcon
+                        name="external-link"
+                        className="h-4 w-4 shrink-0"
+                      />
                     </a>
                   ))}
                 </div>
@@ -1490,7 +1417,8 @@ function UploadHelpResourcesModal({
             rel="noopener noreferrer"
             className="ua-upload-modal-action rounded-lg px-4 py-2 text-sm font-semibold"
           >
-            Browse all documentation ↗
+            Browse all documentation
+            <LucideIcon name="external-link" className="ml-2 h-4 w-4" />
           </a>
         </div>
       </section>
@@ -1499,19 +1427,7 @@ function UploadHelpResourcesModal({
 }
 
 const ProgressIcon = () => (
-  <svg
-    className="w-5 h-5"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M4 19V5m0 14h16M8 16v-4m4 4V8m4 8v-7"
-    />
-  </svg>
+  <LucideIcon name="chart-column-increasing" className="w-5 h-5" />
 );
 
 const MovieIcon = () => <WebUiIcon name="movie" />;
@@ -1545,75 +1461,13 @@ const mediaIconForCategory = (category) => {
   }
 };
 
-const PlayIcon = () => (
-  <svg
-    className="w-4 h-4"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
-    />
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-    />
-  </svg>
-);
+const PlayIcon = () => <LucideIcon name="circle-play" className="w-4 h-4" />;
 
-const PlusIcon = () => (
-  <svg
-    className="w-4 h-4"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M12 5v14m-7-7h14"
-    />
-  </svg>
-);
+const PlusIcon = () => <LucideIcon name="plus" className="w-4 h-4" />;
 
-const ExpandIcon = () => (
-  <svg
-    className="w-4 h-4"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M8 3H3v5m13-5h5v5M8 21H3v-5m18 0v5h-5"
-    />
-  </svg>
-);
+const ExpandIcon = () => <LucideIcon name="maximize-2" className="w-4 h-4" />;
 
-const TrashIcon = () => (
-  <svg
-    className="w-4 h-4"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-    />
-  </svg>
-);
+const TrashIcon = () => <LucideIcon name="trash-2" className="w-4 h-4" />;
 
 const LogoIcon = ({ src, className = "w-6 h-6" }) => (
   <img
@@ -1624,118 +1478,28 @@ const LogoIcon = ({ src, className = "w-6 h-6" }) => (
 );
 
 const ChevronDownIcon = () => (
-  <svg
-    className="w-4 h-4"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M19 9l-7 7-7-7"
-    />
-  </svg>
+  <LucideIcon name="chevron-down" className="w-4 h-4" />
 );
 
 const ChevronRightIcon = () => (
-  <svg
-    className="w-4 h-4"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M9 5l7 7-7 7"
-    />
-  </svg>
+  <LucideIcon name="chevron-right" className="w-4 h-4" />
 );
 
-const SearchIcon = () => (
-  <svg
-    className="w-4 h-4"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-    />
-  </svg>
-);
+const SearchIcon = () => <LucideIcon name="search" className="w-4 h-4" />;
 
 const CollapseAllIcon = () => (
-  <svg
-    className="w-4 h-4"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"
-    />
-  </svg>
+  <LucideIcon name="minimize-2" className="w-4 h-4" />
 );
 
 const ExpandAllIcon = () => (
-  <svg
-    className="w-4 h-4"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"
-    />
-  </svg>
+  <LucideIcon name="maximize-2" className="w-4 h-4" />
 );
 
 const SpinnerIcon = () => (
-  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-    <circle
-      className="opacity-25"
-      cx="12"
-      cy="12"
-      r="10"
-      stroke="currentColor"
-      strokeWidth="4"
-    ></circle>
-    <path
-      className="opacity-75"
-      fill="currentColor"
-      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-    ></path>
-  </svg>
+  <LucideIcon name="loader-circle" className="w-4 h-4 animate-spin" />
 );
 
-const RefreshIcon = () => (
-  <svg
-    className="w-4 h-4"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M20 11a8.1 8.1 0 00-14.8-4.5L3 9m0 0V4m0 5h5M4 13a8.1 8.1 0 0014.8 4.5L21 15m0 0v5m0-5h-5"
-    />
-  </svg>
-);
+const RefreshIcon = () => <LucideIcon name="refresh-cw" className="w-4 h-4" />;
 
 const metadataProviderStyles = {
   tmdb: {
@@ -1858,51 +1622,9 @@ const renderMetadataProviderIcon = (key, isDarkMode) => {
 
   switch (key) {
     case "google_books":
-      return (
-        <svg
-          className="w-4 h-4"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          aria-hidden="true"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={1.8}
-            d="M5 6.25A2.25 2.25 0 017.25 4h10.5A1.25 1.25 0 0119 5.25v13.5A1.25 1.25 0 0117.75 20H7.25A2.25 2.25 0 015 17.75V6.25z"
-          />
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={1.8}
-            d="M7.5 6H18M8 9.5h6.5M8 13h7.5"
-          />
-        </svg>
-      );
+      return <LucideIcon name="book-open" className="w-4 h-4" />;
     case "openlibrary":
-      return (
-        <svg
-          className="w-4 h-4"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          aria-hidden="true"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={1.8}
-            d="M4.5 6.5A2.5 2.5 0 017 4h11.5v15.5H7a2.5 2.5 0 010-5h11.5"
-          />
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={1.8}
-            d="M8.5 8.5h6M8.5 12h6"
-          />
-        </svg>
-      );
+      return <LucideIcon name="book-open" className="w-4 h-4" />;
     default:
       return (
         <span className="text-[11px] font-black tracking-wide">
@@ -4189,7 +3911,7 @@ function AudionutsUAGUI() {
                       title="Remove from queue"
                       disabled={isExecuting}
                     >
-                      ✕
+                      <LucideIcon name="x" className="h-3 w-3" />
                     </button>
                   </div>
                   <div className="flex flex-col gap-1">
@@ -4715,18 +4437,7 @@ function AudionutsUAGUI() {
                     setRootFolderDropTarget(null);
                   }}
                 >
-                  <svg
-                    viewBox="0 0 16 16"
-                    aria-hidden="true"
-                    className="h-4 w-4"
-                  >
-                    <circle cx="5" cy="3.5" r="1" fill="currentColor" />
-                    <circle cx="11" cy="3.5" r="1" fill="currentColor" />
-                    <circle cx="5" cy="8" r="1" fill="currentColor" />
-                    <circle cx="11" cy="8" r="1" fill="currentColor" />
-                    <circle cx="5" cy="12.5" r="1" fill="currentColor" />
-                    <circle cx="11" cy="12.5" r="1" fill="currentColor" />
-                  </svg>
+                  <LucideIcon name="grip-vertical" className="h-4 w-4" />
                 </span>
                 <button
                   type="button"
@@ -4856,7 +4567,7 @@ function AudionutsUAGUI() {
     if (hasDescFile) {
       if (!descFilePath) {
         appendSystemMessage(
-          "✗ Please select or enter a description file path when using --descfile",
+          "Error: Please select or enter a description file path when using --descfile",
           "error",
         );
         return false;
@@ -4864,7 +4575,7 @@ function AudionutsUAGUI() {
       const pathValidation = isValidDescFilePath(descFilePath);
       if (!pathValidation.valid) {
         appendSystemMessage(
-          `✗ Invalid description file: ${pathValidation.error}`,
+          `Error: Invalid description file: ${pathValidation.error}`,
           "error",
         );
         return false;
@@ -4875,14 +4586,14 @@ function AudionutsUAGUI() {
     if (hasDescLink) {
       if (!descLinkUrl) {
         appendSystemMessage(
-          "✗ Please enter a description URL when using --desclink",
+          "Error: Please enter a description URL when using --desclink",
           "error",
         );
         return false;
       }
       if (!isValidUrl(descLinkUrl)) {
         appendSystemMessage(
-          "✗ Please enter a valid paste URL for --desclink (pastebin, hastebin, etc.)",
+          "Error: Please enter a valid paste URL for --desclink (pastebin, hastebin, etc.)",
           "error",
         );
         return false;
@@ -4895,7 +4606,7 @@ function AudionutsUAGUI() {
 
     appendSystemMessage("");
     appendSystemMessage(`$ python upload.py "${path}" ${customArgs}`);
-    appendSystemMessage("→ Starting execution...");
+    appendSystemMessage("Starting execution...");
 
     let localController = null;
 
@@ -4918,13 +4629,16 @@ function AudionutsUAGUI() {
       if (!response.ok) {
         const errText = await response.text();
         appendSystemMessage(
-          `✗ Execute failed (${response.status}): ${errText || "Request failed"}`,
+          `Error: Execute failed (${response.status}): ${errText || "Request failed"}`,
           "error",
         );
         return false;
       }
       if (!response.body) {
-        appendSystemMessage("✗ Execute failed: empty response body", "error");
+        appendSystemMessage(
+          "Error: Execute failed: empty response body",
+          "error",
+        );
         return false;
       }
       const reader = response.body.getReader();
@@ -4971,7 +4685,9 @@ function AudionutsUAGUI() {
           } else if (data.type === "exit") {
             if (!(localController && localController.signal.aborted)) {
               appendSystemMessage("");
-              appendSystemMessage(`✓ Process exited with code ${data.code}`);
+              appendSystemMessage(
+                `Success: Process exited with code ${data.code}`,
+              );
               exitCode = data.code;
             }
           }
@@ -5004,7 +4720,7 @@ function AudionutsUAGUI() {
       /* eslint-enable no-constant-condition */
 
       if (!(localController && localController.signal.aborted)) {
-        appendSystemMessage("✓ Execution completed");
+        appendSystemMessage("Success: Execution completed");
         appendSystemMessage("");
         if (exitCode === 0) {
           await refreshFileBrowserAfterUpload(localController.signal);
@@ -5014,7 +4730,10 @@ function AudionutsUAGUI() {
       return false;
     } catch (error) {
       if (!(localController && localController.signal.aborted)) {
-        appendSystemMessage("✗ Execution error: " + error.message, "error");
+        appendSystemMessage(
+          "Error: Execution failed: " + error.message,
+          "error",
+        );
       }
       return false;
     } finally {
@@ -5049,7 +4768,7 @@ function AudionutsUAGUI() {
         if (!response.ok) {
           const errText = await response.text();
           appendSystemMessage(
-            `✗ Failed to generate queue file: ${errText}`,
+            `Error: Failed to generate queue file: ${errText}`,
             "error",
           );
           setIsExecuting(false);
@@ -5059,7 +4778,7 @@ function AudionutsUAGUI() {
         const data = await response.json();
         if (!data.success || !data.path) {
           appendSystemMessage(
-            `✗ Failed to generate queue file: ${data.error || "Unknown error"}`,
+            `Error: Failed to generate queue file: ${data.error || "Unknown error"}`,
             "error",
           );
           setIsExecuting(false);
@@ -5070,7 +4789,7 @@ function AudionutsUAGUI() {
         await executeSinglePath(data.path, newSessionId);
       } catch (error) {
         appendSystemMessage(
-          `✗ Error generating queue: ${error.message}`,
+          `Error generating queue: ${error.message}`,
           "error",
         );
       } finally {
@@ -5083,7 +4802,10 @@ function AudionutsUAGUI() {
     const path =
       selectedPaths.length === 1 ? selectedPaths[0].path : selectedPath;
     if (!path) {
-      appendSystemMessage("✗ Please select a file or folder first", "error");
+      appendSystemMessage(
+        "Error: Please select a file or folder first",
+        "error",
+      );
       return;
     }
 
@@ -5118,7 +4840,7 @@ function AudionutsUAGUI() {
           body: JSON.stringify({ session_id: sessionId }),
         });
 
-        appendSystemMessage("✗ Process terminated by user", "error");
+        appendSystemMessage("Error: Process terminated by user", "error");
 
         setIsExecuting(false);
         setSessionId("");
@@ -6428,19 +6150,10 @@ function AudionutsUAGUI() {
                           : "bg-white border-gray-300 text-gray-700 placeholder-gray-400 focus:border-blue-500"
                       } focus:outline-none`}
                     />
-                    <svg
-                      className={`absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                      />
-                    </svg>
+                    <LucideIcon
+                      name="search"
+                      className={`absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}
+                    />
                     {fileBrowserSearch && (
                       <button
                         type="button"
@@ -6448,19 +6161,7 @@ function AudionutsUAGUI() {
                         onClick={() => handleFileBrowserSearch("")}
                         className={`absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded ${isDarkMode ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-200 text-gray-500"}`}
                       >
-                        <svg
-                          className="w-3.5 h-3.5"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M6 18L18 6M6 6l12 12"
-                          />
-                        </svg>
+                        <LucideIcon name="x" className="h-3.5 w-3.5" />
                       </button>
                     )}
                   </div>
@@ -6517,19 +6218,10 @@ function AudionutsUAGUI() {
                             descFilePath &&
                             !descFileError && (
                               <span className="text-green-500 ml-1">
-                                <svg
-                                  className="w-4 h-4 inline"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  viewBox="0 0 24 24"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M5 13l4 4L19 7"
-                                  />
-                                </svg>
+                                <LucideIcon
+                                  name="check"
+                                  className="inline h-4 w-4"
+                                />
                               </span>
                             )}
                         </h2>
@@ -6570,19 +6262,7 @@ function AudionutsUAGUI() {
                             }}
                             className={`p-1 rounded ${isDarkMode ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-200 text-gray-500"}`}
                           >
-                            <svg
-                              className="w-4 h-4"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M6 18L18 6M6 6l12 12"
-                              />
-                            </svg>
+                            <LucideIcon name="x" className="h-4 w-4" />
                           </button>
                         </div>
                       ) : (
@@ -6748,8 +6428,9 @@ function AudionutsUAGUI() {
                   Output
                 </h3>
                 {isExecuting && (
-                  <span className="ml-auto text-xs text-green-400 animate-pulse">
-                    ● Running
+                  <span className="ml-auto inline-flex items-center gap-1 text-xs text-green-400 animate-pulse">
+                    <LucideIcon name="circle" className="h-2.5 w-2.5" />
+                    Running
                   </span>
                 )}
                 {isExecuting && (
@@ -6877,19 +6558,7 @@ function AudionutsUAGUI() {
                         onClick={() => setArgSearchFilter("")}
                         className={`absolute inset-y-0 right-0 pr-3 flex items-center ${isDarkMode ? "text-gray-400 hover:text-gray-200" : "text-gray-500 hover:text-gray-700"}`}
                       >
-                        <svg
-                          className="w-4 h-4"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M6 18L18 6M6 6l12 12"
-                          />
-                        </svg>
+                        <LucideIcon name="x" className="h-4 w-4" />
                       </button>
                     )}
                   </div>
@@ -7207,19 +6876,10 @@ function AudionutsUAGUI() {
                           : "bg-white border-gray-300 text-gray-700 placeholder-gray-400 focus:border-blue-500"
                       } focus:outline-none`}
                     />
-                    <svg
-                      className={`absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                      />
-                    </svg>
+                    <LucideIcon
+                      name="search"
+                      className={`absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}
+                    />
                     {fileBrowserSearch && (
                       <button
                         type="button"
@@ -7227,19 +6887,7 @@ function AudionutsUAGUI() {
                         onClick={() => handleFileBrowserSearch("")}
                         className={`absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded ${isDarkMode ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-200 text-gray-500"}`}
                       >
-                        <svg
-                          className="w-3.5 h-3.5"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M6 18L18 6M6 6l12 12"
-                          />
-                        </svg>
+                        <LucideIcon name="x" className="h-3.5 w-3.5" />
                       </button>
                     )}
                   </div>
@@ -7306,19 +6954,10 @@ function AudionutsUAGUI() {
                             descFilePath &&
                             !descFileError && (
                               <span className="text-green-500 ml-1">
-                                <svg
-                                  className="w-4 h-4 inline"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  viewBox="0 0 24 24"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M5 13l4 4L19 7"
-                                  />
-                                </svg>
+                                <LucideIcon
+                                  name="check"
+                                  className="inline h-4 w-4"
+                                />
                               </span>
                             )}
                         </h2>
@@ -7362,19 +7001,7 @@ function AudionutsUAGUI() {
                             className={`p-1 rounded ${isDarkMode ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-200 text-gray-500"}`}
                             title="Clear selection"
                           >
-                            <svg
-                              className="w-4 h-4"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M6 18L18 6M6 6l12 12"
-                              />
-                            </svg>
+                            <LucideIcon name="x" className="h-4 w-4" />
                           </button>
                         </div>
                       ) : (
@@ -7422,19 +7049,7 @@ function AudionutsUAGUI() {
                                 className={`p-1 rounded ${isDarkMode ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-200 text-gray-500"}`}
                                 title="Clear selection"
                               >
-                                <svg
-                                  className="w-4 h-4"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  viewBox="0 0 24 24"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M6 18L18 6M6 6l12 12"
-                                  />
-                                </svg>
+                                <LucideIcon name="x" className="h-4 w-4" />
                               </button>
                             </div>
                           </div>
@@ -7538,19 +7153,7 @@ function AudionutsUAGUI() {
                           <label
                             className={`text-sm font-semibold ${isDarkMode ? "text-gray-300" : "text-gray-700"} flex items-center gap-2`}
                           >
-                            <svg
-                              className="w-4 h-4"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
-                              />
-                            </svg>
+                            <LucideIcon name="link" className="h-4 w-4" />
                             Description Link URL (pastebin, hastebin, etc.):
                           </label>
                           <input
@@ -7596,30 +7199,12 @@ function AudionutsUAGUI() {
                         }`}
                       >
                         <div className="flex items-center gap-2">
-                          <svg
-                            className={`w-4 h-4 ${
+                          <LucideIcon
+                            name={descFileError ? "circle-x" : "triangle-alert"}
+                            className={`h-4 w-4 ${
                               descFileError ? "text-red-500" : "text-yellow-500"
                             }`}
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            {descFileError ? (
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M6 18L18 6M6 6l12 12"
-                              />
-                            ) : (
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                              />
-                            )}
-                          </svg>
+                          />
                           <span
                             className={`text-sm font-medium ${
                               descFileError
@@ -7722,8 +7307,9 @@ function AudionutsUAGUI() {
                     Execution Output
                   </h3>
                   {isExecuting && (
-                    <span className="ml-auto text-sm text-green-400 animate-pulse">
-                      ● Running
+                    <span className="ml-auto inline-flex items-center gap-1 text-sm text-green-400 animate-pulse">
+                      <LucideIcon name="circle" className="h-3 w-3" />
+                      Running
                     </span>
                   )}
                   {!isExecuting && (
@@ -7868,19 +7454,7 @@ function AudionutsUAGUI() {
                     onClick={() => setArgSearchFilter("")}
                     className={`absolute inset-y-0 right-0 pr-3 flex items-center ${isDarkMode ? "text-gray-400 hover:text-gray-200" : "text-gray-500 hover:text-gray-700"}`}
                   >
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M6 18L18 6M6 6l12 12"
-                      />
-                    </svg>
+                    <LucideIcon name="x" className="h-4 w-4" />
                   </button>
                 )}
               </div>

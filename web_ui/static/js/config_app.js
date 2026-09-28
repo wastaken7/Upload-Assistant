@@ -82,27 +82,10 @@ function loadQRCodeLib() {
   });
 }
 
-// Info icon component (similar to lucide-react Info icon)
-const InfoIcon = ({ className = "" }) => {
-  return React.createElement(
-    "svg",
-    {
-      xmlns: "http://www.w3.org/2000/svg",
-      width: "16",
-      height: "16",
-      viewBox: "0 0 24 24",
-      fill: "none",
-      stroke: "currentColor",
-      strokeWidth: "2",
-      strokeLinecap: "round",
-      strokeLinejoin: "round",
-      className: className,
-    },
-    React.createElement("circle", { cx: "12", cy: "12", r: "10" }),
-    React.createElement("path", { d: "M12 16v-4" }),
-    React.createElement("path", { d: "M12 8h.01" }),
-  );
-};
+const LucideIcon = window.UALucideIcon;
+const InfoIcon = ({ className = "" }) => (
+  <LucideIcon name="info" className={className} />
+);
 
 // Reflow wrapped config comments while retaining paragraphs, lists and URLs.
 const formatConfigHelpText = (lines) =>
@@ -183,12 +166,12 @@ const renderAnnounceUrlHelpText = (text) =>
           href={href}
           target="_blank"
           rel="noopener noreferrer"
-          className="ua-config-service-action font-semibold hover:underline"
+          className="ua-config-service-action inline-flex items-center gap-1 font-semibold hover:underline"
         >
           {href.endsWith("#how-to-export-cookies")
             ? "How to export cookies"
             : href}{" "}
-          <span aria-hidden="true">↗</span>
+          <LucideIcon name="external-link" className="h-3 w-3" />
         </a>
       </span>
     );
@@ -353,29 +336,12 @@ const WorkspaceSwitcher = ({ activeWorkspace, isDarkMode, stretch }) => {
 const RailUploadIcon = () => <RailAssetIcon name="upload" />;
 
 const RailAssetIcon = ({ name }) => (
-  <span
-    aria-hidden="true"
-    className="inline-block h-5 w-5 flex-none"
-    style={{
-      backgroundColor: "currentColor",
-      mask: `url(/static/img/webui-icons/${name}.svg) center / contain no-repeat`,
-      WebkitMask: `url(/static/img/webui-icons/${name}.svg) center / contain no-repeat`,
-    }}
-  />
+  <LucideIcon name={name} className="h-5 w-5" />
 );
 
 const RailHelpIcon = () => <RailAssetIcon name="help" />;
 
-const RailUpdateIcon = () => (
-  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14"
-    />
-  </svg>
-);
+const RailUpdateIcon = () => <LucideIcon name="download" className="h-5 w-5" />;
 
 const RailChangelogIcon = () => <RailAssetIcon name="changelog" />;
 
@@ -1193,6 +1159,7 @@ const formatConfigFieldLabel = (key, pathParts = []) => {
       my_announce_url: "Personal Announce URL",
       bhd_rss_key: "BHD RSS Key",
       bioma_api_key: "Bioma API Key",
+      image_host_api_key: "Image Host API Key",
       ptgen_api: "PTGen API Key",
       use_for_search: "Use for Search",
       link_dir_name: "Link Directory Name",
@@ -2003,16 +1970,10 @@ function LogoLanguageSelect({ id, value, onChange }) {
             }
           }}
         >
-          <svg
+          <LucideIcon
+            name={isOpen ? "chevron-up" : "chevron-down"}
             className="h-4 w-4"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            aria-hidden="true"
-          >
-            <path d={isOpen ? "m6 15 6-6 6 6" : "m6 9 6 6 6-6"} />
-          </svg>
+          />
         </button>
       </div>
       {isOpen &&
@@ -2235,7 +2196,7 @@ function TagListEditor({
               removeEntry(entry);
             }}
           >
-            ×
+            <LucideIcon name="x" className="h-3 w-3" />
           </button>
         </span>
       ))}
@@ -2843,9 +2804,10 @@ function ConfigLeafEditor({
               href="https://www.bittorrent.org/beps/bep_0016.html"
               target="_blank"
               rel="noreferrer"
-              className="ua-config-service-action font-semibold hover:underline"
+              className="ua-config-service-action inline-flex items-center gap-1 font-semibold hover:underline"
             >
-              Learn more <span aria-hidden="true">↗</span>
+              Learn more
+              <LucideIcon name="external-link" className="h-3 w-3" />
             </a>
           </p>
         )}
@@ -3588,24 +3550,16 @@ function ConfigLeafEditor({
                       onClick={(e) => removeClient(client, e)}
                       className="ua-config-list-tag-remove inline-flex h-4 w-4 shrink-0 items-center justify-center rounded"
                     >
-                      ×
+                      <LucideIcon name="x" className="h-3 w-3" />
                     </button>
                   </span>
                 ))
               )}
             </div>
-            <svg
+            <LucideIcon
+              name="chevron-down"
               className={`ua-config-accordion-chevron h-4 w-4 shrink-0 transition-transform ${isOpen ? "rotate-180" : "rotate-0"}`}
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <path d="m6 9 6 6 6-6"></path>
-            </svg>
+            />
           </div>
           {isOpen && (
             <div
@@ -3864,9 +3818,10 @@ function ConfigLeafEditor({
                 href={credentialHelp.href}
                 target="_blank"
                 rel="noreferrer"
-                className={`ua-config-service-action font-semibold hover:underline ${credentialHelp.linkOnNewLine ? "mt-0.5 block" : ""}`}
+                className={`ua-config-service-action items-center gap-1 font-semibold hover:underline ${credentialHelp.linkOnNewLine ? "mt-0.5 flex" : "inline-flex"}`}
               >
-                {credentialHelp.linkLabel} <span aria-hidden="true">↗</span>
+                {credentialHelp.linkLabel}
+                <LucideIcon name="external-link" className="h-3 w-3" />
               </a>
             </React.Fragment>
           )}
@@ -3944,18 +3899,7 @@ function MetadataCacheServices({
             }}
             aria-hidden="true"
           >
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="m9 18 6-6-6-6"></path>
-            </svg>
+            <LucideIcon name="chevron-right" className="h-[18px] w-[18px]" />
           </span>
         </span>
       </button>
@@ -4255,25 +4199,19 @@ function ReleaseGroupOverrides({
                           })
                         }
                       >
-                        <svg
+                        <span
                           className="ua-config-accordion-chevron shrink-0 transition-transform"
                           style={{
                             transform: isGroupOpen
                               ? "rotate(90deg)"
                               : "rotate(0deg)",
                           }}
-                          width="18"
-                          height="18"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          aria-hidden="true"
                         >
-                          <path d="m9 18 6-6-6-6" />
-                        </svg>
+                          <LucideIcon
+                            name="chevron-right"
+                            className="h-[18px] w-[18px]"
+                          />
+                        </span>
                         <span className="min-w-0">
                           <span className="block break-words text-sm font-semibold">
                             {name}
@@ -4597,7 +4535,7 @@ function FolderPickerModal({ fieldLabel, onCancel, onSelect }) {
                   className="ua-config-folder-row flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left"
                   onClick={() => openFolder(item.path)}
                 >
-                  <span aria-hidden="true">📁</span>
+                  <LucideIcon name="folder" className="h-4 w-4" />
                   <span className="min-w-0">
                     <span className="block truncate text-sm font-medium">
                       {item.name}
@@ -4690,18 +4628,7 @@ function TorrentClientCreator({ templateItems, configuredNames, onAddClient }) {
           style={{ transform: isOpen ? "rotate(90deg)" : "rotate(0deg)" }}
           aria-hidden="true"
         >
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="m9 18 6-6-6-6"></path>
-          </svg>
+          <LucideIcon name="chevron-right" className="h-[18px] w-[18px]" />
         </span>
       </button>
 
@@ -4928,19 +4855,7 @@ function HelpResourcesModal({
             data-ua-modal-initial-focus
             onClick={onClose}
           >
-            <svg
-              className="h-4 w-4"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              aria-hidden="true"
-            >
-              <path
-                d="M6 6l12 12M18 6L6 18"
-                strokeWidth="2"
-                strokeLinecap="round"
-              />
-            </svg>
+            <LucideIcon name="x" className="h-4 w-4" />
           </button>
         </div>
 
@@ -4998,12 +4913,10 @@ function HelpResourcesModal({
                           {link.description}
                         </span>
                       </span>
-                      <span
-                        className="ua-config-service-action shrink-0 text-sm"
-                        aria-hidden="true"
-                      >
-                        ↗
-                      </span>
+                      <LucideIcon
+                        name="external-link"
+                        className="ua-config-service-action h-4 w-4 shrink-0"
+                      />
                     </a>
                   ))}
                 </div>
@@ -5017,9 +4930,10 @@ function HelpResourcesModal({
             href="https://github.com/wastaken7/Upload-Assistant/tree/development/docs"
             target="_blank"
             rel="noopener noreferrer"
-            className="ua-config-service-action rounded-lg border px-4 py-2 text-sm font-semibold"
+            className="ua-config-service-action inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-semibold"
           >
-            Browse all documentation ↗
+            Browse all documentation
+            <LucideIcon name="external-link" className="h-4 w-4" />
           </a>
         </div>
       </section>
@@ -5376,26 +5290,7 @@ function ApiKeyExpiryStatus({
           onClick={check}
         >
           {checking && (
-            <svg
-              className="h-3 w-3 animate-spin"
-              viewBox="0 0 24 24"
-              fill="none"
-              aria-hidden="true"
-            >
-              <circle
-                cx="12"
-                cy="12"
-                r="9"
-                stroke="currentColor"
-                strokeWidth="3"
-                opacity="0.3"
-              />
-              <path
-                d="M12 3a9 9 0 0 1 9 9"
-                stroke="currentColor"
-                strokeWidth="3"
-              />
-            </svg>
+            <LucideIcon name="loader-circle" className="h-3 w-3 animate-spin" />
           )}
           {checking ? "Checking…" : "Check"}
         </button>,
@@ -5408,10 +5303,15 @@ function ApiKeyExpiryStatus({
             <span
               tabIndex={0}
               aria-label={details}
-              className="border-b border-dotted border-current"
+              className="inline-flex items-center gap-1 border-b border-dotted border-current"
             >
               {isDraft && "Draft · "}
-              {feedback && !feedback.error && "✓ Accepted · "}
+              {feedback && !feedback.error && (
+                <>
+                  <LucideIcon name="check" className="h-3 w-3" />
+                  Accepted ·
+                </>
+              )}
               {apiKeyExpiryLabel(expiry, true)}
             </span>
           </Tooltip>
@@ -5663,6 +5563,7 @@ function TrackerSettings({
         "ApiUser",
         "bhd_rss_key",
         "bioma_api_key",
+        "image_host_api_key",
         "ptgen_api",
         "base_url",
         "api_url",
@@ -5681,6 +5582,7 @@ function TrackerSettings({
         "doubleup",
         "sticky",
         "modq",
+        "force_rehost_images",
         "exclusive",
         "refundable",
         "draft",
@@ -6832,18 +6734,10 @@ function TrackerManager({
                   }}
                   aria-hidden="true"
                 >
-                  <svg
-                    width="18"
-                    height="18"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="m9 18 6-6-6-6"></path>
-                  </svg>
+                  <LucideIcon
+                    name="chevron-right"
+                    className="h-[18px] w-[18px]"
+                  />
                 </span>
               </button>
               {trackerView === "configured" ? (
@@ -6916,12 +6810,17 @@ function TrackerManager({
                         {setupState.requirements.map((requirement) => (
                           <span
                             key={requirement.id}
-                            className="ua-config-tracker-requirement rounded-full border px-2.5 py-1 text-xs font-semibold"
+                            className="ua-config-tracker-requirement inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold"
                             data-complete={
                               requirement.complete ? "true" : "false"
                             }
                           >
-                            {requirement.complete ? "✓ " : "○ "}
+                            <LucideIcon
+                              name={
+                                requirement.complete ? "circle-check" : "circle"
+                              }
+                              className="h-3 w-3"
+                            />
                             {requirement.label}
                           </span>
                         ))}
@@ -7829,9 +7728,10 @@ function ItemList({
               href="https://github.com/wastaken7/Upload-Assistant/blob/development/docs/upload-order-and-bandwidth-control.md"
               target="_blank"
               rel="noopener noreferrer"
-              className="ua-config-service-action font-semibold hover:underline"
+              className="ua-config-service-action inline-flex items-center gap-1 font-semibold hover:underline"
             >
-              upload order and bandwidth control guide ↗
+              upload order and bandwidth control guide
+              <LucideIcon name="external-link" className="h-3 w-3" />
             </a>
             .
           </p>
@@ -8204,9 +8104,10 @@ function ItemList({
                       href="https://github.com/wastaken7/Upload-Assistant/blob/development/docs/description-builder.md"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="ua-config-service-action font-semibold hover:underline"
+                      className="ua-config-service-action inline-flex items-center gap-1 font-semibold hover:underline"
                     >
-                      description builder guide ↗
+                      description builder guide
+                      <LucideIcon name="external-link" className="h-3 w-3" />
                     </a>
                     .
                   </p>
@@ -8475,18 +8376,10 @@ function ItemList({
                   }}
                   aria-hidden="true"
                 >
-                  <svg
-                    width="18"
-                    height="18"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="m9 18 6-6-6-6"></path>
-                  </svg>
+                  <LucideIcon
+                    name="chevron-right"
+                    className="h-[18px] w-[18px]"
+                  />
                 </span>
               </button>
               {isOpen && (
@@ -9497,7 +9390,7 @@ function AccessLogTab({ isDarkMode }) {
                       className="ml-1 inline-flex h-5 w-5 items-center justify-center rounded text-red-500 hover:text-red-700"
                       aria-label={`Remove ${ip} from the whitelist`}
                     >
-                      ×
+                      <LucideIcon name="x" className="h-3 w-3" />
                     </button>
                   </span>
                 ))}
@@ -9546,7 +9439,7 @@ function AccessLogTab({ isDarkMode }) {
                       className="ml-1 inline-flex h-5 w-5 items-center justify-center rounded text-red-500 hover:text-red-700"
                       aria-label={`Remove ${ip} from the blacklist`}
                     >
-                      ×
+                      <LucideIcon name="x" className="h-3 w-3" />
                     </button>
                   </span>
                 ))}
@@ -9694,7 +9587,13 @@ function AccessLogTab({ isDarkMode }) {
                       <div
                         className={`text-xs ${entry.success ? "text-green-600" : "text-red-600"}`}
                       >
-                        {entry.status} {entry.success ? "✓" : "✗"}
+                        <span className="inline-flex items-center gap-1">
+                          {entry.status}
+                          <LucideIcon
+                            name={entry.success ? "circle-check" : "circle-x"}
+                            className="h-3 w-3"
+                          />
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -9867,7 +9766,7 @@ function ConfigSidebar({
           aria-label="Close configuration navigation"
           onClick={onClose}
         >
-          ×
+          <LucideIcon name="x" className="h-4 w-4" />
         </button>
       </div>
 
@@ -12506,7 +12405,7 @@ function ConfigApp() {
                             onClick={() => setIsPendingSummaryOpen(false)}
                             aria-label="Close pending changes"
                           >
-                            ×
+                            <LucideIcon name="x" className="h-4 w-4" />
                           </button>
                         </div>
                         <div className="max-h-80 space-y-2 overflow-y-auto p-2">

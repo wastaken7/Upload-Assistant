@@ -3413,6 +3413,9 @@ def _build_config_items(
         subsection_items = []
 
     for key in merged_keys:
+        # Legacy configs can retain removed settings after default synchronization.
+        if path == ["DEFAULT"] and key == "keep_meta":
+            continue
         example_value = example_section.get(key)
         user_value = user_dict.get(key)
         key_path = [*path, key]
@@ -3544,6 +3547,13 @@ def _prepare_default_webui_section(
             prepared[client_key] = default_value
             comments_map.setdefault(f"DEFAULT/{client_key}", help_text)
             subsection_map[f"DEFAULT/{client_key}"] = "CLIENT SELECTION"
+
+    if "stats_enabled" in prepared:
+        # Group statistics with Main Settings only for WebUI presentation.
+        # Keep the fields together so the builder emits a single subsection.
+        subsection_map["DEFAULT/stats_enabled"] = "MAIN SETTINGS"
+        main_settings = {key: value for key, value in prepared.items() if subsection_map.get(f"DEFAULT/{key}") == "MAIN SETTINGS"}
+        prepared = {**main_settings, **prepared}
 
     return prepared
 
@@ -4223,10 +4233,18 @@ def stats_api():
     date_from = request.args.get("from")
     date_to = request.args.get("to")
     tracker = str(request.args.get("tracker", ""))
+    time_basis = str(request.args.get("timezone", "utc"))
+    local_date = request.args.get("today")
     try:
         config = _load_config_from_file(STATE_DIR / "data" / "config.py") or {}
         enabled = stats_collection_enabled(config)
-        stats_kwargs = {"date_from": date_from, "date_to": date_to, "tracker": tracker}
+        stats_kwargs = {
+            "date_from": date_from,
+            "date_to": date_to,
+            "tracker": tracker,
+            "time_basis": time_basis,
+            "local_date": local_date,
+        }
         payload = get_stats(period, mode, STATE_DIR, **stats_kwargs) if enabled else get_empty_stats(period, mode, **stats_kwargs)
         _add_stats_destination_display_names(payload)
         payload["enabled"] = enabled
@@ -4811,6 +4829,7 @@ _TRACKER_CONFIGURATION_KEYS = frozenset(
         "ApiUser",
         "bhd_rss_key",
         "bioma_api_key",
+        "image_host_api_key",
         "ptgen_api",
     }
 )

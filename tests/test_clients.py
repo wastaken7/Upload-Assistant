@@ -1,14 +1,62 @@
 # ruff: noqa: S101
 
+import ast
 import asyncio
-from unittest.mock import patch
+from pathlib import Path
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
 from src import configvalidator
 from src.clients import Clients
+from src.config_sync import sync_user_config
 from src.configvalidator import DEFAULT_KEY_TYPES, validate_config
 from src.meta import Meta
+
+
+def test_find_existing_torrents_skips_unconfigured_client_after_config_sync(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.py"
+    config_path.write_text("config = {'DEFAULT': {}}\n", encoding="utf-8")
+    example_path = Path(__file__).parents[1] / "data" / "example_config.py"
+
+    result = sync_user_config(config_path, example_path)
+    config = ast.literal_eval(ast.parse(config_path.read_text(encoding="utf-8")).body[0].value)
+    assert result.changed
+    assert config["DEFAULT"]["default_torrent_client"] == "qbittorrent"
+    assert "TORRENT_CLIENTS" not in config
+
+    clients = Clients(config)
+    meta = Meta(base_dir=str(tmp_path), uuid="no-client", client=None)
+    with patch.object(clients, "_search_single_client_for_torrent", new_callable=AsyncMock) as search:
+        assert asyncio.run(clients.find_existing_torrents(meta)) == []
+        search.assert_not_awaited()
+    assert meta.client is None
+
+
+@pytest.mark.parametrize(
+    "selected_client,defaults",
+    [
+        ("qbittorrent", {}),
+        (None, {"default_torrent_client": "qbittorrent"}),
+        (None, {"injecting_client_list": ["qbittorrent"]}),
+    ],
+)
+@pytest.mark.parametrize("client_section", [{}, {"TORRENT_CLIENTS": {}}])
+def test_add_to_client_skips_unconfigured_client(tmp_path: Path, selected_client, defaults, client_section) -> None:
+    clients = Clients({"DEFAULT": defaults, "TRACKERS": {"TEST": {}}, **client_section})
+    meta = Meta(base_dir=str(tmp_path), uuid="no-client", path=str(tmp_path / "video.mkv"), client=selected_client)
+    torrent_path = tmp_path / "tmp" / meta.uuid / "[TEST].torrent"
+    torrent_path.parent.mkdir(parents=True)
+    torrent_path.touch()
+
+    with (
+        patch("src.clients.Torrent.read"),
+        patch("src.clients.logger.info") as log,
+        patch.object(clients, "remote_path_map", new_callable=AsyncMock) as path_map,
+    ):
+        asyncio.run(clients.add_to_client(meta, "TEST"))
+        log.assert_called_once_with("[bold red]Torrent client 'qbittorrent' not found in config.")
+        path_map.assert_not_awaited()
 
 
 def test_empty_inject_delay_is_a_no_op() -> None:

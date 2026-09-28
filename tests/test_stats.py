@@ -33,6 +33,8 @@ def test_stats_aggregate_real_activity(tmp_path):
     )
     stats.record_event("upload", service="FICTIONAL", operation="torrent_tracker", outcome="skipped:dupe", category="MOVIE", state_dir=tmp_path)
     stats.record_event("artifact", service="torrent", operation="created", category="base", state_dir=tmp_path)
+    stats.record_event("artifact", service="screenshot", operation="created", category="standard", count=5, state_dir=tmp_path)
+    stats.record_event("artifact", service="screenshot", operation="created", category="menu", count=2, state_dir=tmp_path)
     stats.record_event("cache", service="imaginarydb", operation="title", outcome="hit", state_dir=tmp_path)
     stats.record_event("cache", service="imaginarydb", operation="title", outcome="miss", state_dir=tmp_path)
     stats.record_event("api", service="imaginarydb", operation="title", outcome="request", state_dir=tmp_path)
@@ -46,6 +48,7 @@ def test_stats_aggregate_real_activity(tmp_path):
         "upload_success_rate": 100.0,
         "torrents_created": 1,
         "nzbs_created": 0,
+        "screenshots_created": 7,
         "api_operations": 1,
         "cache_hit_rate": 50.0,
         "uploaded_bytes": 4_000,
@@ -62,6 +65,21 @@ def test_stats_aggregate_real_activity(tmp_path):
     assert destination["average_duration_ms"] == 1250
     assert destination["bytes"] == 4_000
     assert result["api"]["requests"] == 1
+    assert {(row["type"], row["operation"], row["variant"], row["count"]) for row in result["artifacts"] if row["type"] == "screenshot"} == {
+        ("screenshot", "created", "menu", 2),
+        ("screenshot", "created", "standard", 5),
+    }
+
+
+def test_screenshot_manifest_only_publishes_existing_screenshots(tmp_path):
+    from src import screenshot_manifest
+
+    source = tmp_path / "Celestial.Harbor-frame.png"
+    source.write_bytes(b"fictional screenshot")
+
+    published = screenshot_manifest.register(tmp_path, "fictional-release", [source, tmp_path / "missing.png"], "main")
+
+    assert len(published) == 1
 
 
 def test_unique_uploaded_bytes_counts_each_successful_item_once(tmp_path):
@@ -175,6 +193,89 @@ def test_schema_v2_recreates_unreleased_v1_aggregates(tmp_path):
         columns = {row[1] for row in db.execute("PRAGMA table_info(stats_daily)")}
         assert "destination" in columns
         assert db.execute("SELECT value FROM stats_meta WHERE key = 'schema_version'").fetchone() == ("2",)
+
+
+def test_content_duration_column_is_added_without_losing_v2_aggregates(tmp_path):
+    database = tmp_path / "data" / "stats.sqlite3"
+    database.parent.mkdir(parents=True)
+    with sqlite3.connect(database) as db:
+        db.execute("CREATE TABLE stats_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+        db.execute("INSERT INTO stats_meta VALUES ('schema_version', '2')")
+        db.execute(
+            """
+            CREATE TABLE stats_daily (
+                day TEXT NOT NULL, family TEXT NOT NULL, service TEXT NOT NULL,
+                operation TEXT NOT NULL, outcome TEXT NOT NULL, category TEXT NOT NULL,
+                source TEXT NOT NULL, mode TEXT NOT NULL, destination TEXT NOT NULL,
+                count INTEGER NOT NULL DEFAULT 0, duration_ms INTEGER NOT NULL DEFAULT 0,
+                bytes INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (day, family, service, operation, outcome, category, source, mode, destination)
+            )
+            """
+        )
+        db.execute(
+            "INSERT INTO stats_daily VALUES (?, 'item', '', 'completed', 'success', 'MOVIE', 'cli', 'real', '', 3, 0, 12000)",
+            (datetime.now(UTC).date().isoformat(),),
+        )
+
+    result = stats.get_stats("all", "real", tmp_path)
+
+    assert result["overview"]["items_completed"] == 3
+    with sqlite3.connect(database) as db:
+        columns = {row[1] for row in db.execute("PRAGMA table_info(stats_daily)")}
+        assert "content_seconds" in columns
+        assert db.execute("SELECT count, bytes, content_seconds FROM stats_daily").fetchone() == (3, 12_000, 0)
+
+
+@pytest.mark.asyncio
+async def test_successful_content_time_counts_once_globally_and_per_destination(monkeypatch, tmp_path):
+    monkeypatch.setattr(stats, "_database_path", lambda _state_dir=None: tmp_path / "data" / "stats.sqlite3")
+
+    class TorrentTracker:
+        is_usenet = False
+
+    meta = Meta(
+        category="MOVIE",
+        content_duration_category="Movie",
+        content_duration_seconds=7_200.4,
+        tracker_status={
+            "FICTIONAL": {"upload_success": True},
+            "IMAGINARY": {"upload_success": True},
+            "EXAMPLE": {"dupe": True, "upload_success": False},
+        },
+    )
+
+    await stats.record_completed_item_stats_async(
+        meta,
+        {"FICTIONAL": TorrentTracker, "IMAGINARY": TorrentTracker, "EXAMPLE": TorrentTracker},
+    )
+
+    global_result = stats.get_stats("all", "real", tmp_path)
+    fictional = stats.get_stats("all", "real", tmp_path, tracker="FICTIONAL")
+    duplicate = stats.get_stats("all", "real", tmp_path, tracker="EXAMPLE")
+
+    assert global_result["content_time"] == {
+        "total_seconds": 7_200,
+        "by_category": [{"category": "Movie", "items": 1, "seconds": 7_200}],
+    }
+    assert fictional["content_time"] == global_result["content_time"]
+    assert duplicate["content_time"] == {"total_seconds": 0, "by_category": []}
+
+
+@pytest.mark.asyncio
+async def test_failed_prepared_pack_duration_does_not_fall_back_to_representative_mediainfo(monkeypatch, tmp_path):
+    monkeypatch.setattr(stats, "_database_path", lambda _state_dir=None: tmp_path / "data" / "stats.sqlite3")
+    meta = Meta(
+        category="TV",
+        content_duration_category="TV",
+        content_duration_seconds=None,
+        mediainfo={"media": {"track": [{"@type": "General", "Duration": "1200"}]}},
+        tracker_status={"FICTIONAL": {"upload_success": True}},
+    )
+
+    await stats.record_completed_item_stats_async(meta, {"FICTIONAL": object})
+
+    assert stats.get_stats("all", "real", tmp_path)["content_time"] == {"total_seconds": 0, "by_category": []}
 
 
 def test_calendar_ranges_use_inclusive_utc_boundaries():
@@ -501,6 +602,17 @@ def test_invalid_filters_are_rejected(tmp_path):
         stats.get_stats("custom", "real", tmp_path, date_from="bad", date_to="2026-01-01")
     with pytest.raises(ValueError, match="on or before"):
         stats.get_stats("custom", "real", tmp_path, date_from="2026-01-02", date_to="2026-01-01")
+    with pytest.raises(ValueError, match="timezone must be one of"):
+        stats.get_stats("today", "real", tmp_path, time_basis="server")
+
+
+def test_stats_can_resolve_periods_from_the_browser_local_date():
+    result = stats.get_empty_stats("today", time_basis="browser", local_date="2026-09-27")
+
+    assert result["time_context"]["basis"] == "browser"
+    assert result["time_context"]["today"] == result["period"]["to"]
+    assert result["period"]["from"] == result["period"]["to"] == "2026-09-27"
+    assert result["period"]["timezone"] == "Browser local time"
 
 
 def test_one_year_range_contains_365_inclusive_days():

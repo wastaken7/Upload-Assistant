@@ -937,7 +937,8 @@ html[data-ua-mode="light"] .ua-auth-page {
   gap: 0.4rem;
 }
 
-.ua-auth-footer svg {
+.ua-auth-footer svg,
+.ua-auth-footer .ua-lucide-icon {
   height: 0.9rem;
   width: 0.9rem;
 }
@@ -2365,34 +2366,87 @@ html.ua-upload-document #root {
   appearance: auto;
 }
 
-.ua-stats-export-trigger {
+.ua-stats-actions-trigger {
   min-height: 44px;
-  background: color-mix(in srgb, #2563eb 82%, var(--ua-config-surface-raised));
-  border: 1px solid color-mix(in srgb, #60a5fa 38%, transparent);
-  color: #fff;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  background: color-mix(
+    in srgb,
+    var(--ua-config-surface-raised) 86%,
+    var(--ua-config-bg)
+  );
+  border: 1px solid var(--ua-config-border);
+  color: var(--ua-config-text);
 }
 
-.ua-stats-export-trigger:hover:not(:disabled),
-.ua-stats-export-trigger:focus-visible:not(:disabled) {
-  background: color-mix(in srgb, #3b82f6 88%, var(--ua-config-surface-raised));
+.ua-stats-actions-trigger:hover,
+.ua-stats-actions-trigger:focus-visible {
+  background: color-mix(
+    in srgb,
+    var(--ua-copper-bright) 10%,
+    var(--ua-config-surface-raised)
+  );
+  border-color: color-mix(
+    in srgb,
+    var(--ua-copper-bright) 42%,
+    var(--ua-config-border)
+  );
   outline: none;
 }
 
-.ua-stats-reset {
-  min-height: 44px;
-  border: 1px solid color-mix(in srgb, #ef4444 65%, transparent);
-  color: #ef6464;
-  transition:
-    background 150ms ease,
-    border-color 150ms ease;
+.ua-stats-settings-trigger {
+  background: color-mix(
+    in srgb,
+    var(--ua-config-surface-raised) 86%,
+    var(--ua-config-bg)
+  );
+  border: 1px solid var(--ua-config-border);
+  color: var(--ua-config-text);
 }
 
-.ua-stats-reset:hover,
-.ua-stats-reset:focus-visible {
-  background: color-mix(in srgb, #ef4444 10%, transparent);
-  border-color: #ef4444;
+.ua-stats-settings-trigger:hover,
+.ua-stats-settings-trigger:focus-visible {
+  background: color-mix(
+    in srgb,
+    var(--ua-copper-bright) 10%,
+    var(--ua-config-surface-raised)
+  );
+  border-color: color-mix(
+    in srgb,
+    var(--ua-copper-bright) 42%,
+    var(--ua-config-border)
+  );
   outline: none;
+}
+
+.ua-stats-settings-modal
+  :where(
+    .ua-stats-settings-group,
+    .ua-stats-settings-option,
+    .ua-stats-settings-note
+  ) {
+  border-color: color-mix(in srgb, var(--ua-config-border) 88%, transparent);
+}
+
+.ua-stats-settings-group,
+.ua-stats-settings-note {
+  background: color-mix(
+    in srgb,
+    var(--ua-config-surface-raised) 56%,
+    var(--ua-config-surface)
+  );
+}
+
+.ua-stats-settings-option {
+  background: color-mix(
+    in srgb,
+    var(--ua-config-surface-raised) 38%,
+    transparent
+  );
+}
+
+.ua-stats-settings-modal .ua-theme-picker,
+.ua-stats-settings-modal .ua-stats-control {
+  max-width: 100%;
+  min-width: 0;
 }
 
 .ua-stats-range-chip {
@@ -2421,15 +2475,13 @@ html.ua-upload-document #root {
 
   .ua-stats-custom-dates,
   .ua-stats-control,
-  .ua-stats-toolbar > .relative.flex,
-  .ua-stats-reset {
+  .ua-stats-settings-trigger {
     flex: 1 1 calc(50% - 0.5rem);
   }
 
   .ua-stats-custom-summary,
   .ua-stats-control,
-  .ua-stats-export-trigger,
-  .ua-stats-reset {
+  .ua-stats-settings-trigger {
     width: 100%;
   }
 
@@ -2452,20 +2504,25 @@ html.ua-upload-document #root {
   color: var(--ua-config-text);
 }
 
-.ua-stats-export-menu {
+.ua-stats-actions-menu {
   background: var(--ua-config-surface-raised);
   border: 1px solid var(--ua-config-border);
   color: var(--ua-config-text);
 }
 
-.ua-stats-export-menu button:hover,
-.ua-stats-export-menu button:focus-visible {
+.ua-stats-actions-menu button:hover:not(:disabled),
+.ua-stats-actions-menu button:focus-visible:not(:disabled) {
   background: color-mix(
     in srgb,
     var(--ua-copper-bright) 12%,
     var(--ua-config-surface-raised)
   );
   outline: none;
+}
+
+.ua-stats-actions-danger {
+  border-color: var(--ua-config-border);
+  color: #ef6464;
 }
 
 .ua-stats-heatmap {
@@ -2811,7 +2868,7 @@ html.ua-upload-document #root {
 select {
   -webkit-appearance: none;
   appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none'%3E%3Cpath d='m4 6 4 4 4-4' stroke='%23a8a29e' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-image: url("/static/img/lucide-icons/chevron-down-muted.svg");
   background-position: right 0.75rem center;
   background-repeat: no-repeat;
   background-size: 1rem;
@@ -3518,4 +3575,9 @@ html[data-ua-shape="square"]
     .ua-auth-submit
   ) {
   border-radius: 0.125rem !important;
+}
+.ua-lucide-icon {
+  background-color: currentColor;
+  mask: var(--ua-lucide-icon) center / contain no-repeat;
+  -webkit-mask: var(--ua-lucide-icon) center / contain no-repeat;
 }

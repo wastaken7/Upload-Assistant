@@ -5,6 +5,68 @@
   const INTERFACE_STYLE_KEY = "ua_interface_style";
   const DEFAULT_COLOR_THEME = "charcoal";
   const DEFAULT_INTERFACE_STYLE = "square";
+  const LUCIDE_ICON_BASE = "/static/img/lucide-icons";
+  const WEB_UI_ICON_MAP = Object.freeze({
+    book: "book-open",
+    changelog: "history",
+    config: "sliders-horizontal",
+    "file-structure": "folder-tree",
+    gamepad: "gamepad-2",
+    help: "circle-help",
+    logout: "log-out",
+    movie: "clapperboard",
+    music: "music-2",
+    palette: "palette",
+    pepper: "flame",
+    screenshots: "images",
+    settings: "sliders-horizontal",
+    stats: "chart-no-axes-combined",
+    tv: "tv",
+    upload: "upload",
+  });
+  const STATS_ICON_MAP = Object.freeze({
+    "activity-heatmap": "flame",
+    "api-operations": "network",
+    "artifact-activity": "boxes",
+    "average-item-size": "chart-spline",
+    "cache-by-provider": "package",
+    "cache-hit-rate": "database",
+    "cache-writes": "file-pen-line",
+    categories: "shapes",
+    "content-time": "clock",
+    "daily-activity": "activity",
+    "data-uploaded": "git-branch",
+    "duplicates-prevented": "copy-check",
+    "execution-source": "square-terminal",
+    "external-operations": "globe",
+    "hashing-io-avoided": "gauge",
+    "items-completed": "clipboard-check",
+    "media-profile": "list-tree",
+    "nzbs-created": "cloud-upload",
+    "personal-releases": "user-round-plus",
+    "pioneering-rate": "flag",
+    "screenshots-created": "image-plus",
+    settings: "sliders-horizontal",
+    "streaming-services": "circle-play",
+    "successful-uploads": "upload",
+    "torrents-created": "magnet",
+    "unique-data-uploaded": "file-stack",
+    "upload-flow": "workflow",
+    "uploads-by-destination": "crosshair",
+  });
+
+  function UALucideIcon({ name, className = "h-5 w-5", label }) {
+    const resolvedName = WEB_UI_ICON_MAP[name] || STATS_ICON_MAP[name] || name;
+    return React.createElement("span", {
+      role: label ? "img" : undefined,
+      "aria-label": label || undefined,
+      "aria-hidden": label ? undefined : true,
+      className: `ua-lucide-icon inline-block flex-none ${className}`,
+      style: {
+        "--ua-lucide-icon": `url(${LUCIDE_ICON_BASE}/${resolvedName}.svg)`,
+      },
+    });
+  }
   const UA_THEMES = Object.freeze([
     {
       id: "amethyst",
@@ -763,7 +825,10 @@
                         "aria-label": `View contribution for ${entry.summary}`,
                         title: "View contribution on GitHub",
                       },
-                      "↗",
+                      h(UALucideIcon, {
+                        name: "external-link",
+                        className: "h-3.5 w-3.5",
+                      }),
                     )
                   : null,
               ),
@@ -831,7 +896,19 @@
 
       const previousFocus = document.activeElement;
       const previousOverflow = document.body.style.overflow;
+      const previousPaddingRight = document.body.style.paddingRight;
+      const scrollbarWidth = Math.max(
+        0,
+        window.innerWidth - document.documentElement.clientWidth,
+      );
       const dialog = dialogRef.current;
+      if (scrollbarWidth) {
+        const bodyPaddingRight =
+          Number.parseFloat(
+            window.getComputedStyle(document.body).paddingRight,
+          ) || 0;
+        document.body.style.paddingRight = `${bodyPaddingRight + scrollbarWidth}px`;
+      }
       document.body.style.overflow = "hidden";
 
       const focusFrame = window.requestAnimationFrame(() => {
@@ -880,6 +957,7 @@
         window.cancelAnimationFrame(focusFrame);
         window.removeEventListener("keydown", handleKeyDown);
         document.body.style.overflow = previousOverflow;
+        document.body.style.paddingRight = previousPaddingRight;
         window.requestAnimationFrame(() => {
           const activeModal = document.activeElement?.closest?.(
             '[role="dialog"][aria-modal="true"]',
@@ -1080,9 +1158,13 @@
               target: "_blank",
               rel: "noopener noreferrer",
               className:
-                "ua-update-primary rounded-lg px-4 py-2 text-sm font-semibold",
+                "ua-update-primary inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold",
             },
-            "View release ↗",
+            "View release",
+            React.createElement(UALucideIcon, {
+              name: "external-link",
+              className: "h-4 w-4",
+            }),
           ),
         ),
       ),
@@ -1465,7 +1547,10 @@
                           title: "Compare unreleased changes on GitHub",
                           "aria-label": "Compare unreleased changes on GitHub",
                         },
-                        "↗",
+                        h(UALucideIcon, {
+                          name: "external-link",
+                          className: "h-3.5 w-3.5",
+                        }),
                       )
                     : null,
                 ),
@@ -1609,7 +1694,10 @@
                                               title: `View commit ${shortSha || summary} on GitHub`,
                                               "aria-label": `View commit ${shortSha || summary} on GitHub`,
                                             },
-                                            "↗",
+                                            h(UALucideIcon, {
+                                              name: "external-link",
+                                              className: "h-3.5 w-3.5",
+                                            }),
                                           )
                                         : null,
                                     );
@@ -1772,7 +1860,10 @@
                                   title: `View ${version} on GitHub`,
                                   "aria-label": `View ${version} on GitHub`,
                                 },
-                                "↗",
+                                h(UALucideIcon, {
+                                  name: "external-link",
+                                  className: "h-3.5 w-3.5",
+                                }),
                               )
                             : null,
                         ),
@@ -1824,9 +1915,13 @@
               target: "_blank",
               rel: "noopener noreferrer",
               className:
-                "ua-update-primary rounded-lg px-4 py-2 text-sm font-semibold",
+                "ua-update-primary inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold",
             },
-            "View all releases ↗",
+            "View all releases",
+            h(UALucideIcon, {
+              name: "external-link",
+              className: "h-4 w-4",
+            }),
           ),
         ),
       ),
@@ -1956,5 +2051,6 @@
     window.UAChangelogModal = window.UAChangelogModal || UAChangelogModal;
     window.useUAModalFocus = window.useUAModalFocus || useUAModalFocus;
     window.sanitizeHtml = window.sanitizeHtml || sanitizeHtml;
+    window.UALucideIcon = window.UALucideIcon || UALucideIcon;
   }
 })();

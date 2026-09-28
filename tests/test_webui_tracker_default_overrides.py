@@ -110,17 +110,19 @@ def test_disable_save_sync_reload_keeps_keys_and_follows_default_changes(tracker
     for key in keys:
         assert update(["TRACKERS", "AITHER", key], None)[1] == 200
 
-    # A later release still introduces ordinary settings while retaining inheritance.
+    # New general defaults are added while tracker options remain user-managed.
     example = server._load_config_from_file(example_path)
+    example["DEFAULT"]["new_option"] = True
     example["TRACKERS"]["AITHER"]["new_option"] = True
     example_path.write_text(f"config = {example!r}\n", encoding="utf-8")
     result = sync_user_config(config_path, example_path)
-    assert result.added_paths == ("TRACKERS.AITHER.new_option",)
+    assert result.added_paths == ("DEFAULT.new_option",)
     assert not sync_user_config(config_path, example_path).changed
 
     saved = server._load_config_from_file(config_path)
+    assert saved["DEFAULT"]["new_option"] is True
     assert saved["TRACKERS"]["AITHER"] == {
-        **original["TRACKERS"]["AITHER"], **dict.fromkeys(keys), "new_option": True,
+        **original["TRACKERS"]["AITHER"], **dict.fromkeys(keys),
     }
     items = server._build_config_items(example["TRACKERS"]["AITHER"], saved["TRACKERS"]["AITHER"], {}, {}, ["TRACKERS", "AITHER"])
     for item in items:
@@ -162,9 +164,9 @@ def test_bulk_disable_can_save_inheritance_for_an_unsaved_tracker(tracker_config
     config_path, example_path, original = tracker_config
     config_path.write_text(f"config = {{'DEFAULT': {original['DEFAULT']!r}}}\n", encoding="utf-8")
     assert set_overrides(False)[1] == 200
-    sync_user_config(config_path, example_path)
+    assert not sync_user_config(config_path, example_path).changed
     tracker = server._load_config_from_file(config_path)["TRACKERS"]["AITHER"]
-    assert tracker == {"api_key": "", "add_logo": None, "multiScreens": None, "custom_signature": None}
+    assert tracker == {"add_logo": None, "multiScreens": None, "custom_signature": None}
 
 
 def test_inheritance_retains_the_setting_in_config_source(tracker_config):
