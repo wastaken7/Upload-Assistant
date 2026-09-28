@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Stats · Upload-Assistant</title>
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="{{ url_for('static', filename='img/logo.svg') }}"
+    />
+    <meta name="theme-color" content="#171615" />
+    {% include "_theme_bootstrap.html" %}
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/theme.css') }}"
+    />
+  </head>
+  <body>
+    <div id="root">
+      <div
+        id="root-loading"
+        class="ua-startup-screen"
+        role="status"
+        aria-live="polite"
+      >
+        <div class="ua-startup-card">
+          <p class="ua-startup-eyebrow">Upload Assistant · {{ app_version }}</p>
+          <h1 class="ua-startup-title">Loading statistics</h1>
+        </div>
+      </div>
+    </div>
+    <script>
+      window.UA_APP_VERSION = {{ app_version | tojson }};
+      window.UA_CSRF_TOKEN = {{ csrf_token | tojson }};
+      window.UA_LOGO_URL = {{ url_for('static', filename='img/logo.svg') | tojson }};
+    </script>
+    <script
+      crossorigin
+      src="https://unpkg.com/react@18/umd/react.production.min.js"
+    ></script>
+    <script
+      crossorigin
+      src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"
+    ></script>
+    <script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
+    <script src="{{ url_for('static', filename='js/shared_utils.js') }}"></script>
+    <script
+      type="text/babel"
+      src="{{ url_for('static', filename='js/stats_app.js') }}"
+    ></script>
+  </body>
+</html>

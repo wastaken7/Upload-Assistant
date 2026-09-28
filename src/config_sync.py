@@ -27,7 +27,11 @@ _USER_MANAGED_PATHS = frozenset(
 
 
 class ConfigSyncError(RuntimeError):
-    """Raised when a configuration cannot be synchronized safely."""
+    """Raised when a configuration cannot be synchronized or written safely."""
+
+
+class ConfigWriteConflict(ConfigSyncError):
+    """Raised when an external edit invalidates a staged configuration write."""
 
 
 @dataclass(frozen=True)
@@ -235,7 +239,8 @@ def _next_backup_path(config_path: Path) -> Path:
 
 
 @contextmanager
-def _sync_lock(config_path: Path, timeout: float = 10.0) -> Iterator[None]:
+def config_write_lock(config_path: Path, timeout: float = 10.0) -> Iterator[None]:
+    """Serialize WebUI and startup-sync writers across threads and processes."""
     lock_path = config_path.with_name(f"{config_path.name}.sync.lock")
     lock_file = lock_path.open("a+b")
     started = time.monotonic()
@@ -250,7 +255,7 @@ def _sync_lock(config_path: Path, timeout: float = 10.0) -> Iterator[None]:
                     break
                 except OSError as exc:
                     if time.monotonic() - started >= timeout:
-                        raise ConfigSyncError("Timed out waiting for the configuration sync lock") from exc
+                        raise ConfigSyncError("Timed out waiting for the configuration write lock") from exc
                     time.sleep(0.05)
             try:
                 yield
@@ -266,7 +271,7 @@ def _sync_lock(config_path: Path, timeout: float = 10.0) -> Iterator[None]:
                     break
                 except BlockingIOError as exc:
                     if time.monotonic() - started >= timeout:
-                        raise ConfigSyncError("Timed out waiting for the configuration sync lock") from exc
+                        raise ConfigSyncError("Timed out waiting for the configuration write lock") from exc
                     time.sleep(0.05)
             try:
                 yield
@@ -274,6 +279,38 @@ def _sync_lock(config_path: Path, timeout: float = 10.0) -> Iterator[None]:
                 fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
     finally:
         lock_file.close()
+
+
+def replace_config_source(config_path: Path, updated_source: str, original_bytes: bytes) -> None:
+    """Atomically replace validated config, rejecting external edits; hold config_write_lock first."""
+    temp_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            newline="",
+            dir=config_path.parent,
+            prefix=f".{config_path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as temp_file:
+            temp_path = Path(temp_file.name)
+            temp_file.write(updated_source)
+            temp_file.flush()
+            os.fsync(temp_file.fileno())
+        shutil.copymode(config_path, temp_path)
+        _parse_config(temp_path.read_text(encoding="utf-8"), str(temp_path))
+        if config_path.read_bytes() != original_bytes:
+            raise ConfigWriteConflict("Configuration changed while saving. Your pending changes are kept; review the latest configuration before retrying.")
+        temp_path.replace(config_path)
+        temp_path = None
+    except ConfigWriteConflict:
+        raise
+    except Exception as exc:
+        raise ConfigSyncError(f"Could not replace the configuration safely: {exc}") from exc
+    finally:
+        if temp_path is not None:
+            temp_path.unlink(missing_ok=True)
 
 
 def sync_user_config(config_path: Path, example_path: Path) -> ConfigSyncResult:
@@ -291,7 +328,7 @@ def sync_user_config(config_path: Path, example_path: Path) -> ConfigSyncResult:
     if not example_path.is_file():
         raise ConfigSyncError(f"Bundled example configuration does not exist: {example_path}")
 
-    with _sync_lock(config_path):
+    with config_write_lock(config_path):
         original_bytes = config_path.read_bytes()
         try:
             original_source = original_bytes.decode("utf-8")
@@ -322,32 +359,7 @@ def sync_user_config(config_path: Path, example_path: Path) -> ConfigSyncResult:
         shutil.copy2(config_path, backup_path)
         if backup_path.read_bytes() != original_bytes:
             raise ConfigSyncError("Configuration changed before its backup could be verified; try again")
-        temp_path: Path | None = None
-        try:
-            with tempfile.NamedTemporaryFile(
-                mode="w",
-                encoding="utf-8",
-                newline="",
-                dir=config_path.parent,
-                prefix=f".{config_path.name}.",
-                suffix=".tmp",
-                delete=False,
-            ) as temp_file:
-                temp_file.write(updated_source)
-                temp_file.flush()
-                os.fsync(temp_file.fileno())
-                temp_path = Path(temp_file.name)
-            shutil.copymode(config_path, temp_path)
-            _parse_config(temp_path.read_text(encoding="utf-8"), str(temp_path))
-            if config_path.read_bytes() != original_bytes:
-                raise ConfigSyncError("Configuration changed before it could be replaced; try again")
-            temp_path.replace(config_path)
-            temp_path = None
-        except Exception as exc:
-            raise ConfigSyncError(f"Could not replace the configuration safely: {exc}") from exc
-        finally:
-            if temp_path is not None:
-                temp_path.unlink(missing_ok=True)
+        replace_config_source(config_path, updated_source, original_bytes)
 
         return ConfigSyncResult(
             added_paths=tuple(addition.dotted_path for addition in additions),

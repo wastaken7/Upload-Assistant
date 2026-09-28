@@ -16,6 +16,8 @@ On the first run after upgrading, a legacy `data/config.py` in the checkout is *
 
 If an earlier automatic update restored options you deliberately removed, restore the last good `config.py.backup-*` after installing the fix, preserving any later edits you want to keep. The updater does not remove existing entries automatically because it cannot distinguish restored examples from settings you chose yourself.
 
+`DEFAULT.stats_enabled` controls collection of privacy-preserving daily aggregates for the Web UI Stats workspace. It defaults to `False`; setting it to `True` enables collection and display. Disabling it again hides existing statistics without deleting them.
+
 ## Config file shape
 
 The config is a Python dict named `config` with these top-level sections:
@@ -359,6 +361,14 @@ Example:
 
 ### Per-tracker blocks
 
+In the WebUI's **Tracker-Specific DEFAULT Overrides**, untick a field and save to
+inherit its current `DEFAULT` value. The tracker setting stays in `config.py` as
+`None` (for example, `"add_logo": None`), so automatic configuration updates keep
+that choice. Later changes to `DEFAULT` also apply to inherited fields. Tick the
+field to save a tracker-specific value instead. `False`, `0`, and an empty text
+override are explicit values, not the `None` inheritance marker. Matching
+release-group text overrides still take precedence.
+
 Each tracker identifier (e.g. `"AITHER"`, `"BLUTOPIA"`) contains a dict of settings.
 
 Common keys you will see:
@@ -471,7 +481,7 @@ For bandwidth-control connection requirements and workflow settings, see [Upload
 
 ### Tracker overridable settings
 
-Tracker overridable settings are settings that you can add inside each tracker config dictionary; these settings override the values inside the DEFAULT config. In order for this to work, you must edit the config file, locate the tracker by name, and add your custom value.
+Tracker overridable settings are settings inside each tracker config dictionary that override the values in DEFAULT. Edit them through the WebUI's **Tracker-Specific DEFAULT Overrides** or directly in `config.py`. Set a tracker setting to `None` to inherit DEFAULT while keeping the setting in the file.
 
 Example:
 

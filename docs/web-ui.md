@@ -13,6 +13,7 @@ For a minimal first run, see the [WebUI Quick Start](web-ui-basic.md). Docker an
 - [Monitoring and reviewing a run](#monitoring-and-reviewing-a-run)
 - [Configuration workspace](#configuration-workspace)
 - [Security and administration](#security-and-administration)
+- [Statistics](#statistics)
 - [Appearance, Help, and Changelog](#appearance-help-and-changelog)
 - [Mobile layout](#mobile-layout)
 - [Troubleshooting](#troubleshooting)
@@ -86,7 +87,7 @@ The sign-in and recovery pages use the color theme, light/dark mode, and corner 
 
 The desktop interface has three main areas:
 
-1. **Application rail:** switches between Upload and Configuration and opens Changelog, Help, Appearance, or Log out.
+1. **Application rail:** switches between Upload, Configuration, and Stats and opens Changelog, Help, Appearance, or Log out.
 2. **Workspace navigation:** File Browser on the Upload page or the settings navigation on the Configuration page.
 3. **Main workspace:** upload controls, execution output, configuration fields, or administration tools.
 
@@ -235,9 +236,19 @@ Each priority selector continues to list all configured image hosts, including h
 - Use **Configured Trackers** to review, rename, edit, or remove existing tracker entries.
 - Use **Available Trackers** to add a supported tracker from its template.
 
+Configured and Available tracker searches accept names, tracker codes and CLI aliases, ignoring case. Search uses each tracker's saved alias (or its template alias if unsaved) and any pending alias edit. After saving an alias change, search uses the new alias.
+
+Each tracker's **Advanced → CLI Alias** field provides an optional shorthand for `-tk` or `--trackers`. The full tracker code still works regardless of the alias, and aliases do not rename tracker cards or change the default tracker list.
+
+On the Upload page, entering an alias such as `-tk ATH` highlights the corresponding tracker card. Alias matching ignores case and uses the saved configuration. Conflicting aliases are rejected when saving, using the same rules as the CLI; a batch can swap two aliases because validation uses the final values.
+
 Default and Configured Trackers also show the cached availability dot used by the Upload page. Choose **Check tracker status** to refresh those credential-free checks. Any detected issue is summarized above the tracker list; Available Trackers are not checked until they have been configured.
 
 New trackers and tracker edits remain pending until the configuration is saved.
+
+**Save Config** sends pending field edits together in one request, including changes across multiple trackers. All field edits in that batch are validated before the file is written. If the server rejects the save, the edits remain pending so you can correct them or retry without re-entering them.
+
+WebUI configuration writes share a lock with startup synchronization and replace the file atomically. Missing parent sections in sparse configurations are created during staging. External changes detected before replacement cause the save to be rejected, preserving the newer file and the pending WebUI edits.
 
 ## Security and administration
 
@@ -275,6 +286,18 @@ The blacklist takes precedence over the whitelist. Repeated failed API access at
 
 The local account, encrypted credentials, token metadata, 2FA state, IP controls, and access-log level are stored in `webui_auth.json`. Access events are written to `access_log.log` in the same application configuration directory. The generated `session_secret` is also stored there unless `SESSION_SECRET` or `SESSION_SECRET_FILE` overrides it.
 
+## Statistics
+
+Open **Stats** from the application workspace navigation to inspect local activity for today, this or last month, the last 7, 30, or 90 days, one year, a custom inclusive UTC interval, or the full recorded period. The selected preset is remembered in the current browser. Real uploads and `--debug` simulations are stored and displayed separately.
+
+The dashboard includes upload success and pioneering rates by destination, a route Sankey, media categories and technical profiles, a resolution×video/HDR matrix, torrents and NZBs created or reused, cache hit rates, logical external operations, known payload bytes sent through NNTP and successful image uploads, and CLI versus WebUI usage. The timeline switches between event counts, processed/uploaded volume, or both scales. Clicking a destination filters content metrics across the dashboard; cache and external-operation metrics remain global and are labeled accordingly. Dolby Vision profiles and compatible HDR layers are retained in combined buckets. The dashboard also shows unique uploaded volume, duplicate prevention, an estimate of hashing I/O avoided by reused base torrents, a 52-week activity heatmap, and comparisons with the previous equal-length period. WEB items are grouped by their identified streaming service, with unidentified WEB sources shown as **Unknown**. Personal releases are compared with standard releases and include aggregate results, success rate, category, and unique volume. Operations whose payload size is not measured display an em dash instead of a misleading zero. Distribution sections show local SVG donut charts with their exact sortable tables available in an expandable area directly below each chart. A logical external operation represents one adapter action; redirects and internal retries do not create additional hits.
+
+The current filtered response can be downloaded as JSON, or the daily timeline can be exported as CSV. Export runs locally in the browser and does not add another server-side data store. Tracker reliability labels are derived from the displayed success rate: they summarize aggregate outcomes and are not an uptime monitor.
+
+Statistics are daily aggregates. Upload Assistant does not store release names, paths, release-group names or tags, external media IDs, URLs, or credentials in the statistics database. Personal releases are stored only as a `personal` or `standard` aggregate. Collection begins when the feature is installed; existing cache files and logs are not scanned or backfilled, though later accesses to an existing cache count as new hits or misses.
+
+The database is stored at `data/stats.sqlite3` below the user-state directory. Collection is disabled by default; set `DEFAULT.stats_enabled` to `True` to opt in. While disabled, the dashboard is blocked and does not return or display previously collected aggregates. Stored aggregates remain intact and become visible again if collection is re-enabled. **Reset** remains available, requires typing `RESET`, and removes only statistics; it never removes cache entries, configuration, torrents, or NZBs.
+
 ## Appearance, Help, and Changelog
 
 ### Appearance
@@ -303,7 +326,7 @@ The changelog is derived from the normal Upload Assistant releases; WebUI change
 
 The same functions are reorganized for smaller screens:
 
-- Upload and Configuration are available in the compact workspace navigation.
+- Upload, Configuration, and Stats are available in the compact workspace navigation.
 - Files, Upload, and Arguments move to bottom navigation.
 - During a run, those destinations adapt to Progress, media information, Screenshots, and Description when available.
 - Help, Changelog, and Appearance open as viewport-sized dialogs with their own scrolling content.

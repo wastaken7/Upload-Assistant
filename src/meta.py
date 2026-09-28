@@ -666,6 +666,11 @@ class Meta:
                 setattr(self, k, v)
 
     @staticmethod
+    def tracker_name_aliases() -> dict[str, str]:
+        """Expose the built-in tracker names accepted by runtime selection."""
+        return dict(_TRACKER_ID_ALIASES)
+
+    @staticmethod
     def canonical_tracker_name(tracker_name: str) -> str:
         """Return the canonical tracker name for an accepted alias."""
         normalized_name = tracker_name.upper()

@@ -1,7 +1,41 @@
 from pathlib import Path
 
+import pytest
+
 import web_ui.server as server
 from src.trackers.retroflix import RetroFlix
+
+
+@pytest.mark.parametrize("alias", ["ATH", "FOX", ""])
+def test_catalog_exposes_current_cli_aliases_and_builtin_names(tmp_path, monkeypatch, alias):
+    config = {"DEFAULT": {}, "TRACKERS": {"default_trackers": "BLU", "AITHER": {"cli_alias": alias}}}
+    monkeypatch.setattr(server, "STATE_DIR", tmp_path)
+    monkeypatch.setattr(server, "_load_config_from_file", lambda path: config if path.name == "config.py" else {})
+    for guard in ("_is_authenticated", "_verify_csrf_header", "_verify_same_origin"):
+        monkeypatch.setattr(server, guard, lambda: True)
+    with server.app.test_request_context("/api/trackers"):
+        payload = server.get_trackers().get_json()
+    assert payload["success"] is True
+    assert payload["alias_error"] == ""
+    assert payload["default_trackers"] == ["BLUTOPIA"]
+    assert payload["tracker_aliases"]["BLU"] == "BLUTOPIA"
+    assert payload["tracker_aliases"].get("ATH") == ("AITHER" if alias == "ATH" else None)
+    if alias:
+        assert payload["tracker_aliases"][alias] == "AITHER"
+
+
+def test_invalid_manual_alias_does_not_hide_tracker_catalog(tmp_path, monkeypatch):
+    config = {"TRACKERS": {"AITHER": {"cli_alias": "BHD"}}}
+    monkeypatch.setattr(server, "STATE_DIR", tmp_path)
+    monkeypatch.setattr(server, "_load_config_from_file", lambda path: config if path.name == "config.py" else {})
+    for guard in ("_is_authenticated", "_verify_csrf_header", "_verify_same_origin"):
+        monkeypatch.setattr(server, guard, lambda: True)
+    with server.app.test_request_context("/api/trackers"):
+        payload = server.get_trackers().get_json()
+    assert payload["success"] is True
+    assert payload["trackers"]
+    assert "already selects BEYONDHD" in payload["alias_error"]
+    assert payload["tracker_aliases"]["BHD"] == "BEYONDHD"
 
 
 def test_tracker_codebase_uses_registered_frameworks_only() -> None:
