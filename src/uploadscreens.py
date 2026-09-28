@@ -591,6 +591,56 @@ async def upload_image_task(args: Sequence[Any]) -> dict[str, Any]:
                 logger.error(f"[red]Unexpected error with ShareX image host: {e!s}[/red]")
                 return {"status": "failed", "reason": f"Unexpected error: {e!s}"}
 
+        elif img_host == "samaritano":
+            url = "https://img.samaritano.cc/api/v1/images"
+            api_key = config.get("TRACKERS", {}).get("SAMARITANO", {}).get("image_host_api_key")
+
+            if not isinstance(api_key, str) or not api_key.strip():
+                logger.info("[red]Samaritano image host API key not found in config (image_host_api_key).[/red]")
+                return {"status": "failed", "reason": "Missing Samaritano image host API key"}
+
+            try:
+                headers = {"Authorization": f"Bearer {api_key.strip()}"}
+                async with httpx.AsyncClient() as client, aiofiles.open(image, "rb") as img_file:
+                    files = {"file": (Path(image).name, await img_file.read())}
+                    response = await client.post(url, headers=headers, files=files, timeout=timeout)
+
+                if response.status_code not in (200, 201):
+                    logger.info(f"[yellow]Samaritano image host upload failed with status {response.status_code}.[/yellow]")
+                    return {"status": "failed", "reason": f"Samaritano upload failed: HTTP {response.status_code}"}
+
+                response_data = response.json()
+                if not isinstance(response_data, dict):
+                    return {"status": "failed", "reason": "Invalid Samaritano response"}
+
+                raw_url = response_data.get("url")
+                if not isinstance(raw_url, str) or not raw_url.strip():
+                    logger.info("[yellow]Samaritano image host response missing URL.[/yellow]")
+                    return {"status": "failed", "reason": "No URL in Samaritano response"}
+
+                raw_url = raw_url.strip()
+                thumbnail_url = response_data.get("thumbnail_url")
+                img_url = thumbnail_url.strip() if isinstance(thumbnail_url, str) and thumbnail_url.strip() else raw_url
+                return {
+                    "status": "success",
+                    "img_url": img_url,
+                    "raw_url": raw_url,
+                    "web_url": raw_url,
+                    "local_file_path": image,
+                }
+            except httpx.TimeoutException:
+                logger.info("[red]Request to Samaritano image host timed out.[/red]")
+                return {"status": "failed", "reason": "Request timed out"}
+            except httpx.RequestError as e:
+                logger.info(f"[red]Request to Samaritano image host failed with error: {e}[/red]")
+                return {"status": "failed", "reason": str(e)}
+            except ValueError as e:
+                logger.info(f"[red]Invalid JSON response from Samaritano image host: {e}[/red]")
+                return {"status": "failed", "reason": "Invalid JSON response"}
+            except Exception as e:
+                logger.error(f"[red]Unexpected error with Samaritano image host: {e!s}[/red]")
+                return {"status": "failed", "reason": f"Unexpected error: {e!s}"}
+
         elif img_host == "lostimg":
             url = "https://lostimg.cc/api/v1/images"
             try:

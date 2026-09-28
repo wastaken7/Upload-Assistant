@@ -3552,10 +3552,7 @@ def _prepare_default_webui_section(
         # Group statistics with Main Settings only for WebUI presentation.
         # Keep the fields together so the builder emits a single subsection.
         subsection_map["DEFAULT/stats_enabled"] = "MAIN SETTINGS"
-        main_settings = {
-            key: value for key, value in prepared.items()
-            if subsection_map.get(f"DEFAULT/{key}") == "MAIN SETTINGS"
-        }
+        main_settings = {key: value for key, value in prepared.items() if subsection_map.get(f"DEFAULT/{key}") == "MAIN SETTINGS"}
         prepared = {**main_settings, **prepared}
 
     return prepared
@@ -4824,6 +4821,7 @@ _TRACKER_CONFIGURATION_KEYS = frozenset(
         "ApiUser",
         "bhd_rss_key",
         "bioma_api_key",
+        "image_host_api_key",
         "ptgen_api",
     }
 )
