@@ -1,5 +1,6 @@
 # ruff: noqa: S101
 
+import asyncio
 import os
 from pathlib import Path
 from unittest.mock import AsyncMock
@@ -55,6 +56,46 @@ async def test_pesto_uses_stable_auth_password_flag(tmp_path: Path, monkeypatch)
     assert Path(captured["config_root"]).parts[-2:] == ("usenet", "pesto-config")
     assert captured["archive_dir_exists"] is True
     assert result == tmp_path / "tmp" / "release.mkv" / "release.nzb"
+
+
+@pytest.mark.asyncio
+async def test_nntp_success_stats_cannot_cancel_nzb_finalization(tmp_path: Path, monkeypatch) -> None:
+    source_file = tmp_path / "fictional-release.mkv"
+    source_file.write_bytes(b"video")
+    final_nzb = tmp_path / "tmp" / source_file.name / "fictional-release.nzb"
+
+    async def fake_check_binary(binary_name, *_args, **_kwargs):
+        return binary_name
+
+    async def fake_run_pesto(cmd, **_kwargs):
+        nzb_path = Path(cmd[cmd.index("--out") + 1])
+        nzb_path.write_text("<nzb>" + (" " * 100) + "</nzb>", encoding="utf-8")
+
+    async def cancel_during_stats(family, **_kwargs):
+        if family == "api":
+            raise asyncio.CancelledError
+
+    monkeypatch.setattr(usenetcreate, "check_binary", fake_check_binary)
+    monkeypatch.setattr(usenetcreate, "run_pesto_with_progress", fake_run_pesto)
+    monkeypatch.setattr(usenetcreate, "record_event_async", cancel_during_stats)
+    meta = Meta(base_dir=str(tmp_path), path=str(source_file), uuid="test", basename_no_ext="fictional-release")
+
+    with pytest.raises(asyncio.CancelledError):
+        await usenetcreate.prepare_and_upload_usenet(
+            meta,
+            {
+                "USENET": {
+                    "host": "news.example.com",
+                    "username": "poster",
+                    "password": "secret",
+                    "newsgroups": "alt.binaries.test",
+                    "usenet_uploader": "pesto",
+                    "skip_archive": True,
+                }
+            },
+        )
+
+    assert final_nzb.is_file()
 
 
 def test_pesto_command_redaction_masks_all_sensitive_values() -> None:

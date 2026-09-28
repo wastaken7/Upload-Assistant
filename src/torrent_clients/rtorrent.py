@@ -425,7 +425,7 @@ class RtorrentClientMixin:
 
                 if valid:
                     try:
-                        await TorrentCreator.create_base_from_existing_torrent(resolved_path, meta.base_dir, meta.uuid)
+                        await TorrentCreator.create_base_from_existing_torrent(resolved_path, meta.base_dir, meta.uuid, meta.source_size)
                         logger.debug("[green]Created BASE.torrent from existing torrent")
                     except Exception as e:
                         logger.info(f"[bold red]Error creating BASE.torrent: {e}")

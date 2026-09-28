@@ -1114,24 +1114,9 @@ const TerminalIcon = () => (
 
 const PaletteIcon = () => <WebUiIcon name="palette" />;
 
-const SettingsIcon = () => <WebUiIcon name="settings" />;
+const SettingsIcon = () => <WebUiIcon name="config" />;
 
-const HelpIcon = () => (
-  <svg
-    className="h-5 w-5"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-    aria-hidden="true"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M12 6.75c-2.5-1.5-5.5-1.5-8-.5v11c2.5-1 5.5-1 8 .5m0-11c2.5-1.5 5.5-1.5 8-.5v11c-2.5-1-5.5-1-8 .5m0-11v11"
-    />
-  </svg>
-);
+const HelpIcon = () => <WebUiIcon name="help" />;
 
 const UpdateIcon = () => (
   <svg
@@ -1150,45 +1135,13 @@ const UpdateIcon = () => (
   </svg>
 );
 
-const ChangelogIcon = () => (
-  <svg
-    className="h-5 w-5"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-    aria-hidden="true"
-  >
-    <circle cx="12" cy="12" r="9" strokeWidth={2} />
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M12 7v5l3 2"
-    />
-  </svg>
-);
+const ChangelogIcon = () => <WebUiIcon name="changelog" />;
 
-const UploadRailIcon = () => (
-  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M12 16V4m0 0L7 9m5-5 5 5M5 20h14"
-    />
-  </svg>
-);
+const StatsIcon = () => <WebUiIcon name="stats" />;
 
-const LogoutIcon = () => (
-  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M10 17l5-5-5-5m5 5H3m10-8h5a2 2 0 012 2v12a2 2 0 01-2 2h-5"
-    />
-  </svg>
-);
+const UploadRailIcon = () => <WebUiIcon name="upload" />;
+
+const LogoutIcon = () => <WebUiIcon name="logout" />;
 
 const WorkspaceSwitcher = ({
   activeWorkspace,
@@ -1199,6 +1152,7 @@ const WorkspaceSwitcher = ({
   const workspaces = [
     { id: "upload", label: "Upload", href: `${appBase}/` },
     { id: "config", label: "Configuration", href: `${appBase}/config` },
+    { id: "stats", label: "Stats", href: `${appBase}/stats` },
   ];
 
   return (
@@ -1249,6 +1203,12 @@ const ApplicationRail = ({
       label: "Config",
       href: `${appBase}/config`,
       icon: <SettingsIcon />,
+    },
+    {
+      id: "stats",
+      label: "Stats",
+      href: `${appBase}/stats`,
+      icon: <StatsIcon />,
     },
   ];
 
@@ -2021,6 +1981,8 @@ function AudionutsUAGUI() {
   const [trackers, setTrackers] = useState([]);
   const [defaultTrackers, setDefaultTrackers] = useState(new Set());
   const [selectedTrackers, setSelectedTrackers] = useState(new Set());
+  const [trackerAliases, setTrackerAliases] = useState({});
+  const [trackerAliasError, setTrackerAliasError] = useState("");
   const [trackerStatuses, setTrackerStatuses] = useState({});
   const [isCheckingTrackerStatuses, setIsCheckingTrackerStatuses] =
     useState(false);
@@ -2867,7 +2829,11 @@ function AudionutsUAGUI() {
     }
   };
 
-  const parseTrackersFromArgs = (argsString, defaultTrackersSet) => {
+  const parseTrackersFromArgs = (
+    argsString,
+    defaultTrackersSet,
+    aliases = trackerAliases,
+  ) => {
     const hasTk = /(?:^|\s)(-tk|--trackers)(?=$|=|\s)/i.test(argsString);
     if (!hasTk) {
       return new Set(defaultTrackersSet);
@@ -2882,6 +2848,7 @@ function AudionutsUAGUI() {
       const list = val
         .split(",")
         .map((t) => t.trim().toUpperCase())
+        .map((name) => (Object.hasOwn(aliases, name) ? aliases[name] : name))
         .filter(Boolean);
       return new Set(list);
     }
@@ -3115,6 +3082,16 @@ function AudionutsUAGUI() {
             </div>
           </div>
         </div>
+        {trackerAliasError && (
+          <div
+            className="ua-tracker-status-advisory rounded-md border px-3 py-2 text-xs"
+            data-tone="danger"
+            role="alert"
+          >
+            {trackerAliasError}. Update CLI Alias in tracker configuration
+            before using -tk or --trackers.
+          </div>
+        )}
         {trackerStatusError && (
           <div
             className="ua-tracker-status-advisory rounded-md border px-3 py-2 text-xs"
@@ -3302,7 +3279,7 @@ function AudionutsUAGUI() {
     if (isDifferent) {
       setSelectedTrackers(newSet);
     }
-  }, [customArgs, defaultTrackers]);
+  }, [customArgs, defaultTrackers, trackerAliases]);
 
   // Get current values from args
   const descFilePath = extractArgValue(customArgs, "--descfile");
@@ -3805,8 +3782,14 @@ function AudionutsUAGUI() {
           setTrackers(data.trackers);
           const defaultSet = new Set(data.default_trackers || []);
           setDefaultTrackers(defaultSet);
-
-          const initialSet = parseTrackersFromArgs(customArgs, defaultSet);
+          const aliases = data.tracker_aliases || {};
+          setTrackerAliases(aliases);
+          setTrackerAliasError(data.alias_error || "");
+          const initialSet = parseTrackersFromArgs(
+            customArgs,
+            defaultSet,
+            aliases,
+          );
           setSelectedTrackers(initialSet);
 
           if (window.loadUATrackerStatuses) {

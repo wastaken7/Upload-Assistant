@@ -9,6 +9,7 @@ import re
 import secrets
 import shutil
 import threading
+import time
 from pathlib import Path
 from typing import Any
 
@@ -20,6 +21,7 @@ from rich.progress import BarColumn, TaskID, TaskProgressColumn, TextColumn
 
 from src.console import console, logger, progress_display
 from src.meta import Meta
+from src.stats import record_event_async
 from src.webui_progress import complete_progress, has_progress_callback, publish_progress
 
 
@@ -1183,6 +1185,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
     if not pesto_season_upload:
         for path_to_check in [final_nzb_path, nzb_file]:
             if path_to_check and await is_valid_nzb(path_to_check):
+                await record_event_async("artifact", service="nzb", operation="reused", outcome="success", category="single")
                 return path_to_check
     else:
         season_entries = discover_pesto_season_entries(Path(input_path))
@@ -1213,6 +1216,9 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
         else:
             logger.info(f"[bold red]Configuration Error: {e}[/bold red]")
             return None
+
+    nntp_service = "pesto" if use_pesto else "nyuu"
+    nntp_duration_ms = 0.0
 
     if use_pesto:
         if not prepare_only:
@@ -1250,6 +1256,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
             meta.usenet_pack_nzb_path = str(reusable_pack_path)
             meta.usenet_nzb_paths.append(str(reusable_pack_path))
             logger.info("[cyan]Reusing the complete existing Pesto season NZB set; NNTP repost skipped.[/cyan]")
+            await record_event_async("artifact", service="nzb", operation="reused", outcome="success", category="season", count=len(meta.usenet_nzb_paths))
             return reusable_pack_path
 
         # A previous season post may have completed every episode but failed
@@ -1284,9 +1291,12 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
             meta.usenet_pack_nzb_path = str(expected_pack_path)
             meta.usenet_nzb_paths.append(str(expected_pack_path))
             logger.info("[cyan]Rebuilt the missing season NZB from saved episode NZBs; NNTP repost skipped.[/cyan]")
+            await record_event_async("artifact", service="nzb", operation="reused", outcome="success", category="episode", count=len(reusable_episode_paths))
+            await record_event_async("artifact", service="nzb", operation="created", outcome="success", category="pack")
             return expected_pack_path
         except Exception as exc:
             logger.warning(f"[yellow]Could not rebuild the missing season NZB from saved episodes: {exc}. Continuing with episode NZBs.[/yellow]")
+            await record_event_async("artifact", service="nzb", operation="reused", outcome="success", category="episode", count=len(reusable_episode_paths))
             return reusable_episode_paths[0]
         finally:
             with contextlib.suppress(Exception):
@@ -1645,8 +1655,10 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
                 async with aiofiles.open(debug_nzb, "w", encoding="utf-8") as f:
                     await f.write(mock_nzb_content)
         else:
+            post_started = time.monotonic()
             try:
                 await run_pesto_with_progress(cmd_pesto, cwd=str(upload_root), env=pesto_env)
+                nntp_duration_ms = (time.monotonic() - post_started) * 1000
             except Exception:
                 # pesto writes the NZB to --out before it knows the post-check
                 # verification failed, so a failed run can still leave a
@@ -1660,6 +1672,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
                     elif await aiofiles.ospath.exists(nzb_file):
                         await aiofiles.os.remove(nzb_file)
                 await cleanup_temp_upload_dir()
+                await record_event_async("api", service="pesto", operation="nntp_post", outcome="error", duration_ms=(time.monotonic() - post_started) * 1000)
                 raise
     else:
         # 6b. Upload via nyuu
@@ -1742,8 +1755,10 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
             async with aiofiles.open(nzb_file, "w", encoding="utf-8") as f:
                 await f.write(mock_nzb_content)
         else:
+            post_started = time.monotonic()
             try:
                 await run_nyuu_with_progress(cmd_nyuu, cwd=str(upload_root))
+                nntp_duration_ms = (time.monotonic() - post_started) * 1000
             except Exception:
                 # nyuu writes the NZB progressively as files are posted, before
                 # the post-check verification (if enabled) confirms every article
@@ -1757,6 +1772,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
                     if await aiofiles.ospath.exists(nzb_file):
                         await aiofiles.os.remove(nzb_file)
                 await cleanup_temp_upload_dir()
+                await record_event_async("api", service="nyuu", operation="nntp_post", outcome="error", duration_ms=(time.monotonic() - post_started) * 1000)
                 raise
 
         # nyuu doesn't inject the password into the NZB — do it manually.
@@ -1800,6 +1816,10 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
         with contextlib.suppress(Exception):
             if await aiofiles.ospath.exists(season_nzb_dir) and not any(season_nzb_dir.iterdir()):
                 await asyncio.to_thread(os.rmdir, season_nzb_dir)
+        await record_event_async("api", service=nntp_service, operation="nntp_post", outcome="success", duration_ms=nntp_duration_ms, bytes_count=total_size)
+        for relocated_nzb in relocated_nzbs:
+            variant = "pack" if Path(relocated_nzb).name == expected_pack_name else "episode"
+            await record_event_async("artifact", service="nzb", operation="created", outcome="success", category=variant)
         return Path(meta.usenet_pack_nzb_path or relocated_nzbs[0]) if relocated_nzbs else None
 
     if await aiofiles.ospath.exists(nzb_file):
@@ -1817,4 +1837,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
         if not is_debug and await aiofiles.ospath.exists(uuid_dir) and not [p.name for p in Path(uuid_dir).iterdir()]:
             await asyncio.to_thread(os.rmdir, uuid_dir)
 
+    await record_event_async("api", service=nntp_service, operation="nntp_post", outcome="success", duration_ms=nntp_duration_ms, bytes_count=total_size)
+    if await is_valid_nzb(final_nzb_path):
+        await record_event_async("artifact", service="nzb", operation="created", outcome="success", category="single")
     return final_nzb_path

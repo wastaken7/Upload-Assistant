@@ -226,6 +226,38 @@ def cli_argument_catalog() -> tuple[dict[str, str], ...]:
     return tuple(catalog)
 
 
+def tracker_cli_aliases(config: Mapping[str, Any]) -> dict[str, str]:
+    """Validate and resolve configured -tk aliases for both the CLI and WebUI."""
+    from src.meta import Meta
+    from src.trackersetup import tracker_class_map
+
+    trackers = config.get("TRACKERS", {})
+    if not isinstance(trackers, Mapping):
+        return {}
+
+    canonical_names = set(tracker_class_map) | {"MANUAL", "USENET"}
+    aliases: dict[str, str] = {}
+    for name, options in trackers.items():
+        if not isinstance(options, Mapping):
+            continue
+        canonical = str(name).upper()
+        alias_value = options.get("cli_alias")
+        if not isinstance(alias_value, str) or not alias_value.strip():
+            continue
+        alias = alias_value.strip().upper()
+        if "," in alias or any(char.isspace() for char in alias):
+            raise ValueError(f"Invalid cli_alias for {canonical}: use one tracker identifier without spaces or commas")
+        if alias in canonical_names and alias != canonical:
+            raise ValueError(f"cli_alias {alias} for {canonical} conflicts with a canonical tracker name")
+        existing_target = Meta.canonical_tracker_name(alias)
+        if existing_target != alias and existing_target != canonical:
+            raise ValueError(f"cli_alias {alias} for {canonical} already selects {existing_target}")
+        if alias in aliases and aliases[alias] != canonical:
+            raise ValueError(f"cli_alias {alias} is configured for both {aliases[alias]} and {canonical}")
+        aliases[alias] = canonical
+    return aliases
+
+
 class Args:
     """
     Parse Args
@@ -235,35 +267,11 @@ class Args:
         self.config = config
 
     def tracker_cli_aliases(self, parser: CustomArgumentParser) -> dict[str, str]:
-        """Resolve configured aliases only for -tk/--trackers input."""
-        from src.meta import Meta
-        from src.trackersetup import tracker_class_map
-
-        trackers = self.config.get("TRACKERS", {})
-        if not isinstance(trackers, Mapping):
-            return {}
-
-        canonical_names = set(tracker_class_map) | {"MANUAL", "USENET"}
-        aliases: dict[str, str] = {}
-        for name, options in trackers.items():
-            if not isinstance(options, Mapping):
-                continue
-            canonical = str(name).upper()
-            alias_value = options.get("cli_alias")
-            if not isinstance(alias_value, str) or not alias_value.strip():
-                continue
-            alias = alias_value.strip().upper()
-            if "," in alias or any(char.isspace() for char in alias):
-                parser.error(f"Invalid cli_alias for {canonical}: use one tracker identifier without spaces or commas")
-            if alias in canonical_names and alias != canonical:
-                parser.error(f"cli_alias {alias} for {canonical} conflicts with a canonical tracker name")
-            existing_target = Meta.canonical_tracker_name(alias)
-            if existing_target != alias and existing_target != canonical:
-                parser.error(f"cli_alias {alias} for {canonical} already selects {existing_target}")
-            if alias in aliases and aliases[alias] != canonical:
-                parser.error(f"cli_alias {alias} is configured for both {aliases[alias]} and {canonical}")
-            aliases[alias] = canonical
-        return aliases
+        """Report shared alias validation errors through argparse."""
+        try:
+            return tracker_cli_aliases(self.config)
+        except ValueError as error:
+            parser.error(str(error))
 
     def parse(self, argv: Sequence[str], meta: Meta) -> tuple[Meta, CustomArgumentParser, list[str]]:
         input = list(argv)
