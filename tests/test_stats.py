@@ -33,6 +33,8 @@ def test_stats_aggregate_real_activity(tmp_path):
     )
     stats.record_event("upload", service="FICTIONAL", operation="torrent_tracker", outcome="skipped:dupe", category="MOVIE", state_dir=tmp_path)
     stats.record_event("artifact", service="torrent", operation="created", category="base", state_dir=tmp_path)
+    stats.record_event("artifact", service="screenshot", operation="created", category="standard", count=5, state_dir=tmp_path)
+    stats.record_event("artifact", service="screenshot", operation="created", category="menu", count=2, state_dir=tmp_path)
     stats.record_event("cache", service="imaginarydb", operation="title", outcome="hit", state_dir=tmp_path)
     stats.record_event("cache", service="imaginarydb", operation="title", outcome="miss", state_dir=tmp_path)
     stats.record_event("api", service="imaginarydb", operation="title", outcome="request", state_dir=tmp_path)
@@ -46,6 +48,7 @@ def test_stats_aggregate_real_activity(tmp_path):
         "upload_success_rate": 100.0,
         "torrents_created": 1,
         "nzbs_created": 0,
+        "screenshots_created": 7,
         "api_operations": 1,
         "cache_hit_rate": 50.0,
         "uploaded_bytes": 4_000,
@@ -62,6 +65,29 @@ def test_stats_aggregate_real_activity(tmp_path):
     assert destination["average_duration_ms"] == 1250
     assert destination["bytes"] == 4_000
     assert result["api"]["requests"] == 1
+    assert {(row["type"], row["operation"], row["variant"], row["count"]) for row in result["artifacts"] if row["type"] == "screenshot"} == {
+        ("screenshot", "created", "menu", 2),
+        ("screenshot", "created", "standard", 5),
+    }
+
+
+def test_screenshot_manifest_records_only_published_screenshots(monkeypatch, tmp_path):
+    from src import screenshot_manifest
+
+    recorded = []
+    monkeypatch.setattr(screenshot_manifest, "record_event", lambda family, **values: recorded.append((family, values)))
+    source = tmp_path / "Celestial.Harbor-frame.png"
+    source.write_bytes(b"fictional screenshot")
+
+    published = screenshot_manifest.register(tmp_path, "fictional-release", [source, tmp_path / "missing.png"], "main")
+
+    assert len(published) == 1
+    assert recorded == [
+        (
+            "artifact",
+            {"service": "screenshot", "operation": "created", "category": "standard", "count": 1},
+        )
+    ]
 
 
 def test_unique_uploaded_bytes_counts_each_successful_item_once(tmp_path):
@@ -501,6 +527,17 @@ def test_invalid_filters_are_rejected(tmp_path):
         stats.get_stats("custom", "real", tmp_path, date_from="bad", date_to="2026-01-01")
     with pytest.raises(ValueError, match="on or before"):
         stats.get_stats("custom", "real", tmp_path, date_from="2026-01-02", date_to="2026-01-01")
+    with pytest.raises(ValueError, match="timezone must be one of"):
+        stats.get_stats("today", "real", tmp_path, time_basis="server")
+
+
+def test_stats_can_resolve_periods_from_the_browser_local_date():
+    result = stats.get_empty_stats("today", time_basis="browser", local_date="2026-09-27")
+
+    assert result["time_context"]["basis"] == "browser"
+    assert result["time_context"]["today"] == result["period"]["to"]
+    assert result["period"]["from"] == result["period"]["to"] == "2026-09-27"
+    assert result["period"]["timezone"] == "Browser local time"
 
 
 def test_one_year_range_contains_365_inclusive_days():

@@ -458,13 +458,37 @@ def _resolve_period(period: str, today: datetime, date_from: str | None = None, 
     raise ValueError("range must be one of: today, this_month, last_month, 7d, 30d, 90d, 1y, all, custom")
 
 
-def _empty_payload(period: str, mode: str, generated_at: str, *, start: str | None, end: str, tracker: str = "") -> dict[str, Any]:
+def _stats_now(time_basis: str, local_date: str | None = None) -> datetime:
+    if time_basis == "utc":
+        return datetime.now(UTC)
+    if time_basis == "browser":
+        browser_date = _parse_date(local_date, "today")
+        return datetime.combine(browser_date, datetime.min.time(), tzinfo=UTC)
+    raise ValueError("timezone must be one of: utc, browser")
+
+
+def _empty_payload(
+    period: str,
+    mode: str,
+    generated_at: str,
+    *,
+    start: str | None,
+    end: str,
+    tracker: str = "",
+    time_basis: str = "utc",
+    now: datetime,
+) -> dict[str, Any]:
+    period_timezone = "UTC" if time_basis == "utc" else "Browser local time"
     return {
         "success": True,
         "range": period,
         "mode": mode,
         "generated_at": generated_at,
-        "period": {"from": start, "to": end, "timezone": "UTC"},
+        "period": {"from": start, "to": end, "timezone": period_timezone},
+        "time_context": {
+            "basis": time_basis,
+            "today": now.date().isoformat(),
+        },
         "filters": {"destinations": [], "active_tracker": tracker or None},
         "overview": {
             "items_completed": 0,
@@ -473,6 +497,7 @@ def _empty_payload(period: str, mode: str, generated_at: str, *, start: str | No
             "upload_success_rate": 0.0,
             "torrents_created": 0,
             "nzbs_created": 0,
+            "screenshots_created": 0,
             "api_operations": 0,
             "cache_hit_rate": 0.0,
             "uploaded_bytes": 0,
@@ -506,13 +531,24 @@ def get_empty_stats(
     date_from: str | None = None,
     date_to: str | None = None,
     tracker: str = "",
+    time_basis: str = "utc",
+    local_date: str | None = None,
 ) -> dict[str, Any]:
     """Return the stable response shape without reading stored aggregates."""
     if mode not in {"real", "debug"}:
         raise ValueError("mode must be one of: real, debug")
-    now = datetime.now(UTC)
+    now = _stats_now(time_basis, local_date)
     start, end = _resolve_period(period, now, date_from, date_to)
-    return _empty_payload(period, mode, now.isoformat(), start=start, end=end, tracker=_dimension(tracker))
+    return _empty_payload(
+        period,
+        mode,
+        datetime.now(UTC).isoformat(),
+        start=start,
+        end=end,
+        tracker=_dimension(tracker),
+        time_basis=time_basis,
+        now=now,
+    )
 
 
 def get_stats(
@@ -523,10 +559,20 @@ def get_stats(
     date_from: str | None = None,
     date_to: str | None = None,
     tracker: str = "",
+    time_basis: str = "utc",
+    local_date: str | None = None,
 ) -> dict[str, Any]:
     active_tracker = _dimension(tracker.upper())
-    payload = get_empty_stats(period, mode, date_from=date_from, date_to=date_to, tracker=active_tracker)
-    now = datetime.fromisoformat(str(payload["generated_at"]))
+    payload = get_empty_stats(
+        period,
+        mode,
+        date_from=date_from,
+        date_to=date_to,
+        tracker=active_tracker,
+        time_basis=time_basis,
+        local_date=local_date,
+    )
+    now = datetime.fromisoformat(str(payload["time_context"]["today"]))
     start = payload["period"]["from"]
     end = payload["period"]["to"]
     path = _database_path(state_dir)
@@ -675,6 +721,8 @@ def get_stats(
                 overview["torrents_created"] += count
             if service == "nzb" and operation == "created" and outcome == "success":
                 overview["nzbs_created"] += count
+            if service == "screenshot" and operation == "created" and outcome == "success":
+                overview["screenshots_created"] += count
             if service == "torrent" and operation == "reused" and outcome == "success":
                 overview["hashing_bytes_avoided"] += int(bytes_count)
         elif family == "cache":

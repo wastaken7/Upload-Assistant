@@ -831,7 +831,19 @@
 
       const previousFocus = document.activeElement;
       const previousOverflow = document.body.style.overflow;
+      const previousPaddingRight = document.body.style.paddingRight;
+      const scrollbarWidth = Math.max(
+        0,
+        window.innerWidth - document.documentElement.clientWidth,
+      );
       const dialog = dialogRef.current;
+      if (scrollbarWidth) {
+        const bodyPaddingRight =
+          Number.parseFloat(
+            window.getComputedStyle(document.body).paddingRight,
+          ) || 0;
+        document.body.style.paddingRight = `${bodyPaddingRight + scrollbarWidth}px`;
+      }
       document.body.style.overflow = "hidden";
 
       const focusFrame = window.requestAnimationFrame(() => {
@@ -880,6 +892,7 @@
         window.cancelAnimationFrame(focusFrame);
         window.removeEventListener("keydown", handleKeyDown);
         document.body.style.overflow = previousOverflow;
+        document.body.style.paddingRight = previousPaddingRight;
         window.requestAnimationFrame(() => {
           const activeModal = document.activeElement?.closest?.(
             '[role="dialog"][aria-modal="true"]',

@@ -39,7 +39,7 @@ def test_stats_filters_use_theme_aware_selects():
     stats_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
     theme = (server.CODE_DIR / "web_ui" / "static" / "css" / "theme.css").read_text(encoding="utf-8")
 
-    assert 'className="ua-stats-control rounded-xl px-4 text-sm"' in stats_app
+    assert 'className="ua-stats-control w-full min-w-0 rounded-xl px-4 text-sm"' in stats_app
     assert 'className="ua-theme-picker rounded-lg px-3 py-2 text-sm"' in stats_app
     focus_styles = theme.split(".ua-stats-custom-summary:focus-visible {", 1)[1].split("}", 1)[0]
     assert "outline: 2px solid var(--ua-copper-bright)" in focus_styles
@@ -54,6 +54,48 @@ def test_stats_period_selector_is_segmented_and_remembered():
     assert 'aria-label="Statistics period"' in stats_app
     assert "aria-pressed={period === value}" in stats_app
     assert "window.UAStorage.set(STATS_PERIOD_KEY, period)" in stats_app
+
+
+def test_stats_settings_are_persistent_and_control_the_requested_views():
+    stats_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
+    theme_css = (server.CODE_DIR / "web_ui" / "static" / "css" / "theme.css").read_text(encoding="utf-8")
+    settings_icon = server.CODE_DIR / "web_ui" / "static" / "img" / "stats-icons" / "settings.svg"
+
+    assert 'const STATS_SETTINGS_KEY = "ua_stats_settings_v1"' in stats_app
+    assert 'name="settings"' in stats_app
+    assert settings_icon.is_file()
+    assert "Stats display" in stats_app
+    assert "Close stats display" in stats_app
+    assert "Display" in stats_app
+    assert "Real activity" in stats_app
+    assert "Debug simulations" in stats_app
+    assert '<option value="browser">{localTimeLabel}</option>' in stats_app
+    assert "Historical statistics are stored in UTC calendar-day buckets." in stats_app
+    assert 'query.set("today", isoTodayLocal())' in stats_app
+    assert '<option value="DD-MM-YYYY">DD-MM-YYYY</option>' in stats_app
+    assert 'label="Daily activity color gradient"' in stats_app
+    assert 'label="Tracker and indexer favicons"' in stats_app
+    assert "visible.throughput" in stats_app
+    assert "visible.dataUploaded" in stats_app
+    assert "visible.uploadsByDestination" in stats_app
+    assert "const areaPath" in stats_app
+    assert "<linearGradient" in stats_app
+    assert "fill={`url(#daily-activity-gradient-${entry.key})`}" in stats_app
+    assert 'filter="url(#daily-activity-gradient)"' not in stats_app
+    assert "showFavicons={settings.showFavicons}" in stats_app
+    assert "JSON.stringify(settings)" in stats_app
+    assert "sm:grid-cols-2 md:grid-cols-3" in stats_app
+    assert stats_app.count("grid min-w-0 gap-1 text-sm") == 3
+    assert ".ua-stats-settings-modal\n  :where(" in theme_css
+    assert "var(--ua-config-border) 88%" in theme_css
+
+
+def test_modal_scroll_lock_preserves_the_page_width():
+    shared_utils = (server.CODE_DIR / "web_ui" / "static" / "js" / "shared_utils.js").read_text(encoding="utf-8")
+
+    assert "window.innerWidth - document.documentElement.clientWidth" in shared_utils
+    assert "bodyPaddingRight + scrollbarWidth" in shared_utils
+    assert "document.body.style.paddingRight = previousPaddingRight" in shared_utils
 
 
 def test_application_rails_use_the_supplied_icons():
@@ -153,6 +195,7 @@ def test_stats_summary_cards_have_distinct_icons():
         "successful-uploads",
         "torrents-created",
         "nzbs-created",
+        "screenshots-created",
         "api-operations",
         "cache-hit-rate",
         "cache-writes",
@@ -180,8 +223,9 @@ def test_stats_summary_cards_have_distinct_icons():
         assert (icon_dir / f"{icon}.svg").is_file()
 
 
-def test_stats_ui_exposes_volume_profiles_comparisons_and_exports():
+def test_stats_ui_exposes_volume_profiles_comparisons_and_actions():
     stats_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
+    theme_css = (server.CODE_DIR / "web_ui" / "static" / "css" / "theme.css").read_text(encoding="utf-8")
 
     assert 'label="Data uploaded"' in stats_app
     assert 'label="Unique data uploaded"' in stats_app
@@ -192,18 +236,36 @@ def test_stats_ui_exposes_volume_profiles_comparisons_and_exports():
     assert "function MediaProfile" in stats_app
     assert "function ActivityHeatmap" in stats_app
     assert "vs previous period" in stats_app
-    assert "function ExportMenu" in stats_app
+    assert "function StatsActionsMenu" in stats_app
     assert 'aria-haspopup="menu"' in stats_app
-    assert 'ref={menuRef} className="relative flex"' in stats_app
-    assert 'className="ua-stats-export-trigger h-full rounded-xl px-4 text-sm font-medium disabled:opacity-40"' in stats_app
+    assert 'aria-label="Statistics actions"' in stats_app
+    assert '<span aria-hidden="true">⋯</span>' in stats_app
+    assert "exportsDisabled={!statsEnabled || !hasData}" in stats_app
     assert "CSV timeline" in stats_app
     assert "JSON details" in stats_app
+    assert "onReset={() => setResetOpen(true)}" in stats_app
+    assert 'className="ua-stats-actions-danger' in stats_app
+    assert ".ua-stats-actions-menu" in theme_css
     assert "ReliabilityBadge" in stats_app
     assert 'title="Streaming services"' in stats_app
     assert 'title="Personal releases"' in stats_app
     assert "function StreamingServices" in stats_app
     assert "function ReleaseProfiles" in stats_app
     assert "release groups and tags are never stored" in stats_app
+
+
+def test_stats_generated_artifacts_combines_screenshot_types():
+    stats_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
+
+    assert 'label="Screenshots created"' in stats_app
+    assert "overview.screenshots_created" in stats_app
+    assert 'row.type === "screenshot" && row.operation === "created"' in stats_app
+    assert "screenshotArtifactMap.standard" in stats_app
+    assert "screenshotArtifactMap.menu" in stats_app
+    assert "screenshotArtifactMap.spectrogram" in stats_app
+    assert "(screenshotArtifactMap.dovi_plot || 0) +" in stats_app
+    assert "(screenshotArtifactMap.hdr10plus_plot || 0)" in stats_app
+    assert "HDR plots" in stats_app
 
 
 def test_activity_heatmap_fits_panel_without_horizontal_scroll():
@@ -329,6 +391,23 @@ def test_stats_api_accepts_one_year_range(monkeypatch):
 
     assert response.status_code == 200
     assert response.json["range"] == "1y"
+
+
+def test_stats_api_accepts_browser_time_and_rejects_unknown_timezones(monkeypatch):
+    _authenticated(monkeypatch)
+    response = server.app.test_client().get("/api/stats?range=today&mode=real&timezone=browser&today=2026-09-27")
+
+    assert response.status_code == 200
+    assert response.json["time_context"]["basis"] == "browser"
+    assert response.json["period"] == {
+        "from": "2026-09-27",
+        "to": "2026-09-27",
+        "timezone": "Browser local time",
+    }
+
+    invalid = server.app.test_client().get("/api/stats?range=today&mode=real&timezone=server")
+    assert invalid.status_code == 400
+    assert "timezone must be one of" in invalid.json["error"]
 
 
 def test_stats_api_accepts_custom_utc_range_and_tracker(monkeypatch, tmp_path):

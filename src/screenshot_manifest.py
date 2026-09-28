@@ -11,6 +11,7 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+from src.stats import record_event
 from src.temp_paths import release_temp_dir, screenshots_dir
 
 _locks: dict[str, threading.RLock] = {}
@@ -65,6 +66,7 @@ def register(base_dir: str | Path, release_id: str, paths: list[str | Path], gro
             entries[screenshot_id] = {"file": target.name, "group": group}
             result.append(target)
         _save(base_dir, release_id, manifest)
+        record_event("artifact", service="screenshot", operation="created", category="standard", count=len(result))
         return result
 
 

@@ -35,6 +35,7 @@ from src.screenshot_manifest import files as manifest_files
 from src.screenshot_manifest import forget_file as forget_screenshot_file
 from src.screenshot_manifest import register as register_screenshots
 from src.screenshot_overlays import overlay_filters, overlay_fontfile, overlay_options
+from src.stats import record_event_async
 from src.temp_paths import artwork_dir, screenshots_dir
 from src.webui_progress import complete_progress, publish_progress
 
@@ -1754,6 +1755,7 @@ async def generate_ebook_screenshots(
 
             logger.info(traceback.format_exc())
 
+    await record_event_async("artifact", service="screenshot", operation="created", category="standard", count=len(screenshots))
     return screenshots
 
 
