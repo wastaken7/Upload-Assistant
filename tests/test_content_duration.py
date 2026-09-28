@@ -36,6 +36,12 @@ def test_existing_content_duration_reuses_prepared_metadata():
     assert content_duration.existing_content_duration(Meta(category="TV", mediainfo={"media": {"track": [{"@type": "General", "Duration": "1512.25"}]}})) == 1_512.25
 
 
+def test_multi_disc_duration_requires_every_disc_length():
+    meta = Meta(category="MOVIE", is_disc="BDMV", discs=[{"bdinfo": {"length": "01:30:00"}}, {"bdinfo": {}}], bdinfo={"length": "01:30:00"})
+
+    assert content_duration.existing_content_duration(meta) == 0.0
+
+
 @pytest.mark.asyncio
 async def test_video_pack_is_probed_once_during_preparation(monkeypatch, tmp_path):
     files = []

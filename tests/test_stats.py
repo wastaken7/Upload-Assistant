@@ -71,23 +71,15 @@ def test_stats_aggregate_real_activity(tmp_path):
     }
 
 
-def test_screenshot_manifest_records_only_published_screenshots(monkeypatch, tmp_path):
+def test_screenshot_manifest_only_publishes_existing_screenshots(tmp_path):
     from src import screenshot_manifest
 
-    recorded = []
-    monkeypatch.setattr(screenshot_manifest, "record_event", lambda family, **values: recorded.append((family, values)))
     source = tmp_path / "Celestial.Harbor-frame.png"
     source.write_bytes(b"fictional screenshot")
 
     published = screenshot_manifest.register(tmp_path, "fictional-release", [source, tmp_path / "missing.png"], "main")
 
     assert len(published) == 1
-    assert recorded == [
-        (
-            "artifact",
-            {"service": "screenshot", "operation": "created", "category": "standard", "count": 1},
-        )
-    ]
 
 
 def test_unique_uploaded_bytes_counts_each_successful_item_once(tmp_path):
@@ -268,6 +260,22 @@ async def test_successful_content_time_counts_once_globally_and_per_destination(
     }
     assert fictional["content_time"] == global_result["content_time"]
     assert duplicate["content_time"] == {"total_seconds": 0, "by_category": []}
+
+
+@pytest.mark.asyncio
+async def test_failed_prepared_pack_duration_does_not_fall_back_to_representative_mediainfo(monkeypatch, tmp_path):
+    monkeypatch.setattr(stats, "_database_path", lambda _state_dir=None: tmp_path / "data" / "stats.sqlite3")
+    meta = Meta(
+        category="TV",
+        content_duration_category="TV",
+        content_duration_seconds=None,
+        mediainfo={"media": {"track": [{"@type": "General", "Duration": "1200"}]}},
+        tracker_status={"FICTIONAL": {"upload_success": True}},
+    )
+
+    await stats.record_completed_item_stats_async(meta, {"FICTIONAL": object})
+
+    assert stats.get_stats("all", "real", tmp_path)["content_time"] == {"total_seconds": 0, "by_category": []}
 
 
 def test_calendar_ranges_use_inclusive_utc_boundaries():

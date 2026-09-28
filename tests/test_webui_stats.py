@@ -349,6 +349,16 @@ def test_stats_requests_cancel_stale_filters_and_report_reset_failures():
     assert 'setError("Unable to reset statistics")' in stats_app
 
 
+def test_browser_local_today_refreshes_at_local_midnight():
+    stats_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
+
+    assert 'period !== "today" || settings.timezone !== "browser"' in stats_app
+    assert "nextMidnight.setHours(24, 0, 0, 0)" in stats_app
+    assert "setTodayRefresh((value) => value + 1)" in stats_app
+    assert "window.clearTimeout(timer)" in stats_app
+    assert "todayRefresh," in stats_app
+
+
 def test_stats_ui_exposes_advanced_ranges_tracker_filter_and_sankey():
     stats_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
 

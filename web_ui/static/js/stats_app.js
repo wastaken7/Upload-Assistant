@@ -1929,6 +1929,7 @@ function StatsApp() {
   const [helpOpen, setHelpOpen] = useState(false);
   const [changelogOpen, setChangelogOpen] = useState(false);
   const [mediaCategory, setMediaCategory] = useState("");
+  const [todayRefresh, setTodayRefresh] = useState(0);
 
   useEffect(() => {
     window.UAStorage.set("ua_config_theme", isDarkMode ? "dark" : "light");
@@ -1940,6 +1941,17 @@ function StatsApp() {
   useEffect(() => {
     window.UAStorage.set(STATS_SETTINGS_KEY, JSON.stringify(settings));
   }, [settings]);
+  useEffect(() => {
+    if (period !== "today" || settings.timezone !== "browser") return undefined;
+    const now = new Date();
+    const nextMidnight = new Date(now);
+    nextMidnight.setHours(24, 0, 0, 0);
+    const timer = window.setTimeout(
+      () => setTodayRefresh((value) => value + 1),
+      nextMidnight.getTime() - now.getTime(),
+    );
+    return () => window.clearTimeout(timer);
+  }, [period, settings.timezone, todayRefresh]);
 
   const load = async (signal) => {
     setLoading(true);
@@ -1978,7 +1990,14 @@ function StatsApp() {
     const controller = new AbortController();
     load(controller.signal);
     return () => controller.abort();
-  }, [period, mode, customRange, activeTracker, settings.timezone]);
+  }, [
+    period,
+    mode,
+    customRange,
+    activeTracker,
+    settings.timezone,
+    todayRefresh,
+  ]);
   useEffect(() => {
     const categories = data?.media?.categories || [];
     if (!categories.includes(mediaCategory))

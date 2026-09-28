@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any, cast
 
 from src.app_paths import DATA_DIR
-from src.content_duration import content_duration_category, existing_content_duration
+from src.content_duration import content_duration_category, existing_content_duration, prepared_content_duration
 
 _SCHEMA_VERSION = "2"
 _PERIOD_DAYS = {"7d": 7, "30d": 30, "90d": 90, "1y": 365}
@@ -370,8 +370,9 @@ async def record_completed_item_stats_async(meta: Any, tracker_class_map: Mappin
 
     item_size = max(0, int(getattr(meta, "source_size", 0) or 0))
     category = str(getattr(meta, "category", "") or "")
-    content_category = str(getattr(meta, "content_duration_category", "") or content_duration_category(meta))
-    content_seconds = existing_content_duration(meta)
+    prepared_category = str(getattr(meta, "content_duration_category", "") or "")
+    content_category = prepared_category or content_duration_category(meta)
+    content_seconds = prepared_content_duration(meta) if prepared_category else existing_content_duration(meta)
     normalized_outcomes = [tracker_route_outcome(status) for _destination, status, _kind in routes]
     item_outcome = "success" if "success" in normalized_outcomes else "error" if "error" in normalized_outcomes else "no_upload"
     await record_event_async("item", operation="completed", outcome=item_outcome, bytes_count=item_size)

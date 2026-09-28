@@ -78,9 +78,7 @@ def _disc_seconds(meta: Any) -> float:
         for disc in discs:
             bdinfo = _mapping(_mapping(disc).get("bdinfo", {}))
             durations.append(_clock_seconds(bdinfo.get("length")))
-        total = sum(durations)
-        if total > 0:
-            return total
+        return sum(durations) if durations and all(duration > 0 for duration in durations) else 0.0
     bdinfo = _mapping(cast(object, getattr(meta, "bdinfo", {})))
     return _clock_seconds(bdinfo.get("length"))
 
@@ -104,6 +102,11 @@ def existing_content_duration(meta: Any) -> float:
     if getattr(meta, "is_disc", ""):
         return _disc_seconds(meta)
     return _mediainfo_seconds(meta)
+
+
+def prepared_content_duration(meta: Any) -> float:
+    """Return only the canonical value set by ``populate_content_duration``."""
+    return _positive_number(getattr(meta, "content_duration_seconds", None))
 
 
 def _probe_video_duration(path: str, executable: str) -> float:
