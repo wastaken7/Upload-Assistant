@@ -99,6 +99,8 @@ class Meta:
     client: str | None = None
     combined_genres: list[str] | str = field(default_factory=list)
     comic: bool = False
+    content_duration_category: str = ""
+    content_duration_seconds: float | None = None
     comparison_groups: dict[str, dict[str, Any]] | list[dict[str, Any]] = field(default_factory=dict)
     comparison_index: int | None = None
     comparison: str | None = None

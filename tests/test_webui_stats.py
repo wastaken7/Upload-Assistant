@@ -120,7 +120,10 @@ def test_stats_combines_charts_with_expandable_tables():
 
     assert "function DonutChart" in stats_app
     assert "const ChartWithTable" in stats_app
-    assert stats_app.count("<ChartWithTable") == 9
+    assert stats_app.count("<ChartWithTable") == 10
+    assert 'title="Successful media time"' in stats_app
+    assert 'centerLabel="uploaded"' in stats_app
+    assert "valueFormatter={formatMediaHours}" in stats_app
     assert 'className="ua-stats-table-details mt-5"' in stats_app
     assert 'aria-label="Show or hide data table"' in stats_app
     assert 'className="ml-auto flex h-9 w-9 cursor-pointer' in stats_app

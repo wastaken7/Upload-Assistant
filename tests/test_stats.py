@@ -203,6 +203,73 @@ def test_schema_v2_recreates_unreleased_v1_aggregates(tmp_path):
         assert db.execute("SELECT value FROM stats_meta WHERE key = 'schema_version'").fetchone() == ("2",)
 
 
+def test_content_duration_column_is_added_without_losing_v2_aggregates(tmp_path):
+    database = tmp_path / "data" / "stats.sqlite3"
+    database.parent.mkdir(parents=True)
+    with sqlite3.connect(database) as db:
+        db.execute("CREATE TABLE stats_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+        db.execute("INSERT INTO stats_meta VALUES ('schema_version', '2')")
+        db.execute(
+            """
+            CREATE TABLE stats_daily (
+                day TEXT NOT NULL, family TEXT NOT NULL, service TEXT NOT NULL,
+                operation TEXT NOT NULL, outcome TEXT NOT NULL, category TEXT NOT NULL,
+                source TEXT NOT NULL, mode TEXT NOT NULL, destination TEXT NOT NULL,
+                count INTEGER NOT NULL DEFAULT 0, duration_ms INTEGER NOT NULL DEFAULT 0,
+                bytes INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (day, family, service, operation, outcome, category, source, mode, destination)
+            )
+            """
+        )
+        db.execute(
+            "INSERT INTO stats_daily VALUES (?, 'item', '', 'completed', 'success', 'MOVIE', 'cli', 'real', '', 3, 0, 12000)",
+            (datetime.now(UTC).date().isoformat(),),
+        )
+
+    result = stats.get_stats("all", "real", tmp_path)
+
+    assert result["overview"]["items_completed"] == 3
+    with sqlite3.connect(database) as db:
+        columns = {row[1] for row in db.execute("PRAGMA table_info(stats_daily)")}
+        assert "content_seconds" in columns
+        assert db.execute("SELECT count, bytes, content_seconds FROM stats_daily").fetchone() == (3, 12_000, 0)
+
+
+@pytest.mark.asyncio
+async def test_successful_content_time_counts_once_globally_and_per_destination(monkeypatch, tmp_path):
+    monkeypatch.setattr(stats, "_database_path", lambda _state_dir=None: tmp_path / "data" / "stats.sqlite3")
+
+    class TorrentTracker:
+        is_usenet = False
+
+    meta = Meta(
+        category="MOVIE",
+        content_duration_category="Movie",
+        content_duration_seconds=7_200.4,
+        tracker_status={
+            "FICTIONAL": {"upload_success": True},
+            "IMAGINARY": {"upload_success": True},
+            "EXAMPLE": {"dupe": True, "upload_success": False},
+        },
+    )
+
+    await stats.record_completed_item_stats_async(
+        meta,
+        {"FICTIONAL": TorrentTracker, "IMAGINARY": TorrentTracker, "EXAMPLE": TorrentTracker},
+    )
+
+    global_result = stats.get_stats("all", "real", tmp_path)
+    fictional = stats.get_stats("all", "real", tmp_path, tracker="FICTIONAL")
+    duplicate = stats.get_stats("all", "real", tmp_path, tracker="EXAMPLE")
+
+    assert global_result["content_time"] == {
+        "total_seconds": 7_200,
+        "by_category": [{"category": "Movie", "items": 1, "seconds": 7_200}],
+    }
+    assert fictional["content_time"] == global_result["content_time"]
+    assert duplicate["content_time"] == {"total_seconds": 0, "by_category": []}
+
+
 def test_calendar_ranges_use_inclusive_utc_boundaries():
     today = stats.get_empty_stats("today", "real")
     this_month = stats.get_empty_stats("this_month", "real")

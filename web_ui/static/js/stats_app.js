@@ -41,6 +41,7 @@ const DEFAULT_STATS_SETTINGS = Object.freeze({
     activityHeatmap: true,
     uploadsByDestination: true,
     categories: true,
+    contentTime: true,
     artifactActivity: true,
     mediaProfile: true,
     streamingServices: true,
@@ -95,6 +96,7 @@ const SECTION_VISIBILITY = [
   ["activityHeatmap", "Activity heatmap"],
   ["uploadsByDestination", "Uploads by destination"],
   ["categories", "Categories"],
+  ["contentTime", "Successful media time"],
   ["artifactActivity", "Artifact activity"],
   ["mediaProfile", "Media profile"],
   ["streamingServices", "Streaming services"],
@@ -134,6 +136,18 @@ const formatCompactNumber = (value) =>
   }).format(value || 0);
 const formatDuration = (value) =>
   value >= 1000 ? `${(value / 1000).toFixed(1)}s` : `${value || 0}ms`;
+const formatMediaHours = (seconds) => {
+  const hours = Math.max(0, Number(seconds) || 0) / 3600;
+  return `${new Intl.NumberFormat(undefined, {
+    maximumFractionDigits: hours >= 100 ? 0 : 1,
+  }).format(hours)} h`;
+};
+const formatMediaTime = (seconds) => {
+  const totalMinutes = Math.round(Math.max(0, Number(seconds) || 0) / 60);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return hours ? `${formatNumber(hours)}h ${minutes}m` : `${minutes}m`;
+};
 const formatBytes = (value) => {
   if (!value || value <= 0) return "0 B";
   const units = ["B", "KB", "MB", "GB", "TB"];
@@ -1643,6 +1657,8 @@ function DonutChart({
   onSelect,
   activeLabel = "",
   showFavicons = true,
+  valueFormatter = formatNumber,
+  centerLabel = "Total",
 }) {
   const normalizedRows = rows
     .map((row) => ({
@@ -1708,8 +1724,8 @@ function DonutChart({
           ))}
         </svg>
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-2xl font-bold">{formatNumber(total)}</span>
-          <span className="text-xs opacity-60">Total</span>
+          <span className="text-2xl font-bold">{valueFormatter(total)}</span>
+          <span className="text-xs opacity-60">{centerLabel}</span>
         </div>
       </div>
       <ul className="grid gap-2 text-sm">
@@ -1744,7 +1760,7 @@ function DonutChart({
               </span>
             </span>
             <span className="shrink-0 tabular-nums">
-              {formatNumber(segment.value)} · {segment.percentage.toFixed(1)}%
+              {valueFormatter(segment.value)} · {segment.percentage.toFixed(1)}%
             </span>
           </li>
         ))}
@@ -2617,6 +2633,53 @@ function StatsApp() {
                     </Section>
                   )}
                 </div>
+              )}
+              {visible.contentTime && (
+                <Section
+                  icon="content-time"
+                  title="Successful media time"
+                  subtitle="Each successfully processed item is counted once, regardless of destination. Unknown runtimes are excluded."
+                >
+                  <ChartWithTable
+                    chart={
+                      <DonutChart
+                        ariaLabel="Successfully uploaded media time by category"
+                        rows={(data.content_time?.by_category || []).map(
+                          (row) => ({
+                            label: row.category,
+                            value: row.seconds,
+                          }),
+                        )}
+                        valueFormatter={formatMediaHours}
+                        centerLabel="uploaded"
+                      />
+                    }
+                    table={
+                      <Table
+                        rows={data.content_time?.by_category || []}
+                        empty="No successful media duration in this period."
+                        headers={[
+                          { label: "Category", key: "category" },
+                          {
+                            label: "Items",
+                            sortValue: (row) => row.items,
+                            render: (row) => formatNumber(row.items),
+                          },
+                          {
+                            label: "Media time",
+                            sortValue: (row) => row.seconds,
+                            render: (row) => formatMediaTime(row.seconds),
+                          },
+                          {
+                            label: "Hours",
+                            sortValue: (row) => row.seconds,
+                            render: (row) => formatMediaHours(row.seconds),
+                          },
+                        ]}
+                      />
+                    }
+                  />
+                </Section>
               )}
               {visible.mediaProfile && (
                 <Section

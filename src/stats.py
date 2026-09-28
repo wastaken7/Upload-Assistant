@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any, cast
 
 from src.app_paths import DATA_DIR
+from src.content_duration import content_duration_category, existing_content_duration
 
 _SCHEMA_VERSION = "2"
 _PERIOD_DAYS = {"7d": 7, "30d": 30, "90d": 90, "1y": 365}
@@ -258,11 +259,19 @@ def _connect(path: Path) -> sqlite3.Connection:
                     destination TEXT NOT NULL,
                     count INTEGER NOT NULL DEFAULT 0,
                     duration_ms INTEGER NOT NULL DEFAULT 0,
+                    content_seconds INTEGER NOT NULL DEFAULT 0,
                     bytes INTEGER NOT NULL DEFAULT 0,
                     PRIMARY KEY (day, family, service, operation, outcome, category, source, mode, destination)
                 )
                 """
             )
+            current_columns = {str(row[1]) for row in db.execute("PRAGMA table_info(stats_daily)")}
+            if "content_seconds" not in current_columns:
+                try:
+                    db.execute("ALTER TABLE stats_daily ADD COLUMN content_seconds INTEGER NOT NULL DEFAULT 0")
+                except sqlite3.OperationalError as exc:
+                    if "duplicate column" not in str(exc).lower():
+                        raise
             db.execute("INSERT OR REPLACE INTO stats_meta VALUES ('schema_version', ?)", (_SCHEMA_VERSION,))
             db.commit()
             _initialized_paths.add(path)
@@ -281,6 +290,7 @@ def record_event(
     destination: str = "",
     count: int = 1,
     duration_ms: int | float = 0,
+    content_seconds: int | float = 0,
     bytes_count: int = 0,
     state_dir: str | Path | None = None,
 ) -> None:
@@ -304,15 +314,16 @@ def record_event(
                 db.execute(
                     """
                     INSERT INTO stats_daily
-                        (day, family, service, operation, outcome, category, source, mode, destination, count, duration_ms, bytes)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        (day, family, service, operation, outcome, category, source, mode, destination, count, duration_ms, content_seconds, bytes)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT (day, family, service, operation, outcome, category, source, mode, destination)
                     DO UPDATE SET
                         count = count + excluded.count,
                         duration_ms = duration_ms + excluded.duration_ms,
+                        content_seconds = content_seconds + excluded.content_seconds,
                         bytes = bytes + excluded.bytes
                     """,
-                    (*dimensions, int(count), max(0, round(duration_ms)), max(0, int(bytes_count))),
+                    (*dimensions, int(count), max(0, round(duration_ms)), max(0, round(content_seconds)), max(0, int(bytes_count))),
                 )
             return
         except sqlite3.OperationalError as exc:
@@ -359,11 +370,21 @@ async def record_completed_item_stats_async(meta: Any, tracker_class_map: Mappin
 
     item_size = max(0, int(getattr(meta, "source_size", 0) or 0))
     category = str(getattr(meta, "category", "") or "")
+    content_category = str(getattr(meta, "content_duration_category", "") or content_duration_category(meta))
+    content_seconds = existing_content_duration(meta)
     normalized_outcomes = [tracker_route_outcome(status) for _destination, status, _kind in routes]
     item_outcome = "success" if "success" in normalized_outcomes else "error" if "error" in normalized_outcomes else "no_upload"
     await record_event_async("item", operation="completed", outcome=item_outcome, bytes_count=item_size)
     await record_release_profile_async(meta, item_outcome)
     await record_media_profile_async(meta)
+    if item_outcome == "success" and content_category and content_seconds > 0:
+        await record_event_async(
+            "content",
+            operation="uploaded",
+            outcome="success",
+            category=content_category,
+            content_seconds=content_seconds,
+        )
 
     for destination, status, destination_type in routes:
         outcome = tracker_route_outcome(status)
@@ -381,6 +402,15 @@ async def record_completed_item_stats_async(meta: Any, tracker_class_map: Mappin
         scoped_outcome = "success" if outcome == "success" else "error" if outcome == "error" else "no_upload"
         await record_release_profile_async(meta, scoped_outcome, destination=destination)
         await record_media_profile_async(meta, destination=destination)
+        if outcome == "success" and content_category and content_seconds > 0:
+            await record_event_async(
+                "content",
+                operation="uploaded",
+                outcome="success",
+                category=content_category,
+                destination=destination,
+                content_seconds=content_seconds,
+            )
         if destination_type == "torrent_tracker":
             torrent_path = Path(str(getattr(meta, "base_dir", ""))) / "tmp" / str(getattr(meta, "uuid", "")) / f"[{destination}].torrent"
             if torrent_path.is_file():
@@ -513,6 +543,7 @@ def _empty_payload(
         "comparison": {"items_completed_pct": None, "uploads_pct": None, "cache_hit_rate_delta": None},
         "items": {"success": 0, "no_upload": 0, "error": 0},
         "uploads": {"by_destination": [], "by_category": []},
+        "content_time": {"total_seconds": 0, "by_category": []},
         "sankey": {"unit": "item_destination_route", "nodes": [], "links": []},
         "media": {"categories": [], "dimensions": [], "matrix": []},
         "streaming": {"services": []},
@@ -580,7 +611,7 @@ def get_stats(
         return payload
     try:
         with closing(_connect(path)) as db:
-            query = "SELECT day, family, service, operation, outcome, category, source, count, duration_ms, bytes, destination FROM stats_daily WHERE mode = ? AND day <= ?"
+            query = "SELECT day, family, service, operation, outcome, category, source, count, duration_ms, content_seconds, bytes, destination FROM stats_daily WHERE mode = ? AND day <= ?"
             parameters: list[object] = [mode, end]
             if start:
                 query += " AND day >= ?"
@@ -652,13 +683,14 @@ def get_stats(
     streaming_services: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
     release_profiles: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
     release_profile_categories: dict[tuple[str, str], dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    content_categories: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
     sources: dict[str, int] = defaultdict(int)
     overview = payload["overview"]
 
-    for day, family, service, operation, outcome, category, source, count, duration_ms, bytes_count, destination in rows:
+    for day, family, service, operation, outcome, category, source, count, duration_ms, content_seconds, bytes_count, destination in rows:
         count = int(count)
         effective_destination = destination or (service if family == "upload" else "")
-        if family in {"item", "media", "media_matrix", "release_profile", "artifact"}:
+        if family in {"item", "media", "media_matrix", "release_profile", "artifact", "content"}:
             if active_tracker:
                 if family == "item" or destination != active_tracker:
                     continue
@@ -757,6 +789,10 @@ def get_stats(
                 category_bucket["count"] += count
                 category_bucket[outcome] += count
                 category_bucket["bytes"] += int(bytes_count)
+        elif family == "content" and operation == "uploaded" and outcome == "success" and category:
+            bucket = content_categories[category]
+            bucket["items"] += count
+            bucket["seconds"] += int(content_seconds)
 
     overview["upload_success_rate"] = round(100 * overview["uploads"] / overview["upload_attempts"], 1) if overview["upload_attempts"] else 0.0
     overview["average_item_bytes"] = round(overview["processed_bytes"] / overview["items_completed"]) if overview["items_completed"] else 0
@@ -808,6 +844,13 @@ def get_stats(
         {"category": name, "successes": values["success"], "errors": values["error"], "skipped": values["skipped"], "bytes": values["bytes"]}
         for name, values in sorted(categories.items(), key=lambda item: -item[1]["success"])
     ]
+    payload["content_time"] = {
+        "total_seconds": sum(values["seconds"] for values in content_categories.values()),
+        "by_category": [
+            {"category": name, "items": values["items"], "seconds": values["seconds"]}
+            for name, values in sorted(content_categories.items(), key=lambda item: (-item[1]["seconds"], item[0]))
+        ],
+    }
     payload["artifacts"] = [
         {"type": artifact_type, "operation": operation, "variant": variant, "count": values["count"], "bytes": values["bytes"]}
         for (artifact_type, operation, variant), values in sorted(artifacts.items())
