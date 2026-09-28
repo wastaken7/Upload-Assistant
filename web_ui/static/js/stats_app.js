@@ -873,7 +873,7 @@ function ActivityHeatmap({ rows }) {
           ))}
         </div>
         <div
-          className="grid w-full grid-flow-col grid-rows-7 gap-[2px] sm:gap-1"
+          className="grid min-w-0 w-full grid-flow-col grid-rows-7 gap-[2px] sm:gap-1"
           style={columnStyle}
           role="img"
           aria-label="Activity during the last 52 weeks"
@@ -881,7 +881,7 @@ function ActivityHeatmap({ rows }) {
           {cells.map((cell) => (
             <span
               key={cell.date}
-              className="aspect-square rounded-[3px]"
+              className="aspect-square min-w-0 w-full self-center rounded-[3px]"
               style={{
                 background: cell.count
                   ? `color-mix(in srgb, var(--ua-copper-bright) ${25 + Math.round((cell.count / maximum) * 70)}%, var(--ua-stats-heatmap-empty))`

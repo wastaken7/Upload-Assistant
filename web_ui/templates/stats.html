@@ -26,8 +26,31 @@
         aria-live="polite"
       >
         <div class="ua-startup-card">
-          <p class="ua-startup-eyebrow">Upload Assistant · {{ app_version }}</p>
-          <h1 class="ua-startup-title">Loading statistics</h1>
+          <div class="ua-startup-brand">
+            <span class="ua-startup-logo-frame" aria-hidden="true">
+              <img
+                class="ua-startup-logo"
+                src="{{ url_for('static', filename='img/logo.svg') }}"
+                alt=""
+              />
+            </span>
+            <div>
+              <p class="ua-startup-eyebrow">
+                Upload Assistant · {{ app_version }}
+              </p>
+              <h1 class="ua-startup-title">Loading statistics</h1>
+            </div>
+          </div>
+          <p class="ua-startup-description">
+            Preparing your activity overview and charts.
+          </p>
+          <div class="ua-startup-progress-track" aria-hidden="true">
+            <span class="ua-startup-progress-bar"></span>
+          </div>
+          <p class="ua-startup-delayed-hint">
+            Taking longer than expected? Check that this browser can reach the
+            required CDN resources.
+          </p>
         </div>
       </div>
     </div>
