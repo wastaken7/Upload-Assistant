@@ -2151,7 +2151,7 @@ def load_heavy_globals() -> None:
 
 async def do_the_thing(base_dir: str) -> None:
     from src.api_key_expiry import reset_api_key_expiry_warnings
-    from src.stats import completed_item_outcome, configure_stats, record_event_async, record_media_profile_async, record_release_profile_async, set_stats_context
+    from src.stats import configure_stats, record_completed_item_stats_async, record_event_async, record_release_profile_async, set_stats_context
 
     reset_api_key_expiry_warnings()
     load_heavy_globals()
@@ -2949,30 +2949,7 @@ async def do_the_thing(base_dir: str) -> None:
 
             # Persist and expose the completed item before user-managed hooks run.
             # Hooks may inspect the final tracker status and files have not yet been cleaned.
-            completed_statuses = [status for status in meta.tracker_status.values() if isinstance(status, Mapping)]
-            for tracker_name, tracker_result in meta.tracker_status.items():
-                if not isinstance(tracker_result, Mapping) or "upload_success" in tracker_result or tracker_result.get("upload") is True:
-                    continue
-                normalized_tracker = str(tracker_name).replace(" ", "").upper().strip()
-                if normalized_tracker in {"MANUAL", "USENET"}:
-                    continue
-                tracker_type = tracker_class_map.get(normalized_tracker)
-                destination_type = "usenet_indexer" if tracker_type and getattr(tracker_type, "is_usenet", False) else "torrent_tracker"
-                result_message = str(tracker_result.get("status_message", "")).lower()
-                if tracker_result.get("dupe") or "dupe" in result_message or "duplicate" in result_message:
-                    skip_reason = "dupe"
-                elif "user" in result_message or "declin" in result_message:
-                    skip_reason = "user"
-                elif "unsupported" in result_message or "eligible" in result_message:
-                    skip_reason = "ineligible"
-                else:
-                    skip_reason = "rule"
-                await record_event_async("upload", service=normalized_tracker, operation=destination_type, outcome=f"skipped:{skip_reason}")
-            item_outcome = completed_item_outcome(completed_statuses)
-            item_bytes = max(0, int(meta.source_size or 0))
-            await record_event_async("item", operation="completed", outcome=item_outcome, bytes_count=item_bytes)
-            await record_release_profile_async(meta, item_outcome)
-            await record_media_profile_async(meta)
+            await record_completed_item_stats_async(meta, tracker_class_map)
             await write_meta_file(meta)
             _publish_webui_preview_target(cast(str, meta.path or ""), meta.uuid or None)
             await run_post_upload_hooks(meta, config)

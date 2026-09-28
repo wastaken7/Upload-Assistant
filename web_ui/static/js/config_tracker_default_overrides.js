@@ -37,7 +37,9 @@
     };
     const coerceFieldValue = (item, value) => {
       const valueType = typeof (
-        item.example_value ?? item.value ?? defaults[item.key]
+        item.example_value ??
+        item.value ??
+        defaults[item.key]
       );
       return valueType === "boolean"
         ? value === true || value === "true" || value === "True"

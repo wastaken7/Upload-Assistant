@@ -37,8 +37,13 @@ def test_stats_desktop_rail_has_shared_controls_without_desktop_switcher():
 
 def test_stats_filters_use_theme_aware_selects():
     stats_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
+    theme = (server.CODE_DIR / "web_ui" / "static" / "css" / "theme.css").read_text(encoding="utf-8")
 
-    assert stats_app.count('className="ua-theme-picker rounded-lg px-3 py-2 text-sm"') >= 2
+    assert 'className="ua-stats-control rounded-xl px-4 text-sm"' in stats_app
+    assert 'className="ua-theme-picker rounded-lg px-3 py-2 text-sm"' in stats_app
+    focus_styles = theme.split(".ua-stats-custom-summary:focus-visible {", 1)[1].split("}", 1)[0]
+    assert "outline: 2px solid var(--ua-copper-bright)" in focus_styles
+    assert "outline-offset: 2px" in focus_styles
 
 
 def test_stats_period_selector_is_segmented_and_remembered():
@@ -152,6 +157,7 @@ def test_stats_summary_cards_have_distinct_icons():
         "cache-hit-rate",
         "cache-writes",
         "daily-activity",
+        "upload-flow",
         "uploads-by-destination",
         "categories",
         "artifact-activity",
@@ -159,7 +165,6 @@ def test_stats_summary_cards_have_distinct_icons():
         "external-operations",
         "execution-source",
         "data-uploaded",
-        "average-item-size",
         "duplicates-prevented",
         "hashing-io-avoided",
         "activity-heatmap",
@@ -167,6 +172,7 @@ def test_stats_summary_cards_have_distinct_icons():
         "unique-data-uploaded",
         "streaming-services",
         "personal-releases",
+        "pioneering-rate",
     )
     icon_dir = server.CODE_DIR / "web_ui" / "static" / "img" / "stats-icons"
     for icon in icons:
@@ -189,7 +195,7 @@ def test_stats_ui_exposes_volume_profiles_comparisons_and_exports():
     assert "function ExportMenu" in stats_app
     assert 'aria-haspopup="menu"' in stats_app
     assert 'ref={menuRef} className="relative flex"' in stats_app
-    assert 'className="ua-theme-picker h-full rounded-lg px-3 py-2 text-sm disabled:opacity-40"' in stats_app
+    assert 'className="ua-stats-export-trigger h-full rounded-xl px-4 text-sm font-medium disabled:opacity-40"' in stats_app
     assert "CSV timeline" in stats_app
     assert "JSON details" in stats_app
     assert "ReliabilityBadge" in stats_app
@@ -228,7 +234,7 @@ def test_daily_activity_uses_curved_paths_without_changing_data_points():
     trend = stats_app.split("function TrendChart", 1)[1].split("function ActivityHeatmap", 1)[0]
     assert "const curvePath" in trend
     assert " C ${controlX},${previous.y} ${controlX},${current.y}" in trend
-    assert "d={curvePath(entry.key)}" in trend
+    assert "d={curvePath(entry)}" in trend
     assert "<polyline" not in trend
 
 
@@ -265,6 +271,51 @@ def test_stats_requests_cancel_stale_filters_and_report_reset_failures():
     assert 'setError("Unable to reset statistics")' in stats_app
 
 
+def test_stats_ui_exposes_advanced_ranges_tracker_filter_and_sankey():
+    stats_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
+
+    assert '["today", "Today"]' in stats_app
+    assert '["this_month", "This month"]' in stats_app
+    assert '["last_month", "Last month"]' in stats_app
+    assert 'query.set("from", customRange.from)' in stats_app
+    assert 'query.set("tracker", activeTracker)' in stats_app
+    assert 'aria-label="Clear tracker filter"' in stats_app
+    assert "function SankeyDiagram" in stats_app
+    assert 'aria-label="Upload route Sankey diagram"' in stats_app
+    assert "function MediaMatrix" in stats_app
+    assert "Resolution \u00d7 video/HDR profile" in stats_app
+    assert 'label="Pioneering rate"' in stats_app
+    assert 'label="Average item size"' not in stats_app
+
+
+def test_stats_summary_cards_have_distinct_visual_containers():
+    stats_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
+    theme = (server.CODE_DIR / "web_ui" / "static" / "css" / "theme.css").read_text(encoding="utf-8")
+
+    card_styles = theme.split(".ua-stats-summary-card {", 1)[1].split("}", 1)[0]
+    assert 'className="ua-stats-summary-card relative rounded-xl p-4 shadow-sm"' in stats_app
+    assert "border: 1px solid" in card_styles
+    assert "ua-stats-range-chip-icon" not in stats_app
+
+
+def test_donut_legend_rows_do_not_use_colored_backgrounds():
+    stats_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
+    donut = stats_app.split("function DonutChart", 1)[1].split("const Section", 1)[0]
+
+    assert "ua-stats-series-active" not in donut
+    assert 'activeLabel && activeLabel === segment.id ? "font-semibold"' in donut
+
+
+def test_daily_activity_can_switch_between_counts_and_volume():
+    stats_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
+    trend = stats_app.split("function TrendChart", 1)[1].split("function ActivityHeatmap", 1)[0]
+
+    assert 'key: "processed_bytes"' in trend
+    assert 'key: "uploaded_bytes"' in trend
+    assert '["count", "volume", "both"]' in trend
+    assert 'view === "both"' in trend
+
+
 def test_stats_api_validates_filters(monkeypatch):
     _authenticated(monkeypatch)
     response = server.app.test_client().get("/api/stats?range=invalid&mode=real")
@@ -278,6 +329,29 @@ def test_stats_api_accepts_one_year_range(monkeypatch):
 
     assert response.status_code == 200
     assert response.json["range"] == "1y"
+
+
+def test_stats_api_accepts_custom_utc_range_and_tracker(monkeypatch, tmp_path):
+    _authenticated(monkeypatch)
+    monkeypatch.setattr(server, "STATE_DIR", tmp_path)
+    monkeypatch.setattr(server, "_load_config_from_file", lambda _path: {"DEFAULT": {"stats_enabled": True}})
+    stats.configure_stats({"DEFAULT": {"stats_enabled": True}})
+    stats.record_event(
+        "upload",
+        service="FICTIONAL",
+        operation="torrent_tracker",
+        outcome="success",
+        destination="FICTIONAL",
+        state_dir=tmp_path,
+    )
+    today = stats.get_empty_stats("today")["period"]["to"]
+
+    response = server.app.test_client().get(f"/api/stats?range=custom&from={today}&to={today}&mode=real&tracker=FICTIONAL")
+
+    assert response.status_code == 200
+    assert response.json["filters"]["active_tracker"] == "FICTIONAL"
+    assert response.json["period"]["timezone"] == "UTC"
+    assert response.json["overview"]["items_completed"] == 1
 
 
 def test_stats_reset_requires_exact_confirmation(monkeypatch):

@@ -2,12 +2,16 @@ const { useEffect, useMemo, useRef, useState } = React;
 const APP_BASE = window.location.origin;
 const STATS_PERIOD_KEY = "ua_stats_period";
 const STATS_PERIODS = [
+  ["today", "Today"],
+  ["this_month", "This month"],
+  ["last_month", "Last month"],
   ["7d", "7d"],
   ["30d", "30d"],
   ["90d", "90d"],
   ["1y", "1y"],
   ["all", "All"],
 ];
+const TREND_VIEW_KEY = "ua_stats_trend_view";
 const CHART_COLORS = [
   "#3b82f6",
   "#22c55e",
@@ -48,6 +52,7 @@ const formatBytes = (value) => {
   );
   return `${(value / 1024 ** power).toFixed(power ? 1 : 0)} ${units[power]}`;
 };
+const isoTodayUtc = () => new Date().toISOString().slice(0, 10);
 const formatDimensionValue = (value) =>
   String(value || "Unknown").replaceAll("_", " ");
 const OPERATION_LABELS = {
@@ -369,7 +374,7 @@ const StatsIcon = ({ name, className = "h-5 w-5" }) => (
 );
 
 const MetricIcon = ({ type }) => (
-  <span className="flex h-8 w-8 flex-none items-center justify-center opacity-60">
+  <span className="ua-stats-metric-icon flex h-8 w-8 flex-none items-center justify-center">
     <StatsIcon name={type} className="h-5 w-5" />
   </span>
 );
@@ -392,6 +397,20 @@ const Card = ({ icon, label, value, detail, trend }) => (
       </p>
     )}
   </article>
+);
+
+const MetricGroup = ({ title, global = false, children }) => (
+  <section className="ua-stats-panel rounded-xl p-3 shadow-sm">
+    <h2 className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider opacity-65">
+      {title}
+      {global && (
+        <span className="rounded-full border px-2 py-0.5 normal-case tracking-normal">
+          Global
+        </span>
+      )}
+    </h2>
+    <div className="grid gap-3 sm:grid-cols-2">{children}</div>
+  </section>
 );
 
 function ExportMenu({ disabled, onCsv, onJson }) {
@@ -423,7 +442,7 @@ function ExportMenu({ disabled, onCsv, onJson }) {
         type="button"
         disabled={disabled}
         onClick={() => setOpen((current) => !current)}
-        className="ua-theme-picker h-full rounded-lg px-3 py-2 text-sm disabled:opacity-40"
+        className="ua-stats-export-trigger h-full rounded-xl px-4 text-sm font-medium disabled:opacity-40"
         aria-haspopup="menu"
         aria-expanded={open}
       >
@@ -457,12 +476,18 @@ function ExportMenu({ disabled, onCsv, onJson }) {
   );
 }
 
-function TrendChart({ rows }) {
+function TrendChart({ rows, trackerActive = false }) {
+  const [view, setView] = useState(() => {
+    const stored = window.UAStorage.get(TREND_VIEW_KEY);
+    return ["count", "volume", "both"].includes(stored) ? stored : "count";
+  });
   const [visible, setVisible] = useState({
     items: true,
     uploads: true,
     upload_errors: true,
     api: false,
+    processed_bytes: true,
+    uploaded_bytes: true,
   });
   const [hovered, setHovered] = useState(null);
   const width = 760,
@@ -471,29 +496,72 @@ function TrendChart({ rows }) {
   const plotWidth = width - plot.left - plot.right;
   const plotHeight = height - plot.top - plot.bottom;
   const series = [
-    { key: "items", label: "Items", color: "#8b5cf6" },
-    { key: "uploads", label: "Uploads", color: "#22c55e" },
-    { key: "upload_errors", label: "Upload errors", color: "#ef4444" },
-    { key: "api", label: "API operations", color: "#f59e0b" },
+    { key: "items", label: "Items", color: "#8b5cf6", kind: "count" },
+    { key: "uploads", label: "Uploads", color: "#22c55e", kind: "count" },
+    {
+      key: "upload_errors",
+      label: "Upload errors",
+      color: "#ef4444",
+      kind: "count",
+    },
+    {
+      key: "api",
+      label: trackerActive ? "API operations (global)" : "API operations",
+      color: "#f59e0b",
+      kind: "count",
+    },
+    {
+      key: "processed_bytes",
+      label: "Processed volume",
+      color: "#06b6d4",
+      kind: "volume",
+    },
+    {
+      key: "uploaded_bytes",
+      label: "Uploaded volume",
+      color: "#14b8a6",
+      kind: "volume",
+    },
   ];
-  const activeSeries = series.filter((entry) => visible[entry.key]);
-  const maximum = Math.max(
+  const viewSeries = series.filter(
+    (entry) => view === "both" || entry.kind === view,
+  );
+  const activeSeries = viewSeries.filter((entry) => visible[entry.key]);
+  const countMaximum = Math.max(
     1,
-    ...rows.flatMap((row) => activeSeries.map((entry) => row[entry.key] || 0)),
+    ...rows.flatMap((row) =>
+      activeSeries
+        .filter((entry) => entry.kind === "count")
+        .map((entry) => row[entry.key] || 0),
+    ),
+  );
+  const byteMaximum = Math.max(
+    1,
+    ...rows.flatMap((row) =>
+      activeSeries
+        .filter((entry) => entry.kind === "volume")
+        .map((entry) => row[entry.key] || 0),
+    ),
   );
   const xFor = (index) =>
     rows.length <= 1
       ? width / 2
       : plot.left + (index * plotWidth) / (rows.length - 1);
-  const yForValue = (value) => plot.top + (1 - value / maximum) * plotHeight;
-  const yFor = (key, row) => yForValue(row[key] || 0);
-  const yStepCount = Math.min(4, maximum);
+  const scaleMaximum = view === "volume" ? byteMaximum : countMaximum;
+  const yForValue = (value, kind = "count") =>
+    plot.top +
+    (1 - value / (kind === "volume" ? byteMaximum : countMaximum)) * plotHeight;
+  const yFor = (entry, row) => yForValue(row[entry.key] || 0, entry.kind);
+  const yStepCount = Math.min(4, scaleMaximum);
   const yTicks = Array.from(
     new Set(
       Array.from({ length: yStepCount + 1 }, (_, index) =>
-        Math.round((maximum * index) / yStepCount),
+        Math.round((scaleMaximum * index) / yStepCount),
       ),
     ),
+  );
+  const byteTicks = Array.from({ length: 5 }, (_, index) =>
+    Math.round((byteMaximum * index) / 4),
   );
   const xTickCount = Math.min(7, rows.length);
   const xTickIndices = Array.from(
@@ -511,10 +579,10 @@ function TrendChart({ rows }) {
       ...(rows.length > 365 ? { year: "2-digit" } : { day: "numeric" }),
       timeZone: "UTC",
     });
-  const curvePath = (key) => {
+  const curvePath = (entry) => {
     const coordinates = rows.map((row, index) => ({
       x: xFor(index),
-      y: yFor(key, row),
+      y: yFor(entry, row),
     }));
     if (!coordinates.length) return "";
     return coordinates.slice(1).reduce((path, current, index) => {
@@ -544,24 +612,41 @@ function TrendChart({ rows }) {
               <line
                 x1={plot.left}
                 x2={width - plot.right}
-                y1={yForValue(value)}
-                y2={yForValue(value)}
+                y1={yForValue(value, view === "volume" ? "volume" : "count")}
+                y2={yForValue(value, view === "volume" ? "volume" : "count")}
                 stroke="currentColor"
                 opacity="0.12"
               />
               <text
                 x={plot.left - 8}
-                y={yForValue(value)}
+                y={yForValue(value, view === "volume" ? "volume" : "count")}
                 fill="currentColor"
                 fontSize="10"
                 textAnchor="end"
                 dominantBaseline="middle"
                 opacity="0.65"
               >
-                {formatCompactNumber(value)}
+                {view === "volume"
+                  ? formatBytes(value)
+                  : formatCompactNumber(value)}
               </text>
             </React.Fragment>
           ))}
+          {view === "both" &&
+            byteTicks.map((value) => (
+              <text
+                key={`bytes-${value}`}
+                x={width - plot.right + 8}
+                y={yForValue(value, "volume")}
+                fill="currentColor"
+                fontSize="10"
+                textAnchor="start"
+                dominantBaseline="middle"
+                opacity="0.65"
+              >
+                {formatBytes(value)}
+              </text>
+            ))}
           <line
             x1={plot.left}
             x2={plot.left}
@@ -600,7 +685,7 @@ function TrendChart({ rows }) {
           {activeSeries.map((entry) => (
             <path
               key={entry.key}
-              d={curvePath(entry.key)}
+              d={curvePath(entry)}
               fill="none"
               stroke={entry.color}
               strokeWidth="3"
@@ -641,18 +726,42 @@ function TrendChart({ rows }) {
             }}
           >
             <p className="font-semibold">
-              {new Date(`${rows[hovered].date}T00:00:00`).toLocaleDateString()}
+              {new Date(`${rows[hovered].date}T00:00:00Z`).toLocaleDateString(
+                undefined,
+                { timeZone: "UTC" },
+              )}
             </p>
             <p className="mt-1">{formatNumber(rows[hovered].items)} items</p>
             <p>{formatNumber(rows[hovered].uploads)} uploads</p>
             <p>{formatNumber(rows[hovered].upload_errors)} upload errors</p>
             <p>{formatBytes(rows[hovered].uploaded_bytes)} uploaded</p>
+            <p>{formatBytes(rows[hovered].processed_bytes)} processed</p>
             <p>{formatNumber(rows[hovered].api)} API operations</p>
           </div>
         )}
       </div>
-      <div className="flex flex-wrap justify-center gap-2 text-xs">
-        {series.map((entry) => (
+      <div className="mt-2 flex flex-wrap justify-center gap-2 text-xs">
+        {["count", "volume", "both"].map((value) => (
+          <button
+            key={value}
+            type="button"
+            aria-pressed={view === value}
+            className={`rounded-lg px-3 py-1.5 ${view === value ? "ua-stats-series-active" : "opacity-55"}`}
+            onClick={() => {
+              setView(value);
+              window.UAStorage.set(TREND_VIEW_KEY, value);
+            }}
+          >
+            {value === "count"
+              ? "Count"
+              : value === "volume"
+                ? "Volume"
+                : "Both"}
+          </button>
+        ))}
+      </div>
+      <div className="mt-2 flex flex-wrap justify-center gap-2 text-xs">
+        {viewSeries.map((entry) => (
           <button
             key={entry.key}
             type="button"
@@ -765,6 +874,7 @@ function ActivityHeatmap({ rows }) {
         </div>
         <div
           className="grid w-full grid-flow-col grid-rows-7 gap-[2px] sm:gap-1"
+          style={columnStyle}
           role="img"
           aria-label="Activity during the last 52 weeks"
         >
@@ -825,6 +935,113 @@ const ReliabilityBadge = ({ rate, attempts }) => {
     </span>
   );
 };
+
+function SankeyDiagram({ sankey }) {
+  const nodes = sankey?.nodes || [];
+  const links = sankey?.links || [];
+  const root = nodes.find((node) => node.kind === "root");
+  const trackers = nodes.filter((node) => node.kind === "tracker");
+  const outcomes = nodes.filter((node) => node.kind === "outcome");
+  if (!root || !links.length)
+    return (
+      <p className="py-8 text-center text-sm opacity-60">
+        No upload routes in this period.
+      </p>
+    );
+  const height = Math.max(240, trackers.length * 52 + 40);
+  const trackerY = new Map(
+    trackers.map((node, index) => [
+      node.id,
+      ((index + 1) * height) / (trackers.length + 1),
+    ]),
+  );
+  const outcomeY = new Map(
+    outcomes.map((node, index) => [
+      node.id,
+      ((index + 1) * height) / (outcomes.length + 1),
+    ]),
+  );
+  const maximum = Math.max(1, ...links.map((link) => link.value));
+  const nodeById = new Map(nodes.map((node) => [node.id, node]));
+  const pointFor = (id) => {
+    if (id === "routes") return { x: 92, y: height / 2 };
+    if (id.startsWith("tracker:")) return { x: 380, y: trackerY.get(id) };
+    return { x: 680, y: outcomeY.get(id) };
+  };
+  return (
+    <div>
+      <div className="overflow-x-auto">
+        <svg
+          viewBox={`0 0 760 ${height}`}
+          className="min-w-[700px]"
+          role="img"
+          aria-label="Upload route Sankey diagram"
+        >
+          {links.map((link, index) => {
+            const source = pointFor(link.source);
+            const target = pointFor(link.target);
+            const bend = (source.x + target.x) / 2;
+            return (
+              <path
+                key={`${link.source}:${link.target}:${index}`}
+                d={`M ${source.x},${source.y} C ${bend},${source.y} ${bend},${target.y} ${target.x},${target.y}`}
+                fill="none"
+                stroke={link.source === "routes" ? "#8b5cf6" : "#22c55e"}
+                strokeOpacity="0.35"
+                strokeWidth={Math.max(2, (link.value / maximum) * 28)}
+              >
+                <title>{`${nodeById.get(link.source)?.label} → ${nodeById.get(link.target)?.label}: ${formatNumber(link.value)}`}</title>
+              </path>
+            );
+          })}
+          {nodes.map((node) => {
+            const point = pointFor(node.id);
+            return (
+              <g key={node.id} transform={`translate(${point.x}, ${point.y})`}>
+                <rect
+                  x="-72"
+                  y="-16"
+                  width="144"
+                  height="32"
+                  rx="8"
+                  fill="var(--ua-config-surface-raised)"
+                  stroke="currentColor"
+                  strokeOpacity="0.2"
+                />
+                <text
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  fill="currentColor"
+                  fontSize="11"
+                >
+                  {node.label} · {formatNumber(node.total)}
+                </text>
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+      <details className="ua-stats-table-details mt-4">
+        <summary className="cursor-pointer text-sm font-medium">
+          Accessible route table
+        </summary>
+        <Table
+          rows={links.map((link, index) => ({
+            key: `${link.source}:${link.target}:${index}`,
+            source: nodeById.get(link.source)?.label,
+            target: nodeById.get(link.target)?.label,
+            value: link.value,
+          }))}
+          headers={[
+            { label: "From", key: "source" },
+            { label: "To", key: "target" },
+            { label: "Routes", key: "value" },
+          ]}
+        />
+      </details>
+    </div>
+  );
+}
 
 function MediaProfile({ media, category, onCategoryChange }) {
   const rows = (media?.dimensions || []).filter(
@@ -902,6 +1119,68 @@ function MediaProfile({ media, category, onCategoryChange }) {
           />
         }
       />
+      <MediaMatrix rows={media.matrix || []} category={category} />
+    </div>
+  );
+}
+
+function MediaMatrix({ rows, category }) {
+  const filtered = rows.filter((row) => row.category === category);
+  if (!filtered.length) return null;
+  const resolutions = [...new Set(filtered.map((row) => row.resolution))];
+  const profiles = [...new Set(filtered.map((row) => row.profile))];
+  const maximum = Math.max(...filtered.map((row) => row.count), 1);
+  const byCell = new Map(
+    filtered.map((row) => [`${row.resolution}\u0000${row.profile}`, row]),
+  );
+  return (
+    <div className="mt-5">
+      <h3 className="mb-2 text-sm font-semibold">
+        Resolution × video/HDR profile
+      </h3>
+      <div className="ua-stats-table-scroll overflow-x-auto">
+        <table className="ua-stats-table w-full text-left text-xs">
+          <thead>
+            <tr>
+              <th className="px-2 py-2">Resolution</th>
+              {profiles.map((profile) => (
+                <th className="min-w-32 px-2 py-2" key={profile}>
+                  {formatDimensionValue(profile)}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {resolutions.map((resolution) => (
+              <tr key={resolution}>
+                <th className="px-2 py-2">{resolution}</th>
+                {profiles.map((profile) => {
+                  const cell = byCell.get(`${resolution}\u0000${profile}`);
+                  const opacity = cell
+                    ? 0.15 + (cell.count / maximum) * 0.75
+                    : 0;
+                  return (
+                    <td
+                      key={profile}
+                      className="px-2 py-3 text-center tabular-nums"
+                      style={{
+                        backgroundColor: `rgba(59, 130, 246, ${opacity})`,
+                      }}
+                      title={
+                        cell
+                          ? `${formatNumber(cell.count)} items · ${formatBytes(cell.bytes)}`
+                          : "No items"
+                      }
+                    >
+                      {cell ? formatNumber(cell.count) : "—"}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -999,12 +1278,13 @@ function ReleaseProfiles({ releaseProfiles }) {
   );
 }
 
-function DonutChart({ rows, ariaLabel }) {
+function DonutChart({ rows, ariaLabel, onSelect, activeLabel = "" }) {
   const normalizedRows = rows
     .map((row) => ({
       label: String(row.label || "Unknown"),
       value: Math.max(0, Number(row.value) || 0),
       favicon: row.favicon || "",
+      id: row.id || "",
     }))
     .filter((row) => row.value > 0)
     .sort((left, right) => right.value - left.value);
@@ -1056,6 +1336,9 @@ function DonutChart({ rows, ariaLabel }) {
               strokeDashoffset={-segment.offset}
               strokeLinecap="butt"
               transform="rotate(-90 21 21)"
+              className={onSelect && segment.id ? "cursor-pointer" : ""}
+              opacity={activeLabel && activeLabel !== segment.id ? "0.3" : "1"}
+              onClick={() => segment.id && onSelect?.(segment.id)}
             />
           ))}
         </svg>
@@ -1068,7 +1351,16 @@ function DonutChart({ rows, ariaLabel }) {
         {segments.map((segment) => (
           <li
             key={segment.label}
-            className="flex min-w-0 items-center justify-between gap-3"
+            className={`flex min-w-0 items-center justify-between gap-3 px-1 ${onSelect && segment.id ? "cursor-pointer" : ""} ${activeLabel && activeLabel === segment.id ? "font-semibold" : ""}`}
+            role={onSelect && segment.id ? "button" : undefined}
+            tabIndex={onSelect && segment.id ? 0 : undefined}
+            onClick={() => segment.id && onSelect?.(segment.id)}
+            onKeyDown={(event) => {
+              if (onSelect && (event.key === "Enter" || event.key === " ")) {
+                event.preventDefault();
+                onSelect(segment.id);
+              }
+            }}
           >
             <span className="flex min-w-0 items-center gap-2">
               <span
@@ -1128,7 +1420,13 @@ const ChartWithTable = ({ chart, table }) => (
   </>
 );
 
-function Table({ headers, rows, empty = "No data in this period." }) {
+function Table({
+  headers,
+  rows,
+  empty = "No data in this period.",
+  onRowClick,
+  activeKey = "",
+}) {
   const [sort, setSort] = useState({ label: "", direction: "ascending" });
   const sortedRows = useMemo(() => {
     if (!sort.label) return rows;
@@ -1202,7 +1500,21 @@ function Table({ headers, rows, empty = "No data in this period." }) {
         </thead>
         <tbody>
           {sortedRows.map((row, index) => (
-            <tr key={row.key || index}>
+            <tr
+              key={row.key || index}
+              className={`${onRowClick ? "cursor-pointer" : ""} ${activeKey && activeKey === row.key ? "ua-stats-series-active" : ""}`}
+              tabIndex={onRowClick ? 0 : undefined}
+              onClick={() => onRowClick?.(row)}
+              onKeyDown={(event) => {
+                if (
+                  onRowClick &&
+                  (event.key === "Enter" || event.key === " ")
+                ) {
+                  event.preventDefault();
+                  onRowClick(row);
+                }
+              }}
+            >
               {headers.map((header) => (
                 <td className="px-2 py-2.5" key={header.label}>
                   {header.render ? header.render(row) : row[header.key]}
@@ -1222,6 +1534,13 @@ function StatsApp() {
     return STATS_PERIODS.some(([value]) => value === stored) ? stored : "30d";
   });
   const [mode, setMode] = useState("real");
+  const [customFrom, setCustomFrom] = useState(isoTodayUtc);
+  const [customTo, setCustomTo] = useState(isoTodayUtc);
+  const [customRange, setCustomRange] = useState(() => ({
+    from: isoTodayUtc(),
+    to: isoTodayUtc(),
+  }));
+  const [activeTracker, setActiveTracker] = useState("");
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -1248,8 +1567,14 @@ function StatsApp() {
     setLoading(true);
     setError("");
     try {
+      const query = new URLSearchParams({ range: period, mode });
+      if (period === "custom") {
+        query.set("from", customRange.from);
+        query.set("to", customRange.to);
+      }
+      if (activeTracker) query.set("tracker", activeTracker);
       const response = await fetch(
-        `${APP_BASE}/api/stats?range=${period}&mode=${mode}`,
+        `${APP_BASE}/api/stats?${query.toString()}`,
         {
           headers: { "X-CSRF-Token": window.UA_CSRF_TOKEN },
           signal,
@@ -1270,7 +1595,7 @@ function StatsApp() {
     const controller = new AbortController();
     load(controller.signal);
     return () => controller.abort();
-  }, [period, mode]);
+  }, [period, mode, customRange, activeTracker]);
   useEffect(() => {
     const categories = data?.media?.categories || [];
     if (!categories.includes(mediaCategory))
@@ -1302,6 +1627,13 @@ function StatsApp() {
   };
 
   const overview = data?.overview || {};
+  const activeTrackerRow = (data?.filters?.destinations || []).find(
+    (row) => row.destination === activeTracker,
+  );
+  const toggleTracker = (destination) =>
+    setActiveTracker((current) =>
+      current === destination ? "" : destination || "",
+    );
   const statsEnabled = data?.enabled !== false;
   const artifactMap = useMemo(
     () =>
@@ -1322,7 +1654,7 @@ function StatsApp() {
       data.artifacts.length);
   const exportJson = () =>
     downloadText(
-      `upload-assistant-stats-${period}-${mode}.json`,
+      `upload-assistant-stats-${period}-${mode}${activeTracker ? `-${activeTracker}` : ""}.json`,
       JSON.stringify(data, null, 2),
       "application/json",
     );
@@ -1345,7 +1677,7 @@ function StatsApp() {
       ),
     ];
     downloadText(
-      `upload-assistant-stats-${period}-${mode}.csv`,
+      `upload-assistant-stats-${period}-${mode}${activeTracker ? `-${activeTracker}` : ""}.csv`,
       lines.join("\n"),
       "text/csv;charset=utf-8",
     );
@@ -1384,18 +1716,18 @@ function StatsApp() {
           }
         }}
       />
-      <main className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">
-        <header className="flex flex-col gap-4 border-b pb-5 sm:flex-row sm:items-end sm:justify-between">
-          <div>
+      <main className="mx-auto max-w-[1680px] p-4 sm:p-6 lg:p-8">
+        <header className="ua-stats-header flex flex-col gap-5 border-b pb-6 xl:flex-row xl:items-center xl:justify-between">
+          <div className="ua-stats-heading shrink-0">
             <p className="text-xs font-semibold uppercase tracking-widest opacity-60">
               Upload Assistant
             </p>
             <h1 className="mt-1 text-2xl font-bold">Statistics</h1>
             <p className="mt-1 text-sm opacity-60">Local daily aggregates.</p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="ua-stats-toolbar flex flex-wrap items-stretch gap-2">
             <div
-              className="flex items-center gap-1"
+              className="ua-stats-period-group flex flex-wrap items-center rounded-xl p-1"
               role="group"
               aria-label="Statistics period"
             >
@@ -1405,20 +1737,71 @@ function StatsApp() {
                   type="button"
                   onClick={() => setPeriod(value)}
                   aria-pressed={period === value}
-                  className={`rounded-lg px-3 py-2 text-sm transition-colors ${
+                  className={`ua-stats-period-button rounded-lg px-3 text-sm transition-colors ${
                     period === value
-                      ? "bg-[var(--ua-config-surface-raised)] font-semibold shadow-sm"
-                      : "opacity-55 hover:opacity-100"
+                      ? "ua-stats-period-button-active font-semibold shadow-sm"
+                      : "opacity-65 hover:opacity-100"
                   }`}
                 >
                   {label}
                 </button>
               ))}
+              <details className="ua-stats-custom-dates relative">
+                <summary
+                  className={`ua-stats-custom-summary flex h-full cursor-pointer list-none items-center gap-2 rounded-lg px-3 text-sm ${period === "custom" ? "ua-stats-period-button-active font-semibold shadow-sm" : ""}`}
+                >
+                  <svg
+                    aria-hidden="true"
+                    viewBox="0 0 24 24"
+                    className="h-4 w-4"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                  >
+                    <path d="M7 2v3M17 2v3M3.5 9h17M5 4h14a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" />
+                    <path d="M7 13h3M14 13h3M7 17h3M14 17h3" />
+                  </svg>
+                  Custom dates
+                </summary>
+                <div className="ua-stats-chart-tooltip absolute right-0 z-20 mt-3 grid min-w-64 gap-3 rounded-lg p-3 shadow-xl">
+                  <label className="grid gap-1 text-xs">
+                    <span>From (UTC)</span>
+                    <input
+                      type="date"
+                      value={customFrom}
+                      max={customTo}
+                      onChange={(event) => setCustomFrom(event.target.value)}
+                      className="ua-theme-picker rounded-lg px-3 py-2"
+                    />
+                  </label>
+                  <label className="grid gap-1 text-xs">
+                    <span>To (UTC)</span>
+                    <input
+                      type="date"
+                      value={customTo}
+                      min={customFrom}
+                      max={isoTodayUtc()}
+                      onChange={(event) => setCustomTo(event.target.value)}
+                      className="ua-theme-picker rounded-lg px-3 py-2"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    className="rounded-lg bg-blue-600 px-3 py-2 text-sm text-white"
+                    onClick={() => {
+                      setCustomRange({ from: customFrom, to: customTo });
+                      setPeriod("custom");
+                    }}
+                  >
+                    Apply range
+                  </button>
+                </div>
+              </details>
             </div>
             <select
               value={mode}
               onChange={(event) => setMode(event.target.value)}
-              className="ua-theme-picker rounded-lg px-3 py-2 text-sm"
+              className="ua-stats-control rounded-xl px-4 text-sm"
               aria-label="Statistics mode"
             >
               <option value="real">Real activity</option>
@@ -1432,12 +1815,27 @@ function StatsApp() {
             <button
               type="button"
               onClick={() => setResetOpen(true)}
-              className="rounded-lg border border-red-500 px-3 py-2 text-sm text-red-500"
+              className="ua-stats-reset rounded-xl px-4 text-sm font-medium"
             >
               Reset
             </button>
           </div>
         </header>
+        <div className="mt-5 flex flex-wrap items-center gap-2 text-xs">
+          <span className="ua-stats-range-chip inline-flex items-center rounded-full px-4 py-2">
+            UTC: {data?.period?.from || "first event"} → {data?.period?.to}
+          </span>
+          {activeTracker && (
+            <button
+              type="button"
+              className="ua-stats-series-active rounded-full px-3 py-1"
+              onClick={() => setActiveTracker("")}
+              aria-label="Clear tracker filter"
+            >
+              {activeTrackerRow?.display_name || activeTracker} ×
+            </button>
+          )}
+        </div>
         {error && (
           <div
             role="alert"
@@ -1468,92 +1866,113 @@ function StatsApp() {
                   </p>
                 </div>
               )}
-              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                <Card
-                  icon="items-completed"
-                  label="Items completed"
-                  value={formatNumber(overview.items_completed)}
-                  detail={`${formatNumber(data.items.success)} with upload · ${formatNumber(data.items.no_upload)} without upload · ${formatNumber(data.items.error)} errors`}
-                  trend={formatTrend(data.comparison?.items_completed_pct)}
-                />
-                <Card
-                  icon="successful-uploads"
-                  label="Successful uploads"
-                  value={formatNumber(overview.uploads)}
-                  detail={`${overview.upload_success_rate || 0}% of ${formatNumber(overview.upload_attempts)} attempts`}
-                  trend={formatTrend(data.comparison?.uploads_pct)}
-                />
-                <Card
-                  icon="torrents-created"
-                  label="Torrents created"
-                  value={formatNumber(overview.torrents_created)}
-                  detail={`${formatNumber(artifactMap["torrent:reused"])} reused`}
-                />
-                <Card
-                  icon="nzbs-created"
-                  label="NZBs created"
-                  value={formatNumber(overview.nzbs_created)}
-                  detail={`${formatNumber(artifactMap["nzb:reused"])} reused`}
-                />
-                <Card
-                  icon="api-operations"
-                  label="API operations"
-                  value={formatNumber(overview.api_operations)}
-                  detail={`${formatNumber(data.api.errors)} errors`}
-                />
-                <Card
-                  icon="cache-hit-rate"
-                  label="Cache hit rate"
-                  value={`${overview.cache_hit_rate || 0}%`}
-                  detail={`${formatNumber(data.cache.hits)} hits · ${formatNumber(data.cache.misses)} misses`}
-                  trend={formatTrend(
-                    data.comparison?.cache_hit_rate_delta,
-                    " pts",
-                  )}
-                />
-                <Card
-                  icon="cache-writes"
-                  label="Cache writes"
-                  value={formatNumber(data.cache.writes)}
-                  detail={`${formatBytes(data.cache.bytes_written)} written since collection began`}
-                />
-                <Card
-                  icon="hashing-io-avoided"
-                  label="Hashing I/O avoided"
-                  value={formatBytes(overview.hashing_bytes_avoided)}
-                  detail="Media volume covered by reused base torrents"
-                />
-                <Card
-                  icon="data-uploaded"
-                  label="Data uploaded"
-                  value={formatBytes(overview.uploaded_bytes)}
-                  detail="Successful destination uploads"
-                />
-                <Card
-                  icon="unique-data-uploaded"
-                  label="Unique data uploaded"
-                  value={formatBytes(overview.unique_uploaded_bytes)}
-                  detail="Each successfully uploaded item counted once"
-                />
-                <Card
-                  icon="average-item-size"
-                  label="Average item size"
-                  value={formatBytes(overview.average_item_bytes)}
-                  detail={`${formatBytes(overview.processed_bytes)} processed`}
-                />
-                <Card
-                  icon="duplicates-prevented"
-                  label="Duplicates prevented"
-                  value={formatNumber(overview.duplicate_preventions)}
-                  detail={`${overview.pioneering_rate || 0}% pioneering rate`}
-                />
+              <div className="grid gap-4 xl:grid-cols-2">
+                <MetricGroup title="Throughput & scale">
+                  <Card
+                    icon="items-completed"
+                    label="Items completed"
+                    value={formatNumber(overview.items_completed)}
+                    detail={`${formatNumber(data.items.success)} with upload · ${formatNumber(data.items.no_upload)} without upload · ${formatNumber(data.items.error)} errors`}
+                    trend={formatTrend(data.comparison?.items_completed_pct)}
+                  />
+                  <Card
+                    icon="successful-uploads"
+                    label="Successful uploads"
+                    value={formatNumber(overview.uploads)}
+                    detail={`${overview.upload_success_rate || 0}% of ${formatNumber(overview.upload_attempts)} attempts`}
+                    trend={formatTrend(data.comparison?.uploads_pct)}
+                  />
+                  <Card
+                    icon="data-uploaded"
+                    label="Data uploaded"
+                    value={formatBytes(overview.uploaded_bytes)}
+                    detail="Successful destination uploads"
+                  />
+                  <Card
+                    icon="unique-data-uploaded"
+                    label="Unique data uploaded"
+                    value={formatBytes(overview.unique_uploaded_bytes)}
+                    detail="Each successful item counted once"
+                  />
+                </MetricGroup>
+                <MetricGroup title="Efficiency & intelligence">
+                  <Card
+                    icon="duplicates-prevented"
+                    label="Duplicates prevented"
+                    value={formatNumber(overview.duplicate_preventions)}
+                    detail="Routes stopped before upload"
+                  />
+                  <Card
+                    icon="pioneering-rate"
+                    label="Pioneering rate"
+                    value={`${overview.pioneering_rate || 0}%`}
+                    detail="Uploads ÷ uploads plus duplicates"
+                  />
+                  <Card
+                    icon="hashing-io-avoided"
+                    label="Hashing I/O avoided"
+                    value={formatBytes(overview.hashing_bytes_avoided)}
+                    detail="Media volume covered by reused base torrents"
+                  />
+                </MetricGroup>
+                <MetricGroup
+                  title="Health & infrastructure"
+                  global={Boolean(activeTracker)}
+                >
+                  <Card
+                    icon="cache-hit-rate"
+                    label="Cache hit rate"
+                    value={`${overview.cache_hit_rate || 0}%`}
+                    detail={`${formatNumber(data.cache.hits)} hits · ${formatNumber(data.cache.misses)} misses`}
+                    trend={formatTrend(
+                      data.comparison?.cache_hit_rate_delta,
+                      " pts",
+                    )}
+                  />
+                  <Card
+                    icon="cache-writes"
+                    label="Cache writes"
+                    value={formatNumber(data.cache.writes)}
+                    detail={`${formatBytes(data.cache.bytes_written)} written since collection began`}
+                  />
+                  <Card
+                    icon="api-operations"
+                    label="API operations"
+                    value={formatNumber(overview.api_operations)}
+                    detail={`${formatNumber(data.api.errors)} errors`}
+                  />
+                </MetricGroup>
+                <MetricGroup title="Generated artifacts">
+                  <Card
+                    icon="torrents-created"
+                    label="Torrents created"
+                    value={formatNumber(overview.torrents_created)}
+                    detail={`${formatNumber(artifactMap["torrent:reused"])} reused`}
+                  />
+                  <Card
+                    icon="nzbs-created"
+                    label="NZBs created"
+                    value={formatNumber(overview.nzbs_created)}
+                    detail={`${formatNumber(artifactMap["nzb:reused"])} reused`}
+                  />
+                </MetricGroup>
               </div>
               <Section
                 icon="daily-activity"
                 title="Daily activity"
                 subtitle="The three lines are separate measures and are not intended to be added together."
               >
-                <TrendChart rows={data.timeline} />
+                <TrendChart
+                  rows={data.timeline}
+                  trackerActive={Boolean(activeTracker)}
+                />
+              </Section>
+              <Section
+                icon="upload-flow"
+                title="Upload flow"
+                subtitle="Each unit is one processed item × target tracker route."
+              >
+                <SankeyDiagram sankey={data.sankey} />
               </Section>
               <Section
                 icon="activity-heatmap"
@@ -1575,7 +1994,10 @@ function StatsApp() {
                         label: row.display_name || row.destination,
                         value: row.successes + row.errors + row.skipped,
                         favicon: row.destination,
+                        id: row.destination,
                       }))}
+                      activeLabel={activeTracker}
+                      onSelect={toggleTracker}
                     />
                   }
                   table={
@@ -1629,6 +2051,11 @@ function StatsApp() {
                           render: (r) => `${r.success_rate}%`,
                         },
                         {
+                          label: "Pioneering",
+                          sortValue: (r) => r.pioneering_rate,
+                          render: (r) => `${r.pioneering_rate}%`,
+                        },
+                        {
                           label: "Health",
                           sortValue: (r) => r.success_rate,
                           render: (r) => (
@@ -1649,6 +2076,12 @@ function StatsApp() {
                           render: (r) => formatBytes(r.bytes),
                         },
                       ]}
+                      activeKey={
+                        activeTracker
+                          ? `${activeTracker}:${data.uploads.by_destination.find((row) => row.destination === activeTracker)?.type || ""}`
+                          : ""
+                      }
+                      onRowClick={(row) => toggleTracker(row.destination)}
                     />
                   }
                 />
@@ -1749,7 +2182,15 @@ function StatsApp() {
                   <ReleaseProfiles releaseProfiles={data.release_profiles} />
                 </Section>
               </div>
-              <Section icon="cache-by-provider" title="Cache by provider">
+              <Section
+                icon="cache-by-provider"
+                title="Cache by provider"
+                subtitle={
+                  activeTracker
+                    ? "Global · not affected by the tracker filter."
+                    : ""
+                }
+              >
                 <ChartWithTable
                   chart={
                     <DonutChart
@@ -1788,7 +2229,7 @@ function StatsApp() {
               <Section
                 icon="external-operations"
                 title="External operations"
-                subtitle="Logical adapter operations; internal redirects and retries are not counted separately. Bytes sent are available for NNTP and successful image uploads."
+                subtitle={`${activeTracker ? "Global · not affected by the tracker filter. " : ""}Logical adapter operations; internal redirects and retries are not counted separately. Bytes sent are available for NNTP and successful image uploads.`}
               >
                 <ChartWithTable
                   chart={
