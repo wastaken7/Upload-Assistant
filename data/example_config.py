@@ -2849,6 +2849,10 @@ config: dict[str, Any] = {
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
             "use_for_search": False,
             "api_key": "",
+            # API key for the tracker-only image host at https://img.samaritano.cc/
+            "image_host_api_key": "",
+            # Rehost this tracker's images on img.samaritano.cc. Failures keep the default image host.
+            "force_rehost_images": False,
             "anon": True,
             # Set this to True if you want to allow external subtitles to be included in the upload
             "allow_ext_subtitles": True,
