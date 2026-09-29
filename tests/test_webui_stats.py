@@ -171,7 +171,7 @@ def test_external_operation_bytes_distinguish_unknown_from_zero():
 
     assert 'label: "Bytes sent"' in stats_app
     assert 'r.bytes > 0 ? formatBytes(r.bytes) : "—"' in stats_app
-    assert "Bytes sent are available for NNTP and successful image uploads." in stats_app
+    assert "Bytes sent are shown for NNTP and successful image uploads." in stats_app
 
 
 def test_stats_operations_use_friendly_labels_with_a_readable_fallback():
@@ -267,7 +267,7 @@ def test_stats_ui_exposes_volume_profiles_comparisons_and_actions():
     assert 'title="Personal releases"' in stats_app
     assert "function StreamingServices" in stats_app
     assert "function ReleaseProfiles" in stats_app
-    assert "release groups and tags are never stored" in stats_app
+    assert "Release group names and tags are not saved." in stats_app
 
 
 def test_stats_generated_artifacts_combines_screenshot_types():

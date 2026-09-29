@@ -93,6 +93,9 @@ def media_profile_dimensions(meta: Any) -> list[tuple[str, str]]:
         add("media", getattr(meta, "music_media", "") or getattr(meta, "source", ""))
         add("audio_codec", _audio_codec_bucket(getattr(meta, "audio", "") or getattr(meta, "type", "")))
     elif category == "BOOK":
+        streaming_service = getattr(meta, "service_longname", "") or getattr(meta, "service", "")
+        if streaming_service:
+            add("streaming_service", streaming_service)
         kind = (
             "audiobook"
             if getattr(meta, "audiobook", False)
