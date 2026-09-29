@@ -97,14 +97,28 @@ class SceneManager:
             response = await self._cached_srrdb_request(
                 client, f"https://api.srrdb.com/v1/search/store-real-filename:{quoted_name}", cache_dir / f"{quoted_name}.json",
             )
-            if not response or response.get("warnings"):
+            if response is None or response.get("warnings"):
                 continue
-            candidates = response.get("results", [])
+            candidates = response.get("results")
+            count = response.get("resultsCount")
+            if isinstance(count, bool) or not isinstance(count, (int, str)):
+                return None
+            try:
+                count = int(count)
+            except ValueError:
+                return None
+            if not isinstance(candidates, list) or any(
+                not isinstance(candidate, dict)
+                or not isinstance(candidate.get("release"), str)
+                or not candidate["release"].strip()
+                for candidate in candidates
+            ):
+                return None
+            # Do not guess from truncated results or fan out over broad searches.
+            if count != len(candidates) or len(candidates) > 10:
+                return None
             if not candidates:
                 continue
-            # Do not guess from truncated results or fan out over broad searches.
-            if int(response.get("resultsCount", 0)) != len(candidates) or len(candidates) > 10:
-                return None
 
             matches = {}
             for candidate in candidates:

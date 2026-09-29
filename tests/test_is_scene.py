@@ -107,13 +107,14 @@ class _RoutedClient(_FakeAsyncClient):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("cached_miss", [False, True])
+@pytest.mark.parametrize("count", [1, "1"])
 async def test_archived_filename_fallback_restores_release_and_reuses_cache(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, cached_miss: bool,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, cached_miss: bool, count: int | str,
 ) -> None:
     nfo_url = f"https://www.srrdb.com/download/file/{_RELEASE}/{_BASENAME}.nfo"
     client = _RoutedClient({
         f"https://api.srrdb.com/v1/search/r:{_BASENAME}": _Response(_EMPTY_SEARCH),
-        _SEARCH_URL: _Response({"resultsCount": 1, "results": [_RESULT]}),
+        _SEARCH_URL: _Response({"resultsCount": count, "results": [_RESULT]}),
         _DETAILS_URL: _Response({
             "archived-files": [{"name": f"{_BASENAME}.mkv"}],
             "files": [{"name": f"{_BASENAME}.nfo"}],
@@ -145,7 +146,7 @@ async def test_archived_filename_fallback_restores_release_and_reuses_cache(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("case", ["no_candidates", "wrong_filename", "stored_file_only", "ambiguous", "details_error", "truncated", "warnings"])
+@pytest.mark.parametrize("case", ["no_candidates", "wrong_filename", "stored_file_only", "ambiguous", "details_error", "truncated", "overly_broad", "warnings"])
 async def test_archived_filename_fallback_does_not_guess(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, case: str,
 ) -> None:
@@ -170,6 +171,8 @@ async def test_archived_filename_fallback_does_not_guess(
         routes[_DETAILS_URL] = httpx.RequestError("unavailable")
     elif case == "truncated":
         candidate_search["resultsCount"] = 2
+    elif case == "overly_broad":
+        candidate_search.update(resultsCount=11, results=[_RESULT] * 11)
     elif case == "warnings":
         candidate_search["warnings"] = ["Search could not be completed"]
 
@@ -181,6 +184,31 @@ async def test_archived_filename_fallback_does_not_guess(
     assert not meta.scene_name
     assert not meta.nfo
     assert not any("/download/" in url for url in client.requested_urls)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("payload", [
+    {},
+    {"results": [_RESULT]},
+    *[{"resultsCount": count, "results": [_RESULT]} for count in (None, "invalid", "1.5", [], {}, True, 1.0, -1)],
+    {"resultsCount": 0},
+    *[{"resultsCount": 0, "results": results} for results in (None, {}, "")],
+    *[{"resultsCount": 1, "results": [candidate]} for candidate in (
+        None, "release", [], {}, {"release": None}, {"release": 123}, {"release": ""}, {"release": "   "},
+    )],
+    {"resultsCount": 2, "results": [_RESULT, {"release": None}]},
+])
+async def test_archived_filename_fallback_rejects_malformed_payloads(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, payload: dict[str, Any],
+) -> None:
+    exact_url = f"https://api.srrdb.com/v1/search/r:{_BASENAME}"
+    client = _RoutedClient({exact_url: _Response(_EMPTY_SEARCH), _SEARCH_URL: _Response(payload)})
+    monkeypatch.setattr("src.is_scene.httpx.AsyncClient", lambda: client)
+    meta = Meta(base_dir=str(tmp_path), uuid="scene-test")
+    video = f"{_BASENAME}.mkv"
+    assert await SceneManager({"DEFAULT": {}}).is_scene(video, meta, 7654321) == (video, False, 7654321)
+    assert client.requested_urls == [exact_url, _SEARCH_URL]
+    assert not meta.scene_name
 
 
 @pytest.mark.asyncio
