@@ -125,6 +125,19 @@ test("file-browser persistence, restoration, refresh and execution outcomes", as
   assert.deepEqual([...context.expandedFoldersRef.current], ["/data/a/b"]);
   context.expandedFoldersRef.current = context.getStoredExpandedFolders();
 
+  const refreshStates = [];
+  const manualSearches = [];
+  context.fileBrowserRefreshing = false;
+  context.setFileBrowserRefreshing = (value) => refreshStates.push(value);
+  context.fileBrowserSearchQuery = { current: "new download" };
+  context.handleFileBrowserSearch = (query) => manualSearches.push(query);
+  load("refreshFileBrowser");
+  requests.length = 0;
+  await context.refreshFileBrowser();
+  assert.deepEqual(refreshStates, [true, false]);
+  assert.deepEqual(requests, Object.keys(responses));
+  assert.deepEqual(manualSearches, ["new download"]);
+
   let delayResolve;
   let delay;
   context.setTimeout = (fn, ms) => {

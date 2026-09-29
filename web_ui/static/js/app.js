@@ -2163,6 +2163,7 @@ function AudionutsUAGUI() {
     useState(null);
   const [fileBrowserSearchLoading, setFileBrowserSearchLoading] =
     useState(false);
+  const [fileBrowserRefreshing, setFileBrowserRefreshing] = useState(false);
   const fileBrowserSearchTimer = useRef(null);
   const fileBrowserSearchQuery = useRef("");
   const fileBrowserSearchId = useRef(0);
@@ -3373,6 +3374,19 @@ function AudionutsUAGUI() {
       console.error("Failed to load browse roots:", error);
     } finally {
       setFileBrowserRestoring(false);
+    }
+  };
+
+  const refreshFileBrowser = async () => {
+    if (fileBrowserRefreshing) return;
+    setFileBrowserRefreshing(true);
+    try {
+      await loadBrowseRoots();
+      if (fileBrowserSearchQuery.current) {
+        handleFileBrowserSearch(fileBrowserSearchQuery.current);
+      }
+    } finally {
+      setFileBrowserRefreshing(false);
     }
   };
 
@@ -6131,12 +6145,27 @@ function AudionutsUAGUI() {
             ) : (
               <div className="flex flex-col h-full">
                 <div className="ua-upload-panel-header p-3 border-b flex-shrink-0">
-                  <h2
-                    className={`text-base font-bold ${isDarkMode ? "text-white" : "text-gray-800"} flex items-center gap-2`}
-                  >
-                    <FolderIcon />
-                    File Browser
-                  </h2>
+                  <div className="flex items-center justify-between gap-2">
+                    <h2
+                      className={`text-base font-bold ${isDarkMode ? "text-white" : "text-gray-800"} flex items-center gap-2`}
+                    >
+                      <FolderIcon />
+                      File Browser
+                    </h2>
+                    <button
+                      type="button"
+                      onClick={refreshFileBrowser}
+                      disabled={fileBrowserRefreshing}
+                      aria-label="Refresh file browser"
+                      title="Refresh file browser"
+                      className={`rounded p-1.5 transition-colors disabled:cursor-wait disabled:opacity-60 ${isDarkMode ? "text-gray-400 hover:bg-gray-700 hover:text-gray-200" : "text-gray-500 hover:bg-gray-200 hover:text-gray-700"}`}
+                    >
+                      <LucideIcon
+                        name="refresh-cw"
+                        className={`h-4 w-4 ${fileBrowserRefreshing ? "animate-spin" : ""}`}
+                      />
+                    </button>
+                  </div>
                   <div className="relative mt-2">
                     <input
                       type="text"
@@ -6857,12 +6886,27 @@ function AudionutsUAGUI() {
             ) : (
               <>
                 <div className="ua-upload-panel-header p-4 border-b">
-                  <h2
-                    className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-gray-800"} flex items-center gap-2`}
-                  >
-                    <FolderIcon />
-                    File Browser
-                  </h2>
+                  <div className="flex items-center justify-between gap-2">
+                    <h2
+                      className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-gray-800"} flex items-center gap-2`}
+                    >
+                      <FolderIcon />
+                      File Browser
+                    </h2>
+                    <button
+                      type="button"
+                      onClick={refreshFileBrowser}
+                      disabled={fileBrowserRefreshing}
+                      aria-label="Refresh file browser"
+                      title="Refresh file browser"
+                      className={`rounded p-1.5 transition-colors disabled:cursor-wait disabled:opacity-60 ${isDarkMode ? "text-gray-400 hover:bg-gray-700 hover:text-gray-200" : "text-gray-500 hover:bg-gray-200 hover:text-gray-700"}`}
+                    >
+                      <LucideIcon
+                        name="refresh-cw"
+                        className={`h-4 w-4 ${fileBrowserRefreshing ? "animate-spin" : ""}`}
+                      />
+                    </button>
+                  </div>
                   <div className="relative mt-2">
                     <input
                       type="text"
