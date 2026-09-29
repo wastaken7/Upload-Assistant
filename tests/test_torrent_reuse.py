@@ -47,6 +47,35 @@ async def test_preparation_looks_up_original_client_hash_after_reuse(tmp_path, m
 
 
 @pytest.mark.asyncio
+async def test_reuse_keeps_qbit_hash_from_exported_torrent_filename(tmp_path, monkeypatch):
+    media = tmp_path / "release.mkv"
+    client_hash = "583ec15ee200c190645ba7a48a832fab8093bf32"
+    source = tmp_path / f"{client_hash}.torrent"
+    torrent = Torrent()
+    torrent.metainfo["info"] = {"name": media.name, "length": 8 * MIB, "piece length": 4 * MIB, "pieces": b"x" * 40}
+    torrent.source = "CLIENT"
+    torrent.write(source, overwrite=True)
+    assert str(torrent.infohash) != client_hash  # noqa: S101
+
+    async def find_candidate(_self, _meta, _client_name, *_args):
+        return [str(source)]
+
+    monkeypatch.setattr(Clients, "_search_single_client_for_torrent", find_candidate)
+    config = {
+        "DEFAULT": {"default_torrent_client": "qbit"},
+        "TORRENT_CLIENTS": {"qbit": {"torrent_client": "qbit"}},
+    }
+    meta = Meta({"base_dir": str(tmp_path), "uuid": "release", "path": str(media), "filelist": [str(media)], "client": "qbit"})
+
+    found = await Clients(config).find_existing_torrent(meta)
+
+    assert found is not None  # noqa: S101
+    assert meta.reuse_torrent_infohash == client_hash  # noqa: S101
+    entry = TorrentManifest(meta.base_dir, meta.uuid).entry_for_path(found)
+    assert entry is not None and entry.client_infohash == client_hash  # noqa: S101
+
+
+@pytest.mark.asyncio
 async def test_base_subs_contains_external_subtitle_with_custom_torrent(tmp_path):
     video = tmp_path / "release.mkv"
     subtitle = tmp_path / "release.pt-BR.srt"
