@@ -5,7 +5,7 @@ from torf import Torrent
 
 from src.clients import Clients
 from src.meta import Meta
-from src.prep_helpers import process_trackers_and_torrent
+from src.prep_helpers import _should_lookup_torrent_properties, process_trackers_and_torrent
 from src.torrent_manifest import TorrentManifest
 from src.torrent_policy import MIB, TorrentPolicy
 from src.torrentcreate import TorrentCreator
@@ -73,6 +73,32 @@ async def test_reuse_keeps_qbit_hash_from_exported_torrent_filename(tmp_path, mo
     assert meta.reuse_torrent_infohash == client_hash  # noqa: S101
     entry = TorrentManifest(meta.base_dir, meta.uuid).entry_for_path(found)
     assert entry is not None and entry.client_infohash == client_hash  # noqa: S101
+
+
+def test_metadata_does_not_repeat_properties_lookup_for_reused_torrent(tmp_path):
+    meta = Meta(
+        {
+            "infohash": "583ec15ee200c190645ba7a48a832fab8093bf32",
+            "reuse_torrent_path": str(tmp_path / "reused.torrent"),
+            "base_torrent_created": False,
+            "we_checked_them_all": False,
+        }
+    )
+
+    assert not _should_lookup_torrent_properties(meta, None)  # noqa: S101
+
+
+def test_metadata_keeps_properties_lookup_for_explicit_infohash():
+    meta = Meta(
+        {
+            "infohash": "583ec15ee200c190645ba7a48a832fab8093bf32",
+            "reuse_torrent_path": None,
+            "base_torrent_created": False,
+            "we_checked_them_all": False,
+        }
+    )
+
+    assert _should_lookup_torrent_properties(meta, None)  # noqa: S101
 
 
 @pytest.mark.asyncio
