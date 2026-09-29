@@ -1034,7 +1034,7 @@ async def search_metadata(
         if _should_lookup_torrent_properties(meta, ids):
             meta = await client.get_ptp_from_hash(meta)
 
-        if not meta.edit and not ids:
+        if not meta.edit and (not ids or meta.tracker_ids):
             # Reuse information from trackers with fallback
             await prep_instance.tracker_data_manager.get_tracker_data(
                 videopath, meta, search_term, search_file_folder, meta.category, skip_tracker_descriptions=skip_tracker_descriptions
