@@ -419,6 +419,7 @@ class Meta:
     retrieved_aka: str | None = None
     retry_count: int = 0
     reuse_torrent_client: str | None = None
+    reuse_torrent_infohash: str | None = None
     reuse_torrent_path: str | None = None
     rtorrent_label: str | None = None
     runtime: int = 60

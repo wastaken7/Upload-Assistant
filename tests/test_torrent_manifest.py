@@ -6,7 +6,7 @@ import pytest
 from torf import Torrent
 
 from src.torrent_manifest import TorrentEntry, TorrentManifest
-from src.torrent_policy import ANTHELION_POLICY, PASSTHEPOPCORN_POLICY, MIB, TorrentPolicy, TorrentStats
+from src.torrent_policy import ANTHELION_POLICY, MIB, PASSTHEPOPCORN_POLICY, TorrentPolicy, TorrentStats
 from src.torrent_provision import provision_tracker_torrents
 from src.torrentcreate import TorrentCreator
 from src.trackers.common import Common
@@ -57,6 +57,24 @@ def test_manifest_keeps_layouts_separate_and_deduplicates(tmp_path):
     assert first.id == again.id
     assert len(manifest.entries("base")) == 1
     assert len(manifest.entries("base_subs")) == 1
+
+
+def test_client_infohash_survives_normalization_and_managed_reregistration(tmp_path):
+    source = tmp_path / "fictional-release.torrent"
+    torrent = write_torrent(source)
+    torrent.source = "CLIENT"
+    torrent.write(source, overwrite=True)
+    original_hash = torrent.infohash
+    manifest = TorrentManifest(tmp_path, "fictional-release")
+
+    entry = manifest.register(source, "base", "client:fictional-qbit", client_infohash=original_hash)
+    assert entry.infohash != original_hash
+    assert entry.client_infohash == original_hash
+
+    managed = manifest.entry_path(entry)
+    repeated = manifest.register(managed, "base", "client")
+    assert repeated.client_infohash == original_hash
+    assert repeated.origin == "client:fictional-qbit"
 
 
 def test_explicit_default_replaces_the_previous_default(tmp_path):

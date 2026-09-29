@@ -823,7 +823,7 @@ async def process_trackers_and_torrent(
             else:
                 meta.base_reuse_torrent_path = reuse_torrent_path
             try:
-                meta.infohash = Torrent.read(reuse_torrent_path).infohash
+                meta.infohash = meta.reuse_torrent_infohash or Torrent.read(reuse_torrent_path).infohash
             except Exception as e:
                 logger.debug(f"[yellow]Unable to read infohash from cached torrent: {e}")
             # Fetch properties only: this preserves comment/tracker-ID discovery

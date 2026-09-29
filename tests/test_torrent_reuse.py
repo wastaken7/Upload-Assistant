@@ -5,9 +5,45 @@ from torf import Torrent
 
 from src.clients import Clients
 from src.meta import Meta
+from src.prep_helpers import process_trackers_and_torrent
 from src.torrent_manifest import TorrentManifest
 from src.torrent_policy import MIB, TorrentPolicy
 from src.torrentcreate import TorrentCreator
+
+
+@pytest.mark.asyncio
+async def test_preparation_looks_up_original_client_hash_after_reuse(tmp_path, monkeypatch):
+    media = tmp_path / "fictional-release.mkv"
+    source = tmp_path / "fictional-release.torrent"
+    torrent = Torrent()
+    torrent.metainfo["info"] = {"name": media.name, "length": 8 * MIB, "piece length": 4 * MIB, "pieces": b"x" * 40}
+    torrent.source = "CLIENT"
+    torrent.write(source, overwrite=True)
+    original_hash = torrent.infohash
+
+    async def find_candidate(_self, _meta, _client_name, *_args):
+        return [str(source)]
+
+    looked_up = []
+
+    async def capture_lookup(_self, meta, **_kwargs):
+        looked_up.append(meta.infohash)
+        return meta
+
+    monkeypatch.setattr(Clients, "_search_single_client_for_torrent", find_candidate)
+    monkeypatch.setattr(Clients, "get_ptp_from_hash", capture_lookup)
+    config = {
+        "DEFAULT": {"default_torrent_client": "fictional-qbit"},
+        "TORRENT_CLIENTS": {"fictional-qbit": {"torrent_client": "qbit"}},
+        "TRACKERS": {},
+    }
+    meta = Meta({"base_dir": str(tmp_path), "uuid": "fictional-release", "path": str(media), "filelist": [str(media)], "client": "fictional-qbit", "trackers": ["ANTHELION"]})
+
+    await process_trackers_and_torrent(SimpleNamespace(config=config), meta, Clients(config), [], [], "", "")
+
+    assert looked_up == [original_hash]
+    assert meta.reuse_torrent_client == "fictional-qbit"
+    assert Torrent.read(meta.reuse_torrent_path).infohash != original_hash
 
 
 @pytest.mark.asyncio
