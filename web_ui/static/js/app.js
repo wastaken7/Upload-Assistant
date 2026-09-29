@@ -2165,6 +2165,7 @@ function AudionutsUAGUI() {
     useState(false);
   const [fileBrowserRefreshing, setFileBrowserRefreshing] = useState(false);
   const fileBrowserSearchTimer = useRef(null);
+  const fileBrowserSearchCompletion = useRef(null);
   const fileBrowserSearchQuery = useRef("");
   const fileBrowserSearchId = useRef(0);
 
@@ -3377,13 +3378,14 @@ function AudionutsUAGUI() {
     }
   };
 
+  /** Reload visible file-browser data without resetting navigation state. */
   const refreshFileBrowser = async () => {
     if (fileBrowserRefreshing) return;
     setFileBrowserRefreshing(true);
     try {
       await loadBrowseRoots();
       if (fileBrowserSearchQuery.current) {
-        handleFileBrowserSearch(fileBrowserSearchQuery.current);
+        await handleFileBrowserSearch(fileBrowserSearchQuery.current);
       }
     } finally {
       setFileBrowserRefreshing(false);
@@ -3552,6 +3554,8 @@ function AudionutsUAGUI() {
       if (fileBrowserSearchTimer.current) {
         clearTimeout(fileBrowserSearchTimer.current);
       }
+      fileBrowserSearchCompletion.current?.();
+      fileBrowserSearchCompletion.current = null;
     };
   }, []);
 
@@ -4093,68 +4097,88 @@ function AudionutsUAGUI() {
 
   // File Browser search
   const handleFileBrowserSearch = (value, signal) => {
-    if (signal?.aborted) return;
-    const searchId = ++fileBrowserSearchId.current;
-    setFileBrowserSearch(value);
-    const searchQuery = value.trim();
-    fileBrowserSearchQuery.current = searchQuery;
+    if (signal?.aborted) return Promise.resolve();
+    fileBrowserSearchCompletion.current?.();
     if (fileBrowserSearchTimer.current) {
       clearTimeout(fileBrowserSearchTimer.current);
     }
-    if (!searchQuery) {
-      setFileBrowserSearchResults(null);
-      setFileBrowserSearchLoading(false);
-      return;
-    }
-    setFileBrowserSearchLoading(true);
-    const onAbort = () => {
-      if (fileBrowserSearchId.current === searchId) {
-        clearTimeout(fileBrowserSearchTimer.current);
+    return new Promise((resolve) => {
+      const searchId = ++fileBrowserSearchId.current;
+      let settled = false;
+      const settle = () => {
+        if (settled) return;
+        settled = true;
+        if (fileBrowserSearchCompletion.current === settle) {
+          fileBrowserSearchCompletion.current = null;
+        }
+        resolve();
+      };
+      fileBrowserSearchCompletion.current = settle;
+      setFileBrowserSearch(value);
+      const searchQuery = value.trim();
+      fileBrowserSearchQuery.current = searchQuery;
+      if (!searchQuery) {
+        setFileBrowserSearchResults(null);
         setFileBrowserSearchLoading(false);
+        settle();
+        return;
       }
-    };
-    signal?.addEventListener("abort", onAbort, { once: true });
-    fileBrowserSearchTimer.current = setTimeout(async () => {
-      if (signal?.aborted) return;
-      try {
-        const response = await apiFetch(
-          `${API_BASE}/browse_search?q=${encodeURIComponent(searchQuery)}`,
-          { signal },
-        );
-        if (signal?.aborted) return;
-        if (!response.ok) {
-          throw new Error(`Search request failed (${response.status})`);
-        }
-        const data = await response.json();
-        if (signal?.aborted) return;
-        // Early return if the search has changed since this request
-        if (fileBrowserSearchId.current !== searchId) return;
-        if (data.success) {
-          setFileBrowserSearchResults(data);
-        } else {
-          setFileBrowserSearchResults({
-            items: [],
-            query: searchQuery,
-            count: 0,
-          });
-        }
-      } catch (error) {
-        if (signal?.aborted) return;
-        console.error("File browser search failed:", error);
+      setFileBrowserSearchLoading(true);
+      const onAbort = () => {
         if (fileBrowserSearchId.current === searchId) {
-          setFileBrowserSearchResults({
-            items: [],
-            query: searchQuery,
-            count: 0,
-          });
-        }
-      } finally {
-        signal?.removeEventListener("abort", onAbort);
-        if (!signal?.aborted && fileBrowserSearchId.current === searchId) {
+          clearTimeout(fileBrowserSearchTimer.current);
           setFileBrowserSearchLoading(false);
         }
-      }
-    }, 300); //300ms debounce so we dont spam requests for every keystroke
+        signal?.removeEventListener("abort", onAbort);
+        settle();
+      };
+      signal?.addEventListener("abort", onAbort, { once: true });
+      fileBrowserSearchTimer.current = setTimeout(async () => {
+        if (signal?.aborted) {
+          settle();
+          return;
+        }
+        try {
+          const response = await apiFetch(
+            `${API_BASE}/browse_search?q=${encodeURIComponent(searchQuery)}`,
+            { signal },
+          );
+          if (signal?.aborted) return;
+          if (!response.ok) {
+            throw new Error(`Search request failed (${response.status})`);
+          }
+          const data = await response.json();
+          if (signal?.aborted) return;
+          // Early return if the search has changed since this request
+          if (fileBrowserSearchId.current !== searchId) return;
+          if (data.success) {
+            setFileBrowserSearchResults(data);
+          } else {
+            setFileBrowserSearchResults({
+              items: [],
+              query: searchQuery,
+              count: 0,
+            });
+          }
+        } catch (error) {
+          if (signal?.aborted) return;
+          console.error("File browser search failed:", error);
+          if (fileBrowserSearchId.current === searchId) {
+            setFileBrowserSearchResults({
+              items: [],
+              query: searchQuery,
+              count: 0,
+            });
+          }
+        } finally {
+          signal?.removeEventListener("abort", onAbort);
+          if (!signal?.aborted && fileBrowserSearchId.current === searchId) {
+            setFileBrowserSearchLoading(false);
+          }
+          settle();
+        }
+      }, 300); //300ms debounce so we dont spam requests for every keystroke
+    });
   };
 
   const refreshFileBrowserAfterUpload = async (signal) => {

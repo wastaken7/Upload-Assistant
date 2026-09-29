@@ -130,13 +130,28 @@ test("file-browser persistence, restoration, refresh and execution outcomes", as
   context.fileBrowserRefreshing = false;
   context.setFileBrowserRefreshing = (value) => refreshStates.push(value);
   context.fileBrowserSearchQuery = { current: "new download" };
-  context.handleFileBrowserSearch = (query) => manualSearches.push(query);
+  let finishManualSearch;
+  let manualSearchStarted;
+  const searchStarted = new Promise((resolve) => {
+    manualSearchStarted = resolve;
+  });
+  context.handleFileBrowserSearch = (query) => {
+    manualSearches.push(query);
+    manualSearchStarted();
+    return new Promise((resolve) => {
+      finishManualSearch = resolve;
+    });
+  };
   load("refreshFileBrowser");
   requests.length = 0;
-  await context.refreshFileBrowser();
-  assert.deepEqual(refreshStates, [true, false]);
+  const manualRefresh = context.refreshFileBrowser();
+  await searchStarted;
+  assert.deepEqual(refreshStates, [true]);
   assert.deepEqual(requests, Object.keys(responses));
   assert.deepEqual(manualSearches, ["new download"]);
+  finishManualSearch();
+  await manualRefresh;
+  assert.deepEqual(refreshStates, [true, false]);
 
   let delayResolve;
   let delay;
@@ -168,6 +183,7 @@ test("file-browser persistence, restoration, refresh and execution outcomes", as
   assert.equal(searches.length, 1);
 
   context.fileBrowserSearchTimer = { current: null };
+  context.fileBrowserSearchCompletion = { current: null };
   context.fileBrowserSearchId = { current: 0 };
   context.setFileBrowserSearch = () => {};
   let searchLoading = false;
