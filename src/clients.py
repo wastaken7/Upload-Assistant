@@ -292,7 +292,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                         continue
                     torrent = Torrent.read(candidate)
                     has_subs = any(Path(str(file)).suffix.casefold() in SUBTITLE_EXTENSIONS for file in torrent.files)
-                    entry = manifest.register(candidate, "base_subs" if has_subs else "base", f"client:{client_name}")
+                    entry = manifest.register(candidate, "base_subs" if has_subs else "base", f"client:{client_name}", client_infohash=str(torrent.infohash))
                     managed = str(manifest.entry_path(entry))
                     if managed not in paths:
                         paths.append(managed)
@@ -319,6 +319,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
         chosen = entries[0]
         if chosen.origin.startswith("client:"):
             meta.reuse_torrent_client = chosen.origin.removeprefix("client:")
+        meta.reuse_torrent_infohash = chosen.client_infohash
         return str(manifest.entry_path(chosen))
 
     async def _find_existing_torrent(self, meta: Meta) -> str | None:

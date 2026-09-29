@@ -27,6 +27,7 @@ class TorrentEntry:
     piece_count: int
     content_size: int
     metainfo_size: int
+    client_infohash: str | None = None
 
     @property
     def stats(self) -> TorrentStats:
@@ -109,13 +110,21 @@ class TorrentManifest:
         torrent.private = True
         return torrent
 
-    def register(self, source: str | Path, layout: TorrentLayout, origin: str, *, make_default: bool = False) -> TorrentEntry:
+    def register(self, source: str | Path, layout: TorrentLayout, origin: str, *, make_default: bool = False, client_infohash: str | None = None) -> TorrentEntry:
         with self._lock:
             torrent = self._normalize(source)
             infohash = str(torrent.infohash)
             entry_id = f"{layout}:{infohash}"
             relative = Path("torrents") / str(int(torrent.piece_size)) / f"{infohash}.torrent"
             output = self._resolve(relative.as_posix())
+            manifest = self._load()
+            torrents = cast(dict[str, Any], manifest["torrents"])
+            # Re-registering a managed base must retain its original client
+            # identity, rather than treating the normalized hash as a client hash.
+            previous = torrents.get(entry_id)
+            if Path(source).resolve() == output and isinstance(previous, dict):
+                origin = str(previous.get("origin", origin))
+                client_infohash = previous.get("client_infohash")
             output.parent.mkdir(parents=True, exist_ok=True)
             temporary = output.with_suffix(".tmp")
             Torrent.copy(torrent).write(temporary, overwrite=True)
@@ -131,9 +140,8 @@ class TorrentManifest:
                 piece_count=stats.piece_count,
                 content_size=stats.content_size,
                 metainfo_size=stats.metainfo_size,
+                client_infohash=client_infohash,
             )
-            manifest = self._load()
-            torrents = cast(dict[str, Any], manifest["torrents"])
             torrents[entry_id] = asdict(entry)
             defaults = cast(dict[str, Any], manifest["defaults"])
             if make_default or layout not in defaults:
