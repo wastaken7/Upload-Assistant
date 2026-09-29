@@ -1339,7 +1339,6 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
     # Prep normally starts these while metadata and screenshots are being
     # generated. Keep this fallback for paths which bypass normal prep.
     early_artifact_tasks = get_early_artifact_tasks(meta.uuid) or start_early_artifact_tasks(meta, client, config)
-    release_early_artifact_progress(meta.uuid)
     early_base_torrent_task, early_usenet_prepare_task = early_artifact_tasks
 
     filename: str = meta.title
@@ -1870,6 +1869,10 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
     has_local_subs = bool(meta.subtitle_files)
     torrent_manifest = TorrentManifest(meta.base_dir, meta.uuid)
 
+    # Keep background progress hidden while interactive preparation may still
+    # prompt the user. Show it only when this foreground flow must wait for the
+    # early tasks, so a live progress bar cannot obscure an active prompt.
+    release_early_artifact_progress(meta.uuid)
     try:
         await asyncio.gather(early_base_torrent_task, early_usenet_prepare_task)
     finally:
