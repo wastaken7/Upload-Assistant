@@ -368,6 +368,20 @@ def test_web_media_without_a_service_is_grouped_as_unknown():
 
     assert ("streaming_service", "Unknown") in dimensions
     assert ("streaming_service", "Unknown") not in stats.media_profile_dimensions(Meta(category="MOVIE", type="REMUX"))
+    assert not any(name == "streaming_service" for name, _value in stats.media_profile_dimensions(Meta(category="BOOK", audiobook=True)))  # noqa: S101
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("service", "name"), [("audible", "Audible"), ("ubook", "Ubook")])
+async def test_book_streaming_service_appears_in_stats(monkeypatch, tmp_path, service, name):
+    monkeypatch.setattr(stats, "_database_path", lambda _state_dir=None: tmp_path / "data" / "stats.sqlite3")
+    meta = Meta(category="BOOK", audiobook=True, service=service, service_longname=name, source_size=12_000)
+
+    await stats.record_media_profile_async(meta)
+    result = stats.get_stats("all", "real", tmp_path)
+
+    assert ("streaming_service", name) in stats.media_profile_dimensions(meta)  # noqa: S101
+    assert result["streaming"]["services"] == [{"service": name, "items": 1, "bytes": 12_000, "average_item_bytes": 12_000}]  # noqa: S101
 
 
 @pytest.mark.parametrize(

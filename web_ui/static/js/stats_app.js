@@ -709,9 +709,9 @@ const Card = ({ icon, label, value, detail, trend }) => (
   </article>
 );
 
-const MetricGroup = ({ title, global = false, children }) => (
+const MetricGroup = ({ title, subtitle, global = false, children }) => (
   <section className="ua-stats-panel rounded-xl p-3 shadow-sm">
-    <h2 className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider opacity-65">
+    <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider opacity-65">
       {title}
       {global && (
         <span className="rounded-full border px-2 py-0.5 normal-case tracking-normal">
@@ -719,6 +719,7 @@ const MetricGroup = ({ title, global = false, children }) => (
         </span>
       )}
     </h2>
+    {subtitle && <p className="mb-3 mt-1 text-xs opacity-60">{subtitle}</p>}
     <div className="grid gap-3 sm:grid-cols-2">{children}</div>
   </section>
 );
@@ -2280,7 +2281,10 @@ function StatsApp() {
               )}
               <div className="grid gap-4 xl:grid-cols-2">
                 {visible.throughput && (
-                  <MetricGroup title="Throughput & scale">
+                  <MetricGroup
+                    title="Throughput & scale"
+                    subtitle="A quick view of completed items, uploads, and data volume."
+                  >
                     {visible.itemsCompleted && (
                       <Card
                         icon="items-completed"
@@ -2320,7 +2324,10 @@ function StatsApp() {
                   </MetricGroup>
                 )}
                 {visible.efficiency && (
-                  <MetricGroup title="Efficiency & intelligence">
+                  <MetricGroup
+                    title="Efficiency & intelligence"
+                    subtitle="See duplicate prevention and work saved by reusing torrents."
+                  >
                     {visible.duplicatesPrevented && (
                       <Card
                         icon="duplicates-prevented"
@@ -2350,6 +2357,7 @@ function StatsApp() {
                 {visible.health && (
                   <MetricGroup
                     title="Health & infrastructure"
+                    subtitle="Check cache performance and calls to external services."
                     global={Boolean(activeTracker)}
                   >
                     {visible.cacheHitRate && (
@@ -2383,7 +2391,10 @@ function StatsApp() {
                   </MetricGroup>
                 )}
                 {visible.artifactsSummary && (
-                  <MetricGroup title="Generated artifacts">
+                  <MetricGroup
+                    title="Generated artifacts"
+                    subtitle="See how many torrents, NZBs, and screenshots were created."
+                  >
                     {visible.torrentsCreated && (
                       <Card
                         icon="torrents-created"
@@ -2415,7 +2426,7 @@ function StatsApp() {
                 <Section
                   icon="daily-activity"
                   title="Daily activity"
-                  subtitle="The three lines are separate measures and are not intended to be added together."
+                  subtitle="Follow activity over time. Each line shows a different measure."
                 >
                   <TrendChart
                     rows={data.timeline}
@@ -2429,7 +2440,7 @@ function StatsApp() {
                 <Section
                   icon="upload-flow"
                   title="Upload flow"
-                  subtitle="Each unit is one processed item × target tracker route."
+                  subtitle="Follow items from each destination to their upload result. An item sent to multiple sites appears once per site."
                 >
                   <SankeyDiagram sankey={data.sankey} />
                 </Section>
@@ -2438,7 +2449,7 @@ function StatsApp() {
                 <Section
                   icon="activity-heatmap"
                   title="Activity heatmap"
-                  subtitle="Completed items in the last year."
+                  subtitle="See how many items were completed each day over the past year."
                 >
                   <ActivityHeatmap
                     rows={data.heatmap}
@@ -2451,7 +2462,7 @@ function StatsApp() {
                 <Section
                   icon="uploads-by-destination"
                   title="Uploads by destination"
-                  subtitle="One release uploaded to several sites counts once for each destination."
+                  subtitle="Uploads to multiple sites are counted once per site."
                 >
                   <ChartWithTable
                     chart={
@@ -2561,7 +2572,11 @@ function StatsApp() {
               {(visible.categories || visible.artifactActivity) && (
                 <div className="grid gap-5 lg:grid-cols-2">
                   {visible.categories && (
-                    <Section icon="categories" title="Categories">
+                    <Section
+                      icon="categories"
+                      title="Categories"
+                      subtitle="See upload results and data volume for each content category."
+                    >
                       <ChartWithTable
                         chart={
                           <DonutChart
@@ -2592,7 +2607,11 @@ function StatsApp() {
                     </Section>
                   )}
                   {visible.artifactActivity && (
-                    <Section icon="artifact-activity" title="Artifact activity">
+                    <Section
+                      icon="artifact-activity"
+                      title="Artifact activity"
+                      subtitle="See which files were created or reused during processing."
+                    >
                       <ChartWithTable
                         chart={
                           <DonutChart
@@ -2638,7 +2657,7 @@ function StatsApp() {
                 <Section
                   icon="content-time"
                   title="Successful media time"
-                  subtitle="Each successfully processed item is counted once, regardless of destination. Unknown runtimes are excluded."
+                  subtitle="See the total duration of successfully uploaded media. Each item counts once, and items without a known duration are left out."
                 >
                   <ChartWithTable
                     chart={
@@ -2685,7 +2704,7 @@ function StatsApp() {
                 <Section
                   icon="media-profile"
                   title="Media profile"
-                  subtitle="Low-cardinality technical characteristics."
+                  subtitle="Explore video, audio, format, and other details by category."
                 >
                   <MediaProfile
                     media={data.media}
@@ -2700,7 +2719,7 @@ function StatsApp() {
                     <Section
                       icon="streaming-services"
                       title="Streaming services"
-                      subtitle="Processed WEB items grouped by their identified source."
+                      subtitle="See the services identified for WEB and BOOK items."
                     >
                       <StreamingServices services={data.streaming.services} />
                     </Section>
@@ -2709,7 +2728,7 @@ function StatsApp() {
                     <Section
                       icon="personal-releases"
                       title="Personal releases"
-                      subtitle="Aggregate results only; release groups and tags are never stored."
+                      subtitle="Compare personal and standard releases. Release group names and tags are not saved."
                     >
                       <ReleaseProfiles
                         releaseProfiles={data.release_profiles}
@@ -2722,11 +2741,7 @@ function StatsApp() {
                 <Section
                   icon="cache-by-provider"
                   title="Cache by provider"
-                  subtitle={
-                    activeTracker
-                      ? "Global · not affected by the tracker filter."
-                      : ""
-                  }
+                  subtitle={`${activeTracker ? "These totals include all trackers, even when one is selected. " : ""}See cache hits, misses, and writes for each provider.`}
                 >
                   <ChartWithTable
                     chart={
@@ -2768,7 +2783,7 @@ function StatsApp() {
                 <Section
                   icon="external-operations"
                   title="External operations"
-                  subtitle={`${activeTracker ? "Global · not affected by the tracker filter. " : ""}Logical adapter operations; internal redirects and retries are not counted separately. Bytes sent are available for NNTP and successful image uploads.`}
+                  subtitle={`${activeTracker ? "These totals include all trackers, even when one is selected. " : ""}See how often external services were used. Redirects and retries are not counted separately. Bytes sent are shown for NNTP and successful image uploads.`}
                 >
                   <ChartWithTable
                     chart={
@@ -2815,7 +2830,11 @@ function StatsApp() {
                 </Section>
               )}
               {visible.executionSource && (
-                <Section icon="execution-source" title="Execution source">
+                <Section
+                  icon="execution-source"
+                  title="Execution source"
+                  subtitle="See whether completed items were started from the command line or web interface."
+                >
                   <ChartWithTable
                     chart={
                       <DonutChart
