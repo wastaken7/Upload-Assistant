@@ -781,6 +781,9 @@ async def gather_book_prep(
         if meta.keywords:
             meta.keywords = map_audiobook_keywords(meta.keywords)
 
+    if meta.book_series:
+        meta.book_series = re.sub(r"\s*\[[^\]]*\]", "", meta.book_series).strip()
+
     if meta.audiobook:
         meta.title = normalize_audiobook_title(meta.title, meta.book_series, meta.book_series_index)
     meta.title = normalize_book_title_separators(meta.title)
@@ -807,9 +810,13 @@ def normalize_audiobook_title(title: str, series: str, series_index: str = "") -
             return title[: repeated_volume.start()].rstrip()
     if len(title) > len(series):
         if title.casefold().endswith(series.casefold()):
-            return title[: -len(series)].rstrip(" :-\u2013\u2014")
-        if title.casefold().startswith(series.casefold()):
-            return title[len(series) :].lstrip(" :-\u2013\u2014")
+            title = title[: -len(series)].rstrip(" :-\u2013\u2014")
+        elif title.casefold().startswith(series.casefold()):
+            title = title[len(series) :].lstrip(" :-\u2013\u2014")
+    if series_index:
+        repeated_index = re.search(rf"\s+{re.escape(series_index)}$", title)
+        if repeated_index:
+            title = title[: repeated_index.start()].rstrip(" :-\u2013\u2014")
     return title
 
 
