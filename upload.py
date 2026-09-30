@@ -2557,7 +2557,7 @@ async def do_the_thing(base_dir: str) -> None:
                 if config["DEFAULT"].get("cross_seeding", True):
                     await process_cross_seeds(meta)
                 if not meta.site_check:
-                    logger.info("we are not uploading.......")
+                    logger.info("No new upload to a tracker was performed.")
                     if "queue" in meta and meta.queue is not None:
                         processed_files_count += 1
                         skipped_files_count += 1

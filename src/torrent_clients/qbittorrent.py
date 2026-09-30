@@ -853,7 +853,7 @@ class QbittorrentClientMixin:
                 logger.info("[bold red]Linking failed and fallback is disabled; aborting qBittorrent add")
                 return
         elif cross:
-            logger.info("[yellow]Cross seed requested, but no linking method is configured. Proceeding with original path naming.")
+            logger.info("[cyan]Using original content path for cross-seed (no linking required).[/cyan]")
 
         proxy_url = client.get("qui_proxy_url")
         qbt_client = None
@@ -1015,7 +1015,10 @@ class QbittorrentClientMixin:
                 await qbt_session.aclose()
             return
 
-        logger.debug(f"[green]Successfully added torrent to qBittorrent ({tracker})[/green]")
+        if cross and not (use_symlink or use_hardlink):
+            logger.info(f"[green]{tracker}: Cross-seed added to qBittorrent using original content path.[/green]")
+        else:
+            logger.debug(f"[green]Successfully added torrent to qBittorrent ({tracker})[/green]")
 
         if not cross:
             try:
