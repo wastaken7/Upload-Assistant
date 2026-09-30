@@ -1,16 +1,17 @@
 # ruff: noqa: S101
+from io import BytesIO
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 import pytest
 from PIL import Image
 
+import upload
 from src.args import Args
 from src.artwork import prepare_artwork
 from src.meta import Meta
 from src.trackers.UNIT3D import UNIT3D
 from upload import _prompt_book_meta, _prompt_music_meta
-import upload
 
 
 @pytest.fixture(autouse=True)
@@ -97,9 +98,9 @@ async def test_generic_artwork_cli_args_normalize_local_images(tmp_path: Path) -
 
     artwork = tmp_path / "tmp" / "generic-artwork" / "artwork"
     assert meta.artwork_path == str(artwork / "POSTER.png")
-    assert meta.artwork_banner_path == str(artwork / "POSTER_BANNER.png")
+    assert meta.artwork_banner_path == str(artwork / "POSTER_BANNER.jpg")
     assert Image.open(meta.artwork_path).format == "PNG"
-    assert Image.open(meta.artwork_banner_path).format == "PNG"
+    assert Image.open(meta.artwork_banner_path).format == "JPEG"
 
 
 @pytest.mark.asyncio
@@ -112,8 +113,8 @@ async def test_generic_poster_url_is_normalized_and_retained(tmp_path: Path) -> 
         await prepare_artwork(meta)
 
     assert meta.artwork_url == "https://images.example/poster.jpg"
-    assert meta.artwork_path == str(tmp_path / "tmp" / "url-artwork" / "artwork" / "POSTER.png")
-    assert Image.open(meta.artwork_path).format == "PNG"
+    assert meta.artwork_path == str(tmp_path / "tmp" / "url-artwork" / "artwork" / "POSTER.jpg")
+    assert Image.open(meta.artwork_path).format == "JPEG"
 
 
 @pytest.mark.asyncio
@@ -127,9 +128,43 @@ async def test_local_artwork_discovery_normalizes_named_poster_and_banner(tmp_pa
     await prepare_artwork(meta)
 
     artwork = tmp_path / "tmp" / "discovered-artwork" / "artwork"
-    assert meta.artwork_path == str(artwork / "POSTER.png")
+    assert meta.artwork_path == str(artwork / "POSTER.jpg")
     assert meta.artwork_banner_path == str(artwork / "POSTER_BANNER.png")
     assert meta.artwork_url == ""
+
+
+@pytest.mark.asyncio
+async def test_music_keeps_valid_local_jpeg_without_png_conversion(tmp_path: Path) -> None:
+    album = tmp_path / "Invented Album"
+    album.mkdir()
+    cover = album / "cover.jpg"
+    image = Image.effect_noise((256, 256), 100).convert("RGB")
+    image.save(cover, "JPEG", quality=80)
+    png = BytesIO()
+    image.save(png, "PNG")
+    assert cover.stat().st_size < png.tell()
+    meta = Meta(category="MUSIC", base_dir=str(tmp_path), uuid="music-local-cover", path=str(album))
+    artwork = tmp_path / "tmp" / "music-local-cover" / "artwork"
+    artwork.mkdir(parents=True)
+    (artwork / "POSTER.png").write_bytes(b"invalid prior artifact")
+
+    with patch("src.artwork.MAX_ARTWORK_BYTES", (cover.stat().st_size + png.tell()) // 2):
+        await prepare_artwork(meta)
+        assert meta.artwork_path == str(artwork / "POSTER.jpg")
+        assert Path(meta.artwork_path).read_bytes() == cover.read_bytes()
+        assert not (artwork / "POSTER.png").exists()
+
+
+@pytest.mark.asyncio
+async def test_generic_artwork_converts_webp_when_jpeg_and_png_are_required(tmp_path: Path) -> None:
+    cover = tmp_path / "cover.webp"
+    Image.new("RGB", (32, 48), "yellow").save(cover, "WEBP")
+    meta = Meta(category="BOOK", base_dir=str(tmp_path), uuid="webp-cover", path=str(tmp_path))
+
+    await prepare_artwork(meta)
+
+    assert Path(meta.artwork_path).name == "POSTER.png"
+    assert Image.open(meta.artwork_path).format == "PNG"
 
 
 @pytest.mark.asyncio
@@ -140,8 +175,8 @@ async def test_category_artwork_path_is_normalized_without_a_named_sidecar(tmp_p
 
     await prepare_artwork(meta)
 
-    assert meta.artwork_path == str(tmp_path / "tmp" / "extracted-artwork" / "artwork" / "POSTER.png")
-    assert Image.open(meta.artwork_path).format == "PNG"
+    assert meta.artwork_path == str(tmp_path / "tmp" / "extracted-artwork" / "artwork" / "POSTER.jpg")
+    assert Image.open(meta.artwork_path).format == "JPEG"
 
 
 def test_imghost_cli_arg_takes_precedence_over_automatic_selection(tmp_path: Path) -> None:

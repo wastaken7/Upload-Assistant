@@ -666,11 +666,12 @@ async def _handle_image_upload(
     screenshot_path = screenshots_dir(base_dir, folder_id)
     logger.debug(f"[yellow]Searching for screenshots in {screenshot_path}...")
     all_screenshots: list[str] = [str(path) for path in manifest_files(base_dir, folder_id, "main")]
+    allowed_suffixes = {".png", ".jpg", ".jpeg"} if meta.category == "BOOK" else {".png"}
 
     # First check if there are any saved screenshots matching those in the image_list
     if meta.image_list and isinstance(meta.image_list, list):
-        # Get all PNG files in the screenshots directory
-        all_png_files: list[str] = [str(screenshot_path / name) for name in await aio_os.listdir(screenshot_path) if name.endswith(".png")]
+        # BOOK screenshots can retain their original JPEG encoding.
+        all_png_files: list[str] = [str(screenshot_path / name) for name in await aio_os.listdir(screenshot_path) if Path(name).suffix.casefold() in allowed_suffixes]
         if all_png_files and meta.debug:
             logger.info(f"[cyan]Found {len(all_png_files)} PNG files in screenshots directory")
 
@@ -682,7 +683,7 @@ async def _handle_image_upload(
                 if url_value:
                     parsed_url = urlparse(url_value)
                     filename_from_url = Path(parsed_url.path).name
-                    if filename_from_url and filename_from_url.lower().endswith(".png"):
+                    if filename_from_url and Path(filename_from_url).suffix.casefold() in allowed_suffixes:
                         image_filenames.append(filename_from_url)
                         break
 
@@ -702,7 +703,7 @@ async def _handle_image_upload(
         if filename and len(all_screenshots) < multi_screens:
             sanitized_title = await sanitize_filename(filename)
             title_pattern_files = [f for f in all_png_files if Path(f).name.startswith(sanitized_title)]
-            logger.debug(f"[yellow]Searching for screenshots with pattern: {sanitized_title}*.png")
+            logger.debug(f"[yellow]Searching for screenshots with title: {sanitized_title}")
             if title_pattern_files:
                 # Only add title pattern files that aren't already in all_screenshots
                 for file in title_pattern_files:
@@ -715,7 +716,7 @@ async def _handle_image_upload(
     if len(all_screenshots) < multi_screens:
         for _file in filelist:
             sanitized_title = await sanitize_filename(filename)
-            filename_pattern = f"{glob.escape(sanitized_title)}*.png"
+            filename_pattern = f"{glob.escape(sanitized_title)}*"
             logger.debug(f"[yellow]Searching for screenshots with pattern: {filename_pattern}")
 
             if meta.is_disc == "DVD":
@@ -723,7 +724,7 @@ async def _handle_image_upload(
                     lambda: [str(p) for p in screenshots_dir(meta.base_dir, meta.uuid).glob(f"{glob.escape(meta.discs[0]['name'])}-*.png")]
                 )
             else:
-                existing_screens = await asyncio.to_thread(lambda fp=filename_pattern: [str(p) for p in screenshot_path.glob(fp)])
+                existing_screens = await asyncio.to_thread(lambda fp=filename_pattern: [str(p) for p in screenshot_path.glob(fp) if p.suffix.casefold() in allowed_suffixes])
 
             # Add any new screenshots to our list
             for screen in existing_screens:
@@ -732,7 +733,8 @@ async def _handle_image_upload(
 
     # Fallback: glob for indexed screenshots if still not enough
     if len(all_screenshots) < multi_screens:
-        image_patterns = ["*.png", ".[!.]*.png"]
+        suffixes = ("png", "jpg", "jpeg") if meta.category == "BOOK" else ("png",)
+        image_patterns = [pattern for suffix in suffixes for pattern in (f"*.{suffix}", f".[!.]*.{suffix}")]
         image_glob: list[str] = []
         for pattern in image_patterns:
             glob_results = await asyncio.to_thread(lambda p=pattern: [str(path) for path in screenshot_path.glob(p)])
@@ -755,7 +757,7 @@ async def _handle_image_upload(
         logger.debug(f"[cyan]Filtered out {len(unwanted_files)} unwanted files, remaining: {len(image_glob)}")
 
         # Only keep files that match the indexed pattern: xxx-0.png, xxx-1.png, etc.
-        indexed_pattern = re.compile(r".*-\d+\.png$")
+        indexed_pattern = re.compile(r".*-\d+\.(?:png|jpe?g)$" if meta.category == "BOOK" else r".*-\d+\.png$", re.IGNORECASE)
         indexed_files: list[str] = [file for file in image_glob if indexed_pattern.match(Path(file).name)]
         logger.debug(f"[cyan]Found {len(indexed_files)} indexed files matching pattern")
 

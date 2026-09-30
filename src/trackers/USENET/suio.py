@@ -367,10 +367,13 @@ class Suio:
         # Cover image file (optional)
         if meta.category not in ("TV", "MOVIE"):
             cover_jpg_path = artwork_dir(meta.base_dir, meta.uuid) / "POSTER.jpg"
+            cover_jpeg_path = artwork_dir(meta.base_dir, meta.uuid) / "POSTER.jpeg"
             cover_png_path = artwork_dir(meta.base_dir, meta.uuid) / "POSTER.png"
             cover_path = None
             if Path(cover_jpg_path).exists():
                 cover_path = cover_jpg_path
+            elif Path(cover_jpeg_path).exists():
+                cover_path = cover_jpeg_path
             elif Path(cover_png_path).exists():
                 cover_path = cover_png_path
             if cover_path:

@@ -198,7 +198,7 @@ class Cinematik(UNIT3D):
 
         # Define the paths for both jpg and png poster images
         poster_dir = artwork_dir(meta.base_dir, meta.uuid)
-        poster_paths = [poster_dir / filename for filename in ("POSTER.png", "poster.png", "POSTER.jpg", "poster.jpg")]
+        poster_paths = [poster_dir / filename for filename in ("POSTER.png", "poster.png", "POSTER.jpg", "poster.jpg", "POSTER.jpeg", "poster.jpeg")]
 
         # Check if either poster.jpg or poster.png already exists
         existing_poster = next((path for path in poster_paths if path.is_file()), None)

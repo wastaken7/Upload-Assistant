@@ -110,6 +110,7 @@ from src.meta_file import write_meta_file
 from src.qbitwait import Wait
 from src.queuemanage import QueueManager
 from src.rehostimages import check_tracker_image_hosts
+from src.screenshot_manifest import files as manifest_files
 from src.takescreens import TakeScreensManager, download_artwork_from_meta
 from src.temp_paths import artwork_dir, music_release_snapshot_path, screenshots_dir
 from src.torrent_manifest import TorrentManifest
@@ -1009,7 +1010,7 @@ async def _prompt_music_meta(meta: Meta) -> None:
 
 
 def book_screens(meta: Meta, min_successful_uploads: int) -> tuple[int, int]:
-    """Count non-poster PNG screenshots for a BOOK upload and cap the upload minimum.
+    """Count supported BOOK screenshots and cap the upload minimum.
 
     Args:
         meta: The metadata dictionary (needs ``base_dir`` and ``uuid``).
@@ -1017,11 +1018,13 @@ def book_screens(meta: Meta, min_successful_uploads: int) -> tuple[int, int]:
 
     Returns:
         A ``(actual_screens, capped_min)`` tuple where *actual_screens* is the
-        number of non-poster PNGs found and *capped_min* is
+        number of screenshots found and *capped_min* is
         ``min(min_successful_uploads, actual_screens)`` so the upload loop never
         requires more images than actually exist.
     """
-    screenshot_files = list(screenshots_dir(meta.base_dir, meta.uuid).glob("*.png"))
+    screenshot_files = manifest_files(meta.base_dir, meta.uuid, "main")
+    if not screenshot_files:
+        screenshot_files = [path for path in screenshots_dir(meta.base_dir, meta.uuid).iterdir() if path.is_file() and path.suffix.casefold() in {".jpg", ".jpeg", ".png"}]
     actual_screens = len(screenshot_files)
     capped_min = min(min_successful_uploads, actual_screens)
     return actual_screens, capped_min
