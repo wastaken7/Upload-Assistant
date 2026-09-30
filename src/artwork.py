@@ -3,6 +3,7 @@
 import asyncio
 import ipaddress
 import re
+import shutil
 import socket
 import warnings
 from io import BytesIO
@@ -155,6 +156,9 @@ def _write_png(source: Path | bytes, destination: Path) -> bool:
                 image = image.convert("RGBA" if "transparency" in image.info else "RGB")
             destination.parent.mkdir(parents=True, exist_ok=True)
             image.save(temporary, "PNG")
+        if not is_valid_cover_image(temporary):
+            temporary.unlink(missing_ok=True)
+            return False
         temporary.replace(destination)
         return True
     except OSError, SyntaxError, ValueError:
@@ -162,8 +166,29 @@ def _write_png(source: Path | bytes, destination: Path) -> bool:
         return False
 
 
+def _write_supported_original(source: Path | bytes, destination: Path) -> Path | None:
+    """Keep valid JPEG/PNG bytes and give the artifact the matching suffix."""
+    try:
+        if isinstance(source, Path) and source.stat().st_size > MAX_ARTWORK_BYTES:
+            return None
+        content = source.read_bytes() if isinstance(source, Path) else source
+        if len(content) > MAX_ARTWORK_BYTES or not is_valid_image_bytes(content):
+            return None
+        with Image.open(BytesIO(content)) as image:
+            suffix = {"JPEG": ".jpg", "PNG": ".png"}.get(image.format)
+        if suffix is None:
+            return None
+        target = destination.with_suffix(suffix)
+        temporary = target.with_suffix(".tmp")
+        temporary.write_bytes(content)
+        temporary.replace(target)
+        return target
+    except OSError, SyntaxError, ValueError:
+        return None
+
+
 async def prepare_artwork(meta: Meta) -> None:
-    """Resolve every artwork source into the canonical per-release PNG files.
+    """Resolve artwork into per-release files with a matching image suffix.
 
     Explicit arguments win over local files beside the media; those in turn win
     over category-specific extraction and remote metadata providers.
@@ -195,9 +220,40 @@ async def prepare_artwork(meta: Meta) -> None:
             continue
 
         destination = output_dir / output_name
-        if source is None or not await asyncio.to_thread(_write_png, source, destination):
+        original = await asyncio.to_thread(_write_supported_original, source, destination) if source is not None else None
+        if original is not None:
+            destination = original
+            prepared = True
+        else:
+            prepared = source is not None and await asyncio.to_thread(_write_png, source, destination)
+        if not prepared and destination.is_file() and not await asyncio.to_thread(is_valid_cover_image, destination):
+            destination.unlink(missing_ok=True)
+        if (
+            not prepared
+            and meta.category == "MUSIC"
+            and kind == "poster"
+            and source_path is not None
+            and source_path.suffix.casefold() in _COVER_SUFFIXES
+            and await asyncio.to_thread(is_valid_cover_image, source_path)
+        ):
+            # A valid JPEG/WebP may expand past the upload limit when re-encoded
+            # as PNG. Keep its original encoding in the per-release art directory.
+            original_format = output_dir / f"POSTER{source_path.suffix.casefold()}"
+            try:
+                if source_path != original_format:
+                    await asyncio.to_thread(shutil.copyfile, source_path, original_format)
+                destination = original_format
+                prepared = True
+            except OSError:
+                original_format.unlink(missing_ok=True)
+        if not prepared:
             logger.warning(f"[yellow]Could not prepare {input_name.replace('_', ' ')}; ignoring it.[/yellow]")
             continue
+
+        for suffix in (".jpg", ".jpeg", ".png", ".webp", ".gif"):
+            previous = output_dir / f"{Path(output_name).stem}{suffix}"
+            if previous != destination:
+                previous.unlink(missing_ok=True)
 
         setattr(meta, meta_name, str(destination))
         if input_name == "explicit_poster":

@@ -800,7 +800,8 @@ async def _upload_screens(
             # process-global ``cwd`` race between concurrent uploads.
             image_glob = [str(path) for path in registered_screens]
         else:
-            image_patterns = ["*.png", ".[!.]*.png"]
+            suffixes = ("png", "jpg", "jpeg") if meta.category == "BOOK" else ("png",)
+            image_patterns = [pattern for suffix in suffixes for pattern in (f"*.{suffix}", f".[!.]*.{suffix}")]
             image_glob = []
             for pattern in image_patterns:
                 glob_results = await asyncio.to_thread(lambda p=pattern: [str(path) for path in screenshot_path.glob(p)])
@@ -839,7 +840,7 @@ async def _upload_screens(
         # Sort images by numeric suffix
         def extract_numeric_suffix(filename: str) -> float:
             """Return the numeric screenshot suffix for stable ordering."""
-            match = re.search(r"-(\d+)\.png$", filename)
+            match = re.search(r"-(\d+)\.(?:png|jpe?g)$", filename, re.IGNORECASE)
             return int(match.group(1)) if match else float("inf")
 
         image_glob.sort(key=extract_numeric_suffix)

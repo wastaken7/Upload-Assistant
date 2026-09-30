@@ -1122,7 +1122,25 @@ class BJShare:
             "X-Requested-With": "XMLHttpRequest",
             "Accept": "application/json",
         }
-        files = {"file": (filename, image_bytes, "image/png")}
+        try:
+            with Image.open(BytesIO(image_bytes)) as image:
+                image_format = image.format
+                if image_format == "WEBP":
+                    converted = BytesIO()
+                    image.save(converted, format="PNG")
+                    image_bytes = converted.getvalue()
+                    image_format = "PNG"
+            content_type, extensions, default_extension = {
+                "JPEG": ("image/jpeg", {".pjp", ".jfif", ".jpe", ".pjpeg", ".jpeg", ".jpg"}, ".jpg"),
+                "PNG": ("image/png", {".png"}, ".png"),
+                "GIF": ("image/gif", {".gif"}, ".gif"),
+            }[image_format]
+        except OSError, KeyError, ValueError:
+            logger.info(f"{self.tracker}: Unsupported image format for image host: {filename}", extra={"markup": False})
+            return None
+        if Path(filename).suffix.casefold() not in extensions:
+            filename = f"{Path(filename).stem}{default_extension}"
+        files = {"file": (filename, image_bytes, content_type)}
 
         try:
             response = await self.session.post(upload_url, headers=headers, files=files, timeout=120)
@@ -1183,7 +1201,8 @@ class BJShare:
 
     async def get_screenshots(self, meta: Meta) -> list[str]:
         screens_dir = screenshots_dir(meta.base_dir, meta.uuid)
-        local_files = sorted((*screens_dir.glob("*.png"), *screens_dir.glob("*.webp")))
+        supported_suffixes = {".pjp", ".jfif", ".jpe", ".pjpeg", ".jpeg", ".jpg", ".png", ".gif", ".webp"}
+        local_files = sorted(path for path in screens_dir.iterdir() if path.is_file() and path.suffix.casefold() in supported_suffixes)
 
         disc_menu_links = [img.get("raw_url") for img in meta.menu_images if img.get("raw_url")][:3]
 
