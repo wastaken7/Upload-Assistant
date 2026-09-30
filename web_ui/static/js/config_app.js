@@ -959,7 +959,7 @@ const loadCsrfToken =
   (typeof window !== "undefined" && window.loadCsrfToken) || (async () => {});
 
 const sensitiveKeyPattern =
-  /(api|username|password|announce_url|rss_key|passkey|qui_proxy_url)/i;
+  /(api|username|password|announce_url|rss_key|passkey|qui_proxy_url|userhash)/i;
 const isSensitiveKey = (key) => sensitiveKeyPattern.test(key || "");
 const isTorrentClientUserPass = (key, pathParts) =>
   pathParts.includes("TORRENT_CLIENTS") && /(user|pass)/i.test(key || "");
@@ -992,6 +992,7 @@ const DISPLAY_LABEL_OVERRIDES = {
   fileLimit: "File Limit",
   processLimit: "Process Limit",
   dalexni_api: "Dalexni API Key",
+  catbox_userhash: "Catbox Userhash (optional)",
   imgbb_api: "ImgBB API Key",
   lensdump_api: "LensDump API Key",
   lostimg_api: "LostImg API Key",
@@ -1255,6 +1256,7 @@ const INLINE_FIELD_HELP = {
 };
 
 const imageHostApiKeys = {
+  catbox: ["catbox_userhash"],
   imgbb: ["imgbb_api"],
   lensdump: ["lensdump_api"],
   lostimg: ["lostimg_api"],
@@ -1282,6 +1284,7 @@ const REDUNDANT_IMAGE_HOST_API_HELP_KEYS = new Set([
 ]);
 
 const IMAGE_HOST_LABELS = {
+  catbox: "Catbox",
   dalexni: "Dalexni",
   imgbb: "ImgBB",
   imgbox: "Imgbox",

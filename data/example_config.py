@@ -226,7 +226,7 @@ config: dict[str, Any] = {
         "prowlarr_api_key": "",
         # --- IMAGE HOSTING ---
         # Order of image hosts, with the primary host first and backups after it.
-        # Available image hosts: dalexni, imgbb, imgbox, lensdump, lostimg, midnightscene, onlyimage, passtheimage, pixhost, ptscreens, seedpool_cdn, sharex, utppm, zipline
+        # Available image hosts: catbox, dalexni, imgbb, imgbox, lensdump, lostimg, midnightscene, onlyimage, passtheimage, pixhost, ptscreens, seedpool_cdn, sharex, utppm, zipline
         "img_host_1": "",
         "img_host_2": "",
         "img_host_3": "",
@@ -244,6 +244,8 @@ config: dict[str, Any] = {
         # Minimum number of successful image uploads required to continue.
         "min_successful_image_uploads": "3",
         # Image-host credentials
+        # Optional Catbox userhash. Leave blank for anonymous uploads.
+        "catbox_userhash": "",
         "dalexni_api": "",
         "imgbb_api": "",
         "lensdump_api": "",
