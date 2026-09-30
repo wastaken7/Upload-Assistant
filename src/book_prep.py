@@ -1046,7 +1046,8 @@ def sanitize_book_author(meta: Meta) -> None:
         normalized_author = re.sub(r"\s*[,;/&]+\s*$", "", normalized_author)
         normalized_author = re.sub(r"^\s*[,;/&]+\s*", "", normalized_author)
         normalized_author = re.sub(r"\b(?:and|e)\b\s*$", "", normalized_author, flags=re.IGNORECASE)
-        normalized_author = re.sub(r"^\s*\b(?:and|e)\b\s*", "", normalized_author, flags=re.IGNORECASE)
+        if not re.match(r"^\s*\b(?:and|e)\b", author, flags=re.IGNORECASE):
+            normalized_author = re.sub(r"^\s*\b(?:and|e)\b\s*", "", normalized_author, flags=re.IGNORECASE)
         normalized_author = re.sub(r"\s*-\s*$", "", normalized_author)
         normalized_author = re.sub(r"^\s*-\s*", "", normalized_author)
         normalized_author = re.sub(r"\s+", " ", normalized_author).strip()
@@ -1071,7 +1072,7 @@ def extract_first_author(author: str) -> str:
     normalized = author.replace("_", " ") if has_underscores else author
 
     # Split by common delimiters: comma, semicolon, ampersand, slash, plus, and, e, y, with, and space-hyphen-space
-    split_pattern = r"\s*(?:,|;|&|/|\+|\band\b|\be\b|\by\b|\bwith\b|\s+-\s+)\s*"
+    split_pattern = r"\s*(?:,|;|&|/|\+|\band\b|\s+\be\b\s+|\by\b|\bwith\b|\s+-\s+)\s*"
     parts = re.split(split_pattern, normalized, flags=re.IGNORECASE)
 
     first_author = parts[0].strip() if parts else ""
@@ -1149,7 +1150,8 @@ def clean_translator_from_author(author: str) -> tuple[str, str]:
     normalized = re.sub(r"\s*[,;/&]+\s*$", "", normalized)
     normalized = re.sub(r"^\s*[,;/&]+\s*", "", normalized)
     normalized = re.sub(r"\b(?:and|e)\b\s*$", "", normalized, flags=re.IGNORECASE)
-    normalized = re.sub(r"^\s*\b(?:and|e)\b\s*", "", normalized, flags=re.IGNORECASE)
+    if count1 or count2:
+        normalized = re.sub(r"^\s*\b(?:and|e)\b\s*", "", normalized, flags=re.IGNORECASE)
     normalized = re.sub(r"\s*-\s*$", "", normalized)
     normalized = re.sub(r"^\s*-\s*", "", normalized)
     normalized = re.sub(r"\s+", " ", normalized).strip()
