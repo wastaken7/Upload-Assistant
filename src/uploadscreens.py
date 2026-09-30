@@ -9,6 +9,7 @@ import time
 from collections.abc import Awaitable, Callable, Sequence
 from pathlib import Path
 from typing import Any, cast
+from urllib.parse import urlparse
 
 import aiofiles
 import httpx
@@ -124,6 +125,29 @@ async def upload_image_task(args: Sequence[Any]) -> dict[str, Any]:
                     return {"status": "failed", "reason": "Imgbox upload failed. No valid URLs returned."}
             except Exception as e:
                 return {"status": "failed", "reason": f"Error during Imgbox upload: {e!s}"}
+
+        elif img_host == "catbox":
+            data = {"reqtype": "fileupload"}
+            userhash = config.get("DEFAULT", {}).get("catbox_userhash", "").strip()
+            if userhash:
+                data["userhash"] = userhash
+            try:
+                async with httpx.AsyncClient() as client, aiofiles.open(image, "rb") as img_file:
+                    response = await client.post(
+                        "https://catbox.moe/user/api.php",
+                        data=data,
+                        files={"fileToUpload": (Path(image).name, await img_file.read())},
+                        timeout=timeout,
+                    )
+                url = response.text.strip()
+                parsed = urlparse(url)
+                if response.status_code != 200 or parsed.scheme != "https" or parsed.hostname != "files.catbox.moe" or not parsed.path.strip("/"):
+                    return {"status": "failed", "reason": f"Catbox upload failed (HTTP {response.status_code})"}
+                return {"status": "success", "img_url": url, "raw_url": url, "web_url": url, "local_file_path": image}
+            except httpx.TimeoutException:
+                return {"status": "failed", "reason": "Catbox request timed out"}
+            except httpx.RequestError as e:
+                return {"status": "failed", "reason": f"Catbox request failed: {e}"}
 
         elif img_host == "imgbb":
             url = "https://api.imgbb.com/1/upload"

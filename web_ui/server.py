@@ -3009,9 +3009,9 @@ def _redact_sensitive(value: Any) -> Any:
     """Return a copy of the value with sensitive dictionary fields redacted.
 
     Keys containing any of these substrings will be redacted (case-insensitive):
-    password, pass, secret, token, key, totp, api, credential, auth
+    password, pass, secret, token, key, totp, api, credential, auth, userhash
     """
-    sensitive_parts = ("password", "pass", "secret", "token", "key", "totp", "api", "credential", "auth")
+    sensitive_parts = ("password", "pass", "secret", "token", "key", "totp", "api", "credential", "auth", "userhash")
 
     if isinstance(value, Mapping):
         out: dict[str, Any] = {}
@@ -3038,7 +3038,7 @@ def _is_sensitive_key(key: Any) -> bool:
     if not isinstance(key, str):
         return False
     lowered = key.lower()
-    sensitive_parts = ("password", "pass", "secret", "token", "key", "totp", "api", "credential", "auth")
+    sensitive_parts = ("password", "pass", "secret", "token", "key", "totp", "api", "credential", "auth", "userhash")
     return any(part in lowered for part in sensitive_parts)
 
 
