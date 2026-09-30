@@ -192,7 +192,7 @@ class CapybaraBR(UNIT3D):
             game_lang_has_pt = "PORTUGUESE" in str(meta.languages).upper()
             game_lang_has_eng = "ENGLISH" in str(meta.languages).upper()
 
-            if game_has_multiple_languages and game_lang_has_pt:
+            if meta.manual_multi or (game_has_multiple_languages and game_lang_has_pt):
                 game_lang = "[MULTI]"
             elif game_lang_has_eng:
                 game_lang = "[INGLÊS]"
