@@ -1132,6 +1132,7 @@ class Args:
                         meta.manual_type = value2.upper().replace("-", "")
                     elif key in ("region", "distributor"):
                         meta[key] = value2.strip().upper()
+                        meta[f"bluray_auto_{key}"] = None
                     elif key == "tag":
                         meta[key] = f"-{value2}"
                     elif key == "description_file" or key == "comparison":

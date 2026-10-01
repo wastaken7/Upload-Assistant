@@ -1,5 +1,6 @@
 import asyncio
 import inspect
+import json
 from unittest.mock import AsyncMock
 
 import pytest
@@ -134,6 +135,58 @@ async def test_automatic_selection_carries_subheader(tmp_path, monkeypatch, regi
     assert meta.release_url == URL
     assert meta.release_subheader == LABEL
     assert meta.release_subheader_url == URL
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('selection', ['manual', 'automatic'])
+@pytest.mark.parametrize('restore', [False, True])
+@pytest.mark.parametrize('overrides', [(), ('region',), ('distributor',), ('region', 'distributor')])
+async def test_reselection_refreshes_auto_metadata_and_preserves_cli_overrides(tmp_path, monkeypatch, selection, restore, overrides):
+    first = release(subheader=LABEL)
+    second = release(subheader='Other Studio | US release') | {
+        'url': URL.replace('123456', '999'),
+        'release_id': '999',
+        'country': 'United States',
+        'publisher': 'Other Studio',
+    }
+    meta = Meta(base_dir=str(tmp_path), uuid='test', is_disc='BDMV', unattended=selection == 'automatic', bluray_single_score=1)
+    monkeypatch.setattr('src.bluray_com.fetch_release_details', AsyncMock(side_effect=lambda selected, _: selected))
+    if selection == 'manual':
+        folder = tmp_path / 'tmp' / 'test'
+        folder.mkdir(parents=True)
+        (folder / 'debug_bluray_BD_123.html').write_text('Cached release list')
+        monkeypatch.setattr('src.bluray_com.search_bluray', AsyncMock(return_value='Search results'))
+        monkeypatch.setattr('src.bluray_com.extract_bluray_links', lambda _: [{'releases_url': 'https://www.blu-ray.com/Example/123/', 'title': 'Example', 'year': '1981'}])
+        monkeypatch.setattr('src.bluray_com.extract_bluray_release_info', AsyncMock(side_effect=[[first], [second]]))
+        monkeypatch.setattr('src.bluray_com.cli_ui.ask_string', lambda _: '1')
+        await get_bluray_releases(meta)
+    else:
+        await process_all_releases([first], meta)
+    assert (meta.region, meta.distributor) == ('GBR', 'EXAMPLE STUDIO')
+
+    # An explicit override must be preserved even when it equals the auto-filled value.
+    if overrides:
+        args = [str(tmp_path)]
+        if selection == 'automatic':
+            args.append('--unattended')
+        for field in overrides:
+            args.extend([f'--{field}', getattr(meta, field).lower()])
+        meta, _, _ = Args({'DEFAULT': {'screens': 1}}).parse(args, meta)
+    if restore:
+        meta = Meta(json.loads(json.dumps(meta.to_dict())))
+    meta.edit = True
+    if selection == 'manual':
+        await get_bluray_releases(meta)
+    else:
+        await process_all_releases([second], meta)
+
+    assert meta.region == ('GBR' if 'region' in overrides else 'USA')
+    assert meta.distributor == ('EXAMPLE STUDIO' if 'distributor' in overrides else 'OTHER STUDIO')
+    assert meta.release_url == second['url']
+    # Manual selection fetches the label on demand; automatic selection carries it.
+    await ensure_release_subheader(meta)
+    assert meta.release_subheader == second['subheader']
+    assert meta.release_subheader_url == second['url']
 
 
 def test_html_and_bbcode_labels_are_text():
