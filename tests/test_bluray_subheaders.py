@@ -99,8 +99,9 @@ async def test_absent_subheader_is_not_refetched(monkeypatch):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize('distributor', ['', 'CUSTOM DISTRIBUTOR'])
 @pytest.mark.parametrize('region, expected', [('', 'GBR'), ('USA', 'USA')])
-async def test_manual_selection_without_covers_fetches_label_on_demand(tmp_path, monkeypatch, region, expected):
+async def test_manual_selection_without_covers_fetches_label_on_demand(tmp_path, monkeypatch, region, expected, distributor):
     folder = tmp_path / 'tmp' / 'test'
     folder.mkdir(parents=True)
     (folder / 'debug_bluray_BD_123.html').write_text('Cached release list')
@@ -110,10 +111,10 @@ async def test_manual_selection_without_covers_fetches_label_on_demand(tmp_path,
     monkeypatch.setattr('src.bluray_com.cli_ui.ask_string', lambda _: '1')
     fetched = AsyncMock(return_value=release(subheader=LABEL))
     monkeypatch.setattr('src.bluray_com.fetch_release_details', fetched)
-    meta, _, _ = Args({'DEFAULT': {'screens': 1}}).parse([str(tmp_path)] + (['--region', region.lower()] if region else []), Meta(base_dir=str(tmp_path), uuid='test', is_disc='BDMV', use_bluray_images=False))
+    meta, _, _ = Args({'DEFAULT': {'screens': 1}}).parse([str(tmp_path)] + (['--region', region.lower()] if region else []) + (['--distributor', distributor.lower()] if distributor else []), Meta(base_dir=str(tmp_path), uuid='test', is_disc='BDMV', use_bluray_images=False))
     await get_bluray_releases(meta)
     assert meta.region == expected
-    assert meta.distributor == 'EXAMPLE STUDIO'
+    assert meta.distributor == (distributor or 'EXAMPLE STUDIO')
     assert meta.release_url == URL
     fetched.assert_not_awaited()
     await builder().get_bluray_section(meta)
@@ -122,13 +123,14 @@ async def test_manual_selection_without_covers_fetches_label_on_demand(tmp_path,
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize('distributor', ['', 'CUSTOM DISTRIBUTOR'])
 @pytest.mark.parametrize('region, expected', [('', 'GBR'), ('USA', 'USA')])
-async def test_automatic_selection_carries_subheader(tmp_path, monkeypatch, region, expected):
+async def test_automatic_selection_carries_subheader(tmp_path, monkeypatch, region, expected, distributor):
     monkeypatch.setattr('src.bluray_com.fetch_release_details', AsyncMock(return_value=release(subheader=LABEL)))
-    meta = Meta(base_dir=str(tmp_path), uuid='test', is_disc='BDMV', unattended=True, bluray_single_score=1, region=region)
+    meta = Meta(base_dir=str(tmp_path), uuid='test', is_disc='BDMV', unattended=True, bluray_single_score=1, region=region, distributor=distributor)
     await process_all_releases([release()], meta)
     assert meta.region == expected
-    assert meta.distributor == 'EXAMPLE STUDIO'
+    assert meta.distributor == (distributor or 'EXAMPLE STUDIO')
     assert meta.release_url == URL
     assert meta.release_subheader == LABEL
     assert meta.release_subheader_url == URL

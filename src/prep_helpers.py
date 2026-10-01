@@ -1619,7 +1619,7 @@ async def finalize_metadata(
                         meta.video_width = int(float(video_track.get("Width", 0)))
                         meta.video_height = int(float(video_track.get("Height", 0)))
 
-        meta.distributor = await get_distributor(meta.distributor)
+        meta.distributor = await get_distributor(meta.distributor) or meta.distributor
         if meta.distributor is None:
             meta.distributor = ""
 
