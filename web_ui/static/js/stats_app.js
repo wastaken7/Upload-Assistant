@@ -191,6 +191,38 @@ const formatStatsDate = (value, pattern = "YYYY-MM-DD", short = false) => {
 };
 const formatDimensionValue = (value) =>
   String(value || "Unknown").replaceAll("_", " ");
+const CACHE_PROVIDER_LABELS = {
+  tmdb: "TMDb",
+  imdb: "IMDb",
+  tvdb: "TVDb",
+  tvmaze: "TVmaze",
+  anilist: "AniList",
+  douban: "Douban",
+  igdb: "IGDB",
+  steam: "Steam",
+  gazellegames: "GazelleGames",
+  google_books: "Google Books",
+  openlibrary: "Open Library",
+  myanonamouse: "MyAnonamouse",
+  musicbrainz: "MusicBrainz",
+  discogs: "Discogs",
+  audible: "Audible",
+};
+const formatCacheProvider = (value) => {
+  const key = String(value || "")
+    .trim()
+    .toLowerCase();
+  if (!key) return "Unknown";
+  return (
+    CACHE_PROVIDER_LABELS[key] ||
+    key
+      .replaceAll("_", " ")
+      .replace(/\b\w/g, (character) => character.toUpperCase())
+  );
+};
+const formatUploadType = (value) =>
+  ({ usenet_indexer: "indexer", torrent_tracker: "tracker" })[value] ||
+  formatDimensionValue(value);
 const OPERATION_LABELS = {
   credential_sync: "Sync credentials",
   image_upload: "Upload images",
@@ -2498,7 +2530,11 @@ function StatsApp() {
                               </span>
                             ),
                           },
-                          { label: "Type", key: "type" },
+                          {
+                            label: "Type",
+                            sortValue: (r) => formatUploadType(r.type),
+                            render: (r) => formatUploadType(r.type),
+                          },
                           {
                             label: "Attempts",
                             sortValue: (r) => r.attempts,
@@ -2748,7 +2784,7 @@ function StatsApp() {
                       <DonutChart
                         ariaLabel="Cache activity by provider"
                         rows={data.cache.by_provider.map((row) => ({
-                          label: row.provider,
+                          label: formatCacheProvider(row.provider),
                           value:
                             row.hits + row.misses + row.writes + row.bypasses,
                         }))}
@@ -2758,7 +2794,12 @@ function StatsApp() {
                       <Table
                         rows={data.cache.by_provider}
                         headers={[
-                          { label: "Provider", key: "provider" },
+                          {
+                            label: "Provider",
+                            sortValue: (row) =>
+                              formatCacheProvider(row.provider),
+                            render: (row) => formatCacheProvider(row.provider),
+                          },
                           { label: "Hits", key: "hits" },
                           { label: "Misses", key: "misses" },
                           { label: "Writes", key: "writes" },

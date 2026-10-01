@@ -14,6 +14,7 @@ from bs4.element import AttributeValueList
 
 from src.console import logger
 from src.meta import Meta
+from src.stats import record_event_async
 
 
 class SceneManager:
@@ -30,6 +31,18 @@ class SceneManager:
         if value is None:
             return ""
         return str(value)
+
+    async def _srrdb_get(self, client: httpx.AsyncClient, url: str, operation: str, request_timeout: float) -> httpx.Response:
+        started = time.monotonic()
+        try:
+            response = await client.get(url, timeout=request_timeout)
+        except Exception:
+            await record_event_async("api", service="srrdb", operation=operation, outcome="error", duration_ms=(time.monotonic() - started) * 1000)
+            raise
+        await record_event_async(
+            "api", service="srrdb", operation=operation, outcome="success" if response.status_code == 200 else "error", duration_ms=(time.monotonic() - started) * 1000
+        )
+        return response
 
     async def is_scene(self, video: str, meta: Meta, imdb: int | None = None, lower: bool = False) -> tuple[str, bool, int | None]:
         scene_start_time = 0.0
@@ -81,7 +94,7 @@ class SceneManager:
                     url = f"https://api.srrdb.com/v1/search/r:{quoted_base}"
                     logger.debug(f"Using SRRDB url: {url}")
                     try:
-                        response = await client.get(url, timeout=30.0)
+                        response = await self._srrdb_get(client, url, "search", 30.0)
                         if response.status_code == 200:
                             response_json = response.json()
                             # Save to cache
@@ -122,7 +135,7 @@ class SceneManager:
 
                             if release_details_dict is None:
                                 release_details_url = f"https://api.srrdb.com/v1/details/{release}"
-                                release_details_response = await client.get(release_details_url, timeout=30.0)
+                                release_details_response = await self._srrdb_get(client, release_details_url, "details", 30.0)
                                 if release_details_response.status_code == 200:
                                     release_details_dict = release_details_response.json()
                                     details_text = json.dumps(release_details_dict)
@@ -147,7 +160,7 @@ class SceneManager:
                                 meta.nfo = True
                                 meta.auto_nfo = True
                             else:
-                                nfo_response = await client.get(nfo_url, timeout=30.0)
+                                nfo_response = await self._srrdb_get(client, nfo_url, "nfo_download", 30.0)
                                 if nfo_response.status_code == 200:
                                     await asyncio.to_thread(Path(nfo_file_path).write_bytes, nfo_response.content)
                                     meta.nfo = True
@@ -173,7 +186,7 @@ class SceneManager:
                     logger.debug(f"Using SRRDB url: {url}")
 
                     try:
-                        response = await client.get(url, timeout=10.0)
+                        response = await self._srrdb_get(client, url, "search", 10.0)
                         response_json = response.json()
 
                         if int(response_json.get("resultsCount", 0)) > 0:
@@ -193,7 +206,7 @@ class SceneManager:
                                         nfo_file_path = Path(save_path) / f"{release_lower}.nfo"
 
                                         if not Path(nfo_file_path).exists():
-                                            nfo_response = await client.get(nfo_url, timeout=30.0)
+                                            nfo_response = await self._srrdb_get(client, nfo_url, "nfo_download", 30.0)
                                             if nfo_response.status_code == 200:
                                                 await asyncio.to_thread(Path(nfo_file_path).write_bytes, nfo_response.content)
                                                 meta.nfo = True

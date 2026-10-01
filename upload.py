@@ -2157,7 +2157,7 @@ def load_heavy_globals() -> None:
 
 async def do_the_thing(base_dir: str) -> None:
     from src.api_key_expiry import reset_api_key_expiry_warnings
-    from src.stats import configure_stats, record_completed_item_stats_async, record_event_async, record_release_profile_async, set_stats_context
+    from src.stats import accumulate_upload_durations, configure_stats, record_completed_item_stats_async, record_event_async, record_release_profile_async, set_stats_context
 
     reset_api_key_expiry_warnings()
     load_heavy_globals()
@@ -2766,6 +2766,7 @@ async def do_the_thing(base_dir: str) -> None:
                                                     list(other_api_trackers),
                                                     upload_target="usenet indexer",
                                                 )
+                                                accumulate_upload_durations(meta, meta_usenet, submission_trackers)
                                                 if is_pack_submission:
                                                     for tracker in submission_trackers:
                                                         meta.tracker_status.setdefault(tracker.upper(), {}).update(
@@ -2848,6 +2849,7 @@ async def do_the_thing(base_dir: str) -> None:
                                 list(other_api_trackers),
                                 bandwidth_control=bandwidth_control,
                             )
+                            accumulate_upload_durations(meta, meta_torrent, torrent_trackers)
 
                     async def wait_before_usenet_upload(meta: Meta = meta) -> None:
                         logger.info("\n[yellow]Checking bandwidth before starting Usenet upload...[/yellow]")

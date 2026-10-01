@@ -724,6 +724,32 @@ async def upload_image_task(args: Sequence[Any]) -> dict[str, Any]:
         return {"status": "failed", "reason": str(e)}
 
 
+async def upload_image_task_with_stats(args: Sequence[Any]) -> dict[str, Any]:
+    """Record a direct image-host upload outside UploadScreensManager."""
+    image_path = Path(str(args[0]))
+    started = time.monotonic()
+    try:
+        result = await upload_image_task(args)
+    except Exception:
+        await record_event_async("api", service=str(args[1]), operation="image_upload", outcome="error", duration_ms=(time.monotonic() - started) * 1000)
+        raise
+
+    success = result.get("status") == "success"
+    bytes_count = 0
+    if success:
+        with contextlib.suppress(OSError):
+            bytes_count = image_path.stat().st_size
+    await record_event_async(
+        "api",
+        service=str(args[1]),
+        operation="image_upload",
+        outcome="success" if success else "error",
+        duration_ms=(time.monotonic() - started) * 1000,
+        bytes_count=bytes_count,
+    )
+    return result
+
+
 async def _upload_screens(
     config: dict[str, Any],
     meta: Meta,

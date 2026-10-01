@@ -9,7 +9,7 @@ from src.tracker_images import ImageCollection, set_tracker_image_collection
 from src.trackers.common import Common
 from src.trackers.UNIT3D import UNIT3D
 from src.trackers.UNIT3D.capybarabr import CapybaraBR
-from src.uploadscreens import upload_image_task
+from src.uploadscreens import upload_image_task_with_stats as upload_image_task
 
 Config = dict[str, Any]
 

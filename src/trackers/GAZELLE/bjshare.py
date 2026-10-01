@@ -2,6 +2,7 @@
 import asyncio
 import platform
 import re
+import time
 from datetime import UTC, datetime
 from io import BytesIO
 from pathlib import Path
@@ -24,6 +25,7 @@ from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder
 from src.languages import languages_manager
 from src.meta import Meta
+from src.stats import record_event_async
 from src.temp_paths import screenshots_dir
 from src.tmdb import TmdbManager
 from src.trackers.common import Common
@@ -1142,6 +1144,8 @@ class BJShare:
             filename = f"{Path(filename).stem}{default_extension}"
         files = {"file": (filename, image_bytes, content_type)}
 
+        started = time.monotonic()
+        uploaded = False
         try:
             response = await self.session.post(upload_url, headers=headers, files=files, timeout=120)
             response.raise_for_status()
@@ -1153,10 +1157,20 @@ class BJShare:
             else:
                 logger.info(f"{self.tracker}: [bold red]The image host appears to be down.[/bold red]")
 
+            uploaded = bool(img_url)
             return img_url
         except Exception as e:
             logger.info(f"Exceção no upload de {filename}: {e}", extra={"markup": False})
             return None
+        finally:
+            await record_event_async(
+                "api",
+                service=self.tracker,
+                operation="image_upload",
+                outcome="success" if uploaded else "error",
+                duration_ms=(time.monotonic() - started) * 1000,
+                bytes_count=len(image_bytes) if uploaded else 0,
+            )
 
     async def get_cover(self, meta: Meta):
         category = meta.category
