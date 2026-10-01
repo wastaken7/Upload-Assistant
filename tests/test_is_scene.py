@@ -118,6 +118,26 @@ class _RoutedClient(_FakeAsyncClient):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("operation,url", [("search", _SEARCH_URL), ("details", _DETAILS_URL)])
+async def test_warning_response_is_returned_without_caching_and_can_be_retried(
+    tmp_path: Path, operation: str, url: str,
+) -> None:
+    warning_payload = {"warnings": ["Request could not be completed"]}
+    client = _RoutedClient({url: _Response(warning_payload)})
+    manager = SceneManager({"DEFAULT": {}})
+    cache_file = tmp_path / "cache" / "response.json"
+
+    assert await manager._cached_srrdb_request(client, url, cache_file, operation) == warning_payload
+    assert not cache_file.parent.exists()
+
+    client.routes[url] = _Response(_EMPTY_SEARCH)
+    assert await manager._cached_srrdb_request(client, url, cache_file, operation) == _EMPTY_SEARCH
+    assert json.loads(cache_file.read_text(encoding="utf-8")) == _EMPTY_SEARCH
+    assert await manager._cached_srrdb_request(client, url, cache_file, operation) == _EMPTY_SEARCH
+    assert client.requested_urls == [url, url]
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("cached_miss", [False, True])
 @pytest.mark.parametrize("count", [1, "1"])
 async def test_archived_filename_fallback_restores_release_and_reuses_cache(

@@ -55,11 +55,12 @@ class SceneManager:
             if response.status_code == 200:
                 payload = response.json()
                 if isinstance(payload, dict):
-                    try:
-                        await asyncio.to_thread(cache_file.parent.mkdir, parents=True, exist_ok=True)
-                        await asyncio.to_thread(cache_file.write_text, json.dumps(payload), encoding="utf-8")
-                    except OSError as e:
-                        logger.warning(f"[yellow]SRRDB: Could not save cache: {e}[/yellow]")
+                    if not payload.get("warnings"):
+                        try:
+                            await asyncio.to_thread(cache_file.parent.mkdir, parents=True, exist_ok=True)
+                            await asyncio.to_thread(cache_file.write_text, json.dumps(payload), encoding="utf-8")
+                        except OSError as e:
+                            logger.warning(f"[yellow]SRRDB: Could not save cache: {e}[/yellow]")
                     return payload
         except Exception as e:
             logger.info(f"[yellow]SRRDB: Request failed: {e}")
