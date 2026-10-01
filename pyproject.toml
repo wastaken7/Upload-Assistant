@@ -107,7 +107,7 @@ include = ["bin*", "data*", "src*", "web_ui*"]
 exclude = ["tests", "tmp", "build", "build.*"]
 
 [tool.setuptools.package-data]
-data = ["tags.json", "templates/*.csv", "templates/*.json"]
+data = ["tags.json", "templates/*.csv", "templates/*.json", "distributors/*.json"]
 web_ui = ["static/**/*", "templates/*.html"]
 
 [tool.ruff]
