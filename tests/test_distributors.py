@@ -56,14 +56,14 @@ def test_unknown_tracker_uses_upstream_only():
 @pytest.mark.parametrize("name", [path.stem for path in sorted((Path(__file__).resolve().parent.parent / "data" / "distributors").glob("*.json"))])
 def test_all_canonical_entries_round_trip(name):
     path = Path(__file__).resolve().parent.parent / "data" / "distributors" / f"{name}.json"
-    data = json.loads(path.read_text())
+    data = json.loads(path.read_text(encoding="utf-8"))
     tracker = "" if name == "default" else name.upper()
     if name == "default":
         assert set(map(int, data["distributors"])) == set(range(1, 966))
         assert set(data["aliases"].values()) <= set(range(1, 966))
     entries = data["distributors"]
     if name != "default":
-        default = json.loads((path.parent / "default.json").read_text())["distributors"]
+        default = json.loads((path.parent / "default.json").read_text(encoding="utf-8"))["distributors"]
         assert "source" not in data
         assert all(id_value not in default or default[id_value].upper() != label.upper() for id_value, label in entries.items())
         entries = {id_value: label for id_value, label in default.items() if int(id_value) not in data.get("excluded_ids", [])} | entries
@@ -155,7 +155,7 @@ def test_verified_empty_overrides_use_default_mapping(tracker):
     assert distributor_id("BFI", tracker) == distributor_id("BFI")
     assert distributor_name(965, tracker) == distributor_name(965)
     path = Path(__file__).resolve().parent.parent / "data" / "distributors" / f"{tracker.lower()}.json"
-    assert json.loads(path.read_text()) == {"distributors": {}}
+    assert json.loads(path.read_text(encoding="utf-8")) == {"distributors": {}}
 
 
 def test_latteam_only_supports_other():
@@ -272,7 +272,7 @@ def test_unaccented_cinematographe_alias(tracker, expected):
 
 def test_polishtorrent_only_has_ascii_spelling_aliases():
     path = Path(__file__).resolve().parent.parent / "data" / "distributors" / "polishtorrent.json"
-    assert json.loads(path.read_text())["aliases"] == {"PIEC SMAKOW": 1004, "PRIME": 969}
+    assert json.loads(path.read_text(encoding="utf-8"))["aliases"] == {"PIEC SMAKOW": 1004, "PRIME": 969}
 
 
 @pytest.mark.parametrize("alias, tracker, expected", [
@@ -381,8 +381,8 @@ def test_new_tracker_file_is_discovered_without_registration(tmp_path, monkeypat
     import src.distributors as distributors
 
     default_path = Path(__file__).resolve().parent.parent / "data" / "distributors" / "default.json"
-    (tmp_path / "default.json").write_text(default_path.read_text())
-    (tmp_path / "newtracker.json").write_text(json.dumps({"distributors": {"10001": "New Distributor"}, "aliases": {"NEW LABEL": 10001}}))
+    (tmp_path / "default.json").write_text(default_path.read_text(encoding="utf-8"), encoding="utf-8")
+    (tmp_path / "newtracker.json").write_text(json.dumps({"distributors": {"10001": "New Distributor"}, "aliases": {"NEW LABEL": 10001}}), encoding="utf-8")
     monkeypatch.setattr(distributors, "_DISTRIBUTOR_DIR", tmp_path)
     distributors._load_maps.cache_clear()
     try:
