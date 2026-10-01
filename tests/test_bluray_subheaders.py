@@ -27,6 +27,36 @@ def release(**kwargs):
     return dict(title='Example Series', url=URL, country='United Kingdom', publisher='Example Studio', price='', release_id='123456', **kwargs)
 
 
+@pytest.fixture
+def manual_release_selection(tmp_path, monkeypatch):
+    folder = tmp_path / 'tmp' / 'test'
+    folder.mkdir(parents=True)
+    (folder / 'debug_bluray_BD_123.html').write_text('Cached release list')
+    monkeypatch.setattr('src.bluray_com.search_bluray', AsyncMock(return_value='Search results'))
+    monkeypatch.setattr('src.bluray_com.extract_bluray_links', lambda _: [{'releases_url': 'https://www.blu-ray.com/Example/123/', 'title': 'Example', 'year': '1981'}])
+    releases = AsyncMock()
+    monkeypatch.setattr('src.bluray_com.extract_bluray_release_info', releases)
+    monkeypatch.setattr('src.bluray_com.cli_ui.ask_string', lambda _: '1')
+    return releases
+
+
+@pytest.fixture
+def select_release(request, monkeypatch, selection):
+    if selection == 'manual':
+        releases = request.getfixturevalue('manual_release_selection')
+
+        async def select(meta, selected):
+            releases.return_value = [selected]
+            await get_bluray_releases(meta)
+    else:
+        monkeypatch.setattr('src.bluray_com.fetch_release_details', AsyncMock(side_effect=lambda selected, _: selected))
+
+        async def select(meta, selected):
+            await process_all_releases([selected], meta)
+
+    return select
+
+
 @pytest.mark.asyncio
 async def test_subheader_without_specs_and_with_entities():
     result = await parse_release_details(HTML, release(), Meta())
@@ -102,14 +132,8 @@ async def test_absent_subheader_is_not_refetched(monkeypatch):
 @pytest.mark.asyncio
 @pytest.mark.parametrize('distributor', ['', 'CUSTOM DISTRIBUTOR'])
 @pytest.mark.parametrize('region, expected', [('', 'GBR'), ('USA', 'USA')])
-async def test_manual_selection_without_covers_fetches_label_on_demand(tmp_path, monkeypatch, region, expected, distributor):
-    folder = tmp_path / 'tmp' / 'test'
-    folder.mkdir(parents=True)
-    (folder / 'debug_bluray_BD_123.html').write_text('Cached release list')
-    monkeypatch.setattr('src.bluray_com.search_bluray', AsyncMock(return_value='Search results'))
-    monkeypatch.setattr('src.bluray_com.extract_bluray_links', lambda _: [{'releases_url': 'https://www.blu-ray.com/Example/123/', 'title': 'Example', 'year': '1981'}])
-    monkeypatch.setattr('src.bluray_com.extract_bluray_release_info', AsyncMock(return_value=[release()]))
-    monkeypatch.setattr('src.bluray_com.cli_ui.ask_string', lambda _: '1')
+async def test_manual_selection_without_covers_fetches_label_on_demand(tmp_path, monkeypatch, manual_release_selection, region, expected, distributor):
+    manual_release_selection.return_value = [release()]
     fetched = AsyncMock(return_value=release(subheader=LABEL))
     monkeypatch.setattr('src.bluray_com.fetch_release_details', fetched)
     meta, _, _ = Args({'DEFAULT': {'screens': 1}}).parse([str(tmp_path)] + (['--region', region.lower()] if region else []) + (['--distributor', distributor.lower()] if distributor else []), Meta(base_dir=str(tmp_path), uuid='test', is_disc='BDMV', use_bluray_images=False))
@@ -141,7 +165,7 @@ async def test_automatic_selection_carries_subheader(tmp_path, monkeypatch, regi
 @pytest.mark.parametrize('selection', ['manual', 'automatic'])
 @pytest.mark.parametrize('restore', [False, True])
 @pytest.mark.parametrize('overrides', [(), ('region',), ('distributor',), ('region', 'distributor')])
-async def test_reselection_refreshes_auto_metadata_and_preserves_cli_overrides(tmp_path, monkeypatch, selection, restore, overrides):
+async def test_reselection_refreshes_auto_metadata_and_preserves_cli_overrides(tmp_path, select_release, selection, restore, overrides):
     first = release(subheader=LABEL)
     second = release(subheader='Other Studio | US release') | {
         'url': URL.replace('123456', '999'),
@@ -150,18 +174,7 @@ async def test_reselection_refreshes_auto_metadata_and_preserves_cli_overrides(t
         'publisher': 'Other Studio',
     }
     meta = Meta(base_dir=str(tmp_path), uuid='test', is_disc='BDMV', unattended=selection == 'automatic', bluray_single_score=1)
-    monkeypatch.setattr('src.bluray_com.fetch_release_details', AsyncMock(side_effect=lambda selected, _: selected))
-    if selection == 'manual':
-        folder = tmp_path / 'tmp' / 'test'
-        folder.mkdir(parents=True)
-        (folder / 'debug_bluray_BD_123.html').write_text('Cached release list')
-        monkeypatch.setattr('src.bluray_com.search_bluray', AsyncMock(return_value='Search results'))
-        monkeypatch.setattr('src.bluray_com.extract_bluray_links', lambda _: [{'releases_url': 'https://www.blu-ray.com/Example/123/', 'title': 'Example', 'year': '1981'}])
-        monkeypatch.setattr('src.bluray_com.extract_bluray_release_info', AsyncMock(side_effect=[[first], [second]]))
-        monkeypatch.setattr('src.bluray_com.cli_ui.ask_string', lambda _: '1')
-        await get_bluray_releases(meta)
-    else:
-        await process_all_releases([first], meta)
+    await select_release(meta, first)
     assert (meta.region, meta.distributor) == ('GBR', 'EXAMPLE STUDIO')
 
     # An explicit override must be preserved even when it equals the auto-filled value.
@@ -175,10 +188,7 @@ async def test_reselection_refreshes_auto_metadata_and_preserves_cli_overrides(t
     if restore:
         meta = Meta(json.loads(json.dumps(meta.to_dict())))
     meta.edit = True
-    if selection == 'manual':
-        await get_bluray_releases(meta)
-    else:
-        await process_all_releases([second], meta)
+    await select_release(meta, second)
 
     assert meta.region == ('GBR' if 'region' in overrides else 'USA')
     assert meta.distributor == ('EXAMPLE STUDIO' if 'distributor' in overrides else 'OTHER STUDIO')

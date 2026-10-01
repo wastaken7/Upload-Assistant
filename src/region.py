@@ -272,8 +272,8 @@ async def get_region(bdinfo: dict[str, Any], region: str | None = None) -> str:
     return region
 
 
-async def get_distributor(distributor_in: str | None) -> str:
-    distributor_list = [
+_DISTRIBUTORS = frozenset(
+    (
         "01 DISTRIBUTION",
         "100 DESTINATIONS TRAVEL FILM",
         "101 FILMS",
@@ -2514,13 +2514,13 @@ async def get_distributor(distributor_in: str | None) -> str:
         "ZYX",
         "ZYX MUSIC",
         "車庫娛樂",
-    ]
-    distributor_out = ""
-    if distributor_in is not None and distributor_in not in ["None", ""]:
-        for each in distributor_list:
-            if distributor_in.upper() == each:
-                distributor_out = each
-    return distributor_out
+    )
+)
+
+
+async def get_distributor(distributor_in: str | None) -> str:
+    normalized = distributor_in.upper() if distributor_in else ""
+    return normalized if normalized in _DISTRIBUTORS else ""
 
 
 async def get_service(
