@@ -356,6 +356,15 @@ def tracker_route_outcome(status: Mapping[str, Any]) -> str:
     return "skipped:no_upload"
 
 
+def accumulate_upload_durations(meta: Any, flow_meta: Any, destinations: Iterable[str]) -> None:
+    """Keep measured upload times when a flow uses a copy of the item metadata."""
+    for destination in destinations:
+        key = f"{str(destination).replace(' ', '').upper()}_upload_duration"
+        duration = float(flow_meta.get(key) or 0)
+        if duration > 0:
+            meta[key] = float(meta.get(key) or 0) + duration
+
+
 async def record_completed_item_stats_async(meta: Any, tracker_class_map: Mapping[str, Any]) -> None:
     """Record global item facts and one complete route for every destination."""
     if not _enabled:

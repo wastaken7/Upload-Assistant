@@ -12,7 +12,7 @@ from src.tracker_images import (
 )
 from src.trackers.common import Common
 from src.trackers.UNIT3D import UNIT3D
-from src.uploadscreens import upload_image_task
+from src.uploadscreens import upload_image_task_with_stats as upload_image_task
 
 
 class CapybaraBR(UNIT3D):

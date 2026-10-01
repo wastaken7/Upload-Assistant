@@ -37,18 +37,25 @@ class _Session:
         ("WEBP", "page.webp", "page.png", "image/png"),
     ],
 )
-def test_bjshare_upload_uses_supported_image_format(image_format: str, input_name: str, expected_name: str, expected_type: str) -> None:
+def test_bjshare_upload_uses_supported_image_format(image_format: str, input_name: str, expected_name: str, expected_type: str, monkeypatch) -> None:
     image = BytesIO()
     Image.new("RGB", (16, 16), "green").save(image, image_format)
     tracker = object.__new__(BJShare)
     tracker.base_url = "https://bjshare.example"
     tracker.tracker = "BJSHARE"
     tracker.session = _Session()
+    events = []
+
+    async def record_event(_family, **kwargs):
+        events.append(kwargs)
+
+    monkeypatch.setattr("src.trackers.GAZELLE.bjshare.record_event_async", record_event)
 
     result = asyncio.run(tracker.img_host(image.getvalue(), input_name))
 
     assert result == "https://images.example/uploaded"  # noqa: S101
     filename, content, mime = tracker.session.files["file"]
+    assert [(event["service"], event["operation"], event["outcome"], event["bytes_count"]) for event in events] == [("BJSHARE", "image_upload", "success", len(content))]  # noqa: S101
     assert (filename, mime) == (expected_name, expected_type)  # noqa: S101
     with Image.open(BytesIO(content)) as uploaded:
         assert uploaded.format == ("PNG" if image_format == "WEBP" else image_format)  # noqa: S101

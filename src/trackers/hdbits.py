@@ -2,6 +2,7 @@
 import asyncio
 import json
 import re
+import time
 from pathlib import Path
 from typing import Any, cast
 from urllib.parse import quote, urlparse
@@ -17,6 +18,7 @@ from src.console import console, logger
 from src.description_review import get_base_description
 from src.exceptions import *  # noqa F403
 from src.meta import Meta
+from src.stats import record_event_async
 from src.temp_paths import screenshots_dir
 from src.torrent_policy import HDBITS_POLICY
 from src.trackers.common import Common
@@ -571,6 +573,25 @@ class HDBits:
 
         return
 
+    async def _post_image_batch(self, url: str, data: dict[str, Any], files: dict[str, tuple[str, bytes, str]]) -> httpx.Response:
+        started = time.monotonic()
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(url, data=data, files=files)
+        except Exception:
+            await record_event_async("api", service="hdbimg", operation="image_upload", outcome="error", duration_ms=(time.monotonic() - started) * 1000)
+            raise
+        uploaded = response.status_code == 200
+        await record_event_async(
+            "api",
+            service="hdbimg",
+            operation="image_upload",
+            outcome="success" if uploaded else "error",
+            duration_ms=(time.monotonic() - started) * 1000,
+            bytes_count=sum(len(file_bytes) for _, file_bytes, _ in files.values()) if uploaded else 0,
+        )
+        return response
+
     async def hdbimg_upload(self, meta: Meta) -> str | None:
         bbcode = ""
         response: httpx.Response | None = None
@@ -746,8 +767,7 @@ class HDBits:
                         chunk_size_mb = sum(Path(all_image_files[int(key.split("[")[1].split("]")[0])]).stat().st_size for key, _ in chunk) / (1024 * 1024)
                         logger.debug(f"{self.tracker}: [cyan]Uploading chunk {chunk_idx + 1}/{len(chunks)} ({len(file_list)} images, {chunk_size_mb:.2f} MiB)")
 
-                    async with httpx.AsyncClient(timeout=30.0) as client:
-                        response = await client.post(url, data=data, files=file_list)
+                    response = await self._post_image_batch(url, data, file_list)
                     if response.status_code == 200:
                         logger.info(f"{self.tracker}: [green]Chunk {chunk_idx + 1}/{len(chunks)} upload successful!")
                         bbcode += response.text
@@ -756,8 +776,7 @@ class HDBits:
                         upload_success = False
                         break
             else:
-                async with httpx.AsyncClient(timeout=30.0) as client:
-                    response = await client.post(url, data=data, files=upload_files)
+                response = await self._post_image_batch(url, data, upload_files)
                 if response.status_code == 200:
                     logger.info(f"{self.tracker}: [green]Upload successful!")
                     bbcode = response.text

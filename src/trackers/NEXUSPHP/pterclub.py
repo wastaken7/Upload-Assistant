@@ -2,6 +2,7 @@
 import glob
 import json
 import re
+import time
 from pathlib import Path
 from typing import Any, cast
 from urllib.parse import urlparse
@@ -16,6 +17,7 @@ from src.console import logger
 from src.cookie_auth import CookieValidator
 from src.exceptions import *  # noqa E403
 from src.meta import Meta
+from src.stats import record_event_async
 from src.temp_paths import screenshots_dir
 from src.trackers.common import Common
 
@@ -342,46 +344,59 @@ class PTerClub:
                 for image_path in images:
                     async with aiofiles.open(image_path, "rb") as f:
                         file_bytes = await f.read()
-                    req = await client.post(
-                        f"{url}/json",
-                        data=data,
-                        files={"source": (Path(image_path).name, file_bytes)},
-                    )
-
-                    res: Any = None
+                    started = time.monotonic()
+                    uploaded = False
                     try:
-                        res = req.json()
-                    except json.decoder.JSONDecodeError:
-                        res = None
+                        req = await client.post(
+                            f"{url}/json",
+                            data=data,
+                            files={"source": (Path(image_path).name, file_bytes)},
+                        )
 
-                    message = None
-                    if isinstance(res, dict):
+                        res: Any = None
+                        try:
+                            res = req.json()
+                        except json.decoder.JSONDecodeError:
+                            res = None
+
+                        message = None
+                        if isinstance(res, dict):
+                            res_dict = cast(dict[str, Any], res)
+                            error = cast(dict[str, Any], res_dict.get("error", {}))
+                            message = error.get("message")
+                        if not message:
+                            message = (req.reason_phrase or "").strip() or (req.text or "").strip()
+
+                        if not req.is_success:
+                            if message in ("重复上传", "Duplicated upload"):
+                                continue
+                            raise Exception(f"HTTP {req.status_code}, reason: {message}")
+
+                        if not isinstance(res, dict):
+                            raise ValueError("Unexpected response payload while uploading to Pterimg.")
                         res_dict = cast(dict[str, Any], res)
-                        error = cast(dict[str, Any], res_dict.get("error", {}))
-                        message = error.get("message")
-                    if not message:
-                        message = (req.reason_phrase or "").strip() or (req.text or "").strip()
-
-                    if not req.is_success:
-                        if message in ("重复上传", "Duplicated upload"):
-                            continue
-                        raise Exception(f"HTTP {req.status_code}, reason: {message}")
-
-                    if not isinstance(res, dict):
-                        raise ValueError("Unexpected response payload while uploading to Pterimg.")
-                    res_dict = cast(dict[str, Any], res)
-                    image_data = res_dict.get("image")
-                    if not isinstance(image_data, dict):
-                        raise ValueError("Missing image data in Pterimg response.")
-                    image_data_dict = cast(dict[str, Any], image_data)
-                    image_url = image_data_dict.get("url")
-                    if not isinstance(image_url, str):
-                        raise ValueError("Missing image url in Pterimg response.")
-                    image_dict = {
-                        "web_url": image_url,
-                        "img_url": image_url,
-                    }
-                    image_list.append(image_dict)
+                        image_data = res_dict.get("image")
+                        if not isinstance(image_data, dict):
+                            raise ValueError("Missing image data in Pterimg response.")
+                        image_data_dict = cast(dict[str, Any], image_data)
+                        image_url = image_data_dict.get("url")
+                        if not isinstance(image_url, str):
+                            raise ValueError("Missing image url in Pterimg response.")
+                        image_dict = {
+                            "web_url": image_url,
+                            "img_url": image_url,
+                        }
+                        image_list.append(image_dict)
+                        uploaded = True
+                    finally:
+                        await record_event_async(
+                            "api",
+                            service="pterimg",
+                            operation="image_upload",
+                            outcome="success" if uploaded else "error",
+                            duration_ms=(time.monotonic() - started) * 1000,
+                            bytes_count=len(file_bytes) if uploaded else 0,
+                        )
         return image_list
 
     async def get_name(self, meta: Meta) -> str:

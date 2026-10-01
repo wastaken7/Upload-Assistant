@@ -164,6 +164,36 @@ async def test_completed_item_records_one_route_per_tracker_and_supports_filteri
 
 
 @pytest.mark.asyncio
+async def test_completed_item_keeps_upload_durations_from_flow_copies(monkeypatch, tmp_path):
+    monkeypatch.setattr(stats, "_database_path", lambda _state_dir=None: tmp_path / "data" / "stats.sqlite3")
+
+    class TorrentTracker:
+        is_usenet = False
+
+    class UsenetIndexer:
+        is_usenet = True
+
+    meta = Meta(
+        category="MOVIE",
+        tracker_status={"FICTIONAL": {"upload_success": True}, "IMAGINARY": {"upload_success": True}},
+    )
+    torrent_flow = meta.copy()
+    torrent_flow["FICTIONAL_upload_duration"] = 1.25
+    stats.accumulate_upload_durations(meta, torrent_flow, ["FICTIONAL"])
+
+    for duration in (0.5, 0.75):
+        usenet_submission = meta.copy()
+        usenet_submission["IMAGINARY_upload_duration"] = duration
+        stats.accumulate_upload_durations(meta, usenet_submission, ["IMAGINARY"])
+
+    await stats.record_completed_item_stats_async(meta, {"FICTIONAL": TorrentTracker, "IMAGINARY": UsenetIndexer})
+    destinations = {row["destination"]: row for row in stats.get_stats("all", "real", tmp_path)["uploads"]["by_destination"]}
+
+    assert destinations["FICTIONAL"]["average_duration_ms"] == 1250
+    assert destinations["IMAGINARY"]["average_duration_ms"] == 1250
+
+
+@pytest.mark.asyncio
 async def test_duplicate_only_item_is_not_classified_as_an_error(monkeypatch, tmp_path):
     monkeypatch.setattr(stats, "_database_path", lambda _state_dir=None: tmp_path / "data" / "stats.sqlite3")
     meta = Meta(
