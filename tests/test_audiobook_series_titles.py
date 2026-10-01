@@ -29,6 +29,19 @@ def test_normalize_audiobook_title_removes_repeated_series_volume_suffix():
     )
 
 
+def test_normalize_audiobook_title_removes_matching_trailing_series_index():
+    assert normalize_audiobook_title("Livro Inventado 2", "Coleção Fictícia", "2") == "Livro Inventado"  # noqa: S101
+
+
+def test_normalize_audiobook_title_keeps_other_trailing_numbers():
+    assert normalize_audiobook_title("Livro Inventado 12", "Coleção Fictícia", "2") == "Livro Inventado 12"  # noqa: S101
+    assert normalize_audiobook_title("Livro Inventado 2", "Coleção Fictícia", "3") == "Livro Inventado 2"  # noqa: S101
+
+
+def test_normalize_audiobook_title_keeps_title_without_index():
+    assert normalize_audiobook_title("Livro Inventado 2", "Coleção Fictícia") == "Livro Inventado 2"  # noqa: S101
+
+
 def test_extract_audiobook_series_without_comma():
     assert extract_audiobook_series_from_title("Livro Exemplo: Série Imaginária Livro 2") == ("Livro Exemplo", "Série Imaginária", "2")  # noqa: S101
 

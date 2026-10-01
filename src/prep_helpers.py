@@ -891,6 +891,11 @@ def _should_fetch_bluray_info(meta: Meta, get_bluray_info: bool) -> bool:
     )
 
 
+def _should_lookup_torrent_properties(meta: Meta, ids: dict[str, Any] | None) -> bool:
+    """Avoid repeating a client lookup after a reusable torrent was resolved."""
+    return bool(meta.infohash is not None and not meta.base_torrent_created and not meta.we_checked_them_all and not meta.reuse_torrent_path and not ids)
+
+
 async def search_metadata(
     prep_instance: Any,
     meta: Meta,
@@ -1026,7 +1031,7 @@ async def search_metadata(
             meta.we_checked_them_all = False
 
         # if not auto qbittorrent search, this also checks with the infohash if passed.
-        if meta.infohash is not None and not meta.base_torrent_created and not meta.we_checked_them_all and not ids:
+        if _should_lookup_torrent_properties(meta, ids):
             meta = await client.get_ptp_from_hash(meta)
 
         if not meta.edit and (not ids or meta.tracker_ids):

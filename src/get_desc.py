@@ -1262,6 +1262,64 @@ class DescriptionBuilder:
 
         return "\n".join(part for part in game_parts if part.strip())
 
+    @staticmethod
+    def _build_music_tracklist(tracks: list[Any], labels: dict[str, Any], table: bool = True) -> str:
+        """Render the audio files in disc/track order from the release snapshot."""
+
+        def positive_number(value: Any) -> int | None:
+            try:
+                number = int(value)
+            except TypeError, ValueError, OverflowError:
+                return None
+            return number if number > 0 else None
+
+        ordered = []
+        for index, track in enumerate(tracks):
+            if not isinstance(track, dict):
+                continue
+            relative_path = str(track.get("relative_path") or "")
+            title = str(track.get("title") or "").strip() or Path(relative_path.replace("\\", "/")).stem
+            if not title:
+                continue
+            disc = positive_number(track.get("disc_number")) or 1
+            number = positive_number(track.get("track_number"))
+            ordered.append((disc, number, relative_path.casefold(), index, title, track.get("duration")))
+
+        if not ordered:
+            return ""
+        ordered.sort(key=lambda item: (item[0], item[1] if item[1] is not None else float("inf"), item[2], item[3]))
+        multiple_discs = len({item[0] for item in ordered}) > 1
+        lines = [f"[h2]{labels['tracklist']}[/h2]"]
+        if table:
+            lines.extend(
+                [
+                    "[table]",
+                    f"[tr][td][b]{labels['track_number']}[/b][/td][td][b]{labels['title']}[/b][/td][td][b]{labels['duration']}[/b][/td][/tr]",
+                ]
+            )
+        for disc, number, _, _, title, duration in ordered:
+            # BBCode needs bracket protection, but HTML escaping turns apostrophes
+            # and ampersands into visible entities on some trackers.
+            safe_title = title.replace("[", "\uff3b").replace("]", "\uff3d").replace("<", "\u2039").replace(">", "\u203a")
+            try:
+                seconds = float(duration)
+            except TypeError, ValueError, OverflowError:
+                seconds = 0
+            duration_text = ""
+            if 0 < seconds < float("inf"):
+                minutes, remainder = divmod(round(seconds), 60)
+                duration_text = f"{minutes:02d}:{remainder:02d}"
+            track_number = f"{number:02d}" if number is not None else "—"
+            if multiple_discs:
+                track_number = f"{disc}.{track_number}"
+            if table:
+                lines.append(f"[tr][td]{track_number}[/td][td]{safe_title}[/td][td]{duration_text}[/td][/tr]")
+            else:
+                lines.append(f"{track_number}. {safe_title}" + (f" ({duration_text})" if duration_text else ""))
+        if table:
+            lines.append("[/table]")
+        return "\n".join(lines)
+
     def _build_music_desc_section(self, meta: Meta, table: bool = True) -> str:
         """Build a tracker-neutral BBCode summary for MUSIC-category uploads."""
         if meta.category != "MUSIC" or not isinstance(meta.music_release, dict):
@@ -1403,7 +1461,8 @@ class DescriptionBuilder:
             body = "\n".join(table_lines)
         else:
             body = "\n".join(f"[b]{label}:[/b] {field_value}" for label, field_value in music_fields)
-        return f"{header}{text['details']}{header_end}\n{body}"
+        tracklist = self._build_music_tracklist(tracks, text, table=table)
+        return f"{header}{text['details']}{header_end}\n{body}" + (f"\n\n{tracklist}" if tracklist else "")
 
     async def general_description_generator(
         self,

@@ -110,6 +110,7 @@ from src.meta_file import write_meta_file
 from src.qbitwait import Wait
 from src.queuemanage import QueueManager
 from src.rehostimages import check_tracker_image_hosts
+from src.screenshot_manifest import files as manifest_files
 from src.takescreens import TakeScreensManager, download_artwork_from_meta
 from src.temp_paths import artwork_dir, music_release_snapshot_path, screenshots_dir
 from src.torrent_manifest import TorrentManifest
@@ -1009,7 +1010,7 @@ async def _prompt_music_meta(meta: Meta) -> None:
 
 
 def book_screens(meta: Meta, min_successful_uploads: int) -> tuple[int, int]:
-    """Count non-poster PNG screenshots for a BOOK upload and cap the upload minimum.
+    """Count supported BOOK screenshots and cap the upload minimum.
 
     Args:
         meta: The metadata dictionary (needs ``base_dir`` and ``uuid``).
@@ -1017,11 +1018,13 @@ def book_screens(meta: Meta, min_successful_uploads: int) -> tuple[int, int]:
 
     Returns:
         A ``(actual_screens, capped_min)`` tuple where *actual_screens* is the
-        number of non-poster PNGs found and *capped_min* is
+        number of screenshots found and *capped_min* is
         ``min(min_successful_uploads, actual_screens)`` so the upload loop never
         requires more images than actually exist.
     """
-    screenshot_files = list(screenshots_dir(meta.base_dir, meta.uuid).glob("*.png"))
+    screenshot_files = manifest_files(meta.base_dir, meta.uuid, "main")
+    if not screenshot_files:
+        screenshot_files = [path for path in screenshots_dir(meta.base_dir, meta.uuid).iterdir() if path.is_file() and path.suffix.casefold() in {".jpg", ".jpeg", ".png"}]
     actual_screens = len(screenshot_files)
     capped_min = min(min_successful_uploads, actual_screens)
     return actual_screens, capped_min
@@ -2154,7 +2157,7 @@ def load_heavy_globals() -> None:
 
 async def do_the_thing(base_dir: str) -> None:
     from src.api_key_expiry import reset_api_key_expiry_warnings
-    from src.stats import configure_stats, record_completed_item_stats_async, record_event_async, record_release_profile_async, set_stats_context
+    from src.stats import accumulate_upload_durations, configure_stats, record_completed_item_stats_async, record_event_async, record_release_profile_async, set_stats_context
 
     reset_api_key_expiry_warnings()
     load_heavy_globals()
@@ -2557,7 +2560,7 @@ async def do_the_thing(base_dir: str) -> None:
                 if config["DEFAULT"].get("cross_seeding", True):
                     await process_cross_seeds(meta)
                 if not meta.site_check:
-                    logger.info("we are not uploading.......")
+                    logger.info("No new upload to a tracker was performed.")
                     if "queue" in meta and meta.queue is not None:
                         processed_files_count += 1
                         skipped_files_count += 1
@@ -2763,6 +2766,7 @@ async def do_the_thing(base_dir: str) -> None:
                                                     list(other_api_trackers),
                                                     upload_target="usenet indexer",
                                                 )
+                                                accumulate_upload_durations(meta, meta_usenet, submission_trackers)
                                                 if is_pack_submission:
                                                     for tracker in submission_trackers:
                                                         meta.tracker_status.setdefault(tracker.upper(), {}).update(
@@ -2845,6 +2849,7 @@ async def do_the_thing(base_dir: str) -> None:
                                 list(other_api_trackers),
                                 bandwidth_control=bandwidth_control,
                             )
+                            accumulate_upload_durations(meta, meta_torrent, torrent_trackers)
 
                     async def wait_before_usenet_upload(meta: Meta = meta) -> None:
                         logger.info("\n[yellow]Checking bandwidth before starting Usenet upload...[/yellow]")
