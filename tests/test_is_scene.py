@@ -58,7 +58,14 @@ class _FakeAsyncClient:
 @pytest.mark.asyncio
 async def test_default_meta_searches_srrdb_and_downloads_nfo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     client = _FakeAsyncClient()
+    events: list[tuple[str, str, str]] = []
+
+    async def record_event(family: str, **kwargs: Any) -> None:
+        assert kwargs["service"] == "srrdb"
+        events.append((family, kwargs["operation"], kwargs["outcome"]))
+
     monkeypatch.setattr("src.is_scene.httpx.AsyncClient", lambda: client)
+    monkeypatch.setattr("src.is_scene.record_event_async", record_event)
     meta = Meta(base_dir=str(tmp_path), uuid="scene-test", category="MOVIE")
 
     video, scene, imdb = await SceneManager({"DEFAULT": {}}).is_scene(
@@ -80,6 +87,11 @@ async def test_default_meta_searches_srrdb_and_downloads_nfo(tmp_path: Path, mon
     assert meta.nfo is True
     assert meta.auto_nfo is True
     assert nfo_path.read_bytes() == b"scene nfo contents"
+    assert events == [("api", "search", "success"), ("api", "details", "success"), ("api", "nfo_download", "success")]
+
+    await SceneManager({"DEFAULT": {}}).is_scene("/downloads/Example.Release.2024.1080p.WEB.H264-GROUP.mkv", meta)
+    assert len(client.requested_urls) == 3
+    assert len(events) == 3
 
 
 _BASENAME = "generic-title.2024.1080p.bluray-examplegroup"
@@ -121,7 +133,14 @@ async def test_archived_filename_fallback_restores_release_and_reuses_cache(
         }),
         nfo_url: _Response(content=b"generic scene nfo"),
     })
+    events: list[tuple[str, str, str]] = []
+
+    async def record_event(family: str, **kwargs: Any) -> None:
+        assert kwargs["service"] == "srrdb"
+        events.append((family, kwargs["operation"], kwargs["outcome"]))
+
     monkeypatch.setattr("src.is_scene.httpx.AsyncClient", lambda: client)
+    monkeypatch.setattr("src.is_scene.record_event_async", record_event)
     search_cache = tmp_path / "tmp" / "scene-test" / "srrdb" / "search" / f"{_BASENAME}.json"
     if cached_miss:
         search_cache.parent.mkdir(parents=True)
@@ -141,6 +160,10 @@ async def test_archived_filename_fallback_restores_release_and_reuses_cache(
     expected = [_SEARCH_URL, _DETAILS_URL, nfo_url]
     if not cached_miss:
         expected.insert(0, f"https://api.srrdb.com/v1/search/r:{_BASENAME}")
+    expected_events = [("api", "search", "success"), ("api", "details", "success"), ("api", "nfo_download", "success")]
+    if not cached_miss:
+        expected_events.insert(0, ("api", "search", "success"))
+    assert events == expected_events
     assert client.requested_urls == expected
     assert json.loads(search_cache.read_text(encoding="utf-8")) == _EMPTY_SEARCH
 
@@ -444,3 +467,53 @@ async def test_directory_is_not_compared_to_an_archived_file(tmp_path: Path, mon
         str(video), _RELEASE, {"archived-files": [{"name": f"{_BASENAME}.mkv", "size": 1}]},
     )
     assert not warnings
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("result", "expected_outcome"), [("no_match", "success"), ("http_error", "error"), ("request_error", "error")])
+async def test_srrdb_search_records_no_match_and_failures(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, result: str, expected_outcome: str) -> None:
+    class SearchClient(_FakeAsyncClient):
+        async def get(self, url: str, **_kwargs: Any) -> _Response:
+            self.requested_urls.append(url)
+            if result == "request_error":
+                raise OSError("network unavailable")
+            response = _Response({"resultsCount": 0, "results": []})
+            if result == "http_error":
+                response.status_code = 503
+            return response
+
+    events: list[tuple[str, str, str]] = []
+
+    async def record_event(_family: str, **kwargs: Any) -> None:
+        events.append((kwargs["service"], kwargs["operation"], kwargs["outcome"]))
+
+    client = SearchClient()
+    monkeypatch.setattr("src.is_scene.httpx.AsyncClient", lambda: client)
+    monkeypatch.setattr("src.is_scene.record_event_async", record_event)
+    meta = Meta(base_dir=str(tmp_path), uuid="scene-failure", category="MOVIE")
+
+    _, scene, _ = await SceneManager({"DEFAULT": {}}).is_scene("/downloads/Fictional.Release.mkv", meta)
+
+    assert scene is False
+    expected_requests = 6 if result == "no_match" else 1
+    assert len(client.requested_urls) == expected_requests
+    assert events == [("srrdb", "search", expected_outcome)] * expected_requests
+
+
+@pytest.mark.asyncio
+async def test_lowercase_srrdb_search_records_search_and_details(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    client = _FakeAsyncClient()
+    operations: list[str] = []
+
+    async def record_event(_family: str, **kwargs: Any) -> None:
+        operations.append(kwargs["operation"])
+
+    monkeypatch.setattr("src.is_scene.httpx.AsyncClient", lambda: client)
+    monkeypatch.setattr("src.is_scene.record_event_async", record_event)
+    meta = Meta(base_dir=str(tmp_path), uuid="lowercase-scene", filename="Fictional.Release", tag="-GROUP", imdb_id=1234567, nfo=True)
+
+    _, scene, _ = await SceneManager({"DEFAULT": {}}).is_scene("/downloads/fictional.release.mkv", meta, lower=True)
+
+    assert scene is True
+    assert len(client.requested_urls) == 2
+    assert operations == ["search", "details"]

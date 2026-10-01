@@ -1,6 +1,7 @@
 // Keep Image Host dropdowns usable when config metadata omits the host list.
 (() => {
   const IMAGE_HOSTS = Object.freeze([
+    "catbox",
     "dalexni",
     "imgbb",
     "imgbox",

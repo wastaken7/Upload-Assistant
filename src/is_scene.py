@@ -17,6 +17,7 @@ from rich.markup import escape
 
 from src.console import logger, prompt_in_thread
 from src.meta import Meta
+from src.stats import record_event_async
 
 
 class SceneFileMismatchError(ValueError):
@@ -38,7 +39,7 @@ class SceneManager:
             return ""
         return str(value)
 
-    async def _cached_srrdb_request(self, client: httpx.AsyncClient, url: str, cache_file: Path) -> dict[str, Any] | None:
+    async def _cached_srrdb_request(self, client: httpx.AsyncClient, url: str, cache_file: Path, operation: str = "search") -> dict[str, Any] | None:
         if cache_file.exists():
             try:
                 cached = json.loads(await asyncio.to_thread(cache_file.read_text, encoding="utf-8"))
@@ -50,7 +51,7 @@ class SceneManager:
 
         logger.debug(f"Using SRRDB url: {url}")
         try:
-            response = await client.get(url, timeout=30.0)
+            response = await self._srrdb_get(client, url, operation, 30.0)
             if response.status_code == 200:
                 payload = response.json()
                 if isinstance(payload, dict):
@@ -67,7 +68,7 @@ class SceneManager:
     async def _release_details(self, client: httpx.AsyncClient, release: str, cache_dir: Path) -> dict[str, Any] | None:
         safe_release = re.sub(r"[^A-Za-z0-9._-]+", "_", Path(release).name).strip("._") or "scene_release"
         return await self._cached_srrdb_request(
-            client, f"https://api.srrdb.com/v1/details/{urllib.parse.quote(release, safe='')}", cache_dir / f"{safe_release}.json",
+            client, f"https://api.srrdb.com/v1/details/{urllib.parse.quote(release, safe='')}", cache_dir / f"{safe_release}.json", operation="details",
         )
 
     def _archived_files(self, details: dict[str, Any]) -> list[dict[str, Any]]:
@@ -194,6 +195,18 @@ class SceneManager:
         if not approved:
             raise SceneFileMismatchError(message)
 
+    async def _srrdb_get(self, client: httpx.AsyncClient, url: str, operation: str, request_timeout: float) -> httpx.Response:
+        started = time.monotonic()
+        try:
+            response = await client.get(url, timeout=request_timeout)
+        except Exception:
+            await record_event_async("api", service="srrdb", operation=operation, outcome="error", duration_ms=(time.monotonic() - started) * 1000)
+            raise
+        await record_event_async(
+            "api", service="srrdb", operation=operation, outcome="success" if response.status_code == 200 else "error", duration_ms=(time.monotonic() - started) * 1000
+        )
+        return response
+
     async def is_scene(self, video: str, meta: Meta, imdb: int | None = None, lower: bool = False) -> tuple[str, bool, int | None]:
         scene_start_time = 0.0
         if meta.debug:
@@ -283,7 +296,7 @@ class SceneManager:
                                 meta.nfo = True
                                 meta.auto_nfo = True
                             else:
-                                nfo_response = await client.get(nfo_url, timeout=30.0)
+                                nfo_response = await self._srrdb_get(client, nfo_url, "nfo_download", 30.0)
                                 if nfo_response.status_code == 200:
                                     await asyncio.to_thread(Path(nfo_file_path).write_bytes, nfo_response.content)
                                     meta.nfo = True
@@ -309,7 +322,7 @@ class SceneManager:
                     logger.debug(f"Using SRRDB url: {url}")
 
                     try:
-                        response = await client.get(url, timeout=10.0)
+                        response = await self._srrdb_get(client, url, "search", 10.0)
                         response_json = response.json()
 
                         if int(response_json.get("resultsCount", 0)) > 0:
@@ -331,7 +344,7 @@ class SceneManager:
                                         nfo_file_path = Path(save_path) / f"{release_lower}.nfo"
 
                                         if not Path(nfo_file_path).exists():
-                                            nfo_response = await client.get(nfo_url, timeout=30.0)
+                                            nfo_response = await self._srrdb_get(client, nfo_url, "nfo_download", 30.0)
                                             if nfo_response.status_code == 200:
                                                 await asyncio.to_thread(Path(nfo_file_path).write_bytes, nfo_response.content)
                                                 meta.nfo = True

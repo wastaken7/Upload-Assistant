@@ -164,6 +164,36 @@ async def test_completed_item_records_one_route_per_tracker_and_supports_filteri
 
 
 @pytest.mark.asyncio
+async def test_completed_item_keeps_upload_durations_from_flow_copies(monkeypatch, tmp_path):
+    monkeypatch.setattr(stats, "_database_path", lambda _state_dir=None: tmp_path / "data" / "stats.sqlite3")
+
+    class TorrentTracker:
+        is_usenet = False
+
+    class UsenetIndexer:
+        is_usenet = True
+
+    meta = Meta(
+        category="MOVIE",
+        tracker_status={"FICTIONAL": {"upload_success": True}, "IMAGINARY": {"upload_success": True}},
+    )
+    torrent_flow = meta.copy()
+    torrent_flow["FICTIONAL_upload_duration"] = 1.25
+    stats.accumulate_upload_durations(meta, torrent_flow, ["FICTIONAL"])
+
+    for duration in (0.5, 0.75):
+        usenet_submission = meta.copy()
+        usenet_submission["IMAGINARY_upload_duration"] = duration
+        stats.accumulate_upload_durations(meta, usenet_submission, ["IMAGINARY"])
+
+    await stats.record_completed_item_stats_async(meta, {"FICTIONAL": TorrentTracker, "IMAGINARY": UsenetIndexer})
+    destinations = {row["destination"]: row for row in stats.get_stats("all", "real", tmp_path)["uploads"]["by_destination"]}
+
+    assert destinations["FICTIONAL"]["average_duration_ms"] == 1250
+    assert destinations["IMAGINARY"]["average_duration_ms"] == 1250
+
+
+@pytest.mark.asyncio
 async def test_duplicate_only_item_is_not_classified_as_an_error(monkeypatch, tmp_path):
     monkeypatch.setattr(stats, "_database_path", lambda _state_dir=None: tmp_path / "data" / "stats.sqlite3")
     meta = Meta(
@@ -368,6 +398,20 @@ def test_web_media_without_a_service_is_grouped_as_unknown():
 
     assert ("streaming_service", "Unknown") in dimensions
     assert ("streaming_service", "Unknown") not in stats.media_profile_dimensions(Meta(category="MOVIE", type="REMUX"))
+    assert not any(name == "streaming_service" for name, _value in stats.media_profile_dimensions(Meta(category="BOOK", audiobook=True)))  # noqa: S101
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("service", "name"), [("audible", "Audible"), ("ubook", "Ubook")])
+async def test_book_streaming_service_appears_in_stats(monkeypatch, tmp_path, service, name):
+    monkeypatch.setattr(stats, "_database_path", lambda _state_dir=None: tmp_path / "data" / "stats.sqlite3")
+    meta = Meta(category="BOOK", audiobook=True, service=service, service_longname=name, source_size=12_000)
+
+    await stats.record_media_profile_async(meta)
+    result = stats.get_stats("all", "real", tmp_path)
+
+    assert ("streaming_service", name) in stats.media_profile_dimensions(meta)  # noqa: S101
+    assert result["streaming"]["services"] == [{"service": name, "items": 1, "bytes": 12_000, "average_item_bytes": 12_000}]  # noqa: S101
 
 
 @pytest.mark.parametrize(

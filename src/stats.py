@@ -93,6 +93,9 @@ def media_profile_dimensions(meta: Any) -> list[tuple[str, str]]:
         add("media", getattr(meta, "music_media", "") or getattr(meta, "source", ""))
         add("audio_codec", _audio_codec_bucket(getattr(meta, "audio", "") or getattr(meta, "type", "")))
     elif category == "BOOK":
+        streaming_service = getattr(meta, "service_longname", "") or getattr(meta, "service", "")
+        if streaming_service:
+            add("streaming_service", streaming_service)
         kind = (
             "audiobook"
             if getattr(meta, "audiobook", False)
@@ -351,6 +354,15 @@ def tracker_route_outcome(status: Mapping[str, Any]) -> str:
     if status.get("upload_success") is False or status.get("upload") is True:
         return "error"
     return "skipped:no_upload"
+
+
+def accumulate_upload_durations(meta: Any, flow_meta: Any, destinations: Iterable[str]) -> None:
+    """Keep measured upload times when a flow uses a copy of the item metadata."""
+    for destination in destinations:
+        key = f"{str(destination).replace(' ', '').upper()}_upload_duration"
+        duration = float(flow_meta.get(key) or 0)
+        if duration > 0:
+            meta[key] = float(meta.get(key) or 0) + duration
 
 
 async def record_completed_item_stats_async(meta: Any, tracker_class_map: Mapping[str, Any]) -> None:

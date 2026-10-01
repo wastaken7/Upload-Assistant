@@ -191,6 +191,38 @@ const formatStatsDate = (value, pattern = "YYYY-MM-DD", short = false) => {
 };
 const formatDimensionValue = (value) =>
   String(value || "Unknown").replaceAll("_", " ");
+const CACHE_PROVIDER_LABELS = {
+  tmdb: "TMDb",
+  imdb: "IMDb",
+  tvdb: "TVDb",
+  tvmaze: "TVmaze",
+  anilist: "AniList",
+  douban: "Douban",
+  igdb: "IGDB",
+  steam: "Steam",
+  gazellegames: "GazelleGames",
+  google_books: "Google Books",
+  openlibrary: "Open Library",
+  myanonamouse: "MyAnonamouse",
+  musicbrainz: "MusicBrainz",
+  discogs: "Discogs",
+  audible: "Audible",
+};
+const formatCacheProvider = (value) => {
+  const key = String(value || "")
+    .trim()
+    .toLowerCase();
+  if (!key) return "Unknown";
+  return (
+    CACHE_PROVIDER_LABELS[key] ||
+    key
+      .replaceAll("_", " ")
+      .replace(/\b\w/g, (character) => character.toUpperCase())
+  );
+};
+const formatUploadType = (value) =>
+  ({ usenet_indexer: "indexer", torrent_tracker: "tracker" })[value] ||
+  formatDimensionValue(value);
 const OPERATION_LABELS = {
   credential_sync: "Sync credentials",
   image_upload: "Upload images",
@@ -709,9 +741,9 @@ const Card = ({ icon, label, value, detail, trend }) => (
   </article>
 );
 
-const MetricGroup = ({ title, global = false, children }) => (
+const MetricGroup = ({ title, subtitle, global = false, children }) => (
   <section className="ua-stats-panel rounded-xl p-3 shadow-sm">
-    <h2 className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider opacity-65">
+    <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider opacity-65">
       {title}
       {global && (
         <span className="rounded-full border px-2 py-0.5 normal-case tracking-normal">
@@ -719,6 +751,7 @@ const MetricGroup = ({ title, global = false, children }) => (
         </span>
       )}
     </h2>
+    {subtitle && <p className="mb-3 mt-1 text-xs opacity-60">{subtitle}</p>}
     <div className="grid gap-3 sm:grid-cols-2">{children}</div>
   </section>
 );
@@ -1299,9 +1332,50 @@ const ReliabilityBadge = ({ rate, attempts }) => {
   );
 };
 
-function SankeyDiagram({ sankey }) {
+const UPLOAD_FLOW_TRACKER_LIMIT = 7;
+
+function groupUploadFlow(sankey, showAll = false) {
   const nodes = sankey?.nodes || [];
   const links = sankey?.links || [];
+  const trackers = nodes
+    .filter((node) => node.kind === "tracker")
+    .sort((a, b) => b.total - a.total);
+  if (showAll || trackers.length <= UPLOAD_FLOW_TRACKER_LIMIT)
+    return { nodes, links };
+
+  const hiddenTrackers = trackers.slice(UPLOAD_FLOW_TRACKER_LIMIT);
+  const hiddenIds = new Set(hiddenTrackers.map((node) => node.id));
+  const othersId = "tracker:group:others";
+  const groupedLinks = new Map();
+  for (const link of links) {
+    const source = hiddenIds.has(link.source) ? othersId : link.source;
+    const target = hiddenIds.has(link.target) ? othersId : link.target;
+    const key = JSON.stringify([source, target]);
+    if (groupedLinks.has(key)) groupedLinks.get(key).value += link.value;
+    else groupedLinks.set(key, { ...link, source, target });
+  }
+  return {
+    nodes: [
+      ...nodes.filter((node) => node.kind === "root"),
+      ...trackers.slice(0, UPLOAD_FLOW_TRACKER_LIMIT),
+      {
+        id: othersId,
+        kind: "tracker",
+        label: "others",
+        total: hiddenTrackers.reduce((total, node) => total + node.total, 0),
+      },
+      ...nodes.filter((node) => node.kind === "outcome"),
+    ],
+    links: [...groupedLinks.values()],
+  };
+}
+
+function SankeyDiagram({ sankey }) {
+  const [showAll, setShowAll] = useState(false);
+  const { nodes, links } = groupUploadFlow(sankey, showAll);
+  const canExpand =
+    (sankey?.nodes || []).filter((node) => node.kind === "tracker").length >
+    UPLOAD_FLOW_TRACKER_LIMIT;
   const root = nodes.find((node) => node.kind === "root");
   const trackers = nodes.filter((node) => node.kind === "tracker");
   const outcomes = nodes.filter((node) => node.kind === "outcome");
@@ -1333,6 +1407,18 @@ function SankeyDiagram({ sankey }) {
   };
   return (
     <div>
+      {canExpand && (
+        <div className="mb-3 flex justify-end">
+          <button
+            type="button"
+            className="rounded-lg border px-3 py-2 text-sm"
+            aria-expanded={showAll}
+            onClick={() => setShowAll((value) => !value)}
+          >
+            {showAll ? "Show top 7" : "Show all"}
+          </button>
+        </div>
+      )}
       <div className="overflow-x-auto">
         <svg
           viewBox={`0 0 760 ${height}`}
@@ -2029,7 +2115,8 @@ function StatsApp() {
   };
 
   const overview = data?.overview || {};
-  const activeTrackerRow = (data?.filters?.destinations || []).find(
+  const destinations = data?.filters?.destinations || [];
+  const activeTrackerRow = destinations.find(
     (row) => row.destination === activeTracker,
   );
   const toggleTracker = (destination) =>
@@ -2149,6 +2236,22 @@ function StatsApp() {
             <p className="mt-1 text-sm opacity-60">Local daily aggregates.</p>
           </div>
           <div className="ua-stats-toolbar flex flex-wrap items-stretch gap-2">
+            <select
+              aria-label="Tracker or indexer"
+              value={activeTracker}
+              onChange={(event) => setActiveTracker(event.target.value)}
+              className="ua-stats-control min-w-0 max-w-full rounded-xl px-4 text-sm"
+            >
+              <option value="">Global</option>
+              {activeTracker && !activeTrackerRow && (
+                <option value={activeTracker}>{activeTracker}</option>
+              )}
+              {destinations.map((row) => (
+                <option key={row.destination} value={row.destination}>
+                  {row.display_name || row.destination}
+                </option>
+              ))}
+            </select>
             <div
               className="ua-stats-period-group flex flex-wrap items-center rounded-xl p-1"
               role="group"
@@ -2280,7 +2383,10 @@ function StatsApp() {
               )}
               <div className="grid gap-4 xl:grid-cols-2">
                 {visible.throughput && (
-                  <MetricGroup title="Throughput & scale">
+                  <MetricGroup
+                    title="Throughput & scale"
+                    subtitle="A quick view of completed items, uploads, and data volume."
+                  >
                     {visible.itemsCompleted && (
                       <Card
                         icon="items-completed"
@@ -2320,7 +2426,10 @@ function StatsApp() {
                   </MetricGroup>
                 )}
                 {visible.efficiency && (
-                  <MetricGroup title="Efficiency & intelligence">
+                  <MetricGroup
+                    title="Efficiency & intelligence"
+                    subtitle="See duplicate prevention and work saved by reusing torrents."
+                  >
                     {visible.duplicatesPrevented && (
                       <Card
                         icon="duplicates-prevented"
@@ -2350,6 +2459,7 @@ function StatsApp() {
                 {visible.health && (
                   <MetricGroup
                     title="Health & infrastructure"
+                    subtitle="Check cache performance and calls to external services."
                     global={Boolean(activeTracker)}
                   >
                     {visible.cacheHitRate && (
@@ -2383,7 +2493,10 @@ function StatsApp() {
                   </MetricGroup>
                 )}
                 {visible.artifactsSummary && (
-                  <MetricGroup title="Generated artifacts">
+                  <MetricGroup
+                    title="Generated artifacts"
+                    subtitle="See how many torrents, NZBs, and screenshots were created."
+                  >
                     {visible.torrentsCreated && (
                       <Card
                         icon="torrents-created"
@@ -2415,7 +2528,7 @@ function StatsApp() {
                 <Section
                   icon="daily-activity"
                   title="Daily activity"
-                  subtitle="The three lines are separate measures and are not intended to be added together."
+                  subtitle="Follow activity over time. Each line shows a different measure."
                 >
                   <TrendChart
                     rows={data.timeline}
@@ -2429,7 +2542,7 @@ function StatsApp() {
                 <Section
                   icon="upload-flow"
                   title="Upload flow"
-                  subtitle="Each unit is one processed item × target tracker route."
+                  subtitle="Follow items from each destination to their upload result. An item sent to multiple sites appears once per site."
                 >
                   <SankeyDiagram sankey={data.sankey} />
                 </Section>
@@ -2438,7 +2551,7 @@ function StatsApp() {
                 <Section
                   icon="activity-heatmap"
                   title="Activity heatmap"
-                  subtitle="Completed items in the last year."
+                  subtitle="See how many items were completed each day over the past year."
                 >
                   <ActivityHeatmap
                     rows={data.heatmap}
@@ -2451,7 +2564,7 @@ function StatsApp() {
                 <Section
                   icon="uploads-by-destination"
                   title="Uploads by destination"
-                  subtitle="One release uploaded to several sites counts once for each destination."
+                  subtitle="Uploads to multiple sites are counted once per site."
                 >
                   <ChartWithTable
                     chart={
@@ -2487,7 +2600,11 @@ function StatsApp() {
                               </span>
                             ),
                           },
-                          { label: "Type", key: "type" },
+                          {
+                            label: "Type",
+                            sortValue: (r) => formatUploadType(r.type),
+                            render: (r) => formatUploadType(r.type),
+                          },
                           {
                             label: "Attempts",
                             sortValue: (r) => r.attempts,
@@ -2561,7 +2678,11 @@ function StatsApp() {
               {(visible.categories || visible.artifactActivity) && (
                 <div className="grid gap-5 lg:grid-cols-2">
                   {visible.categories && (
-                    <Section icon="categories" title="Categories">
+                    <Section
+                      icon="categories"
+                      title="Categories"
+                      subtitle="See upload results and data volume for each content category."
+                    >
                       <ChartWithTable
                         chart={
                           <DonutChart
@@ -2592,7 +2713,11 @@ function StatsApp() {
                     </Section>
                   )}
                   {visible.artifactActivity && (
-                    <Section icon="artifact-activity" title="Artifact activity">
+                    <Section
+                      icon="artifact-activity"
+                      title="Artifact activity"
+                      subtitle="See which files were created or reused during processing."
+                    >
                       <ChartWithTable
                         chart={
                           <DonutChart
@@ -2638,7 +2763,7 @@ function StatsApp() {
                 <Section
                   icon="content-time"
                   title="Successful media time"
-                  subtitle="Each successfully processed item is counted once, regardless of destination. Unknown runtimes are excluded."
+                  subtitle="See the total duration of successfully uploaded media. Each item counts once, and items without a known duration are left out."
                 >
                   <ChartWithTable
                     chart={
@@ -2685,7 +2810,7 @@ function StatsApp() {
                 <Section
                   icon="media-profile"
                   title="Media profile"
-                  subtitle="Low-cardinality technical characteristics."
+                  subtitle="Explore video, audio, format, and other details by category."
                 >
                   <MediaProfile
                     media={data.media}
@@ -2700,7 +2825,7 @@ function StatsApp() {
                     <Section
                       icon="streaming-services"
                       title="Streaming services"
-                      subtitle="Processed WEB items grouped by their identified source."
+                      subtitle="See the services identified for WEB and BOOK items."
                     >
                       <StreamingServices services={data.streaming.services} />
                     </Section>
@@ -2709,7 +2834,7 @@ function StatsApp() {
                     <Section
                       icon="personal-releases"
                       title="Personal releases"
-                      subtitle="Aggregate results only; release groups and tags are never stored."
+                      subtitle="Compare personal and standard releases. Release group names and tags are not saved."
                     >
                       <ReleaseProfiles
                         releaseProfiles={data.release_profiles}
@@ -2722,18 +2847,14 @@ function StatsApp() {
                 <Section
                   icon="cache-by-provider"
                   title="Cache by provider"
-                  subtitle={
-                    activeTracker
-                      ? "Global · not affected by the tracker filter."
-                      : ""
-                  }
+                  subtitle={`${activeTracker ? "These totals include all trackers, even when one is selected. " : ""}See cache hits, misses, and writes for each provider.`}
                 >
                   <ChartWithTable
                     chart={
                       <DonutChart
                         ariaLabel="Cache activity by provider"
                         rows={data.cache.by_provider.map((row) => ({
-                          label: row.provider,
+                          label: formatCacheProvider(row.provider),
                           value:
                             row.hits + row.misses + row.writes + row.bypasses,
                         }))}
@@ -2743,7 +2864,12 @@ function StatsApp() {
                       <Table
                         rows={data.cache.by_provider}
                         headers={[
-                          { label: "Provider", key: "provider" },
+                          {
+                            label: "Provider",
+                            sortValue: (row) =>
+                              formatCacheProvider(row.provider),
+                            render: (row) => formatCacheProvider(row.provider),
+                          },
                           { label: "Hits", key: "hits" },
                           { label: "Misses", key: "misses" },
                           { label: "Writes", key: "writes" },
@@ -2768,7 +2894,7 @@ function StatsApp() {
                 <Section
                   icon="external-operations"
                   title="External operations"
-                  subtitle={`${activeTracker ? "Global · not affected by the tracker filter. " : ""}Logical adapter operations; internal redirects and retries are not counted separately. Bytes sent are available for NNTP and successful image uploads.`}
+                  subtitle={`${activeTracker ? "These totals include all trackers, even when one is selected. " : ""}See how often external services were used. Redirects and retries are not counted separately. Bytes sent are shown for NNTP and successful image uploads.`}
                 >
                   <ChartWithTable
                     chart={
@@ -2815,7 +2941,11 @@ function StatsApp() {
                 </Section>
               )}
               {visible.executionSource && (
-                <Section icon="execution-source" title="Execution source">
+                <Section
+                  icon="execution-source"
+                  title="Execution source"
+                  subtitle="See whether completed items were started from the command line or web interface."
+                >
                   <ChartWithTable
                     chart={
                       <DonutChart

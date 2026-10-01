@@ -3,6 +3,7 @@ import asyncio
 import json
 import platform
 import re
+import time
 import uuid
 from pathlib import Path
 from typing import Any
@@ -20,6 +21,7 @@ from src.cookie_auth import CookieValidator
 from src.get_desc import DescriptionBuilder
 from src.languages import languages_manager
 from src.meta import Meta
+from src.stats import record_event_async
 from src.temp_paths import screenshots_dir
 from src.trackers.common import Common
 from src.trackers.naming import add_incomplete_pack_marker
@@ -453,6 +455,8 @@ class AZTrackerBase:
 
         files = {"qqfile": (filename, image_bytes, "image/png")}
 
+        started = time.monotonic()
+        uploaded = False
         try:
             response = await self.session.post(upload_url, headers=headers, data=data, files=files)
 
@@ -460,7 +464,8 @@ class AZTrackerBase:
                 json_data = response.json()
                 if json_data.get("success"):
                     image_id = json_data.get("imageId")
-                    return str(image_id) if image_id is not None else None
+                    uploaded = image_id is not None
+                    return str(image_id) if uploaded else None
                 error_message = json_data.get("error", "Unknown image host error.")
                 logger.info(f"{self.tracker}: Error uploading {filename}: {error_message}", extra={"markup": False})
                 return None
@@ -469,6 +474,15 @@ class AZTrackerBase:
         except Exception as e:
             logger.info(f"{self.tracker}: Exception when uploading {filename}: {e}", extra={"markup": False})
             return None
+        finally:
+            await record_event_async(
+                "api",
+                service=self.tracker,
+                operation="image_upload",
+                outcome="success" if uploaded else "error",
+                duration_ms=(time.monotonic() - started) * 1000,
+                bytes_count=len(image_bytes) if uploaded else 0,
+            )
 
     async def get_screenshots(self, meta: Meta) -> list[str] | None:
         screens_dir = screenshots_dir(meta.base_dir, meta.uuid)

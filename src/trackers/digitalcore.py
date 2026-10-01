@@ -201,17 +201,19 @@ class DigitalCore:
             #         abcdefghijklmnopqrstuvwxyz
             #         0123456789 . -
             # https://scenerules.org/html/2014_BLURAY.html
-            tracker_name = tracker_name.replace("DD+", "DDP").replace("DTS:", "DTS-").replace("HDR10+", "HDR10P")
-            tracker_name = unicodedata.normalize("NFD", tracker_name)
-            tracker_name = "".join(c for c in tracker_name if c.isascii() and (c.isalnum() or c in (" ", ".", "-")))
-            tracker_name = tracker_name.replace("!", "")
+            tracker_name = self.clean_name(tracker_name)
             if scene_name:
                 tracker_name += " [UNRAR]"
-
         else:
-            tracker_name = f"{scene_name} [UNRAR]" if scene_name else meta.basename_no_ext
+            tracker_name = f"{scene_name} [UNRAR]" if scene_name else self.clean_name(meta.basename_no_ext)
 
         return tracker_name
+
+    def clean_name(self, tracker_name: str) -> str:
+        tracker_name = tracker_name.replace("DD+", "DDP").replace("DTS:", "DTS-").replace("HDR10+", "HDR10P")
+        tracker_name = unicodedata.normalize("NFD", tracker_name)
+        tracker_name = "".join(c for c in tracker_name if c.isascii() and (c.isalnum() or c in (" ", ".", "-")))
+        return tracker_name.replace("!", "")
 
     async def get_firstpic(self, meta: Meta) -> str:
         if meta.category in ("BOOK", "MUSIC"):
