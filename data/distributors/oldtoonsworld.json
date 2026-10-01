@@ -5,5 +5,8 @@
     "968": "US Manga Corps",
     "969": "ADV Films",
     "970": "Crunchyroll"
+  },
+  "aliases": {
+    "CRUNCHYROLL LLC": 970
   }
 }

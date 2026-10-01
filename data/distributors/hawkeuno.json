@@ -967,5 +967,17 @@
     963,
     964,
     965
+  ],
+  "aliases": {
+    "WAC": 19,
+    "WARNER ARCHIVE COLLECTION": 19
+  },
+  "excluded_aliases": [
+    "BUENA VISTA",
+    "DISNEY / BUENA VISTA",
+    "DISNEY BUENA VISTA",
+    "WARNER",
+    "WARNER BROS",
+    "WARNER BROS."
   ]
 }

@@ -59,5 +59,9 @@
   },
   "excluded_ids": [
     17
-  ]
+  ],
+  "aliases": {
+    "PIEC SMAKOW": 1004,
+    "PRIME": 969
+  }
 }

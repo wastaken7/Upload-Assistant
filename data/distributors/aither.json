@@ -64,5 +64,15 @@
   "excluded_ids": [
     18,
     757
-  ]
+  ],
+  "aliases": {
+    "CINEMATOGRAPHE": 969,
+    "CRUNCHYROLL": 968,
+    "CRUNCHYROLL LLC": 968,
+    "FACTORY 25": 982,
+    "US MANGA CORPS": 991,
+    "VIZ MEDIA": 996,
+    "WAC": 974,
+    "WARNER ARCHIVE": 974
+  }
 }
