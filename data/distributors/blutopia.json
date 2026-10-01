@@ -392,7 +392,12 @@
   "excluded_ids": [
     18
   ],
+  "comments": [
+    "Atlantic Film (89) and AtlanticFilm (1037) have separate IDs",
+    "StudioCanal (820) and Studio Canal (1184) have separate IDs"
+  ],
   "aliases": {
+    "ANTI WORLDS": 1210,
     "ARCADES": 971,
     "CAHIERS DU CINEMA": 1076,
     "CINEMATOGRAPHE": 990,
@@ -407,6 +412,9 @@
     "RADIOTELEVISIONE ITALIANA": 1165,
     "RAI": 1165,
     "RENE CHATEAU VIDEO": 1169,
+    "SALZGEBER & CO": 1173,
+    "SOURCE 1 MEDIA": 1018,
+    "SOURCE 1 MEDIA BV": 1018,
     "VERTICE CINE": 1338,
     "WAC": 1204,
     "WARNER ARCHIVE": 1204

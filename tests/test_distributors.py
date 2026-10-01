@@ -189,11 +189,11 @@ def test_hawkeuno_aliases_follow_names_not_upstream_ids():
     ("Crunchyroll", "AITHER", "968"),
     ("Crunchyroll", "ASIANCINEMA", "978"),
     ("Crunchyroll", "BLUTOPIA", "985"),
-    ("Crunchyroll, LLC", "OLDTOONSWORLD", ""),
+    ("Crunchyroll, LLC", "OLDTOONSWORLD", "970"),
     ("Crunchyroll", "ULCX", "966"),
     ("US Manga Corps", "AITHER", "991"),
     ("US Manga Corps", "ASIANCINEMA", "998"),
-    ("U.S. Manga Corps", "OLDTOONSWORLD", ""),
+    ("U.S. Manga Corps", "OLDTOONSWORLD", "968"),
     ("VIZ Media", "AITHER", "996"),
     ("Factory 25", "AITHER", "982"),
     ("Factory 25", "BLUTOPIA", "1025"),
@@ -206,6 +206,52 @@ def test_hawkeuno_aliases_follow_names_not_upstream_ids():
 ])
 def test_obvious_aliases_follow_tracker_ids(alias, tracker, expected):
     assert distributor_id(alias.lower(), tracker) == expected
+
+
+@pytest.mark.parametrize("alias, tracker, expected, canonical", [
+    ("Cine Asia", "", "175", "Cine-Asia"),
+    ("CineAsia", "", "175", "Cine-Asia"),
+    ("AV Jet", "", "96", "AV-JET"),
+    ("Bennett Watt Media", "", "115", "Bennett-Watt Media"),
+    ("Astro Records and Filmworks", "", "87", "Astro Records & Filmworks"),
+    ("U.S. Manga Corps", "OLDTOONSWORLD", "968", "US Manga Corps"),
+    ("Crunchyroll, LLC", "OLDTOONSWORLD", "970", "Crunchyroll"),
+    ("VIZ Media LLC", "AITHER", "996", "VIZ Media, LLC"),
+    ("Anti Worlds", "BLUTOPIA", "1210", "Anti-Worlds"),
+    ("Source 1 Media", "BLUTOPIA", "1018", "Source 1 Media B.V."),
+    ("Source 1 Media BV", "BLUTOPIA", "1018", "Source 1 Media B.V."),
+    ("Salzgeber & Co", "BLUTOPIA", "1173", "Salzgeber & Co."),
+])
+@pytest.mark.asyncio
+async def test_added_spelling_aliases_preserve_canonical_names(alias, tracker, expected, canonical):
+    from src.region import get_distributor
+
+    assert await get_distributor(alias.lower()) == alias.upper()
+    assert distributor_id(f" {alias.lower()} ", tracker) == expected
+    assert distributor_name(expected, tracker) == canonical.upper()
+
+
+@pytest.mark.parametrize("tracker", [path.stem for path in sorted((Path(__file__).resolve().parent.parent / "data" / "distributors").glob("*.json"))])
+def test_default_spelling_aliases_follow_tracker_availability(tracker):
+    for alias, canonical in [
+        ("Cine Asia", "Cine-Asia"),
+        ("CineAsia", "Cine-Asia"),
+        ("AV Jet", "AV-JET"),
+        ("Bennett Watt Media", "Bennett-Watt Media"),
+        ("Astro Records and Filmworks", "Astro Records & Filmworks"),
+    ]:
+        assert distributor_id(alias, tracker) == distributor_id(canonical, tracker)
+
+
+@pytest.mark.parametrize("tracker, first, first_id, second, second_id", [
+    ("", "Entertainment One", "300", "entertainmentone", "302"),
+    ("ASIANCINEMA", "A-film", "24", "Afilm", "1003"),
+    ("BLUTOPIA", "Atlantic Film", "89", "AtlanticFilm", "1037"),
+    ("BLUTOPIA", "StudioCanal", "820", "Studio Canal", "1184"),
+])
+def test_similar_canonical_names_keep_separate_ids(tracker, first, first_id, second, second_id):
+    assert distributor_id(first, tracker) == first_id
+    assert distributor_id(second, tracker) == second_id
 
 
 @pytest.mark.asyncio

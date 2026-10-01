@@ -967,6 +967,9 @@
     "964": "Zylo",
     "965": "Zyx Music"
   },
+  "comments": [
+    "Entertainment One (300) and entertainmentone (302) have separate IDs"
+  ],
   "aliases": {
     "3RD WINDOW FILMS": 855,
     "3RD WINDOW": 855,
@@ -985,7 +988,10 @@
     "ARROW VIDEO": 75,
     "ARTE EDITIONS": 78,
     "ARTE VIDEO": 79,
+    "ASTRO RECORDS AND FILMWORKS": 87,
+    "AV JET": 96,
     "BBI": 108,
+    "BENNETT WATT MEDIA": 115,
     "BFI": 120,
     "BFS": 121,
     "BILDSTORUNG": 125,
@@ -1020,6 +1026,8 @@
     "CC": 218,
     "CCV": 169,
     "CHE KU YU LE": 376,
+    "CINE ASIA": 175,
+    "CINEASIA": 175,
     "CINEART": 176,
     "CITEL": 186,
     "CJ": 187,
