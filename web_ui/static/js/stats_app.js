@@ -1332,9 +1332,50 @@ const ReliabilityBadge = ({ rate, attempts }) => {
   );
 };
 
-function SankeyDiagram({ sankey }) {
+const UPLOAD_FLOW_TRACKER_LIMIT = 7;
+
+function groupUploadFlow(sankey, showAll = false) {
   const nodes = sankey?.nodes || [];
   const links = sankey?.links || [];
+  const trackers = nodes
+    .filter((node) => node.kind === "tracker")
+    .sort((a, b) => b.total - a.total);
+  if (showAll || trackers.length <= UPLOAD_FLOW_TRACKER_LIMIT)
+    return { nodes, links };
+
+  const hiddenTrackers = trackers.slice(UPLOAD_FLOW_TRACKER_LIMIT);
+  const hiddenIds = new Set(hiddenTrackers.map((node) => node.id));
+  const othersId = "tracker:group:others";
+  const groupedLinks = new Map();
+  for (const link of links) {
+    const source = hiddenIds.has(link.source) ? othersId : link.source;
+    const target = hiddenIds.has(link.target) ? othersId : link.target;
+    const key = JSON.stringify([source, target]);
+    if (groupedLinks.has(key)) groupedLinks.get(key).value += link.value;
+    else groupedLinks.set(key, { ...link, source, target });
+  }
+  return {
+    nodes: [
+      ...nodes.filter((node) => node.kind === "root"),
+      ...trackers.slice(0, UPLOAD_FLOW_TRACKER_LIMIT),
+      {
+        id: othersId,
+        kind: "tracker",
+        label: "others",
+        total: hiddenTrackers.reduce((total, node) => total + node.total, 0),
+      },
+      ...nodes.filter((node) => node.kind === "outcome"),
+    ],
+    links: [...groupedLinks.values()],
+  };
+}
+
+function SankeyDiagram({ sankey }) {
+  const [showAll, setShowAll] = useState(false);
+  const { nodes, links } = groupUploadFlow(sankey, showAll);
+  const canExpand =
+    (sankey?.nodes || []).filter((node) => node.kind === "tracker").length >
+    UPLOAD_FLOW_TRACKER_LIMIT;
   const root = nodes.find((node) => node.kind === "root");
   const trackers = nodes.filter((node) => node.kind === "tracker");
   const outcomes = nodes.filter((node) => node.kind === "outcome");
@@ -1366,6 +1407,18 @@ function SankeyDiagram({ sankey }) {
   };
   return (
     <div>
+      {canExpand && (
+        <div className="mb-3 flex justify-end">
+          <button
+            type="button"
+            className="rounded-lg border px-3 py-2 text-sm"
+            aria-expanded={showAll}
+            onClick={() => setShowAll((value) => !value)}
+          >
+            {showAll ? "Show top 7" : "Show all"}
+          </button>
+        </div>
+      )}
       <div className="overflow-x-auto">
         <svg
           viewBox={`0 0 760 ${height}`}
@@ -2062,7 +2115,8 @@ function StatsApp() {
   };
 
   const overview = data?.overview || {};
-  const activeTrackerRow = (data?.filters?.destinations || []).find(
+  const destinations = data?.filters?.destinations || [];
+  const activeTrackerRow = destinations.find(
     (row) => row.destination === activeTracker,
   );
   const toggleTracker = (destination) =>
@@ -2182,6 +2236,22 @@ function StatsApp() {
             <p className="mt-1 text-sm opacity-60">Local daily aggregates.</p>
           </div>
           <div className="ua-stats-toolbar flex flex-wrap items-stretch gap-2">
+            <select
+              aria-label="Tracker or indexer"
+              value={activeTracker}
+              onChange={(event) => setActiveTracker(event.target.value)}
+              className="ua-stats-control min-w-0 max-w-full rounded-xl px-4 text-sm"
+            >
+              <option value="">Global</option>
+              {activeTracker && !activeTrackerRow && (
+                <option value={activeTracker}>{activeTracker}</option>
+              )}
+              {destinations.map((row) => (
+                <option key={row.destination} value={row.destination}>
+                  {row.display_name || row.destination}
+                </option>
+              ))}
+            </select>
             <div
               className="ua-stats-period-group flex flex-wrap items-center rounded-xl p-1"
               role="group"
