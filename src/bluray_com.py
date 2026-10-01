@@ -516,10 +516,10 @@ async def get_bluray_releases(meta: Meta) -> list[Release]:
                             selected_release = matching_releases[selected_idx - 1]
                             cli_ui.info(f"Selected: {selected_release['title']} - {selected_release['country']} - {selected_release['publisher']}")
                             region_code = map_country_to_region_code(selected_release["country"])
-                            meta.region = region_code or "" or ""
+                            meta.region = meta.region or region_code or ""
                             meta.distributor = selected_release["publisher"].upper()
                             set_selected_release(meta, selected_release)
-                            cli_ui.info(f"Set region code to: {region_code}, distributor to: {selected_release['publisher'].upper()}")
+                            cli_ui.info(f"Set region code to: {meta.region}, distributor to: {selected_release['publisher'].upper()}")
 
                             if meta.use_bluray_images:
                                 logger.info("[yellow]Fetching release details to get cover images...[/yellow]")
@@ -1502,13 +1502,13 @@ async def process_all_releases(releases: Sequence[Release], meta: Meta) -> list[
             if len(scored_releases) == 1 and best_score == 100:
                 cli_ui.info(f"Single perfect match found: {best_release['title']} ({best_release['country']}) with score {best_score:.1f}/100")
                 region_code = map_country_to_region_code(best_release["country"])
-                meta.region = region_code or "" or ""
+                meta.region = meta.region or region_code or ""
                 meta.distributor = best_release["publisher"].upper()
                 set_selected_release(meta, best_release)
                 if "cover_images" in best_release:
                     meta.bluray_cover_urls = best_release["cover_images"]
                     await download_cover_images(meta)
-                logger.info(f"[yellow]Set region code to: {region_code}, distributor to: {best_release['publisher'].upper()}")
+                logger.info(f"[yellow]Set region code to: {meta.region}, distributor to: {best_release['publisher'].upper()}")
 
             elif len(scored_releases) == 1:
                 if not meta.unattended or (meta.unattended and meta.unattended_confirm):
@@ -1518,13 +1518,13 @@ async def process_all_releases(releases: Sequence[Release], meta: Meta) -> list[
                         try:
                             if user_input == "y":
                                 region_code = map_country_to_region_code(close_matches[0]["country"])
-                                meta.region = region_code or "" or ""
+                                meta.region = meta.region or region_code or ""
                                 meta.distributor = close_matches[0]["publisher"].upper()
                                 set_selected_release(meta, close_matches[0])
                                 if "cover_images" in close_matches[0]:
                                     meta.bluray_cover_urls = close_matches[0]["cover_images"]
                                     await download_cover_images(meta)
-                                logger.info(f"[yellow]Set region code to: {region_code}, distributor to: {close_matches[0]['publisher'].upper()}")
+                                logger.info(f"[yellow]Set region code to: {meta.region}, distributor to: {close_matches[0]['publisher'].upper()}")
                                 break
                             if user_input == "n":
                                 cli_ui.warning("No release selected.")
@@ -1539,13 +1539,13 @@ async def process_all_releases(releases: Sequence[Release], meta: Meta) -> list[
                 elif best_score > bluray_single_score:
                     cli_ui.info(f"Best match: {best_release['title']} ({best_release['country']}) with score {best_score:.1f}/100")
                     region_code = map_country_to_region_code(best_release["country"])
-                    meta.region = region_code or "" or ""
+                    meta.region = meta.region or region_code or ""
                     meta.distributor = best_release["publisher"].upper()
                     set_selected_release(meta, best_release)
                     if "cover_images" in best_release:
                         meta.bluray_cover_urls = best_release["cover_images"]
                         await download_cover_images(meta)
-                    logger.info(f"[yellow]Set region code to: {region_code}, distributor to: {best_release['publisher'].upper()}")
+                    logger.info(f"[yellow]Set region code to: {meta.region}, distributor to: {best_release['publisher'].upper()}")
                 else:
                     cli_ui.warning(f"No suitable release found. Best match was {best_release['title']} ({best_release['country']}) with score {best_score:.1f}/100")
                     detailed_releases = []
@@ -1598,13 +1598,13 @@ async def process_all_releases(releases: Sequence[Release], meta: Meta) -> list[
                                     selected_release = close_matches[selected_idx - 1]
                                     cli_ui.info(f"Selected: {selected_release['title']} ({selected_release['country']})")
                                     region_code = map_country_to_region_code(selected_release["country"])
-                                    meta.region = region_code or "" or ""
+                                    meta.region = meta.region or region_code or ""
                                     meta.distributor = selected_release["publisher"].upper()
                                     set_selected_release(meta, selected_release)
                                     if "cover_images" in selected_release:
                                         meta.bluray_cover_urls = selected_release["cover_images"]
                                         await download_cover_images(meta)
-                                    logger.info(f"[yellow]Set region code to: {region_code}, distributor to: {selected_release['publisher'].upper()}[/yellow]")
+                                    logger.info(f"[yellow]Set region code to: {meta.region}, distributor to: {selected_release['publisher'].upper()}[/yellow]")
                                     break
                                 logger.info(f"[red]Invalid selection. Please enter a number between 1 and {len(close_matches)}.[/red]")
                             except ValueError:
@@ -1615,13 +1615,13 @@ async def process_all_releases(releases: Sequence[Release], meta: Meta) -> list[
                 elif best_score > bluray_score:
                     cli_ui.info(f"Best match: {best_release['title']} ({best_release['country']}) with score {best_score:.1f}/100")
                     region_code = map_country_to_region_code(best_release["country"])
-                    meta.region = region_code or "" or ""
+                    meta.region = meta.region or region_code or ""
                     meta.distributor = best_release["publisher"].upper()
                     set_selected_release(meta, best_release)
                     if "cover_images" in best_release:
                         meta.bluray_cover_urls = best_release["cover_images"]
                         await download_cover_images(meta)
-                    logger.info(f"[yellow]Set region code to: {region_code}, distributor to: {best_release['publisher'].upper()}[/yellow]")
+                    logger.info(f"[yellow]Set region code to: {meta.region}, distributor to: {best_release['publisher'].upper()}[/yellow]")
                 else:
                     cli_ui.warning(f"No suitable release found. Best match was {best_release['title']} ({best_release['country']}) with score {best_score:.1f}/100")
                     detailed_releases = []
@@ -1640,13 +1640,13 @@ async def process_all_releases(releases: Sequence[Release], meta: Meta) -> list[
                         try:
                             if user_input == "y":
                                 region_code = map_country_to_region_code(best_release["country"])
-                                meta.region = region_code or "" or ""
+                                meta.region = meta.region or region_code or ""
                                 meta.distributor = best_release["publisher"].upper()
                                 set_selected_release(meta, best_release)
                                 if "cover_images" in best_release:
                                     meta.bluray_cover_urls = best_release["cover_images"]
                                     await download_cover_images(meta)
-                                logger.info(f"[yellow]Set region code to: {region_code}, distributor to: {best_release['publisher'].upper()}[/yellow]")
+                                logger.info(f"[yellow]Set region code to: {meta.region}, distributor to: {best_release['publisher'].upper()}[/yellow]")
                                 break
                             if user_input == "n":
                                 cli_ui.warning("No release selected.")
@@ -1661,13 +1661,13 @@ async def process_all_releases(releases: Sequence[Release], meta: Meta) -> list[
                 elif best_score > bluray_score:
                     cli_ui.info(f"Best match: {best_release['title']} ({best_release['country']}) with score {best_score:.1f}/100")
                     region_code = map_country_to_region_code(best_release["country"])
-                    meta.region = region_code or "" or ""
+                    meta.region = meta.region or region_code or ""
                     meta.distributor = best_release["publisher"].upper()
                     set_selected_release(meta, best_release)
                     if "cover_images" in best_release:
                         meta.bluray_cover_urls = best_release["cover_images"]
                         await download_cover_images(meta)
-                    logger.info(f"[yellow]Set region code to: {region_code}, distributor to: {best_release['publisher'].upper()}[/yellow]")
+                    logger.info(f"[yellow]Set region code to: {meta.region}, distributor to: {best_release['publisher'].upper()}[/yellow]")
                 else:
                     cli_ui.warning(f"No suitable release found. Best match was {best_release['title']} ({best_release['country']}) with score {best_score:.1f}/100")
                     detailed_releases = []
