@@ -6,8 +6,19 @@ from pathlib import Path
 _DISTRIBUTOR_DIR = Path(__file__).resolve().parent.parent / "data" / "distributors"
 _TRACKER_FILES = {
     "AITHER": "aither",
+    "ASIANCINEMA": "asiancinema",
     "BLUTOPIA": "blutopia",
+    "DARKPEERS": "darkpeers",
+    "HAWKEUNO": "hawkeuno",
+    "ITATORRENTS": "itatorrents",
+    "LATTEAM": "latteam",
     "OLDTOONSWORLD": "oldtoonsworld",
+    "ONLYENCODES": "onlyencodes",
+    "POLISHTORRENT": "polishtorrent",
+    "RASTASTUGAN": "rastastugan",
+    "REELFLIX": "reelflix",
+    "SHAREISLAND": "shareisland",
+    "THEOLDSCHOOL": "theoldschool",
     "ULCX": "ulcx",
 }
 
@@ -22,12 +33,24 @@ def _load_maps(name: str) -> tuple[dict[str, int], dict[int, str]]:
             entries.pop(str(id_value), None)
         entries.update(overrides["distributors"])
     reverse = {int(id_value): label.upper() for id_value, label in entries.items()}
-    # Preserve established aliases only for IDs actually offered by this tracker.
-    forward = {alias: id_value for alias, id_value in default["aliases"].items() if id_value in reverse}
-    # Accept upstream spellings for renamed entries that retain their upstream ID.
-    forward.update({label.upper(): int(id_value) for id_value, label in default["distributors"].items() if int(id_value) in reverse})
+    canonical = {label: id_value for id_value, label in reverse.items()}
+    # Follow distributor identity when a tracker assigns different numeric IDs.
+    targets = {
+        int(id_value): canonical[label.upper()]
+        for id_value, label in default["distributors"].items()
+        if label.upper() in canonical
+    }
+    alias_targets: dict[int, set[int]] = {}
+    for alias, id_value in default["aliases"].items():
+        if id_value not in targets and alias in canonical:
+            alias_targets.setdefault(id_value, set()).add(canonical[alias])
+    for id_value, candidates in alias_targets.items():
+        if len(candidates) == 1:
+            targets[id_value] = next(iter(candidates))
+    forward = {alias: targets[id_value] for alias, id_value in default["aliases"].items() if id_value in targets}
+    forward.update({label.upper(): targets[int(id_value)] for id_value, label in default["distributors"].items() if int(id_value) in targets})
     # The tracker's canonical names take precedence over inherited aliases.
-    forward.update({label: id_value for id_value, label in reverse.items()})
+    forward.update(canonical)
     return forward, reverse
 
 

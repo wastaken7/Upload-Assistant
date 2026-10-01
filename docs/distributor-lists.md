@@ -4,7 +4,7 @@ Compared on 2026-10-01 against upstream [`DistributorSeeder.php`](https://github
 
 The default ID set contains only upstream IDs. Existing UA aliases are retained for upstream IDs, with canonical upstream names taking precedence. Tracker files contain only additions and canonical name/ID differences from the default. At runtime they are merged with the default; `excluded_ids` preserves upstream entries absent from each snapshot. Trackers without a snapshot use the upstream default.
 
-The default JSON retains the upstream source URL. Tracker JSON files contain distributor differences and any excluded IDs; retrieval dates and hashes are omitted from all lists. They are included in installed packages. Both uploads and metadata reads select the tracker’s mapping; reverse lookup returns its canonical name. Unsupported supplied names are preserved, optional distributor IDs are omitted, and ULCX is skipped when its mandatory distributor cannot be mapped.
+The default JSON retains the upstream source URL. Tracker JSON files contain distributor differences and any excluded IDs; empty `distributors` objects without exclusions confirm a checked list matches upstream; retrieval dates and hashes are omitted from all lists. They are included in installed packages. Both uploads and metadata reads select the tracker’s mapping; reverse lookup returns its canonical name. Unsupported supplied names are preserved, optional distributor IDs are omitted, and ULCX is skipped when its mandatory distributor cannot be mapped.
 
 ## UA default versus upstream
 
@@ -22,9 +22,22 @@ Canonical names now take priority: CAPITOL is 158 (159 is Capitol Records), and 
 | Tracker | Entries | Additional IDs | Missing upstream IDs | Renamed upstream IDs |
 |---|---:|---:|---:|---:|
 | AITHER | 1022 | 59 | 2 | 1 |
+| ASIANCINEMA | 1011 | 48 | 2 | 1 |
 | BLUTOPIA | 1351 | 387 | 1 | 1 |
+| DARKPEERS | 965 | 0 | 0 | 0 |
+| HAWKEUNO | 25 | 0 | 940 | 25 |
+| ITATORRENTS | 968 | 3 | 0 | 0 |
+| LATTEAM | 0 | 0 | 965 | 0 |
 | OLDTOONSWORLD | 970 | 5 | 0 | 0 |
+| ONLYENCODES | 967 | 2 | 0 | 0 |
+| POLISHTORRENT | 1019 | 55 | 1 | 1 |
+| RASTASTUGAN | 965 | 0 | 0 | 0 |
+| REELFLIX | 966 | 1 | 0 | 0 |
+| SHAREISLAND | 971 | 6 | 0 | 0 |
+| THEOLDSCHOOL | 965 | 0 | 0 | 0 |
 | ULCX | 973 | 8 | 0 | 0 |
+
+HAWKEUNO uses its own distributor IDs. LATTEAM’s supplied dropdown contains only “Other”; its override excludes all upstream distributor IDs.
 
 ## AITHER
 
@@ -99,6 +112,69 @@ Canonical names now take priority: CAPITOL is 158 (159 is Capitol Records), and 
 | 1022 | Modern Films |
 | 1023 | POLAR Film |
 | 1024 | Medien |
+
+## ASIANCINEMA
+
+### Missing or renamed upstream entries
+
+| ID | Upstream name | Tracker name |
+|---:|---|---|
+| 17 | @Anime | Absent |
+| 126 | Bill Zebub | Absent |
+| 253 | Disney / Buena Vista | Disney |
+
+### Additional entries
+
+| ID | Tracker name |
+|---:|---|
+| 966 | ABC Studios |
+| 967 | ADV Films |
+| 968 | Arthaus |
+| 969 | ArtsMagic |
+| 970 | Bandai Entertainment |
+| 971 | Canadian International Pictures |
+| 972 | Celluloid Dreams |
+| 973 | Central Park Media |
+| 974 | Chameleon Films |
+| 975 | Channel One |
+| 976 | Chimera Entertainment |
+| 977 | Cinématographe |
+| 978 | Crunchyroll, LLC |
+| 979 | Dark Star Pictures |
+| 980 | Decal Releasing |
+| 981 | Error 4444 |
+| 982 | Factory25 |
+| 983 | Gabita Barbieri Films |
+| 984 | Indicator |
+| 985 | Janson Media |
+| 986 | Joy Sales |
+| 987 | Level 33 Entertainment |
+| 988 | Lost Time Media |
+| 989 | Melusine |
+| 990 | Panik House |
+| 991 | Pioneer |
+| 992 | Plaion |
+| 993 | Radiance Films |
+| 994 | Rentrak |
+| 995 | SamuraiDVD |
+| 996 | Saturn's Core Audio & Video |
+| 997 | Terror Vision |
+| 998 | U.S. Manga Corps |
+| 999 | Urban Vision |
+| 1000 | Utopia Distribution |
+| 1001 | Warner Archive Collection |
+| 1002 | Whole Grain Pictures |
+| 1003 | Afilm |
+| 1004 | Deaf Crocodile |
+| 1005 | Pathfinder Home Entertainment |
+| 1006 | Hong Kong Legends |
+| 1007 | Scholar Video |
+| 1008 | Buena Vista |
+| 1010 | Kani Releasing |
+| 1011 | Wonder Multimídia |
+| 1012 | Anime Factory |
+| 1013 | Xenon |
+| 1014 | KSM Anime |
 
 ## BLUTOPIA
 
@@ -501,13 +577,71 @@ Canonical names now take priority: CAPITOL is 158 (159 is Capitol Records), and 
 | 1352 | Periscope Film |
 | 1353 | Anderson Merchandise |
 
+## DARKPEERS
+
+### Missing or renamed upstream entries
+
+No missing or renamed upstream entries.
+
+## HAWKEUNO
+
+HAWKEUNO uses IDs 1–25 for its own list. All upstream IDs 26–965 are absent; their explicit exclusions are recorded in `data/distributors/hawkeuno.json`.
+
+### Remapped upstream IDs
+
+| ID | Upstream name | Tracker name |
+|---:|---|---|
+| 1 | 01 Distribution | Criterion Collection |
+| 2 | 100 Destinations Travel Film | British Film Institute |
+| 3 | 101 Films | Arrow Video |
+| 4 | 1Films | Shout Factory |
+| 5 | 2 Entertain Video | Indicator |
+| 6 | 20th Century Fox | Eureka Entertainment |
+| 7 | 2L | Kino Lorber |
+| 8 | 3D Content Hub | Second Sight Films |
+| 9 | 3D Media | Twilight Time |
+| 10 | 3L Film | Vinegar Syndrome |
+| 11 | 4Digital | 88 Films |
+| 12 | 4dvd | Imprint |
+| 13 | 4K Ultra HD Movies | Umbrella Entertainment |
+| 14 | 8-Films | Severin Films |
+| 15 | 84 Entertainment | Blue Underground |
+| 16 | 88 Films | Synapse Films |
+| 17 | @Anime | Scream Factory |
+| 18 | A Contracorriente | Mill Creek Entertainment |
+| 19 | A Contracorriente Films | Warner Archive |
+| 20 | A&E Home Video | Sony Pictures Classics |
+| 21 | A&M Records | Universal Pictures |
+| 22 | A+E Networks | Paramount Pictures |
+| 23 | A+R | Disney |
+| 24 | A-film | Lionsgate |
+| 25 | AAA | A24 |
+
+## ITATORRENTS
+
+### Missing or renamed upstream entries
+
+No missing or renamed upstream entries.
+
+### Additional entries
+
+| ID | Tracker name |
+|---:|---|
+| 966 | Altro |
+| 967 | Universal Pictures |
+| 968 | Prime Video |
+
+## LATTEAM
+
+### Missing or renamed upstream entries
+
+All upstream IDs (1–965) are absent.
+
 ## OLDTOONSWORLD
 
 ### Missing or renamed upstream entries
 
-| ID | Upstream name | Tracker name |
-|---:|---|---|
-| — | No differences | — |
+No missing or renamed upstream entries.
 
 ### Additional entries
 
@@ -519,13 +653,134 @@ Canonical names now take priority: CAPITOL is 158 (159 is Capitol Records), and 
 | 969 | ADV Films |
 | 970 | Crunchyroll |
 
-## ULCX
+## ONLYENCODES
+
+### Missing or renamed upstream entries
+
+No missing or renamed upstream entries.
+
+### Additional entries
+
+| ID | Tracker name |
+|---:|---|
+| 966 | Level 33 Entertainment |
+| 967 | A24 |
+
+## POLISHTORRENT
 
 ### Missing or renamed upstream entries
 
 | ID | Upstream name | Tracker name |
 |---:|---|---|
-| — | No differences | — |
+| 17 | @Anime | Absent |
+| 253 | Disney / Buena Vista | Disney + |
+
+### Additional entries
+
+| ID | Tracker name |
+|---:|---|
+| 966 | PTTRiP |
+| 967 | Kadr |
+| 968 | Walt Disney Production |
+| 969 | Prime ➡️ |
+| 970 | Studio Filmowe Perspektywa |
+| 971 | Telewizja Polska |
+| 972 | Canal+ Polska |
+| 973 | Dimension Films |
+| 974 | Hanna-Barbera |
+| 975 | Cinerama |
+| 976 | Universla release |
+| 977 | Dino De Laurentiis |
+| 978 | A24 |
+| 979 | Player |
+| 980 | TVN |
+| 981 | Prime Video |
+| 982 | MAX |
+| 983 | Viaplay |
+| 984 | Amazon Prime |
+| 985 | TVP VOD |
+| 986 | TVP Sport |
+| 987 | WP Pilot |
+| 988 | Megogo |
+| 989 | Extreme+ |
+| 990 | Polsat Box Go |
+| 991 | HBO MAX |
+| 992 | Canal+ Online |
+| 993 | Play Now |
+| 994 | Televio |
+| 995 | Skyshowtime |
+| 996 | Apple TV+ |
+| 997 | CDA Premium |
+| 998 | Rakuten |
+| 999 | iTunes |
+| 1000 | Ninateka |
+| 1001 | E-Kino Pod Baranami |
+| 1002 | MOJEeKINO |
+| 1003 | Nowe Horyzonty |
+| 1004 | Pięć Smaków |
+| 1005 | VOD.MDAG.PL |
+| 1006 | Katoflix |
+| 1007 | Outfilm |
+| 1008 | 35mm.online |
+| 1009 | FlixClassic |
+| 1010 | VOD Warszawa |
+| 1011 | CHILI |
+| 1012 | RED GO |
+| 1013 | ARTE po polsku |
+| 1014 | TVSmart |
+| 1015 | FAME MMA |
+| 1016 | CLOUT MMA |
+| 1017 | PRIME MMA |
+| 1018 | KSW |
+| 1019 | IPLA VOD |
+| 1020 | Kino Polska TV |
+
+## RASTASTUGAN
+
+### Missing or renamed upstream entries
+
+No missing or renamed upstream entries.
+
+## REELFLIX
+
+### Missing or renamed upstream entries
+
+No missing or renamed upstream entries.
+
+### Additional entries
+
+| ID | Tracker name |
+|---:|---|
+| 966 | Radiance Films |
+
+## SHAREISLAND
+
+### Missing or renamed upstream entries
+
+No missing or renamed upstream entries.
+
+### Additional entries
+
+| ID | Tracker name |
+|---:|---|
+| 966 | Fandango |
+| 967 | Universal Pictures Home Entertainment |
+| 968 | Warner Home Video |
+| 969 | Cecchi Gori Home Video |
+| 970 | Terminal Video |
+| 971 | CG Entertainment |
+
+## THEOLDSCHOOL
+
+### Missing or renamed upstream entries
+
+No missing or renamed upstream entries.
+
+## ULCX
+
+### Missing or renamed upstream entries
+
+No missing or renamed upstream entries.
 
 ### Additional entries
 
@@ -542,108 +797,165 @@ Canonical names now take priority: CAPITOL is 158 (159 is Capitol Records), and 
 
 ## Same name, different tracker IDs
 
-| Distributor | AITHER | BLUTOPIA | OLDTOONSWORLD | ULCX |
-|---|---:|---:|---:|---:|
-| A24 | 994 | 984 | — | 970 |
-| ADV FILMS | 987 | 1306 | 969 | 972 |
-| ARTHAUS | 981 | 1296 | — | — |
-| BANDAI ENTERTAINMENT | 988 | 1307 | — | — |
-| CANADIAN INTERNATIONAL PICTURES | 978 | 1217 | — | — |
-| CENTRAL PARK MEDIA | 990 | 1310 | — | — |
-| CG ENTERTAINMENT | — | 1079 | — | 969 |
-| CHAMELEON FILMS | 970 | 1220 | — | — |
-| CINÉMATOGRAPHE | 969 | 990 | — | — |
-| CRUNCHYROLL, LLC | 968 | 985 | — | 966 |
-| DARK STAR PICTURES | 979 | 1012 | — | — |
-| DEAF CROCODILE | — | 1092 | 966 | — |
-| DECAL RELEASING | 971 | 973 | — | — |
-| FACTORY25 | 982 | 1025 | — | — |
-| GABITA BARBIERI FILMS | 977 | 1342 | — | — |
-| GENIUS ENTERTAINMENT | 997 | 1113 | — | — |
-| INDEED FILM | 1001 | 1008 | — | — |
-| INDICATOR | 983 | 967 | — | — |
-| INFINITY ARTHOUSE | 993 | 1120 | — | — |
-| KIMSTIM | 1011 | 1125 | — | — |
-| LEVEL 33 ENTERTAINMENT | 980 | 1015 | — | — |
-| LIGHTBULB FILM DISTRIBUTION | 1000 | 1138 | — | — |
-| MODERN FILMS | 1022 | 1345 | — | — |
-| OLD GOLD MEDIA | 1002 | — | — | 973 |
-| OSTALGICA | 1007 | 1011 | — | — |
-| PLAION | 967 | 969 | — | — |
-| RADIANCE FILMS | 973 | 975 | — | 971 |
-| SANDPIPER PICTURES | 1006 | 1266 | — | — |
-| STUDIO CANAL | 820 | 1184 | 820 | 820 |
-| TERROR VISION | 975 | 1023 | — | — |
-| THE FILM PRESERVE | 999 | 1194 | — | — |
-| UTOPIA DISTRIBUTION | 984 | 1027 | — | — |
-| WARNER ARCHIVE COLLECTION | 974 | 1204 | — | — |
+| Distributor | AITHER | ASIANCINEMA | BLUTOPIA | DARKPEERS | HAWKEUNO | ITATORRENTS | LATTEAM | OLDTOONSWORLD | ONLYENCODES | POLISHTORRENT | RASTASTUGAN | REELFLIX | SHAREISLAND | THEOLDSCHOOL | ULCX |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 88 FILMS | 16 | 16 | 16 | 16 | 11 | 16 | — | 16 | 16 | 16 | 16 | 16 | 16 | 16 | 16 |
+| A24 | 994 | — | 984 | — | 25 | — | — | — | 967 | 978 | — | — | — | — | 970 |
+| ADV FILMS | 987 | 967 | 1306 | — | — | — | — | 969 | — | — | — | — | — | — | 972 |
+| ARTHAUS | 981 | 968 | 1296 | — | — | — | — | — | — | — | — | — | — | — | — |
+| BANDAI ENTERTAINMENT | 988 | 970 | 1307 | — | — | — | — | — | — | — | — | — | — | — | — |
+| BLUE UNDERGROUND | 139 | 139 | 139 | 139 | 15 | 139 | — | 139 | 139 | 139 | 139 | 139 | 139 | 139 | 139 |
+| BUENA VISTA | — | 1008 | 1302 | — | — | — | — | — | — | — | — | — | — | — | — |
+| CANADIAN INTERNATIONAL PICTURES | 978 | 971 | 1217 | — | — | — | — | — | — | — | — | — | — | — | — |
+| CELLULOID DREAMS | 976 | 972 | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| CENTRAL PARK MEDIA | 990 | 973 | 1310 | — | — | — | — | — | — | — | — | — | — | — | — |
+| CG ENTERTAINMENT | — | — | 1079 | — | — | — | — | — | — | — | — | — | 971 | — | 969 |
+| CHAMELEON FILMS | 970 | 974 | 1220 | — | — | — | — | — | — | — | — | — | — | — | — |
+| CINÉMATOGRAPHE | 969 | 977 | 990 | — | — | — | — | — | — | — | — | — | — | — | — |
+| CRUNCHYROLL, LLC | 968 | 978 | 985 | — | — | — | — | — | — | — | — | — | — | — | 966 |
+| DARK STAR PICTURES | 979 | 979 | 1012 | — | — | — | — | — | — | — | — | — | — | — | — |
+| DEAF CROCODILE | — | 1004 | 1092 | — | — | — | — | 966 | — | — | — | — | — | — | — |
+| DECAL RELEASING | 971 | 980 | 973 | — | — | — | — | — | — | — | — | — | — | — | — |
+| DISNEY | — | 253 | — | — | 23 | — | — | — | — | — | — | — | — | — | — |
+| ERROR 4444 | — | 981 | 988 | — | — | — | — | — | — | — | — | — | — | — | — |
+| EUREKA ENTERTAINMENT | 313 | 313 | 313 | 313 | 6 | 313 | — | 313 | 313 | 313 | 313 | 313 | 313 | 313 | 313 |
+| FACTORY25 | 982 | 982 | 1025 | — | — | — | — | — | — | — | — | — | — | — | — |
+| FANDANGO | — | — | 1340 | — | — | — | — | — | — | — | — | — | 966 | — | — |
+| GABITA BARBIERI FILMS | 977 | 983 | 1342 | — | — | — | — | — | — | — | — | — | — | — | — |
+| GENIUS ENTERTAINMENT | 997 | — | 1113 | — | — | — | — | — | — | — | — | — | — | — | — |
+| IMPRINT | 430 | 430 | 430 | 430 | 12 | 430 | — | 430 | 430 | 430 | 430 | 430 | 430 | 430 | 430 |
+| INDEED FILM | 1001 | — | 1008 | — | — | — | — | — | — | — | — | — | — | — | — |
+| INDICATOR | 983 | 984 | 967 | — | 5 | — | — | — | — | — | — | — | — | — | — |
+| INFINITY ARTHOUSE | 993 | — | 1120 | — | — | — | — | — | — | — | — | — | — | — | — |
+| JOY SALES | — | 986 | 1123 | — | — | — | — | — | — | — | — | — | — | — | — |
+| KIMSTIM | 1011 | — | 1125 | — | — | — | — | — | — | — | — | — | — | — | — |
+| KINO LORBER | 470 | 470 | 470 | 470 | 7 | 470 | — | 470 | 470 | 470 | 470 | 470 | 470 | 470 | 470 |
+| LEVEL 33 ENTERTAINMENT | 980 | 987 | 1015 | — | — | — | — | — | 966 | — | — | — | — | — | — |
+| LIGHTBULB FILM DISTRIBUTION | 1000 | — | 1138 | — | — | — | — | — | — | — | — | — | — | — | — |
+| LOST TIME MEDIA | 986 | 988 | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| MILL CREEK ENTERTAINMENT | 560 | 560 | 560 | 560 | 18 | 560 | — | 560 | 560 | 560 | 560 | 560 | 560 | 560 | 560 |
+| MODERN FILMS | 1022 | — | 1345 | — | — | — | — | — | — | — | — | — | — | — | — |
+| OLD GOLD MEDIA | 1002 | — | — | — | — | — | — | — | — | — | — | — | — | — | 973 |
+| OSTALGICA | 1007 | — | 1011 | — | — | — | — | — | — | — | — | — | — | — | — |
+| PANIK HOUSE | — | 990 | 1259 | — | — | — | — | — | — | — | — | — | — | — | — |
+| PARAMOUNT PICTURES | 659 | 659 | 659 | 659 | 22 | 659 | — | 659 | 659 | 659 | 659 | 659 | 659 | 659 | 659 |
+| PATHFINDER HOME ENTERTAINMENT | — | 1005 | 1158 | — | — | — | — | — | — | — | — | — | — | — | — |
+| PIONEER | — | 991 | 1160 | — | — | — | — | — | — | — | — | — | — | — | — |
+| PLAION | 967 | 992 | 969 | — | — | — | — | — | — | — | — | — | — | — | — |
+| PRIME VIDEO | — | — | — | — | — | 968 | — | — | — | 981 | — | — | — | — | — |
+| RADIANCE FILMS | 973 | 993 | 975 | — | — | — | — | — | — | — | — | 966 | — | — | 971 |
+| SANDPIPER PICTURES | 1006 | — | 1266 | — | — | — | — | — | — | — | — | — | — | — | — |
+| SATURN'S CORE AUDIO & VIDEO | 972 | 996 | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| SEVERIN FILMS | 760 | 760 | 760 | 760 | 14 | 760 | — | 760 | 760 | 760 | 760 | 760 | 760 | 760 | 760 |
+| SHOUT FACTORY | 772 | 772 | 772 | 772 | 4 | 772 | — | 772 | 772 | 772 | 772 | 772 | 772 | 772 | 772 |
+| SONY PICTURES CLASSICS | 795 | 795 | 795 | 795 | 20 | 795 | — | 795 | 795 | 795 | 795 | 795 | 795 | 795 | 795 |
+| STUDIO CANAL | 820 | 820 | 1184 | 820 | — | 820 | — | 820 | 820 | 820 | 820 | 820 | 820 | 820 | 820 |
+| SYNAPSE FILMS | 831 | 831 | 831 | 831 | 16 | 831 | — | 831 | 831 | 831 | 831 | 831 | 831 | 831 | 831 |
+| TERMINAL VIDEO | 1005 | — | — | — | — | — | — | — | — | — | — | — | 970 | — | — |
+| TERROR VISION | 975 | 997 | 1023 | — | — | — | — | — | — | — | — | — | — | — | — |
+| THE FILM PRESERVE | 999 | — | 1194 | — | — | — | — | — | — | — | — | — | — | — | — |
+| TWILIGHT TIME | 879 | 879 | 879 | 879 | 9 | 879 | — | 879 | 879 | 879 | 879 | 879 | 879 | 879 | 879 |
+| U.S. MANGA CORPS | 991 | 998 | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| UMBRELLA ENTERTAINMENT | 888 | 888 | 888 | 888 | 13 | 888 | — | 888 | 888 | 888 | 888 | 888 | 888 | 888 | 888 |
+| UNIVERSAL PICTURES | — | — | — | — | 21 | 967 | — | — | — | — | — | — | — | — | — |
+| UTOPIA DISTRIBUTION | 984 | 1000 | 1027 | — | — | — | — | — | — | — | — | — | — | — | — |
+| VINEGAR SYNDROME | 922 | 922 | 922 | 922 | 10 | 922 | — | 922 | 922 | 922 | 922 | 922 | 922 | 922 | 922 |
+| WARNER ARCHIVE COLLECTION | 974 | 1001 | 1204 | — | — | — | — | — | — | — | — | — | — | — | — |
+| XENON | — | 1013 | 1281 | — | — | — | — | — | — | — | — | — | — | — | — |
 
-33 names have different IDs across the supplied trackers.
+63 names have different IDs across the supplied trackers.
 
 ## Same ID, different tracker names
 
-| ID | AITHER | BLUTOPIA | OLDTOONSWORLD | ULCX |
-|---:|---|---|---|---|
-| 473 | Kinowelt Home Entertainment | Kinowelt Home Entertainment/DVD | Kinowelt Home Entertainment/DVD | Kinowelt Home Entertainment/DVD |
-| 820 | Studio Canal | StudioCanal | Studio Canal | Studio Canal |
-| 966 | ABC Studios | Plumeria Pictures | Deaf Crocodile | Crunchyroll, LLC |
-| 967 | Plaion | Indicator | Rhino Home Video | Plaion Pictures |
-| 968 | Crunchyroll, LLC | Crocofilms | US Manga Corps | I Wonder Pictures |
-| 969 | Cinématographe | Plaion | ADV Films | CG Entertainment |
-| 970 | Chameleon Films | Hallmark | Crunchyroll | A24 |
-| 971 | Decal Releasing | Arcadès | — | Radiance Films |
-| 972 | Saturn's Core Audio & Video | Clavis Films | — | ADV Films |
-| 973 | Radiance Films | Decal Releasing | — | Old Gold Media |
-| 974 | Warner Archive Collection | Mayfly | — | — |
-| 975 | Terror Vision | Radiance Films | — | — |
-| 976 | Celluloid Dreams | IndiePix Films | — | — |
-| 977 | Gabita Barbieri Films | ND Play | — | — |
-| 978 | Canadian International Pictures | Cineriz | — | — |
-| 979 | Dark Star Pictures | Cinematografica | — | — |
-| 980 | Level 33 Entertainment | Pierrot Le Fou | — | — |
-| 981 | Arthaus | Giant Interactive | — | — |
-| 982 | Factory25 | Showshank Films | — | — |
-| 983 | Indicator | TFC | — | — |
-| 984 | Utopia Distribution | A24 | — | — |
-| 985 | Janson Media | Crunchyroll, LLC | — | — |
-| 986 | Lost Time Media | Mediacs | — | — |
-| 987 | ADV Films | Happy Entertainment | — | — |
-| 988 | Bandai Entertainment | Error 4444 | — | — |
-| 989 | Melusine | Big World Pictures | — | — |
-| 990 | Central Park Media | Cinématographe | — | — |
-| 991 | U.S. Manga Corps | September Film | — | — |
-| 992 | Cult Media | Cinehollywood | — | — |
-| 993 | Infinity Arthouse | Re:Voir | — | — |
-| 994 | A24 | Warren Miller Entertainment | — | — |
-| 995 | PolyGram Video | Flashback Entertainment | — | — |
-| 996 | VIZ Media, LLC | Survivance | — | — |
-| 997 | Genius Entertainment | Teton Gravity Research | — | — |
-| 998 | Artisan Home Entertainment | Sphere Films | — | — |
-| 999 | The Film Preserve | Dauntless Studios | — | — |
-| 1001 | Indeed Film | Cartuna | — | — |
-| 1002 | Old Gold Media | Program Store | — | — |
-| 1003 | Cine Plus Home Entertainment | Ryko Distribution | — | — |
-| 1004 | Patriot Films | Bleeding Skull | — | — |
-| 1005 | Terminal Video | Midnight Factory | — | — |
-| 1006 | Sandpiper Pictures | ABC - (American Broadcasting Corporation) | — | — |
-| 1007 | Ostalgica | Hammer Films | — | — |
-| 1008 | Distrimax | Indeed Film | — | — |
-| 1009 | Planet Media Home Entertainment | SND | — | — |
-| 1010 | Numax | Vintage Classics | — | — |
-| 1011 | KimStim | Ostalgica | — | — |
-| 1012 | Pro-Fun Media | Dark Star Pictures | — | — |
-| 1013 | Zorro Medien | OneGate Media | — | — |
-| 1014 | Wild Bunch Benelux | Distribpix | — | — |
-| 1015 | Allumination FilmWorks | Level 33 Entertainment | — | — |
-| 1016 | New Line Home Video | Shoreline Entertainment | — | — |
-| 1017 | Cloud Ten Pictures | WMM | — | — |
-| 1018 | Kinowelt Film Entertainment | Source 1 Media B.V. | — | — |
-| 1019 | Visual Vengeance | Criterion Collection - Criterion Premieres | — | — |
-| 1020 | Senator Home Entertainment | ETR Media | — | — |
-| 1021 | Toy Robot Video | Yellow Veil Pictures | — | — |
-| 1022 | Modern Films | Alpha Video | — | — |
-| 1023 | POLAR Film | Terror Vision | — | — |
-| 1024 | Medien | Black Bear | — | — |
+| ID | AITHER | ASIANCINEMA | BLUTOPIA | DARKPEERS | HAWKEUNO | ITATORRENTS | LATTEAM | OLDTOONSWORLD | ONLYENCODES | POLISHTORRENT | RASTASTUGAN | REELFLIX | SHAREISLAND | THEOLDSCHOOL | ULCX |
+|---:|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | 01 Distribution | 01 Distribution | 01 Distribution | 01 Distribution | Criterion Collection | 01 Distribution | — | 01 Distribution | 01 Distribution | 01 Distribution | 01 Distribution | 01 Distribution | 01 Distribution | 01 Distribution | 01 Distribution |
+| 2 | 100 Destinations Travel Film | 100 Destinations Travel Film | 100 Destinations Travel Film | 100 Destinations Travel Film | British Film Institute | 100 Destinations Travel Film | — | 100 Destinations Travel Film | 100 Destinations Travel Film | 100 Destinations Travel Film | 100 Destinations Travel Film | 100 Destinations Travel Film | 100 Destinations Travel Film | 100 Destinations Travel Film | 100 Destinations Travel Film |
+| 3 | 101 Films | 101 Films | 101 Films | 101 Films | Arrow Video | 101 Films | — | 101 Films | 101 Films | 101 Films | 101 Films | 101 Films | 101 Films | 101 Films | 101 Films |
+| 4 | 1Films | 1Films | 1Films | 1Films | Shout Factory | 1Films | — | 1Films | 1Films | 1Films | 1Films | 1Films | 1Films | 1Films | 1Films |
+| 5 | 2 Entertain Video | 2 Entertain Video | 2 Entertain Video | 2 Entertain Video | Indicator | 2 Entertain Video | — | 2 Entertain Video | 2 Entertain Video | 2 Entertain Video | 2 Entertain Video | 2 Entertain Video | 2 Entertain Video | 2 Entertain Video | 2 Entertain Video |
+| 6 | 20th Century Fox | 20th Century Fox | 20th Century Fox | 20th Century Fox | Eureka Entertainment | 20th Century Fox | — | 20th Century Fox | 20th Century Fox | 20th Century Fox | 20th Century Fox | 20th Century Fox | 20th Century Fox | 20th Century Fox | 20th Century Fox |
+| 7 | 2L | 2L | 2L | 2L | Kino Lorber | 2L | — | 2L | 2L | 2L | 2L | 2L | 2L | 2L | 2L |
+| 8 | 3D Content Hub | 3D Content Hub | 3D Content Hub | 3D Content Hub | Second Sight Films | 3D Content Hub | — | 3D Content Hub | 3D Content Hub | 3D Content Hub | 3D Content Hub | 3D Content Hub | 3D Content Hub | 3D Content Hub | 3D Content Hub |
+| 9 | 3D Media | 3D Media | 3D Media | 3D Media | Twilight Time | 3D Media | — | 3D Media | 3D Media | 3D Media | 3D Media | 3D Media | 3D Media | 3D Media | 3D Media |
+| 10 | 3L Film | 3L Film | 3L Film | 3L Film | Vinegar Syndrome | 3L Film | — | 3L Film | 3L Film | 3L Film | 3L Film | 3L Film | 3L Film | 3L Film | 3L Film |
+| 11 | 4Digital | 4Digital | 4Digital | 4Digital | 88 Films | 4Digital | — | 4Digital | 4Digital | 4Digital | 4Digital | 4Digital | 4Digital | 4Digital | 4Digital |
+| 12 | 4dvd | 4dvd | 4dvd | 4dvd | Imprint | 4dvd | — | 4dvd | 4dvd | 4dvd | 4dvd | 4dvd | 4dvd | 4dvd | 4dvd |
+| 13 | 4K Ultra HD Movies | 4K Ultra HD Movies | 4K Ultra HD Movies | 4K Ultra HD Movies | Umbrella Entertainment | 4K Ultra HD Movies | — | 4K Ultra HD Movies | 4K Ultra HD Movies | 4K Ultra HD Movies | 4K Ultra HD Movies | 4K Ultra HD Movies | 4K Ultra HD Movies | 4K Ultra HD Movies | 4K Ultra HD Movies |
+| 14 | 8-Films | 8-Films | 8-Films | 8-Films | Severin Films | 8-Films | — | 8-Films | 8-Films | 8-Films | 8-Films | 8-Films | 8-Films | 8-Films | 8-Films |
+| 15 | 84 Entertainment | 84 Entertainment | 84 Entertainment | 84 Entertainment | Blue Underground | 84 Entertainment | — | 84 Entertainment | 84 Entertainment | 84 Entertainment | 84 Entertainment | 84 Entertainment | 84 Entertainment | 84 Entertainment | 84 Entertainment |
+| 16 | 88 Films | 88 Films | 88 Films | 88 Films | Synapse Films | 88 Films | — | 88 Films | 88 Films | 88 Films | 88 Films | 88 Films | 88 Films | 88 Films | 88 Films |
+| 17 | @Anime | — | @Anime | @Anime | Scream Factory | @Anime | — | @Anime | @Anime | — | @Anime | @Anime | @Anime | @Anime | @Anime |
+| 18 | — | A Contracorriente | — | A Contracorriente | Mill Creek Entertainment | A Contracorriente | — | A Contracorriente | A Contracorriente | A Contracorriente | A Contracorriente | A Contracorriente | A Contracorriente | A Contracorriente | A Contracorriente |
+| 19 | A Contracorriente Films | A Contracorriente Films | A Contracorriente Films | A Contracorriente Films | Warner Archive | A Contracorriente Films | — | A Contracorriente Films | A Contracorriente Films | A Contracorriente Films | A Contracorriente Films | A Contracorriente Films | A Contracorriente Films | A Contracorriente Films | A Contracorriente Films |
+| 20 | A&E Home Video | A&E Home Video | A&E Home Video | A&E Home Video | Sony Pictures Classics | A&E Home Video | — | A&E Home Video | A&E Home Video | A&E Home Video | A&E Home Video | A&E Home Video | A&E Home Video | A&E Home Video | A&E Home Video |
+| 21 | A&M Records | A&M Records | A&M Records | A&M Records | Universal Pictures | A&M Records | — | A&M Records | A&M Records | A&M Records | A&M Records | A&M Records | A&M Records | A&M Records | A&M Records |
+| 22 | A+E Networks | A+E Networks | A+E Networks | A+E Networks | Paramount Pictures | A+E Networks | — | A+E Networks | A+E Networks | A+E Networks | A+E Networks | A+E Networks | A+E Networks | A+E Networks | A+E Networks |
+| 23 | A+R | A+R | A+R | A+R | Disney | A+R | — | A+R | A+R | A+R | A+R | A+R | A+R | A+R | A+R |
+| 24 | A-film | A-film | A-film | A-film | Lionsgate | A-film | — | A-film | A-film | A-film | A-film | A-film | A-film | A-film | A-film |
+| 25 | AAA | AAA | AAA | AAA | A24 | AAA | — | AAA | AAA | AAA | AAA | AAA | AAA | AAA | AAA |
+| 253 | Disney / Buena Vista | Disney | Disney / Buena Vista | Disney / Buena Vista | — | Disney / Buena Vista | — | Disney / Buena Vista | Disney / Buena Vista | Disney + | Disney / Buena Vista | Disney / Buena Vista | Disney / Buena Vista | Disney / Buena Vista | Disney / Buena Vista |
+| 473 | Kinowelt Home Entertainment | Kinowelt Home Entertainment/DVD | Kinowelt Home Entertainment/DVD | Kinowelt Home Entertainment/DVD | — | Kinowelt Home Entertainment/DVD | — | Kinowelt Home Entertainment/DVD | Kinowelt Home Entertainment/DVD | Kinowelt Home Entertainment/DVD | Kinowelt Home Entertainment/DVD | Kinowelt Home Entertainment/DVD | Kinowelt Home Entertainment/DVD | Kinowelt Home Entertainment/DVD | Kinowelt Home Entertainment/DVD |
+| 820 | Studio Canal | Studio Canal | StudioCanal | Studio Canal | — | Studio Canal | — | Studio Canal | Studio Canal | Studio Canal | Studio Canal | Studio Canal | Studio Canal | Studio Canal | Studio Canal |
+| 966 | ABC Studios | ABC Studios | Plumeria Pictures | — | — | Altro | — | Deaf Crocodile | Level 33 Entertainment | PTTRiP | — | Radiance Films | Fandango | — | Crunchyroll, LLC |
+| 967 | Plaion | ADV Films | Indicator | — | — | Universal Pictures | — | Rhino Home Video | A24 | Kadr | — | — | Universal Pictures Home Entertainment | — | Plaion Pictures |
+| 968 | Crunchyroll, LLC | Arthaus | Crocofilms | — | — | Prime Video | — | US Manga Corps | — | Walt Disney Production | — | — | Warner Home Video | — | I Wonder Pictures |
+| 969 | Cinématographe | ArtsMagic | Plaion | — | — | — | — | ADV Films | — | Prime ➡️ | — | — | Cecchi Gori Home Video | — | CG Entertainment |
+| 970 | Chameleon Films | Bandai Entertainment | Hallmark | — | — | — | — | Crunchyroll | — | Studio Filmowe Perspektywa | — | — | Terminal Video | — | A24 |
+| 971 | Decal Releasing | Canadian International Pictures | Arcadès | — | — | — | — | — | — | Telewizja Polska | — | — | CG Entertainment | — | Radiance Films |
+| 972 | Saturn's Core Audio & Video | Celluloid Dreams | Clavis Films | — | — | — | — | — | — | Canal+ Polska | — | — | — | — | ADV Films |
+| 973 | Radiance Films | Central Park Media | Decal Releasing | — | — | — | — | — | — | Dimension Films | — | — | — | — | Old Gold Media |
+| 974 | Warner Archive Collection | Chameleon Films | Mayfly | — | — | — | — | — | — | Hanna-Barbera | — | — | — | — | — |
+| 975 | Terror Vision | Channel One | Radiance Films | — | — | — | — | — | — | Cinerama | — | — | — | — | — |
+| 976 | Celluloid Dreams | Chimera Entertainment | IndiePix Films | — | — | — | — | — | — | Universla release | — | — | — | — | — |
+| 977 | Gabita Barbieri Films | Cinématographe | ND Play | — | — | — | — | — | — | Dino De Laurentiis | — | — | — | — | — |
+| 978 | Canadian International Pictures | Crunchyroll, LLC | Cineriz | — | — | — | — | — | — | A24 | — | — | — | — | — |
+| 979 | Dark Star Pictures | Dark Star Pictures | Cinematografica | — | — | — | — | — | — | Player | — | — | — | — | — |
+| 980 | Level 33 Entertainment | Decal Releasing | Pierrot Le Fou | — | — | — | — | — | — | TVN | — | — | — | — | — |
+| 981 | Arthaus | Error 4444 | Giant Interactive | — | — | — | — | — | — | Prime Video | — | — | — | — | — |
+| 982 | Factory25 | Factory25 | Showshank Films | — | — | — | — | — | — | MAX | — | — | — | — | — |
+| 983 | Indicator | Gabita Barbieri Films | TFC | — | — | — | — | — | — | Viaplay | — | — | — | — | — |
+| 984 | Utopia Distribution | Indicator | A24 | — | — | — | — | — | — | Amazon Prime | — | — | — | — | — |
+| 985 | Janson Media | Janson Media | Crunchyroll, LLC | — | — | — | — | — | — | TVP VOD | — | — | — | — | — |
+| 986 | Lost Time Media | Joy Sales | Mediacs | — | — | — | — | — | — | TVP Sport | — | — | — | — | — |
+| 987 | ADV Films | Level 33 Entertainment | Happy Entertainment | — | — | — | — | — | — | WP Pilot | — | — | — | — | — |
+| 988 | Bandai Entertainment | Lost Time Media | Error 4444 | — | — | — | — | — | — | Megogo | — | — | — | — | — |
+| 989 | Melusine | Melusine | Big World Pictures | — | — | — | — | — | — | Extreme+ | — | — | — | — | — |
+| 990 | Central Park Media | Panik House | Cinématographe | — | — | — | — | — | — | Polsat Box Go | — | — | — | — | — |
+| 991 | U.S. Manga Corps | Pioneer | September Film | — | — | — | — | — | — | HBO MAX | — | — | — | — | — |
+| 992 | Cult Media | Plaion | Cinehollywood | — | — | — | — | — | — | Canal+ Online | — | — | — | — | — |
+| 993 | Infinity Arthouse | Radiance Films | Re:Voir | — | — | — | — | — | — | Play Now | — | — | — | — | — |
+| 994 | A24 | Rentrak | Warren Miller Entertainment | — | — | — | — | — | — | Televio | — | — | — | — | — |
+| 995 | PolyGram Video | SamuraiDVD | Flashback Entertainment | — | — | — | — | — | — | Skyshowtime | — | — | — | — | — |
+| 996 | VIZ Media, LLC | Saturn's Core Audio & Video | Survivance | — | — | — | — | — | — | Apple TV+ | — | — | — | — | — |
+| 997 | Genius Entertainment | Terror Vision | Teton Gravity Research | — | — | — | — | — | — | CDA Premium | — | — | — | — | — |
+| 998 | Artisan Home Entertainment | U.S. Manga Corps | Sphere Films | — | — | — | — | — | — | Rakuten | — | — | — | — | — |
+| 999 | The Film Preserve | Urban Vision | Dauntless Studios | — | — | — | — | — | — | iTunes | — | — | — | — | — |
+| 1000 | Lightbulb Film Distribution | Utopia Distribution | — | — | — | — | — | — | — | Ninateka | — | — | — | — | — |
+| 1001 | Indeed Film | Warner Archive Collection | Cartuna | — | — | — | — | — | — | E-Kino Pod Baranami | — | — | — | — | — |
+| 1002 | Old Gold Media | Whole Grain Pictures | Program Store | — | — | — | — | — | — | MOJEeKINO | — | — | — | — | — |
+| 1003 | Cine Plus Home Entertainment | Afilm | Ryko Distribution | — | — | — | — | — | — | Nowe Horyzonty | — | — | — | — | — |
+| 1004 | Patriot Films | Deaf Crocodile | Bleeding Skull | — | — | — | — | — | — | Pięć Smaków | — | — | — | — | — |
+| 1005 | Terminal Video | Pathfinder Home Entertainment | Midnight Factory | — | — | — | — | — | — | VOD.MDAG.PL | — | — | — | — | — |
+| 1006 | Sandpiper Pictures | Hong Kong Legends | ABC - (American Broadcasting Corporation) | — | — | — | — | — | — | Katoflix | — | — | — | — | — |
+| 1007 | Ostalgica | Scholar Video | Hammer Films | — | — | — | — | — | — | Outfilm | — | — | — | — | — |
+| 1008 | Distrimax | Buena Vista | Indeed Film | — | — | — | — | — | — | 35mm.online | — | — | — | — | — |
+| 1009 | Planet Media Home Entertainment | — | SND | — | — | — | — | — | — | FlixClassic | — | — | — | — | — |
+| 1010 | Numax | Kani Releasing | Vintage Classics | — | — | — | — | — | — | VOD Warszawa | — | — | — | — | — |
+| 1011 | KimStim | Wonder Multimídia | Ostalgica | — | — | — | — | — | — | CHILI | — | — | — | — | — |
+| 1012 | Pro-Fun Media | Anime Factory | Dark Star Pictures | — | — | — | — | — | — | RED GO | — | — | — | — | — |
+| 1013 | Zorro Medien | Xenon | OneGate Media | — | — | — | — | — | — | ARTE po polsku | — | — | — | — | — |
+| 1014 | Wild Bunch Benelux | KSM Anime | Distribpix | — | — | — | — | — | — | TVSmart | — | — | — | — | — |
+| 1015 | Allumination FilmWorks | — | Level 33 Entertainment | — | — | — | — | — | — | FAME MMA | — | — | — | — | — |
+| 1016 | New Line Home Video | — | Shoreline Entertainment | — | — | — | — | — | — | CLOUT MMA | — | — | — | — | — |
+| 1017 | Cloud Ten Pictures | — | WMM | — | — | — | — | — | — | PRIME MMA | — | — | — | — | — |
+| 1018 | Kinowelt Film Entertainment | — | Source 1 Media B.V. | — | — | — | — | — | — | KSW | — | — | — | — | — |
+| 1019 | Visual Vengeance | — | Criterion Collection - Criterion Premieres | — | — | — | — | — | — | IPLA VOD | — | — | — | — | — |
+| 1020 | Senator Home Entertainment | — | ETR Media | — | — | — | — | — | — | Kino Polska TV | — | — | — | — | — |
+| 1021 | Toy Robot Video | — | Yellow Veil Pictures | — | — | — | — | — | — | — | — | — | — | — | — |
+| 1022 | Modern Films | — | Alpha Video | — | — | — | — | — | — | — | — | — | — | — | — |
+| 1023 | POLAR Film | — | Terror Vision | — | — | — | — | — | — | — | — | — | — | — | — |
+| 1024 | Medien | — | Black Bear | — | — | — | — | — | — | — | — | — | — | — | — |
 
 BLUTOPIA distinguishes `StudioCanal` (820) and `Studio Canal` (1184). Its canonical `Studio Canal` entry takes precedence over the upstream spelling for ID 820.
 
@@ -657,12 +969,12 @@ UA’s broader name recognition list is separate from upload IDs. Being recogniz
 |---|---|
 | 1091 | BLUTOPIA |
 | 2GOOD | BLUTOPIA |
-| A24 | AITHER, BLUTOPIA, ULCX |
+| A24 | AITHER, BLUTOPIA, HAWKEUNO, ONLYENCODES, POLISHTORRENT, ULCX |
 | AAMU FILM COMPANY | BLUTOPIA |
 | ABC - (AMERICAN BROADCASTING CORPORATION) | BLUTOPIA |
-| ABC STUDIOS | AITHER |
+| ABC STUDIOS | AITHER, ASIANCINEMA |
 | ACME FILM | BLUTOPIA |
-| ADV FILMS | AITHER, BLUTOPIA, OLDTOONSWORLD, ULCX |
+| ADV FILMS | AITHER, ASIANCINEMA, BLUTOPIA, OLDTOONSWORLD, ULCX |
 | ALLIED VAUGHN | BLUTOPIA |
 | ALLUMINATION FILMWORKS | AITHER |
 | ALPHA VIDEO | BLUTOPIA |
@@ -671,7 +983,7 @@ UA’s broader name recognition list is separate from upload IDs. Being recogniz
 | ARCADE VIDEO | BLUTOPIA |
 | ARCADÈS | BLUTOPIA |
 | ARIZTICAL ENTERTAINMENT | BLUTOPIA |
-| ARTHAUS | AITHER, BLUTOPIA |
+| ARTHAUS | AITHER, ASIANCINEMA, BLUTOPIA |
 | ARTISAN | BLUTOPIA |
 | ARTISAN HOME ENTERTAINMENT | AITHER |
 | ARTISTA FILMI | BLUTOPIA |
@@ -683,7 +995,7 @@ UA’s broader name recognition list is separate from upload IDs. Being recogniz
 | AUD | BLUTOPIA |
 | AVH | BLUTOPIA |
 | B-SPREE CLASSICS | BLUTOPIA |
-| BANDAI ENTERTAINMENT | AITHER, BLUTOPIA |
+| BANDAI ENTERTAINMENT | AITHER, ASIANCINEMA, BLUTOPIA |
 | BAYVIEW | BLUTOPIA |
 | BEL CANTO | BLUTOPIA |
 | BIG WORLD PICTURES | BLUTOPIA |
@@ -698,18 +1010,18 @@ UA’s broader name recognition list is separate from upload IDs. Being recogniz
 | BRITISH HOME ENTERTAINMENT | BLUTOPIA |
 | BURNING BULB PRODUCTIONS | BLUTOPIA |
 | CAHIERS DU CINÉMA | BLUTOPIA |
-| CANADIAN INTERNATIONAL PICTURES | AITHER, BLUTOPIA |
+| CANADIAN INTERNATIONAL PICTURES | AITHER, ASIANCINEMA, BLUTOPIA |
 | CARDINAL RELEASING | BLUTOPIA |
 | CARLTON | BLUTOPIA |
 | CARTUNA | BLUTOPIA |
 | CATCOM HOME VIDEO | BLUTOPIA |
 | CATTLEYA | BLUTOPIA |
 | CDI | BLUTOPIA |
-| CELLULOID DREAMS | AITHER |
-| CENTRAL PARK MEDIA | AITHER, BLUTOPIA |
+| CELLULOID DREAMS | AITHER, ASIANCINEMA |
+| CENTRAL PARK MEDIA | AITHER, ASIANCINEMA, BLUTOPIA |
 | CENTRE AUDIOVISUEL SIMONE DE BEAUVOIR | BLUTOPIA |
-| CG ENTERTAINMENT | BLUTOPIA, ULCX |
-| CHAMELEON FILMS | AITHER, BLUTOPIA |
+| CG ENTERTAINMENT | BLUTOPIA, SHAREISLAND, ULCX |
+| CHAMELEON FILMS | AITHER, ASIANCINEMA, BLUTOPIA |
 | CHANNEL 4 | BLUTOPIA |
 | CHRISTAL FILMS | BLUTOPIA |
 | CHRYSTAL FILMS | BLUTOPIA |
@@ -722,7 +1034,7 @@ UA’s broader name recognition list is separate from upload IDs. Being recogniz
 | CINEMATOGRAFICA | BLUTOPIA |
 | CINEPHOBIA RELEASING | BLUTOPIA |
 | CINERIZ | BLUTOPIA |
-| CINÉMATOGRAPHE | AITHER, BLUTOPIA |
+| CINÉMATOGRAPHE | AITHER, ASIANCINEMA, BLUTOPIA |
 | CLAVIS FILMS | BLUTOPIA |
 | CLOUD TEN PICTURES | AITHER |
 | CMF | BLUTOPIA |
@@ -735,17 +1047,17 @@ UA’s broader name recognition list is separate from upload IDs. Being recogniz
 | CRISTALDI FILM | BLUTOPIA |
 | CRITERION COLLECTION - CRITERION PREMIERES | BLUTOPIA |
 | CROCOFILMS | BLUTOPIA |
-| CRUNCHYROLL, LLC | AITHER, BLUTOPIA, ULCX |
+| CRUNCHYROLL, LLC | AITHER, ASIANCINEMA, BLUTOPIA, ULCX |
 | CULT MEDIA | AITHER |
 | D & D GLASS AND WYATT | BLUTOPIA |
 | DAIEI | BLUTOPIA |
 | DARK SKY FILMS | BLUTOPIA |
-| DARK STAR PICTURES | AITHER, BLUTOPIA |
+| DARK STAR PICTURES | AITHER, ASIANCINEMA, BLUTOPIA |
 | DAUNTLESS STUDIOS | BLUTOPIA |
 | DAVID BURTON MORRIS FILMS | BLUTOPIA |
 | DD HOME ENTERTAINMENT | BLUTOPIA |
-| DEAF CROCODILE | BLUTOPIA, OLDTOONSWORLD |
-| DECAL RELEASING | AITHER, BLUTOPIA |
+| DEAF CROCODILE | ASIANCINEMA, BLUTOPIA, OLDTOONSWORLD |
+| DECAL RELEASING | AITHER, ASIANCINEMA, BLUTOPIA |
 | DEGAUSSER VIDEO | BLUTOPIA |
 | DEKANALOG | BLUTOPIA |
 | DIGITAL CLASSICS | BLUTOPIA |
@@ -772,13 +1084,13 @@ UA’s broader name recognition list is separate from upload IDs. Being recogniz
 | EPELPOL | BLUTOPIA |
 | EPF MEDIA | BLUTOPIA |
 | EPICENTRE FILMS | BLUTOPIA |
-| ERROR 4444 | BLUTOPIA |
+| ERROR 4444 | ASIANCINEMA, BLUTOPIA |
 | ETR MEDIA | BLUTOPIA |
 | EUREKA - MASTERS OF CINEMA | BLUTOPIA |
 | EUSTON HOME ENTERTAINMENT | BLUTOPIA |
 | FACETS | BLUTOPIA |
-| FACTORY25 | AITHER, BLUTOPIA |
-| FANDANGO | BLUTOPIA |
+| FACTORY25 | AITHER, ASIANCINEMA, BLUTOPIA |
+| FANDANGO | BLUTOPIA, SHAREISLAND |
 | FANTOMA | BLUTOPIA |
 | FEEL FILMS | BLUTOPIA |
 | FILM 2000 | BLUTOPIA |
@@ -802,7 +1114,7 @@ UA’s broader name recognition list is separate from upload IDs. Being recogniz
 | FRAMEHAMMER FILMS | BLUTOPIA |
 | FRAMELINE | BLUTOPIA |
 | FUTURAMA | BLUTOPIA |
-| GABITA BARBIERI FILMS | AITHER, BLUTOPIA |
+| GABITA BARBIERI FILMS | AITHER, ASIANCINEMA, BLUTOPIA |
 | GEMINI VIDÉO EDITIONS | BLUTOPIA |
 | GENIUS ENTERTAINMENT | AITHER, BLUTOPIA |
 | GIANT INTERACTIVE | BLUTOPIA |
@@ -834,7 +1146,7 @@ UA’s broader name recognition list is separate from upload IDs. Being recogniz
 | IMPULSE PICTURES | BLUTOPIA |
 | IMPULSO | BLUTOPIA |
 | INDEED FILM | AITHER, BLUTOPIA |
-| INDICATOR | AITHER, BLUTOPIA |
+| INDICATOR | AITHER, ASIANCINEMA, BLUTOPIA, HAWKEUNO |
 | INDIEPIX FILMS | BLUTOPIA |
 | INDIES ENTERTAINMENT | BLUTOPIA |
 | INFINITY ARTHOUSE | AITHER, BLUTOPIA |
@@ -845,9 +1157,9 @@ UA’s broader name recognition list is separate from upload IDs. Being recogniz
 | ISRAELI FILM FUND | BLUTOPIA |
 | ISTITUTO LUCE | BLUTOPIA |
 | ITV STUDIOS HOME ENTERTAINMENT | BLUTOPIA |
-| JANSON MEDIA | AITHER |
+| JANSON MEDIA | AITHER, ASIANCINEMA |
 | JANUS FILMS | BLUTOPIA |
-| JOY SALES | BLUTOPIA |
+| JOY SALES | ASIANCINEMA, BLUTOPIA |
 | JUPITER | BLUTOPIA |
 | KANI | BLUTOPIA |
 | KIDDIEPUNK | BLUTOPIA |
@@ -869,12 +1181,12 @@ UA’s broader name recognition list is separate from upload IDs. Being recogniz
 | LES FILMS DU CAMÉLIA | BLUTOPIA |
 | LES FILMS DU PARADOXE | BLUTOPIA |
 | LEVEL 1 PRODUCTIONS | BLUTOPIA |
-| LEVEL 33 ENTERTAINMENT | AITHER, BLUTOPIA |
+| LEVEL 33 ENTERTAINMENT | AITHER, ASIANCINEMA, BLUTOPIA, ONLYENCODES |
 | LIBERATION ENTERTAINMENT | BLUTOPIA |
 | LIBERATION HALL | BLUTOPIA |
 | LIGHTBULB FILM DISTRIBUTION | AITHER, BLUTOPIA |
 | LOOKOUT MOUNTAIN STUDIO | BLUTOPIA |
-| LOST TIME MEDIA | AITHER |
+| LOST TIME MEDIA | AITHER, ASIANCINEMA |
 | LUMIMIESFILMI | BLUTOPIA |
 | LUSOMUNDO | BLUTOPIA |
 | MADACY ENTERTAINMENT | BLUTOPIA |
@@ -891,7 +1203,7 @@ UA’s broader name recognition list is separate from upload IDs. Being recogniz
 | MEDIABOOK | BLUTOPIA |
 | MEDIACS | BLUTOPIA |
 | MEDIEN | AITHER |
-| MELUSINE | AITHER |
+| MELUSINE | AITHER, ASIANCINEMA |
 | MEMORY | BLUTOPIA |
 | MHZ | BLUTOPIA |
 | MICROCINEMA | BLUTOPIA |
@@ -939,16 +1251,16 @@ UA’s broader name recognition list is separate from upload IDs. Being recogniz
 | OUTCAST FILMS | BLUTOPIA |
 | P.O.M. FILMS | BLUTOPIA |
 | PALM PICTURES | BLUTOPIA |
-| PANIK HOUSE | BLUTOPIA |
+| PANIK HOUSE | ASIANCINEMA, BLUTOPIA |
 | PASSPORT VIDEO | BLUTOPIA |
-| PATHFINDER HOME ENTERTAINMENT | BLUTOPIA |
+| PATHFINDER HOME ENTERTAINMENT | ASIANCINEMA, BLUTOPIA |
 | PATRIOT FILMS | AITHER |
 | PAYLESS ENTERTAINMENT LIMITED | BLUTOPIA |
 | PERISCOPE FILM | BLUTOPIA |
 | PICTURE THIS | BLUTOPIA |
 | PIERROT LE FOU | BLUTOPIA |
-| PIONEER | BLUTOPIA |
-| PLAION | AITHER, BLUTOPIA |
+| PIONEER | ASIANCINEMA, BLUTOPIA |
+| PLAION | AITHER, ASIANCINEMA, BLUTOPIA |
 | PLAN B | BLUTOPIA |
 | PLANET DVD | BLUTOPIA |
 | PLANET MEDIA HOME ENTERTAINMENT | AITHER |
@@ -962,7 +1274,7 @@ UA’s broader name recognition list is separate from upload IDs. Being recogniz
 | PRO-FUN MEDIA | AITHER |
 | PROGRAM STORE | BLUTOPIA |
 | RABINOVICH FOUNDATION | BLUTOPIA |
-| RADIANCE FILMS | AITHER, BLUTOPIA, ULCX |
+| RADIANCE FILMS | AITHER, ASIANCINEMA, BLUTOPIA, REELFLIX, ULCX |
 | RAI − RADIOTELEVISIONE ITALIANA | BLUTOPIA |
 | RE:VOIR | BLUTOPIA |
 | RED BULL MEDIA HOUSE | BLUTOPIA |
@@ -983,7 +1295,7 @@ UA’s broader name recognition list is separate from upload IDs. Being recogniz
 | SALZGEBER & CO. | BLUTOPIA |
 | SANCTUARY RECORDS | BLUTOPIA |
 | SANDPIPER PICTURES | AITHER, BLUTOPIA |
-| SATURN'S CORE AUDIO & VIDEO | AITHER |
+| SATURN'S CORE AUDIO & VIDEO | AITHER, ASIANCINEMA |
 | SCANTRADE | BLUTOPIA |
 | SCREEN ARCHIVES ENTERTAINMENT | BLUTOPIA |
 | SENATOR HOME ENTERTAINMENT | AITHER |
@@ -1023,8 +1335,8 @@ UA’s broader name recognition list is separate from upload IDs. Being recogniz
 | TANGO ENTERTAINMENT | BLUTOPIA |
 | TARTAN VIDEO | BLUTOPIA |
 | TELEVISTA | BLUTOPIA |
-| TERMINAL VIDEO | AITHER |
-| TERROR VISION | AITHER, BLUTOPIA |
+| TERMINAL VIDEO | AITHER, SHAREISLAND |
+| TERROR VISION | AITHER, ASIANCINEMA, BLUTOPIA |
 | TETON GRAVITY RESEARCH | BLUTOPIA |
 | TFC | BLUTOPIA |
 | TGG DIRECT | BLUTOPIA |
@@ -1040,11 +1352,11 @@ UA’s broader name recognition list is separate from upload IDs. Being recogniz
 | TRIBECA | BLUTOPIA |
 | TRIMARK | BLUTOPIA |
 | TYPECAST RELEASING | BLUTOPIA |
-| U.S. MANGA CORPS | AITHER |
+| U.S. MANGA CORPS | AITHER, ASIANCINEMA |
 | UFO DISTRIBUTION | BLUTOPIA |
 | UNDERCRANK PRODUCTIONS | BLUTOPIA |
 | UNITED KING FILMS | BLUTOPIA |
-| UTOPIA DISTRIBUTION | AITHER, BLUTOPIA |
+| UTOPIA DISTRIBUTION | AITHER, ASIANCINEMA, BLUTOPIA |
 | VAI | BLUTOPIA |
 | VANGUARD | BLUTOPIA |
 | VIDANGEL STUDIOS | BLUTOPIA |
@@ -1067,7 +1379,7 @@ UA’s broader name recognition list is separate from upload IDs. Being recogniz
 | WILD EAST | BLUTOPIA |
 | WINSTAR | BLUTOPIA |
 | WMM | BLUTOPIA |
-| XENON | BLUTOPIA |
+| XENON | ASIANCINEMA, BLUTOPIA |
 | YELLOW VEIL PICTURES | BLUTOPIA |
 | YUME PICTURES | BLUTOPIA |
 | ZILLION FILM | BLUTOPIA |
@@ -1075,12 +1387,91 @@ UA’s broader name recognition list is separate from upload IDs. Being recogniz
 
 ## Tracker names absent from UA’s recognition list
 
-These canonical names were absent from `get_distributor()` even after the earlier name-list import. Preparation preserves them through its fallback; their tracker-specific IDs now resolve directly.
+Preparation preserves these names through its fallback; their tracker-specific IDs resolve directly.
 
 | Tracker | ID | Name |
 |---|---:|---|
+| ASIANCINEMA | 969 | ArtsMagic |
+| ASIANCINEMA | 975 | Channel One |
+| ASIANCINEMA | 976 | Chimera Entertainment |
+| ASIANCINEMA | 994 | Rentrak |
+| ASIANCINEMA | 995 | SamuraiDVD |
+| ASIANCINEMA | 999 | Urban Vision |
+| ASIANCINEMA | 1002 | Whole Grain Pictures |
+| ASIANCINEMA | 1003 | Afilm |
+| ASIANCINEMA | 1006 | Hong Kong Legends |
+| ASIANCINEMA | 1007 | Scholar Video |
+| ASIANCINEMA | 1010 | Kani Releasing |
+| ASIANCINEMA | 1011 | Wonder Multimídia |
+| ASIANCINEMA | 1012 | Anime Factory |
+| ASIANCINEMA | 1014 | KSM Anime |
+| HAWKEUNO | 3 | Arrow Video |
+| HAWKEUNO | 8 | Second Sight Films |
+| HAWKEUNO | 17 | Scream Factory |
+| HAWKEUNO | 21 | Universal Pictures |
+| ITATORRENTS | 966 | Altro |
+| ITATORRENTS | 967 | Universal Pictures |
+| ITATORRENTS | 968 | Prime Video |
 | OLDTOONSWORLD | 967 | Rhino Home Video |
 | OLDTOONSWORLD | 968 | US Manga Corps |
 | OLDTOONSWORLD | 970 | Crunchyroll |
+| POLISHTORRENT | 253 | Disney + |
+| POLISHTORRENT | 966 | PTTRiP |
+| POLISHTORRENT | 967 | Kadr |
+| POLISHTORRENT | 968 | Walt Disney Production |
+| POLISHTORRENT | 969 | Prime ➡️ |
+| POLISHTORRENT | 970 | Studio Filmowe Perspektywa |
+| POLISHTORRENT | 971 | Telewizja Polska |
+| POLISHTORRENT | 972 | Canal+ Polska |
+| POLISHTORRENT | 973 | Dimension Films |
+| POLISHTORRENT | 974 | Hanna-Barbera |
+| POLISHTORRENT | 975 | Cinerama |
+| POLISHTORRENT | 976 | Universla release |
+| POLISHTORRENT | 977 | Dino De Laurentiis |
+| POLISHTORRENT | 979 | Player |
+| POLISHTORRENT | 980 | TVN |
+| POLISHTORRENT | 981 | Prime Video |
+| POLISHTORRENT | 982 | MAX |
+| POLISHTORRENT | 983 | Viaplay |
+| POLISHTORRENT | 984 | Amazon Prime |
+| POLISHTORRENT | 985 | TVP VOD |
+| POLISHTORRENT | 986 | TVP Sport |
+| POLISHTORRENT | 987 | WP Pilot |
+| POLISHTORRENT | 988 | Megogo |
+| POLISHTORRENT | 989 | Extreme+ |
+| POLISHTORRENT | 990 | Polsat Box Go |
+| POLISHTORRENT | 991 | HBO MAX |
+| POLISHTORRENT | 992 | Canal+ Online |
+| POLISHTORRENT | 993 | Play Now |
+| POLISHTORRENT | 994 | Televio |
+| POLISHTORRENT | 995 | Skyshowtime |
+| POLISHTORRENT | 996 | Apple TV+ |
+| POLISHTORRENT | 997 | CDA Premium |
+| POLISHTORRENT | 998 | Rakuten |
+| POLISHTORRENT | 999 | iTunes |
+| POLISHTORRENT | 1000 | Ninateka |
+| POLISHTORRENT | 1001 | E-Kino Pod Baranami |
+| POLISHTORRENT | 1002 | MOJEeKINO |
+| POLISHTORRENT | 1003 | Nowe Horyzonty |
+| POLISHTORRENT | 1004 | Pięć Smaków |
+| POLISHTORRENT | 1005 | VOD.MDAG.PL |
+| POLISHTORRENT | 1006 | Katoflix |
+| POLISHTORRENT | 1007 | Outfilm |
+| POLISHTORRENT | 1008 | 35mm.online |
+| POLISHTORRENT | 1009 | FlixClassic |
+| POLISHTORRENT | 1010 | VOD Warszawa |
+| POLISHTORRENT | 1011 | CHILI |
+| POLISHTORRENT | 1012 | RED GO |
+| POLISHTORRENT | 1013 | ARTE po polsku |
+| POLISHTORRENT | 1014 | TVSmart |
+| POLISHTORRENT | 1015 | FAME MMA |
+| POLISHTORRENT | 1016 | CLOUT MMA |
+| POLISHTORRENT | 1017 | PRIME MMA |
+| POLISHTORRENT | 1018 | KSW |
+| POLISHTORRENT | 1019 | IPLA VOD |
+| POLISHTORRENT | 1020 | Kino Polska TV |
+| SHAREISLAND | 967 | Universal Pictures Home Entertainment |
+| SHAREISLAND | 968 | Warner Home Video |
+| SHAREISLAND | 969 | Cecchi Gori Home Video |
 | ULCX | 967 | Plaion Pictures |
 | ULCX | 968 | I Wonder Pictures |

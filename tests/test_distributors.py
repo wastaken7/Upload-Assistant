@@ -53,7 +53,7 @@ def test_unknown_tracker_uses_upstream_only():
     assert distributor_name(None) == ""
 
 
-@pytest.mark.parametrize("name", ["default", "aither", "blutopia", "oldtoonsworld", "ulcx"])
+@pytest.mark.parametrize("name", [path.stem for path in sorted((Path(__file__).resolve().parent.parent / "data" / "distributors").glob("*.json"))])
 def test_all_canonical_entries_round_trip(name):
     path = Path(__file__).resolve().parent.parent / "data" / "distributors" / f"{name}.json"
     data = json.loads(path.read_text())
@@ -67,7 +67,7 @@ def test_all_canonical_entries_round_trip(name):
         assert "source" not in data
         assert all(id_value not in default or default[id_value].upper() != label.upper() for id_value, label in entries.items())
         entries = {id_value: label for id_value, label in default.items() if int(id_value) not in data.get("excluded_ids", [])} | entries
-        assert len(entries) == {"aither": 1022, "blutopia": 1351, "oldtoonsworld": 970, "ulcx": 973}[name]
+        assert len(entries) == {"aither": 1022, "asiancinema": 1011, "blutopia": 1351, "darkpeers": 965, "hawkeuno": 25, "itatorrents": 968, "latteam": 0, "oldtoonsworld": 970, "onlyencodes": 967, "polishtorrent": 1019, "rastastugan": 965, "reelflix": 966, "shareisland": 971, "theoldschool": 965, "ulcx": 973}[name]
     for id_value, label in entries.items():
         assert distributor_id(label, tracker) == id_value
         assert distributor_name(id_value, tracker) == label.upper()
@@ -135,3 +135,41 @@ async def test_api_metadata_uses_tracker_specific_reverse_mapping(monkeypatch, m
     else:
         await common.unit3d_torrent_info("OLDTOONSWORLD", "https://tracker.test/api/", "https://tracker.test/search", meta, id="1")
     assert meta.distributor == "DEAF CROCODILE"
+
+
+@pytest.mark.parametrize("tracker, distributor, expected", [
+    ("ASIANCINEMA", "ABC Studios", "966"),
+    ("ITATORRENTS", "Prime Video", "968"),
+    ("ONLYENCODES", "A24", "967"),
+    ("POLISHTORRENT", "PTTRiP", "966"),
+    ("REELFLIX", "Radiance Films", "966"),
+    ("SHAREISLAND", "Fandango", "966"),
+])
+def test_new_tracker_additions(tracker, distributor, expected):
+    assert distributor_id(distributor, tracker) == expected
+    assert distributor_name(expected, tracker) == distributor.upper()
+
+
+@pytest.mark.parametrize("tracker", ["DARKPEERS", "RASTASTUGAN", "THEOLDSCHOOL"])
+def test_verified_empty_overrides_use_default_mapping(tracker):
+    assert distributor_id("BFI", tracker) == distributor_id("BFI")
+    assert distributor_name(965, tracker) == distributor_name(965)
+    path = Path(__file__).resolve().parent.parent / "data" / "distributors" / f"{tracker.lower()}.json"
+    assert json.loads(path.read_text()) == {"distributors": {}}
+
+
+def test_latteam_only_supports_other():
+    assert distributor_id("BFI", "LATTEAM") == ""
+    assert distributor_name(1, "LATTEAM") == ""
+    assert distributor_name(965, "LATTEAM") == ""
+
+
+def test_hawkeuno_aliases_follow_names_not_upstream_ids():
+    assert distributor_id("Criterion Collection", "HAWKEUNO") == "1"
+    assert distributor_id("BFI", "HAWKEUNO") == "2"
+    assert distributor_id("88 Films", "HAWKEUNO") == "11"
+    assert distributor_id("A24", "HAWKEUNO") == "25"
+    assert distributor_name(1, "HAWKEUNO") == "CRITERION COLLECTION"
+    assert distributor_id("01 Distribution", "HAWKEUNO") == ""
+    assert distributor_id("4Digital", "HAWKEUNO") == ""
+    assert distributor_id("4K UHD", "HAWKEUNO") == ""
