@@ -3383,6 +3383,7 @@ function AudionutsUAGUI() {
     if (fileBrowserRefreshing) return;
     setFileBrowserRefreshing(true);
     try {
+      setFileBrowserRestoring(true);
       await loadBrowseRoots();
       if (fileBrowserSearchQuery.current) {
         await handleFileBrowserSearch(fileBrowserSearchQuery.current);
