@@ -43,7 +43,15 @@ def _save(base_dir: str | Path, release_id: str, value: dict[str, Any]) -> None:
     temporary.replace(output)
 
 
-def register(base_dir: str | Path, release_id: str, paths: list[str | Path], group: str, *, timestamps: dict[str, float] | None = None) -> list[Path]:
+def register(
+    base_dir: str | Path,
+    release_id: str,
+    paths: list[str | Path],
+    group: str,
+    *,
+    timestamps: dict[str, float] | None = None,
+    slot_timestamps: dict[str, float] | None = None,
+) -> list[Path]:
     """Publish capture files under UUID names and return their new paths."""
     with _lock(base_dir, release_id):
         manifest = _load(base_dir, release_id)
@@ -65,6 +73,8 @@ def register(base_dir: str | Path, release_id: str, paths: list[str | Path], gro
             entries[screenshot_id] = {"file": target.name, "group": group}
             if timestamps is not None and str(source) in timestamps:
                 entries[screenshot_id]["timestamp"] = timestamps[str(source)]
+            if slot_timestamps is not None and str(source) in slot_timestamps:
+                entries[screenshot_id]["slot_timestamp"] = slot_timestamps[str(source)]
             result.append(target)
         _save(base_dir, release_id, manifest)
         return result
@@ -86,17 +96,20 @@ def files(base_dir: str | Path, release_id: str, group: str | None = None) -> li
     return sorted(result, key=lambda path: path.name)
 
 
-def capture_timestamps(base_dir: str | Path, release_id: str, group: str) -> list[float]:
-    """Return known capture times for active files in one group."""
+def capture_timestamps(base_dir: str | Path, release_id: str, group: str, *, original_slots: bool = False) -> list[float]:
+    """Return active capture times, optionally preferring original sampling slots."""
     directory = screenshots_dir(base_dir, release_id)
     entries = _load(base_dir, release_id).get("screenshots", {})
     if not isinstance(entries, dict):
         return []
-    return [
-        float(value["timestamp"])
-        for value in entries.values()
-        if isinstance(value, dict) and value.get("group") == group and isinstance(value.get("timestamp"), (int, float)) and (directory / str(value.get("file", ""))).is_file()
-    ]
+    result = []
+    for value in entries.values():
+        if not isinstance(value, dict) or value.get("group") != group:
+            continue
+        timestamp = value.get("slot_timestamp", value.get("timestamp")) if original_slots else value.get("timestamp")
+        if isinstance(timestamp, (int, float)) and (directory / str(value.get("file", ""))).is_file():
+            result.append(float(timestamp))
+    return result
 
 
 def clear_group(base_dir: str | Path, release_id: str, group: str) -> None:

@@ -523,6 +523,7 @@ async def test_video_retake_preserves_original_until_replacement_is_valid(monkey
     def register_stub(_base_dir, _uuid, paths, _group, **_kwargs):
         if paths:
             assert _kwargs["timestamps"] == {str(original): 105.0}
+            assert _kwargs["slot_timestamps"] == {str(original): 100.0}
         registered.extend(paths)
         return []
 

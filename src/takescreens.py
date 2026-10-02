@@ -1960,7 +1960,7 @@ async def screenshots(
         sampling_count = num_screens + len(registered_screens) if not force_screenshots and not meta.retake else num_screens
         ss_times = await valid_ss_time([], sampling_count, length, frame_rate, meta, retake=force_screenshots)
     if not force_screenshots and not meta.retake:
-        used_times = capture_timestamps(base_dir, folder_id, group)
+        used_times = capture_timestamps(base_dir, folder_id, group, original_slots=True)
         used_frames = Counter(round(timestamp * frame_rate) for timestamp in used_times)
         missing_times: list[str] = []
         for timestamp in ss_times:
@@ -1978,6 +1978,7 @@ async def screenshots(
         ss_times = ss_times[unknown_count + existing_images_count :]
     ss_times = ss_times[:num_capture]
     captured_times: dict[str, float] = {}
+    slot_times: dict[str, float] = {}
 
     if meta.frame_overlay and any(overlay_options(default_config)[key] for key in ("overlay_frame_number", "overlay_frame_type")):
         logger.debug("[yellow]Getting frame information for overlays...")
@@ -2029,6 +2030,8 @@ async def screenshots(
         image_path = str((screenshot_dir / f"{sanitized_filename}-{image_index}.png").resolve())
         if not Path(image_path).exists() or meta.retake:
             captured_times[image_path] = float(ss_times[i])
+            # A retake may change the actual time, but still fills this slot.
+            slot_times[image_path] = float(ss_times[i])
             capture_tasks.append(capture_with_semaphore((i, path, float(ss_times[i]), image_path, width, height, w_sar, h_sar, loglevel, hdr_tonemap, meta)))
 
     try:
@@ -2264,7 +2267,7 @@ async def screenshots(
         unit="frames",
     )
 
-    new_screens = register_screenshots(base_dir, folder_id, valid_results, group, timestamps=captured_times) if valid_results else []
+    new_screens = register_screenshots(base_dir, folder_id, valid_results, group, timestamps=captured_times, slot_timestamps=slot_times) if valid_results else []
     await record_event_async("artifact", service="screenshot", operation="created", category="standard", count=len(new_screens))
     if not force_screenshots and not meta.retake:
         return [str(screen) for screen in manifest_files(base_dir, folder_id, group)[:requested_screens]]

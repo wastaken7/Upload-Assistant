@@ -206,10 +206,10 @@ def test_partial_registered_group_captures_only_missing_screenshots(tmp_path: Pa
 
 @pytest.mark.parametrize("failed_indices", [{0, 3}, {2, 5}, {4, 5}])
 @pytest.mark.parametrize(
-    ("manual_frames", "duration", "unique_frames"),
-    [("", 100, 6), ("120,240,360,480,600,720", 100, 6), ("120,120,240,240,360,360", 100, 3), ("", 0.1, 1)],
+    ("manual_frames", "duration", "unique_frames", "retake"),
+    [("", 100, 6, False), ("120,240,360,480,600,720", 100, 6, False), ("120,120,240,240,360,360", 100, 3, False), ("", 0.1, 1, False), ("", 100, 6, True)],
 )
-def test_partial_capture_completes_missing_frame_slots(tmp_path: Path, failed_indices: set[int], manual_frames: str, duration: float, unique_frames: int) -> None:
+def test_partial_capture_completes_missing_frame_slots(tmp_path: Path, failed_indices: set[int], manual_frames: str, duration: float, unique_frames: int, retake: bool) -> None:
     release_id = "fictional-release"
     release_dir = tmp_path / "tmp" / release_id
     release_dir.mkdir(parents=True)
@@ -229,12 +229,19 @@ def test_partial_capture_completes_missing_frame_slots(tmp_path: Path, failed_in
     meta = Meta(category="MOVIE", base_dir=str(tmp_path), uuid=release_id, screens=6, imghost="imgbb")
     phase = 0
     captured: list[list[float]] = [[], []]
+    initial_times: dict[int, float] = {}
 
     async def capture_stub(args):
+        output = Path(args[3])
+        is_retry = output.stem.endswith("-retry")
+        if phase == 0 and not is_retry:
+            initial_times[args[0]] = args[2]
         if phase == 0 and args[0] in failed_indices:
             return args[0], None
+        if phase == 0 and retake and args[0] == 0 and not is_retry:
+            output.write_bytes(b"image" * 10000)
+            return args[0], str(output)
         captured[phase].append(args[2])
-        output = Path(args[3])
         output.write_bytes(b"image" * 20000)
         return args[0], str(output)
 
@@ -252,9 +259,14 @@ def test_partial_capture_completes_missing_frame_slots(tmp_path: Path, failed_in
         result = asyncio.run(screenshots("unused.mkv", "Fictional, Movie", release_id, str(tmp_path), meta, manual_frames=manual_frames, cleanup_after_capture=False))
         assert len(result or []) == 6
         assert len(captured[1]) == 2
+        assert Counter(captured[1]) == Counter(initial_times[index] for index in failed_indices)
         timestamps = capture_timestamps(tmp_path, release_id, "main")
         assert len(timestamps) == 6
         assert len(set(timestamps)) == unique_frames
+        assert Counter(capture_timestamps(tmp_path, release_id, "main", original_slots=True)) == Counter(initial_times.values())
+        if retake and 0 not in failed_indices:
+            assert initial_times[0] + 5 in timestamps
+            assert initial_times[0] not in timestamps
         if unique_frames == 6:
             assert set(captured[0]).isdisjoint(captured[1])
         if manual_frames:
