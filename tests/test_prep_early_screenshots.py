@@ -1,16 +1,18 @@
 # ruff: noqa: S101
 
 import asyncio
+import json
 import sys
+from collections import Counter
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from src import prep_helpers
+from src import prep_helpers, takescreens
 from src.meta import Meta
 from src.prep import Prep, populate_hdr_for_early_capture
-from src.screenshot_manifest import register
+from src.screenshot_manifest import capture_timestamps, register
 from src.takescreens import screenshots
 from src.uploadscreens import _upload_screens
 
@@ -200,6 +202,78 @@ def test_partial_registered_group_captures_only_missing_screenshots(tmp_path: Pa
 
     assert len(capture_calls) == 1
     assert len(result or []) == 3
+
+
+@pytest.mark.parametrize("failed_indices", [{0, 3}, {2, 5}, {4, 5}])
+@pytest.mark.parametrize(
+    ("manual_frames", "duration", "unique_frames", "retake"),
+    [("", 100, 6, False), ("120,240,360,480,600,720", 100, 6, False), ("120,120,240,240,360,360", 100, 3, False), ("", 0.1, 1, False), ("", 100, 6, True)],
+)
+def test_partial_capture_completes_missing_frame_slots(tmp_path: Path, failed_indices: set[int], manual_frames: str, duration: float, unique_frames: int, retake: bool) -> None:
+    release_id = "fictional-release"
+    release_dir = tmp_path / "tmp" / release_id
+    release_dir.mkdir(parents=True)
+    (release_dir / "MediaInfo.json").write_text(
+        json.dumps(
+            {
+                "media": {
+                    "track": [
+                        {"Duration": duration},
+                        {"Duration": duration, "Width": 1920, "Height": 1080, "PixelAspectRatio": 1, "DisplayAspectRatio": 1.777, "FrameRate": 24},
+                    ]
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    meta = Meta(category="MOVIE", base_dir=str(tmp_path), uuid=release_id, screens=6, imghost="imgbb")
+    phase = 0
+    captured: list[list[float]] = [[], []]
+    initial_times: dict[int, float] = {}
+
+    async def capture_stub(args):
+        output = Path(args[3])
+        is_retry = output.stem.endswith("-retry")
+        if phase == 0 and not is_retry:
+            initial_times[args[0]] = args[2]
+        if phase == 0 and args[0] in failed_indices:
+            return args[0], None
+        if phase == 0 and retake and args[0] == 0 and not is_retry:
+            output.write_bytes(b"image" * 10000)
+            return args[0], str(output)
+        captured[phase].append(args[2])
+        output.write_bytes(b"image" * 20000)
+        return args[0], str(output)
+
+    with (
+        patch.object(takescreens, "get_image_host", new=AsyncMock(return_value="imgbb")),
+        patch.object(takescreens, "capture_screenshot", new=capture_stub),
+        patch.object(takescreens, "determine_tonemapping", new=AsyncMock(return_value=False)),
+        patch.object(takescreens, "record_event_async", new=AsyncMock()),
+    ):
+        first = asyncio.run(screenshots("unused.mkv", "Fictional Movie", release_id, str(tmp_path), meta, manual_frames=manual_frames, cleanup_after_capture=False))
+        assert len(first or []) == 4
+        phase = 1
+        # Recreate metadata as a resumed run would, and change the display title.
+        meta = Meta(category="MOVIE", base_dir=str(tmp_path), uuid=release_id, screens=6, imghost="imgbb")
+        result = asyncio.run(screenshots("unused.mkv", "Fictional, Movie", release_id, str(tmp_path), meta, manual_frames=manual_frames, cleanup_after_capture=False))
+        assert len(result or []) == 6
+        assert len(captured[1]) == 2
+        assert Counter(captured[1]) == Counter(initial_times[index] for index in failed_indices)
+        timestamps = capture_timestamps(tmp_path, release_id, "main")
+        assert len(timestamps) == 6
+        assert len(set(timestamps)) == unique_frames
+        assert Counter(capture_timestamps(tmp_path, release_id, "main", original_slots=True)) == Counter(initial_times.values())
+        if retake and 0 not in failed_indices:
+            assert initial_times[0] + 5 in timestamps
+            assert initial_times[0] not in timestamps
+        if unique_frames == 6:
+            assert set(captured[0]).isdisjoint(captured[1])
+        if manual_frames:
+            assert Counter(timestamps) == Counter(int(frame) / 24 for frame in manual_frames.split(","))
+        captured[1].clear()
+        asyncio.run(screenshots("unused.mkv", "Fictional Movie", release_id, str(tmp_path), meta, manual_frames=manual_frames, cleanup_after_capture=False))
+        assert captured[1] == []
 
 
 @pytest.mark.asyncio
