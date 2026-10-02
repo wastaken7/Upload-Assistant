@@ -72,6 +72,7 @@ import threading
 import time
 import traceback
 from collections.abc import Iterable, Mapping
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Protocol, cast
 from urllib.parse import urljoin, urlparse
 
@@ -3252,8 +3253,21 @@ def run() -> None:
     if hasattr(signal, "SIGTERM"):
         signal.signal(signal.SIGTERM, _handle_shutdown_signal)
 
+    interrupted_executor: ThreadPoolExecutor | None = None
     try:
-        asyncio.run(main())
+        with asyncio.Runner() as runner:
+            executor = ThreadPoolExecutor(thread_name_prefix="asyncio")
+            runner.get_loop().set_default_executor(executor)
+            try:
+                runner.run(main())
+            finally:
+                if (_shutdown_requested or sys.exc_info()[1] is not None) and not _is_webui_mode:
+                    # Cancellation cannot stop a thread blocked in input() or I/O.
+                    # Detach it before Runner.close() waits for the default pool;
+                    # task finalizers can still use the replacement executor.
+                    executor.shutdown(wait=False, cancel_futures=True)
+                    runner.get_loop().set_default_executor(ThreadPoolExecutor(thread_name_prefix="asyncio"))
+                    interrupted_executor = executor
     except KeyboardInterrupt, SystemExit:
         if not _shutdown_requested:
             logger.info("\n[yellow]Shutting down...[/yellow]")
@@ -3278,6 +3292,19 @@ def run() -> None:
 
         if _shutdown_requested or _is_webui_mode:
             logger.info("[green]Shutdown complete[/green]")
+
+        if interrupted_executor is not None:
+            # Give cooperative workers a short grace period after cleanup. A
+            # blocked worker would otherwise be joined forever at Python exit.
+            executor_join = threading.Thread(target=interrupted_executor.shutdown, daemon=True)
+            executor_join.start()
+            executor_join.join(timeout=1.0)
+            if executor_join.is_alive():
+                logging.shutdown()
+                for stream in (sys.stdout, sys.stderr):
+                    with contextlib.suppress(OSError, ValueError):
+                        stream.flush()
+                os._exit(0)
 
         sys.exit(0)
 
