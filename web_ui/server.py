@@ -4250,7 +4250,7 @@ def stats_api():
         payload = get_stats(period, mode, STATE_DIR, **stats_kwargs) if enabled else get_empty_stats(period, mode, **stats_kwargs)
         _add_stats_destination_display_names(payload)
         payload["enabled"] = enabled
-        return jsonify(payload)
+        return jsonify(payload), 200 if payload["success"] else 500
     except ValueError as exc:
         return jsonify({"success": False, "error": str(exc)}), 400
 
