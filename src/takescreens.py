@@ -15,6 +15,7 @@ import urllib.parse
 import uuid
 import xml.etree.ElementTree as ET
 import zipfile
+from collections import Counter
 from collections.abc import Awaitable, Mapping
 from pathlib import Path
 from typing import Any, cast
@@ -1960,8 +1961,17 @@ async def screenshots(
         ss_times = await valid_ss_time([], sampling_count, length, frame_rate, meta, retake=force_screenshots)
     if not force_screenshots and not meta.retake:
         used_times = capture_timestamps(base_dir, folder_id, group)
-        used_frames = {round(timestamp * frame_rate) for timestamp in used_times}
-        ss_times = [timestamp for timestamp in ss_times if round(float(timestamp) * frame_rate) not in used_frames]
+        used_frames = Counter(round(timestamp * frame_rate) for timestamp in used_times)
+        missing_times: list[str] = []
+        for timestamp in ss_times:
+            frame = round(float(timestamp) * frame_rate)
+            # Each saved screenshot occupies one slot, even when the user
+            # requests repeated frames or a short video's grid repeats them.
+            if used_frames[frame] > 0:
+                used_frames[frame] -= 1
+            else:
+                missing_times.append(timestamp)
+        ss_times = missing_times
         # Older manifests have no capture times. Preserve their count-based
         # reuse while recording times for all new captures.
         unknown_count = max(0, len(registered_screens) - len(used_times))

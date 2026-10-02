@@ -1,7 +1,9 @@
 # ruff: noqa: S101
 
 import asyncio
+import json
 import sys
+from collections import Counter
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
@@ -203,13 +205,25 @@ def test_partial_registered_group_captures_only_missing_screenshots(tmp_path: Pa
 
 
 @pytest.mark.parametrize("failed_indices", [{0, 3}, {2, 5}, {4, 5}])
-@pytest.mark.parametrize("manual_frames", ["", "120,240,360,480,600,720"])
-def test_partial_capture_completes_without_repeating_frames(tmp_path: Path, failed_indices: set[int], manual_frames: str) -> None:
+@pytest.mark.parametrize(
+    ("manual_frames", "duration", "unique_frames"),
+    [("", 100, 6), ("120,240,360,480,600,720", 100, 6), ("120,120,240,240,360,360", 100, 3), ("", 0.1, 1)],
+)
+def test_partial_capture_completes_missing_frame_slots(tmp_path: Path, failed_indices: set[int], manual_frames: str, duration: float, unique_frames: int) -> None:
     release_id = "fictional-release"
     release_dir = tmp_path / "tmp" / release_id
     release_dir.mkdir(parents=True)
     (release_dir / "MediaInfo.json").write_text(
-        '{"media": {"track": [{"Duration": "100"}, {"Duration": "100", "Width": "1920", "Height": "1080", "PixelAspectRatio": "1", "DisplayAspectRatio": "1.777", "FrameRate": "24"}]}}',
+        json.dumps(
+            {
+                "media": {
+                    "track": [
+                        {"Duration": duration},
+                        {"Duration": duration, "Width": 1920, "Height": 1080, "PixelAspectRatio": 1, "DisplayAspectRatio": 1.777, "FrameRate": 24},
+                    ]
+                }
+            }
+        ),
         encoding="utf-8",
     )
     meta = Meta(category="MOVIE", base_dir=str(tmp_path), uuid=release_id, screens=6, imghost="imgbb")
@@ -238,8 +252,13 @@ def test_partial_capture_completes_without_repeating_frames(tmp_path: Path, fail
         result = asyncio.run(screenshots("unused.mkv", "Fictional, Movie", release_id, str(tmp_path), meta, manual_frames=manual_frames, cleanup_after_capture=False))
         assert len(result or []) == 6
         assert len(captured[1]) == 2
-        assert set(captured[0]).isdisjoint(captured[1])
-        assert len(set(capture_timestamps(tmp_path, release_id, "main"))) == 6
+        timestamps = capture_timestamps(tmp_path, release_id, "main")
+        assert len(timestamps) == 6
+        assert len(set(timestamps)) == unique_frames
+        if unique_frames == 6:
+            assert set(captured[0]).isdisjoint(captured[1])
+        if manual_frames:
+            assert Counter(timestamps) == Counter(int(frame) / 24 for frame in manual_frames.split(","))
         captured[1].clear()
         asyncio.run(screenshots("unused.mkv", "Fictional Movie", release_id, str(tmp_path), meta, manual_frames=manual_frames, cleanup_after_capture=False))
         assert captured[1] == []
