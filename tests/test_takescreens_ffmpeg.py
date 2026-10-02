@@ -520,7 +520,9 @@ async def test_video_retake_preserves_original_until_replacement_is_valid(monkey
         Path(image).write_bytes(b"x" * 50000)
         return index, image
 
-    def register_stub(_base_dir, _uuid, paths, _group):
+    def register_stub(_base_dir, _uuid, paths, _group, **_kwargs):
+        if paths:
+            assert _kwargs["timestamps"] == {str(original): 105.0}
         registered.extend(paths)
         return []
 

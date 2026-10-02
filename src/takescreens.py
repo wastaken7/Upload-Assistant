@@ -30,6 +30,7 @@ from src.console import logger
 from src.media_extensions import VIDEO_EXTENSIONS
 from src.mediainfo import MediaInfo
 from src.meta import Meta
+from src.screenshot_manifest import capture_timestamps
 from src.screenshot_manifest import clear_group as clear_screenshot_group
 from src.screenshot_manifest import files as manifest_files
 from src.screenshot_manifest import forget_file as forget_screenshot_file
@@ -1953,7 +1954,20 @@ async def screenshots(
     )
 
     if not ss_times:
-        ss_times = await valid_ss_time([], num_capture, length, frame_rate, meta, retake=force_screenshots)
+        # Keep the original sampling grid when completing a partial capture.
+        # Sampling only the missing count would select already captured frames.
+        sampling_count = num_screens + len(registered_screens) if not force_screenshots and not meta.retake else num_screens
+        ss_times = await valid_ss_time([], sampling_count, length, frame_rate, meta, retake=force_screenshots)
+    if not force_screenshots and not meta.retake:
+        used_times = capture_timestamps(base_dir, folder_id, group)
+        used_frames = {round(timestamp * frame_rate) for timestamp in used_times}
+        ss_times = [timestamp for timestamp in ss_times if round(float(timestamp) * frame_rate) not in used_frames]
+        # Older manifests have no capture times. Preserve their count-based
+        # reuse while recording times for all new captures.
+        unknown_count = max(0, len(registered_screens) - len(used_times))
+        ss_times = ss_times[unknown_count + existing_images_count :]
+    ss_times = ss_times[:num_capture]
+    captured_times: dict[str, float] = {}
 
     if meta.frame_overlay and any(overlay_options(default_config)[key] for key in ("overlay_frame_number", "overlay_frame_type")):
         logger.debug("[yellow]Getting frame information for overlays...")
@@ -2004,6 +2018,7 @@ async def screenshots(
         image_index = existing_images_count + i
         image_path = str((screenshot_dir / f"{sanitized_filename}-{image_index}.png").resolve())
         if not Path(image_path).exists() or meta.retake:
+            captured_times[image_path] = float(ss_times[i])
             capture_tasks.append(capture_with_semaphore((i, path, float(ss_times[i]), image_path, width, height, w_sar, h_sar, loglevel, hdr_tonemap, meta)))
 
     try:
@@ -2146,6 +2161,7 @@ async def screenshots(
 
                             if valid_image:
                                 Path(screenshot_path).replace(image_path)
+                                captured_times[image_path] = adjusted_time
                                 valid_results.append(image_path)
                                 break
                         except Exception as e:
@@ -2193,6 +2209,7 @@ async def screenshots(
 
                     if valid_image:
                         Path(screenshot_path).replace(image_path)
+                        captured_times[image_path] = random_time
                         valid_results.append(image_path)
                         break
                 except Exception as e:
@@ -2237,7 +2254,7 @@ async def screenshots(
         unit="frames",
     )
 
-    new_screens = register_screenshots(base_dir, folder_id, valid_results, group) if valid_results else []
+    new_screens = register_screenshots(base_dir, folder_id, valid_results, group, timestamps=captured_times) if valid_results else []
     await record_event_async("artifact", service="screenshot", operation="created", category="standard", count=len(new_screens))
     if not force_screenshots and not meta.retake:
         return [str(screen) for screen in manifest_files(base_dir, folder_id, group)[:requested_screens]]

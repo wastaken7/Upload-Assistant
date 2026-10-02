@@ -43,7 +43,7 @@ def _save(base_dir: str | Path, release_id: str, value: dict[str, Any]) -> None:
     temporary.replace(output)
 
 
-def register(base_dir: str | Path, release_id: str, paths: list[str | Path], group: str) -> list[Path]:
+def register(base_dir: str | Path, release_id: str, paths: list[str | Path], group: str, *, timestamps: dict[str, float] | None = None) -> list[Path]:
     """Publish capture files under UUID names and return their new paths."""
     with _lock(base_dir, release_id):
         manifest = _load(base_dir, release_id)
@@ -63,6 +63,8 @@ def register(base_dir: str | Path, release_id: str, paths: list[str | Path], gro
                 target = source.with_name(f"{screenshot_id}{suffix}")
             source.replace(target)
             entries[screenshot_id] = {"file": target.name, "group": group}
+            if timestamps is not None and str(source) in timestamps:
+                entries[screenshot_id]["timestamp"] = timestamps[str(source)]
             result.append(target)
         _save(base_dir, release_id, manifest)
         return result
@@ -82,6 +84,19 @@ def files(base_dir: str | Path, release_id: str, group: str | None = None) -> li
         if path.is_file():
             result.append(path)
     return sorted(result, key=lambda path: path.name)
+
+
+def capture_timestamps(base_dir: str | Path, release_id: str, group: str) -> list[float]:
+    """Return known capture times for active files in one group."""
+    directory = screenshots_dir(base_dir, release_id)
+    entries = _load(base_dir, release_id).get("screenshots", {})
+    if not isinstance(entries, dict):
+        return []
+    return [
+        float(value["timestamp"])
+        for value in entries.values()
+        if isinstance(value, dict) and value.get("group") == group and isinstance(value.get("timestamp"), (int, float)) and (directory / str(value.get("file", ""))).is_file()
+    ]
 
 
 def clear_group(base_dir: str | Path, release_id: str, group: str) -> None:
