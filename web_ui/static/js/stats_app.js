@@ -1093,6 +1093,16 @@ function TrendChart({
               strokeLinejoin="round"
             />
           ))}
+          {rows.length === 1 &&
+            activeSeries.map((entry) => (
+              <circle
+                key={`${entry.key}-point`}
+                cx={xFor(0)}
+                cy={yFor(entry, rows[0])}
+                r="4"
+                fill={entry.color}
+              />
+            ))}
           {hovered !== null && (
             <line
               x1={xFor(hovered)}
@@ -1429,7 +1439,7 @@ function SankeyDiagram({ sankey }) {
       <div className="overflow-x-auto">
         <svg
           viewBox={`0 0 760 ${height}`}
-          className="min-w-[700px]"
+          className="mx-auto block w-full min-w-[700px] max-w-[1000px]"
           role="img"
           aria-label="Upload route Sankey diagram"
         >
@@ -1442,7 +1452,15 @@ function SankeyDiagram({ sankey }) {
                 key={`${link.source}:${link.target}:${index}`}
                 d={`M ${source.x},${source.y} C ${bend},${source.y} ${bend},${target.y} ${target.x},${target.y}`}
                 fill="none"
-                stroke={link.source === "routes" ? "#8b5cf6" : "#22c55e"}
+                stroke={
+                  link.source === "routes"
+                    ? "#8b5cf6"
+                    : {
+                        "outcome:error": "#ef4444",
+                        "outcome:duplicate": "#f59e0b",
+                        "outcome:no_upload": "#64748b",
+                      }[link.target] || "#22c55e"
+                }
                 strokeOpacity="0.35"
                 strokeWidth={Math.max(2, (link.value / maximum) * 28)}
               >
@@ -1774,7 +1792,7 @@ function DonutChart({
   });
 
   return (
-    <div className="grid items-center gap-5 sm:grid-cols-[minmax(180px,240px)_1fr]">
+    <div className="ua-stats-donut-layout grid min-w-0 items-center gap-5">
       <div className="relative mx-auto aspect-square w-full max-w-[240px]">
         <svg viewBox="0 0 42 42" role="img" aria-label={ariaLabel}>
           <title>{ariaLabel}</title>
@@ -1882,7 +1900,7 @@ function BarChart({
     <div
       role="group"
       aria-label={ariaLabel}
-      className="max-h-[420px] space-y-3 overflow-y-auto pr-2"
+      className="ua-stats-chart-scroll max-h-[420px] space-y-3 overflow-y-auto pr-2"
     >
       {sortedRows.map((row, index) => {
         const selectable = Boolean(onSelect && row.id);
@@ -1966,16 +1984,56 @@ function DistributionChart(props) {
   );
 }
 
-const Section = ({ icon, title, subtitle, children }) => (
-  <section className="ua-stats-panel rounded-xl p-4 shadow-sm sm:p-5">
-    <div className="flex items-center gap-2.5">
-      <StatsIcon name={icon} className="h-5 w-5 opacity-60" />
-      <h2 className="text-base font-semibold">{title}</h2>
-    </div>
-    {subtitle && <p className="mt-1 text-sm opacity-60">{subtitle}</p>}
-    <div className="mt-4">{children}</div>
-  </section>
-);
+const Section = ({ icon, title, subtitle, children, className = "" }) => {
+  const panelRef = useRef(null);
+  const [needsWideTable, setNeedsWideTable] = useState(false);
+
+  useEffect(() => {
+    const panel = panelRef.current;
+    let frame;
+    const measure = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const tables = Array.from(
+          panel.querySelectorAll("details[open] .ua-stats-table-scroll"),
+        );
+        // Keep the wider row until the tables close: widening removes overflow,
+        // so immediately shrinking again would create a resize loop.
+        setNeedsWideTable(
+          (wide) =>
+            tables.length > 0 &&
+            (wide ||
+              tables.some(
+                (table) => table.scrollWidth > table.clientWidth + 1,
+              )),
+        );
+      });
+    };
+    const observer = new ResizeObserver(measure);
+    observer.observe(panel);
+    panel.addEventListener("toggle", measure, true);
+    measure();
+    return () => {
+      observer.disconnect();
+      panel.removeEventListener("toggle", measure, true);
+      cancelAnimationFrame(frame);
+    };
+  }, [children]);
+
+  return (
+    <section
+      ref={panelRef}
+      className={`ua-stats-panel ua-stats-detail-panel min-w-0 rounded-xl p-4 shadow-sm sm:p-5 ${className} ${needsWideTable ? "ua-stats-wide-table-panel" : ""}`}
+    >
+      <div className="flex items-center gap-2.5">
+        <StatsIcon name={icon} className="h-5 w-5 opacity-60" />
+        <h2 className="text-base font-semibold">{title}</h2>
+      </div>
+      {subtitle && <p className="mt-1 text-sm opacity-60">{subtitle}</p>}
+      <div className="mt-4 min-w-0">{children}</div>
+    </section>
+  );
+};
 
 const ChartWithTable = ({ chart, table }) => (
   <>
@@ -2128,6 +2186,15 @@ function StatsApp() {
   const [loading, setLoading] = useState(true);
   const [resetOpen, setResetOpen] = useState(false);
   const [confirmation, setConfirmation] = useState("");
+  const [resetting, setResetting] = useState(false);
+  const [resetError, setResetError] = useState("");
+  const closeReset = () => {
+    if (resetting) return;
+    setResetOpen(false);
+    setConfirmation("");
+    setResetError("");
+  };
+  const resetDialogRef = window.useUAModalFocus(closeReset, resetOpen);
   const [isDarkMode, setIsDarkMode] = useState(window.getUAStoredTheme);
   const [colorTheme, setColorTheme] = useState(window.getUAStoredColorTheme);
   const [interfaceStyle, setInterfaceStyle] = useState(
@@ -2185,9 +2252,13 @@ function StatsApp() {
       const body = await response.json();
       if (!response.ok)
         throw new Error(body.error || "Unable to load statistics");
+      if (body.success === false)
+        throw new Error(body.error || "Unable to load statistics");
+      if (signal?.aborted) return;
       setData(body);
     } catch (err) {
-      if (err?.name === "AbortError") return;
+      if (err?.name === "AbortError" || signal?.aborted) return;
+      setData(null);
       setError(err.message);
     } finally {
       if (!signal?.aborted) setLoading(false);
@@ -2212,6 +2283,9 @@ function StatsApp() {
   }, [data, mediaCategory]);
 
   const reset = async () => {
+    if (resetting) return;
+    setResetting(true);
+    setResetError("");
     try {
       const response = await fetch(`${APP_BASE}/api/stats`, {
         method: "DELETE",
@@ -2223,16 +2297,18 @@ function StatsApp() {
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) {
-        setError(body.error || "Unable to reset statistics");
+        setResetError(body.error || "Unable to reset statistics");
         return;
       }
     } catch (_error) {
-      setError("Unable to reset statistics");
+      setResetError("Unable to reset statistics");
       return;
+    } finally {
+      setResetting(false);
     }
     setResetOpen(false);
     setConfirmation("");
-    await load();
+    setTodayRefresh((value) => value + 1);
   };
 
   const overview = data?.overview || {};
@@ -2272,6 +2348,13 @@ function StatsApp() {
       overview.api_operations ||
       data.cache.hits ||
       data.cache.misses ||
+      data.cache.writes ||
+      data.cache.bypasses ||
+      overview.duplicate_preventions ||
+      data.uploads.by_destination.length ||
+      data.media.dimensions.length ||
+      data.release_profiles.profiles.length ||
+      data.content_time.total_seconds ||
       data.artifacts.length);
   const exportJson = () =>
     downloadText(
@@ -2393,7 +2476,15 @@ function StatsApp() {
                   {label}
                 </button>
               ))}
-              <details className="ua-stats-custom-dates relative">
+              <details
+                className="ua-stats-custom-dates relative"
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") {
+                    event.currentTarget.open = false;
+                    event.currentTarget.querySelector("summary")?.focus();
+                  }
+                }}
+              >
                 <summary
                   className={`ua-stats-custom-summary flex h-full cursor-pointer list-none items-center gap-2 rounded-lg px-3 text-sm ${period === "custom" ? "ua-stats-period-button-active font-semibold shadow-sm" : ""}`}
                 >
@@ -2424,10 +2515,19 @@ function StatsApp() {
                   </label>
                   <button
                     type="button"
-                    className="rounded-lg bg-blue-600 px-3 py-2 text-sm text-white"
-                    onClick={() => {
+                    className="rounded-lg bg-blue-600 px-3 py-2 text-sm text-white disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={
+                      !customFrom ||
+                      !customTo ||
+                      customFrom > customTo ||
+                      customTo > initialToday()
+                    }
+                    onClick={(event) => {
                       setCustomRange({ from: customFrom, to: customTo });
                       setPeriod("custom");
+                      const details = event.currentTarget.closest("details");
+                      details.open = false;
+                      details.querySelector("summary")?.focus();
                     }}
                   >
                     Apply range
@@ -2445,7 +2545,9 @@ function StatsApp() {
               Display
             </button>
             <StatsActionsMenu
-              exportsDisabled={!statsEnabled || !hasData}
+              exportsDisabled={
+                loading || Boolean(error) || !statsEnabled || !hasData
+              }
               onCsv={exportCsv}
               onJson={exportJson}
               onReset={() => setResetOpen(true)}
@@ -2478,6 +2580,13 @@ function StatsApp() {
             className="mt-5 rounded-lg border border-red-500 p-3 text-sm text-red-500"
           >
             {error}
+            <button
+              type="button"
+              className="ml-3 underline"
+              onClick={() => setTodayRefresh((value) => value + 1)}
+            >
+              Try again
+            </button>
           </div>
         )}
         {loading && (
@@ -2495,10 +2604,13 @@ function StatsApp() {
             >
               {statsEnabled && !hasData && (
                 <div className="ua-stats-panel rounded-xl p-8 text-center shadow-sm">
-                  <h2 className="font-semibold">No statistics recorded yet</h2>
+                  <h2 className="font-semibold">
+                    No activity for these filters
+                  </h2>
                   <p className="mt-2 text-sm opacity-60">
-                    Counters start after this feature is installed. Existing
-                    caches and logs are not backfilled.
+                    Try another period, destination, or activity source.
+                    Counters start when collection is enabled; existing caches
+                    and logs are not backfilled.
                   </p>
                 </div>
               )}
@@ -2600,7 +2712,7 @@ function StatsApp() {
                         icon="cache-writes"
                         label="Cache writes"
                         value={formatNumber(data.cache.writes)}
-                        detail={`${formatBytes(data.cache.bytes_written)} written since collection began`}
+                        detail={`${formatBytes(data.cache.bytes_written)} written in this period`}
                       />
                     )}
                     {visible.apiOperations && (
@@ -2681,418 +2793,425 @@ function StatsApp() {
                   />
                 </Section>
               )}
-              {visible.uploadsByDestination && (
-                <Section
-                  icon="uploads-by-destination"
-                  title="Uploads by destination"
-                  subtitle="Uploads to multiple sites are counted once per site."
-                >
-                  <ChartWithTable
-                    chart={
-                      <DistributionChart
-                        ariaLabel="Upload activity by destination"
-                        rows={data.uploads.by_destination.map((row) => ({
-                          label: row.display_name || row.destination,
-                          value: row.successes + row.errors + row.skipped,
-                          favicon: row.destination,
-                          id: row.destination,
-                        }))}
-                        activeLabel={activeTracker}
-                        onSelect={toggleTracker}
-                        showFavicons={settings.showFavicons}
-                      />
-                    }
-                    table={
-                      <Table
-                        rows={data.uploads.by_destination.map((row) => ({
-                          ...row,
-                          key: `${row.destination}:${row.type}`,
-                        }))}
-                        headers={[
-                          {
-                            label: "Destination",
-                            sortValue: (r) => r.display_name || r.destination,
-                            render: (r) => (
-                              <span className="flex items-center gap-2">
-                                {settings.showFavicons && (
-                                  <TrackerFavicon destination={r.destination} />
-                                )}
-                                <span>{r.display_name || r.destination}</span>
-                              </span>
-                            ),
-                          },
-                          {
-                            label: "Type",
-                            sortValue: (r) => formatUploadType(r.type),
-                            render: (r) => formatUploadType(r.type),
-                          },
-                          {
-                            label: "Attempts",
-                            sortValue: (r) => r.attempts,
-                            render: (r) => formatNumber(r.attempts),
-                          },
-                          {
-                            label: "Success",
-                            sortValue: (r) => r.successes,
-                            render: (r) => formatNumber(r.successes),
-                          },
-                          {
-                            label: "Errors",
-                            sortValue: (r) => r.errors,
-                            render: (r) => formatNumber(r.errors),
-                          },
-                          {
-                            label: "Skipped",
-                            sortValue: (r) => r.skipped,
-                            render: (r) => formatNumber(r.skipped),
-                          },
-                          {
-                            label: "Skip reasons",
-                            render: (r) =>
-                              Object.entries(r.skip_reasons || {})
-                                .map(([reason, count]) => `${reason}: ${count}`)
-                                .join(", ") || "—",
-                          },
-                          {
-                            label: "Rate",
-                            sortValue: (r) => r.success_rate,
-                            render: (r) => `${r.success_rate}%`,
-                          },
-                          {
-                            label: "Pioneering",
-                            sortValue: (r) => r.pioneering_rate,
-                            render: (r) => `${r.pioneering_rate}%`,
-                          },
-                          {
-                            label: "Health",
-                            sortValue: (r) => r.success_rate,
-                            render: (r) => (
-                              <ReliabilityBadge
-                                rate={r.success_rate}
-                                attempts={r.attempts}
-                              />
-                            ),
-                          },
-                          {
-                            label: "Avg time",
-                            sortValue: (r) => r.average_duration_ms,
-                            render: (r) =>
-                              formatDuration(r.average_duration_ms),
-                          },
-                          {
-                            label: "Volume",
-                            sortValue: (r) => r.bytes,
-                            render: (r) => formatBytes(r.bytes),
-                          },
-                        ]}
-                        activeKey={
-                          activeTracker
-                            ? `${activeTracker}:${data.uploads.by_destination.find((row) => row.destination === activeTracker)?.type || ""}`
-                            : ""
-                        }
-                        onRowClick={(row) => toggleTracker(row.destination)}
-                      />
-                    }
-                  />
-                </Section>
-              )}
-              {(visible.categories || visible.artifactActivity) && (
-                <div className="grid gap-5 lg:grid-cols-2">
-                  {visible.categories && (
-                    <Section
-                      icon="categories"
-                      title="Categories"
-                      subtitle="See upload results and data volume for each content category."
-                    >
-                      <ChartWithTable
-                        chart={
-                          <DistributionChart
-                            ariaLabel="Upload activity by category"
-                            rows={data.uploads.by_category.map((row) => ({
-                              label: row.category,
-                              value: row.successes + row.errors + row.skipped,
-                            }))}
-                          />
-                        }
-                        table={
-                          <Table
-                            rows={data.uploads.by_category}
-                            headers={[
-                              { label: "Category", key: "category" },
-                              { label: "Success", key: "successes" },
-                              { label: "Errors", key: "errors" },
-                              { label: "Skipped", key: "skipped" },
-                              {
-                                label: "Volume",
-                                sortValue: (r) => r.bytes,
-                                render: (r) => formatBytes(r.bytes),
-                              },
-                            ]}
-                          />
-                        }
-                      />
-                    </Section>
-                  )}
-                  {visible.artifactActivity && (
-                    <Section
-                      icon="artifact-activity"
-                      title="Artifact activity"
-                      subtitle="See which files were created or reused during processing."
-                    >
-                      <ChartWithTable
-                        chart={
-                          <DonutChart
-                            ariaLabel="Artifact activity"
-                            rows={data.artifacts.map((row) => ({
-                              label: `${formatDimensionValue(row.type)} · ${formatOperation(row.operation)} · ${formatDimensionValue(row.variant)}`,
-                              value: row.count,
-                            }))}
-                          />
-                        }
-                        table={
-                          <Table
-                            rows={data.artifacts}
-                            headers={[
-                              { label: "Type", key: "type" },
-                              {
-                                label: "Operation",
-                                sortValue: (row) =>
-                                  formatOperation(row.operation),
-                                render: (row) => formatOperation(row.operation),
-                              },
-                              { label: "Variant", key: "variant" },
-                              {
-                                label: "Count",
-                                sortValue: (r) => r.count,
-                                render: (r) => formatNumber(r.count),
-                              },
-                              {
-                                label: "Media volume",
-                                sortValue: (r) => r.bytes,
-                                render: (r) =>
-                                  r.bytes > 0 ? formatBytes(r.bytes) : "—",
-                              },
-                            ]}
-                          />
-                        }
-                      />
-                    </Section>
-                  )}
-                </div>
-              )}
-              {visible.contentTime && (
-                <Section
-                  icon="content-time"
-                  title="Successful media time"
-                  subtitle="See the total duration of successfully uploaded media. Each item counts once, and items without a known duration are left out."
-                >
-                  <ChartWithTable
-                    chart={
-                      <DonutChart
-                        ariaLabel="Successfully uploaded media time by category"
-                        rows={(data.content_time?.by_category || []).map(
-                          (row) => ({
+              <div className="ua-stats-detail-grid grid items-start gap-5 xl:grid-cols-2">
+                {visible.uploadsByDestination && (
+                  <Section
+                    icon="uploads-by-destination"
+                    title="Uploads by destination"
+                    subtitle="Uploads to multiple sites are counted once per site."
+                  >
+                    <ChartWithTable
+                      chart={
+                        <DistributionChart
+                          ariaLabel="Upload activity by destination"
+                          rows={data.uploads.by_destination.map((row) => ({
+                            label: row.display_name || row.destination,
+                            value: row.successes + row.errors + row.skipped,
+                            favicon: row.destination,
+                            id: row.destination,
+                          }))}
+                          activeLabel={activeTracker}
+                          onSelect={toggleTracker}
+                          showFavicons={settings.showFavicons}
+                        />
+                      }
+                      table={
+                        <Table
+                          rows={data.uploads.by_destination.map((row) => ({
+                            ...row,
+                            key: `${row.destination}:${row.type}`,
+                          }))}
+                          headers={[
+                            {
+                              label: "Destination",
+                              sortValue: (r) => r.display_name || r.destination,
+                              render: (r) => (
+                                <span className="flex items-center gap-2">
+                                  {settings.showFavicons && (
+                                    <TrackerFavicon
+                                      destination={r.destination}
+                                    />
+                                  )}
+                                  <span>{r.display_name || r.destination}</span>
+                                </span>
+                              ),
+                            },
+                            {
+                              label: "Type",
+                              sortValue: (r) => formatUploadType(r.type),
+                              render: (r) => formatUploadType(r.type),
+                            },
+                            {
+                              label: "Attempts",
+                              sortValue: (r) => r.attempts,
+                              render: (r) => formatNumber(r.attempts),
+                            },
+                            {
+                              label: "Success",
+                              sortValue: (r) => r.successes,
+                              render: (r) => formatNumber(r.successes),
+                            },
+                            {
+                              label: "Errors",
+                              sortValue: (r) => r.errors,
+                              render: (r) => formatNumber(r.errors),
+                            },
+                            {
+                              label: "Skipped",
+                              sortValue: (r) => r.skipped,
+                              render: (r) => formatNumber(r.skipped),
+                            },
+                            {
+                              label: "Skip reasons",
+                              render: (r) =>
+                                Object.entries(r.skip_reasons || {})
+                                  .map(
+                                    ([reason, count]) => `${reason}: ${count}`,
+                                  )
+                                  .join(", ") || "—",
+                            },
+                            {
+                              label: "Rate",
+                              sortValue: (r) => r.success_rate,
+                              render: (r) => `${r.success_rate}%`,
+                            },
+                            {
+                              label: "Pioneering",
+                              sortValue: (r) => r.pioneering_rate,
+                              render: (r) => `${r.pioneering_rate}%`,
+                            },
+                            {
+                              label: "Health",
+                              sortValue: (r) => r.success_rate,
+                              render: (r) => (
+                                <ReliabilityBadge
+                                  rate={r.success_rate}
+                                  attempts={r.attempts}
+                                />
+                              ),
+                            },
+                            {
+                              label: "Avg time",
+                              sortValue: (r) => r.average_duration_ms,
+                              render: (r) =>
+                                formatDuration(r.average_duration_ms),
+                            },
+                            {
+                              label: "Volume",
+                              sortValue: (r) => r.bytes,
+                              render: (r) => formatBytes(r.bytes),
+                            },
+                          ]}
+                          activeKey={
+                            activeTracker
+                              ? `${activeTracker}:${data.uploads.by_destination.find((row) => row.destination === activeTracker)?.type || ""}`
+                              : ""
+                          }
+                          onRowClick={(row) => toggleTracker(row.destination)}
+                        />
+                      }
+                    />
+                  </Section>
+                )}
+                {visible.categories && (
+                  <Section
+                    icon="categories"
+                    title="Categories"
+                    subtitle="See upload results and data volume for each content category."
+                  >
+                    <ChartWithTable
+                      chart={
+                        <DistributionChart
+                          ariaLabel="Upload activity by category"
+                          rows={data.uploads.by_category.map((row) => ({
                             label: row.category,
-                            value: row.seconds,
-                          }),
-                        )}
-                        valueFormatter={formatMediaHours}
-                        centerLabel="uploaded"
-                      />
-                    }
-                    table={
-                      <Table
-                        rows={data.content_time?.by_category || []}
-                        empty="No successful media duration in this period."
-                        headers={[
-                          { label: "Category", key: "category" },
-                          {
-                            label: "Items",
-                            sortValue: (row) => row.items,
-                            render: (row) => formatNumber(row.items),
-                          },
-                          {
-                            label: "Media time",
-                            sortValue: (row) => row.seconds,
-                            render: (row) => formatMediaTime(row.seconds),
-                          },
-                          {
-                            label: "Hours",
-                            sortValue: (row) => row.seconds,
-                            render: (row) => formatMediaHours(row.seconds),
-                          },
-                        ]}
-                      />
-                    }
-                  />
-                </Section>
-              )}
-              {visible.mediaProfile && (
-                <Section
-                  icon="media-profile"
-                  title="Media profile"
-                  subtitle="Explore video, audio, format, and other details by category."
-                >
-                  <MediaProfile
-                    media={data.media}
-                    category={mediaCategory}
-                    onCategoryChange={setMediaCategory}
-                  />
-                </Section>
-              )}
-              {(visible.streamingServices || visible.personalReleases) && (
-                <div className="grid gap-5 lg:grid-cols-2">
-                  {visible.streamingServices && (
-                    <Section
-                      icon="streaming-services"
-                      title="Streaming services"
-                      subtitle="See the services identified for WEB and BOOK items."
-                    >
-                      <StreamingServices services={data.streaming.services} />
-                    </Section>
-                  )}
-                  {visible.personalReleases && (
-                    <Section
-                      icon="personal-releases"
-                      title="Personal releases"
-                      subtitle="Compare personal and standard releases. Release group names and tags are not saved."
-                    >
-                      <ReleaseProfiles
-                        releaseProfiles={data.release_profiles}
-                      />
-                    </Section>
-                  )}
-                </div>
-              )}
-              {visible.cacheByProvider && (
-                <Section
-                  icon="cache-by-provider"
-                  title="Cache by provider"
-                  subtitle={`${activeTracker ? "These totals include all trackers, even when one is selected. " : ""}See cache hits, misses, and writes for each provider.`}
-                >
-                  <ChartWithTable
-                    chart={
-                      <DistributionChart
-                        ariaLabel="Cache activity by provider"
-                        rows={data.cache.by_provider.map((row) => ({
-                          label: formatCacheProvider(row.provider),
-                          value:
-                            row.hits + row.misses + row.writes + row.bypasses,
-                        }))}
-                      />
-                    }
-                    table={
-                      <Table
-                        rows={data.cache.by_provider}
-                        headers={[
-                          {
-                            label: "Provider",
-                            sortValue: (row) =>
-                              formatCacheProvider(row.provider),
-                            render: (row) => formatCacheProvider(row.provider),
-                          },
-                          { label: "Hits", key: "hits" },
-                          { label: "Misses", key: "misses" },
-                          { label: "Writes", key: "writes" },
-                          { label: "Bypasses", key: "bypasses" },
-                          {
-                            label: "Written",
-                            sortValue: (r) => r.bytes_written,
-                            render: (r) => formatBytes(r.bytes_written),
-                          },
-                          {
-                            label: "Hit rate",
-                            sortValue: (r) => r.hit_rate,
-                            render: (r) => `${r.hit_rate}%`,
-                          },
-                        ]}
-                      />
-                    }
-                  />
-                </Section>
-              )}
-              {visible.externalOperations && (
-                <Section
-                  icon="external-operations"
-                  title="External operations"
-                  subtitle={`${activeTracker ? "These totals include all trackers, even when one is selected. " : ""}See how often external services were used. Redirects and retries are not counted separately. Bytes sent are shown for NNTP and successful image uploads.`}
-                >
-                  <ChartWithTable
-                    chart={
-                      <DistributionChart
-                        ariaLabel="External operations by service"
-                        rows={data.api.by_service.map((row) => ({
-                          label: `${row.service} · ${formatOperation(row.operation)}`,
-                          value: row.requests,
-                        }))}
-                      />
-                    }
-                    table={
-                      <Table
-                        rows={data.api.by_service.map((row) => ({
-                          ...row,
-                          key: `${row.service}:${row.operation}`,
-                        }))}
-                        headers={[
-                          { label: "Service", key: "service" },
-                          {
-                            label: "Operation",
-                            sortValue: (row) => formatOperation(row.operation),
-                            render: (row) => formatOperation(row.operation),
-                          },
-                          { label: "Requests", key: "requests" },
-                          { label: "Success", key: "successes" },
-                          { label: "Errors", key: "errors" },
-                          {
-                            label: "Avg time",
-                            sortValue: (r) => r.average_duration_ms,
-                            render: (r) =>
-                              formatDuration(r.average_duration_ms),
-                          },
-                          {
-                            label: "Bytes sent",
-                            sortValue: (r) => r.bytes,
-                            render: (r) =>
-                              r.bytes > 0 ? formatBytes(r.bytes) : "—",
-                          },
-                        ]}
-                      />
-                    }
-                  />
-                </Section>
-              )}
-              {visible.executionSource && (
-                <Section
-                  icon="execution-source"
-                  title="Execution source"
-                  subtitle="See whether completed items were started from the command line or web interface."
-                >
-                  <ChartWithTable
-                    chart={
-                      <DonutChart
-                        ariaLabel="Completed items by execution source"
-                        rows={data.sources.map((row) => ({
-                          label: row.source,
-                          value: row.count,
-                        }))}
-                      />
-                    }
-                    table={
-                      <Table
-                        rows={data.sources}
-                        headers={[
-                          { label: "Source", key: "source" },
-                          {
-                            label: "Completed items",
-                            sortValue: (r) => r.count,
-                            render: (r) => formatNumber(r.count),
-                          },
-                        ]}
-                      />
-                    }
-                  />
-                </Section>
-              )}
+                            value: row.successes + row.errors + row.skipped,
+                          }))}
+                        />
+                      }
+                      table={
+                        <Table
+                          rows={data.uploads.by_category}
+                          headers={[
+                            { label: "Category", key: "category" },
+                            { label: "Success", key: "successes" },
+                            { label: "Errors", key: "errors" },
+                            { label: "Skipped", key: "skipped" },
+                            {
+                              label: "Volume",
+                              sortValue: (r) => r.bytes,
+                              render: (r) => formatBytes(r.bytes),
+                            },
+                          ]}
+                        />
+                      }
+                    />
+                  </Section>
+                )}
+                {visible.artifactActivity && (
+                  <Section
+                    icon="artifact-activity"
+                    title="Artifact activity"
+                    subtitle="See which files were created or reused during processing."
+                  >
+                    <ChartWithTable
+                      chart={
+                        <DonutChart
+                          ariaLabel="Artifact activity"
+                          rows={data.artifacts.map((row) => ({
+                            label: `${formatDimensionValue(row.type)} · ${formatOperation(row.operation)} · ${formatDimensionValue(row.variant)}`,
+                            value: row.count,
+                          }))}
+                        />
+                      }
+                      table={
+                        <Table
+                          rows={data.artifacts}
+                          headers={[
+                            { label: "Type", key: "type" },
+                            {
+                              label: "Operation",
+                              sortValue: (row) =>
+                                formatOperation(row.operation),
+                              render: (row) => formatOperation(row.operation),
+                            },
+                            { label: "Variant", key: "variant" },
+                            {
+                              label: "Count",
+                              sortValue: (r) => r.count,
+                              render: (r) => formatNumber(r.count),
+                            },
+                            {
+                              label: "Media volume",
+                              sortValue: (r) => r.bytes,
+                              render: (r) =>
+                                r.bytes > 0 ? formatBytes(r.bytes) : "—",
+                            },
+                          ]}
+                        />
+                      }
+                    />
+                  </Section>
+                )}
+                {visible.contentTime && (
+                  <Section
+                    icon="content-time"
+                    title="Successful media time"
+                    subtitle="See the total duration of successfully uploaded media. Each item counts once, and items without a known duration are left out."
+                  >
+                    <ChartWithTable
+                      chart={
+                        <DonutChart
+                          ariaLabel="Successfully uploaded media time by category"
+                          rows={(data.content_time?.by_category || []).map(
+                            (row) => ({
+                              label: row.category,
+                              value: row.seconds,
+                            }),
+                          )}
+                          valueFormatter={formatMediaHours}
+                          centerLabel="uploaded"
+                        />
+                      }
+                      table={
+                        <Table
+                          rows={data.content_time?.by_category || []}
+                          empty="No successful media duration in this period."
+                          headers={[
+                            { label: "Category", key: "category" },
+                            {
+                              label: "Items",
+                              sortValue: (row) => row.items,
+                              render: (row) => formatNumber(row.items),
+                            },
+                            {
+                              label: "Media time",
+                              sortValue: (row) => row.seconds,
+                              render: (row) => formatMediaTime(row.seconds),
+                            },
+                            {
+                              label: "Hours",
+                              sortValue: (row) => row.seconds,
+                              render: (row) => formatMediaHours(row.seconds),
+                            },
+                          ]}
+                        />
+                      }
+                    />
+                  </Section>
+                )}
+                {visible.mediaProfile && (
+                  <Section
+                    icon="media-profile"
+                    title="Media profile"
+                    className="xl:col-span-2"
+                    subtitle="Explore video, audio, format, and other details by category."
+                  >
+                    <MediaProfile
+                      media={data.media}
+                      category={mediaCategory}
+                      onCategoryChange={setMediaCategory}
+                    />
+                  </Section>
+                )}
+                {(visible.streamingServices ||
+                  visible.personalReleases ||
+                  visible.executionSource) && (
+                  <div className="grid min-w-0 items-start gap-5 md:grid-cols-2 2xl:grid-cols-3 xl:col-span-2">
+                    {visible.streamingServices && (
+                      <Section
+                        icon="streaming-services"
+                        title="Streaming services"
+                        subtitle="See the services identified for WEB and BOOK items."
+                      >
+                        <StreamingServices services={data.streaming.services} />
+                      </Section>
+                    )}
+                    {visible.personalReleases && (
+                      <Section
+                        icon="personal-releases"
+                        title="Personal releases"
+                        subtitle="Compare personal and standard releases. Release group names and tags are not saved."
+                      >
+                        <ReleaseProfiles
+                          releaseProfiles={data.release_profiles}
+                        />
+                      </Section>
+                    )}
+                    {visible.executionSource && (
+                      <Section
+                        icon="execution-source"
+                        title="Execution source"
+                        subtitle="See whether completed items were started from the command line or web interface."
+                      >
+                        <ChartWithTable
+                          chart={
+                            <DonutChart
+                              ariaLabel="Completed items by execution source"
+                              rows={data.sources.map((row) => ({
+                                label: row.source,
+                                value: row.count,
+                              }))}
+                            />
+                          }
+                          table={
+                            <Table
+                              rows={data.sources}
+                              headers={[
+                                { label: "Source", key: "source" },
+                                {
+                                  label: "Completed items",
+                                  sortValue: (r) => r.count,
+                                  render: (r) => formatNumber(r.count),
+                                },
+                              ]}
+                            />
+                          }
+                        />
+                      </Section>
+                    )}
+                  </div>
+                )}
+                {visible.cacheByProvider && (
+                  <Section
+                    icon="cache-by-provider"
+                    title="Cache by provider"
+                    subtitle={`${activeTracker ? "These totals include all trackers, even when one is selected. " : ""}See cache hits, misses, and writes for each provider.`}
+                  >
+                    <ChartWithTable
+                      chart={
+                        <DistributionChart
+                          ariaLabel="Cache activity by provider"
+                          rows={data.cache.by_provider.map((row) => ({
+                            label: formatCacheProvider(row.provider),
+                            value:
+                              row.hits + row.misses + row.writes + row.bypasses,
+                          }))}
+                        />
+                      }
+                      table={
+                        <Table
+                          rows={data.cache.by_provider}
+                          headers={[
+                            {
+                              label: "Provider",
+                              sortValue: (row) =>
+                                formatCacheProvider(row.provider),
+                              render: (row) =>
+                                formatCacheProvider(row.provider),
+                            },
+                            { label: "Hits", key: "hits" },
+                            { label: "Misses", key: "misses" },
+                            { label: "Writes", key: "writes" },
+                            { label: "Bypasses", key: "bypasses" },
+                            {
+                              label: "Written",
+                              sortValue: (r) => r.bytes_written,
+                              render: (r) => formatBytes(r.bytes_written),
+                            },
+                            {
+                              label: "Hit rate",
+                              sortValue: (r) => r.hit_rate,
+                              render: (r) => `${r.hit_rate}%`,
+                            },
+                          ]}
+                        />
+                      }
+                    />
+                  </Section>
+                )}
+                {visible.externalOperations && (
+                  <Section
+                    icon="external-operations"
+                    title="External operations"
+                    subtitle={`${activeTracker ? "These totals include all trackers, even when one is selected. " : ""}See how often external services were used. Redirects and retries are not counted separately. Bytes sent are shown for NNTP and successful image uploads.`}
+                  >
+                    <ChartWithTable
+                      chart={
+                        <DistributionChart
+                          ariaLabel="External operations by service"
+                          rows={data.api.by_service.map((row) => ({
+                            label: `${row.service} · ${formatOperation(row.operation)}`,
+                            value: row.requests,
+                          }))}
+                        />
+                      }
+                      table={
+                        <Table
+                          rows={data.api.by_service.map((row) => ({
+                            ...row,
+                            key: `${row.service}:${row.operation}`,
+                          }))}
+                          headers={[
+                            { label: "Service", key: "service" },
+                            {
+                              label: "Operation",
+                              sortValue: (row) =>
+                                formatOperation(row.operation),
+                              render: (row) => formatOperation(row.operation),
+                            },
+                            { label: "Requests", key: "requests" },
+                            { label: "Success", key: "successes" },
+                            { label: "Errors", key: "errors" },
+                            {
+                              label: "Avg time",
+                              sortValue: (r) => r.average_duration_ms,
+                              render: (r) =>
+                                formatDuration(r.average_duration_ms),
+                            },
+                            {
+                              label: "Bytes sent",
+                              sortValue: (r) => r.bytes,
+                              render: (r) =>
+                                r.bytes > 0 ? formatBytes(r.bytes) : "—",
+                            },
+                          ]}
+                        />
+                      }
+                    />
+                  </Section>
+                )}
+              </div>
             </div>
             {!statsEnabled && (
               <div className="absolute inset-x-0 top-12 z-10 flex justify-center px-4">
@@ -3130,6 +3249,8 @@ function StatsApp() {
           role="dialog"
           aria-modal="true"
           aria-labelledby="reset-title"
+          ref={resetDialogRef}
+          tabIndex="-1"
         >
           <div className="w-full max-w-md rounded-xl border bg-[var(--ua-surface,#171615)] p-5 shadow-xl">
             <h2 id="reset-title" className="text-lg font-semibold">
@@ -3142,30 +3263,34 @@ function StatsApp() {
             <label className="mt-4 block text-sm">
               Type <strong>RESET</strong> to confirm
               <input
-                autoFocus
+                data-ua-modal-initial-focus
+                disabled={resetting}
                 value={confirmation}
                 onChange={(event) => setConfirmation(event.target.value)}
                 className="mt-2 w-full rounded-lg border bg-transparent px-3 py-2"
               />
             </label>
+            {resetError && (
+              <p role="alert" className="mt-3 text-sm text-red-500">
+                {resetError}
+              </p>
+            )}
             <div className="mt-5 flex justify-end gap-2">
               <button
                 type="button"
-                onClick={() => {
-                  setResetOpen(false);
-                  setConfirmation("");
-                }}
+                onClick={closeReset}
+                disabled={resetting}
                 className="rounded-lg border px-3 py-2 text-sm"
               >
                 Cancel
               </button>
               <button
                 type="button"
-                disabled={confirmation !== "RESET"}
+                disabled={confirmation !== "RESET" || resetting}
                 onClick={reset}
                 className="rounded-lg bg-red-600 px-3 py-2 text-sm text-white disabled:opacity-40"
               >
-                Reset statistics
+                {resetting ? "Resetting…" : "Reset statistics"}
               </button>
             </div>
           </div>

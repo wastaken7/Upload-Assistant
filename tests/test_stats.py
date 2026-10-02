@@ -225,6 +225,23 @@ def test_schema_v2_recreates_unreleased_v1_aggregates(tmp_path):
         assert db.execute("SELECT value FROM stats_meta WHERE key = 'schema_version'").fetchone() == ("2",)
 
 
+def test_unknown_schema_is_preserved_instead_of_reset(tmp_path):
+    stats.record_event("item", operation="completed", count=3, state_dir=tmp_path)
+    database = tmp_path / "data/stats.sqlite3"
+    with sqlite3.connect(database) as db:
+        db.execute("UPDATE stats_meta SET value = '999' WHERE key = 'schema_version'")
+    stats._initialized_paths.discard(database)
+
+    assert stats.get_stats("all", "real", tmp_path)["success"] is False
+    stats.record_event("item", operation="completed", state_dir=tmp_path)
+    with pytest.raises(sqlite3.DatabaseError):
+        stats.reset_stats(tmp_path)
+
+    with sqlite3.connect(database) as db:
+        assert db.execute("SELECT SUM(count) FROM stats_daily").fetchone() == (3,)
+        assert db.execute("SELECT value FROM stats_meta WHERE key = 'schema_version'").fetchone() == ("999",)
+
+
 def test_content_duration_column_is_added_without_losing_v2_aggregates(tmp_path):
     database = tmp_path / "data" / "stats.sqlite3"
     database.parent.mkdir(parents=True)
@@ -625,7 +642,7 @@ async def test_record_event_async_offloads_the_sqlite_write(monkeypatch):
     ]
 
 
-def test_corrupt_database_never_breaks_recording_or_reading(tmp_path):
+def test_corrupt_database_does_not_break_recording_and_reports_read_failure(tmp_path):
     database = tmp_path / "data" / "stats.sqlite3"
     database.parent.mkdir(parents=True)
     database.write_bytes(b"not a sqlite database")
@@ -633,8 +650,41 @@ def test_corrupt_database_never_breaks_recording_or_reading(tmp_path):
     stats.record_event("item", operation="completed", state_dir=tmp_path)
     result = stats.get_stats("all", "real", tmp_path)
 
-    assert result["success"] is True
+    assert result["success"] is False
+    assert "Unable to read statistics" in result["error"]
     assert result["overview"]["items_completed"] == 0
+
+
+def test_api_timeline_and_totals_count_operations_once_per_day(tmp_path):
+    for outcome in ("request", "success"):
+        stats.record_event("api", service="fictional", operation="lookup", outcome=outcome, count=3, state_dir=tmp_path)
+    stats.record_event("api", service="imaginary", operation="search", outcome="error", state_dir=tmp_path)
+    prior_day = (datetime.now(UTC).date() - timedelta(days=1)).isoformat()
+    with sqlite3.connect(tmp_path / "data/stats.sqlite3") as db:
+        db.execute("UPDATE stats_daily SET day = ? WHERE outcome = 'request'", (prior_day,))
+    stats.record_event("api", service="fictional", operation="lookup", outcome="request", count=3, state_dir=tmp_path)
+
+    result = stats.get_stats("7d", "real", tmp_path)
+
+    assert result["overview"]["api_operations"] == 7
+    assert sum(row["api"] for row in result["timeline"]) == 7
+    assert sum(row["requests"] for row in result["api"]["by_service"]) == 7
+    assert result["timeline"][-1]["api"] == 4
+
+
+def test_empty_period_reports_decline_from_previous_activity(tmp_path):
+    stats.record_event("item", operation="completed", state_dir=tmp_path)
+    stats.record_event("upload", service="FICTIONAL", operation="tracker", state_dir=tmp_path)
+    prior_day = (datetime.now(UTC).date() - timedelta(days=7)).isoformat()
+    with sqlite3.connect(tmp_path / "data/stats.sqlite3") as db:
+        db.execute("UPDATE stats_daily SET day = ?", (prior_day,))
+
+    result = stats.get_stats("7d", "real", tmp_path)
+
+    assert result["comparison"]["items_completed_pct"] == -100.0
+    assert result["comparison"]["uploads_pct"] == -100.0
+    assert len(result["timeline"]) == 7
+    assert all(row["items"] == row["uploads"] == 0 for row in result["timeline"])
 
 
 def test_invalid_filters_are_rejected(tmp_path):
