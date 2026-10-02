@@ -12,6 +12,31 @@ const STATS_PERIODS = [
   ["all", "All"],
 ];
 const TREND_VIEW_KEY = "ua_stats_trend_view";
+const TREND_SERIES_KEY = "ua_stats_trend_series_v1";
+const DEFAULT_TREND_SERIES = Object.freeze({
+  items: true,
+  uploads: true,
+  upload_errors: true,
+  api: false,
+  processed_bytes: true,
+  uploaded_bytes: true,
+});
+
+function loadTrendSeries() {
+  try {
+    const stored = JSON.parse(window.UAStorage.get(TREND_SERIES_KEY));
+    return Object.fromEntries(
+      Object.entries(DEFAULT_TREND_SERIES).map(([key, fallback]) => [
+        key,
+        typeof stored?.[key] === "boolean" ? stored[key] : fallback,
+      ]),
+    );
+  } catch (_error) {
+    return { ...DEFAULT_TREND_SERIES };
+  }
+}
+
+const STATS_VIEW_KEY_PREFIX = "ua_stats_view_v1_";
 const STATS_SETTINGS_KEY = "ua_stats_settings_v1";
 const DEFAULT_STATS_SETTINGS = Object.freeze({
   timezone: "utc",
@@ -840,14 +865,10 @@ function TrendChart({
     const stored = window.UAStorage.get(TREND_VIEW_KEY);
     return ["count", "volume", "both"].includes(stored) ? stored : "count";
   });
-  const [visible, setVisible] = useState({
-    items: true,
-    uploads: true,
-    upload_errors: true,
-    api: false,
-    processed_bytes: true,
-    uploaded_bytes: true,
-  });
+  const [visible, setVisible] = useState(loadTrendSeries);
+  useEffect(() => {
+    window.UAStorage.set(TREND_SERIES_KEY, JSON.stringify(visible));
+  }, [visible]);
   const [hovered, setHovered] = useState(null);
   const width = 760,
     height = 220;
@@ -1495,7 +1516,10 @@ function SankeyDiagram({ sankey }) {
           })}
         </svg>
       </div>
-      <details className="ua-stats-table-details mt-4">
+      <PersistentStatsDetails
+        preferenceKey="upload-flow"
+        className="ua-stats-table-details mt-4"
+      >
         <summary className="cursor-pointer text-sm font-medium">
           Accessible route table
         </summary>
@@ -1512,7 +1536,7 @@ function SankeyDiagram({ sankey }) {
             { label: "Routes", key: "value" },
           ]}
         />
-      </details>
+      </PersistentStatsDetails>
     </div>
   );
 }
@@ -1548,6 +1572,7 @@ function MediaProfile({ media, category, onCategoryChange }) {
         </select>
       </label>
       <ChartWithTable
+        preferenceKey="media-profile"
         chart={
           <div className="grid gap-4 xl:grid-cols-2">
             {Object.entries(groups).map(([dimension, values]) => (
@@ -1556,6 +1581,7 @@ function MediaProfile({ media, category, onCategoryChange }) {
                   {formatDimensionValue(dimension)}
                 </h3>
                 <DistributionChart
+                  preferenceKey={`media-profile-${dimension}`}
                   ariaLabel={`${formatDimensionValue(dimension)} distribution`}
                   rows={values.map((row) => ({
                     label: formatDimensionValue(row.value),
@@ -1663,6 +1689,7 @@ function StreamingServices({ services }) {
   const rows = services || [];
   return (
     <ChartWithTable
+      preferenceKey="streaming-services"
       chart={
         <DonutChart
           ariaLabel="Processed items by streaming service"
@@ -1716,6 +1743,7 @@ function ReleaseProfiles({ releaseProfiles }) {
     : [];
   return (
     <ChartWithTable
+      preferenceKey="personal-releases"
       chart={
         <DonutChart
           ariaLabel="Personal and standard releases"
@@ -1953,8 +1981,49 @@ function BarChart({
   );
 }
 
-function DistributionChart(props) {
-  const [mode, setMode] = useState("donut");
+function useStatsViewPreference(preferenceKey, defaultValue, allowedValues) {
+  const storageKey = `${STATS_VIEW_KEY_PREFIX}${preferenceKey}`;
+  const [value, setValue] = useState(() => {
+    try {
+      const stored = JSON.parse(window.UAStorage.get(storageKey));
+      return allowedValues.includes(stored) ? stored : defaultValue;
+    } catch (_error) {
+      return defaultValue;
+    }
+  });
+  const updateValue = (nextValue) => {
+    setValue(nextValue);
+    window.UAStorage.set(storageKey, JSON.stringify(nextValue));
+  };
+  return [value, updateValue];
+}
+
+function PersistentStatsDetails({ preferenceKey, children, ...props }) {
+  const [open, setOpen] = useStatsViewPreference(
+    `${preferenceKey}_table`,
+    false,
+    [true, false],
+  );
+  return (
+    <details
+      {...props}
+      open={open}
+      onToggle={(event) => {
+        if (event.currentTarget.open !== open)
+          setOpen(event.currentTarget.open);
+      }}
+    >
+      {children}
+    </details>
+  );
+}
+
+function DistributionChart({ preferenceKey, ...props }) {
+  const [mode, setMode] = useStatsViewPreference(
+    `${preferenceKey}_chart`,
+    "donut",
+    ["donut", "bar"],
+  );
   return (
     <div>
       <div
@@ -2035,10 +2104,13 @@ const Section = ({ icon, title, subtitle, children, className = "" }) => {
   );
 };
 
-const ChartWithTable = ({ chart, table }) => (
+const ChartWithTable = ({ preferenceKey, chart, table }) => (
   <>
     {chart}
-    <details className="ua-stats-table-details mt-5">
+    <PersistentStatsDetails
+      preferenceKey={preferenceKey}
+      className="ua-stats-table-details mt-5"
+    >
       <summary
         className="ml-auto flex h-9 w-9 cursor-pointer list-none items-center justify-center rounded-lg"
         aria-label="Show or hide data table"
@@ -2052,7 +2124,7 @@ const ChartWithTable = ({ chart, table }) => (
         </span>
       </summary>
       <div className="mt-3">{table}</div>
-    </details>
+    </PersistentStatsDetails>
   </>
 );
 
@@ -2793,7 +2865,7 @@ function StatsApp() {
                   />
                 </Section>
               )}
-              <div className="ua-stats-detail-grid grid items-start gap-5 xl:grid-cols-2">
+              <div className="ua-stats-detail-grid grid items-stretch gap-5 xl:grid-cols-2">
                 {visible.uploadsByDestination && (
                   <Section
                     icon="uploads-by-destination"
@@ -2801,8 +2873,10 @@ function StatsApp() {
                     subtitle="Uploads to multiple sites are counted once per site."
                   >
                     <ChartWithTable
+                      preferenceKey="uploads-by-destination"
                       chart={
                         <DistributionChart
+                          preferenceKey="uploads-by-destination"
                           ariaLabel="Upload activity by destination"
                           rows={data.uploads.by_destination.map((row) => ({
                             label: row.display_name || row.destination,
@@ -2920,8 +2994,10 @@ function StatsApp() {
                     subtitle="See upload results and data volume for each content category."
                   >
                     <ChartWithTable
+                      preferenceKey="categories"
                       chart={
                         <DistributionChart
+                          preferenceKey="categories"
                           ariaLabel="Upload activity by category"
                           rows={data.uploads.by_category.map((row) => ({
                             label: row.category,
@@ -2955,6 +3031,7 @@ function StatsApp() {
                     subtitle="See which files were created or reused during processing."
                   >
                     <ChartWithTable
+                      preferenceKey="artifact-activity"
                       chart={
                         <DonutChart
                           ariaLabel="Artifact activity"
@@ -3000,6 +3077,7 @@ function StatsApp() {
                     subtitle="See the total duration of successfully uploaded media. Each item counts once, and items without a known duration are left out."
                   >
                     <ChartWithTable
+                      preferenceKey="content-time"
                       chart={
                         <DonutChart
                           ariaLabel="Successfully uploaded media time by category"
@@ -3057,7 +3135,7 @@ function StatsApp() {
                 {(visible.streamingServices ||
                   visible.personalReleases ||
                   visible.executionSource) && (
-                  <div className="grid min-w-0 items-start gap-5 md:grid-cols-2 2xl:grid-cols-3 xl:col-span-2">
+                  <div className="grid min-w-0 items-stretch gap-5 md:grid-cols-2 2xl:grid-cols-3 xl:col-span-2">
                     {visible.streamingServices && (
                       <Section
                         icon="streaming-services"
@@ -3085,6 +3163,7 @@ function StatsApp() {
                         subtitle="See whether completed items were started from the command line or web interface."
                       >
                         <ChartWithTable
+                          preferenceKey="execution-source"
                           chart={
                             <DonutChart
                               ariaLabel="Completed items by execution source"
@@ -3119,8 +3198,10 @@ function StatsApp() {
                     subtitle={`${activeTracker ? "These totals include all trackers, even when one is selected. " : ""}See cache hits, misses, and writes for each provider.`}
                   >
                     <ChartWithTable
+                      preferenceKey="cache-by-provider"
                       chart={
                         <DistributionChart
+                          preferenceKey="cache-by-provider"
                           ariaLabel="Cache activity by provider"
                           rows={data.cache.by_provider.map((row) => ({
                             label: formatCacheProvider(row.provider),
@@ -3167,8 +3248,10 @@ function StatsApp() {
                     subtitle={`${activeTracker ? "These totals include all trackers, even when one is selected. " : ""}See how often external services were used. Redirects and retries are not counted separately. Bytes sent are shown for NNTP and successful image uploads.`}
                   >
                     <ChartWithTable
+                      preferenceKey="external-operations"
                       chart={
                         <DistributionChart
+                          preferenceKey="external-operations"
                           ariaLabel="External operations by service"
                           rows={data.api.by_service.map((row) => ({
                             label: `${row.service} · ${formatOperation(row.operation)}`,
