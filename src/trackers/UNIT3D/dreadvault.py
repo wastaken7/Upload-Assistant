@@ -26,6 +26,15 @@ def _remove_last(name: str, token: str) -> str:
     return name[: max(0, start - 1)] + name[end:]
 
 
+def _replace_last(name: str, token: str, replacement: str) -> str:
+    if not token:
+        return name
+    start = max(f" {name} ".rfind(f" {token}{boundary}") for boundary in (" ", "-"))
+    if start < 0:
+        return name
+    return name[:start] + replacement + name[start + len(token) :]
+
+
 def _insert_before_last(name: str, token: str, prefix: str) -> str:
     if not token or not prefix:
         return name
@@ -88,11 +97,13 @@ class DreadVault(UNIT3D):
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
         dreadvault_name: str = meta.name
-        resolution: str = meta.resolution
+        resolution: str = meta.resolution if meta.resolution != "OTHER" else ""
         video_encode: str = meta.video_encode
         name_type: str = meta.type or ""
         source: str = meta.source or ""
         alt_title = meta.aka if not meta.no_aka else ""
+        full_disc = name_type == "DISC"
+        dvd_encode = name_type == "ENCODE" and source in ("NTSC", "PAL")
 
         year = str(meta.year) if meta.year is not None else ""
         if meta.category == "TV":
@@ -103,9 +114,9 @@ class DreadVault(UNIT3D):
         if meta.no_year:
             year = ""
 
-        if name_type == "ENCODE" and source in ("NTSC", "PAL"):
+        if dvd_encode:
             # For an ENCODE, get_source returns a bare NTSC/PAL only for DVD sources; the site titles that DVDRip.
-            dvd_tokens = f" {resolution} {source} "
+            dvd_tokens = f" {f'{resolution} {source}'.strip()} "
             start = dreadvault_name.rfind(dvd_tokens)
             if start >= 0:
                 prefix = dreadvault_name[:start]
@@ -130,21 +141,65 @@ class DreadVault(UNIT3D):
         if alt_title and year:
             dreadvault_name = dreadvault_name.replace(f"{year} {alt_title}", f"{alt_title} {year}", 1)
 
+        edition = re.sub(r"\b(?:4K Remaster(?:ed)?|Remaster(?:ed)?|Criterion|Arrow|RESTORED|Internal|Limited|Retail|Version)\b", "", meta.edition, flags=re.IGNORECASE)
+        edition = " ".join(edition.split())
+        if name_type != "DVDRIP" and not dvd_encode:
+            dreadvault_name = _replace_last(dreadvault_name, meta.edition, edition)
+
+        if name_type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD"):
+            dreadvault_name = _replace_last(dreadvault_name, f"{source} REMUX", f"{resolution} DVD REMUX".strip())
+        elif full_disc and meta.is_disc == "BDMV":
+            dreadvault_name = _replace_last(dreadvault_name, source, "Blu-ray")
+
+        episode_field = ""
+        if meta.category == "TV":
+            season = "" if meta.no_season else str(meta.season or "")
+            episode_field = f"{season}{meta.episode}"
+            if name_type == "DVDRIP" and meta.episode:
+                dreadvault_name = _replace_last(dreadvault_name, season, episode_field)
+            if not episode_field:
+                episode_fields = re.findall(r"\bS\d+(?:E\d+)*\b", dreadvault_name)
+                episode_field = episode_fields[-1] if episode_fields else ""
+            if not meta.tv_pack and re.fullmatch(r"E\d+", meta.episode):
+                episode_title = meta.manual_episode_title or meta.daily_episode_title or meta.auto_episode_title or ""
+                dreadvault_name = _insert_after_last(dreadvault_name, episode_field, episode_title)
+                episode_field = f"{episode_field} {episode_title}".strip()
+
         if not meta.language_checked:
             await languages_manager.process_desc_language(meta, tracker=self.tracker)
-        audio_languages: list[str] = [language for language in meta.audio_languages or [] if language.lower() not in {"no", "undetermined"}]
-        if audio_languages and not await languages_manager.has_english_language(audio_languages):
-            foreign_lang = audio_languages[0].upper()
-            dvd_remux = name_type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD")
-            if dvd_remux and year:
-                dreadvault_name = _insert_after_last(dreadvault_name, year, foreign_lang)
-            elif meta.is_disc != "BDMV":
+        # The language parser excludes commentary and shortens multi-word MediaInfo language names.
+        aliases = {"en": "english", "eng": "english", "no": "zxx", "no linguistic content": "zxx"}
+        audio_languages: list[str] = [aliases.get(language.lower().strip(), language.lower().strip()) for language in meta.audio_languages or []]
+        has_non_linguistic = "zxx" in audio_languages
+        audio_languages = [language for language in audio_languages if language not in {"", "und", "undetermined", "unknown", "xx", "zxx"}]
+        languages = set(audio_languages)
+        dub = ""
+        if not full_disc:
+            if len(languages) >= 3:
+                dub = "Multi-Audio"
+            elif len(languages) == 2:
+                dub = "Dual-Audio"
+            elif languages == {"english"} and (meta.original_language or "").lower() not in ("", "en", "eng", "english", "xx", "und", "zxx", "mul"):
+                dub = "Dubbed"
+            if (meta.no_dub and dub == "Dubbed") or (meta.no_dual and dub in ("Dual-Audio", "Multi-Audio")):
+                dub = ""
+        if audio_languages or has_non_linguistic:
+            audio = re.sub(r"^(?:Dual-Audio|Multi-Audio|MULTI|Dubbed)\s+", "", meta.audio)
+            audio = f"{dub} {audio}".strip()
+            dreadvault_name = _replace_last(dreadvault_name, meta.audio, audio)
+
+        if not full_disc and (audio_languages or has_non_linguistic) and not await languages_manager.has_english_language(audio_languages):
+            foreign_lang = audio_languages[0].upper() if audio_languages else "ZXX"
+            anchor = episode_field or year
+            if anchor:
+                dreadvault_name = _insert_after_last(dreadvault_name, anchor, foreign_lang)
+            else:
                 for anchor in (resolution, str(meta.service), meta.region, source):
                     if anchor and f" {anchor} " in f" {dreadvault_name} ":
                         dreadvault_name = _insert_before_last(dreadvault_name, anchor, foreign_lang)
                         break
 
-        return {"name": dreadvault_name}
+        return {"name": " ".join(dreadvault_name.split())}
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         combined_genres_value = meta.combined_genres
