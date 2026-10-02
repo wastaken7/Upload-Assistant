@@ -388,7 +388,7 @@ def test_stats_summary_cards_have_distinct_visual_containers():
 
 def test_donut_legend_rows_do_not_use_colored_backgrounds():
     stats_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
-    donut = stats_app.split("function DonutChart", 1)[1].split("const Section", 1)[0]
+    donut = stats_app.split("function DonutChart", 1)[1].split("function BarChart", 1)[0]
 
     assert "ua-stats-series-active" not in donut
     assert 'activeLabel && activeLabel === segment.id ? "font-semibold"' in donut
