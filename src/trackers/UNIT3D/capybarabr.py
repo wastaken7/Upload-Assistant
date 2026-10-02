@@ -210,8 +210,7 @@ class CapybaraBR(UNIT3D):
 
         elif category in ("MOVIE", "TV"):
             cbr_name = (
-                cbr_name
-                .replace("DD+ ", "DDP")
+                cbr_name.replace("DD+ ", "DDP")
                 .replace("DD ", "DD")
                 .replace("AAC ", "AAC")
                 .replace("FLAC ", "FLAC")

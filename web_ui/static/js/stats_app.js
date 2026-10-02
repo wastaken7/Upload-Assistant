@@ -919,8 +919,12 @@ function TrendChart({
       ),
     ),
   );
-  const byteTicks = Array.from({ length: 5 }, (_, index) =>
-    Math.round((byteMaximum * index) / 4),
+  const byteTicks = Array.from(
+    new Set(
+      Array.from({ length: 5 }, (_, index) =>
+        Math.round((byteMaximum * index) / 4),
+      ),
+    ),
   );
   const xTickCount = Math.min(7, rows.length);
   const xTickIndices = Array.from(
@@ -1028,6 +1032,7 @@ function TrendChart({
             </React.Fragment>
           ))}
           {view === "both" &&
+            activeSeries.some((entry) => entry.kind === "volume") &&
             byteTicks.map((value) => (
               <text
                 key={`bytes-${value}`}
