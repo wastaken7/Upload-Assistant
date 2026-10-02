@@ -1416,11 +1416,13 @@ function SankeyDiagram({ sankey }) {
         <div className="mb-3 flex justify-end">
           <button
             type="button"
-            className="rounded-lg border px-3 py-2 text-sm"
+            className={`flex h-9 w-9 items-center justify-center rounded-lg ${showAll ? "ua-stats-series-active" : "opacity-55"}`}
+            aria-label={showAll ? "Show top 7" : "Show all"}
+            title={showAll ? "Show top 7" : "Show all"}
             aria-expanded={showAll}
             onClick={() => setShowAll((value) => !value)}
           >
-            {showAll ? "Show top 7" : "Show all"}
+            <LucideIcon name="list-collapse" className="h-4 w-4" />
           </button>
         </div>
       )}
@@ -1535,7 +1537,7 @@ function MediaProfile({ media, category, onCategoryChange }) {
                 <h3 className="mb-3 text-sm font-semibold capitalize">
                   {formatDimensionValue(dimension)}
                 </h3>
-                <DonutChart
+                <DistributionChart
                   ariaLabel={`${formatDimensionValue(dimension)} distribution`}
                   rows={values.map((row) => ({
                     label: formatDimensionValue(row.value),
@@ -1846,6 +1848,120 @@ function DonutChart({
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+function BarChart({
+  rows,
+  ariaLabel,
+  onSelect,
+  activeLabel = "",
+  showFavicons = true,
+  valueFormatter = formatNumber,
+}) {
+  const sortedRows = rows
+    .map((row) => ({
+      label: String(row.label || "Unknown"),
+      value: Math.max(0, Number(row.value) || 0),
+      favicon: row.favicon || "",
+      id: row.id || "",
+    }))
+    .filter((row) => row.value > 0)
+    .sort((left, right) => right.value - left.value);
+  if (!sortedRows.length)
+    return (
+      <p className="py-8 text-center text-sm opacity-60">
+        No data in this period.
+      </p>
+    );
+
+  const maximum = sortedRows[0].value;
+  const total = sortedRows.reduce((sum, row) => sum + row.value, 0);
+  return (
+    <div
+      role="group"
+      aria-label={ariaLabel}
+      className="max-h-[420px] space-y-3 overflow-y-auto pr-2"
+    >
+      {sortedRows.map((row, index) => {
+        const selectable = Boolean(onSelect && row.id);
+        const content = (
+          <>
+            <span className="flex min-w-0 items-center gap-2">
+              {showFavicons && row.favicon && (
+                <TrackerFavicon destination={row.favicon} className="h-4 w-4" />
+              )}
+              <span className="min-w-0 break-words text-left" title={row.label}>
+                {row.label}
+              </span>
+            </span>
+            <span className="shrink-0 tabular-nums">
+              {valueFormatter(row.value)} ·{" "}
+              {((row.value / total) * 100).toFixed(1)}%
+            </span>
+          </>
+        );
+        return (
+          <div key={`${row.id || row.label}:${index}`}>
+            {selectable ? (
+              <button
+                type="button"
+                aria-pressed={activeLabel === row.id}
+                onClick={() => onSelect(row.id)}
+                className={`flex w-full items-center justify-between gap-3 text-sm ${activeLabel === row.id ? "font-semibold" : ""}`}
+              >
+                {content}
+              </button>
+            ) : (
+              <div className="flex items-center justify-between gap-3 text-sm">
+                {content}
+              </div>
+            )}
+            <div className="mt-1 h-3 overflow-hidden rounded-full bg-current/10">
+              <div
+                className="h-full rounded-full"
+                style={{
+                  width: `${(row.value / maximum) * 100}%`,
+                  backgroundColor: CHART_COLORS[index % CHART_COLORS.length],
+                  opacity: activeLabel && activeLabel !== row.id ? 0.3 : 1,
+                }}
+              />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function DistributionChart(props) {
+  const [mode, setMode] = useState("donut");
+  return (
+    <div>
+      <div
+        className="mb-4 flex justify-end"
+        role="group"
+        aria-label="Chart view"
+      >
+        {[
+          ["donut", "chart-pie", "Donut chart"],
+          ["bar", "chart-bar", "Bar chart"],
+        ].map(([value, icon, label]) => (
+          <button
+            key={value}
+            type="button"
+            aria-label={label}
+            title={label}
+            aria-pressed={mode === value}
+            className={`flex h-9 w-9 items-center justify-center rounded-lg ${mode === value ? "ua-stats-series-active" : "opacity-55"}`}
+            onClick={() => setMode(value)}
+          >
+            <LucideIcon name={icon} className="h-4 w-4" />
+          </button>
+        ))}
+      </div>
+      {mode === "donut" ? <DonutChart {...props} /> : <BarChart {...props} />}
     </div>
   );
 }
@@ -2573,7 +2689,7 @@ function StatsApp() {
                 >
                   <ChartWithTable
                     chart={
-                      <DonutChart
+                      <DistributionChart
                         ariaLabel="Upload activity by destination"
                         rows={data.uploads.by_destination.map((row) => ({
                           label: row.display_name || row.destination,
@@ -2690,7 +2806,7 @@ function StatsApp() {
                     >
                       <ChartWithTable
                         chart={
-                          <DonutChart
+                          <DistributionChart
                             ariaLabel="Upload activity by category"
                             rows={data.uploads.by_category.map((row) => ({
                               label: row.category,
@@ -2856,7 +2972,7 @@ function StatsApp() {
                 >
                   <ChartWithTable
                     chart={
-                      <DonutChart
+                      <DistributionChart
                         ariaLabel="Cache activity by provider"
                         rows={data.cache.by_provider.map((row) => ({
                           label: formatCacheProvider(row.provider),
@@ -2903,7 +3019,7 @@ function StatsApp() {
                 >
                   <ChartWithTable
                     chart={
-                      <DonutChart
+                      <DistributionChart
                         ariaLabel="External operations by service"
                         rows={data.api.by_service.map((row) => ({
                           label: `${row.service} · ${formatOperation(row.operation)}`,
