@@ -1,6 +1,8 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
+import json
 import re
+from http.cookiejar import Cookie, CookieJar
 from pathlib import Path
 from typing import Any, cast
 from urllib.parse import urlparse
@@ -46,6 +48,57 @@ class ToTheGlory:
         self.uid = str(config["TRACKERS"][self.tracker].get("user_id", "")).strip()
         self.passkey = str(config["TRACKERS"][self.tracker].get("announce_url", "")).strip().split("/")[-1]
         self.cookie_validator = CookieValidator(config)
+
+    def _cookie_file(self, meta: Meta) -> str:
+        cookiefile = Path(meta.base_dir) / "data" / "cookies" / f"{self.tracker}.json"
+        legacy_cookiefile = cookiefile.with_suffix(".pkl")
+        if not cookiefile.exists() and legacy_cookiefile.exists():
+            cookiefile = legacy_cookiefile
+        return str(cookiefile.resolve())
+
+    def _load_cookies(self, cookiefile: str) -> CookieJar:
+        """Read browser exports and internal JSON cookies (including legacy .pkl files)."""
+        with Path(cookiefile).open(encoding="utf-8") as cookie_file:
+            raw_cookies = json.load(cookie_file)
+        if isinstance(raw_cookies, dict):
+            entries = []
+            for name, data in raw_cookies.items():
+                if not isinstance(data, dict):
+                    raise ValueError(f"{self.tracker}: Invalid cookie JSON format")
+                entries.append({**data, "name": name})
+        elif isinstance(raw_cookies, list):
+            entries = raw_cookies
+        else:
+            raise ValueError(f"{self.tracker}: Invalid cookie JSON format")
+
+        cookies = CookieJar()
+        for data in entries:
+            if not isinstance(data, dict) or not isinstance(data.get("name"), str) or not data["name"]:
+                raise ValueError(f"{self.tracker}: Invalid cookie JSON format")
+            domain = data.get("domain") or urlparse(self.base_url).hostname or ""
+            path = data.get("path") or "/"
+            expires = data.get("expires", data.get("expirationDate"))
+            cookies.set_cookie(
+                Cookie(
+                    version=0,
+                    name=data["name"],
+                    value=str(data.get("value", "")),
+                    port=None,
+                    port_specified=False,
+                    domain=domain,
+                    domain_specified=bool(data.get("domain")),
+                    domain_initial_dot=domain.startswith("."),
+                    path=path,
+                    path_specified=True,
+                    secure=bool(data.get("secure", False)),
+                    expires=expires,
+                    discard=expires is None,
+                    comment=None,
+                    comment_url=None,
+                    rest={},
+                )
+            )
+        return cookies
 
     async def get_name(self, meta: Meta) -> str:
         ttg_name = meta.name
@@ -175,9 +228,7 @@ class ToTheGlory:
             tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
             await common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
             return True  # Debug mode - simulated success
-        cookiefile = str(Path(f"{meta.base_dir}/data/cookies/{self.tracker}.json").resolve())
-        raw_cookies = self.cookie_validator._load_cookies_dict_secure(cookiefile)  # type: ignore[reportPrivateUsage]
-        cookies = {name: str(data.get("value", "")) for name, data in raw_cookies.items()}
+        cookies = self._load_cookies(self._cookie_file(meta))
         async with httpx.AsyncClient(cookies=cookies, follow_redirects=True, timeout=60.0) as client:
             up = await client.post(url=url, data=data, files=files)
 
@@ -200,11 +251,11 @@ class ToTheGlory:
 
     async def search_existing(self, meta: Meta) -> list[str]:
         dupes: list[str] = []
-        cookiefile = str(Path(f"{meta.base_dir}/data/cookies/{self.tracker}.json").resolve())
+        cookiefile = self._cookie_file(meta)
         if not Path(cookiefile).exists():
             logger.info(f"{self.tracker}: [bold red]Cookie file not found: {self.tracker}.json")
             return []
-        cookies = self.cookie_validator._load_cookies_dict_secure(cookiefile)  # type: ignore[reportPrivateUsage]
+        cookies = self._load_cookies(cookiefile)
 
         imdb = f"imdb{meta.imdb}" if meta.imdb_id or 0 != 0 else ""
         if meta.is_disc == "BDMV":
@@ -233,7 +284,7 @@ class ToTheGlory:
         return dupes
 
     async def validate_credentials(self, meta: Meta) -> bool:
-        cookiefile = str(Path(f"{meta.base_dir}/data/cookies/{self.tracker}.pkl").resolve())
+        cookiefile = self._cookie_file(meta)
         if not Path(cookiefile).exists():
             await self.login(cookiefile, meta)
         vcookie = await self.validate_cookies(meta, cookiefile)
@@ -252,8 +303,7 @@ class ToTheGlory:
     async def validate_cookies(self, meta: Meta, cookiefile: str) -> bool:  # noqa: ARG002
         url = f"{self.base_url}"
         if Path(cookiefile).exists():
-            raw_cookies = self.cookie_validator._load_cookies_dict_secure(cookiefile)  # type: ignore[reportPrivateUsage]
-            cookies = {name: str(data.get("value", "")) for name, data in raw_cookies.items()}
+            cookies = self._load_cookies(cookiefile)
             async with httpx.AsyncClient(cookies=cookies, timeout=30.0, follow_redirects=True) as client:
                 resp = await client.get(url=url)
                 logger.debug(f"{self.tracker}: [cyan]Cookies:")
