@@ -655,7 +655,6 @@ class NameManager:
         return text
 
     async def missing_disc_info(self, meta: Meta, active_trackers: Sequence[str]) -> tuple[str, str, list[str]]:
-        distributor_id = await self.common.unit3d_distributor_ids(meta.distributor)
         region_id = await self.common.unit3d_region_ids(str(meta.region))
         region_name = str(meta.region)
         distributor_name = meta.distributor
@@ -673,17 +672,16 @@ class NameManager:
                 region_name = await self._prompt_for_field(meta, "Region code", strictest["region"] == "mandatory")
                 if region_name and region_name != "SKIPPED":
                     region_id = await self.common.unit3d_region_ids(region_name)
-            if not distributor_id:
+            if not distributor_name:
                 distributor_name = await self._prompt_for_field(meta, "Distributor", strictest["distributor"] == "mandatory")
                 if distributor_name and distributor_name != "SKIPPED":
                     logger.info(f"Looking up distributor ID for: {distributor_name}")
-                    distributor_id = await self.common.unit3d_distributor_ids(distributor_name)
-                    logger.info(f"Found distributor ID: {distributor_id}")
 
             for tracker in active_trackers:
                 requirements = TRACKER_DISC_REQUIREMENTS.get(tracker, {})
+                distributor_id = await self.common.unit3d_distributor_ids(distributor_name, tracker=tracker)
                 if (requirements.get("region") == "mandatory" and region_name == "SKIPPED") or (
-                    requirements.get("distributor") == "mandatory" and distributor_name == "SKIPPED"
+                    requirements.get("distributor") == "mandatory" and not distributor_id
                 ):
                     trackers_to_remove.append(tracker)
 

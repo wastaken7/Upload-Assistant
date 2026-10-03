@@ -1,9 +1,11 @@
 import asyncio
 import inspect
+import json
 from unittest.mock import AsyncMock
 
 import pytest
 
+from src.args import Args
 from src.bluray_com import ensure_release_subheader, get_bluray_releases, parse_release_details, process_all_releases, reset_release_subheader_cache, set_selected_release
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
@@ -23,6 +25,36 @@ def builder(tracker='AITHER', enabled=True):
 
 def release(**kwargs):
     return dict(title='Example Series', url=URL, country='United Kingdom', publisher='Example Studio', price='', release_id='123456', **kwargs)
+
+
+@pytest.fixture
+def manual_release_selection(tmp_path, monkeypatch):
+    folder = tmp_path / 'tmp' / 'test'
+    folder.mkdir(parents=True)
+    (folder / 'debug_bluray_BD_123.html').write_text('Cached release list')
+    monkeypatch.setattr('src.bluray_com.search_bluray', AsyncMock(return_value='Search results'))
+    monkeypatch.setattr('src.bluray_com.extract_bluray_links', lambda _: [{'releases_url': 'https://www.blu-ray.com/Example/123/', 'title': 'Example', 'year': '1981'}])
+    releases = AsyncMock()
+    monkeypatch.setattr('src.bluray_com.extract_bluray_release_info', releases)
+    monkeypatch.setattr('src.bluray_com.cli_ui.ask_string', lambda _: '1')
+    return releases
+
+
+@pytest.fixture
+def select_release(request, monkeypatch, selection):
+    if selection == 'manual':
+        releases = request.getfixturevalue('manual_release_selection')
+
+        async def select(meta, selected):
+            releases.return_value = [selected]
+            await get_bluray_releases(meta)
+    else:
+        monkeypatch.setattr('src.bluray_com.fetch_release_details', AsyncMock(side_effect=lambda selected, _: selected))
+
+        async def select(meta, selected):
+            await process_all_releases([selected], meta)
+
+    return select
 
 
 @pytest.mark.asyncio
@@ -98,18 +130,16 @@ async def test_absent_subheader_is_not_refetched(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_manual_selection_without_covers_fetches_label_on_demand(tmp_path, monkeypatch):
-    folder = tmp_path / 'tmp' / 'test'
-    folder.mkdir(parents=True)
-    (folder / 'debug_bluray_BD_123.html').write_text('Cached release list')
-    monkeypatch.setattr('src.bluray_com.search_bluray', AsyncMock(return_value='Search results'))
-    monkeypatch.setattr('src.bluray_com.extract_bluray_links', lambda _: [{'releases_url': 'https://www.blu-ray.com/Example/123/', 'title': 'Example', 'year': '1981'}])
-    monkeypatch.setattr('src.bluray_com.extract_bluray_release_info', AsyncMock(return_value=[release()]))
-    monkeypatch.setattr('src.bluray_com.cli_ui.ask_string', lambda _: '1')
+@pytest.mark.parametrize('distributor', ['', 'CUSTOM DISTRIBUTOR'])
+@pytest.mark.parametrize('region, expected', [('', 'GBR'), ('USA', 'USA')])
+async def test_manual_selection_without_covers_fetches_label_on_demand(tmp_path, monkeypatch, manual_release_selection, region, expected, distributor):
+    manual_release_selection.return_value = [release()]
     fetched = AsyncMock(return_value=release(subheader=LABEL))
     monkeypatch.setattr('src.bluray_com.fetch_release_details', fetched)
-    meta = Meta(base_dir=str(tmp_path), uuid='test', is_disc='BDMV', use_bluray_images=False)
+    meta, _, _ = Args({'DEFAULT': {'screens': 1}}).parse([str(tmp_path)] + (['--region', region.lower()] if region else []) + (['--distributor', distributor.lower()] if distributor else []), Meta(base_dir=str(tmp_path), uuid='test', is_disc='BDMV', use_bluray_images=False))
     await get_bluray_releases(meta)
+    assert meta.region == expected
+    assert meta.distributor == (distributor or 'EXAMPLE STUDIO')
     assert meta.release_url == URL
     fetched.assert_not_awaited()
     await builder().get_bluray_section(meta)
@@ -118,13 +148,55 @@ async def test_manual_selection_without_covers_fetches_label_on_demand(tmp_path,
 
 
 @pytest.mark.asyncio
-async def test_automatic_selection_carries_subheader(tmp_path, monkeypatch):
+@pytest.mark.parametrize('distributor', ['', 'CUSTOM DISTRIBUTOR'])
+@pytest.mark.parametrize('region, expected', [('', 'GBR'), ('USA', 'USA')])
+async def test_automatic_selection_carries_subheader(tmp_path, monkeypatch, region, expected, distributor):
     monkeypatch.setattr('src.bluray_com.fetch_release_details', AsyncMock(return_value=release(subheader=LABEL)))
-    meta = Meta(base_dir=str(tmp_path), uuid='test', is_disc='BDMV', unattended=True, bluray_single_score=1)
+    meta = Meta(base_dir=str(tmp_path), uuid='test', is_disc='BDMV', unattended=True, bluray_single_score=1, region=region, distributor=distributor)
     await process_all_releases([release()], meta)
+    assert meta.region == expected
+    assert meta.distributor == (distributor or 'EXAMPLE STUDIO')
     assert meta.release_url == URL
     assert meta.release_subheader == LABEL
     assert meta.release_subheader_url == URL
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('selection', ['manual', 'automatic'])
+@pytest.mark.parametrize('restore', [False, True])
+@pytest.mark.parametrize('overrides', [(), ('region',), ('distributor',), ('region', 'distributor')])
+async def test_reselection_refreshes_auto_metadata_and_preserves_cli_overrides(tmp_path, select_release, selection, restore, overrides):
+    first = release(subheader=LABEL)
+    second = release(subheader='Other Studio | US release') | {
+        'url': URL.replace('123456', '999'),
+        'release_id': '999',
+        'country': 'United States',
+        'publisher': 'Other Studio',
+    }
+    meta = Meta(base_dir=str(tmp_path), uuid='test', is_disc='BDMV', unattended=selection == 'automatic', bluray_single_score=1)
+    await select_release(meta, first)
+    assert (meta.region, meta.distributor) == ('GBR', 'EXAMPLE STUDIO')
+
+    # An explicit override must be preserved even when it equals the auto-filled value.
+    if overrides:
+        args = [str(tmp_path)]
+        if selection == 'automatic':
+            args.append('--unattended')
+        for field in overrides:
+            args.extend([f'--{field}', getattr(meta, field).lower()])
+        meta, _, _ = Args({'DEFAULT': {'screens': 1}}).parse(args, meta)
+    if restore:
+        meta = Meta(json.loads(json.dumps(meta.to_dict())))
+    meta.edit = True
+    await select_release(meta, second)
+
+    assert meta.region == ('GBR' if 'region' in overrides else 'USA')
+    assert meta.distributor == ('EXAMPLE STUDIO' if 'distributor' in overrides else 'OTHER STUDIO')
+    assert meta.release_url == second['url']
+    # Manual selection fetches the label on demand; automatic selection carries it.
+    await ensure_release_subheader(meta)
+    assert meta.release_subheader == second['subheader']
+    assert meta.release_subheader_url == second['url']
 
 
 def test_html_and_bbcode_labels_are_text():

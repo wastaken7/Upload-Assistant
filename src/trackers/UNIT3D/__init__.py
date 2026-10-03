@@ -296,7 +296,7 @@ class UNIT3D:
         return "0"
 
     async def get_distributor_id(self, meta: Meta) -> dict[str, str]:
-        distributor_id = await self.common.unit3d_distributor_ids(meta.distributor)
+        distributor_id = await self.common.unit3d_distributor_ids(meta.distributor, tracker=self.tracker)
         if distributor_id:
             return {"distributor_id": distributor_id}
 
