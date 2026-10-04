@@ -63,3 +63,10 @@ class TorrentHR(UNIT3D):
             return {"category_id": "0"}
 
         return {"category_id": category_id[resolved_key]}
+
+    async def get_additional_data(self, meta: Meta) -> dict[str, Any]:
+        data: dict[str, Any] = {
+            "mod_queue_opt_in": await self.get_flag(meta, "modq"),
+        }
+
+        return data
