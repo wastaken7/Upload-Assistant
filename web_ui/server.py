@@ -36,8 +36,6 @@ import psutil
 
 import web_ui.auth as auth_mod
 from src.webui_progress import PROGRESS_STDOUT_PREFIX
-from src.webui_results import public_result_url, tracker_result
-from src.webui_prompts import PROMPT_STDOUT_PREFIX
 from src.prompt_sound import PROMPT_SOUND_STDOUT_MARKER
 from src.app_paths import CODE_DIR, DATA_DIR, STATE_DIR
 from src.args import cli_argument_catalog, tracker_cli_aliases
@@ -1411,49 +1409,14 @@ def _set_process_awaiting_input_if_current(session_id: str, process_state: Mappi
             return
         run_token = process_state.get("run_token")
         if run_token and current_state.get("run_token") == run_token:
-            if current_state.get("structured_prompt_id"):
-                return
             current_state["awaiting_input"] = waiting
             current_state["input_type"] = input_type if waiting else None
-
-
-def _set_process_prompt_if_current(session_id: str, process_state: Mapping[str, object], event: Mapping[str, object]) -> bool:
-    with active_processes_lock:
-        current = active_processes.get(session_id)
-        if current is not process_state:
-            return False
-        prompt = event.get("prompt")
-        if event.get("op") == "open" and isinstance(prompt, dict) and prompt.get("id"):
-            current["prompt"] = prompt
-            current["structured_prompt_id"] = prompt["id"]
-            current["awaiting_input"] = True
-            current["input_type"] = prompt.get("kind", "text")
-            return True
-        if event.get("op") == "close" and event.get("id") == current.get("structured_prompt_id"):
-            current["prompt"] = None
-            current["structured_prompt_id"] = None
-            current["awaiting_input"] = False
-            current["input_type"] = None
-            return True
-        return False
-
-
-def _subprocess_prompt_event(chunk: str) -> dict[str, object] | None:
-    payload = chunk.strip()
-    if not payload.startswith(PROMPT_STDOUT_PREFIX):
-        return None
-    try:
-        event = json.loads(payload.removeprefix(PROMPT_STDOUT_PREFIX))
-    except json.JSONDecodeError:
-        return None
-    return event if isinstance(event, dict) else None
 
 
 def _apply_progress_event(process_info: ProcessInfo, event: Mapping[str, object]) -> None:
     operation = str(event.get("op", "upsert")).strip().lower()
     if operation == "reset":
-        previous = process_info.get("progress", {})
-        process_info["progress"] = {key: item for key, item in previous.items() if item.get("group") == "warning"} if isinstance(previous, dict) else {}
+        process_info["progress"] = {}
         return
 
     progress_id = str(event.get("id", "")).strip()
@@ -1467,7 +1430,7 @@ def _apply_progress_event(process_info: ProcessInfo, event: Mapping[str, object]
     progress_map = cast(dict[str, dict[str, object]], progress_map_obj)
 
     current_item = dict(progress_map.get(progress_id, {}))
-    for key in ("id", "label", "detail", "status", "group", "unit", "updated_at", "url", "tracker"):
+    for key in ("id", "label", "detail", "status", "group", "unit", "updated_at"):
         if key in event:
             current_item[key] = event[key]
     for key in ("current", "total"):
@@ -1877,7 +1840,7 @@ def _subprocess_prompt_type(buffer: str, previous_type: str | None = None) -> st
     stripped = re.sub(r"\x1b\[[0-?]*[ -/]*[@-~]", "", last_line).strip()
     if not stripped:
         return None
-    if stripped.startswith((PROGRESS_STDOUT_PREFIX, PROMPT_STDOUT_PREFIX)):
+    if stripped.startswith(PROGRESS_STDOUT_PREFIX):
         return None
     if stripped == ">":
         return previous_type or "text"
@@ -1902,7 +1865,6 @@ def _webui_subprocess_env() -> dict[str, str]:
     env["UA_WEBUI_FORCE_COLOR"] = "1"
     env["UA_WEBUI_PROGRESS_STDOUT"] = "1"
     env["UA_WEBUI_PROMPT_SOUND_STDOUT"] = "1"
-    env["UA_WEBUI_PROMPTS_STDOUT"] = "1"
     env["UA_STATS_SOURCE"] = "webui"
     return env
 
@@ -1919,7 +1881,7 @@ def _subprocess_progress_event(chunk: str) -> dict[str, object] | None:
 
 
 def _should_flush_subprocess_output(buffer: str, char: str, *, idle: bool = False) -> bool:
-    if char == "\n" or (len(buffer) > 512 and not buffer.lstrip().startswith((PROGRESS_STDOUT_PREFIX, PROMPT_STDOUT_PREFIX))):
+    if char == "\n" or (len(buffer) > 512 and not buffer.lstrip().startswith(PROGRESS_STDOUT_PREFIX)):
         return True
     # Wait for a pause in output before flushing unterminated prompts. Checking
     # each character would split ordinary lines at their first colon/question mark.
@@ -2438,26 +2400,6 @@ def _extract_execution_preview(meta_data: Mapping[str, object], fallback_path: s
     }
 
 
-def _preview_tracker_results(meta_data: Mapping[str, object], progress: list[dict[str, object]] | None = None) -> list[dict[str, str]]:
-    results = {}
-    statuses = meta_data.get("tracker_status")
-    if isinstance(statuses, dict):
-        for name, status in statuses.items():
-            if isinstance(status, dict):
-                results[str(name)] = tracker_result(str(name), status, debug=meta_data.get("debug") is True)
-    # Streamed results belong to this execution and can precede the meta.json save.
-    for item in progress or []:
-        if item.get("group") == "tracker":
-            name = str(item.get("label", ""))
-            results[name] = {"tracker": name, "outcome": str(item.get("status", "")), "detail": str(item.get("detail", ""))}
-            if meta_data.get("debug") is True and item.get("status") == "Uploaded":
-                results[name]["outcome"] = "Debug completed"
-            url = public_result_url(item.get("url"))
-            if url and item.get("status") == "Uploaded" and meta_data.get("debug") is not True:
-                results[name]["url"] = url
-    return list(results.values())
-
-
 def _find_execution_preview(session_id: str) -> ExecutionPreview | None:
     process_info = active_processes.get(session_id, {})
     execution_path, resolved_meta_file, resolved_meta = _resolve_execution_preview_meta(session_id)
@@ -2483,8 +2425,6 @@ def _find_execution_preview(session_id: str) -> ExecutionPreview | None:
             preview["awaiting_input"] = bool(process_info.get("awaiting_input"))
             preview["input_type"] = process_info.get("input_type")
             preview["progress"] = _progress_items_for_process(process_info)
-            preview["prompt"] = process_info.get("prompt")
-            preview["tracker_results"] = _preview_tracker_results(meta_data, _progress_items_for_process(process_info))
             return preview
         except Exception:  # noqa: S110
             pass
@@ -2538,7 +2478,6 @@ def _find_execution_preview(session_id: str) -> ExecutionPreview | None:
         "awaiting_input": bool(process_info.get("awaiting_input")),
         "input_type": process_info.get("input_type"),
         "progress": _progress_items_for_process(process_info),
-        "prompt": process_info.get("prompt"),
     }
 
 
@@ -2701,16 +2640,12 @@ class ProgressItem(TypedDict, total=False):
     group: str
     unit: str
     updated_at: float
-    url: str
-    tracker: str
 
 
 class ExecutionPreview(TypedDict, total=False):
     """Serialized preview data for the media currently being processed."""
 
     media_id: str
-    prompt: dict[str, object] | None
-    tracker_results: list[dict[str, str]]
     path: str
     filename: str
     title: str
@@ -7144,12 +7079,6 @@ def execute_command():
                             buffers[output_type] = ""
                             yield f"data: {json.dumps({'type': 'prompt_sound'})}\n\n"
                             continue
-                        prompt_event = _subprocess_prompt_event(buffers[output_type])
-                        if prompt_event is not None:
-                            buffers[output_type] = ""
-                            if _set_process_prompt_if_current(session_id, process_state, prompt_event):
-                                yield f"data: {json.dumps({'type': 'prompt', 'data': process_state.get('prompt'), 'id': prompt_event.get('id')})}\n\n"
-                            continue
                         if prompt_type:
                             _set_process_awaiting_input_if_current(session_id, process_state, True, prompt_type)
                         else:
@@ -7202,16 +7131,11 @@ def execute_command():
 
                     # Wait for process to finish
                     exit_code = process.wait()
-                    final_preview = None
-                    if _session_state_is_current(session_id, process_state):
-                        # A missing preview must not hide the actual exit status.
-                        with contextlib.suppress(Exception):
-                            final_preview = _find_execution_preview(session_id)
 
                     # Clean up (normal path)
                     _discard_session_state(session_id, process_state)
 
-                    yield f"data: {json.dumps({'type': 'exit', 'code': exit_code, 'media': final_preview})}\n\n"
+                    yield f"data: {json.dumps({'type': 'exit', 'code': exit_code})}\n\n"
                 finally:
                     with contextlib.suppress(Exception):
                         if process is not None and process.poll() is None:
@@ -7259,7 +7183,6 @@ def send_input():
         data = _request_json_dict()
         session_id = str(data.get("session_id", "default"))
         user_input = str(data.get("input", ""))
-        prompt_id = data.get("prompt_id")
 
         # Received input for session (logged at debug level previously) - keep minimal output
 
@@ -7287,20 +7210,8 @@ def send_input():
                 return jsonify({"error": "No process found", "success": False}), 500
 
             if process.poll() is None:  # Process still running
-                with active_processes_lock:
-                    # Claim the question and write under the same lock so double
-                    # clicks cannot become an answer to the following question.
-                    active_prompt = process_info.get("prompt")
-                    if active_processes.get(session_id) is not process_info:
-                        return jsonify({"error": "The upload session changed.", "success": False}), 409
-                    if prompt_id is not None and (not isinstance(active_prompt, dict) or active_prompt.get("id") != prompt_id):
-                        return jsonify({"error": "This question has already been answered. Wait for the next question.", "success": False}), 409
-                    if process_info.get("structured_prompt_id") and not active_prompt:
-                        return jsonify({"error": "The previous answer is still being processed.", "success": False}), 409
-                    _write_webui_process_input(process, user_input)
-                    process_info["prompt"] = None
-                    process_info["awaiting_input"] = False
-                    process_info["input_type"] = None
+                _set_process_awaiting_input(session_id, False)
+                _write_webui_process_input(process, user_input)
                 console.print(f"Sent input for session {session_id}", markup=False)
             else:
                 console.print(f"Process already terminated for session {session_id}", markup=False)
