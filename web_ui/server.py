@@ -2754,6 +2754,7 @@ def _webui_auth_ok() -> bool:
 
 @app.before_request
 def _require_auth_for_webui():  # pyright: ignore[reportUnusedFunction]
+    """Enforce IP and authentication checks, recording rejected API credentials."""
     # Health endpoint can be used for orchestration checks.
     if request.path == "/api/health":
         return None
@@ -2806,6 +2807,8 @@ def _require_auth_for_webui():  # pyright: ignore[reportUnusedFunction]
             return None
         # If request accepts HTML (browser), redirect to login; else 401 for API clients
         if "text/html" in (_request_header("Accept") or ""):
+            if _request_header("Authorization"):
+                _handle_failed_auth(client_ip)
             return redirect(url_for("login_page"))
         _handle_failed_auth(client_ip)
         return jsonify({"error": "Authentication required", "success": False}), 401
