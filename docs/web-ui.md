@@ -106,6 +106,8 @@ The File Browser lists only content inside the configured browse roots. Use it t
 
 Normal browsing shows non-hidden files and folders inside the permitted roots so that video, disc, book, game, ISO, and other supported upload types remain available. The separate description-file picker is limited to `.txt`, `.nfo`, and `.md` files.
 
+File browsing has no hourly or daily request quota. Folder listings and recursive searches use minute-based limits, while listing the configured roots is exempt. See [Request limits](#request-limits) for the allowances used throughout the WebUI.
+
 #### Custom root order
 
 Choose **Custom** in **Sort by**, then choose **Reorder**. Drag root folders into position or use the movement controls. The list previews its new position while dragging. Choose **Done** when finished; the ordering controls are hidden outside reorder mode. **Reset** clears the saved custom ordering.
@@ -285,6 +287,29 @@ Open **Configuration → Access Log** to manage:
 The blacklist takes precedence over the whitelist. Repeated failed API access attempts may add the source IP to the blacklist. Review IP changes carefully so that you do not lock out the device or reverse proxy used to administer the WebUI.
 
 The local account, encrypted credentials, token metadata, 2FA state, IP controls, and access-log level are stored in `webui_auth.json`. Access events are written to `access_log.log` in the same application configuration directory. The generated `session_secret` is also stored there unless `SESSION_SECRET` or `SESSION_SECRET_FILE` overrides it.
+
+### Request limits
+
+The WebUI limits request frequency to slow repeated sign-in attempts and protect server resources. Requests are counted separately for each endpoint and client IP; there is no single shared allowance for the whole WebUI. Most explicitly limited API endpoints also keep separate counters for authenticated and unauthenticated requests. Browsers or devices sharing a client IP can share an allowance.
+
+| Operation                                                                                     | Request limit                    |
+| --------------------------------------------------------------------------------------------- | -------------------------------- |
+| Routes without an explicit override, including config saves and most administration actions   | 50 per hour and 200 per day      |
+| Sign-in and recovery pages (`/login` and `/login/recovery`), including page loads and submits | 10 per minute and 100 per day    |
+| Health checks and configured browse-root listing                                              | Exempt                           |
+| Folder listings                                                                               | 600 per minute                   |
+| Recursive file searches                                                                       | 60 per minute                    |
+| External-tool status checks                                                                   | 60 per hour                      |
+| Tracker reachability refreshes, Prowlarr tests, and torrent-client connection tests           | 30 per hour for each endpoint    |
+| Tracker API-key status checks                                                                 | 120 per hour                     |
+| Live preview, screenshot listing, local screenshot images, and generated-description reads    | 7,200 per hour for each endpoint |
+| Start an upload or save an upload queue                                                       | 100 per hour for each endpoint   |
+| Send input to an upload process                                                               | 200 per hour                     |
+| Stop an upload process                                                                        | 50 per hour                      |
+
+An explicit limit replaces the default hourly and daily quotas. The higher allowance for live review applies to the read endpoints; editing descriptions or screenshots still uses the default limits. Each background refresh, folder listing, or configuration save counts as a request. One **Save Config** batch counts as one request regardless of the number of fields edited.
+
+Exceeding a limit returns HTTP 429. Allow the relevant minute, hour, or day window to expire before retrying. These counters are held in memory and reset when the WebUI process restarts. IP blacklisting after repeated authentication failures is a separate protection; see [IP controls and access logging](#ip-controls-and-access-logging).
 
 ## Statistics
 

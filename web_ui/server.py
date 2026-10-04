@@ -4636,6 +4636,7 @@ def twofa_disable():
 
 
 @app.route("/api/browse_roots")
+@limiter.exempt
 def browse_roots():
     """Return configured browse roots"""
     roots = _get_browse_roots()
@@ -6101,6 +6102,7 @@ def api_tokens():
 
 
 @app.route("/api/browse")
+@limiter.limit("600 per minute", key_func=_rate_limit_key_func, override_defaults=True)
 def browse_path():
     """Browse filesystem paths"""
     requested: str = str(request.args.get("path", ""))
@@ -6227,6 +6229,7 @@ def browse_path():
 
 
 @app.route("/api/browse_search")
+@limiter.limit("60 per minute", key_func=_rate_limit_key_func, override_defaults=True)
 def browse_search():
     """Search filesystem for files/folders matching a query string"""
     query = (request.args.get("q") or "").strip()
