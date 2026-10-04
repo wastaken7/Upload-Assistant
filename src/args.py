@@ -412,6 +412,7 @@ class Args:
                 "midnightscene": "MidnightScene",
                 "passtheimage": "PassTheImage",
                 "seedpool_cdn": "Seedpool CDN",
+                "thrimg": "THRImg",
                 "utppm": "UTPPM",
                 "lostimg": "LostImg",
             }
@@ -848,6 +849,7 @@ class Args:
                 "midnightscene",
                 "passtheimage",
                 "seedpool_cdn",
+                "thrimg",
                 "utppm",
                 "lostimg",
             ],

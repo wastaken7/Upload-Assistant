@@ -178,6 +178,7 @@ VALID_IMAGE_HOSTS = [
     "passtheimage",
     "seedpool_cdn",
     "sharex",
+    "thrimg",
     "utppm",
     "lostimg",
     "",
@@ -196,6 +197,7 @@ IMAGE_HOST_API_KEYS: dict[str, str] = {
     "sharex": "sharex_api_key",
     "zipline": "zipline_api_key",
     "midnightscene": "midnightscene_api_key",
+    "thrimg": "thrimg_api",
     "utppm": "utppm_api",
     # imgbox and pixhost don't require API keys
 }
