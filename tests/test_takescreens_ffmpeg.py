@@ -117,6 +117,32 @@ async def test_video_resume_registers_existing_frames_and_fills_gaps(
     assert set(uploaded) == set(result)
 
 
+@pytest.mark.asyncio
+async def test_video_resume_rejects_symlinked_screenshot(tmp_path):
+    release_id = "linked-video"
+    screenshot_dir = takescreens.screenshots_dir(tmp_path, release_id)
+    (screenshot_dir.parent / "MediaInfo.json").write_text(
+        json.dumps({"media": {"track": [{"Duration": 600}, {"Duration": 600, "Width": 256, "Height": 256, "FrameRate": 24}]}}),
+        encoding="utf-8",
+    )
+    outside = tmp_path / "outside.png"
+    Image.frombytes("RGB", (256, 256), Random(0).randbytes(256 * 256 * 3)).save(outside)  # noqa: S311
+    original = outside.read_bytes()
+    link = screenshot_dir / "Video-0.png"
+    try:
+        link.symlink_to(outside)
+    except OSError, NotImplementedError:
+        pytest.skip("Screenshot symlinks are unavailable")
+    meta = Meta(category="MOVIE", base_dir=str(tmp_path), uuid=release_id, screens=1, imghost="ptscreens")
+
+    result = await takescreens.screenshots("source.mkv", "Video", release_id, str(tmp_path), meta, cleanup_after_capture=False)
+
+    assert result is None
+    assert link.is_symlink()
+    assert outside.read_bytes() == original
+    assert takescreens.manifest_files(tmp_path, release_id, "main") == []
+
+
 async def _stop_process(process: asyncio.subprocess.Process) -> None:
     if process.returncode is None:
         process.terminate()

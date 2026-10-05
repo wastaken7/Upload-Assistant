@@ -1923,12 +1923,22 @@ async def screenshots(
 
     sanitized_filename = await sanitize_filename(filename)
     screenshot_dir = screenshots_dir(base_dir, folder_id)
-    test_image_path = str((screenshot_dir / f"{sanitized_filename}-libplacebo-test.png").resolve())
+    test_image_path = str((screenshot_dir / f"{sanitized_filename}-libplacebo-test.png").absolute())
+
+    # Screenshot slots must be regular files within this release. Resolving a
+    # symlink here would make recovery rename or overwrite its external target.
+    if screenshot_dir.is_symlink() or (screenshot_dir / f"{sanitized_filename}-libplacebo-test.png").is_symlink():
+        logger.error("[red]Refusing screenshot capture through a symlink.[/red]")
+        return None
 
     existing_image_paths: list[str] = []
     capture_indices: list[int] = []
     for i in range(num_screens):
-        image_path = str((screenshot_dir / f"{sanitized_filename}-{i}.png").resolve())
+        slot = screenshot_dir / f"{sanitized_filename}-{i}.png"
+        if slot.is_symlink():
+            logger.error(f"[red]Refusing symlinked screenshot slot: {slot}[/red]")
+            return None
+        image_path = str(slot.absolute())
         if Path(image_path).exists() and not meta.retake:
             # A forced exit can leave incomplete PNGs as well as completed
             # frames that have not yet been published to the manifest.
@@ -2035,7 +2045,7 @@ async def screenshots(
 
     capture_tasks: list[Awaitable[tuple[int, str | None] | None]] = []
     for i in range(num_screens):
-        image_path = str((screenshot_dir / f"{sanitized_filename}-{i}.png").resolve())
+        image_path = str((screenshot_dir / f"{sanitized_filename}-{i}.png").absolute())
         captured_times[image_path] = float(ss_times[i])
         # Recovered files occupy sampling slots just like new captures.
         slot_times[image_path] = float(ss_times[i])
@@ -2282,6 +2292,9 @@ async def screenshots(
         unit="frames",
     )
 
+    if any(Path(image_path).is_symlink() for image_path in valid_results):
+        logger.error("[red]Refusing to register a symlinked screenshot.[/red]")
+        return None
     new_screens = register_screenshots(base_dir, folder_id, valid_results, group, timestamps=captured_times, slot_timestamps=slot_times) if valid_results else []
     await record_event_async("artifact", service="screenshot", operation="created", category="standard", count=len(new_screens))
     if not force_screenshots and not meta.retake:
