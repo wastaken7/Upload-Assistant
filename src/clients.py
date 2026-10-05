@@ -3,6 +3,7 @@ import asyncio
 import os
 import re
 import shutil
+import time
 import urllib.parse
 from pathlib import Path
 from typing import Any, cast
@@ -14,6 +15,7 @@ from torf import Torrent
 
 from src.console import logger
 from src.meta import Meta
+from src.stats import record_event_async
 from src.torrent_clients import DelugeClientMixin, QbittorrentClientMixin, RtorrentClientMixin, TransmissionClientMixin
 from src.torrent_clients.path_utils import coerce_str_list, is_path_under
 from src.torrent_manifest import TorrentManifest
@@ -29,6 +31,14 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
         """Initialize torrent-client operations with the application config."""
         self.config = config
         self._tracker_comment_hosts: dict[str, tuple[str, ...]] | None = None
+
+    @staticmethod
+    def _client_infohash(candidate: str | Path, torrent: Torrent) -> str:
+        """Keep the client's hash when its exported torrent is named by infohash."""
+        candidate_stem = Path(candidate).stem.strip().lower()
+        if re.fullmatch(r"(?:[0-9a-f]{40}|[0-9a-f]{64})", candidate_stem):
+            return candidate_stem
+        return str(torrent.infohash)
 
     @staticmethod
     def _matches_tracker_host(host: str, tracker_hosts: dict[str, tuple[str, ...]]) -> str | None:
@@ -168,6 +178,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
 
         logger.debug(f"[cyan]DEBUG: Clients to inject into: {inject_clients}[/cyan]")
 
+        clients_config = self.config.get("TORRENT_CLIENTS", {})
         for client_name in inject_clients:
             client_to_skip = self.config["TRACKERS"][tracker].get("client_to_skip", [])
             if client_name in client_to_skip:
@@ -176,11 +187,11 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
             if client_name == "none" or not client_name:
                 continue
 
-            if client_name not in self.config["TORRENT_CLIENTS"]:
+            if client_name not in clients_config:
                 logger.info(f"[bold red]Torrent client '{client_name}' not found in config.")
                 continue
 
-            client = self.config["TORRENT_CLIENTS"][client_name]
+            client = clients_config[client_name]
             torrent_client = client["torrent_client"]
             await self.inject_delay(meta, tracker, client_name)
 
@@ -189,6 +200,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
 
             logger.debug(f"[bold green]Adding to {client_name} ({torrent_client})")
 
+            operation_started = time.monotonic()
             try:
                 if torrent_client.lower() == "rtorrent":
                     self.rtorrent(meta.path, torrent_path, torrent, meta, local_path, remote_path, client, tracker)
@@ -200,7 +212,11 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                     self.transmission(meta.path, torrent, local_path, remote_path, client, meta)
                 elif torrent_client.lower() == "watch":
                     shutil.copy(torrent_path, client["watch_folder"])
+                await record_event_async(
+                    "api", service=client_name, operation="torrent_client_add", outcome="success", duration_ms=(time.monotonic() - operation_started) * 1000
+                )
             except Exception as e:
+                await record_event_async("api", service=client_name, operation="torrent_client_add", outcome="error", duration_ms=(time.monotonic() - operation_started) * 1000)
                 logger.info(f"[bold red]Failed to add torrent to {client_name}: {e}")
         return
 
@@ -220,7 +236,8 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
         synchronization and more reliable peer discovery.
         """
         tracker_cfg = self.config.get("TRACKERS", {}).get(tracker, {})
-        has_tracker_delay = isinstance(tracker_cfg, dict) and "inject_delay" in tracker_cfg
+        # None retains the setting while inheriting DEFAULT; 0 still disables it.
+        has_tracker_delay = isinstance(tracker_cfg, dict) and tracker_cfg.get("inject_delay") is not None
         inject_delay = tracker_cfg.get("inject_delay") if has_tracker_delay else self.config["DEFAULT"].get("inject_delay", 0)
         if inject_delay is None or (isinstance(inject_delay, str) and not inject_delay.strip()):
             return
@@ -264,18 +281,31 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
         original_client = meta.client
         try:
             for client_name in client_names:
-                if client_name not in self.config["TORRENT_CLIENTS"]:
+                if client_name not in self.config.get("TORRENT_CLIENTS", {}):
                     logger.info(f"[yellow]Client '{client_name}' not found in TORRENT_CLIENTS config, skipping...")
                     continue
                 meta.client = client_name
-                result = await self._search_single_client_for_torrent(meta, client_name, False, False, None, True)
+                operation_started = time.monotonic()
+                outcome = "error"
+                try:
+                    result = await self._search_single_client_for_torrent(meta, client_name, False, False, None, True)
+                    outcome = "success"
+                finally:
+                    await record_event_async(
+                        "api", service=client_name, operation="torrent_client_search", outcome=outcome, duration_ms=(time.monotonic() - operation_started) * 1000
+                    )
                 candidates = result if isinstance(result, list) else [result] if isinstance(result, str) else []
                 for candidate in candidates:
                     if meta.subtitle_files and not self._torrent_includes_all_local_subtitles(candidate, meta) and not self._torrent_has_no_subtitles(candidate):
                         continue
                     torrent = Torrent.read(candidate)
                     has_subs = any(Path(str(file)).suffix.casefold() in SUBTITLE_EXTENSIONS for file in torrent.files)
-                    entry = manifest.register(candidate, "base_subs" if has_subs else "base", f"client:{client_name}")
+                    entry = manifest.register(
+                        candidate,
+                        "base_subs" if has_subs else "base",
+                        f"client:{client_name}",
+                        client_infohash=self._client_infohash(candidate, torrent),
+                    )
                     managed = str(manifest.entry_path(entry))
                     if managed not in paths:
                         paths.append(managed)
@@ -302,6 +332,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
         chosen = entries[0]
         if chosen.origin.startswith("client:"):
             meta.reuse_torrent_client = chosen.origin.removeprefix("client:")
+        meta.reuse_torrent_infohash = chosen.client_infohash
         return str(manifest.entry_path(chosen))
 
     async def _find_existing_torrent(self, meta: Meta) -> str | None:

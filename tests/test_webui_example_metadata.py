@@ -46,10 +46,52 @@ def test_current_example_config_exposes_workflow_subsections() -> None:
 
     assert subsections["DEFAULT/update_notification"] == "MAIN SETTINGS"
     assert subsections["DEFAULT/console_show_time"] == "LOGGING"
+    assert subsections["DEFAULT/stats_enabled"] == "LOCAL STATISTICS"
     assert subsections["DEFAULT/default_torrent_client"] == "CLIENT SELECTION"
     assert subsections["DEFAULT/post_upload_hook_timeout"] == "POST-UPLOAD"
     assert subsections["USENET/enabled"] == "GENERAL SETTINGS"
     assert subsections["USENET/nzb_output_dir"] == "OUTPUT PATHS"
+
+
+def test_stats_enabled_is_grouped_with_main_settings_only_in_webui() -> None:
+    example_path = server.CODE_DIR / "data" / "example_config.py"
+    example_config = server._load_config_from_file(example_path)
+    assert example_config is not None
+    defaults = example_config["DEFAULT"]
+    original_keys = list(defaults)
+    comments, subsections = server._extract_example_metadata(example_path)
+
+    prepared = server._prepare_default_webui_section(defaults, comments, subsections)
+    items = server._build_config_items(prepared, {"stats_enabled": True}, comments, subsections, ["DEFAULT"])
+
+    headings = [item["key"] for item in items if item.get("subsection")]
+    assert headings[:2] == ["MAIN SETTINGS", "LOGGING"]
+    assert headings.count("MAIN SETTINGS") == 1
+    assert "LOCAL STATISTICS" not in headings
+    main_settings = next(item for item in items if item["key"] == "MAIN SETTINGS")
+    stats_items = [item for item in main_settings["children"] if item["key"] == "stats_enabled"]
+    assert len(stats_items) == 1
+    assert stats_items[0]["value"] is True
+    assert stats_items[0]["example_value"] is False
+    assert stats_items[0]["help"] == comments["DEFAULT/stats_enabled"]
+    assert list(defaults) == original_keys
+    assert defaults["stats_enabled"] is False
+
+
+def test_removed_keep_meta_is_not_exposed_from_existing_config() -> None:
+    user_section = {"keep_meta": True, "stats_enabled": True, "custom_setting": "preserved"}
+    items = server._build_config_items(
+        {"stats_enabled": False},
+        user_section,
+        {},
+        {"DEFAULT/stats_enabled": "MAIN SETTINGS"},
+        ["DEFAULT"],
+    )
+
+    assert [item["key"] for item in items] == ["MAIN SETTINGS", "custom_setting"]
+    assert items[0]["children"][0]["value"] is True
+    assert items[1]["value"] == "preserved"
+    assert user_section["keep_meta"] is True
 
 
 def test_current_example_config_exposes_merged_metadata_settings() -> None:

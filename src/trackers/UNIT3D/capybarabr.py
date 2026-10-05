@@ -12,7 +12,7 @@ from src.tracker_images import (
 )
 from src.trackers.common import Common
 from src.trackers.UNIT3D import UNIT3D
-from src.uploadscreens import upload_image_task
+from src.uploadscreens import upload_image_task_with_stats as upload_image_task
 
 
 class CapybaraBR(UNIT3D):
@@ -192,7 +192,7 @@ class CapybaraBR(UNIT3D):
             game_lang_has_pt = "PORTUGUESE" in str(meta.languages).upper()
             game_lang_has_eng = "ENGLISH" in str(meta.languages).upper()
 
-            if game_has_multiple_languages and game_lang_has_pt:
+            if meta.manual_multi or (game_has_multiple_languages and game_lang_has_pt):
                 game_lang = "[MULTI]"
             elif game_lang_has_eng:
                 game_lang = "[INGLÊS]"
@@ -206,10 +206,18 @@ class CapybaraBR(UNIT3D):
                 dlc = f" {dlc}"
 
             year_str = str(meta.year) if meta.year is not None else ""
-            cbr_name = f"{meta.title} {update} {meta.game_version} {year_str} - {tag} {game_lang}{dlc} {bioma_tag}"
+            cbr_name = f"{meta.title} {update} {meta.game_version} {year_str} - {tag} {game_lang}{dlc}"
 
         elif category in ("MOVIE", "TV"):
-            cbr_name = cbr_name.replace("DD+ ", "DDP").replace("DD ", "DD").replace("AAC ", "AAC").replace("FLAC ", "FLAC").replace("Dubbed", "").replace("Dual-Audio", "")
+            cbr_name = (
+                cbr_name.replace("DD+ ", "DDP")
+                .replace("DD ", "DD")
+                .replace("AAC ", "AAC")
+                .replace("FLAC ", "FLAC")
+                .replace("Dubbed", "")
+                .replace("Dual-Audio", "")
+                .replace("MULTI", "")
+            )
 
             # If it is a Series or Anime, remove the year from the title.
             if meta.category in ["TV", "ANIMES"]:

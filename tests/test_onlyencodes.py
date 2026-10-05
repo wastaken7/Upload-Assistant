@@ -25,6 +25,34 @@ def _config() -> dict:
     }
 
 
+@pytest.mark.parametrize("category,episode", [("MOVIE", ""), ("TV", " S01E02")])
+@pytest.mark.parametrize("aka", ["", "AKA Alternate Moon"])
+@pytest.mark.parametrize("no_aka", [False, True])
+def test_onlyencodes_keeps_tmdb_title_and_year(category: str, episode: str, aka: str, no_aka: bool) -> None:
+    name_aka = f" {aka}" if aka and not no_aka else ""
+    name = f"Silver Moon{name_aka} 2025{episode} 1080p WEB-DL DDP 5.1 H.264-FictionalGroup"
+    meta = Meta(
+        category=category,
+        type="WEBDL",
+        title="Silver Moon",
+        year=2025,
+        aka=aka,
+        no_aka=no_aka,
+        name=name,
+        imdb_info={"title": "IMDb Moon", "aka": "Original Moon", "year": 2024},
+        resolution="1080p",
+        tag="FictionalGroup",
+        audio_languages=["English"],
+        language_checked=True,
+    )
+
+    assert _name(meta) == name
+    assert meta.name == name
+    assert meta.title == "Silver Moon"
+    assert meta.year == 2025
+    assert meta.aka == aka
+
+
 def _screens(count: int = 3) -> list[dict[str, str]]:
     return [
         {

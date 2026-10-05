@@ -62,6 +62,61 @@ def test_description_builder_renders_music_release_details():
     assert "3000 kbps, 3100 kbps" in result
 
 
+def test_description_builder_renders_album_tracklist_in_disc_order():
+    meta = Meta(
+        category="MUSIC",
+        music_release={
+            "fields": {"release_type": {"value": "Album"}, "album": {"value": "Invented Album"}},
+            "tracks": [
+                {"relative_path": "Disc 2/02 - Finale.flac", "disc_number": 2, "track_number": 2, "title": "Finale", "duration": 125},
+                {"relative_path": "Disc 1/02 - Next.flac", "disc_number": 1, "track_number": 2, "title": "Next", "duration": 63},
+                {"relative_path": "Disc 1/01 - Opening.flac", "disc_number": 1, "track_number": 1, "title": "Opening", "duration": 121},
+                {"relative_path": "Disc 2\\01 - Untagged.flac", "disc_number": 2, "track_number": 1, "duration": None},
+            ],
+        },
+    )
+    builder = DescriptionBuilder("PEERGARDEN", {"DEFAULT": {}, "TRACKERS": {"PEERGARDEN": {}}}, language="pt-BR")
+
+    result = builder._build_music_desc_section(meta)
+
+    assert "[h2]Lista de faixas[/h2]" in result
+    assert "[tr][td][b]N. da faixa[/b][/td][td][b]Título[/b][/td][td][b]Duração[/b][/td][/tr]" in result
+    assert result.index("[tr][td]1.01[/td][td]Opening[/td][td]02:01[/td][/tr]") < result.index("[tr][td]1.02[/td][td]Next[/td][td]01:03[/td][/tr]")
+    assert result.index("[tr][td]2.01[/td][td]01 - Untagged[/td][td][/td][/tr]") < result.index("[tr][td]2.02[/td][td]Finale[/td][td]02:05[/td][/tr]")
+    assert "Disc 2\\" not in result
+
+
+def test_description_builder_tracklist_handles_missing_tags_and_bbcode():
+    meta = Meta(
+        category="MUSIC",
+        music_release={
+            "tracks": [
+                {"relative_path": "02 - Later.flac", "track_number": None, "title": "Later [b]Track[/b] & Movin' Out", "duration": "invalid"},
+                {"relative_path": "01 - First.flac", "track_number": 1, "title": "First"},
+            ]
+        },
+    )
+    builder = DescriptionBuilder("PEERGARDEN", {"DEFAULT": {}, "TRACKERS": {"PEERGARDEN": {}}})
+
+    result = builder._build_music_desc_section(meta)
+
+    assert "[h2]Tracklist[/h2]" in result
+    assert result.index("[tr][td]01[/td][td]First[/td]") < result.index("[tr][td]—[/td][td]Later \uff3bb\uff3dTrack\uff3b/b\uff3d & Movin' Out[/td]")
+    assert "&#x27;" not in result
+    assert "&amp;" not in result
+    assert "invalid" not in result
+
+
+def test_description_builder_tracklist_uses_plain_text_when_tracker_disables_tables():
+    meta = Meta(category="MUSIC", music_release={"tracks": [{"relative_path": "01 - Opening.flac", "track_number": 1, "title": "Opening", "duration": 121}]})
+    builder = DescriptionBuilder("TORRENTLEECH", {"DEFAULT": {}, "TRACKERS": {"TORRENTLEECH": {}}})
+
+    result = builder._build_music_desc_section(meta)
+
+    assert "[table]" not in result
+    assert "[h2]Tracklist[/h2]\n01. Opening (02:01)" in result
+
+
 def test_description_builder_renders_external_music_ids_as_links():
     musicbrainz_release = "c0d17e85-3a36-4dc8-9a88-c188a5e78b0d"
     musicbrainz_group = "3bdb2b21-f6f5-3f8b-a1e0-067f8bb71940"
@@ -96,7 +151,7 @@ def test_description_generator_includes_music_release_details():
                 "artists": {"value": ["Artist One", "Artist Two"]},
                 "album": {"value": "Example Album"},
             },
-            "tracks": [{"format": "FLAC", "sample_rate": 96000}],
+            "tracks": [{"relative_path": "01 - Prelude.flac", "track_number": 1, "title": "Prelude", "format": "FLAC", "sample_rate": 96000}],
         },
     )
     builder = DescriptionBuilder("PEERGARDEN", {"DEFAULT": {}, "TRACKERS": {"PEERGARDEN": {}}})
@@ -127,6 +182,8 @@ def test_description_generator_includes_music_release_details():
     assert "Artist One, Artist Two" in result
     assert "Example Album" in result
     assert "96 kHz" in result
+    assert "[h2]Tracklist[/h2]\n[table]" in result
+    assert "[tr][td]01[/td][td]Prelude[/td][td][/td][/tr]" in result
 
 
 def test_description_builder_skips_invalid_music_technical_values():

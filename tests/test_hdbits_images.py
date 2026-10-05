@@ -32,7 +32,13 @@ class _Client:
 
 
 def test_hdbits_rehosts_screenshots_from_typed_directory(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    events = []
+
+    async def record_event(_family, **kwargs):
+        events.append(kwargs)
+
     monkeypatch.setattr("src.trackers.hdbits.httpx.AsyncClient", lambda **_kwargs: _Client())
+    monkeypatch.setattr("src.trackers.hdbits.record_event_async", record_event)
     screenshot = screenshots_dir(tmp_path, "release") / "screen.png"
     screenshot.write_bytes(b"png")
     tracker = HDBits({"TRACKERS": {"HDBITS": {"username": "user", "passkey": "pass"}}})
@@ -40,3 +46,4 @@ def test_hdbits_rehosts_screenshots_from_typed_directory(tmp_path, monkeypatch: 
 
     assert asyncio.run(tracker.hdbimg_upload(meta)) == _Response.text
     assert _Client.files == {"images_files[0]": ("screen.png", b"png", "image/png")}
+    assert [(event["service"], event["operation"], event["outcome"], event["bytes_count"]) for event in events] == [("hdbimg", "image_upload", "success", 3)]

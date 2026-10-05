@@ -20,6 +20,7 @@ from langcodes.tag_parser import LanguageTagError
 
 from src.audible import build_audible_author_url, resolve_audible_url
 from src.bbcode import BBCODE
+from src.bluray_com import ensure_release_subheader
 from src.cogs.redaction import PathAwareEncoder
 from src.console import logger
 from src.description_languages import COMMON_LABELS, GAME_LABELS, MUSIC_LABELS, get_book_labels, get_labels
@@ -776,6 +777,17 @@ class DescriptionBuilder:
 
         return custom_signature
 
+    def format_bluray_link(self, url: str, label: str) -> str:
+        if self.tracker == "IMMORTALSEED":
+            return f"{label} — {url}" if label else url
+        if self.tracker == "TORRENTLEECH":
+            return f'<a href="{html.escape(url, quote=True)}">{html.escape(label)}</a>' if label else url
+        if not label:
+            return f"[url]{url}[/url]"
+        # The subheader is text, not tracker BBCode.
+        safe_label = label.replace("[", "&#91;").replace("]", "&#93;")
+        return f"[url={url}]{safe_label}[/url]"
+
     async def get_bluray_section(self, meta: Meta) -> tuple[str, str]:
         release_url: str = ""
         cover_list: list[str] = []
@@ -787,6 +799,7 @@ class DescriptionBuilder:
 
             if meta.is_disc in ["BDMV", "DVD"] and bluray_link and meta.release_url:
                 release_url = meta.release_url
+                await ensure_release_subheader(meta)
 
             cover_data = meta.hosted_artwork
             if not cover_data and await self.common.path_exists(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/covers.json"):
@@ -1249,6 +1262,64 @@ class DescriptionBuilder:
 
         return "\n".join(part for part in game_parts if part.strip())
 
+    @staticmethod
+    def _build_music_tracklist(tracks: list[Any], labels: dict[str, Any], table: bool = True) -> str:
+        """Render the audio files in disc/track order from the release snapshot."""
+
+        def positive_number(value: Any) -> int | None:
+            try:
+                number = int(value)
+            except TypeError, ValueError, OverflowError:
+                return None
+            return number if number > 0 else None
+
+        ordered = []
+        for index, track in enumerate(tracks):
+            if not isinstance(track, dict):
+                continue
+            relative_path = str(track.get("relative_path") or "")
+            title = str(track.get("title") or "").strip() or Path(relative_path.replace("\\", "/")).stem
+            if not title:
+                continue
+            disc = positive_number(track.get("disc_number")) or 1
+            number = positive_number(track.get("track_number"))
+            ordered.append((disc, number, relative_path.casefold(), index, title, track.get("duration")))
+
+        if not ordered:
+            return ""
+        ordered.sort(key=lambda item: (item[0], item[1] if item[1] is not None else float("inf"), item[2], item[3]))
+        multiple_discs = len({item[0] for item in ordered}) > 1
+        lines = [f"[h2]{labels['tracklist']}[/h2]"]
+        if table:
+            lines.extend(
+                [
+                    "[table]",
+                    f"[tr][td][b]{labels['track_number']}[/b][/td][td][b]{labels['title']}[/b][/td][td][b]{labels['duration']}[/b][/td][/tr]",
+                ]
+            )
+        for disc, number, _, _, title, duration in ordered:
+            # BBCode needs bracket protection, but HTML escaping turns apostrophes
+            # and ampersands into visible entities on some trackers.
+            safe_title = title.replace("[", "\uff3b").replace("]", "\uff3d").replace("<", "\u2039").replace(">", "\u203a")
+            try:
+                seconds = float(duration)
+            except TypeError, ValueError, OverflowError:
+                seconds = 0
+            duration_text = ""
+            if 0 < seconds < float("inf"):
+                minutes, remainder = divmod(round(seconds), 60)
+                duration_text = f"{minutes:02d}:{remainder:02d}"
+            track_number = f"{number:02d}" if number is not None else "—"
+            if multiple_discs:
+                track_number = f"{disc}.{track_number}"
+            if table:
+                lines.append(f"[tr][td]{track_number}[/td][td]{safe_title}[/td][td]{duration_text}[/td][/tr]")
+            else:
+                lines.append(f"{track_number}. {safe_title}" + (f" ({duration_text})" if duration_text else ""))
+        if table:
+            lines.append("[/table]")
+        return "\n".join(lines)
+
     def _build_music_desc_section(self, meta: Meta, table: bool = True) -> str:
         """Build a tracker-neutral BBCode summary for MUSIC-category uploads."""
         if meta.category != "MUSIC" or not isinstance(meta.music_release, dict):
@@ -1390,7 +1461,8 @@ class DescriptionBuilder:
             body = "\n".join(table_lines)
         else:
             body = "\n".join(f"[b]{label}:[/b] {field_value}" for label, field_value in music_fields)
-        return f"{header}{text['details']}{header_end}\n{body}"
+        tracklist = self._build_music_tracklist(tracks, text, table=table)
+        return f"{header}{text['details']}{header_end}\n{body}" + (f"\n\n{tracklist}" if tracklist else "")
 
     async def general_description_generator(
         self,
@@ -1411,12 +1483,12 @@ class DescriptionBuilder:
         screenshots: bool = True,
         tonemapped_header: bool = True,
         tv_info: bool = True,
-        ua_signature: bool = True,  # ci: ua_signature v4.4
+        ua_signature: bool = True,  # ci: ua_signature v4.5
         user_description: bool = True,
         music: bool = True,
         dynamic_hdr_plot: bool = True,
         approved_image_hosts: list[str] | None = None,
-        signature: str = "",  # ci: ua_signature v4.4
+        signature: str = "",  # ci: ua_signature v4.5
         desc_header: str = "",
     ) -> str:
         apply_saved_draft(meta)
@@ -1513,9 +1585,8 @@ class DescriptionBuilder:
         if bluray:
             release_url, cover_images = await self.get_bluray_section(meta)
             if release_url:
-                if self.tracker not in ("TORRENTLEECH", "IMMORTALSEED"):
-                    release_url = f"[url]{release_url}[/url]"
-                desc_parts.append(f"[center]{release_url}[/center]")
+                label = meta.release_subheader if meta.release_subheader_url == release_url else ""
+                desc_parts.append(f"[center]{self.format_bluray_link(release_url, label)}[/center]")
             if cover_images:
                 desc_parts.append(f"[center]{cover_images}[/center]\n")
 
@@ -1674,7 +1745,7 @@ class DescriptionBuilder:
                 await description_file.write(self.tracker_specific_formats(self.tracker, "\n".join(part for part in (description_str, ((signature or (f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=4]{meta.ua_signature}[/size][/url][/right]" if meta.ua_signature else "")) if ua_signature else "")) if part.strip())))  # fmt: off
 
         # fmt: off
-        return self.tracker_specific_formats(self.tracker, "\n".join(part for part in (description_str, ((signature or (f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=4]{meta.ua_signature}[/size][/url][/right]" if meta.ua_signature else "")) if ua_signature else "")) if part.strip()))  # ci: ua_signature v4.4
+        return self.tracker_specific_formats(self.tracker, "\n".join(part for part in (description_str, ((signature or (f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=4]{meta.ua_signature}[/size][/url][/right]" if meta.ua_signature else "")) if ua_signature else "")) if part.strip()))  # ci: ua_signature v4.5
         # fmt: on
 
     async def _check_saved_pack_image_links(self, meta: Meta, approved_image_hosts: list[str]) -> dict[str, Any]:
@@ -2314,6 +2385,16 @@ class DescriptionBuilder:
         bbcode = BBCODE()
         from src.trackersetup import get_tracker_framework
 
+        if get_tracker_framework(tracker) == "UNIT3D":
+            # Protect comparison payloads from all formatting, including newline cleanup.
+            comparisons: list[str] = []
+
+            def preserve_comparison(match: re.Match[str]) -> str:
+                comparisons.append(match.group(0))
+                return f"\x00COMPARISON{len(comparisons) - 1}\x00"
+
+            description = re.sub(r"\[comparison=[^\]]*\].*?\[/comparison\]", preserve_comparison, description, flags=re.IGNORECASE | re.DOTALL)
+
         if get_tracker_framework(tracker) == "NEXUSPHP":
             description = bbcode.remove_img_resize(description)
 
@@ -2540,6 +2621,9 @@ class DescriptionBuilder:
             description = description.replace("[hr]", "").replace("[/hr]", "")
             description = description.replace("[ul]", "").replace("[/ul]", "")
             description = description.replace("[ol]", "").replace("[/ol]", "")
-            description = bbcode.convert_comparison_to_collapse(description, 1000)
+            description = bbcode.remove_extra_lines(description)
+            for index, comparison in enumerate(comparisons):
+                description = description.replace(f"\x00COMPARISON{index}\x00", comparison)
+            return description
 
         return bbcode.remove_extra_lines(description)

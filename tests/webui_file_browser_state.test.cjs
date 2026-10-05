@@ -125,6 +125,34 @@ test("file-browser persistence, restoration, refresh and execution outcomes", as
   assert.deepEqual([...context.expandedFoldersRef.current], ["/data/a/b"]);
   context.expandedFoldersRef.current = context.getStoredExpandedFolders();
 
+  const refreshStates = [];
+  const manualSearches = [];
+  context.fileBrowserRefreshing = false;
+  context.setFileBrowserRefreshing = (value) => refreshStates.push(value);
+  context.fileBrowserSearchQuery = { current: "new download" };
+  let finishManualSearch;
+  let manualSearchStarted;
+  const searchStarted = new Promise((resolve) => {
+    manualSearchStarted = resolve;
+  });
+  context.handleFileBrowserSearch = (query) => {
+    manualSearches.push(query);
+    manualSearchStarted();
+    return new Promise((resolve) => {
+      finishManualSearch = resolve;
+    });
+  };
+  load("refreshFileBrowser");
+  requests.length = 0;
+  const manualRefresh = context.refreshFileBrowser();
+  await searchStarted;
+  assert.deepEqual(refreshStates, [true]);
+  assert.deepEqual(requests, Object.keys(responses));
+  assert.deepEqual(manualSearches, ["new download"]);
+  finishManualSearch();
+  await manualRefresh;
+  assert.deepEqual(refreshStates, [true, false]);
+
   let delayResolve;
   let delay;
   context.setTimeout = (fn, ms) => {
@@ -155,6 +183,7 @@ test("file-browser persistence, restoration, refresh and execution outcomes", as
   assert.equal(searches.length, 1);
 
   context.fileBrowserSearchTimer = { current: null };
+  context.fileBrowserSearchCompletion = { current: null };
   context.fileBrowserSearchId = { current: 0 };
   context.setFileBrowserSearch = () => {};
   let searchLoading = false;

@@ -120,24 +120,10 @@
         : placement === "sidebar"
           ? "ua-config-sidebar-action rounded-lg px-3 py-2 text-sm font-semibold"
           : "ua-upload-header-action rounded-lg p-2";
-    const icon = h(
-      "svg",
-      {
-        width: 20,
-        height: 20,
-        viewBox: "0 0 24 24",
-        fill: "none",
-        stroke: "currentColor",
-        strokeWidth: 2,
-        strokeLinecap: "round",
-        strokeLinejoin: "round",
-        "aria-hidden": true,
-      },
-      h("path", {
-        d: "M10.3 3.9 1.8 18.6A1.6 1.6 0 0 0 3.2 21h17.6a1.6 1.6 0 0 0 1.4-2.4L13.7 3.9a2 2 0 0 0-3.4 0Z",
-      }),
-      h("path", { d: "M12 9v4m0 4h.01" }),
-    );
+    const icon = h(window.UALucideIcon, {
+      name: "triangle-alert",
+      className: "h-5 w-5",
+    });
 
     return h(
       React.Fragment,
@@ -197,7 +183,10 @@
                     buttonRef.current?.focus();
                   },
                 },
-                "×",
+                h(window.UALucideIcon, {
+                  name: "x",
+                  className: "h-4 w-4",
+                }),
               ),
             ),
             h(

@@ -104,6 +104,7 @@ Sequence Usenet and torrent tracker uploads while limiting contention with qBitt
 ### 8. Modern Web UI & Real-Time Engine
 
 - **Full Parity Web UI**: Modern interface providing full feature parity with CLI options (`--webui`).
+- **Private Local Statistics**: A dedicated Stats workspace tracks daily upload outcomes, cache efficiency, logical API operations, torrent/NZB creation, destinations, and categories without storing media names, paths, external IDs, URLs, or credentials.
 - **Real-Time Execution & Presets**: Live log streams, real-time preparation preview, preset saving, and interactive screenshot management.
 
 ## Supported Sites
@@ -271,7 +272,7 @@ Open the generated `config.py` in a text editor (like Notepad++, VS Code, or Tex
 
 ## **Updating:**
 
-Run `uv tool upgrade upload-assistant` to update the published installation. If you installed the development version from GitHub, run `uv tool install --force git+https://github.com/wastaken7/Upload-Assistant.git` to fetch it again. On the next start, Upload Assistant adds newly introduced settings from [`data/example_config.py`](data/example_config.py) without changing existing values. A timestamped backup is created beside `config.py` whenever this automatic update changes the file.
+Run `uv tool upgrade upload-assistant` to update the published installation. If you installed the development version from GitHub, run `uv tool install --force git+https://github.com/wastaken7/Upload-Assistant.git` to fetch it again. On the next start, Upload Assistant adds missing general settings from [`data/example_config.py`](data/example_config.py) without changing existing values. Tracker/client sections and optional cache-service/tag overrides are left untouched so omitted settings continue to inherit their defaults. Add new tracker/client options manually when needed. A timestamped backup is created beside `config.py` whenever this automatic update changes the file.
 
 ## **CLI Usage:**
 

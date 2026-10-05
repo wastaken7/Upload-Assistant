@@ -12,6 +12,7 @@ import cli_ui
 from src.binaries import configured_binary
 from src.console import logger
 from src.meta import Meta
+from src.stats import record_event_async
 from src.temp_paths import spectrograms_dir
 from src.webui_progress import complete_progress, publish_progress
 
@@ -359,6 +360,8 @@ async def process_audio_spectrograms(meta: Meta, config: dict[str, Any], uploads
             group="spectrogram",
             unit="streams",
         )
+
+    await record_event_async("artifact", service="screenshot", operation="created", category="spectrogram", count=len(generated_files))
 
     if generated_files and uploadscreens_manager:
         logger.info("[yellow]Uploading Audio Spectrograms...[/yellow]")
