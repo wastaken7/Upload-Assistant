@@ -2754,6 +2754,7 @@ def _webui_auth_ok() -> bool:
 
 @app.before_request
 def _require_auth_for_webui():  # pyright: ignore[reportUnusedFunction]
+    """Enforce IP and authentication checks, recording rejected API credentials."""
     # Health endpoint can be used for orchestration checks.
     if request.path == "/api/health":
         return None
@@ -2806,6 +2807,8 @@ def _require_auth_for_webui():  # pyright: ignore[reportUnusedFunction]
             return None
         # If request accepts HTML (browser), redirect to login; else 401 for API clients
         if "text/html" in (_request_header("Accept") or ""):
+            if _request_header("Authorization"):
+                _handle_failed_auth(client_ip)
             return redirect(url_for("login_page"))
         _handle_failed_auth(client_ip)
         return jsonify({"error": "Authentication required", "success": False}), 401
@@ -4636,6 +4639,7 @@ def twofa_disable():
 
 
 @app.route("/api/browse_roots")
+@limiter.exempt
 def browse_roots():
     """Return configured browse roots"""
     roots = _get_browse_roots()
@@ -6101,6 +6105,7 @@ def api_tokens():
 
 
 @app.route("/api/browse")
+@limiter.limit("600 per minute", key_func=_rate_limit_key_func, override_defaults=True)
 def browse_path():
     """Browse filesystem paths"""
     requested: str = str(request.args.get("path", ""))
@@ -6227,6 +6232,7 @@ def browse_path():
 
 
 @app.route("/api/browse_search")
+@limiter.limit("60 per minute", key_func=_rate_limit_key_func, override_defaults=True)
 def browse_search():
     """Search filesystem for files/folders matching a query string"""
     query = (request.args.get("q") or "").strip()
