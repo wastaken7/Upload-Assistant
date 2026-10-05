@@ -53,3 +53,4 @@ tmp/*
 user-args.json
 venv/*
 web_ui/static/js/node_modules/
+web_ui/static/img/trackers/suio.png
