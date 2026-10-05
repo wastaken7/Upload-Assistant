@@ -18,6 +18,7 @@ from bin.get_dynamic_hdr_tools import TOOLS, get_tool
 from src.binaries import configured_binary
 from src.console import logger
 from src.meta import Meta
+from src.stats import record_event_async
 from src.temp_paths import dynamic_hdr_plots_dir, release_temp_dir
 from src.webui_progress import complete_progress, publish_progress
 
@@ -146,6 +147,7 @@ async def process_dynamic_hdr_plots(meta: Meta, config: dict[str, Any], uploadsc
     tools: dict[str, str] = {}
     ffmpeg_binary = configured_binary("ffmpeg_path", config) or "ffmpeg"
     generated: list[str] = []
+    generated_by_kind = dict.fromkeys(formats, 0)
     for position, (kind, source) in enumerate(jobs, start=1):
         try:
             if kind not in tools:
@@ -153,11 +155,15 @@ async def process_dynamic_hdr_plots(meta: Meta, config: dict[str, Any], uploadsc
             binary = tools[kind]
             plot = await _generate_plot(binary, kind, source, output_dir, ffmpeg_binary)
             generated.append(str(plot))
+            generated_by_kind[kind] += 1
             detail = f"Generated {kind} plot for {source.name}"
         except Exception as error:
             detail = f"{kind} plot failed for {source.name}: {error!s}"
             logger.warning(f"[yellow]{detail}[/yellow]")
         publish_progress(progress_id, "Generating dynamic HDR plots", current=position, total=len(jobs), detail=detail, group="dynamic_hdr", unit="plots")
+
+    for kind, count in generated_by_kind.items():
+        await record_event_async("artifact", service="screenshot", operation="created", category=f"{kind}_plot", count=count)
 
     if generated and uploadscreens_manager and not meta.skip_imghost_upload:
         try:

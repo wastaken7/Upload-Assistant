@@ -45,3 +45,13 @@ async def test_book_prep_keeps_two_part_title_and_series_metadata(tmp_path):
 
     assert meta.title == "Livro: Subtítulo"  # noqa: S101
     assert meta.book_series == "Série"  # noqa: S101
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("audiobook", [False, True])
+async def test_book_prep_removes_bracketed_text_from_series(tmp_path, audiobook):
+    meta = Meta(title="Livro Inventado", book_series="Coleção Fictícia [Edição Especial]", audiobook=audiobook, edit=True)
+
+    await gather_book_prep(meta, "book.m4b" if audiobook else "book.epub", str(tmp_path))
+
+    assert meta.book_series == "Coleção Fictícia"  # noqa: S101

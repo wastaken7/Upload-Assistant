@@ -226,7 +226,7 @@ class TrackerDataManager:
                     version = 1
                 await asyncio.to_thread(save_review, temp_dir, candidate.description, version)
             return
-        logger.info(f"[cyan]Selected description from {tracker_name}:[/cyan]\n{candidate.description[:1000]}", extra={"markup": False})
+        logger.info(f"Selected description from {tracker_name}:\n{candidate.description[:1000]}", extra={"markup": False})
         choice = await prompt_in_thread(cli_ui.ask_string, "\nEnter 'e' to edit, 'd' to discard the description, or press Enter to keep it: ")
         choice = (choice or "").strip().lower()
         if choice == "e":

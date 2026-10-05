@@ -4,6 +4,7 @@ import json
 import random
 import re
 from collections.abc import Mapping, MutableMapping, Sequence
+from contextvars import ContextVar
 from pathlib import Path
 from typing import Any, cast
 
@@ -21,6 +22,14 @@ console = Console()
 Release = MutableMapping[str, Any]
 MovieLink = MutableMapping[str, Any]
 
+# Shared by description tasks in one preparation run, never saved in Meta.
+_failed_subheader_urls: ContextVar[set[str] | None] = ContextVar("failed_bluray_subheader_urls", default=None)
+
+
+def reset_release_subheader_cache() -> None:
+    """Start a fresh cache without affecting other concurrent preparation runs."""
+    _failed_subheader_urls.set(set())
+
 
 def _style_contains(style: str | None, token: str) -> bool:
     return bool(style and token in style)
@@ -36,6 +45,41 @@ def _style_gray(style: str | None) -> bool:
 
 def _style_specs(style: str | None) -> bool:
     return _style_contains(style, "font-size: 12px")
+
+
+def set_selected_release(meta: Meta, release: Release) -> None:
+    """Keep the display label attached to the release it was parsed from."""
+    meta.release_url = str(release.get("url") or "")
+    meta.release_subheader = str(release.get("subheader") or "")
+    meta.release_subheader_url = meta.release_url if "subheader" in release else ""
+
+
+async def ensure_release_subheader(meta: Meta) -> None:
+    """Fetch missing link details only when a description actually needs them."""
+    url = meta.release_url
+    if not url or meta.release_subheader_url == url:
+        return
+    meta.release_subheader = ""
+    meta.release_subheader_url = ""
+    release_id = re.search(r"/(\d+)/?(?:[?#].*)?$", url)
+    if not release_id:
+        return
+    failed_urls = _failed_subheader_urls.get()
+    if failed_urls is None:
+        failed_urls = set()
+        _failed_subheader_urls.set(failed_urls)
+    if url in failed_urls:
+        return
+    try:
+        release = await fetch_release_details({"url": url, "release_id": release_id[1], "title": meta.title}, meta)
+        if "subheader" not in release:
+            # Exhausted retries return the original release instead of raising.
+            failed_urls.add(url)
+        if meta.release_url == url:
+            set_selected_release(meta, release)
+    except Exception as error:
+        failed_urls.add(url)
+        logger.warning(f"Could not fetch Blu-ray.com link label: {error}")
 
 
 async def search_bluray(meta: Meta) -> str | None:
@@ -474,7 +518,7 @@ async def get_bluray_releases(meta: Meta) -> list[Release]:
                             region_code = map_country_to_region_code(selected_release["country"])
                             meta.region = region_code or "" or ""
                             meta.distributor = selected_release["publisher"].upper()
-                            meta.release_url = selected_release["url"]
+                            set_selected_release(meta, selected_release)
                             cli_ui.info(f"Set region code to: {region_code}, distributor to: {selected_release['publisher'].upper()}")
 
                             if meta.use_bluray_images:
@@ -485,6 +529,7 @@ async def get_bluray_releases(meta: Meta) -> list[Release]:
                                     meta.bluray_cover_urls = selected_release["cover_images"]
                                     await download_cover_images(meta)
 
+                            set_selected_release(meta, selected_release)
                             return [selected_release]
                         cli_ui.warning(f"Invalid selection: {selected_idx}. Must be between 1 and {len(matching_releases)}")
                     except ValueError:
@@ -518,6 +563,8 @@ async def get_bluray_releases(meta: Meta) -> list[Release]:
 async def parse_release_details(response_text: str, release: Release, meta: Meta) -> Release:
     try:
         soup: Any = BeautifulSoup(response_text, "lxml")
+        subheader = soup.select_one("span.subheading.grey")
+        release["subheader"] = " ".join(subheader.get_text(" ", strip=True).split()) if subheader else ""
         specs_td: Any = soup.find("td", width="228px", style=_style_specs)
 
         if not specs_td:
@@ -1457,7 +1504,7 @@ async def process_all_releases(releases: Sequence[Release], meta: Meta) -> list[
                 region_code = map_country_to_region_code(best_release["country"])
                 meta.region = region_code or "" or ""
                 meta.distributor = best_release["publisher"].upper()
-                meta.release_url = best_release["url"]
+                set_selected_release(meta, best_release)
                 if "cover_images" in best_release:
                     meta.bluray_cover_urls = best_release["cover_images"]
                     await download_cover_images(meta)
@@ -1473,7 +1520,7 @@ async def process_all_releases(releases: Sequence[Release], meta: Meta) -> list[
                                 region_code = map_country_to_region_code(close_matches[0]["country"])
                                 meta.region = region_code or "" or ""
                                 meta.distributor = close_matches[0]["publisher"].upper()
-                                meta.release_url = close_matches[0]["url"]
+                                set_selected_release(meta, close_matches[0])
                                 if "cover_images" in close_matches[0]:
                                     meta.bluray_cover_urls = close_matches[0]["cover_images"]
                                     await download_cover_images(meta)
@@ -1494,7 +1541,7 @@ async def process_all_releases(releases: Sequence[Release], meta: Meta) -> list[
                     region_code = map_country_to_region_code(best_release["country"])
                     meta.region = region_code or "" or ""
                     meta.distributor = best_release["publisher"].upper()
-                    meta.release_url = best_release["url"]
+                    set_selected_release(meta, best_release)
                     if "cover_images" in best_release:
                         meta.bluray_cover_urls = best_release["cover_images"]
                         await download_cover_images(meta)
@@ -1553,7 +1600,7 @@ async def process_all_releases(releases: Sequence[Release], meta: Meta) -> list[
                                     region_code = map_country_to_region_code(selected_release["country"])
                                     meta.region = region_code or "" or ""
                                     meta.distributor = selected_release["publisher"].upper()
-                                    meta.release_url = selected_release["url"]
+                                    set_selected_release(meta, selected_release)
                                     if "cover_images" in selected_release:
                                         meta.bluray_cover_urls = selected_release["cover_images"]
                                         await download_cover_images(meta)
@@ -1570,7 +1617,7 @@ async def process_all_releases(releases: Sequence[Release], meta: Meta) -> list[
                     region_code = map_country_to_region_code(best_release["country"])
                     meta.region = region_code or "" or ""
                     meta.distributor = best_release["publisher"].upper()
-                    meta.release_url = best_release["url"]
+                    set_selected_release(meta, best_release)
                     if "cover_images" in best_release:
                         meta.bluray_cover_urls = best_release["cover_images"]
                         await download_cover_images(meta)
@@ -1595,7 +1642,7 @@ async def process_all_releases(releases: Sequence[Release], meta: Meta) -> list[
                                 region_code = map_country_to_region_code(best_release["country"])
                                 meta.region = region_code or "" or ""
                                 meta.distributor = best_release["publisher"].upper()
-                                meta.release_url = best_release["url"]
+                                set_selected_release(meta, best_release)
                                 if "cover_images" in best_release:
                                     meta.bluray_cover_urls = best_release["cover_images"]
                                     await download_cover_images(meta)
@@ -1616,7 +1663,7 @@ async def process_all_releases(releases: Sequence[Release], meta: Meta) -> list[
                     region_code = map_country_to_region_code(best_release["country"])
                     meta.region = region_code or "" or ""
                     meta.distributor = best_release["publisher"].upper()
-                    meta.release_url = best_release["url"]
+                    set_selected_release(meta, best_release)
                     if "cover_images" in best_release:
                         meta.bluray_cover_urls = best_release["cover_images"]
                         await download_cover_images(meta)

@@ -30,8 +30,9 @@ from src.meta import Meta
     ],
 )
 @pytest.mark.parametrize("manual", [False, True])
+@pytest.mark.parametrize("registered_timestamps", [False, True])
 async def test_video_resume_registers_existing_frames_and_fills_gaps(
-    monkeypatch, tmp_path, existing_indices, registered_count, corrupt_indices, empty_indices, manual
+    monkeypatch, tmp_path, existing_indices, registered_count, corrupt_indices, empty_indices, manual, registered_timestamps
 ):
     release_id = "interrupted-video"
     screenshot_dir = takescreens.screenshots_dir(tmp_path, release_id)
@@ -51,7 +52,12 @@ async def test_video_resume_registers_existing_frames_and_fills_gaps(
         output = screenshot_dir / f"registered-{index}.png"
         image.save(output)
         registered.append(output)
-    registered = takescreens.register_screenshots(tmp_path, release_id, registered, "main")
+    meta = Meta(category="TV", tv_pack=1, base_dir=str(tmp_path), uuid=release_id, screens=12, image_list=[], imghost="ptscreens")
+    sampling_times = [float(index + 1) for index in range(12)] if manual else [float(value) for value in await takescreens.valid_ss_time([], 12, 600, 24, meta)]
+    registered_slots = list(range(1, 12, 2))[:registered_count] if registered_timestamps else list(range(registered_count))
+    timestamps = {str(output): sampling_times[slot] for output, slot in zip(registered, registered_slots)} if registered_timestamps else None
+    registered = takescreens.register_screenshots(tmp_path, release_id, registered, "main", timestamps=timestamps, slot_timestamps=timestamps)
+    remaining_times = [timestamp for slot, timestamp in enumerate(sampling_times) if slot not in registered_slots]
     calls = []
 
     async def image_host_stub(_meta):
@@ -71,7 +77,6 @@ async def test_video_resume_registers_existing_frames_and_fills_gaps(
     monkeypatch.setattr(takescreens, "get_image_host", image_host_stub)
     monkeypatch.setattr(takescreens, "determine_tonemapping", tonemapping_stub)
     monkeypatch.setattr(takescreens, "capture_screenshot", capture_stub)
-    meta = Meta(category="TV", tv_pack=1, base_dir=str(tmp_path), uuid=release_id, screens=12, image_list=[], imghost="ptscreens")
     kwargs = {"manual_frames": [24 * (index + 1) for index in range(12)]} if manual else {}
 
     result = await takescreens.screenshots("source.mkv", "Illegal", release_id, str(tmp_path), meta, cleanup_after_capture=False, **kwargs)
@@ -79,8 +84,9 @@ async def test_video_resume_registers_existing_frames_and_fills_gaps(
     expected_indices = set(range(12 - registered_count)) - set(existing_indices)
     assert {name for _, _, name in calls} == {f"Illegal-{index}.png" for index in expected_indices}
     assert len(calls) == len(expected_indices)
-    if manual:
-        assert all(timestamp == index + 1 for index, timestamp, _ in calls)
+    assert all(timestamp == remaining_times[index] for index, timestamp, _ in calls)
+    expected_times = sampling_times if registered_timestamps else remaining_times
+    assert sorted(takescreens.capture_timestamps(tmp_path, release_id, "main", original_slots=True)) == sorted(expected_times)
     inventory = takescreens.manifest_files(tmp_path, release_id, "main")
     assert len(result) == len(inventory) == 12
     assert set(result) == {str(path) for path in inventory}
@@ -616,7 +622,10 @@ async def test_video_retake_preserves_original_until_replacement_is_valid(monkey
         Path(image).write_bytes(b"x" * 50000)
         return index, image
 
-    def register_stub(_base_dir, _uuid, paths, _group):
+    def register_stub(_base_dir, _uuid, paths, _group, **_kwargs):
+        if paths:
+            assert _kwargs["timestamps"] == {str(original): 105.0}
+            assert _kwargs["slot_timestamps"] == {str(original): 100.0}
         registered.extend(paths)
         return []
 

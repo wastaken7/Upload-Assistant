@@ -72,6 +72,7 @@ import threading
 import time
 import traceback
 from collections.abc import Iterable, Mapping
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Protocol, cast
 from urllib.parse import urljoin, urlparse
 
@@ -110,6 +111,7 @@ from src.meta_file import write_meta_file
 from src.qbitwait import Wait
 from src.queuemanage import QueueManager
 from src.rehostimages import check_tracker_image_hosts
+from src.screenshot_manifest import files as manifest_files
 from src.takescreens import TakeScreensManager, download_artwork_from_meta
 from src.temp_paths import artwork_dir, music_release_snapshot_path, screenshots_dir
 from src.torrent_manifest import TorrentManifest
@@ -1009,7 +1011,7 @@ async def _prompt_music_meta(meta: Meta) -> None:
 
 
 def book_screens(meta: Meta, min_successful_uploads: int) -> tuple[int, int]:
-    """Count non-poster PNG screenshots for a BOOK upload and cap the upload minimum.
+    """Count supported BOOK screenshots and cap the upload minimum.
 
     Args:
         meta: The metadata dictionary (needs ``base_dir`` and ``uuid``).
@@ -1017,11 +1019,13 @@ def book_screens(meta: Meta, min_successful_uploads: int) -> tuple[int, int]:
 
     Returns:
         A ``(actual_screens, capped_min)`` tuple where *actual_screens* is the
-        number of non-poster PNGs found and *capped_min* is
+        number of screenshots found and *capped_min* is
         ``min(min_successful_uploads, actual_screens)`` so the upload loop never
         requires more images than actually exist.
     """
-    screenshot_files = list(screenshots_dir(meta.base_dir, meta.uuid).glob("*.png"))
+    screenshot_files = manifest_files(meta.base_dir, meta.uuid, "main")
+    if not screenshot_files:
+        screenshot_files = [path for path in screenshots_dir(meta.base_dir, meta.uuid).iterdir() if path.is_file() and path.suffix.casefold() in {".jpg", ".jpeg", ".png"}]
     actual_screens = len(screenshot_files)
     capped_min = min(min_successful_uploads, actual_screens)
     return actual_screens, capped_min
@@ -1339,7 +1343,6 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
     # Prep normally starts these while metadata and screenshots are being
     # generated. Keep this fallback for paths which bypass normal prep.
     early_artifact_tasks = get_early_artifact_tasks(meta.uuid) or start_early_artifact_tasks(meta, client, config)
-    release_early_artifact_progress(meta.uuid)
     early_base_torrent_task, early_usenet_prepare_task = early_artifact_tasks
 
     filename: str = meta.title
@@ -1870,6 +1873,10 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
     has_local_subs = bool(meta.subtitle_files)
     torrent_manifest = TorrentManifest(meta.base_dir, meta.uuid)
 
+    # Keep background progress hidden while interactive preparation may still
+    # prompt the user. Show it only when this foreground flow must wait for the
+    # early tasks, so a live progress bar cannot obscure an active prompt.
+    release_early_artifact_progress(meta.uuid)
     try:
         await asyncio.gather(early_base_torrent_task, early_usenet_prepare_task)
     finally:
@@ -1890,7 +1897,7 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
             if not reuse_torrent or not Path(reuse_torrent).exists():
                 reuse_torrent = await client.find_existing_torrent(meta)
             if reuse_torrent is not None:
-                await TORRENT_CREATOR.create_base_from_existing_torrent(reuse_torrent, meta.base_dir, meta.uuid)
+                await TORRENT_CREATOR.create_base_from_existing_torrent(reuse_torrent, meta.base_dir, meta.uuid, meta.source_size)
 
         # 2. Re-create base torrents if rehash is True
         if meta.rehash is True and meta.nohash is False:
@@ -1906,7 +1913,7 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
                 and Path(base_reuse_torrent).exists()
                 and (not has_local_subs or client._torrent_has_no_subtitles(base_reuse_torrent))
             ):
-                await TORRENT_CREATOR.create_base_from_existing_torrent(base_reuse_torrent, meta.base_dir, meta.uuid)
+                await TORRENT_CREATOR.create_base_from_existing_torrent(base_reuse_torrent, meta.base_dir, meta.uuid, meta.source_size)
             if torrent_manifest.default_path("base") is None and meta.nohash is False:
                 await TORRENT_CREATOR.create_torrent(meta, Path(cast(str, meta.path)), "BASE")
             if has_local_subs and torrent_manifest.default_path("base_subs") is None and meta.nohash is False:
@@ -2151,6 +2158,7 @@ def load_heavy_globals() -> None:
 
 async def do_the_thing(base_dir: str) -> None:
     from src.api_key_expiry import reset_api_key_expiry_warnings
+    from src.stats import accumulate_upload_durations, configure_stats, record_completed_item_stats_async, record_event_async, record_release_profile_async, set_stats_context
 
     reset_api_key_expiry_warnings()
     load_heavy_globals()
@@ -2174,9 +2182,12 @@ async def do_the_thing(base_dir: str) -> None:
     except Exception as exc:
         logger.warning(f"[yellow]Warning: could not reload config from disk: {exc}[/yellow]")
 
+    configure_stats(config)
+
     from src.prowlarr import ProwlarrError, apply_prowlarr_credentials, configured_prowlarr, fetch_prowlarr_credentials
 
     if prowlarr_connection := configured_prowlarr(config):
+        prowlarr_started = time.monotonic()
         try:
             report = await asyncio.to_thread(
                 fetch_prowlarr_credentials,
@@ -2185,8 +2196,10 @@ async def do_the_thing(base_dir: str) -> None:
                 set(tracker_class_map),
             )
             applied = apply_prowlarr_credentials(config, report)
+            await record_event_async("api", service="prowlarr", operation="credential_sync", outcome="success", duration_ms=(time.monotonic() - prowlarr_started) * 1000)
             logger.debug(f"[green]Prowlarr supplied fallback credentials for {len(applied)} tracker(s).[/green]")
         except ProwlarrError as exc:
+            await record_event_async("api", service="prowlarr", operation="credential_sync", outcome="error", duration_ms=(time.monotonic() - prowlarr_started) * 1000)
             logger.warning(f"[yellow]Prowlarr credential fallback unavailable: {exc}[/yellow]")
 
     await asyncio.sleep(0.1)  # Ensure it's not racing
@@ -2477,6 +2490,8 @@ async def do_the_thing(base_dir: str) -> None:
 
                 meta.path = path
                 meta.uuid = ""
+                set_stats_context(debug=bool(meta.debug), category="")
+                await record_event_async("item", operation="started", outcome="success")
                 _publish_webui_preview_target(path)
 
                 if not path:
@@ -2522,6 +2537,9 @@ async def do_the_thing(base_dir: str) -> None:
             finally:
                 await cancel_and_drain_early_artifact_tasks(meta.uuid)
             if not meta_success:
+                set_stats_context(debug=bool(meta.debug), category=str(meta.category or ""))
+                await record_event_async("item", operation="completed", outcome="error")
+                await record_release_profile_async(meta, "error")
                 if "queue" in meta and meta.queue is not None:
                     processed_files_count += 1
                     skipped_files_count += 1
@@ -2536,12 +2554,14 @@ async def do_the_thing(base_dir: str) -> None:
                 cleanup_manager.reset_terminal()
                 continue
 
+            set_stats_context(debug=bool(meta.debug), category=str(meta.category or ""))
+
             tracker_setup = TrackerSetup(config=config)
             if "we_are_uploading" not in meta or not meta.we_are_uploading:
                 if config["DEFAULT"].get("cross_seeding", True):
                     await process_cross_seeds(meta)
                 if not meta.site_check:
-                    logger.info("we are not uploading.......")
+                    logger.info("No new upload to a tracker was performed.")
                     if "queue" in meta and meta.queue is not None:
                         processed_files_count += 1
                         skipped_files_count += 1
@@ -2747,6 +2767,7 @@ async def do_the_thing(base_dir: str) -> None:
                                                     list(other_api_trackers),
                                                     upload_target="usenet indexer",
                                                 )
+                                                accumulate_upload_durations(meta, meta_usenet, submission_trackers)
                                                 if is_pack_submission:
                                                     for tracker in submission_trackers:
                                                         meta.tracker_status.setdefault(tracker.upper(), {}).update(
@@ -2829,6 +2850,7 @@ async def do_the_thing(base_dir: str) -> None:
                                 list(other_api_trackers),
                                 bandwidth_control=bandwidth_control,
                             )
+                            accumulate_upload_durations(meta, meta_torrent, torrent_trackers)
 
                     async def wait_before_usenet_upload(meta: Meta = meta) -> None:
                         logger.info("\n[yellow]Checking bandwidth before starting Usenet upload...[/yellow]")
@@ -2936,6 +2958,7 @@ async def do_the_thing(base_dir: str) -> None:
 
             # Persist and expose the completed item before user-managed hooks run.
             # Hooks may inspect the final tracker status and files have not yet been cleaned.
+            await record_completed_item_stats_async(meta, tracker_class_map)
             await write_meta_file(meta)
             _publish_webui_preview_target(cast(str, meta.path or ""), meta.uuid or None)
             await run_post_upload_hooks(meta, config)
@@ -3230,8 +3253,21 @@ def run() -> None:
     if hasattr(signal, "SIGTERM"):
         signal.signal(signal.SIGTERM, _handle_shutdown_signal)
 
+    interrupted_executor: ThreadPoolExecutor | None = None
     try:
-        asyncio.run(main())
+        with asyncio.Runner() as runner:
+            executor = ThreadPoolExecutor(thread_name_prefix="asyncio")
+            runner.get_loop().set_default_executor(executor)
+            try:
+                runner.run(main())
+            finally:
+                if (_shutdown_requested or sys.exc_info()[1] is not None) and not _is_webui_mode:
+                    # Cancellation cannot stop a thread blocked in input() or I/O.
+                    # Detach it before Runner.close() waits for the default pool;
+                    # task finalizers can still use the replacement executor.
+                    executor.shutdown(wait=False, cancel_futures=True)
+                    runner.get_loop().set_default_executor(ThreadPoolExecutor(thread_name_prefix="asyncio"))
+                    interrupted_executor = executor
     except KeyboardInterrupt, SystemExit:
         if not _shutdown_requested:
             logger.info("\n[yellow]Shutting down...[/yellow]")
@@ -3256,6 +3292,19 @@ def run() -> None:
 
         if _shutdown_requested or _is_webui_mode:
             logger.info("[green]Shutdown complete[/green]")
+
+        if interrupted_executor is not None:
+            # Give cooperative workers a short grace period after cleanup. A
+            # blocked worker would otherwise be joined forever at Python exit.
+            executor_join = threading.Thread(target=interrupted_executor.shutdown, daemon=True)
+            executor_join.start()
+            executor_join.join(timeout=1.0)
+            if executor_join.is_alive():
+                logging.shutdown()
+                for stream in (sys.stdout, sys.stderr):
+                    with contextlib.suppress(OSError, ValueError):
+                        stream.flush()
+                os._exit(0)
 
         sys.exit(0)
 

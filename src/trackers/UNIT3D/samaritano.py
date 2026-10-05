@@ -1,11 +1,15 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 from typing import Any
 
+from src.console import logger
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
+from src.rehostimages import _download_image_for_rehost, _local_image_path
+from src.tracker_images import ImageCollection, set_tracker_image_collection
 from src.trackers.common import Common
 from src.trackers.UNIT3D import UNIT3D
 from src.trackers.UNIT3D.capybarabr import CapybaraBR
+from src.uploadscreens import upload_image_task_with_stats as upload_image_task
 
 Config = dict[str, Any]
 
@@ -163,6 +167,85 @@ class Samaritano(UNIT3D):
             return True
 
         return await self.common.check_portuguese_video_requirements(meta, self.tracker)
+
+    async def check_image_hosts(self, meta: Meta) -> None:
+        if meta.category == "MUSIC" or meta.skip_imghost_upload:
+            return
+
+        force_rehost = str(self.tracker_config.get("force_rehost_images", False)).strip().lower() in {"1", "true", "yes"}
+        if not force_rehost:
+            return
+
+        api_key = self.tracker_config.get("image_host_api_key")
+        if not isinstance(api_key, str) or not api_key.strip():
+            logger.warning(f"[yellow]{self.tracker}: image host API key not configured, keeping the default image host.[/yellow]")
+            return
+
+        await self.rehost_samaritano_images(meta)
+
+    async def _rehost_collection(self, meta: Meta, collection_name: ImageCollection, items: list[dict[str, Any]]) -> list[dict[str, Any]] | None:
+        if not items:
+            return []
+
+        rehosted_items: list[dict[str, Any]] = []
+
+        for index, item in enumerate(items):
+            if not isinstance(item, dict):
+                return None
+
+            raw_url = item.get("raw_url", "")
+            local_path = await _local_image_path(meta, collection_name, item)
+            if local_path is None and isinstance(raw_url, str) and raw_url:
+                local_path = await _download_image_for_rehost(meta, collection_name, raw_url)
+
+            if local_path is None:
+                logger.warning(f"[yellow]{self.tracker}: cannot locate or download {collection_name} image {index + 1} for rehosting; keeping the default image host.[/yellow]")
+                return None
+
+            upload_result = await upload_image_task((str(local_path), "samaritano", self.config, meta))
+            if upload_result.get("status") != "success":
+                reason = upload_result.get("reason", "unknown error")
+                logger.warning(f"[yellow]{self.tracker}: failed to rehost {collection_name} image {index + 1}: {reason}. Keeping the default image host.[/yellow]")
+                return None
+
+            rehosted_item = dict(item)
+            rehosted_item.update(
+                {
+                    "img_url": upload_result["img_url"],
+                    "raw_url": upload_result["raw_url"],
+                    "web_url": upload_result["web_url"],
+                    "local_file_path": str(local_path),
+                }
+            )
+            rehosted_items.append(rehosted_item)
+
+        return rehosted_items
+
+    async def rehost_samaritano_images(self, meta: Meta) -> None:
+        collections: tuple[ImageCollection, ...] = (
+            "screenshots",
+            "menu_images",
+            "spectrograms_images",
+            "dynamic_hdr_plot_images",
+        )
+        pending: dict[ImageCollection, list[dict[str, Any]]] = {}
+
+        for collection_name in collections:
+            source_name = "image_list" if collection_name == "screenshots" else collection_name
+            source = getattr(meta, source_name, [])
+            if not isinstance(source, list) or not source:
+                continue
+            rehosted = await self._rehost_collection(meta, collection_name, source)
+            if rehosted is None:
+                return
+            pending[collection_name] = rehosted
+
+        for collection_name, rehosted in pending.items():
+            set_tracker_image_collection(meta, self.tracker, collection_name, rehosted)
+
+        if pending:
+            image_count = sum(len(items) for items in pending.values())
+            logger.info(f"[green]{self.tracker}: Successfully rehosted {image_count} images to the tracker image host.[/green]")
 
     async def get_description(self, meta: Meta) -> dict[str, str]:
         signature = f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=4]Compartilhado com {meta.ua_name} {meta.current_version} (fork)[/size][/url][/right]"

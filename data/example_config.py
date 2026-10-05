@@ -115,6 +115,11 @@ config: dict[str, Any] = {
         # "injecting_client_list": ["qbittorrent", "rtorrent"],
         # Clients searched for existing torrents:
         # "searching_client_list": ["qbittorrent", "qbittorrent_searching"],
+        # --- LOCAL STATISTICS ---
+        # Store privacy-preserving daily aggregates for the Stats Web UI. No media
+        # names, paths, external IDs, URLs, or credentials are stored. Opt in by
+        # changing this setting to True.
+        "stats_enabled": False,
         # --- METADATA CACHING ---
         # Public metadata cache
         # Cache responses from sites such as TMDB and IMDb for reuse in future runs, reducing API requests.
@@ -221,7 +226,7 @@ config: dict[str, Any] = {
         "prowlarr_api_key": "",
         # --- IMAGE HOSTING ---
         # Order of image hosts, with the primary host first and backups after it.
-        # Available image hosts: dalexni, imgbb, imgbox, lensdump, lostimg, midnightscene, onlyimage, passtheimage, pixhost, ptscreens, seedpool_cdn, sharex, utppm, zipline
+        # Available image hosts: catbox, dalexni, imgbb, imgbox, lensdump, lostimg, midnightscene, onlyimage, passtheimage, pixhost, ptscreens, seedpool_cdn, sharex, utppm, zipline
         "img_host_1": "",
         "img_host_2": "",
         "img_host_3": "",
@@ -239,6 +244,8 @@ config: dict[str, Any] = {
         # Minimum number of successful image uploads required to continue.
         "min_successful_image_uploads": "3",
         # Image-host credentials
+        # Optional Catbox userhash. Leave blank for anonymous uploads.
+        "catbox_userhash": "",
         "dalexni_api": "",
         "imgbb_api": "",
         "lensdump_api": "",
@@ -2844,6 +2851,10 @@ config: dict[str, Any] = {
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
             "use_for_search": False,
             "api_key": "",
+            # API key for the tracker-only image host at https://img.samaritano.cc/
+            "image_host_api_key": "",
+            # Rehost this tracker's images on img.samaritano.cc. Failures keep the default image host.
+            "force_rehost_images": False,
             "anon": True,
             # Set this to True if you want to allow external subtitles to be included in the upload
             "allow_ext_subtitles": True,
