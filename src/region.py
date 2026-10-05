@@ -2686,6 +2686,8 @@ async def get_mediainfo_service(meta: Meta) -> tuple[str, str]:
         if not isinstance(track, dict):
             continue
         if track.get("@type") == "Video":
+            if track.get("Encoded_Library_Settings"):
+                return "", ""
             nominal = track.get("BitRate_Nominal") or track.get("NominalBitRate")
             video_match |= _mediainfo_number(nominal) == 10000000
         elif track.get("@type") == "Audio" and track.get("Format") == "E-AC-3":

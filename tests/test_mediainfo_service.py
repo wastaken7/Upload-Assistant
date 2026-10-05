@@ -28,6 +28,19 @@ async def test_amazon_signatures(channels, bitrate, key, nominal):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize('settings,expected', [
+    (None, ('AMZN', 'Amazon')),
+    ('', ('AMZN', 'Amazon')),
+    ({}, ('AMZN', 'Amazon')),
+    ('cabac=1 / ref=4 / crf=18.0', ('', '')),
+])
+async def test_amazon_requires_missing_encoding_settings(settings, expected):
+    meta = metadata()
+    meta.mediainfo['media']['track'][2]['Encoded_Library_Settings'] = settings
+    assert await get_mediainfo_service(meta) == expected
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize('key', ['BitRate_Nominal', 'NominalBitRate'])
 async def test_amazon_signature_after_export(key, tmp_path, monkeypatch):
     meta = metadata()
