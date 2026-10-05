@@ -5,9 +5,11 @@ import json
 import sys
 from collections import Counter
 from pathlib import Path
+from random import Random
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from PIL import Image
 
 from src import prep_helpers, takescreens
 from src.meta import Meta
@@ -404,7 +406,7 @@ def test_screenshots_sets_tonemapped_when_reusing_existing_screenshots(tmp_path:
     )
     for index in range(2):
         image = screenshot_dir / f"title-{index}.png"
-        image.write_bytes(b"image")
+        Image.frombytes("RGB", (256, 256), Random(index).randbytes(256 * 256 * 3)).save(image)
     meta = Meta(category="MOVIE", base_dir=str(tmp_path), uuid=release_id, screens=2, hdr="HDR10", imghost="imgbb")
 
     with (
