@@ -1,5 +1,8 @@
+import json
+
 import pytest
 
+from src.exportmi import export_info
 from src.meta import Meta
 from src.region import get_mediainfo_service
 
@@ -21,6 +24,23 @@ async def test_amazon_signatures(channels, bitrate, key, nominal):
     meta = metadata()
     meta.mediainfo['media']['track'][0].update(Channels=channels, BitRate=bitrate)
     meta.mediainfo['media']['track'][2] = {'@type': 'Video', key: nominal}
+    assert await get_mediainfo_service(meta) == ('AMZN', 'Amazon')
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('key', ['BitRate_Nominal', 'NominalBitRate'])
+async def test_amazon_signature_after_export(key, tmp_path, monkeypatch):
+    meta = metadata()
+    meta.mediainfo['media']['track'][2] = {'@type': 'Video', key: '10000000'}
+    report = json.dumps(meta.mediainfo)
+    (tmp_path / 'tmp' / 'release').mkdir(parents=True)
+
+    def fake_parse(_video, *, output, **_kwargs):
+        return report if output == 'JSON' else 'General\n'
+
+    monkeypatch.setattr('src.exportmi.MediaInfo.parse', fake_parse)
+    meta.mediainfo = await export_info('example.mkv', False, 'release', str(tmp_path))
+
     assert await get_mediainfo_service(meta) == ('AMZN', 'Amazon')
 
 
