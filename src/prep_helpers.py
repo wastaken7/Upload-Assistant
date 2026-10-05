@@ -1689,6 +1689,8 @@ async def finalize_metadata(
         # MediaInfo signatures are weaker evidence than explicit, filename or NFO services.
         if not meta.service:
             meta.service, meta.service_longname = await get_mediainfo_service(meta)
+            if meta.service:
+                logger.info(f"[green]Detected {meta.service} ({meta.service_longname}) from MediaInfo signature[/green]")
 
         # Combine genres from TMDB and IMDb
         tmdb_genres = meta.genres or []
