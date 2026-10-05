@@ -2005,6 +2005,7 @@ async def screenshots(
 
     test_time = str(ss_times[0] if ss_times else 0)
     hdr_tonemap = False
+    tonemapping_checked = bool(capture_indices)
     if capture_indices:
         hdr_tonemap = await determine_tonemapping(w_sar, h_sar, width, height, path, test_time, test_image_path, loglevel, meta)
     elif tone_map and any(marker in meta.hdr for marker in ("HDR", "DV", "HLG")):
@@ -2130,6 +2131,9 @@ async def screenshots(
                     retake = True
 
         if retake:
+            if not tonemapping_checked:
+                hdr_tonemap = await determine_tonemapping(w_sar, h_sar, width, height, path, test_time, test_image_path, loglevel, meta)
+                tonemapping_checked = True
             retry_attempts = 5
             retry_offsets = [5.0, 10.0, -10.0, 100.0, -100.0]
             retry_image = str(Path(image_path).with_name(f"{Path(image_path).stem}-retry.png"))

@@ -642,3 +642,32 @@ async def test_video_retake_preserves_original_until_replacement_is_valid(monkey
     assert original.read_bytes() == (b"y" * 80000 if retry_succeeds else b"x" * 50000)
     assert not Path(attempts[0]).exists()
     assert registered == ([str(original)] if retry_succeeds else [])
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("tone_map", "force_tonemap"), [(False, True), (True, False)])
+async def test_recovered_frame_retake_honors_tonemapping(monkeypatch, tmp_path, tone_map, force_tonemap):
+    release_id = "recovered-tonemap"
+    screenshot_dir = takescreens.screenshots_dir(tmp_path, release_id)
+    (screenshot_dir.parent / "MediaInfo.json").write_text(
+        json.dumps({"media": {"track": [{"Duration": 600}, {"Duration": 600, "Width": 256, "Height": 256, "FrameRate": 24}]}}), encoding="utf-8"
+    )
+    Image.new("RGB", (256, 256)).save(screenshot_dir / "Video-0.png")
+    calls = []
+
+    async def capture_stub(args):
+        calls.append(args)
+        Image.frombytes("RGB", (256, 256), Random(0).randbytes(256 * 256 * 3)).save(args[3])
+        return args[0], args[3]
+
+    monkeypatch.setattr(takescreens, "tone_map", tone_map)
+    monkeypatch.setattr(takescreens, "use_libplacebo", False)
+    monkeypatch.setattr(takescreens, "capture_screenshot", capture_stub)
+    meta = Meta(category="MOVIE", base_dir=str(tmp_path), uuid=release_id, screens=1, hdr="HDR10", force_tonemap=force_tonemap, imghost="ptscreens")
+
+    result = await takescreens.screenshots("source.mkv", "Video", release_id, str(tmp_path), meta, cleanup_after_capture=False)
+
+    assert len(calls) == len(result) == 1
+    assert Path(calls[0][3]).name == "Video-0-retry.png"
+    assert calls[0][-2] is True
+    assert meta.tonemapped is True
