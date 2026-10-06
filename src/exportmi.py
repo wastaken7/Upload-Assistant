@@ -272,6 +272,7 @@ async def export_info(
                         "CodecID": track.get("CodecID", {}),
                         "CodecID_Hint": track.get("CodecID_Hint", {}),
                         "Duration": track.get("Duration", {}),
+                        "BitRate_Mode": track.get("BitRate_Mode", {}),
                         "BitRate": track.get("BitRate", {}),
                         "BitRate_Nominal": track.get("BitRate_Nominal", {}),
                         "NominalBitRate": track.get("NominalBitRate", {}),

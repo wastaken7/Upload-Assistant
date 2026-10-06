@@ -2690,7 +2690,7 @@ async def get_mediainfo_service(meta: Meta) -> tuple[str, str]:
             if track.get("Encoded_Library_Settings"):
                 return "", ""
             nominal = track.get("BitRate_Nominal") or track.get("NominalBitRate")
-            video_match |= _mediainfo_number(nominal) == 10000000
+            video_match |= track.get("BitRate_Mode") == "CBR" and _mediainfo_number(nominal) == 10000000
         elif track.get("@type") == "Audio" and track.get("Format") == "E-AC-3":
             audio_match |= (_mediainfo_number(track.get("Channels")), _mediainfo_number(track.get("BitRate"))) in ((2, 224000), (6, 640000))
     if video_match and audio_match:
