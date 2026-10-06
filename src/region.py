@@ -2280,6 +2280,7 @@ async def get_service(
         "HoiChoi": "HoiChoi",
         "Hotstar": "HTSR",
         "HPLAY": "HPLAY",
+        "HRTi": "HRTi",
         "HS": "HTSR",
         "HSTR": "HTSR",
         "HTSR": "HTSR",

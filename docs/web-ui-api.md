@@ -2,13 +2,15 @@
 
 This document summarizes the WebUI HTTP API implemented in `web_ui/server.py`. For each endpoint it lists HTTP methods, authentication and CSRF requirements, accepted payload or query parameters, special rules, and example response shapes. For normal browser usage, see the [WebUI guide](web-ui.md).
 
+See the guide's [Request limits](web-ui.md#request-limits) table for all default limits, endpoint overrides, and exemptions. Routes without an override allow 50 requests per hour and 200 per day, counted separately per endpoint and client IP. Explicit endpoint limits replace those defaults.
+
 ---
 
 ### /api/health
 
 - Methods: GET
 - Auth: none
-- Rate limit: 70 per hour (keyed by get_remote_address)
+- Rate limit: exempt
 - Description: basic health check
 - Response: {"status": "healthy", "success": true, "message": "..."}
 
@@ -130,9 +132,19 @@ Notes:
 
 - Methods: GET
 - Auth: requires either a valid Bearer API token (programmatic use) OR a logged-in web session + CSRF + Origin (same-origin). Bearer tokens are allowed without CSRF; session callers must provide `X-CSRF-Token` and same-origin headers.
+- Rate limit: 600 per minute; replaces the default hourly and daily quotas
 - Query params: path (filesystem path within configured browse roots)
-- Description: lists files and subfolders in resolved path; skips unsupported video extensions and hidden files
+- Description: lists non-hidden files and folders in the resolved path; `filter=desc` limits files to supported description formats
 - Response: {"items": [...], "success": true, "path": "...", "count": N}
+
+### /api/browse_search
+
+- Methods: GET
+- Auth: same Bearer-token or authenticated-session requirements as `/api/browse`
+- Rate limit: 60 per minute; replaces the default hourly and daily quotas
+- Query params: `q` (search text), optional `filter` and `max_results` (default 100, maximum 500)
+- Description: recursively searches the configured browse roots for matching files and folders
+- Response: {"items": [...], "success": true, "query": "...", "count": N, "truncated": true|false}
 
 ---
 
@@ -201,7 +213,8 @@ The following endpoints via a valid web session.
 ### /api/browse_roots
 
 - Methods: GET
-- Auth: none required; if a Bearer token is provided it must be valid
+- Auth: requires an authenticated request; if a Bearer token is provided it must be valid
+- Rate limit: exempt
 - Description: returns configured browse root directories
 - Response: {"items": [{"name":"...","path":"...","type":"folder"}], "success": true}
 
@@ -230,7 +243,7 @@ The following endpoints via a valid web session.
 
 - Methods: GET, POST
 - Auth: requires web session + CSRF + Origin (disallows bearer token)
-- Rate limit: POST is limited to 30 checks per hour; GET only reads the in-memory cache
+- Rate limit: POST allows 30 checks per hour; GET inherits the default 50 per hour and 200 per day
 - POST payload: {"trackers": ["AITHER", "BLUTOPIA"]}
 - Description: GET returns cached tracker website-reachability results. POST refreshes the named supported trackers concurrently without using credentials or downloading response bodies. Results expire after 15 minutes and are advisory only.
 - Response: {"success": true, "cache_seconds": 900, "statuses": {"AITHER": {"state": "available", "message": "...", "checked_at": "...", "stale": false}}}. Issue and unavailable results can also include a machine-readable `reason`, such as `timeout`, `connection`, `rate_limit`, or `server_error`.
@@ -271,4 +284,4 @@ Notes & security model summary:
 
 - Web session authentication (login + encrypted session cookie) is required for any endpoints that modify server state (config, tokens, IP lists, enabling/disabling 2FA). Bearer tokens are intended for programmatic calls and are accepted only on a subset of read/execute endpoints; tokens are validated as valid/invalid (no per-token scope enforcement).
 - CSRF protection: state-changing endpoints invoked from the browser require a per-session CSRF token passed in a header (see `/api/csrf_token`). Token management endpoints explicitly disallow Basic/Bearer auth to ensure management is performed from the authenticated UI with CSRF protection.
-- Rate limits: enforced for interactive/execution endpoints (see endpoints above). The limiter key function distinguishes authenticated sessions from unauthenticated callers.
+- Rate limits: defaults apply to routes without an override or exemption. Counters are separate per endpoint and client IP; most explicitly limited API routes also distinguish authenticated and unauthenticated requests. See [Request limits](web-ui.md#request-limits) for the full table and HTTP 429 behaviour.
