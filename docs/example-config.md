@@ -189,11 +189,29 @@ These can be [overridden per-tracker](#tracker-overridable-settings) by adding t
 - `image_tag_blacklist` (list[str]): Tracker-specific screenshot attributes rejected by this tracker. Any listed tag excludes the image; this setting is read from the tracker block and is not inherited from `DEFAULT`.
 - `tonemapped_header` (str): BBCode header added for tone-mapped releases.
 - `custom_signature` (str): BBCode signature appended at bottom of description.
-- `tag_overrides` (dict): Per-release-group overrides for these text fields. The
+- `tag_overrides` (dict): Per-release-group overrides for description presentation settings. The
   group key is matched against `meta.tag` case-insensitively and may be written
   with or without its leading hyphen. A tracker-level `tag_overrides` entry has
   precedence over a `DEFAULT` entry; unspecified fields use their normal
-  tracker/default value.
+  tracker/default value. `None` inherits the next source; `False` and `0`
+  are explicit overrides. Priority per field: tracker group, DEFAULT group,
+  ordinary tracker setting, ordinary DEFAULT setting.
+
+  In addition to the text fields above, supported options are:
+  `thumbnail_size`, `screens_per_row`, `pack_thumb_size`, `multiScreens`,
+  `logo_size`, `bluray_image_size`, `episode_overview`, `add_logo`,
+  `full_mediainfo`, `add_bluray_link`, `use_bluray_images`,
+  `add_audio_spectrogram`, `add_dynamic_hdr_plot`, and
+  `hide_screenshot_header_if_only_section`. Numbers may be integers or
+  numeric strings; booleans may be Python booleans or boolean strings.
+
+  These overrides control description rendering. Images and episode data
+  must already be available from preparation; enabling a rendering option
+  does not generate or fetch missing assets. Explicit command-line flags
+  and tracker-specific formats/limits retain their existing behavior.
+  For example, TorrentLeech still uses two screenshots per row and its
+  fixed thumbnail width. Tracker limits (`charLimit`, `fileLimit`,
+  `processLimit`) are not release-group overrides.
 
   Default overrides apply to every tracker that supports the description field:
 
@@ -204,6 +222,9 @@ These can be [overridden per-tracker](#tracker-overridable-settings) by adding t
               "MyAwesomeGroupTag": {
                   "custom_signature": "[center]Group signature[/center]",
                   "screenshot_header": "[h2]Group screenshots[/h2]",
+                  "thumbnail_size": "400",
+                  "screens_per_row": "3",
+                  "episode_overview": False,
               },
           },
       },

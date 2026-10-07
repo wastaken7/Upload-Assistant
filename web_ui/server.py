@@ -2705,6 +2705,7 @@ class ConfigItem(TypedDict, total=False):
     help: list[str]
     subsection: str | bool
     override_fields: list[ConfigItem]
+    field_type: str
 
 
 class ConfigSection(TypedDict, total=False):
@@ -3350,6 +3351,24 @@ _RELEASE_GROUP_OVERRIDE_FIELDS = (
     "tonemapped_header",
     "custom_signature",
 )
+_RELEASE_GROUP_BOOL_FIELDS = (
+    "episode_overview",
+    "add_logo",
+    "full_mediainfo",
+    "add_bluray_link",
+    "use_bluray_images",
+    "add_audio_spectrogram",
+    "add_dynamic_hdr_plot",
+    "hide_screenshot_header_if_only_section",
+)
+_RELEASE_GROUP_INT_FIELDS = (
+    "thumbnail_size",
+    "screens_per_row",
+    "logo_size",
+    "bluray_image_size",
+    "pack_thumb_size",
+    "multiScreens",
+)
 
 
 def _is_release_group_override_path(path: list[str]) -> bool:
@@ -3371,8 +3390,23 @@ def _validate_release_group_overrides(value: object) -> None:
         seen.add(normalized_name)
         if not isinstance(fields, dict):
             raise ValueError(f"Overrides for {name} must be a dictionary.")
-        for field, text in fields.items():
-            if not isinstance(field, str) or not field or (text is not None and not isinstance(text, str)):
+        for field, field_val in fields.items():
+            if not isinstance(field, str) or not field:
+                raise ValueError(f"Overrides for {name} need non-empty field names.")
+            if field_val is None:
+                continue
+            if field in _RELEASE_GROUP_BOOL_FIELDS:
+                if isinstance(field_val, bool) or (isinstance(field_val, str) and field_val.strip().lower() in ("true", "false", "1", "0", "yes", "no", "on", "off")):
+                    continue
+                raise ValueError(f"{field} for {name} must be a boolean or null.")
+            if field in _RELEASE_GROUP_INT_FIELDS:
+                try:
+                    if isinstance(field_val, bool) or not isinstance(field_val, (str, int)) or int(field_val) < 0:
+                        raise ValueError
+                except (ValueError, TypeError):  # fmt: skip
+                    raise ValueError(f"{field} for {name} must be a non-negative integer or null.") from None
+                continue
+            if not isinstance(field_val, str):
                 raise ValueError(f"Overrides for {name} must contain text fields or null values.")
 
 
@@ -3438,7 +3472,15 @@ def _build_config_items(
                 "source": "config" if key in user_dict else "example",
                 "children": [],
                 "help": help_text or comments_map.get("DEFAULT/tag_overrides", []),
-                "override_fields": [{"key": field, "help": comments_map.get(f"DEFAULT/{field}", [])} for field in _RELEASE_GROUP_OVERRIDE_FIELDS],
+                "override_fields": [
+                    {"key": field, "field_type": field_type, "help": comments_map.get(f"DEFAULT/{field}", [])}
+                    for fields, field_type in (
+                        (_RELEASE_GROUP_OVERRIDE_FIELDS, "text"),
+                        (_RELEASE_GROUP_BOOL_FIELDS, "boolean"),
+                        (_RELEASE_GROUP_INT_FIELDS, "number"),
+                    )
+                    for field in fields
+                ],
             }
         elif isinstance(example_value, Mapping) or isinstance(user_value, Mapping):
             example_value = _as_dict(example_value) or {}
