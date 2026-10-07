@@ -203,3 +203,26 @@ def test_updates_require_authenticated_same_origin_session(config_files, monkeyp
 
     assert actual_status == status
     assert config_path.read_bytes() == original
+
+
+@pytest.mark.parametrize("field", ["thumbnail_size", "pack_thumb_size", "logo_size", "bluray_image_size"])
+@pytest.mark.parametrize("value", [0, "0", -1, "", True])
+def test_invalid_image_sizes_do_not_modify_config(config_files, field, value):
+    _, config_path = config_files
+    original = config_path.read_bytes()
+    _, status = update(["DEFAULT", "tag_overrides"], {"FictionalGroup": {field: value}})
+    assert status == 400
+    assert config_path.read_bytes() == original
+
+
+@pytest.mark.parametrize("field,minimum", [("thumbnail_size", 1), ("pack_thumb_size", 1), ("logo_size", 1), ("bluray_image_size", 1), ("screens_per_row", 0), ("multiScreens", 0)])
+def test_numeric_bounds_match_editor_and_allow_minimum(config_files, field, minimum):
+    _, config_path = config_files
+    for value in (minimum, str(minimum), None):
+        _, status = update(["DEFAULT", "tag_overrides"], {"FictionalGroup": {field: value}})
+        assert status == 200
+        saved = server._load_config_from_file(config_path)
+        assert saved["DEFAULT"]["tag_overrides"]["FictionalGroup"][field] == value
+    items = server._build_config_items({"tag_overrides": {}}, {}, {}, {}, ["DEFAULT"])
+    metadata = next(entry for entry in items[0]["override_fields"] if entry["key"] == field)
+    assert metadata["field_min"] == minimum

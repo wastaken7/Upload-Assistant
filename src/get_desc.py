@@ -401,10 +401,11 @@ class DescriptionBuilder:
 
     def _get_tag_override(self, key: str, meta: Meta | None) -> Any:
         """Return a tag-specific value, preserving false and zero overrides."""
-        if not meta or not meta.tag:
+        tag_value = getattr(meta, "tag", "")
+        if not tag_value:
             return None
 
-        tag = str(meta.tag).strip().lstrip("-").casefold()
+        tag = str(tag_value).strip().lstrip("-").casefold()
         if not tag:
             return None
 

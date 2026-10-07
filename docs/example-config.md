@@ -203,7 +203,11 @@ These can be [overridden per-tracker](#tracker-overridable-settings) by adding t
   `full_mediainfo`, `add_bluray_link`, `use_bluray_images`,
   `add_audio_spectrogram`, `add_dynamic_hdr_plot`, and
   `hide_screenshot_header_if_only_section`. Numbers may be integers or
-  numeric strings; booleans may be Python booleans or boolean strings.
+  numeric strings. Image sizes (`thumbnail_size`, `pack_thumb_size`,
+  `logo_size`, `bluray_image_size`) must be at least 1; `screens_per_row`
+  and `multiScreens` also accept 0. Clearing an image-size override in the
+  editor restores a positive inherited value, or 1 if none is available.
+  Booleans may be Python booleans or boolean strings.
 
   These overrides control description rendering. Images and episode data
   must already be available from preparation; enabling a rendering option

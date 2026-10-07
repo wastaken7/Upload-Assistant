@@ -25,11 +25,18 @@ babel.traverse(ast, {
 });
 assert.ok(blurHandler, "Release group inputs need a blur handler");
 
-function blur(fieldType, value) {
+function blur(
+  fieldType,
+  value,
+  key = "screens_per_row",
+  minimum = 0,
+  inheritedValue = 400,
+) {
   const changes = [];
-  const values = { thumbnail_size: value, custom_signature: "Saved signature" };
+  const values = { [key]: value, custom_signature: "Saved signature" };
   const context = vm.createContext({
-    field: { key: "thumbnail_size", field_type: fieldType },
+    field: { key, field_type: fieldType, field_min: minimum },
+    inherited: { value: inheritedValue },
     name: "FictionalGroup",
     groups: { FictionalGroup: values, OtherGroup: { screens_per_row: 3 } },
     values,
@@ -47,7 +54,7 @@ test("clearing a numeric group override resets it to zero on blur and preserves 
   assert.deepEqual(blur("number", ""), [
     {
       FictionalGroup: {
-        thumbnail_size: 0,
+        screens_per_row: 0,
         custom_signature: "Saved signature",
       },
       OtherGroup: { screens_per_row: 3 },
@@ -60,4 +67,27 @@ test("blur preserves numeric edits including zero and intentional blank text", (
     assert.deepEqual(blur("number", value), []);
   }
   assert.deepEqual(blur("text", ""), []);
+});
+
+test("empty image sizes restore a positive inherited size instead of zero", () => {
+  for (const key of [
+    "thumbnail_size",
+    "pack_thumb_size",
+    "logo_size",
+    "bluray_image_size",
+  ]) {
+    for (const [inherited, expected] of [
+      [400, 400],
+      ["300", 300],
+      [0, 1],
+      ["", 1],
+      ["invalid", 1],
+    ]) {
+      assert.equal(
+        blur("number", "", key, 1, inherited)[0].FictionalGroup[key],
+        expected,
+      );
+    }
+    assert.deepEqual(blur("number", "400", key, 1), []);
+  }
 });

@@ -2706,6 +2706,7 @@ class ConfigItem(TypedDict, total=False):
     subsection: str | bool
     override_fields: list[ConfigItem]
     field_type: str
+    field_min: int
 
 
 class ConfigSection(TypedDict, total=False):
@@ -3370,6 +3371,8 @@ _RELEASE_GROUP_INT_FIELDS = (
     "multiScreens",
 )
 
+_RELEASE_GROUP_IMAGE_SIZE_FIELDS = {"thumbnail_size", "pack_thumb_size", "logo_size", "bluray_image_size"}
+
 
 def _is_release_group_override_path(path: list[str]) -> bool:
     """Identify the complete DEFAULT or tracker-specific release-group mapping."""
@@ -3400,11 +3403,12 @@ def _validate_release_group_overrides(value: object) -> None:
                     continue
                 raise ValueError(f"{field} for {name} must be a boolean or null.")
             if field in _RELEASE_GROUP_INT_FIELDS:
+                minimum = 1 if field in _RELEASE_GROUP_IMAGE_SIZE_FIELDS else 0
                 try:
-                    if isinstance(field_val, bool) or not isinstance(field_val, (str, int)) or int(field_val) < 0:
+                    if isinstance(field_val, bool) or not isinstance(field_val, (str, int)) or int(field_val) < minimum:
                         raise ValueError
                 except (ValueError, TypeError):  # fmt: skip
-                    raise ValueError(f"{field} for {name} must be a non-negative integer or null.") from None
+                    raise ValueError(f"{field} for {name} must be an integer of at least {minimum}, or null.") from None
                 continue
             if not isinstance(field_val, str):
                 raise ValueError(f"Overrides for {name} must contain text fields or null values.")
@@ -3473,7 +3477,12 @@ def _build_config_items(
                 "children": [],
                 "help": help_text or comments_map.get("DEFAULT/tag_overrides", []),
                 "override_fields": [
-                    {"key": field, "field_type": field_type, "help": comments_map.get(f"DEFAULT/{field}", [])}
+                    {
+                        "key": field,
+                        "field_type": field_type,
+                        "field_min": 1 if field in _RELEASE_GROUP_IMAGE_SIZE_FIELDS else 0,
+                        "help": comments_map.get(f"DEFAULT/{field}", []),
+                    }
                     for fields, field_type in (
                         (_RELEASE_GROUP_OVERRIDE_FIELDS, "text"),
                         (_RELEASE_GROUP_BOOL_FIELDS, "boolean"),

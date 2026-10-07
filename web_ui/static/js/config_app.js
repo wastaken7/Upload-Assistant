@@ -4041,14 +4041,15 @@ function ReleaseGroupOverrides({
       const value =
         draftCache.current.get(pathKey)?.get(name)?.get(key) ??
         inheritedField(name, key).value;
-      const fieldType = fields.find((field) => field.key === key)?.field_type;
+      const field = fields.find((field) => field.key === key);
+      const fieldType = field?.field_type;
       nextValues[key] =
         fieldType === "boolean"
           ? ["true", "1", "yes", "on"].includes(
               String(value).trim().toLowerCase(),
             )
           : fieldType === "number" && value === ""
-            ? 0
+            ? field.field_min
             : value;
     } else {
       // Remember disabled values only for this editing session, outside the saved map.
@@ -4402,7 +4403,7 @@ function ReleaseGroupOverrides({
                                     }
                                     min={
                                       field.field_type === "number"
-                                        ? 0
+                                        ? field.field_min
                                         : undefined
                                     }
                                     step={
@@ -4438,7 +4439,17 @@ function ReleaseGroupOverrides({
                                       ) {
                                         updateGroups({
                                           ...groups,
-                                          [name]: { ...values, [field.key]: 0 },
+                                          [name]: {
+                                            ...values,
+                                            [field.key]:
+                                              field.field_min > 0
+                                                ? Math.max(
+                                                    field.field_min,
+                                                    Number(inherited.value) ||
+                                                      field.field_min,
+                                                  )
+                                                : 0,
+                                          },
                                         });
                                       }
                                     }}
