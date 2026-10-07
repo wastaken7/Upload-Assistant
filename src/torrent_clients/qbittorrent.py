@@ -705,21 +705,28 @@ class QbittorrentClientMixin:
         remote_path: str,
         client: dict[str, Any],
         _is_disc: str,
-        filelist: list[str],
+        filelist: list[str],  # noqa: ARG002 - retained for caller compatibility
         meta: Meta,
         tracker: str,
         cross: bool = False,
     ) -> None:
         qbt_proxy_url = ""
-        if meta.keep_folder:
-            path = str(Path(path).parent)
-        else:
-            isdir = Path(path).is_dir()
-            if len(filelist) != 1 or not isdir:
-                path = str(Path(path).parent)
+        # The torrent layout, rather than the video count, determines whether
+        # qBittorrent appends a root directory (e.g. a video plus subtitles).
+        multi_file = torrent.mode == "multifile"
+        content_path = Path(path)
+        if content_path.is_file():
+            content_path = content_path.parent
+        content_layout = client.get("content_layout", "Original")
+        path = str(content_path.parent if multi_file and content_layout != "NoSubfolder" else content_path)
 
         # Get the appropriate source path
-        src = meta.filelist[0] if len(meta.filelist) == 1 and Path(meta.filelist[0]).is_file() and not meta.keep_folder else meta.path
+        if multi_file:
+            src = str(content_path)
+        elif len(meta.filelist) == 1 and Path(meta.filelist[0]).is_file():
+            src = meta.filelist[0]
+        else:
+            src = meta.path
 
         if not src:
             error_msg = "[red]No source path found in meta."
@@ -839,6 +846,8 @@ class QbittorrentClientMixin:
 
             if cross:
                 linking_success = await create_cross_seed_links(meta=meta, torrent=torrent, tracker_dir=tracker_dir, use_hardlink=use_hardlink)
+            elif multi_file:
+                linking_success = await _link_torrent_files(torrent, content_path, Path(tracker_dir), use_hardlink)
             else:
                 src_name = Path(src.rstrip(os.sep)).name
                 dst = Path(tracker_dir) / src_name
@@ -854,6 +863,9 @@ class QbittorrentClientMixin:
                 return
         elif cross:
             logger.info("[cyan]Using original content path for cross-seed (no linking required).[/cyan]")
+
+        if multi_file and not (use_symlink or use_hardlink) and content_layout != "NoSubfolder" and content_path.parent / torrent.name != content_path:
+            raise ValueError(f"Torrent root {torrent.name!r} does not match source directory {content_path.name!r}; linking is required")
 
         proxy_url = client.get("qui_proxy_url")
         qbt_client = None
@@ -875,7 +887,7 @@ class QbittorrentClientMixin:
         if use_symlink or use_hardlink:
             if tracker_dir is None:
                 raise ValueError("Linking enabled but tracker_dir was not set")
-            save_path = str(tracker_dir)  # Default to linked directory
+            save_path = str(Path(tracker_dir) / torrent.name if multi_file and content_layout == "NoSubfolder" else tracker_dir)
         else:
             save_path = str(path)  # Default to the original path
 
@@ -892,7 +904,6 @@ class QbittorrentClientMixin:
             auto_management = any(is_path_under(path, each) for each in coerce_str_list(am_config))
 
         qbt_category = client["qbit_cross_cat"] if cross and client.get("qbit_cross_cat") else client.get("qbit_cat") if not meta.qbit_cat else meta.qbit_cat
-        content_layout = client.get("content_layout", "Original")
         logger.debug(f"qbt_category: {qbt_category}")
         logger.debug(f"Content Layout: {content_layout}")
         logger.debug(f"[bold yellow]qBittorrent save path: {save_path}")
@@ -1922,6 +1933,35 @@ async def match_tracker_url(tracker_urls: list[str], meta: Meta) -> None:
         if tracker_id not in remove_trackers:
             remove_trackers.append(tracker_id)
     logger.debug(f"[bold cyan]Storing matched tracker IDs for later removal: {remove_trackers}")
+
+
+async def _link_torrent_files(torrent: Torrent, source_root: Path, tracker_dir: Path, use_hardlink: bool) -> bool:
+    """Link the torrent's exact files without exposing a shared source directory."""
+    links: list[tuple[Path, Path]] = []
+    source_base = source_root.resolve()
+    destination_base = tracker_dir.resolve()
+    for file in torrent.files:
+        relative_path = Path(str(file))
+        try:
+            source = source_root / relative_path.relative_to(torrent.name)
+        except ValueError:
+            return False
+        destination = tracker_dir / relative_path
+        if not source.resolve().is_relative_to(source_base) or not destination.parent.resolve().is_relative_to(destination_base):
+            logger.info("[bold red]Refusing to create torrent links outside the source or destination directory")
+            return False
+        if not source.is_file():
+            logger.info(f"[bold red]Torrent source file is missing: {source}")
+            return False
+        if (destination.is_symlink() or destination.exists()) and (not destination.exists() or not source.samefile(destination)):
+            logger.info(f"[bold red]Torrent link destination already contains a different file: {destination}")
+            return False
+        links.append((source, destination))
+
+    for source, destination in links:
+        if not await async_link_directory(src=str(source), dst=destination, use_hardlink=use_hardlink):
+            return False
+    return bool(links)
 
 
 async def create_cross_seed_links(meta: Meta, torrent: Torrent, tracker_dir: str, use_hardlink: bool) -> bool:

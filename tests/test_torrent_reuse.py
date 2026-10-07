@@ -102,23 +102,29 @@ def test_metadata_keeps_properties_lookup_for_explicit_infohash():
 
 
 @pytest.mark.asyncio
-async def test_base_subs_contains_external_subtitle_with_custom_torrent(tmp_path):
-    video = tmp_path / "release.mkv"
-    subtitle = tmp_path / "release.pt-BR.srt"
+@pytest.mark.parametrize("file_input", [False, True])
+@pytest.mark.parametrize("keep_folder", [False, True])
+@pytest.mark.parametrize("brackets", [False, True])
+async def test_base_subs_contains_external_subtitle_with_custom_torrent(tmp_path, file_input, keep_folder, brackets):
+    release = tmp_path / ("Fictional.Movie.[2025]" if brackets else "Fictional.Movie.2025")
+    release.mkdir()
+    video = release / ("release.[GROUP].mkv" if brackets else "release.mkv")
+    subtitle = release / ("release.[pt-BR].srt" if brackets else "release.pt-BR.srt")
     video.write_bytes(b"video data")
     subtitle.write_text("subtitle data", encoding="utf-8")
+    (release / "release.p.srt").write_text("unselected subtitle", encoding="utf-8")
 
     meta = Meta(
         {
             "base_dir": str(tmp_path),
             "uuid": "test-release",
-            "path": str(video),
+            "path": str(video if file_input else release),
             "filelist": [str(video)],
             "subtitle_files": [str(subtitle)],
             "category": "MOVIE",
-            "isdir": False,
+            "isdir": not file_input,
             "is_disc": "",
-            "keep_folder": False,
+            "keep_folder": keep_folder,
             "mkbrr": False,
             "max_piece_size": 1,
             "trackers": [],
@@ -126,7 +132,7 @@ async def test_base_subs_contains_external_subtitle_with_custom_torrent(tmp_path
     )
     (tmp_path / "tmp" / meta.uuid).mkdir(parents=True)
 
-    await TorrentCreator.create_torrent(meta, video, "BASE_SUBS")
+    await TorrentCreator.create_torrent(meta, meta.path, "BASE_SUBS")
 
     from torf import Torrent
 
@@ -135,7 +141,8 @@ async def test_base_subs_contains_external_subtitle_with_custom_torrent(tmp_path
 
 
 @pytest.mark.asyncio
-async def test_base_subs_excludes_unselected_subtitles(tmp_path):
+@pytest.mark.parametrize("file_input", [False, True])
+async def test_base_subs_excludes_unselected_subtitles(tmp_path, file_input):
     video = tmp_path / "release.mkv"
     selected_subtitle = tmp_path / "release.pt-BR.srt"
     unrelated_subtitle = tmp_path / "release.en.srt"
@@ -147,11 +154,11 @@ async def test_base_subs_excludes_unselected_subtitles(tmp_path):
         {
             "base_dir": str(tmp_path),
             "uuid": "selected-subs",
-            "path": str(video),
+            "path": str(video if file_input else tmp_path),
             "filelist": [str(video)],
             "subtitle_files": [str(selected_subtitle)],
             "category": "MOVIE",
-            "isdir": False,
+            "isdir": not file_input,
             "is_disc": "",
             "keep_folder": False,
             "mkbrr": False,
@@ -161,7 +168,7 @@ async def test_base_subs_excludes_unselected_subtitles(tmp_path):
     )
     (tmp_path / "tmp" / meta.uuid).mkdir(parents=True)
 
-    await TorrentCreator.create_torrent(meta, video, "BASE_SUBS")
+    await TorrentCreator.create_torrent(meta, meta.path, "BASE_SUBS")
 
     from torf import Torrent
 
