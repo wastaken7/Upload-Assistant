@@ -2,6 +2,7 @@
 import asyncio
 import contextlib
 import fnmatch
+import glob
 import math
 import os
 import platform
@@ -252,7 +253,7 @@ class TorrentCreator:
                         meta.mkbrr = False
                     elif not meta.tv_pack:
                         folder_name = Path(str(path)).name
-                        include = [f"{folder_name}/{Path(f).name}" for f in creation_filelist]
+                        include = [glob.escape(f"{folder_name}/{Path(f).name}") for f in creation_filelist]
                         exclude = ["*", "*/**"]
 
                 elif meta.isdir:
@@ -277,11 +278,11 @@ class TorrentCreator:
                         include = ["*.mkv", "*.mp4", "*.ts"] if not meta.is_disc else []
                     else:
                         folder_name = Path(str(path)).name
-                        include = [f"{folder_name}/{Path(f).name}" for f in creation_filelist]
+                        include = [glob.escape(f"{folder_name}/{Path(f).name}") for f in creation_filelist]
                         exclude = ["*", "*/**"]
                 elif is_subs:
                     folder_name = Path(path).name
-                    include = [f"{folder_name}/{Path(file).name}" for file in creation_filelist]
+                    include = [glob.escape(f"{folder_name}/{Path(file).name}") for file in creation_filelist]
                     exclude = ["*", "*/**"]
                 else:
                     exclude = ["*.*", "*sample.mkv", "!sample*.*"] if not meta.is_disc else []
@@ -470,10 +471,13 @@ class TorrentCreator:
                     # subtitle files selected for this upload, never every subtitle
                     # matching an extension below the creation root.
                     root = Path(path).resolve()
+                    root_name = Path(path).name
                     selected_subtitles: list[str] = []
                     for subtitle_file in meta.subtitle_files:
                         try:
-                            selected_subtitles.append(Path(str(subtitle_file)).resolve().relative_to(root).as_posix())
+                            relative_subtitle = Path(str(subtitle_file)).resolve().relative_to(root)
+                            # torf matches paths including the torrent's root name.
+                            selected_subtitles.append(glob.escape((Path(root_name) / relative_subtitle).as_posix()))
                         except ValueError:
                             logger.warning(f"[yellow]Selected subtitle is outside torrent root and will be skipped: {subtitle_file}")
                     custom_include = list(dict.fromkeys([*custom_include, *selected_subtitles]))
