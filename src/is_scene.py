@@ -147,7 +147,13 @@ class SceneManager:
         if not stat.S_ISREG(local_stat.st_mode):
             return False
 
-        archived = self._archived_files(details)
+        # Compressed volumes are stored files; archived-files lists their contents.
+        extension = path.suffix.lower()
+        if extension in {".rar", ".zip", ".7z", ".tar", ".gz"} or re.fullmatch(r"\.r\d{2,3}", extension):
+            stored = details.get("files", [])
+            archived = [file for file in stored if isinstance(file, dict) and isinstance(file.get("name"), str)] if isinstance(stored, list) else []
+        else:
+            archived = self._archived_files(details)
         matches = [file for file in archived if self._archived_basename(file).casefold() == path.name.casefold()]
         # A release-named file can be compared to the sole archived file even if renamed.
         if not matches and len(archived) == 1 and path.stem.casefold() == release.casefold():

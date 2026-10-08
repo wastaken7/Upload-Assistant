@@ -10,6 +10,7 @@ import pytest
 
 from src.is_scene import SceneFileMismatchError, SceneManager
 from src.meta import Meta
+from src.prep_game import resolve_game_filelist
 
 
 class _Response:
@@ -475,6 +476,64 @@ async def test_unapproved_file_differences_stop_processing(
             assert not meta.nfo
     assert len(prompts) == (0 if mode == "unattended" else 2)
     assert not any("/download/" in url for url in client.requested_urls)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("extension", [".rar", ".r00", ".zip", ".7z", ".tar", ".gz"])
+@pytest.mark.parametrize("case", ["matching", "size_mismatch", "renamed"])
+async def test_game_archives_are_compared_to_stored_files(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    extension: str,
+    case: str,
+) -> None:
+    release = "Fictional.Game.Update.v1.2-EXAMPLEGROUP"
+    folder = tmp_path / release
+    folder.mkdir()
+    filename = f"fictional-game{extension}"
+    (folder / filename).write_bytes(b"data")
+    meta = Meta(base_dir=str(tmp_path), uuid="scene-test", path=str(folder), category="GAME", isdir=True, unattended=True, nfo=True)
+    video, _, _, _ = resolve_game_filelist(meta, str(folder))
+    client = _RoutedClient(
+        {
+            f"https://api.srrdb.com/v1/search/r:{release}": _Response({"resultsCount": 1, "results": [{"release": release, "hasNFO": "no"}]}),
+            f"https://api.srrdb.com/v1/details/{release}": _Response(
+                {
+                    "files": [
+                        {"name": f"original{extension}" if case == "renamed" else filename, "size": 8 if case == "size_mismatch" else 4},
+                        {"name": "fictional-game.nfo", "size": 20},
+                    ],
+                    "archived-files": [{"name": "Update/PATCH.exe", "size": 100}, {"name": "Update/Patch.bin", "size": 200}],
+                }
+            ),
+        }
+    )
+    monkeypatch.setattr("src.is_scene.httpx.AsyncClient", lambda: client)
+    warnings = []
+    monkeypatch.setattr("src.is_scene.logger.warning", warnings.append)
+    manager = SceneManager({"DEFAULT": {}})
+    if case == "matching":
+        assert (await manager.is_scene(video, meta, 0))[1] is True
+        assert not warnings
+    else:
+        with pytest.raises(SceneFileMismatchError):
+            await manager.is_scene(video, meta, 0)
+        assert warnings
+        assert any("File size mismatch" in warning for warning in warnings) == (case == "size_mismatch")
+
+
+@pytest.mark.asyncio
+async def test_media_file_size_uses_archived_files(tmp_path: Path) -> None:
+    video = tmp_path / "fictional-video.mkv"
+    video.write_bytes(b"data")
+    assert not await SceneManager({"DEFAULT": {}})._warn_file_differences(
+        str(video),
+        "Fictional.Video-EXAMPLEGROUP",
+        {
+            "files": [{"name": video.name, "size": 8}],
+            "archived-files": [{"name": video.name, "size": 4}],
+        },
+    )
 
 
 @pytest.mark.asyncio
