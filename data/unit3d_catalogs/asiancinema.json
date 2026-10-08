@@ -1,4 +1,36 @@
 {
+  "regions": {
+    "1": "KOR",
+    "2": "CHN",
+    "3": "JPN",
+    "4": "TWN",
+    "5": "SGP",
+    "6": "PHI",
+    "7": "THA",
+    "8": "VIE",
+    "9": "MAS",
+    "10": "IDN",
+    "11": "CAM",
+    "12": "LAO",
+    "13": "HKG",
+    "14": "USA",
+    "15": "GBR",
+    "16": "ESP",
+    "17": "GER",
+    "18": "FRA",
+    "19": "EUR",
+    "20": "MEX",
+    "21": "AUS",
+    "22": "IND",
+    "23": "RUS",
+    "24": "AUT",
+    "25": "NLD",
+    "26": "POL",
+    "27": "BRA",
+    "28": "ITA",
+    "29": "TUR",
+    "30": "PRK"
+  },
   "distributors": {
     "253": "Disney",
     "966": "ABC Studios",
@@ -50,12 +82,41 @@
     "1013": "Xenon",
     "1014": "KSM Anime"
   },
+  "categories": {
+    "1": "Movies",
+    "2": "TV",
+    "3": "Music"
+  },
+  "types": {
+    "1": "Full Disc",
+    "7": "Remux",
+    "9": "WEB-DL",
+    "13": "SDTV",
+    "15": "FLAC",
+    "17": "HDTV",
+    "19": "UHDTV"
+  },
+  "resolutions": {
+    "1": "2160p",
+    "2": "1080i/p",
+    "3": "720p",
+    "4": "576i/p",
+    "5": "480i/p",
+    "6": "Other"
+  },
+  "regions_complete": true,
+  "distributors_complete": true,
+  "default_ids": {
+    "distributors": [
+      "1-16",
+      "18-125",
+      "127-252",
+      "254-965"
+    ]
+  },
   "excluded_ids": [
     17,
     126
-  ],
-  "comments": [
-    "A-film (24) and Afilm (1003) have separate IDs"
   ],
   "aliases": {
     "ARTS MAGIC": 969,

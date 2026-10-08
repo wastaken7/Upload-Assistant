@@ -1,6 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import re
-from typing import Any, ClassVar
+from typing import Any
 
 from src.console import logger
 from src.languages import languages_manager
@@ -30,12 +30,6 @@ class Aither(UNIT3D):
     supported_categories = ("TV", "MOVIE")
     tracker_urls = ("https://aither.cc",)
     allowed_bloated_audio_languages = ("en",)
-    REGION_IDS: ClassVar[dict[str, str]] = {
-        "FIN": "244",
-        "SWE": "246",
-        "CZE": "247",
-        "EST": "248",
-    }
 
     def __init__(self, config: dict[str, Any]):
         super().__init__(config, tracker_name="AITHER")
@@ -116,22 +110,6 @@ class Aither(UNIT3D):
                 pass
 
         return data
-
-    async def get_region_id(self, meta: Meta) -> dict[str, str]:
-        region_id = self.REGION_IDS.get(str(meta.region or "").upper())
-        if region_id:
-            return {"region_id": region_id}
-        return await super().get_region_id(meta)
-
-    async def get_region_name(self, region_id: int | str | None) -> str:
-        region_name = {value: key for key, value in self.REGION_IDS.items()}.get(str(region_id), "")
-        if region_name:
-            return region_name
-        try:
-            normalized_id = int(region_id) if region_id is not None else 0
-        except TypeError, ValueError:
-            return ""
-        return await self.common.unit3d_region_ids(reverse=True, region_id=normalized_id)
 
     async def get_name(self, meta: Meta):
         aither_name: str = meta.name

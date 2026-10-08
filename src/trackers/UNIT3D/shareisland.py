@@ -170,7 +170,7 @@ class ShareIsland(UNIT3D):
         # Build name per ShareIsland type-specific format
         if effective_type == "DISC":
             # Inject region from validated session data if available
-            region = _shri_session_data.get(meta.uuid, {}).get("_shri_region_name") or meta.region
+            region = _shri_session_data.get(meta.uuid, {}).get("_shri_region_name") or meta.region_overrides.get(self.tracker, meta.region)
             if meta.is_disc == "BDMV":
                 # BDMV: Title Year 3D Edition Hybrid REPACK Resolution Region UHD Source HDR VideoCodec Audio
                 name = f"{title} {year} {season}{episode} {three_d} {edition} {hybrid} {repack} {resolution} {region} {uhd} {source} {hdr} {video_codec} {audio}"
@@ -286,7 +286,7 @@ class ShareIsland(UNIT3D):
         Stores validated IDs in module-level dict keyed by UUID for use during upload.
         """
         if meta.is_disc in ["DVD", "HDDVD"]:
-            region_name = meta.region
+            region_name = meta.region_overrides.get(self.tracker, meta.region)
 
             # Prompt for region if not in meta
             if not region_name and (not meta.unattended or meta.unattended_confirm):
@@ -303,7 +303,7 @@ class ShareIsland(UNIT3D):
                 raise ValueError("Region required for disc upload")
 
             # Validate region code with API
-            region_id = await self.common.unit3d_region_ids(region_name)
+            region_id = await self.common.unit3d_region_ids(region_name, tracker=self.tracker)
             if not region_id:
                 cli_ui.error(f"Invalid region code '{region_name}'; skipping ShareIsland.")
                 raise ValueError(f"Invalid region code: {region_name}")
