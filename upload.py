@@ -1576,6 +1576,7 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
                     "ONLYENCODES",
                     "PASSTHEPOPCORN",
                     "SKIPTHECOMMERCIALS",
+                    "TORRENTHR",
                     "TVCHAOSUK",
                 }
 

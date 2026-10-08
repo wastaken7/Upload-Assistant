@@ -21,9 +21,16 @@ function initializer(options, variable = "myRegions") {
 }
 
 test("accepts unquoted numeric object keys in literal data", async () => {
-  const result = run(["let myDistributors = [{value: 8, label: 'Example Studio', extra: {1: 'Example value'}}];"], {includeDistributors: false});
+  const result = run(
+    [
+      "let myDistributors = [{value: 8, label: 'Example Studio', extra: {1: 'Example value'}}];",
+    ],
+    { includeDistributors: false },
+  );
   assert.deepEqual(result.alerts, []);
-  assert.deepEqual(JSON.parse(await result.blob.text()).distributors, {8: "Example Studio"});
+  assert.deepEqual(JSON.parse(await result.blob.text()).distributors, {
+    8: "Example Studio",
+  });
 });
 
 test("reads array spreads larger than the engine argument limit", async () => {

@@ -695,6 +695,7 @@ async def disc_screenshots(
                     "passtheimage",
                     "seedpool_cdn",
                     "sharex",
+                    "thrimg",
                     "utppm",
                 ]:
                     logger.debug(f"[green]Image {image_path} meets size requirements for {img_host}.[/green]")
@@ -731,7 +732,20 @@ async def disc_screenshots(
                         elif (
                             img_host
                             and img_host
-                            in ["lensdump", "ptscreens", "onlyimage", "dalexni", "zipline", "midnightscene", "bioma", "passtheimage", "seedpool_cdn", "sharex", "utppm"]
+                            in [
+                                "lensdump",
+                                "ptscreens",
+                                "onlyimage",
+                                "dalexni",
+                                "zipline",
+                                "midnightscene",
+                                "bioma",
+                                "passtheimage",
+                                "seedpool_cdn",
+                                "sharex",
+                                "thrimg",
+                                "utppm",
+                            ]
                             and new_size > 75000
                         ):
                             logger.info(f"[green]Successfully retaken screenshot for: {image_path} ({new_size} bytes)[/green]")
@@ -2133,6 +2147,7 @@ async def screenshots(
                     "passtheimage",
                     "seedpool_cdn",
                     "sharex",
+                    "thrimg",
                     "utppm",
                 ]:
                     logger.debug(f"[green]Image {image_path} meets size requirements for {img_host}.[/green]")
@@ -2191,7 +2206,20 @@ async def screenshots(
                             elif (
                                 img_host
                                 and img_host
-                                in ["lensdump", "ptscreens", "onlyimage", "dalexni", "zipline", "midnightscene", "bioma", "passtheimage", "seedpool_cdn", "sharex", "utppm"]
+                                in [
+                                    "lensdump",
+                                    "ptscreens",
+                                    "onlyimage",
+                                    "dalexni",
+                                    "zipline",
+                                    "midnightscene",
+                                    "bioma",
+                                    "passtheimage",
+                                    "seedpool_cdn",
+                                    "sharex",
+                                    "thrimg",
+                                    "utppm",
+                                ]
                                 and new_size > 75000
                             ):
                                 logger.info(f"[green]Successfully retaken screenshot for: {screenshot_path} ({new_size} bytes)[/green]")
@@ -2240,7 +2268,7 @@ async def screenshots(
                     elif (
                         img_host
                         and img_host
-                        in ["lensdump", "ptscreens", "onlyimage", "dalexni", "zipline", "midnightscene", "bioma", "passtheimage", "seedpool_cdn", "sharex", "utppm"]
+                        in ["lensdump", "ptscreens", "onlyimage", "dalexni", "zipline", "midnightscene", "bioma", "passtheimage", "seedpool_cdn", "sharex", "thrimg", "utppm"]
                         and new_size > 75000
                     ):
                         valid_image = True

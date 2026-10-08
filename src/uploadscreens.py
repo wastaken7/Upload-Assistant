@@ -454,6 +454,46 @@ async def upload_image_task(args: Sequence[Any]) -> dict[str, Any]:
                 logger.info(f"[red]Request failed with error: {e}")
                 return {"status": "failed", "reason": str(e)}
 
+        elif img_host == "thrimg":
+            url = "https://slike.torrenthr.org/api/1/upload"
+            data: dict[str, Any] = {"key": config.get("DEFAULT", {}).get("thrimg_api")}
+            response: httpx.Response | None = None
+            response_data: dict[str, Any] = {}
+            try:
+                async with httpx.AsyncClient() as client, aiofiles.open(image, "rb") as image_file:
+                    files = {"source": (Path(image).name, await image_file.read())}
+
+                    response = await client.post(url, data=data, files=files, timeout=timeout)
+                    response.raise_for_status()
+                    response_data = response.json()
+
+                    img_data = response_data.get("image") if isinstance(response_data, dict) else None
+                    image_url = img_data.get("url") if isinstance(img_data, dict) else None
+                    if not isinstance(image_url, str) or not image_url.strip():
+                        return {"status": "failed", "reason": f"THR img response was missing a valid image URL for {Path(image).name}"}
+                    img_url = image_url.strip()
+                    raw_url = img_url
+                    web_url = img_url
+            except httpx.TimeoutException:
+                logger.info("[red]Request to THR img timed out after 60 seconds")
+                return {"status": "failed", "reason": "Request timed out"}
+            except httpx.RequestError as exc:
+                logger.info(f"[red]Failed to upload image {Path(image).name}: {exc}")
+                return {"status": "failed", "reason": f"Failed to upload image {Path(image).name}: {exc}"}
+            except httpx.HTTPStatusError:
+                logger.info(f"[red]Failed to upload image {Path(image).name}")
+                reason = f"Failed to upload image {Path(image).name}"
+                if response is not None:
+                    logger.info(f"[red]THR img returned HTTP {response.status_code}")
+                    logger.info(response.text)
+                    reason += f": HTTP {response.status_code}: {response.text[:300]}"
+                return {"status": "failed", "reason": reason}
+            except ValueError:
+                logger.info(f"[red]Failed to parse THR img response for {Path(image).name}")
+                if response is not None:
+                    logger.info(response.text)
+                return {"status": "failed", "reason": f"Failed to parse THR img response for {Path(image).name}"}
+
         elif img_host == "passtheimage":
             url = "https://passtheima.ge/api/1/upload"
             try:
