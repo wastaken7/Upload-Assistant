@@ -206,10 +206,18 @@ class CapybaraBR(UNIT3D):
                 dlc = f" {dlc}"
 
             year_str = str(meta.year) if meta.year is not None else ""
-            cbr_name = f"{meta.title} {update} {meta.game_version} {year_str} - {tag} {game_lang}{dlc} {bioma_tag}"
+            cbr_name = f"{meta.title} {update} {meta.game_version} {year_str} - {tag} {game_lang}{dlc}"
 
         elif category in ("MOVIE", "TV"):
-            cbr_name = cbr_name.replace("DD+ ", "DDP").replace("DD ", "DD").replace("AAC ", "AAC").replace("FLAC ", "FLAC").replace("Dubbed", "").replace("Dual-Audio", "")
+            cbr_name = (
+                cbr_name.replace("DD+ ", "DDP")
+                .replace("DD ", "DD")
+                .replace("AAC ", "AAC")
+                .replace("FLAC ", "FLAC")
+                .replace("Dubbed", "")
+                .replace("Dual-Audio", "")
+                .replace("MULTI", "")
+            )
 
             # If it is a Series or Anime, remove the year from the title.
             if meta.category in ["TV", "ANIMES"]:

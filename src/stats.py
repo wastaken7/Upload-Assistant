@@ -245,6 +245,9 @@ def _connect(path: Path) -> sqlite3.Connection:
             db.execute("PRAGMA journal_mode = WAL")
             db.execute("CREATE TABLE IF NOT EXISTS stats_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
             schema_row = db.execute("SELECT value FROM stats_meta WHERE key = 'schema_version'").fetchone()
+            if schema_row is not None and schema_row[0] not in {"1", _SCHEMA_VERSION}:
+                db.close()
+                raise sqlite3.DatabaseError("Unsupported statistics schema version")
             existing_columns = {str(row[1]) for row in db.execute("PRAGMA table_info(stats_daily)")}
             if (schema_row is not None and schema_row[0] != _SCHEMA_VERSION) or (existing_columns and "destination" not in existing_columns):
                 db.execute("DROP TABLE IF EXISTS stats_daily")
@@ -677,13 +680,13 @@ def get_stats(
                     (mode, prior_start.isoformat(), prior_end.isoformat()),
                 ).fetchall()
     except OSError, sqlite3.Error:
+        payload.update(success=False, error="Unable to read statistics. Check the statistics database and try again.")
         return payload
 
     payload["filters"]["destinations"] = [{"destination": str(row[0])} for row in sorted(destination_rows) if row[0]]
     payload["heatmap"] = [{"date": day, "count": int(count)} for day, count in heatmap_rows]
-    if not rows:
-        return payload
-    payload["period"]["from"] = start or min(row[0] for row in rows)
+    if rows:
+        payload["period"]["from"] = start or min(row[0] for row in rows)
 
     timeline: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
     destinations: dict[tuple[str, str], dict[str, int]] = defaultdict(lambda: defaultdict(int))
@@ -691,6 +694,7 @@ def get_stats(
     artifacts: dict[tuple[str, str, str], dict[str, int]] = defaultdict(lambda: defaultdict(int))
     cache_services: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
     api_services: dict[tuple[str, str], dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    daily_api_services: dict[tuple[str, str, str], dict[str, int]] = defaultdict(lambda: defaultdict(int))
     media_dimensions: dict[tuple[str, str, str], dict[str, int]] = defaultdict(lambda: defaultdict(int))
     media_matrix: dict[tuple[str, str, str], dict[str, int]] = defaultdict(lambda: defaultdict(int))
     streaming_services: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
@@ -779,7 +783,7 @@ def get_stats(
             api_services[(service, operation)]["duration_ms"] += int(duration_ms)
             api_services[(service, operation)]["bytes"] += int(bytes_count)
             overview["api_operations"] += count
-            timeline[day]["api"] += count
+            daily_api_services[(day, service, operation)][outcome] += count
         elif family == "media":
             bucket = media_dimensions[(category, service, operation)]
             bucket["count"] += count
@@ -923,7 +927,11 @@ def get_stats(
     ]
     api_successes = sum(values["success"] for values in api_services.values())
     api_errors = sum(values["error"] for values in api_services.values())
-    api_requests = sum(values["request"] or (values["success"] + values["error"]) for values in api_services.values())
+    for (day, service, operation), values in daily_api_services.items():
+        requests = values["request"] or (values["success"] + values["error"])
+        timeline[day]["api"] += requests
+        api_services[(service, operation)]["requests"] += requests
+    api_requests = sum(values["requests"] for values in api_services.values())
     overview["api_operations"] = api_requests
     payload["api"].update(
         total=overview["api_operations"],
@@ -934,7 +942,7 @@ def get_stats(
             {
                 "service": service,
                 "operation": operation,
-                "requests": values["request"] or (values["success"] + values["error"]),
+                "requests": values["requests"],
                 "successes": values["success"],
                 "errors": values["error"],
                 "average_duration_ms": round(values["duration_ms"] / (values["success"] + values["error"])) if values["success"] + values["error"] else 0,
@@ -942,11 +950,11 @@ def get_stats(
             }
             for (service, operation), values in sorted(
                 api_services.items(),
-                key=lambda item: -(item[1]["request"] or (item[1]["success"] + item[1]["error"])),
+                key=lambda item: -item[1]["requests"],
             )
         ],
     )
-    first_day = datetime.fromisoformat(str(payload["period"]["from"])).date()
+    first_day = datetime.fromisoformat(str(payload["period"]["from"] or end)).date()
     last_day = datetime.fromisoformat(str(payload["period"]["to"])).date()
     timeline_rows: list[dict[str, Any]] = []
     cursor = first_day

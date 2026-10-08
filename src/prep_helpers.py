@@ -206,8 +206,11 @@ def init_meta(prep_instance: Any, meta: Meta, mode: str) -> tuple[bool, bool, Cl
     meta.we_checked_tvdb = False
     meta.we_checked_tmdb = False
     meta.we_asked_tvmaze = False
-    meta.audio_languages = None
-    meta.subtitle_languages = None
+    # Confirmation corrections rerun prep on the same Meta. Keep checked
+    # languages (including manual answers), since detection skips checked meta.
+    if not meta.language_checked:
+        meta.audio_languages = None
+        meta.subtitle_languages = None
     meta.aither_trumpable = None
     meta.anime = False
     meta.subtitle_files = cast(list[str], [])

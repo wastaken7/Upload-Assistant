@@ -2705,6 +2705,8 @@ class ConfigItem(TypedDict, total=False):
     help: list[str]
     subsection: str | bool
     override_fields: list[ConfigItem]
+    field_type: str
+    field_min: int
 
 
 class ConfigSection(TypedDict, total=False):
@@ -2754,6 +2756,7 @@ def _webui_auth_ok() -> bool:
 
 @app.before_request
 def _require_auth_for_webui():  # pyright: ignore[reportUnusedFunction]
+    """Enforce IP and authentication checks, recording rejected API credentials."""
     # Health endpoint can be used for orchestration checks.
     if request.path == "/api/health":
         return None
@@ -2806,6 +2809,8 @@ def _require_auth_for_webui():  # pyright: ignore[reportUnusedFunction]
             return None
         # If request accepts HTML (browser), redirect to login; else 401 for API clients
         if "text/html" in (_request_header("Accept") or ""):
+            if _request_header("Authorization"):
+                _handle_failed_auth(client_ip)
             return redirect(url_for("login_page"))
         _handle_failed_auth(client_ip)
         return jsonify({"error": "Authentication required", "success": False}), 401
@@ -3347,6 +3352,26 @@ _RELEASE_GROUP_OVERRIDE_FIELDS = (
     "tonemapped_header",
     "custom_signature",
 )
+_RELEASE_GROUP_BOOL_FIELDS = (
+    "episode_overview",
+    "add_logo",
+    "full_mediainfo",
+    "add_bluray_link",
+    "use_bluray_images",
+    "add_audio_spectrogram",
+    "add_dynamic_hdr_plot",
+    "hide_screenshot_header_if_only_section",
+)
+_RELEASE_GROUP_INT_FIELDS = (
+    "thumbnail_size",
+    "screens_per_row",
+    "logo_size",
+    "bluray_image_size",
+    "pack_thumb_size",
+    "multiScreens",
+)
+
+_RELEASE_GROUP_IMAGE_SIZE_FIELDS = {"thumbnail_size", "pack_thumb_size", "logo_size", "bluray_image_size"}
 
 
 def _is_release_group_override_path(path: list[str]) -> bool:
@@ -3368,8 +3393,24 @@ def _validate_release_group_overrides(value: object) -> None:
         seen.add(normalized_name)
         if not isinstance(fields, dict):
             raise ValueError(f"Overrides for {name} must be a dictionary.")
-        for field, text in fields.items():
-            if not isinstance(field, str) or not field or (text is not None and not isinstance(text, str)):
+        for field, field_val in fields.items():
+            if not isinstance(field, str) or not field:
+                raise ValueError(f"Overrides for {name} need non-empty field names.")
+            if field_val is None:
+                continue
+            if field in _RELEASE_GROUP_BOOL_FIELDS:
+                if isinstance(field_val, bool) or (isinstance(field_val, str) and field_val.strip().lower() in ("true", "false", "1", "0", "yes", "no", "on", "off")):
+                    continue
+                raise ValueError(f"{field} for {name} must be a boolean or null.")
+            if field in _RELEASE_GROUP_INT_FIELDS:
+                minimum = 1 if field in _RELEASE_GROUP_IMAGE_SIZE_FIELDS else 0
+                try:
+                    if isinstance(field_val, bool) or not isinstance(field_val, (str, int)) or int(field_val) < minimum:
+                        raise ValueError
+                except (ValueError, TypeError):  # fmt: skip
+                    raise ValueError(f"{field} for {name} must be an integer of at least {minimum}, or null.") from None
+                continue
+            if not isinstance(field_val, str):
                 raise ValueError(f"Overrides for {name} must contain text fields or null values.")
 
 
@@ -3435,7 +3476,20 @@ def _build_config_items(
                 "source": "config" if key in user_dict else "example",
                 "children": [],
                 "help": help_text or comments_map.get("DEFAULT/tag_overrides", []),
-                "override_fields": [{"key": field, "help": comments_map.get(f"DEFAULT/{field}", [])} for field in _RELEASE_GROUP_OVERRIDE_FIELDS],
+                "override_fields": [
+                    {
+                        "key": field,
+                        "field_type": field_type,
+                        "field_min": 1 if field in _RELEASE_GROUP_IMAGE_SIZE_FIELDS else 0,
+                        "help": comments_map.get(f"DEFAULT/{field}", []),
+                    }
+                    for fields, field_type in (
+                        (_RELEASE_GROUP_OVERRIDE_FIELDS, "text"),
+                        (_RELEASE_GROUP_BOOL_FIELDS, "boolean"),
+                        (_RELEASE_GROUP_INT_FIELDS, "number"),
+                    )
+                    for field in fields
+                ],
             }
         elif isinstance(example_value, Mapping) or isinstance(user_value, Mapping):
             example_value = _as_dict(example_value) or {}
@@ -4250,7 +4304,7 @@ def stats_api():
         payload = get_stats(period, mode, STATE_DIR, **stats_kwargs) if enabled else get_empty_stats(period, mode, **stats_kwargs)
         _add_stats_destination_display_names(payload)
         payload["enabled"] = enabled
-        return jsonify(payload)
+        return jsonify(payload), 200 if payload["success"] else 500
     except ValueError as exc:
         return jsonify({"success": False, "error": str(exc)}), 400
 
@@ -4636,6 +4690,7 @@ def twofa_disable():
 
 
 @app.route("/api/browse_roots")
+@limiter.exempt
 def browse_roots():
     """Return configured browse roots"""
     roots = _get_browse_roots()
@@ -6101,6 +6156,7 @@ def api_tokens():
 
 
 @app.route("/api/browse")
+@limiter.limit("600 per minute", key_func=_rate_limit_key_func, override_defaults=True)
 def browse_path():
     """Browse filesystem paths"""
     requested: str = str(request.args.get("path", ""))
@@ -6227,6 +6283,7 @@ def browse_path():
 
 
 @app.route("/api/browse_search")
+@limiter.limit("60 per minute", key_func=_rate_limit_key_func, override_defaults=True)
 def browse_search():
     """Search filesystem for files/folders matching a query string"""
     query = (request.args.get("q") or "").strip()

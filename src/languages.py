@@ -188,13 +188,22 @@ class LanguagesManager:
             logger.info("[cyan]Detected hardcoded subtitles from the filename.[/cyan]")
 
         if meta.category not in ["MOVIE", "TV"]:
-            meta.language_checked = True
+            # No media-language check has run for this category. A later
+            # correction to MOVIE/TV must still detect the track languages.
+            meta.language_checked = False
             meta.audio_languages = []
             meta.subtitle_languages = []
             return
 
         if "language_checked" not in meta:
             meta.language_checked = False
+
+        # Explicit hardcoded-subtitle corrections apply even when track
+        # languages are cached. Preserve detected or manually entered audio.
+        if meta.is_disc != "BDMV" and meta.hardcoded_subs and meta.hardcoded_subs_language:
+            meta.subtitle_languages = [meta.hardcoded_subs_language]
+            meta.write_hc_languages = True
+            meta.no_subs = False
 
         if meta.language_checked:
             return

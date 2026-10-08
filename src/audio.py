@@ -403,10 +403,15 @@ async def _get_audio_v2(
 
                     # First pass: collect all audio languages and set flags
                     non_eng_non_orig_languages: list[str] = []
+                    distinct_audio_languages: set[str] = set()
                     for t in audio_tracks:
                         audio_language = str(t.get("Language") or "")
                         logger.debug(f"DEBUG: Audio Language = {audio_language}")
                         audio_language = audio_language.lower().strip()
+                        if audio_language and not audio_language.startswith(("zx", "xx", "und")):
+                            # Collapse regional tags (for example pt-BR and pt-PT)
+                            # so multiple dubs in the same language do not become MULTI.
+                            distinct_audio_languages.add(audio_language.replace("_", "-").split("-", 1)[0])
                         if audio_language.startswith("en"):
                             logger.debug(f"DEBUG: Found English audio track: {audio_language}")
                             eng = True
@@ -433,7 +438,7 @@ async def _get_audio_v2(
                         bloated_check(meta, non_eng_non_orig_languages, is_eng_original_with_non_eng=is_eng_original)
 
                     if ((eng and (orig or non_en_non_commentary)) or (orig and non_en_non_commentary)) and len(audio_tracks) > 1 and not meta.no_dual:
-                        dual = "MULTI" if len(audio_tracks) >= 3 else "Dual-Audio"
+                        dual = "MULTI" if len(distinct_audio_languages) >= 3 else "Dual-Audio"
                         meta.dual_audio = dual == "Dual-Audio"
                     elif eng and not orig and orig_lang not in ["zxx", "xx", "en", None] and not meta.no_dub:
                         dual = "Dubbed"

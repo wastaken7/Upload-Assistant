@@ -15,6 +15,7 @@ import urllib.parse
 import uuid
 import xml.etree.ElementTree as ET
 import zipfile
+from collections import Counter
 from collections.abc import Awaitable, Mapping
 from pathlib import Path
 from typing import Any, cast
@@ -30,6 +31,7 @@ from src.console import logger
 from src.media_extensions import VIDEO_EXTENSIONS
 from src.mediainfo import MediaInfo
 from src.meta import Meta
+from src.screenshot_manifest import capture_timestamps
 from src.screenshot_manifest import clear_group as clear_screenshot_group
 from src.screenshot_manifest import files as manifest_files
 from src.screenshot_manifest import forget_file as forget_screenshot_file
@@ -1921,23 +1923,38 @@ async def screenshots(
 
     sanitized_filename = await sanitize_filename(filename)
     screenshot_dir = screenshots_dir(base_dir, folder_id)
-    test_image_path = str((screenshot_dir / f"{sanitized_filename}-libplacebo-test.png").resolve())
+    test_image_path = str((screenshot_dir / f"{sanitized_filename}-libplacebo-test.png").absolute())
 
-    existing_images_count = 0
+    # Screenshot slots must be regular files within this release. Resolving a
+    # symlink here would make recovery rename or overwrite its external target.
+    if screenshot_dir.is_symlink() or (screenshot_dir / f"{sanitized_filename}-libplacebo-test.png").is_symlink():
+        logger.error("[red]Refusing screenshot capture through a symlink.[/red]")
+        return None
+
     existing_image_paths: list[str] = []
+    capture_indices: list[int] = []
     for i in range(num_screens):
-        image_path = str((screenshot_dir / f"{sanitized_filename}-{i}.png").resolve())
+        slot = screenshot_dir / f"{sanitized_filename}-{i}.png"
+        if slot.is_symlink():
+            logger.error(f"[red]Refusing symlinked screenshot slot: {slot}[/red]")
+            return None
+        image_path = str(slot.absolute())
         if Path(image_path).exists() and not meta.retake:
-            existing_images_count += 1
-            existing_image_paths.append(image_path)
+            # A forced exit can leave incomplete PNGs as well as completed
+            # frames that have not yet been published to the manifest.
+            try:
+                with Image.open(image_path) as image:
+                    image.verify()
+            except OSError, SyntaxError, ValueError:
+                logger.debug(f"[yellow]Recapturing incomplete screenshot: {image_path}[/yellow]")
+            else:
+                existing_image_paths.append(image_path)
+                continue
+        capture_indices.append(i)
 
-    if existing_images_count == num_screens and not meta.retake:
-        logger.debug("[yellow]The correct number of screenshots already exists. Skipping capture process.")
-        if tone_map and any(marker in meta.hdr for marker in ("HDR", "DV", "HLG")):
-            meta.tonemapped = True
-        return existing_image_paths
-
-    num_capture = num_screens - existing_images_count
+    # Concurrent captures can finish out of order. Fill the actual missing
+    # indices instead of assuming every existing file forms a contiguous prefix.
+    num_capture = len(capture_indices)
 
     progress_id = f"screenshots-{folder_id}"
     progress_label = "FFmpeg screenshots"
@@ -1953,16 +1970,37 @@ async def screenshots(
     )
 
     if not ss_times:
-        ss_times = await valid_ss_time([], num_capture, length, frame_rate, meta, retake=force_screenshots)
+        # Keep the original sampling grid when completing a partial capture.
+        # Sampling only the missing count would select already captured frames.
+        sampling_count = num_screens + len(registered_screens) if not force_screenshots and not meta.retake else num_screens
+        ss_times = await valid_ss_time([], sampling_count, length, frame_rate, meta, retake=force_screenshots)
+    if not force_screenshots and not meta.retake:
+        used_times = capture_timestamps(base_dir, folder_id, group, original_slots=True)
+        used_frames = Counter(round(timestamp * frame_rate) for timestamp in used_times)
+        missing_times: list[str] = []
+        for timestamp in ss_times:
+            frame = round(float(timestamp) * frame_rate)
+            # Each saved screenshot occupies one slot, even when the user
+            # requests repeated frames or a short video's grid repeats them.
+            if used_frames[frame] > 0:
+                used_frames[frame] -= 1
+            else:
+                missing_times.append(timestamp)
+        ss_times = missing_times
+        # Older manifests have no capture times. Preserve their count-based
+        # reuse while recording times for all new captures.
+        unknown_count = max(0, len(registered_screens) - len(used_times))
+        ss_times = ss_times[unknown_count:]
+    # Keep one timestamp per unregistered file slot, including recovered files.
+    # Only the capture task list is sparse; compacting times would shift gaps.
+    ss_times = ss_times[:num_screens]
+    captured_times: dict[str, float] = {}
+    slot_times: dict[str, float] = {}
 
     if meta.frame_overlay and any(overlay_options(default_config)[key] for key in ("overlay_frame_number", "overlay_frame_type")):
         logger.debug("[yellow]Getting frame information for overlays...")
         # Build list of (original_index, task) to preserve index correspondence
-        frame_info_tasks_with_idx = [
-            (i, get_frame_info(path, ss_times[i], meta))
-            for i in range(num_capture)
-            if not (screenshot_dir / f"{sanitized_filename}-{existing_images_count + i}.png").exists() or meta.retake
-        ]
+        frame_info_tasks_with_idx = [(i, get_frame_info(path, ss_times[i], meta)) for i in capture_indices]
         frame_info_results = await asyncio.gather(*[task for _, task in frame_info_tasks_with_idx])
         meta.frame_info_map = {}
 
@@ -1976,7 +2014,13 @@ async def screenshots(
     num_workers = min(num_tasks, task_limit)
 
     test_time = str(ss_times[0] if ss_times else 0)
-    hdr_tonemap = await determine_tonemapping(w_sar, h_sar, width, height, path, test_time, test_image_path, loglevel, meta)
+    hdr_tonemap = False
+    tonemapping_checked = bool(capture_indices)
+    if capture_indices:
+        hdr_tonemap = await determine_tonemapping(w_sar, h_sar, width, height, path, test_time, test_image_path, loglevel, meta)
+    elif tone_map and any(marker in meta.hdr for marker in ("HDR", "DV", "HLG")):
+        meta.tonemapped = True
+        hdr_tonemap = True
 
     logger.debug(f"Using {num_workers} worker(s) for {num_capture} image(s)")
 
@@ -2000,11 +2044,14 @@ async def screenshots(
             return result
 
     capture_tasks: list[Awaitable[tuple[int, str | None] | None]] = []
-    for i in range(num_capture):
-        image_index = existing_images_count + i
-        image_path = str((screenshot_dir / f"{sanitized_filename}-{image_index}.png").resolve())
-        if not Path(image_path).exists() or meta.retake:
-            capture_tasks.append(capture_with_semaphore((i, path, float(ss_times[i]), image_path, width, height, w_sar, h_sar, loglevel, hdr_tonemap, meta)))
+    for i in range(num_screens):
+        image_path = str((screenshot_dir / f"{sanitized_filename}-{i}.png").absolute())
+        captured_times[image_path] = float(ss_times[i])
+        # Recovered files occupy sampling slots just like new captures.
+        slot_times[image_path] = float(ss_times[i])
+    for i in capture_indices:
+        image_path = str((screenshot_dir / f"{sanitized_filename}-{i}.png").resolve())
+        capture_tasks.append(capture_with_semaphore((i, path, float(ss_times[i]), image_path, width, height, w_sar, h_sar, loglevel, hdr_tonemap, meta)))
 
     try:
         results = cast(list[object], await asyncio.gather(*capture_tasks, return_exceptions=True))
@@ -2040,6 +2087,9 @@ async def screenshots(
     if not force_screenshots and meta.debug:
         logger.info(f"[green]Successfully captured {len(capture_results)} screenshots.")
 
+    # Recovered frames need the same host validation and manifest registration
+    # as new captures; upload selection only uses the manifest once it exists.
+    capture_results = existing_image_paths + capture_results
     valid_results: list[str] = []
     remaining_retakes: list[str] = []
     for image_path in capture_results:
@@ -2091,6 +2141,9 @@ async def screenshots(
                     retake = True
 
         if retake:
+            if not tonemapping_checked:
+                hdr_tonemap = await determine_tonemapping(w_sar, h_sar, width, height, path, test_time, test_image_path, loglevel, meta)
+                tonemapping_checked = True
             retry_attempts = 5
             retry_offsets = [5.0, 10.0, -10.0, 100.0, -100.0]
             retry_image = str(Path(image_path).with_name(f"{Path(image_path).stem}-retry.png"))
@@ -2146,6 +2199,7 @@ async def screenshots(
 
                             if valid_image:
                                 Path(screenshot_path).replace(image_path)
+                                captured_times[image_path] = adjusted_time
                                 valid_results.append(image_path)
                                 break
                         except Exception as e:
@@ -2193,6 +2247,7 @@ async def screenshots(
 
                     if valid_image:
                         Path(screenshot_path).replace(image_path)
+                        captured_times[image_path] = random_time
                         valid_results.append(image_path)
                         break
                 except Exception as e:
@@ -2232,12 +2287,15 @@ async def screenshots(
         progress_label,
         current=num_capture,
         total=num_capture,
-        detail=f"{len(valid_results)}/{num_capture} frames captured",
+        detail=f"{len(valid_results)}/{num_screens} frames processed",
         group="media",
         unit="frames",
     )
 
-    new_screens = register_screenshots(base_dir, folder_id, valid_results, group) if valid_results else []
+    if any(Path(image_path).is_symlink() for image_path in valid_results):
+        logger.error("[red]Refusing to register a symlinked screenshot.[/red]")
+        return None
+    new_screens = register_screenshots(base_dir, folder_id, valid_results, group, timestamps=captured_times, slot_timestamps=slot_times) if valid_results else []
     await record_event_async("artifact", service="screenshot", operation="created", category="standard", count=len(new_screens))
     if not force_screenshots and not meta.retake:
         return [str(screen) for screen in manifest_files(base_dir, folder_id, group)[:requested_screens]]

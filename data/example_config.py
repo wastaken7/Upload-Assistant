@@ -414,7 +414,7 @@ config: dict[str, Any] = {
         # Custom signature added to the bottom of the description.
         # Can be overridden per tracker by adding the same setting to its configuration.
         "custom_signature": "",
-        # Override description text fields for specific release groups. Tags are matched
+        # Override description presentation settings for specific release groups. Tags are matched
         # case-insensitively, with or without their leading hyphen.
         # Per-tracker tag_overrides take precedence over these DEFAULT overrides.
         "tag_overrides": {
@@ -427,6 +427,9 @@ config: dict[str, Any] = {
             #     "dynamic_hdr_plot_header": "[h2]MyAwesomeGroupTag Dynamic HDR Metadata[/h2]",
             #     "tonemapped_header": "[center]MyAwesomeGroupTag SDR reference screenshots[/center]",
             #     "custom_signature": "[center]MyAwesomeGroupTag signature[/center]",
+            #     "thumbnail_size": "400",
+            #     "screens_per_row": "3",
+            #     "episode_overview": False,
             # },
         },
         # --- BLU-RAY SETTINGS ---
