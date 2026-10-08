@@ -75,6 +75,8 @@ class Meta:
     bit_depth: str = ""
     bloated: bool = False
     bluray_audio_skip: bool = False
+    bluray_auto_distributor: str | None = None
+    bluray_auto_region: str | None = None
     bluray_cover_urls: dict[str, Any] = field(default_factory=dict)
     bluray_score: int = 100
     bluray_single_score: int = 100
@@ -400,6 +402,7 @@ class Meta:
     regex_title: str = ""
     regex_year: str = ""
     region: str = ""
+    region_overrides: dict[str, str] = field(default_factory=dict)
     refundable: bool = False
     rehash: bool = False
     rehosted_artwork_url: str | None = None

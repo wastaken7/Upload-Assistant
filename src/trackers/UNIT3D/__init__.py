@@ -296,18 +296,22 @@ class UNIT3D:
         return "0"
 
     async def get_distributor_id(self, meta: Meta) -> dict[str, str]:
-        distributor_id = await self.common.unit3d_distributor_ids(meta.distributor)
+        distributor_id = await self.common.unit3d_distributor_ids(meta.distributor, tracker=self.tracker)
         if distributor_id:
             return {"distributor_id": distributor_id}
 
         return {}
 
     async def get_region_id(self, meta: Meta) -> dict[str, str]:
-        region_id = await self.common.unit3d_region_ids(meta.region)
+        region = meta.region_overrides.get(self.tracker, meta.region)
+        region_id = await self.common.unit3d_region_ids(region, tracker=self.tracker)
         if region_id:
             return {"region_id": region_id}
 
         return {}
+
+    async def get_region_name(self, region_id: int | str | None) -> str:
+        return await self.common.unit3d_region_ids(reverse=True, region_id=region_id, tracker=self.tracker)
 
     async def get_tmdb(self, meta: Meta) -> dict[str, str]:
         return {"tmdb": str(meta.tmdb) if meta.tmdb is not None else "0"}
