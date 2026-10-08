@@ -250,7 +250,9 @@
           if (["'", '"'].includes(source[position])) {
             key = string();
           } else {
-            const match = /^(?:[A-Za-z_$][\w$]*|\d+)/.exec(source.slice(position));
+            const match = /^(?:[A-Za-z_$][\w$]*|\d+)/.exec(
+              source.slice(position),
+            );
             if (!match) throw new Error("Invalid catalog object key.");
             key = match[0];
             position += key.length;
