@@ -652,8 +652,7 @@ class NameManager:
         return text
 
     async def missing_disc_info(self, meta: Meta, active_trackers: Sequence[str]) -> tuple[str, str, list[str]]:
-        region_id = await self.common.unit3d_region_ids(str(meta.region))
-        region_name = str(meta.region)
+        region_name = str(meta.region or "")
         distributor_name = meta.distributor
         trackers_to_remove: list[str] = []
 
@@ -665,10 +664,8 @@ class NameManager:
                     strictest["region"] = "mandatory"
                 if requirements.get("distributor") == "mandatory":
                     strictest["distributor"] = "mandatory"
-            if not region_id:
+            if not region_name:
                 region_name = await self._prompt_for_field(meta, "Region code", strictest["region"] == "mandatory")
-                if region_name and region_name != "SKIPPED":
-                    region_id = await self.common.unit3d_region_ids(region_name)
             if not distributor_name:
                 distributor_name = await self._prompt_for_field(meta, "Distributor", strictest["distributor"] == "mandatory")
                 if distributor_name and distributor_name != "SKIPPED":
@@ -676,6 +673,20 @@ class NameManager:
 
             for tracker in active_trackers:
                 requirements = TRACKER_DISC_REQUIREMENTS.get(tracker, {})
+                tracker_region = meta.region_overrides.get(tracker, region_name)
+                region_id = await self.common.unit3d_region_ids(tracker_region, tracker=tracker)
+                if requirements.get("region") == "mandatory":
+                    while not region_id and tracker_region and tracker_region != "SKIPPED":
+                        logger.warning(f"Region '{tracker_region}' is not recognized by {tracker}.")
+                        if meta.unattended and not meta.unattended_confirm:
+                            break
+                        replacement = await self._prompt_for_field(meta, f"Region code for {tracker} (press Enter to skip this tracker)", True)
+                        if not replacement or replacement == "SKIPPED":
+                            break
+                        tracker_region = replacement
+                        region_id = await self.common.unit3d_region_ids(tracker_region, tracker=tracker)
+                    if region_id and tracker_region != region_name:
+                        meta.region_overrides[tracker] = tracker_region
                 distributor_id = await self.common.unit3d_distributor_ids(distributor_name, tracker=tracker)
                 if requirements.get("distributor") == "mandatory":
                     while not distributor_id and distributor_name and distributor_name != "SKIPPED":
@@ -687,10 +698,13 @@ class NameManager:
                             break
                         distributor_name = replacement
                         distributor_id = await self.common.unit3d_distributor_ids(distributor_name, tracker=tracker)
-                missing_region = requirements.get("region") == "mandatory" and region_name == "SKIPPED"
+                missing_region = requirements.get("region") == "mandatory" and not region_id
                 missing_distributor = requirements.get("distributor") == "mandatory" and not distributor_id
                 if missing_region or missing_distributor:
-                    reason = "missing region information" if missing_region else f"missing or unsupported distributor '{distributor_name}'"
+                    if missing_region:
+                        reason = f"unsupported region '{tracker_region}'" if tracker_region and tracker_region != "SKIPPED" else "missing region information"
+                    else:
+                        reason = f"unsupported distributor '{distributor_name}'" if distributor_name and distributor_name != "SKIPPED" else "missing distributor information"
                     logger.warning(f"Skipping upload to {tracker}: {reason}.")
                     trackers_to_remove.append(tracker)
 

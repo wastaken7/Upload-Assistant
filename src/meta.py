@@ -402,6 +402,7 @@ class Meta:
     regex_title: str = ""
     regex_year: str = ""
     region: str = ""
+    region_overrides: dict[str, str] = field(default_factory=dict)
     refundable: bool = False
     rehash: bool = False
     rehosted_artwork_url: str | None = None

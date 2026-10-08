@@ -1,0 +1,92 @@
+{
+  "regions": {},
+  "distributors": {
+    "20": "A&amp;E Home Video",
+    "21": "A&amp;M Records",
+    "87": "Astro Records &amp; Filmworks",
+    "225": "D&#039;ailly Company",
+    "228": "Dall&#039;Angelo Pictures",
+    "240": "Delta Music &amp; Entertainment",
+    "289": "Ein&#039;s M&amp;M CO",
+    "395": "Gunpowder &amp; Sky",
+    "404": "Hell &amp; Back Recordings",
+    "405": "Hen&#039;s Tooth Video",
+    "452": "J&amp;R Adventures",
+    "461": "Kam &amp; Ronson Enterprises",
+    "484": "L&#039;atelier d&#039;images",
+    "506": "Loud &amp; Proud Records",
+    "679": "Polyband &amp; Toppic Video/WVG",
+    "686": "Pride &amp; Joy",
+    "717": "Reliance Home Video &amp; Games",
+    "890": "Uncork&#039;d Entertainment",
+    "898": "Universe Laser &amp; Video Co.",
+    "924": "Virgil Films &amp; Entertainment"
+  },
+  "categories": {
+    "1": "Movies",
+    "2": "TV",
+    "3": "Music",
+    "4": "Books",
+    "5": "Games",
+    "6": "Applications",
+    "7": "Other"
+  },
+  "types": {
+    "1": "Film",
+    "2": "CAM",
+    "3": "Episode",
+    "4": "Pack",
+    "5": "MP3",
+    "6": "FLAC",
+    "7": "e-Book",
+    "8": "Magazine",
+    "9": "Comic",
+    "10": "PC",
+    "11": "Console",
+    "12": "Other",
+    "13": "Foreign",
+    "14": "Unknown"
+  },
+  "resolutions": {
+    "1": "4320p",
+    "2": "2160p",
+    "3": "1080p",
+    "4": "HD",
+    "5": "720p",
+    "6": "576p",
+    "7": "SD",
+    "8": "480p",
+    "9": "360p",
+    "10": "404p",
+    "11": "Other",
+    "12": "N/A"
+  },
+  "regions_complete": true,
+  "distributors_complete": true,
+  "default_ids": {
+    "regions": [
+      "1-242"
+    ],
+    "distributors": [
+      "1-19",
+      "22-86",
+      "88-224",
+      "226-227",
+      "229-239",
+      "241-288",
+      "290-394",
+      "396-403",
+      "406-451",
+      "453-460",
+      "462-483",
+      "485-505",
+      "507-678",
+      "680-685",
+      "687-716",
+      "718-889",
+      "891-897",
+      "899-923",
+      "925-965"
+    ]
+  }
+}

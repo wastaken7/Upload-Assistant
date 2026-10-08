@@ -1,0 +1,56 @@
+{
+  "regions": {},
+  "distributors": {},
+  "categories": {
+    "1": "Movies",
+    "2": "TV",
+    "3": "Music",
+    "4": "Games",
+    "5": "Software",
+    "7": "Books",
+    "8": "Audiobooks",
+    "9": "Podcasts"
+  },
+  "types": {
+    "1": "Full Disc",
+    "2": "REMUX",
+    "3": "Encode",
+    "4": "WEB-DL",
+    "5": "WEBRip",
+    "6": "HDTV",
+    "7": "MP3",
+    "8": "FLAC",
+    "9": "ePub",
+    "10": "PDF",
+    "11": "Windows",
+    "12": "Mac OS",
+    "13": "Android",
+    "14": "iOS",
+    "15": "Other",
+    "17": "Linux",
+    "18": "Console"
+  },
+  "resolutions": {
+    "1": "4320p",
+    "2": "2160p",
+    "3": "1080p",
+    "4": "1080i",
+    "5": "720p",
+    "6": "576p",
+    "7": "576i",
+    "8": "480p",
+    "9": "480i",
+    "10": "Other",
+    "11": "540p"
+  },
+  "regions_complete": true,
+  "distributors_complete": true,
+  "default_ids": {
+    "regions": [
+      "1-244"
+    ],
+    "distributors": [
+      "1-965"
+    ]
+  }
+}

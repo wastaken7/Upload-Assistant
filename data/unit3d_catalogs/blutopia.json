@@ -1,5 +1,13 @@
 {
+  "regions": {
+    "245": "SVK",
+    "246": "FIN",
+    "247": "SWE",
+    "248": "BGR",
+    "249": "DNK"
+  },
   "distributors": {
+    "285": "Edel Records",
     "820": "StudioCanal",
     "966": "Plumeria Pictures",
     "967": "Indicator",
@@ -389,12 +397,51 @@
     "1352": "Periscope Film",
     "1353": "Anderson Merchandise"
   },
+  "categories": {
+    "1": "Movie",
+    "2": "TV Show",
+    "3": "Movie FANRES",
+    "5": "Trailer",
+    "8": "Other",
+    "9": "Live Concert",
+    "10": "TV FANRES"
+  },
+  "types": {
+    "1": "Full Disc",
+    "3": "Remux",
+    "4": "WEB-DL",
+    "5": "WEBRip",
+    "6": "HDTV",
+    "12": "Encode",
+    "15": "Other"
+  },
+  "resolutions": {
+    "1": "2160p",
+    "2": "1080p",
+    "3": "1080i",
+    "5": "720p",
+    "6": "576p",
+    "7": "576i",
+    "8": "480p",
+    "9": "480i",
+    "10": "Other",
+    "11": "4320p"
+  },
+  "regions_complete": true,
+  "distributors_complete": true,
+  "default_ids": {
+    "regions": [
+      "1-244"
+    ],
+    "distributors": [
+      "1-17",
+      "19-284",
+      "286-819",
+      "821-965"
+    ]
+  },
   "excluded_ids": [
     18
-  ],
-  "comments": [
-    "Atlantic Film (89) and AtlanticFilm (1037) have separate IDs",
-    "StudioCanal (820) and Studio Canal (1184) have separate IDs"
   ],
   "aliases": {
     "ANTI WORLDS": 1210,

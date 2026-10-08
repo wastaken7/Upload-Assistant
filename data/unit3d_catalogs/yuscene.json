@@ -1,0 +1,70 @@
+{
+  "regions": {},
+  "distributors": {},
+  "categories": {
+    "1": "Movies",
+    "2": "TV",
+    "7": "Games",
+    "8": "Music",
+    "10": "Music Videos",
+    "11": "Sport",
+    "12": "eBooks",
+    "13": "Audiobooks"
+  },
+  "types": {
+    "2": "Remux",
+    "3": "Encode",
+    "4": "WEB-DL",
+    "5": "WEBRip",
+    "6": "HDTV",
+    "7": "DVD",
+    "8": "Xbox",
+    "9": "Mp3",
+    "10": "PC",
+    "12": "PlayStation",
+    "13": "Win",
+    "14": "Mac",
+    "15": "Linux",
+    "16": "FLAC",
+    "17": "Full Disc",
+    "18": "Video",
+    "19": "Animation",
+    "20": "BluRay",
+    "21": "PDF",
+    "22": "RAR",
+    "23": "M4B",
+    "24": "Epub",
+    "25": "Mobi",
+    "26": "FB2",
+    "27": "Cbr/Cbz",
+    "28": "AZW3",
+    "29": "Lit",
+    "30": "Rtf",
+    "31": "M4A",
+    "32": "Nes",
+    "33": "Snes",
+    "35": "Nintendo"
+  },
+  "resolutions": {
+    "1": "4320p",
+    "2": "2160p",
+    "3": "1080p",
+    "4": "1080i",
+    "5": "720p",
+    "6": "576p",
+    "7": "576i",
+    "8": "480p",
+    "9": "480i",
+    "10": "Other"
+  },
+  "regions_complete": true,
+  "distributors_complete": true,
+  "default_ids": {
+    "regions": [
+      "1-244"
+    ],
+    "distributors": [
+      "1-965"
+    ]
+  }
+}

@@ -1,4 +1,10 @@
 {
+  "regions": {
+    "244": "FIN",
+    "246": "SWE",
+    "247": "CZE",
+    "248": "EST"
+  },
   "distributors": {
     "473": "Kinowelt Home Entertainment",
     "966": "ABC Studios",
@@ -59,7 +65,59 @@
     "1021": "Toy Robot Video",
     "1022": "Modern Films",
     "1023": "POLAR Film",
-    "1024": "Medien"
+    "1024": "Medien",
+    "1025": "Colours of Entertainment"
+  },
+  "categories": {
+    "1": "Movie",
+    "2": "TV",
+    "9": "Sport"
+  },
+  "types": {
+    "1": "Full Disc",
+    "2": "Remux",
+    "3": "Encode",
+    "4": "WEB-DL",
+    "5": "WEBRip",
+    "6": "HDTV",
+    "7": "Other",
+    "10": "Movie Pack",
+    "16": "Test",
+    "20": "Music - General",
+    "29": "Blues",
+    "30": "Classical",
+    "31": "Electronic",
+    "32": "Hip-Hop / Rap",
+    "33": "Jazz & Funk",
+    "34": "Latin",
+    "35": "Pop",
+    "36": "Rock"
+  },
+  "resolutions": {
+    "1": "4320p",
+    "2": "2160p",
+    "3": "1080p",
+    "4": "1080i",
+    "5": "720p",
+    "6": "576p",
+    "7": "576i",
+    "8": "480p",
+    "9": "480i",
+    "10": "Other",
+    "42": "1440p"
+  },
+  "regions_complete": true,
+  "distributors_complete": true,
+  "default_ids": {
+    "regions": [
+      "1-243"
+    ],
+    "distributors": [
+      "1-17",
+      "19-472",
+      "474-756",
+      "758-965"
+    ]
   },
   "excluded_ids": [
     18,

@@ -69,7 +69,10 @@ class SceneManager:
     async def _release_details(self, client: httpx.AsyncClient, release: str, cache_dir: Path) -> dict[str, Any] | None:
         safe_release = re.sub(r"[^A-Za-z0-9._-]+", "_", Path(release).name).strip("._") or "scene_release"
         return await self._cached_srrdb_request(
-            client, f"https://api.srrdb.com/v1/details/{urllib.parse.quote(release, safe='')}", cache_dir / f"{safe_release}.json", operation="details",
+            client,
+            f"https://api.srrdb.com/v1/details/{urllib.parse.quote(release, safe='')}",
+            cache_dir / f"{safe_release}.json",
+            operation="details",
         )
 
     def _archived_files(self, details: dict[str, Any]) -> list[dict[str, Any]]:
@@ -82,14 +85,17 @@ class SceneManager:
         return Path(file["name"].replace("\\", "/")).name
 
     async def _search_archived_filename(
-        self, client: httpx.AsyncClient, filename: str, cache_dir: Path, details_cache_dir: Path,
+        self,
+        client: httpx.AsyncClient,
+        filename: str,
+        cache_dir: Path,
+        details_cache_dir: Path,
     ) -> dict[str, Any] | None:
         # Stored sample names can identify a release when the media name differs.
         base = Path(filename).stem.lower()
         ext = Path(filename).suffix.lower()
         sample_ext = ".m2ts" if ext == ".iso" else ext
-        names = [filename, f"{base}.sample{sample_ext}", f"{base}-sample{sample_ext}",
-                 f"sample-{base}{sample_ext}", f"sample.{base}{sample_ext}"]
+        names = [filename, f"{base}.sample{sample_ext}", f"{base}-sample{sample_ext}", f"sample-{base}{sample_ext}", f"sample.{base}{sample_ext}"]
         prefix, separator, group = base.rpartition("-")
         if separator:
             names.extend([f"{prefix}.sample-{group}{sample_ext}", f"{prefix}-sample-{group}{sample_ext}"])
@@ -97,7 +103,9 @@ class SceneManager:
         for name in names:
             quoted_name = urllib.parse.quote(name, safe="")
             response = await self._cached_srrdb_request(
-                client, f"https://api.srrdb.com/v1/search/store-real-filename:{quoted_name}", cache_dir / f"{quoted_name}.json",
+                client,
+                f"https://api.srrdb.com/v1/search/store-real-filename:{quoted_name}",
+                cache_dir / f"{quoted_name}.json",
             )
             if response is None or response.get("warnings"):
                 continue
@@ -110,10 +118,7 @@ class SceneManager:
             except ValueError:
                 return None
             if not isinstance(candidates, list) or any(
-                not isinstance(candidate, dict)
-                or not isinstance(candidate.get("release"), str)
-                or not candidate["release"].strip()
-                for candidate in candidates
+                not isinstance(candidate, dict) or not isinstance(candidate.get("release"), str) or not candidate["release"].strip() for candidate in candidates
             ):
                 return None
             # Do not guess from truncated results or fan out over broad searches.
@@ -248,16 +253,23 @@ class SceneManager:
                 # Cache file for search
                 search_cache_file = Path(search_cache_dir) / f"{quoted_base}.json"
                 response_json = await self._cached_srrdb_request(
-                    client, f"https://api.srrdb.com/v1/search/r:{quoted_base}", search_cache_file,
+                    client,
+                    f"https://api.srrdb.com/v1/search/r:{quoted_base}",
+                    search_cache_file,
                 )
 
                 if (
-                    response_json is not None and int(response_json.get("resultsCount", 0)) == 0
-                    and match and (not meta.is_disc or meta.keep_folder)
+                    response_json is not None
+                    and int(response_json.get("resultsCount", 0)) == 0
+                    and match
+                    and (not meta.is_disc or meta.keep_folder)
                     and not (meta.category == "GAME" and meta.isdir)
                 ):
                     archived_result = await self._search_archived_filename(
-                        client, Path(video).name, cache_dir / "stored-filename-search", details_cache_dir,
+                        client,
+                        Path(video).name,
+                        cache_dir / "stored-filename-search",
+                        details_cache_dir,
                     )
                     if archived_result:
                         response_json = {"resultsCount": 1, "results": [archived_result]}

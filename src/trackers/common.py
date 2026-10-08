@@ -32,6 +32,8 @@ from src.genre_map import AUDIBLE_ENG_GENRE_MAP, AUDIBLE_PTBR_GENRE_MAP, ENG_TO_
 from src.languages import languages_manager
 from src.meta import Meta
 from src.torrent_manifest import TorrentManifest
+from src.unit3d_catalogs import region_id as resolve_region_id
+from src.unit3d_catalogs import region_name as resolve_region_name
 from src.usenetcreate import verify_nzb_has_password
 
 
@@ -532,271 +534,12 @@ class Common:
             logger.info(f"[bold red]Error saving image links: {e}[/bold red]")
             return None
 
-    async def unit3d_region_ids(self, region: str = "", reverse: bool = False, region_id: int = 0) -> str:
-        region_map = {
-            "AFG": 1,
-            "AIA": 2,
-            "ALA": 3,
-            "ALG": 4,
-            "AND": 5,
-            "ANG": 6,
-            "ARG": 7,
-            "ARM": 8,
-            "ARU": 9,
-            "ASA": 10,
-            "ATA": 11,
-            "ATF": 12,
-            "ATG": 13,
-            "AUS": 14,
-            "AUT": 15,
-            "AZE": 16,
-            "BAH": 17,
-            "BAN": 18,
-            "BDI": 19,
-            "BEL": 20,
-            "BEN": 21,
-            "BER": 22,
-            "BES": 23,
-            "BFA": 24,
-            "BHR": 25,
-            "BHU": 26,
-            "BIH": 27,
-            "BLM": 28,
-            "BLR": 29,
-            "BLZ": 30,
-            "BOL": 31,
-            "BOT": 32,
-            "BRA": 33,
-            "BRB": 34,
-            "BRU": 35,
-            "BVT": 36,
-            "CAM": 37,
-            "CAN": 38,
-            "CAY": 39,
-            "CCK": 40,
-            "CEE": 41,
-            "CGO": 42,
-            "CHA": 43,
-            "CHI": 44,
-            "CHN": 45,
-            "CIV": 46,
-            "CMR": 47,
-            "COD": 48,
-            "COK": 49,
-            "COL": 50,
-            "COM": 51,
-            "CPV": 52,
-            "CRC": 53,
-            "CRO": 54,
-            "CTA": 55,
-            "CUB": 56,
-            "CUW": 57,
-            "CXR": 58,
-            "CYP": 59,
-            "DJI": 60,
-            "DMA": 61,
-            "DOM": 62,
-            "ECU": 63,
-            "EGY": 64,
-            "ENG": 65,
-            "EQG": 66,
-            "ERI": 67,
-            "ESH": 68,
-            "ESP": 69,
-            "ETH": 70,
-            "FIJ": 71,
-            "FLK": 72,
-            "FRA": 73,
-            "FRO": 74,
-            "FSM": 75,
-            "GAB": 76,
-            "GAM": 77,
-            "GBR": 78,
-            "GEO": 79,
-            "GER": 80,
-            "GGY": 81,
-            "GHA": 82,
-            "GIB": 83,
-            "GLP": 84,
-            "GNB": 85,
-            "GRE": 86,
-            "GRL": 87,
-            "GRN": 88,
-            "GUA": 89,
-            "GUF": 90,
-            "GUI": 91,
-            "GUM": 92,
-            "GUY": 93,
-            "HAI": 94,
-            "HKG": 95,
-            "HMD": 96,
-            "HON": 97,
-            "HUN": 98,
-            "IDN": 99,
-            "IMN": 100,
-            "IND": 101,
-            "IOT": 102,
-            "IRL": 103,
-            "IRN": 104,
-            "IRQ": 105,
-            "ISL": 106,
-            "ISR": 107,
-            "ITA": 108,
-            "JAM": 109,
-            "JEY": 110,
-            "JOR": 111,
-            "JPN": 112,
-            "KAZ": 113,
-            "KEN": 114,
-            "KGZ": 115,
-            "KIR": 116,
-            "KNA": 117,
-            "KOR": 118,
-            "KSA": 119,
-            "KUW": 120,
-            "KVX": 121,
-            "LAO": 122,
-            "LBN": 123,
-            "LBR": 124,
-            "LBY": 125,
-            "LCA": 126,
-            "LES": 127,
-            "LIE": 128,
-            "LKA": 129,
-            "LUX": 130,
-            "MAC": 131,
-            "MAD": 132,
-            "MAF": 133,
-            "MAR": 134,
-            "MAS": 135,
-            "MDA": 136,
-            "MDV": 137,
-            "MEX": 138,
-            "MHL": 139,
-            "MKD": 140,
-            "MLI": 141,
-            "MLT": 142,
-            "MNG": 143,
-            "MNP": 144,
-            "MON": 145,
-            "MOZ": 146,
-            "MRI": 147,
-            "MSR": 148,
-            "MTN": 149,
-            "MTQ": 150,
-            "MWI": 151,
-            "MYA": 152,
-            "MYT": 153,
-            "NAM": 154,
-            "NCA": 155,
-            "NCL": 156,
-            "NEP": 157,
-            "NFK": 158,
-            "NIG": 159,
-            "NIR": 160,
-            "NIU": 161,
-            "NLD": 162,
-            "NOR": 163,
-            "NRU": 164,
-            "NZL": 165,
-            "OMA": 166,
-            "PAK": 167,
-            "PAN": 168,
-            "PAR": 169,
-            "PCN": 170,
-            "PER": 171,
-            "PHI": 172,
-            "PLE": 173,
-            "PLW": 174,
-            "PNG": 175,
-            "POL": 176,
-            "POR": 177,
-            "PRK": 178,
-            "PUR": 179,
-            "QAT": 180,
-            "REU": 181,
-            "ROU": 182,
-            "RSA": 183,
-            "RUS": 184,
-            "RWA": 185,
-            "SAM": 186,
-            "SCO": 187,
-            "SDN": 188,
-            "SEN": 189,
-            "SEY": 190,
-            "SGS": 191,
-            "SHN": 192,
-            "SIN": 193,
-            "SJM": 194,
-            "SLE": 195,
-            "SLV": 196,
-            "SMR": 197,
-            "SOL": 198,
-            "SOM": 199,
-            "SPM": 200,
-            "SRB": 201,
-            "SSD": 202,
-            "STP": 203,
-            "SUI": 204,
-            "SUR": 205,
-            "SWZ": 206,
-            "SXM": 207,
-            "SYR": 208,
-            "TAH": 209,
-            "TAN": 210,
-            "TCA": 211,
-            "TGA": 212,
-            "THA": 213,
-            "TJK": 214,
-            "TKL": 215,
-            "TKM": 216,
-            "TLS": 217,
-            "TOG": 218,
-            "TRI": 219,
-            "TUN": 220,
-            "TUR": 221,
-            "TUV": 222,
-            "TWN": 223,
-            "UAE": 224,
-            "UGA": 225,
-            "UKR": 226,
-            "UMI": 227,
-            "URU": 228,
-            "USA": 229,
-            "UZB": 230,
-            "VAN": 231,
-            "VAT": 232,
-            "VEN": 233,
-            "VGB": 234,
-            "VIE": 235,
-            "VIN": 236,
-            "VIR": 237,
-            "WAL": 238,
-            "WLF": 239,
-            "YEM": 240,
-            "ZAM": 241,
-            "ZIM": 242,
-            "EUR": 243,
-        }
-
+    async def unit3d_region_ids(self, region: str = "", reverse: bool = False, region_id: int | str | None = 0, tracker: str = "") -> str:
         if reverse:
-            # Reverse lookup: Find region code by ID
-            # Convert to int to handle cases where API returns string
-            try:
-                region_id = region_id
-            except ValueError, TypeError:
-                return ""
-            for code, id_value in region_map.items():
-                if id_value == region_id:
-                    return code
-            return ""
-        # Forward lookup: Find region ID by code
-        region_id_value = region_map.get(region)
-        return str(region_id_value) if region_id_value else ""
+            return resolve_region_name(region_id, tracker)
+        return resolve_region_id(region, tracker)
 
-    async def unit3d_distributor_ids(
-        self, distributor: str = "", reverse: bool = False, distributor_id: int | str | None = 0, tracker: str = ""
-    ) -> str:
+    async def unit3d_distributor_ids(self, distributor: str = "", reverse: bool = False, distributor_id: int | str | None = 0, tracker: str = "") -> str:
         if reverse:
             return distributor_name(distributor_id, tracker)
         return resolve_distributor_id(distributor, tracker)
@@ -855,7 +598,7 @@ class Common:
         logger.debug(f"[blue]Distributor ID: {distributor_id}[/blue]")
 
         if not meta.region and region_id:
-            region_name = await self.unit3d_region_ids(reverse=True, region_id=region_id)
+            region_name = await self.unit3d_region_ids(reverse=True, region_id=region_id, tracker=tracker)
             if region_name:
                 meta.region = region_name
                 logger.debug(f"[green]Mapped region_id {region_id} to '{region_name}'[/green]")
@@ -991,7 +734,7 @@ class Common:
                 imdb = 0 if imdb == 0 else imdb
                 if not meta.region and meta.is_disc in ("BDMV", "DVD"):
                     region_id = attributes.get("region_id")
-                    region_name = await region_resolver(region_id) if region_resolver else await self.unit3d_region_ids(reverse=True, region_id=region_id)
+                    region_name = await region_resolver(region_id) if region_resolver else await self.unit3d_region_ids(reverse=True, region_id=region_id, tracker=tracker)
                     if region_name:
                         meta.region = region_name
                 if not meta.distributor and meta.is_disc in ("BDMV", "DVD"):
@@ -1018,7 +761,7 @@ class Common:
                     imdb = 0 if imdb == 0 else imdb
                     if not meta.region and meta.is_disc in ("BDMV", "DVD"):
                         region_id = attributes.get("region_id")
-                        region_name = await region_resolver(region_id) if region_resolver else await self.unit3d_region_ids(reverse=True, region_id=region_id)
+                        region_name = await region_resolver(region_id) if region_resolver else await self.unit3d_region_ids(reverse=True, region_id=region_id, tracker=tracker)
                         if region_name:
                             meta.region = region_name
                     if not meta.distributor and meta.is_disc in ("BDMV", "DVD"):
