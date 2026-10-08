@@ -19,6 +19,7 @@ from src.bluray_com import get_bluray_releases
 from src.book_prep import AUDIOBOOK_EXTENSIONS, BOOK_EXTENSIONS, BOOK_SERVICES
 from src.cleanup import cleanup_manager
 from src.clients import Clients
+from src.config_helpers import parse_bool
 from src.console import logger
 from src.edition import get_edition
 from src.exceptions import NoAudioMediaError
@@ -888,9 +889,29 @@ def _apply_derived_imdb_id(meta: Meta, filename: str, imdb_id: int, info: dict[s
     return True
 
 
-def _should_fetch_bluray_info(meta: Meta, get_bluray_info: bool) -> bool:
+def _should_add_bluray_link(meta: Meta, config: dict[str, Any]) -> bool:
+    default = parse_bool(config.get("DEFAULT", {}).get("add_bluray_link", False))
+    trackers_config = config.get("TRACKERS", {})
+    trackers = meta.trackers or [tracker.strip().upper() for tracker in trackers_config.get("default_trackers", "").split(",") if tracker.strip()]
+    if isinstance(trackers, str):
+        trackers = [tracker.strip().upper() for tracker in trackers.split(",") if tracker.strip()]
+    if not trackers:
+        return default
+    for tracker in trackers:
+        value = trackers_config.get(tracker, {}).get("add_bluray_link")
+        enabled = default if value is None or value == "" else parse_bool(value)
+        if enabled:
+            return True
+    return False
+
+
+def _should_fetch_bluray_info(meta: Meta, get_bluray_info: bool, add_bluray_link: bool = False) -> bool:
     return bool(
-        meta.is_disc in ("BDMV", "DVD") and get_bluray_info and (not meta.distributor or not meta.region) and meta.imdb_id != 0 and not meta.edit and not meta.site_check
+        meta.is_disc in ("BDMV", "DVD")
+        and (add_bluray_link or (get_bluray_info and (not meta.distributor or not meta.region)))
+        and meta.imdb_id != 0
+        and (add_bluray_link or not meta.edit)
+        and not meta.site_check
     )
 
 
@@ -1470,7 +1491,7 @@ async def finalize_metadata(
     meta.bluray_score = int(float(prep_instance.config["DEFAULT"].get("bluray_score", 100)))
     meta.bluray_single_score = int(float(prep_instance.config["DEFAULT"].get("bluray_single_score", 100)))
     meta.use_bluray_images = prep_instance.config["DEFAULT"].get("use_bluray_images", False)
-    if _should_fetch_bluray_info(meta, get_bluray_info):
+    if _should_fetch_bluray_info(meta, get_bluray_info, _should_add_bluray_link(meta, prep_instance.config)):
         releases = await get_bluray_releases(meta)
 
         if releases and meta.is_disc in ("BDMV", "DVD") and meta.use_bluray_images:
@@ -1622,7 +1643,7 @@ async def finalize_metadata(
                         meta.video_width = int(float(video_track.get("Width", 0)))
                         meta.video_height = int(float(video_track.get("Height", 0)))
 
-        meta.distributor = await get_distributor(meta.distributor)
+        meta.distributor = await get_distributor(meta.distributor) or meta.distributor
         if meta.distributor is None:
             meta.distributor = ""
 

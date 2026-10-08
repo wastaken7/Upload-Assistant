@@ -1,0 +1,14 @@
+{
+  "distributors": {
+    "966": "Deaf Crocodile",
+    "967": "Rhino Home Video",
+    "968": "US Manga Corps",
+    "969": "ADV Films",
+    "970": "Crunchyroll"
+  },
+  "aliases": {
+    "CRUNCHYROLL LLC": 970,
+    "CRUNCHYROLL, LLC": 970,
+    "U.S. MANGA CORPS": 968
+  }
+}

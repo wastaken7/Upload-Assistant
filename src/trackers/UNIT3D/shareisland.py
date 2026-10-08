@@ -316,7 +316,7 @@ class ShareIsland(UNIT3D):
                 distributor_name = distributor_name.strip().upper() if distributor_name else None
 
             if distributor_name:
-                distributor_id = await self.common.unit3d_distributor_ids(distributor_name)
+                distributor_id = await self.common.unit3d_distributor_ids(distributor_name, tracker=self.tracker)
 
             # Store in module-level dict keyed by UUID (survives instance recreation)
             _shri_session_data[meta.uuid] = {
