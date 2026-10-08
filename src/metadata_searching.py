@@ -112,6 +112,7 @@ async def all_ids(meta: Meta, tvdb_handler: Any, tmdb_manager: TmdbManager) -> M
             tvdb_id=meta.tvdb_id,
             filename=meta.filename,
             base_dir=meta.base_dir,
+            manual_season=meta.manual_season,
         ),
         imdb_manager.get_imdb_info_api(meta.imdb_id, manual_language=meta.manual_language, base_dir=meta.base_dir, config=tmdb_manager.config),
     ]
@@ -264,6 +265,7 @@ async def imdb_tmdb_tvdb(meta: Meta, filename: str, tvdb_handler: Any, tmdb_mana
             tvdb_id=meta.tvdb_id,
             filename=filename,
             base_dir=meta.base_dir,
+            manual_season=meta.manual_season,
         ),
         imdb_manager.get_imdb_info_api(meta.imdb_id, manual_language=meta.manual_language, base_dir=meta.base_dir, config=tmdb_manager.config),
     ]
@@ -500,6 +502,7 @@ async def imdb_tmdb(meta: Meta, filename: str, _tvdb_handler: Any, tmdb_manager:
             quickie_search=meta.quickie_search,
             filename=filename,
             base_dir=meta.base_dir,
+            manual_season=meta.manual_season,
         ),
         imdb_manager.get_imdb_info_api(meta.imdb_id, manual_language=meta.manual_language, base_dir=meta.base_dir, config=tmdb_manager.config),
     ]
