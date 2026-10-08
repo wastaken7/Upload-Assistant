@@ -105,7 +105,7 @@ async def test_required_tracker_accepts_its_custom_distributor_without_prompt():
 async def test_unsupported_supplied_distributor_is_preserved_and_required_tracker_skipped():
     manager = NameManager({})
     manager._prompt_for_field = AsyncMock()
-    meta = Meta(is_disc="BDMV", region="USA", distributor="UNLISTED STUDIO")
+    meta = Meta(is_disc="BDMV", region="USA", distributor="UNLISTED STUDIO", unattended=True)
     region, distributor, removed = await manager.missing_disc_info(meta, ["ULCX", "OLDTOONSWORLD"])
     assert (region, distributor, removed) == ("USA", "UNLISTED STUDIO", ["ULCX"])
     manager._prompt_for_field.assert_not_awaited()
