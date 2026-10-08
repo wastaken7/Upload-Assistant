@@ -2,6 +2,7 @@
 from typing import Any
 
 from src.meta import Meta
+from src.rehostimages import ImageHostPolicy, RehostImagesManager
 from src.trackers.common import Common
 from src.trackers.UNIT3D import UNIT3D
 
@@ -20,10 +21,13 @@ class TorrentHR(UNIT3D):
     supported_categories = ("TV", "MOVIE")
     tracker_urls = ("torrenthr.org",)
     allows_bloated_audio = True
+    approved_image_hosts = ("thrimg",)
+    image_host_policy = ImageHostPolicy({"slike.torrenthr.org": "thrimg"}, approved_image_hosts)
 
     def __init__(self, config: dict[str, Any]) -> None:
         super().__init__(config, tracker_name=self.tracker)
         self.common = Common(config)
+        self.rehost_images_manager = RehostImagesManager(config)
 
     async def get_category_id(self, meta: Meta, category: str | None = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         category_id = {
