@@ -4021,6 +4021,10 @@ function AudionutsUAGUI() {
     );
   };
 
+  const collapseFileBrowser = () => {
+    setExpandedFolders(new Set());
+  };
+
   const toggleFolder = async (path) => {
     const newExpanded = new Set(expandedFolders);
 
@@ -6169,19 +6173,30 @@ function AudionutsUAGUI() {
                       <FolderIcon />
                       File Browser
                     </h2>
-                    <button
-                      type="button"
-                      onClick={refreshFileBrowser}
-                      disabled={fileBrowserRefreshing}
-                      aria-label="Refresh file browser"
-                      title="Refresh file browser"
-                      className={`rounded p-1.5 transition-colors disabled:cursor-wait disabled:opacity-60 ${isDarkMode ? "text-gray-400 hover:bg-gray-700 hover:text-gray-200" : "text-gray-500 hover:bg-gray-200 hover:text-gray-700"}`}
-                    >
-                      <LucideIcon
-                        name="refresh-cw"
-                        className={`h-4 w-4 ${fileBrowserRefreshing ? "animate-spin" : ""}`}
-                      />
-                    </button>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={collapseFileBrowser}
+                        aria-label="Collapse all folders"
+                        title="Collapse all folders"
+                        className={`rounded p-1.5 transition-colors ${isDarkMode ? "text-gray-400 hover:bg-gray-700 hover:text-gray-200" : "text-gray-500 hover:bg-gray-200 hover:text-gray-700"}`}
+                      >
+                        <LucideIcon name="list-collapse" className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={refreshFileBrowser}
+                        disabled={fileBrowserRefreshing}
+                        aria-label="Refresh file browser"
+                        title="Refresh file browser"
+                        className={`rounded p-1.5 transition-colors disabled:cursor-wait disabled:opacity-60 ${isDarkMode ? "text-gray-400 hover:bg-gray-700 hover:text-gray-200" : "text-gray-500 hover:bg-gray-200 hover:text-gray-700"}`}
+                      >
+                        <LucideIcon
+                          name="refresh-cw"
+                          className={`h-4 w-4 ${fileBrowserRefreshing ? "animate-spin" : ""}`}
+                        />
+                      </button>
+                    </div>
                   </div>
                   <div className="relative mt-2">
                     <input
@@ -6910,19 +6925,30 @@ function AudionutsUAGUI() {
                       <FolderIcon />
                       File Browser
                     </h2>
-                    <button
-                      type="button"
-                      onClick={refreshFileBrowser}
-                      disabled={fileBrowserRefreshing}
-                      aria-label="Refresh file browser"
-                      title="Refresh file browser"
-                      className={`rounded p-1.5 transition-colors disabled:cursor-wait disabled:opacity-60 ${isDarkMode ? "text-gray-400 hover:bg-gray-700 hover:text-gray-200" : "text-gray-500 hover:bg-gray-200 hover:text-gray-700"}`}
-                    >
-                      <LucideIcon
-                        name="refresh-cw"
-                        className={`h-4 w-4 ${fileBrowserRefreshing ? "animate-spin" : ""}`}
-                      />
-                    </button>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={collapseFileBrowser}
+                        aria-label="Collapse all folders"
+                        title="Collapse all folders"
+                        className={`rounded p-1.5 transition-colors ${isDarkMode ? "text-gray-400 hover:bg-gray-700 hover:text-gray-200" : "text-gray-500 hover:bg-gray-200 hover:text-gray-700"}`}
+                      >
+                        <LucideIcon name="list-collapse" className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={refreshFileBrowser}
+                        disabled={fileBrowserRefreshing}
+                        aria-label="Refresh file browser"
+                        title="Refresh file browser"
+                        className={`rounded p-1.5 transition-colors disabled:cursor-wait disabled:opacity-60 ${isDarkMode ? "text-gray-400 hover:bg-gray-700 hover:text-gray-200" : "text-gray-500 hover:bg-gray-200 hover:text-gray-700"}`}
+                      >
+                        <LucideIcon
+                          name="refresh-cw"
+                          className={`h-4 w-4 ${fileBrowserRefreshing ? "animate-spin" : ""}`}
+                        />
+                      </button>
+                    </div>
                   </div>
                   <div className="relative mt-2">
                     <input
