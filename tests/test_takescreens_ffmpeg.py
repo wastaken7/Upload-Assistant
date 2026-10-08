@@ -5,14 +5,142 @@ import asyncio
 import json
 import sys
 from pathlib import Path
+from random import Random
 from types import SimpleNamespace
 
 import ffmpeg
 import pytest
 from PIL import Image
 
-from src import takescreens
+from src import takescreens, uploadscreens
 from src.meta import Meta
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("existing_indices", "registered_count", "corrupt_indices", "empty_indices"),
+    [
+        ([], 0, [], []),
+        (list(range(6)), 0, [], []),
+        ([0, 2, 4, 7, 9, 11], 0, [], []),
+        (list(range(12)), 0, [], []),
+        (list(range(6)), 6, [], []),
+        (list(range(6)), 0, [6, 8], []),
+        pytest.param([0, 1, 2, 3], 6, [], [4, 5], id="six-renamed-four-complete-two-empty"),
+    ],
+)
+@pytest.mark.parametrize("manual", [False, True])
+@pytest.mark.parametrize("registered_timestamps", [False, True])
+async def test_video_resume_registers_existing_frames_and_fills_gaps(
+    monkeypatch, tmp_path, existing_indices, registered_count, corrupt_indices, empty_indices, manual, registered_timestamps
+):
+    release_id = "interrupted-video"
+    screenshot_dir = takescreens.screenshots_dir(tmp_path, release_id)
+    (screenshot_dir.parent / "MediaInfo.json").write_text(
+        json.dumps({"media": {"track": [{"Duration": 600}, {"Duration": 600, "Width": 256, "Height": 256, "FrameRate": 24}]}}),
+        encoding="utf-8",
+    )
+    image = Image.frombytes("RGB", (256, 256), Random(0).randbytes(256 * 256 * 3))
+    for index in existing_indices:
+        image.save(screenshot_dir / f"Illegal-{index}.png")
+    for index in corrupt_indices:
+        (screenshot_dir / f"Illegal-{index}.png").write_bytes(b"incomplete PNG" * 10000)
+    for index in empty_indices:
+        (screenshot_dir / f"Illegal-{index}.png").touch()
+    registered = []
+    for index in range(registered_count):
+        output = screenshot_dir / f"registered-{index}.png"
+        image.save(output)
+        registered.append(output)
+    meta = Meta(category="TV", tv_pack=1, base_dir=str(tmp_path), uuid=release_id, screens=12, image_list=[], imghost="ptscreens")
+    sampling_times = [float(index + 1) for index in range(12)] if manual else [float(value) for value in await takescreens.valid_ss_time([], 12, 600, 24, meta)]
+    registered_slots = list(range(1, 12, 2))[:registered_count] if registered_timestamps else list(range(registered_count))
+    timestamps = {str(output): sampling_times[slot] for output, slot in zip(registered, registered_slots)} if registered_timestamps else None
+    registered = takescreens.register_screenshots(tmp_path, release_id, registered, "main", timestamps=timestamps, slot_timestamps=timestamps)
+    remaining_times = [timestamp for slot, timestamp in enumerate(sampling_times) if slot not in registered_slots]
+    calls = []
+
+    async def image_host_stub(_meta):
+        return "ptscreens"
+
+    async def tonemapping_stub(*_args):
+        return False
+
+    async def capture_stub(args):
+        index, _source, timestamp, output, *_rest = args
+        calls.append((index, timestamp, Path(output).name))
+        image.save(output)
+        return index, output
+
+    monkeypatch.setattr(takescreens, "cutoff", 12)
+    monkeypatch.setattr(takescreens, "tone_map", False)
+    monkeypatch.setattr(takescreens, "get_image_host", image_host_stub)
+    monkeypatch.setattr(takescreens, "determine_tonemapping", tonemapping_stub)
+    monkeypatch.setattr(takescreens, "capture_screenshot", capture_stub)
+    kwargs = {"manual_frames": [24 * (index + 1) for index in range(12)]} if manual else {}
+
+    result = await takescreens.screenshots("source.mkv", "Illegal", release_id, str(tmp_path), meta, cleanup_after_capture=False, **kwargs)
+
+    expected_indices = set(range(12 - registered_count)) - set(existing_indices)
+    assert {name for _, _, name in calls} == {f"Illegal-{index}.png" for index in expected_indices}
+    assert len(calls) == len(expected_indices)
+    assert all(timestamp == remaining_times[index] for index, timestamp, _ in calls)
+    expected_times = sampling_times if registered_timestamps else remaining_times
+    assert sorted(takescreens.capture_timestamps(tmp_path, release_id, "main", original_slots=True)) == sorted(expected_times)
+    inventory = takescreens.manifest_files(tmp_path, release_id, "main")
+    assert len(result) == len(inventory) == 12
+    assert set(result) == {str(path) for path in inventory}
+    assert set(registered) <= set(inventory)
+    assert not list(screenshot_dir.glob("Illegal-*.png"))
+    for output in inventory:
+        with Image.open(output) as recovered:
+            recovered.verify()
+
+    # The later upload-stage capture must reuse the entire recovered group,
+    # including when metadata enrichment changed the display title.
+    calls.clear()
+    second_result = await takescreens.screenshots("source.mkv", "New Title", release_id, str(tmp_path), meta, cleanup_after_capture=False, **kwargs)
+    assert second_result == result
+    assert calls == []
+
+    uploaded = []
+
+    async def upload_stub(args):
+        uploaded.append(args[0])
+        url = f"https://images.example/{Path(args[0]).name}"
+        return {"status": "success", "img_url": url, "raw_url": url, "web_url": url}
+
+    monkeypatch.setattr(uploadscreens, "upload_image_task", upload_stub)
+    config = {"DEFAULT": {"img_host_1": "ptscreens"}, "TRACKERS": {}}
+    _, uploaded_count = await uploadscreens._upload_screens(config, meta, 12, 1, 0, 12, [], {})
+    assert uploaded_count == len(uploaded) == 12
+    assert set(uploaded) == set(result)
+
+
+@pytest.mark.asyncio
+async def test_video_resume_rejects_symlinked_screenshot(tmp_path):
+    release_id = "linked-video"
+    screenshot_dir = takescreens.screenshots_dir(tmp_path, release_id)
+    (screenshot_dir.parent / "MediaInfo.json").write_text(
+        json.dumps({"media": {"track": [{"Duration": 600}, {"Duration": 600, "Width": 256, "Height": 256, "FrameRate": 24}]}}),
+        encoding="utf-8",
+    )
+    outside = tmp_path / "outside.png"
+    Image.frombytes("RGB", (256, 256), Random(0).randbytes(256 * 256 * 3)).save(outside)  # noqa: S311
+    original = outside.read_bytes()
+    link = screenshot_dir / "Video-0.png"
+    try:
+        link.symlink_to(outside)
+    except OSError, NotImplementedError:
+        pytest.skip("Screenshot symlinks are unavailable")
+    meta = Meta(category="MOVIE", base_dir=str(tmp_path), uuid=release_id, screens=1, imghost="ptscreens")
+
+    result = await takescreens.screenshots("source.mkv", "Video", release_id, str(tmp_path), meta, cleanup_after_capture=False)
+
+    assert result is None
+    assert link.is_symlink()
+    assert outside.read_bytes() == original
+    assert takescreens.manifest_files(tmp_path, release_id, "main") == []
 
 
 async def _stop_process(process: asyncio.subprocess.Process) -> None:
@@ -520,7 +648,10 @@ async def test_video_retake_preserves_original_until_replacement_is_valid(monkey
         Path(image).write_bytes(b"x" * 50000)
         return index, image
 
-    def register_stub(_base_dir, _uuid, paths, _group):
+    def register_stub(_base_dir, _uuid, paths, _group, **_kwargs):
+        if paths:
+            assert _kwargs["timestamps"] == {str(original): 105.0}
+            assert _kwargs["slot_timestamps"] == {str(original): 100.0}
         registered.extend(paths)
         return []
 
@@ -537,3 +668,32 @@ async def test_video_retake_preserves_original_until_replacement_is_valid(monkey
     assert original.read_bytes() == (b"y" * 80000 if retry_succeeds else b"x" * 50000)
     assert not Path(attempts[0]).exists()
     assert registered == ([str(original)] if retry_succeeds else [])
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("tone_map", "force_tonemap"), [(False, True), (True, False)])
+async def test_recovered_frame_retake_honors_tonemapping(monkeypatch, tmp_path, tone_map, force_tonemap):
+    release_id = "recovered-tonemap"
+    screenshot_dir = takescreens.screenshots_dir(tmp_path, release_id)
+    (screenshot_dir.parent / "MediaInfo.json").write_text(
+        json.dumps({"media": {"track": [{"Duration": 600}, {"Duration": 600, "Width": 256, "Height": 256, "FrameRate": 24}]}}), encoding="utf-8"
+    )
+    Image.new("RGB", (256, 256)).save(screenshot_dir / "Video-0.png")
+    calls = []
+
+    async def capture_stub(args):
+        calls.append(args)
+        Image.frombytes("RGB", (256, 256), Random(0).randbytes(256 * 256 * 3)).save(args[3])
+        return args[0], args[3]
+
+    monkeypatch.setattr(takescreens, "tone_map", tone_map)
+    monkeypatch.setattr(takescreens, "use_libplacebo", False)
+    monkeypatch.setattr(takescreens, "capture_screenshot", capture_stub)
+    meta = Meta(category="MOVIE", base_dir=str(tmp_path), uuid=release_id, screens=1, hdr="HDR10", force_tonemap=force_tonemap, imghost="ptscreens")
+
+    result = await takescreens.screenshots("source.mkv", "Video", release_id, str(tmp_path), meta, cleanup_after_capture=False)
+
+    assert len(calls) == len(result) == 1
+    assert Path(calls[0][3]).name == "Video-0-retry.png"
+    assert calls[0][-2] is True
+    assert meta.tonemapped is True

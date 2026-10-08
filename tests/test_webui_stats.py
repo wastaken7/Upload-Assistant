@@ -9,6 +9,20 @@ def _authenticated(monkeypatch):
     monkeypatch.setattr(server, "_get_bearer_from_header", lambda: None)
 
 
+def test_stats_api_reports_unreadable_database(monkeypatch, tmp_path):
+    _authenticated(monkeypatch)
+    monkeypatch.setattr(server, "STATE_DIR", tmp_path)
+    monkeypatch.setattr(server, "_load_config_from_file", lambda _path: {"DEFAULT": {"stats_enabled": True}})
+    (tmp_path / "data").mkdir()
+    (tmp_path / "data/stats.sqlite3").write_bytes(b"fictional invalid database")
+
+    response = server.app.test_client().get("/api/stats?range=all")
+
+    assert response.status_code == 500
+    assert response.json["success"] is False
+    assert "Unable to read statistics" in response.json["error"]
+
+
 def test_stats_page_renders_for_authenticated_session(monkeypatch):
     _authenticated(monkeypatch)
     response = server.app.test_client().get("/stats")
@@ -152,7 +166,7 @@ def test_upload_destination_views_use_local_tracker_favicons():
     assert "`/static/img/trackers/${slug}.png`" in stats_app
     assert "label: row.display_name || row.destination" in stats_app
     assert "favicon: row.destination" in stats_app
-    assert "<TrackerFavicon destination={r.destination}" in stats_app
+    assert "destination={r.destination}" in stats_app
     assert "<span>{r.display_name || r.destination}</span>" in stats_app
 
 
@@ -203,7 +217,7 @@ def test_stats_summary_cards_have_distinct_icons():
 
     assert "const MetricIcon" in stats_app
     assert 'className="ua-stats-summary-card relative rounded-xl p-4 shadow-sm"' in stats_app
-    assert 'className="ua-stats-panel rounded-xl p-4 shadow-sm sm:p-5"' in stats_app
+    assert "ua-stats-panel ua-stats-detail-panel min-w-0 rounded-xl p-4 shadow-sm sm:p-5" in stats_app
     assert 'className="ua-stats-panel rounded-xl p-8 text-center shadow-sm"' in stats_app
     icons = (
         "items-completed",
@@ -256,7 +270,7 @@ def test_stats_ui_exposes_volume_profiles_comparisons_and_actions():
     assert 'aria-haspopup="menu"' in stats_app
     assert 'aria-label="Statistics actions"' in stats_app
     assert '<LucideIcon name="ellipsis" className="h-5 w-5" />' in stats_app
-    assert "exportsDisabled={!statsEnabled || !hasData}" in stats_app
+    assert "loading || Boolean(error) || !statsEnabled || !hasData" in stats_app
     assert "CSV timeline" in stats_app
     assert "JSON details" in stats_app
     assert "onReset={() => setResetOpen(true)}" in stats_app
@@ -388,7 +402,7 @@ def test_stats_summary_cards_have_distinct_visual_containers():
 
 def test_donut_legend_rows_do_not_use_colored_backgrounds():
     stats_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
-    donut = stats_app.split("function DonutChart", 1)[1].split("const Section", 1)[0]
+    donut = stats_app.split("function DonutChart", 1)[1].split("function BarChart", 1)[0]
 
     assert "ua-stats-series-active" not in donut
     assert 'activeLabel && activeLabel === segment.id ? "font-semibold"' in donut

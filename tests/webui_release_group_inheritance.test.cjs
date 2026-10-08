@@ -156,5 +156,30 @@ test("global editor does not claim one inherited value applies to every tracker"
 test("invalid global group configuration does not display a misleading source", () => {
   const inherited = resolve({ ...trackerScope, globalGroups: null });
   assert.equal(inherited.inheritedLabel, "Inherited source unavailable");
+  assert.equal(inherited.overrideLabel, "Overrides inherited values");
   assert.equal(inherited.preview, "");
+});
+
+test("inherited booleans and numbers retain their types including false and zero", () => {
+  for (const [key, value] of [
+    ["episode_overview", false],
+    ["multiScreens", 0],
+    ["thumbnail_size", 400],
+  ]) {
+    const scope = {
+      ...trackerScope,
+      key,
+      defaults: { [key]: value },
+      trackerItems: [],
+    };
+    for (const options of [
+      scope,
+      { ...scope, globalGroups: { MyGroup: { [key]: value } } },
+      { ...scope, trackerItems: [{ key, source: "config", value }] },
+    ]) {
+      assert.equal(resolve(options).value, value);
+      assert.equal(resolve(options).preview, String(value));
+    }
+    assert.equal(resolve({ ...scope, pathParts: ["DEFAULT"] }).value, value);
+  }
 });

@@ -1,11 +1,15 @@
 import asyncio
 
+import langcodes
 import pytest
 
+from src.audio import AudioManager
 from src.get_name import NameManager
+from src.languages import LanguagesManager
 from src.meta import _TRACKER_ID_ALIASES, Meta
 from src.trackers.UNIT3D.dreadvault import DreadVault
 from src.trackersetup import TrackerSetup, tracker_class_map
+from src.video import VideoManager
 
 
 def _tracker() -> DreadVault:
@@ -322,7 +326,8 @@ def test_dreadvault_preserves_title_spaces_when_dvdrip_source_and_encode_are_emp
     assert name == "Example Movie 1990 480p DVDRip DD 2.0-GRP"  # noqa: S101
 
 
-def test_dreadvault_adds_foreign_audio_language_before_encode_resolution():
+@pytest.mark.parametrize("first_track_language", ["ja", ""])
+def test_dreadvault_adds_foreign_audio_language_before_encode_resolution(first_track_language):
     meta = Meta(
         name="Example Movie 2001 1080p BluRay DD 5.1 x264-GRP",
         type="ENCODE",
@@ -330,6 +335,7 @@ def test_dreadvault_adds_foreign_audio_language_before_encode_resolution():
         resolution="1080p",
         audio_languages=["Japanese"],
         language_checked=True,
+        mediainfo={"media": {"track": [{"@type": "Audio", "Language": first_track_language}, {"@type": "Audio", "Language": "ja"}]}},
     )
 
     name = asyncio.run(_tracker().get_name(meta))["name"]
@@ -381,7 +387,7 @@ def test_dreadvault_omits_foreign_audio_language_from_bdmv_disc():
 
     name = asyncio.run(_tracker().get_name(meta))["name"]
 
-    assert name == "Example Movie 2001 1080p BluRay AVC DD 5.1-GRP"  # noqa: S101
+    assert name == "Example Movie 2001 1080p Blu-ray AVC DD 5.1-GRP"  # noqa: S101
 
 
 def test_dreadvault_omits_language_marker_when_audio_includes_english():
@@ -390,17 +396,43 @@ def test_dreadvault_omits_language_marker_when_audio_includes_english():
         type="ENCODE",
         source="BluRay",
         resolution="1080p",
+        audio="DD 5.1",
         audio_languages=["Japanese", "English"],
         language_checked=True,
     )
 
     name = asyncio.run(_tracker().get_name(meta))["name"]
 
-    assert name == "Example Movie 2001 1080p BluRay DD 5.1 x264-GRP"  # noqa: S101
+    assert name == "Example Movie 2001 1080p BluRay Dual-Audio DD 5.1 x264-GRP"  # noqa: S101
 
 
-@pytest.mark.parametrize("audio_language", ["No", "Undetermined"])
-def test_dreadvault_omits_language_marker_for_non_linguistic_audio(audio_language):
+@pytest.mark.parametrize(
+    ("audio_languages", "flag", "expected"),
+    [
+        (["Japanese", "English"], "no_dual", "Example Movie 2001 1080p BluRay DD 5.1 x264-GRP"),
+        (["English"], "no_dub", "Example Movie 2001 1080p BluRay DD 5.1 x264-GRP"),
+    ],
+)
+def test_dreadvault_dub_token_respects_no_dual_and_no_dub(audio_languages, flag, expected):
+    meta = Meta(
+        name="Example Movie 2001 1080p BluRay DD 5.1 x264-GRP",
+        type="ENCODE",
+        source="BluRay",
+        resolution="1080p",
+        audio="DD 5.1",
+        audio_languages=audio_languages,
+        original_language="ja",
+        language_checked=True,
+        **{flag: True},
+    )
+
+    name = asyncio.run(_tracker().get_name(meta))["name"]
+
+    assert name == expected  # noqa: S101
+
+
+@pytest.mark.parametrize(("audio_language", "marker"), [("No", "ZXX "), ("zxx", "ZXX "), ("No linguistic content", "ZXX "), ("Undetermined", ""), ("und", ""), ("", "")])
+def test_dreadvault_formats_non_linguistic_and_undetermined_audio(audio_language, marker):
     meta = Meta(
         name="Ghost 1984 NTSC x264 DVDRip DD 2.0-SaL",
         type="DVDRIP",
@@ -414,7 +446,40 @@ def test_dreadvault_omits_language_marker_for_non_linguistic_audio(audio_languag
 
     name = asyncio.run(_tracker().get_name(meta))["name"]
 
-    assert name == "Ghost 1984 480p DVDRip DD 2.0 x264-SaL"  # noqa: S101
+    assert name == f"Ghost 1984 {marker}480p DVDRip DD 2.0 x264-SaL"  # noqa: S101
+
+
+@pytest.mark.parametrize(
+    ("audio_languages", "original_language", "marker", "dub"),
+    [
+        (["", "Undetermined", "und", "Japanese"], "ja", "JAPANESE ", ""),
+        (["No", "Norwegian"], "no", "NORWEGIAN ", ""),
+        (["zxx", "French", "Japanese", "French"], "ja", "FRENCH ", "Dual-Audio "),
+        (["No linguistic content", "Italian", "German", "French"], "ja", "ITALIAN ", "Multi-Audio "),
+        (["Undetermined", "Japanese", "English"], "ja", "", "Dual-Audio "),
+        (["No", "Japanese", "English"], "ja", "", "Dual-Audio "),
+        (["zxx", "English"], "ja", "", "Dubbed "),
+        (["English"], "no", "", "Dubbed "),
+        (["Undetermined", "No"], "ja", "ZXX ", ""),
+        ([], "ja", "", "MULTI "),
+        (["", "Undetermined", "und"], "ja", "", "MULTI "),
+    ],
+)
+def test_dreadvault_uses_only_linguistic_languages_for_marker_and_dub(audio_languages, original_language, marker, dub):
+    meta = Meta(
+        name="Example Movie 2001 1080p BluRay MULTI DD 5.1 x264-GRP",
+        type="ENCODE",
+        source="BluRay",
+        resolution="1080p",
+        audio="MULTI DD 5.1",
+        audio_languages=audio_languages,
+        original_language=original_language,
+        language_checked=True,
+    )
+
+    name = asyncio.run(_tracker().get_name(meta))["name"]
+
+    assert name == f"Example Movie 2001 {marker}1080p BluRay {dub}DD 5.1 x264-GRP"  # noqa: S101
 
 
 def test_dreadvault_adds_foreign_audio_language_to_a_dvdrip():
@@ -436,7 +501,7 @@ def test_dreadvault_adds_foreign_audio_language_to_a_dvdrip():
     assert name == "Imaginary Dolls 1999 JAPANESE 480p DVDRip DD 2.0 x264-GVXXI"  # noqa: S101
 
 
-def test_dreadvault_adds_foreign_audio_language_to_a_dvd_full_disc():
+def test_dreadvault_omits_foreign_audio_language_from_a_dvd_full_disc():
     meta = Meta(
         name="Sample Film 1977 USA NTSC DVD9 LPCM 2.0",
         year=1977,
@@ -453,7 +518,7 @@ def test_dreadvault_adds_foreign_audio_language_to_a_dvd_full_disc():
 
     name = asyncio.run(_tracker().get_name(meta))["name"]
 
-    assert name == "Sample Film 1977 JAPANESE USA NTSC DVD9 LPCM 2.0"  # noqa: S101
+    assert name == "Sample Film 1977 USA NTSC DVD9 LPCM 2.0"  # noqa: S101
 
 
 def test_dreadvault_adds_foreign_audio_language_after_year_for_dvd_remux():
@@ -471,7 +536,7 @@ def test_dreadvault_adds_foreign_audio_language_after_year_for_dvd_remux():
 
     name = asyncio.run(_tracker().get_name(meta))["name"]
 
-    assert name == "Example Movie 2001 JAPANESE PAL DVD REMUX DD 5.1-GRP"  # noqa: S101
+    assert name == "Example Movie 2001 JAPANESE 576p DVD REMUX DD 5.1-GRP"  # noqa: S101
 
 
 def test_dreadvault_adds_dvd_remux_language_after_release_year_when_title_contains_year():
@@ -493,7 +558,7 @@ def test_dreadvault_adds_dvd_remux_language_after_release_year_when_title_contai
 
     name = asyncio.run(_tracker().get_name(meta))["name"]
 
-    assert name == "Imaginary Film 2000 2000 JAPANESE PAL DVD REMUX DD 2.0-GRP"  # noqa: S101
+    assert name == "Imaginary Film 2000 2000 JAPANESE 576p DVD REMUX DD 2.0-GRP"  # noqa: S101
 
 
 def test_dreadvault_adds_foreign_audio_language_before_source_for_yearless_dvd_remux():
@@ -511,7 +576,7 @@ def test_dreadvault_adds_foreign_audio_language_before_source_for_yearless_dvd_r
 
     name = asyncio.run(_tracker().get_name(meta))["name"]
 
-    assert name == "Example Movie JAPANESE PAL DVD REMUX DD 2.0-GRP"  # noqa: S101
+    assert name == "Example Movie JAPANESE 576p DVD REMUX DD 2.0-GRP"  # noqa: S101
 
 
 def test_dreadvault_never_adds_trump_suffix_for_exact_match():
@@ -559,4 +624,355 @@ def test_dreadvault_moves_tv_aka_before_year_with_foreign_audio_language():
 
     name = asyncio.run(_tracker().get_name(meta))["name"]
 
-    assert name == "Example Show AKA Alt Show 2024 JAPANESE S01 PAL DVD REMUX DD 2.0-GRP"  # noqa: S101
+    assert name == "Example Show AKA Alt Show 2024 S01 JAPANESE 576p DVD REMUX DD 2.0-GRP"  # noqa: S101
+
+
+# /wikis/6 rev 2026-09-30, R1-R11: release facts and exact titles.
+@pytest.mark.parametrize(
+    ("facts", "expected"),
+    [
+        pytest.param(
+            {
+                "category": "MOVIE",
+                "type": "ENCODE",
+                "title": "Kuroko's Basketball",
+                "aka": "Kuroko no Basket",
+                "year": 2017,
+                "resolution": "1080p",
+                "source": "BluRay",
+                "audio": {"codec": "DD+", "channels": "5.1"},
+                "video": "x264",
+                "tracks": [{"lang": "Japanese"}],
+                "original_language": "ja",
+                "tag": "Kitsune",
+            },
+            "Kuroko's Basketball AKA Kuroko no Basket 2017 JAPANESE 1080p BluRay DD+ 5.1 x264-Kitsune",
+            id="lang-basic",
+        ),
+        pytest.param(
+            {
+                "category": "MOVIE",
+                "type": "ENCODE",
+                "title": "The Wailing",
+                "year": 2016,
+                "hybrid": True,
+                "repack": "REPACK",
+                "resolution": "1080p",
+                "source": "BluRay",
+                "audio": {"codec": "DD", "channels": "5.1"},
+                "video": "x264",
+                "tracks": [{"lang": "Korean"}],
+                "original_language": "ko",
+                "tag": "GRP",
+            },
+            "The Wailing 2016 KOREAN Hybrid REPACK 1080p BluRay DD 5.1 x264-GRP",
+            id="lang-before-hybrid-repack",
+        ),
+        pytest.param(
+            {
+                "category": "TV",
+                "type": "WEBDL",
+                "title": "Kingdom",
+                "season": 1,
+                "episode": 1,
+                "episode_title": "The Hungry Dead",
+                "resolution": "1080p",
+                "source": "WEB",
+                "service": "NF",
+                "audio": {"codec": "DD+", "channels": "5.1"},
+                "video": "H.264",
+                "tracks": [{"lang": "Korean"}],
+                "original_language": "ko",
+                "tag": "GRP",
+            },
+            "Kingdom S01E01 The Hungry Dead KOREAN 1080p NF WEB-DL DD+ 5.1 H.264-GRP",
+            id="lang-tv-episode-named",
+        ),
+        pytest.param(
+            {
+                "category": "MOVIE",
+                "type": "ENCODE",
+                "title": "Ringu",
+                "year": 1998,
+                "resolution": "1080p",
+                "source": "BluRay",
+                "audio": {"codec": "FLAC", "channels": "2.0"},
+                "video": "x264",
+                "tracks": [{"lang": "Japanese"}, {"lang": "French"}],
+                "original_language": "ja",
+                "tag": "GRP",
+            },
+            "Ringu 1998 JAPANESE 1080p BluRay Dual-Audio FLAC 2.0 x264-GRP",
+            id="dual-no-english",
+        ),
+        pytest.param(
+            {
+                "category": "MOVIE",
+                "type": "ENCODE",
+                "title": "Inferno",
+                "year": 1980,
+                "resolution": "1080p",
+                "source": "BluRay",
+                "audio": {"codec": "DTS-HD MA", "channels": "1.0"},
+                "video": "x264",
+                "tracks": [{"lang": "Italian"}, {"lang": "English"}, {"lang": "German"}],
+                "original_language": "it",
+                "tag": "GRP",
+            },
+            "Inferno 1980 1080p BluRay Multi-Audio DTS-HD MA 1.0 x264-GRP",
+            id="multi-with-english",
+        ),
+        pytest.param(
+            {
+                "category": "MOVIE",
+                "type": "ENCODE",
+                "title": "Zombie Flesh Eaters",
+                "year": 1979,
+                "resolution": "1080p",
+                "source": "BluRay",
+                "audio": {"codec": "DTS-HD MA", "channels": "1.0"},
+                "video": "x264",
+                "tracks": [{"lang": "English"}],
+                "original_language": "it",
+                "tag": "GRP",
+            },
+            "Zombie Flesh Eaters 1979 1080p BluRay Dubbed DTS-HD MA 1.0 x264-GRP",
+            id="dubbed",
+        ),
+        pytest.param(
+            {
+                "category": "MOVIE",
+                "type": "ENCODE",
+                "title": "Nosferatu",
+                "year": 1922,
+                "resolution": "1080p",
+                "source": "BluRay",
+                "audio": {"codec": "FLAC", "channels": "2.0"},
+                "video": "x264",
+                "tracks": [{"lang": "No linguistic content"}],
+                "original_language": "de",
+                "tag": "GRP",
+            },
+            "Nosferatu 1922 ZXX 1080p BluRay FLAC 2.0 x264-GRP",
+            id="lang-zxx",
+        ),
+        pytest.param(
+            {
+                "category": "MOVIE",
+                "type": "ENCODE",
+                "title": "Dead Snow",
+                "year": 2009,
+                "resolution": "1080p",
+                "source": "BluRay",
+                "audio": {"codec": "DTS", "channels": "5.1"},
+                "video": "x264",
+                "tracks": [{"lang": "No linguistic content"}, {"lang": "Norwegian"}],
+                "original_language": "no",
+                "tag": "GRP",
+            },
+            "Dead Snow 2009 NORWEGIAN 1080p BluRay DTS 5.1 x264-GRP",
+            id="zxx-music-track-before-dialogue",
+        ),
+        pytest.param(
+            {
+                "category": "MOVIE",
+                "type": "REMUX",
+                "title": "Alien Abduction: Incident in Lake County",
+                "year": 1998,
+                "resolution": "576i",
+                "source": "PAL DVD",
+                "audio": {"codec": "DD", "channels": "2.0"},
+                "video": "MPEG-2",
+                "tag": "DVL",
+            },
+            "Alien Abduction: Incident in Lake County 1998 576i DVD REMUX DD 2.0-DVL",
+            id="dvd-remux-pal",
+        ),
+        pytest.param(
+            {
+                "category": "MOVIE",
+                "type": "REMUX",
+                "title": "Kuroneko",
+                "year": 1968,
+                "resolution": "480i",
+                "source": "NTSC DVD",
+                "audio": {"codec": "DD", "channels": "1.0"},
+                "video": "MPEG-2",
+                "tracks": [{"lang": "Japanese"}],
+                "original_language": "ja",
+                "tag": "GRP",
+            },
+            "Kuroneko 1968 JAPANESE 480i DVD REMUX DD 1.0-GRP",
+            id="dvd-remux-foreign",
+        ),
+        pytest.param(
+            {
+                "category": "MOVIE",
+                "type": "DISC",
+                "disc": "DVD",
+                "title": "Rabies",
+                "year": 2010,
+                "resolution": "576i",
+                "source": "PAL DVD",
+                "dvd_size": "DVD9",
+                "audio": {"codec": "DD", "channels": "5.1"},
+                "video": "MPEG-2",
+                "tracks": [{"lang": "Hebrew"}, {"lang": "French"}],
+                "original_language": "he",
+                "tag": "GRP",
+            },
+            "Rabies 2010 PAL DVD9 DD 5.1-GRP",
+            id="dvd-disc-foreign-no-marker",
+        ),
+        pytest.param(
+            {
+                "category": "MOVIE",
+                "type": "ENCODE",
+                "title": "The Vampires of Coyoacan",
+                "year": 1974,
+                "resolution": "480p",
+                "source": "NTSC DVD",
+                "audio": {"codec": "MP3", "channels": "2.0"},
+                "video": "x264",
+                "tracks": [{"lang": "Spanish"}],
+                "original_language": "es",
+                "tag": "GRP",
+            },
+            "The Vampires of Coyoacan 1974 SPANISH 480p DVDRip MP3 2.0 x264-GRP",
+            id="dvdrip-foreign",
+        ),
+        pytest.param(
+            {
+                "category": "MOVIE",
+                "type": "DISC",
+                "disc": "BDMV",
+                "title": "Kwaidan",
+                "year": 1964,
+                "resolution": "1080p",
+                "source": "BluRay",
+                "region": "JPN",
+                "video": "AVC",
+                "audio": {"codec": "LPCM", "channels": "1.0"},
+                "tracks": [{"lang": "Japanese"}, {"lang": "English"}],
+                "original_language": "ja",
+                "tag": "GRP",
+            },
+            "Kwaidan 1964 1080p JPN Blu-ray AVC LPCM 1.0-GRP",
+            id="bd-disc-foreign-no-marker",
+        ),
+        pytest.param(
+            {
+                "category": "MOVIE",
+                "type": "DISC",
+                "disc": "BDMV",
+                "title": "Night of the Living Dead",
+                "year": 1968,
+                "edition": "Criterion Director's Cut",
+                "resolution": "1080p",
+                "source": "BluRay",
+                "region": "USA",
+                "video": "AVC",
+                "audio": {"codec": "LPCM", "channels": "1.0"},
+                "tag": "GRP",
+            },
+            "Night of the Living Dead 1968 Director's Cut 1080p USA Blu-ray AVC LPCM 1.0-GRP",
+            id="bd-disc-cut-kept-distributor-dropped",
+        ),
+    ],
+)
+def test_dreadvault_naming_guide(facts, expected, tmp_path):
+    disc = facts.get("disc", "")
+    source = facts["source"]
+    if "BluRay" in source:
+        source = "Blu-ray" if disc == "BDMV" else "BluRay"
+    elif source in ("PAL DVD", "NTSC DVD") and facts["type"] != "REMUX":
+        source = source.split()[0]
+    elif source == "HD DVD":
+        source = "HDDVD"
+    elif source == "WEB":
+        source = "Web"
+    meta = Meta(
+        category=facts["category"],
+        type=facts["type"],
+        title=facts["title"],
+        aka=f"AKA {facts['aka']}" if facts.get("aka") else "",
+        year=facts.get("year"),
+        season=f"S{facts['season']:02d}" if facts.get("season") else "",
+        episode=f"E{facts['episode']:02d}" if facts.get("episode") else "",
+        tv_pack=facts["category"] == "TV" and not facts.get("episode"),
+        auto_episode_title=facts.get("episode_title"),
+        resolution=facts["resolution"],
+        source=source,
+        is_disc=disc or None,
+        dvd_size=facts.get("dvd_size", ""),
+        region=facts.get("region", ""),
+        three_d="3D" if facts.get("three_d") else "",
+        uhd="UHD" if facts["source"].startswith("UHD ") else "",
+        hdr=facts.get("hdr", ""),
+        service=facts.get("service", ""),
+        edition=facts.get("edition", ""),
+        repack=facts.get("repack", ""),
+        webdv=facts.get("hybrid", False),
+        hardcoded_subs=facts.get("hc", False),
+        original_language=facts.get("original_language", "en"),
+        tag=f"-{facts['tag']}" if facts.get("tag") else "",
+        base_dir=str(tmp_path),
+        uuid="release",
+        unattended=True,
+    )
+    audio = facts["audio"]
+    codec = audio["codec"]
+    audio_format = {"DD": "AC-3", "DD+": "E-AC-3", "TrueHD": "MLP FBA", "DTS-HD MA": "DTS", "LPCM": "PCM", "MP3": "MPEG Audio"}.get(codec, codec)
+    video_format = {"x264": "AVC", "H.264": "AVC", "x265": "HEVC", "H.265": "HEVC", "MPEG-2": "MPEG Video", "XviD": "MPEG-4 Visual"}.get(facts["video"], facts["video"])
+    video_track = {
+        "@type": "Video",
+        "Format": video_format,
+        "Format_Version": "2" if video_format == "MPEG Video" else "",
+        "Format_Profile": "High 10" if facts.get("hi10p") else "",
+        "BitDepth": "10" if facts.get("hi10p") or meta.hdr else "8",
+        "Encoded_Library_Name": facts["video"] if facts["video"] in ("x264", "x265", "XviD") else "",
+    }
+    media_tracks = [{"@type": "General"}, video_track]
+    text_tracks = []
+    bd_tracks = []
+    for index, track in enumerate(facts.get("tracks", [{"lang": "English"}])):
+        language = track["lang"]
+        title = "Commentary" if track.get("commentary") else ""
+        media_tracks.append(
+            {
+                "@type": "Audio",
+                "StreamOrder": str(index + 1),
+                "Default": "Yes" if index == 0 else "No",
+                "Language": langcodes.find(language).language if language else "",
+                "Title": title,
+                "Format": audio_format,
+                "Format_Profile": "Layer 3" if codec == "MP3" else "",
+                "Format_AdditionalFeatures": "XLL" if codec == "DTS-HD MA" else ("16-ch" if codec == "TrueHD" else "JOC") if audio.get("object") == "Atmos" else "",
+                "Channels": str(sum(int(part) for part in audio["channels"].split("."))),
+            }
+        )
+        text_tracks.append(f"Audio #{index + 1}\nFormat : {audio_format}\nLanguage : {language}\nTitle : {title}\n")
+        bd_codec = {"TrueHD": "Dolby TrueHD Audio", "DTS-HD MA": "DTS-HD Master Audio", "LPCM": "LPCM Audio"}.get(codec, codec)
+        bd_tracks.append({"language": language, "codec": bd_codec, "channels": audio["channels"]})
+    meta.mediainfo = {"media": {"track": media_tracks}}
+    output_dir = tmp_path / "tmp" / meta.uuid
+    output_dir.mkdir(parents=True)
+    # LanguagesManager reads text exports; AudioManager reads the equivalent JSON/BDInfo.
+    (output_dir / "MEDIAINFO.txt").write_text("\n".join(text_tracks), encoding="utf-8")
+    (output_dir / "BD_SUMMARY_00.txt").write_text("\n".join(f"Audio: {track['language']} / {track['codec']} / {track['channels']}" for track in bd_tracks), encoding="utf-8")
+    bdinfo = None
+    if disc == "BDMV":
+        bd_video_codec = {"AVC": "MPEG-4 AVC Video", "HEVC": "MPEG-H HEVC Video"}[facts["video"]]
+        bdinfo = {"audio": bd_tracks, "video": [{"codec": bd_video_codec}]}
+        meta.bdinfo = bdinfo
+    meta.audio, meta.channels, meta.has_commentary = asyncio.run(AudioManager({}).get_audio_v2(meta.mediainfo, meta, bdinfo))
+    meta.video_encode, meta.video_codec, meta.has_encode_settings, meta.bit_depth = asyncio.run(VideoManager().get_video_encode(meta.mediainfo, meta.type, bdinfo))
+    if disc == "BDMV":
+        meta.video_encode = ""
+        meta.video_codec = asyncio.run(VideoManager().get_video_codec(bdinfo))
+    asyncio.run(LanguagesManager().process_desc_language(meta))
+    meta.name = _build_name(meta)
+
+    name = asyncio.run(_tracker().get_name(meta))["name"]
+
+    assert name == expected  # noqa: S101
