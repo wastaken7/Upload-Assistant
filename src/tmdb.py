@@ -131,6 +131,7 @@ class TmdbManager:
         quickie_search: bool = False,
         filename: str | None = None,
         base_dir: str = "",
+        manual_season: str | int | None = None,
     ) -> dict[str, Any]:
         return await tmdb_other_meta(
             tmdb_id=tmdb_id,
@@ -151,6 +152,7 @@ class TmdbManager:
             filename=filename,
             base_dir=base_dir,
             config=self.config,
+            manual_season=manual_season,
         )
 
     async def get_keywords(self, tmdb_id: int, category: str) -> list[str]:
@@ -949,6 +951,7 @@ async def tmdb_other_meta(
     filename: str | None = None,
     base_dir: str = "",
     config: dict[str, Any] | None = None,
+    manual_season: str | int | None = None,
 ) -> dict[str, Any]:
     """
     Fetch metadata from TMDB for a movie or TV show.
@@ -1259,7 +1262,23 @@ async def tmdb_other_meta(
 
     # Get anime information if applicable
     filename = filename if category == "MOVIE" else path
-    mal_id, retrieved_aka, anime, demographic = await get_anime(media_data, Meta({"title": title, "aka": retrieved_aka, "mal_id": 0, "filename": filename}))
+    mal_id, retrieved_aka, anime, demographic = await get_anime(
+        media_data,
+        Meta(
+            {
+                "title": title,
+                "aka": retrieved_aka,
+                "mal_id": mal_manual or 0,
+                "filename": filename or "",
+                "tmdb_id": tmdb_id,
+                "category": category or "",
+                "tvdb_id": tvdb_id,
+                "imdb_id": imdb_id,
+                "manual_season": manual_season,
+                "base_dir": base_dir,
+            }
+        ),
+    )
 
     if mal_manual is not None and mal_manual != 0:
         mal_id = mal_manual
@@ -1419,9 +1438,81 @@ async def get_anime(response: dict[str, Any], meta: Meta) -> tuple[int, str, boo
     return mal_id, alt_name, anime, demographic
 
 
+def _expected_anime_season(meta: Meta) -> int | None:
+    if meta.manual_season is not None:
+        match = re.fullmatch(r"S?(\d+)", str(meta.manual_season), re.IGNORECASE)
+        return int(match.group(1)) if match else None
+    if meta.filename:
+        with contextlib.suppress(Exception):
+            parsed = typing_cast(dict[str, Any], anitopy_parse_fn(meta.filename) or {})
+            value = parsed.get("anime_season")
+            if value is not None:
+                return int(value)
+            guessed = guessit_fn(meta.filename, None)
+            value = guessed.get("season")
+            if isinstance(value, int):
+                return value
+    if meta.season:
+        match = re.fullmatch(r"S?(\d+)", str(meta.season), re.IGNORECASE)
+        if match:
+            return int(match.group(1))
+    return None
+
+
+async def _get_arm_mal_id(meta: Meta, season: int | None) -> int:
+    """Use only an unambiguous TV mapping; never infer a cour or a season."""
+    if meta.category != "TV" or not meta.tmdb_id or season is None:
+        return 0
+    try:
+        cache = cache_for(meta.base_dir, {"DEFAULT": default_config})
+        key = str(meta.tmdb_id)
+        mappings = await cache.get("arm", "tv_mappings", key)
+        if is_cache_miss(mappings):
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                response = await client.get(
+                    "https://arm.haglund.dev/api/v2/themoviedb",
+                    params={"id": meta.tmdb_id, "include": "myanimelist,themoviedb-season,thetvdb,imdb"},
+                )
+                response.raise_for_status()
+                mappings = response.json()
+            if mappings is None:
+                mappings = []
+            if not isinstance(mappings, list):
+                return 0
+            await cache.set("arm", "tv_mappings", key, mappings, negative=not bool(mappings))
+        if not isinstance(mappings, list):
+            return 0
+        candidates = [item for item in mappings if isinstance(item, dict) and type(item.get("themoviedb-season")) is int and item["themoviedb-season"] == season]
+        if len(candidates) != 1:
+            return 0
+        candidate = candidates[0]
+        # The ARM endpoint shares the numeric TMDB namespace for movies and TV.
+        # Reject conflicts with identifiers already obtained from TMDB.
+        if meta.tvdb_id and candidate.get("thetvdb") != int(meta.tvdb_id):
+            return 0
+        if meta.imdb_id:
+            imdb_id = str(meta.imdb_id).removeprefix("tt")
+            mapped_imdb = str(candidate.get("imdb") or "").removeprefix("tt")
+            if not imdb_id.isdigit() or not mapped_imdb.isdigit() or int(mapped_imdb) != int(imdb_id):
+                return 0
+        mal_id = candidate.get("myanimelist")
+        return mal_id if type(mal_id) is int and mal_id > 0 else 0
+    except Exception as exc:
+        logger.debug(f"ARM anime mapping unavailable; using AniList title search: {exc}")
+        return 0
+
+
 async def get_romaji(tmdb_name: str, mal: int | None, meta: Meta) -> tuple[str, int, str, str, int, str]:
     media: list[dict[str, Any]] = []
     demographic = "Mina"  # Default to Mina if no tags are found
+    expected_season = _expected_anime_season(meta)
+    arm_mal = await _get_arm_mal_id(meta, expected_season) if mal in (None, 0) else 0
+    if arm_mal:
+        # Reuse the existing exact MAL query and metadata cache. If enrichment
+        # fails, leave the original title search available as a fallback.
+        mapped = await get_romaji(tmdb_name, arm_mal, meta)
+        if mapped[0]:
+            return mapped
 
     # Try AniList query with tmdb_name first, then fallback to meta.filename if no results
     for search_term in [tmdb_name, meta.filename]:
@@ -1527,28 +1618,6 @@ async def get_romaji(tmdb_name: str, mal: int | None, meta: Meta) -> tuple[str, 
         if media not in (None, []):
             break  # Found results, stop search_term loop
     search_name = meta.filename.lower() if "subsplease" in meta.filename.lower() else re.sub(r"[^0-9a-zA-Z\[\\]]+", "", tmdb_name.lower().replace(" ", ""))
-
-    # Extract expected season number from various sources
-    expected_season = None
-
-    # Try manual_season first
-    if meta.manual_season:
-        season_match = re.search(r"S?(\d+)", str(meta.manual_season), re.IGNORECASE)
-        if season_match:
-            expected_season = int(season_match.group(1))
-
-    # Try parsing the filename with anitopy
-    if expected_season is None and meta.filename:
-        with contextlib.suppress(Exception):
-            parsed = typing_cast(dict[str, Any], anitopy_parse_fn(meta.filename) or {})
-            if parsed.get("anime_season"):
-                expected_season = int(parsed["anime_season"])
-
-    # Fall back to meta.season if available
-    if expected_season is None and meta.season:
-        season_match = re.search(r"S?(\d+)", str(meta.season), re.IGNORECASE)
-        if season_match:
-            expected_season = int(season_match.group(1))
 
     if media not in (None, []):
         result: dict[str, Any] = {"title": {}}
@@ -1992,6 +2061,7 @@ async def set_tmdb_metadata(meta: Meta, filename: str | None = None) -> None:
                     quickie_search=meta.quickie_search,
                     filename=filename,
                     base_dir=meta.base_dir,
+                    manual_season=meta.manual_season,
                     config=default_config,
                 )
 
