@@ -1,4 +1,5 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+import html
 import json
 import re
 from functools import cache
@@ -96,7 +97,7 @@ def _load_distributor_maps(name: str) -> tuple[dict[str, int], dict[int, str]]:
             entries.pop(str(id_value), None)
         tracker_aliases = overrides.get("aliases", {})
         excluded_aliases = overrides.get("excluded_aliases", [])
-    reverse = {int(id_value): label.upper() for id_value, label in entries.items()}
+    reverse = {int(id_value): html.unescape(label).upper() for id_value, label in entries.items()}
     canonical = {label: id_value for id_value, label in reverse.items()}
     # Follow distributor identity when a tracker assigns different numeric IDs.
     targets = {int(id_value): canonical[label.upper()] for id_value, label in default["distributors"].items() if label.upper() in canonical}

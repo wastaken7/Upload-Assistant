@@ -1,4 +1,5 @@
 # ruff: noqa: S101
+import html
 import json
 from pathlib import Path
 from unittest.mock import AsyncMock
@@ -71,6 +72,7 @@ def test_all_canonical_entries_round_trip(name):
         entries = expand_catalog_section(data, default, "distributors") if data.get("distributors_complete", False) else default["distributors"] | entries
         entries = {key: value for key, value in entries.items() if int(key) not in data.get("excluded_ids", [])}
     for id_value, label in entries.items():
+        label = html.unescape(label)
         assert distributor_id(label, tracker) == id_value
         assert distributor_name(id_value, tracker) == label.upper()
 

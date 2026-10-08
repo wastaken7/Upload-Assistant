@@ -9,6 +9,28 @@ import pytest
 from src import unit3d_catalogs as catalogs
 
 
+@pytest.mark.parametrize("compact", [False, True])
+@pytest.mark.parametrize(
+    "encoded,decoded", [("Example &amp; Studio", "Example & Studio"), ("Example&#039;s Studio", "Example's Studio"), ("Example &amp;amp; Studio", "Example &amp; Studio")]
+)
+def test_distributor_labels_decode_once_for_lookups_and_alias_identity(tmp_path, monkeypatch, compact, encoded, decoded):
+    default = {"distributors": {"1": decoded, "2": "Other Studio"}, "aliases": {"EXAMPLE": 1}}
+    catalog = {"distributors": {"9": encoded, "2": "Other Studio"}, "distributors_complete": True}
+    if compact:
+        catalog = catalogs.compact_catalog(catalog, default)
+    (tmp_path / "default.json").write_text(json.dumps(default), encoding="utf-8")
+    (tmp_path / "example.json").write_text(json.dumps(catalog), encoding="utf-8")
+    monkeypatch.setattr(catalogs, "_CATALOG_DIR", tmp_path)
+    catalogs._load_distributor_maps.cache_clear()
+    try:
+        assert catalogs.distributor_id(decoded.lower(), "EXAMPLE") == "9"
+        assert catalogs.distributor_name(9, "EXAMPLE") == decoded.upper()
+        assert catalogs.distributor_id("EXAMPLE", "EXAMPLE") == "9"
+        assert catalogs.distributor_id("Other Studio", "EXAMPLE") == "2"
+    finally:
+        catalogs._load_distributor_maps.cache_clear()
+
+
 @pytest.mark.parametrize("label", ["Example Studio", "Alternate Studio"])
 def test_default_aliases_are_case_insensitive_and_follow_tracker_identity(tmp_path, monkeypatch, label):
     default = {"distributors": {"1": "Example Studio"}, "aliases": {"alternate studio": 1}}
