@@ -1635,6 +1635,7 @@ class DescriptionBuilder:
                 "PTFANS",
                 "PTGTK",
                 "PTZONE",
+                "QINGWA",
                 "RAILGUNPT",
                 "XINGYUNGEPT",
                 "NEXUSPHP",
