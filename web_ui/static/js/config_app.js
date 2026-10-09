@@ -1405,6 +1405,7 @@ const trackerNameMap = {
   PTGTK: "PT GTK",
   PTSKIT: "PTSKIT",
   PTZONE: "PTZone",
+  QINGWA: "QingWa",
   RACING4EVERYONE: "Racing4Everyone",
   RAILGUNPT: "RailgunPT",
   RASTASTUGAN: "Rastastugan",

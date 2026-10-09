@@ -176,6 +176,7 @@ Sequence Usenet and torrent tracker uploads while limiting contention with qBitt
 | <img src="web_ui/static/img/trackers/pterclub.png" width="16" height="16" />                  | PTerClub               | PTERCLUB               | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/ptfans.png" width="16" height="16" />                    | PTFans                 | PTFANS                 | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/ptskit.png" width="16" height="16" />                    | PTSKIT                 | PTSKIT                 | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/qingwa.png" width="16" height="16" />                    | QingWa                 | QINGWA                 | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/racing4everyone.png" width="16" height="16" />           | Racing4Everyone        | RACING4EVERYONE        | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/railgunpt.png" width="16" height="16" />                 | RailgunPT              | RAILGUNPT              | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/rastastugan.png" width="16" height="16" />               | Rastastugan            | RASTASTUGAN            | MOVIE, TV, BOOK, GAME, MUSIC |
