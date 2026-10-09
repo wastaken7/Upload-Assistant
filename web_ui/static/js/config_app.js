@@ -11656,7 +11656,7 @@ function ConfigApp() {
   }, []);
 
   useEffect(() => {
-    storage.set(THEME_KEY, isDarkMode ? "dark" : "light");
+    window.setUAThemeMode(isDarkMode);
   }, [isDarkMode]);
 
   useEffect(() => {

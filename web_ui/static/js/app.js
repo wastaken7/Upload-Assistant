@@ -1,3 +1,20 @@
+const parseUploadPaths = (text) => {
+  const seen = new Set();
+  return text.split(/\r?\n/).flatMap((line, index) => {
+    let path = line.trim();
+    if (
+      path.length >= 2 &&
+      ((path.startsWith('"') && path.endsWith('"')) ||
+        (path.startsWith("'") && path.endsWith("'")))
+    ) {
+      path = path.slice(1, -1);
+    }
+    if (!path || seen.has(path)) return [];
+    seen.add(path);
+    return [{ path, line: index + 1, args: "" }];
+  });
+};
+
 const { useState, useRef, useEffect, useLayoutEffect, useCallback } = React;
 const THEME_KEY = "ua_config_theme";
 const LEFT_SIDEBAR_WIDTH_KEY = "ua_webui_left_sidebar_width_v2";
@@ -1695,6 +1712,8 @@ function AudionutsUAGUI() {
   ]);
 
   const [selectedPath, setSelectedPath] = useState("");
+  const [manualPathsText, setManualPathsText] = useState(null);
+  const [pathInputError, setPathInputError] = useState("");
   const [, setSelectedName] = useState("");
   const [customArgs, setCustomArgs] = useState("");
   const [argumentPresets, setArgumentPresets] = useState([]);
@@ -3468,7 +3487,7 @@ function AudionutsUAGUI() {
     }
   }, [hasDescFile]);
   useEffect(() => {
-    storage.set(THEME_KEY, isDarkMode ? "dark" : "light");
+    window.setUAThemeMode(isDarkMode);
   }, [isDarkMode]);
 
   useEffect(() => {
@@ -3600,51 +3619,49 @@ function AudionutsUAGUI() {
   };
 
   const handleToggleSelectAll = () => {
+    setManualPathsText(null);
+    setPathInputError("");
     const visible = getVisiblePaths();
     if (visible.length === 0) return;
 
     const allSelected = visible.every((p) =>
       selectedPaths.some((x) => x.path === p),
     );
-    if (allSelected) {
-      setSelectedPaths((prev) => prev.filter((p) => !visible.includes(p.path)));
-    } else {
-      setSelectedPaths((prev) => {
-        const next = [...prev];
-        visible.forEach((p) => {
-          if (!next.some((x) => x.path === p)) next.push({ path: p, args: "" });
-        });
-        return next;
+    const next = allSelected
+      ? selectedPaths.filter((p) => !visible.includes(p.path))
+      : [...selectedPaths];
+    if (!allSelected) {
+      visible.forEach((p) => {
+        if (!next.some((x) => x.path === p)) next.push({ path: p, args: "" });
       });
     }
+    setSelectedPaths(next);
+    setSelectedPath(next[0]?.path || "");
   };
 
   const handleTogglePathSelect = (path) => {
-    setSelectedPaths((prev) => {
-      const isSelected = prev.some((x) => x.path === path);
-      let next;
-      if (isSelected) {
-        next = prev.filter((p) => p.path !== path);
-      } else {
-        next = [...prev, { path, args: "" }];
-      }
-      if (next.length === 1) {
-        setSelectedPath(next[0].path);
-        const findName = (nodes) => {
-          for (const node of nodes) {
-            if (node.path === next[0].path) return node.name;
-            if (node.children) {
-              const res = findName(node.children);
-              if (res) return res;
-            }
+    setManualPathsText(null);
+    setPathInputError("");
+    const isSelected = selectedPaths.some((x) => x.path === path);
+    const next = isSelected
+      ? selectedPaths.filter((p) => p.path !== path)
+      : [...selectedPaths, { path, args: "" }];
+    setSelectedPaths(next);
+    setSelectedPath(next[0]?.path || "");
+    if (next.length === 1) {
+      const findName = (nodes) => {
+        for (const node of nodes) {
+          if (node.path === next[0].path) return node.name;
+          if (node.children) {
+            const res = findName(node.children);
+            if (res) return res;
           }
-          return "";
-        };
-        const name = findName(directories) || next[0].path.split(/[/\\]/).pop();
-        setSelectedName(name);
-      }
-      return next;
-    });
+        }
+        return "";
+      };
+      const name = findName(directories) || next[0].path.split(/[/\\]/).pop();
+      setSelectedName(name);
+    }
   };
 
   const handleUpdateItemArgs = (path, newArgs) => {
@@ -3803,7 +3820,12 @@ function AudionutsUAGUI() {
           </label>
           {selectedPaths.length > 0 && (
             <button
-              onClick={() => setSelectedPaths([])}
+              onClick={() => {
+                setSelectedPaths([]);
+                setSelectedPath("");
+                setManualPathsText(null);
+                setPathInputError("");
+              }}
               className="ua-accent-link font-semibold"
             >
               Clear Selection
@@ -3871,154 +3893,170 @@ function AudionutsUAGUI() {
     );
   };
 
+  const handlePathInputChange = (text) => {
+    setManualPathsText(text);
+    setPathInputError("");
+    const previousArgs = new Map(
+      selectedPaths.map((item) => [item.path, item.args]),
+    );
+    const items = parseUploadPaths(text).map((item) => ({
+      ...item,
+      args: previousArgs.get(item.path) || "",
+    }));
+    setSelectedPaths(items);
+    setSelectedPath(items[0]?.path || "");
+    setSelectedName(items[0]?.path.split(/[/\\]/).pop() || "");
+  };
+
   const renderSelectedPathOrQueue = (isMobileView = false) => {
+    const pathText =
+      manualPathsText !== null
+        ? manualPathsText
+        : selectedPaths.length
+          ? selectedPaths.map((item) => item.path).join("\n")
+          : selectedPath;
+    const pathEditor = (
+      <div
+        className={`p-3 border rounded-lg ${isDarkMode ? "bg-gray-700 border-gray-600" : "bg-blue-50 border-blue-200"}`}
+      >
+        <label
+          htmlFor="upload-paths"
+          className={`block text-xs font-semibold mb-1 ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}
+        >
+          Upload paths:
+        </label>
+        <textarea
+          id="upload-paths"
+          value={pathText}
+          onChange={(event) => handlePathInputChange(event.target.value)}
+          rows={Math.min(6, Math.max(2, pathText.split("\n").length))}
+          placeholder="Paste a server file or folder path, one per line"
+          disabled={isExecuting}
+          spellCheck={false}
+          aria-invalid={!!pathInputError}
+          aria-describedby={
+            pathInputError
+              ? "upload-paths-help upload-paths-error"
+              : "upload-paths-help"
+          }
+          className={`w-full px-2 py-2 text-sm font-mono border rounded-lg resize-y ${isDarkMode ? "bg-gray-800 border-gray-600 text-white placeholder-gray-400" : "bg-white border-gray-300 text-gray-900"}`}
+        />
+        <p
+          id="upload-paths-help"
+          className={`text-xs mt-1 ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}
+        >
+          Enter adds a line. Multiple paths create a queue. Only permitted
+          server folders are accepted (maximum 1000 paths).
+        </p>
+        {pathInputError && (
+          <p
+            id="upload-paths-error"
+            role="alert"
+            className="text-xs text-red-500 mt-1"
+          >
+            {pathInputError}
+          </p>
+        )}
+        {isMobileView && (
+          <button
+            onClick={() => setActivePanel("files")}
+            className="ua-accent-link text-xs mt-2"
+          >
+            Browse files
+          </button>
+        )}
+      </div>
+    );
     if (selectedPaths.length > 1) {
       return (
-        <div
-          className={`p-4 rounded-lg border ${
-            isDarkMode
-              ? "bg-gray-800 border-gray-700"
-              : "bg-white border-gray-200 shadow-sm"
-          } space-y-3`}
-        >
-          <div className="flex items-center justify-between border-b pb-2 border-gray-700">
-            <h3
-              className={`${isMobileView ? "text-xs" : "text-sm"} font-bold ${
-                isDarkMode ? "text-white" : "text-gray-800"
-              } flex items-center gap-2`}
-            >
-              <span className="flex h-2 w-2 relative">
-                {isExecuting && (
-                  <span className="ua-accent-indicator animate-ping absolute inline-flex h-full w-full rounded-full opacity-75"></span>
-                )}
-                <span
-                  className={`relative inline-flex rounded-full h-2 w-2 ${isExecuting ? "ua-accent-indicator" : "bg-gray-400"}`}
-                ></span>
-              </span>
-              Execution Queue ({selectedPaths.length} items)
-            </h3>
-          </div>
-          <div className="max-h-60 overflow-y-auto space-y-3 pr-1 font-mono text-[11px]">
-            {selectedPaths.map((item, idx) => {
-              const name = item.path.split(/[/\\]/).pop() || item.path;
+        <>
+          {pathEditor}
+          <div
+            className={`p-4 rounded-lg border ${
+              isDarkMode
+                ? "bg-gray-800 border-gray-700"
+                : "bg-white border-gray-200 shadow-sm"
+            } space-y-3`}
+          >
+            <div className="flex items-center justify-between border-b pb-2 border-gray-700">
+              <h3
+                className={`${isMobileView ? "text-xs" : "text-sm"} font-bold ${
+                  isDarkMode ? "text-white" : "text-gray-800"
+                } flex items-center gap-2`}
+              >
+                <span className="flex h-2 w-2 relative">
+                  {isExecuting && (
+                    <span className="ua-accent-indicator animate-ping absolute inline-flex h-full w-full rounded-full opacity-75"></span>
+                  )}
+                  <span
+                    className={`relative inline-flex rounded-full h-2 w-2 ${isExecuting ? "ua-accent-indicator" : "bg-gray-400"}`}
+                  ></span>
+                </span>
+                Execution Queue ({selectedPaths.length} items)
+              </h3>
+            </div>
+            <div className="max-h-60 overflow-y-auto space-y-3 pr-1 font-mono text-[11px]">
+              {selectedPaths.map((item, idx) => {
+                const name = item.path.split(/[/\\]/).pop() || item.path;
 
-              return (
-                <div
-                  key={item.path}
-                  className={`flex flex-col gap-1.5 p-2 rounded border ${
-                    isDarkMode
-                      ? "bg-gray-900 border-gray-800"
-                      : "bg-gray-50 border-gray-200"
-                  }`}
-                >
-                  <div className="flex items-center justify-between min-w-0">
-                    <span
-                      className={`truncate font-semibold ${
-                        isDarkMode ? "text-gray-200" : "text-gray-800"
-                      }`}
-                      title={item.path}
-                    >
-                      {idx + 1}. {name}
-                    </span>
-                    <button
-                      onClick={() => handleTogglePathSelect(item.path)}
-                      className="text-red-500 hover:text-red-400 font-bold ml-2 text-xs font-sans"
-                      title="Remove from queue"
-                      disabled={isExecuting}
-                    >
-                      <LucideIcon name="x" className="h-3 w-3" />
-                    </button>
+                return (
+                  <div
+                    key={item.path}
+                    className={`flex flex-col gap-1.5 p-2 rounded border ${
+                      isDarkMode
+                        ? "bg-gray-900 border-gray-800"
+                        : "bg-gray-50 border-gray-200"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between min-w-0">
+                      <span
+                        className={`truncate font-semibold ${
+                          isDarkMode ? "text-gray-200" : "text-gray-800"
+                        }`}
+                        title={item.path}
+                      >
+                        {idx + 1}. {name}
+                      </span>
+                      <button
+                        onClick={() => handleTogglePathSelect(item.path)}
+                        className="text-red-500 hover:text-red-400 font-bold ml-2 text-xs font-sans"
+                        title="Remove from queue"
+                        disabled={isExecuting}
+                      >
+                        <LucideIcon name="x" className="h-3 w-3" />
+                      </button>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label
+                        className={`text-[10px] ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                      >
+                        Line Arguments:
+                      </label>
+                      <input
+                        type="text"
+                        value={item.args}
+                        onChange={(e) =>
+                          handleUpdateItemArgs(item.path, e.target.value)
+                        }
+                        placeholder="e.g. --tmdb audiobook/12345 --anon"
+                        className={`w-full px-2 py-1 text-xs border rounded-lg ${
+                          isDarkMode
+                            ? "bg-gray-800 border-gray-700 text-white placeholder-gray-500"
+                            : "bg-white border-gray-300 text-gray-900 placeholder-gray-400"
+                        }`}
+                        disabled={isExecuting}
+                      />
+                    </div>
                   </div>
-                  <div className="flex flex-col gap-1">
-                    <label
-                      className={`text-[10px] ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
-                    >
-                      Line Arguments:
-                    </label>
-                    <input
-                      type="text"
-                      value={item.args}
-                      onChange={(e) =>
-                        handleUpdateItemArgs(item.path, e.target.value)
-                      }
-                      placeholder="e.g. --tmdb audiobook/12345 --anon"
-                      className={`w-full px-2 py-1 text-xs border rounded-lg ${
-                        isDarkMode
-                          ? "bg-gray-800 border-gray-700 text-white placeholder-gray-500"
-                          : "bg-white border-gray-300 text-gray-900 placeholder-gray-400"
-                      }`}
-                      disabled={isExecuting}
-                    />
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
-        </div>
+        </>
       );
     }
 
-    if (isMobileView) {
-      return selectedPath ? (
-        <div
-          className={`p-2 rounded-lg ${isDarkMode ? "bg-gray-700 border-gray-600" : "bg-blue-50 border-blue-200"} border`}
-        >
-          <div className="flex items-center justify-between">
-            <p
-              className={`text-xs font-semibold ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}
-            >
-              Selected:
-            </p>
-            <button
-              onClick={() => setActivePanel("files")}
-              className={`text-xs px-2 py-0.5 rounded ${isDarkMode ? "bg-gray-600 text-gray-200 hover:bg-gray-500" : "bg-blue-100 text-blue-700 hover:bg-blue-200"}`}
-            >
-              Browse
-            </button>
-          </div>
-          <p
-            className={`text-xs ${isDarkMode ? "text-white" : "text-gray-800"} break-all font-mono mt-1`}
-          >
-            {selectedPath}
-          </p>
-        </div>
-      ) : (
-        <button
-          onClick={() => setActivePanel("files")}
-          className={`ua-accent-dropzone w-full p-3 rounded-lg border-2 border-dashed text-center inline-flex items-center justify-center ${isDarkMode ? "border-gray-600 text-gray-400" : "border-gray-300 text-gray-500"}`}
-        >
-          <FolderIcon />
-          <span className="text-sm ml-2">Tap to select a file or folder</span>
-        </button>
-      );
-    }
-
-    return (
-      selectedPath && (
-        <div
-          className={`p-3 ${
-            isDarkMode
-              ? "bg-gray-700 border-gray-600"
-              : "bg-blue-50 border-blue-200"
-          } border rounded-lg`}
-        >
-          <p
-            className={`text-xs font-semibold ${
-              isDarkMode ? "text-gray-300" : "text-gray-600"
-            } mb-1`}
-          >
-            Selected Path:
-          </p>
-          <p
-            className={`text-sm ${
-              isDarkMode ? "text-white" : "text-gray-800"
-            } break-all font-mono`}
-          >
-            {selectedPath}
-          </p>
-        </div>
-      )
-    );
+    return pathEditor;
   };
 
   const collapseFileBrowser = () => {
@@ -4218,6 +4256,10 @@ function AudionutsUAGUI() {
       const parentPath =
         separatorIdx > 0 ? item.path.substring(0, separatorIdx) : "";
       const activateSearchResult = () => {
+        setManualPathsText(null);
+        setPathInputError("");
+        if (manualPathsText !== null || selectedPaths.length <= 1)
+          setSelectedPaths([]);
         setSelectedPath(item.path);
         setSelectedName(item.name);
         if (isMobile) setActivePanel("main");
@@ -4234,6 +4276,7 @@ function AudionutsUAGUI() {
               type="checkbox"
               aria-label={`Select ${item.type === "folder" ? "folder" : "file"} ${item.name}`}
               checked={selectedPaths.some((x) => x.path === item.path)}
+              onClick={(event) => event.stopPropagation()}
               onChange={(e) => {
                 e.stopPropagation();
                 handleTogglePathSelect(item.path);
@@ -4299,6 +4342,10 @@ function AudionutsUAGUI() {
         item.type === "folder";
       const rootFolderIndex = rootFolderPaths.indexOf(item.path);
       const activateTreeItem = () => {
+        setManualPathsText(null);
+        setPathInputError("");
+        if (manualPathsText !== null || selectedPaths.length <= 1)
+          setSelectedPaths([]);
         if (item.type === "folder") {
           toggleFolder(item.path);
         }
@@ -4375,6 +4422,7 @@ function AudionutsUAGUI() {
               type="checkbox"
               aria-label={`Select ${item.type === "folder" ? "folder" : "file"} ${item.name}`}
               checked={selectedPaths.some((x) => x.path === item.path)}
+              onClick={(event) => event.stopPropagation()}
               onChange={(e) => {
                 e.stopPropagation();
                 handleTogglePathSelect(item.path);
@@ -4601,7 +4649,8 @@ function AudionutsUAGUI() {
     });
   };
 
-  const executeSinglePath = async (path, newSessionId) => {
+  const executeSinglePath = async (path, newSessionId, itemArgs = "") => {
+    const executionArgs = [customArgs, itemArgs].filter(Boolean).join(" ");
     // Validate --descfile: must have a valid description file path
     if (hasDescFile) {
       if (!descFilePath) {
@@ -4644,7 +4693,7 @@ function AudionutsUAGUI() {
     if (lastFullHashRef) lastFullHashRef.current = "";
 
     appendSystemMessage("");
-    appendSystemMessage(`$ python upload.py "${path}" ${customArgs}`);
+    appendSystemMessage(`$ python upload.py "${path}" ${executionArgs}`);
     appendSystemMessage("Starting execution...");
 
     let localController = null;
@@ -4659,7 +4708,7 @@ function AudionutsUAGUI() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           path: path,
-          args: customArgs,
+          args: executionArgs,
           session_id: newSessionId,
         }),
         signal: controller.signal,
@@ -4784,77 +4833,57 @@ function AudionutsUAGUI() {
   };
 
   const executeCommand = async () => {
-    // Run before any await, including queue creation, to retain user activation.
     window.uaPromptSound?.unlock();
-    if (selectedPaths.length > 1) {
-      setIsExecuting(true);
-      const rootContainer = richOutputRef.current;
-      if (rootContainer) {
-        rootContainer.innerHTML = "";
-      }
-
-      try {
-        const response = await apiFetch(`${API_BASE}/save_queue`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ items: selectedPaths }),
-        });
-
-        if (!response.ok) {
-          const errText = await response.text();
-          appendSystemMessage(
-            `Error: Failed to generate queue file: ${errText}`,
-            "error",
-          );
-          setIsExecuting(false);
-          return;
-        }
-
-        const data = await response.json();
-        if (!data.success || !data.path) {
-          appendSystemMessage(
-            `Error: Failed to generate queue file: ${data.error || "Unknown error"}`,
-            "error",
-          );
-          setIsExecuting(false);
-          return;
-        }
-
-        const newSessionId = "session_" + Date.now();
-        await executeSinglePath(data.path, newSessionId);
-      } catch (error) {
-        appendSystemMessage(
-          `Error generating queue: ${error.message}`,
-          "error",
-        );
-      } finally {
-        setIsExecuting(false);
-        setSessionId("");
-      }
+    if (isExecuting) return;
+    const previousArgs = new Map(
+      selectedPaths.map((item) => [item.path, item.args]),
+    );
+    const items =
+      manualPathsText !== null
+        ? parseUploadPaths(manualPathsText).map((item) => ({
+            ...item,
+            args: previousArgs.get(item.path) || "",
+          }))
+        : selectedPaths.length
+          ? selectedPaths
+          : selectedPath
+            ? [{ path: selectedPath, args: "" }]
+            : [];
+    if (!items.length || items.length > 1000) {
+      const error = items.length
+        ? "Maximum 1000 paths per upload"
+        : "Enter or select a file or folder first";
+      setPathInputError(error);
       return;
     }
-
-    const path =
-      selectedPaths.length === 1 ? selectedPaths[0].path : selectedPath;
-    if (!path) {
-      appendSystemMessage(
-        "Error: Please select a file or folder first",
-        "error",
-      );
-      return;
-    }
-
-    const rootContainer = richOutputRef.current;
+    setPathInputError("");
     setIsExecuting(true);
-    if (rootContainer) {
-      rootContainer.innerHTML = "";
+    try {
+      const response = await apiFetch(`${API_BASE}/save_queue`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items, return_single_path: items.length === 1 }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success || !data.path) {
+        const line = items[data.item - 1]?.line;
+        const error = `${line ? `Line ${line}: ` : ""}${data.error || "Could not validate upload paths"}`;
+        setPathInputError(error);
+        return;
+      }
+      const rootContainer = richOutputRef.current;
+      if (rootContainer) rootContainer.innerHTML = "";
+      await executeSinglePath(
+        data.path,
+        "session_" + Date.now(),
+        items.length === 1 ? items[0].args : "",
+      );
+    } catch (error) {
+      setPathInputError(`Could not prepare upload: ${error.message}`);
+    } finally {
+      setIsExecuting(false);
+      setSessionId("");
     }
-
-    const newSessionId = "session_" + Date.now();
-    await executeSinglePath(path, newSessionId);
-
-    setIsExecuting(false);
-    setSessionId("");
   };
 
   const clearTerminal = async () => {
@@ -6170,7 +6199,7 @@ function AudionutsUAGUI() {
                     <h2
                       className={`text-base font-bold ${isDarkMode ? "text-white" : "text-gray-800"} flex items-center gap-2`}
                     >
-                      <FolderIcon />
+                      <LucideIcon name="folders" className="w-4 h-4" />
                       File Browser
                     </h2>
                     <div className="flex shrink-0 items-center gap-1">
@@ -6922,7 +6951,7 @@ function AudionutsUAGUI() {
                     <h2
                       className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-gray-800"} flex items-center gap-2`}
                     >
-                      <FolderIcon />
+                      <LucideIcon name="folders" className="w-4 h-4" />
                       File Browser
                     </h2>
                     <div className="flex shrink-0 items-center gap-1">

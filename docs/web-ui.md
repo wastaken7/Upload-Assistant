@@ -106,6 +106,14 @@ The File Browser lists only content inside the configured browse roots. Use it t
 
 Normal browsing shows non-hidden files and folders inside the permitted roots so that video, disc, book, game, ISO, and other supported upload types remain available. The separate description-file picker is limited to `.txt`, `.nfo`, and `.md` files.
 
+Listings and searches omit dot-prefixed entries, Windows entries marked Hidden or System, and known system folders such as `$RECYCLE.BIN` and `System Volume Information`. Searches do not descend into those folders.
+
+You can also type or paste paths into **Upload paths** on desktop or mobile. Use server paths, one file or folder per line. Enter adds a line; use the execution button to start. One path runs individually, and multiple paths create a WebUI queue. Blank lines and duplicate paths are ignored, surrounding quotes are accepted, and each queue item can have its own arguments. The limit is 1,000 paths per upload.
+
+The server validates the complete selection before starting, and reports the invalid item (or original text line). Paths must exist inside the configured browse roots. Upload folders are inspected for escaping file links and reject directory links and Windows junctions. Local description, comparison, disc menu, poster and banner paths also use the permitted roots. Additional content paths belong in the path field, not in Additional Arguments.
+
+For text queues, paste their paths into **Upload paths** instead of selecting a `.txt` or `.log` queue file. Only temporary queues issued by the running WebUI are accepted outside the content roots; their contents are checked for modifications and their items are revalidated by the upload process. Ordinary CLI queue handling is unchanged. These checks constrain WebUI inputs; OS permissions remain the boundary against concurrent filesystem changes by other server processes or users.
+
 File browsing has no hourly or daily request quota. Folder listings and recursive searches use minute-based limits, while listing the configured roots is exempt. See [Request limits](#request-limits) for the allowances used throughout the WebUI.
 
 #### Custom root order

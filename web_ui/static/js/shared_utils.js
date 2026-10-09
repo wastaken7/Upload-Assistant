@@ -10,7 +10,7 @@
     book: "book-open",
     changelog: "history",
     config: "sliders-horizontal",
-    "file-structure": "folder-tree",
+    "file-structure": "folder",
     gamepad: "gamepad-2",
     help: "circle-help",
     logout: "log-out",
@@ -219,6 +219,14 @@
       typeof window.UA_DEFAULT_THEME === "boolean"
       ? window.UA_DEFAULT_THEME
       : true;
+  }
+
+  function setUAThemeMode(isDarkMode) {
+    const mode = isDarkMode ? "dark" : "light";
+    if (typeof document !== "undefined") {
+      document.documentElement.dataset.uaMode = mode;
+    }
+    uaStorage.set(THEME_KEY, mode);
   }
 
   function getUAStoredColorTheme() {
@@ -2018,6 +2026,7 @@
     window.UAHelpResourceGroups =
       window.UAHelpResourceGroups || UA_HELP_RESOURCE_GROUPS;
     window.getUAStoredTheme = window.getUAStoredTheme || getUAStoredTheme;
+    window.setUAThemeMode = window.setUAThemeMode || setUAThemeMode;
     window.getUAStoredColorTheme =
       window.getUAStoredColorTheme || getUAStoredColorTheme;
     window.setUAColorTheme = window.setUAColorTheme || setUAColorTheme;
