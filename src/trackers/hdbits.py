@@ -519,7 +519,8 @@ class HDBits:
         desc = bbcode.convert_comparison_to_centered(desc, 1000)
         desc = re.sub(r"(\[img=\d+)]", "[img]", desc, flags=re.IGNORECASE)
         desc = re.sub(r"\[/size\]|\[size=\d+\]", "", desc, flags=re.IGNORECASE)
-        desc_parts.append(f"{desc}\n")
+        if desc:
+            desc_parts.append(f"{desc}\n")
 
         if self.rehost_images is True:
             logger.info(f"{self.tracker}: [green]Rehosting Images...")
