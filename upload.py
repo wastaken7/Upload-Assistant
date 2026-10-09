@@ -2523,7 +2523,15 @@ async def do_the_thing(base_dir: str) -> None:
                     else:
                         meta.item_args = list(sys.argv[1:])
 
-                path = validate_subprocess_path(path)
+                try:
+                    path = validate_subprocess_path(path)
+                except ValueError as error:
+                    logger.info(f"[red]Skipping '{escape(path)}': {escape(str(error))}[/red]")
+                    if "queue" in meta and meta.queue is not None:
+                        processed_files_count += 1
+                        skipped_files_count += 1
+                        logger.info(f"[cyan]Processed {processed_files_count}/{total_files} files with {skipped_files_count} skipped uploading.\n\n")
+                    continue
                 meta.path = path
                 meta.uuid = ""
                 set_stats_context(debug=bool(meta.debug), category="")

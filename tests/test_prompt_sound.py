@@ -92,6 +92,7 @@ def test_execute_stream_delivers_sound_once_without_rendering_marker(tmp_path, m
             return 0
 
     process = Process()
+    monkeypatch.setattr(server, "_get_browse_roots", lambda: [str(tmp_path)])
     monkeypatch.setattr(server, "_is_authenticated", lambda: True)
     monkeypatch.setattr(server, "_verify_csrf_header", lambda: True)
     monkeypatch.setattr(server, "_verify_same_origin", lambda: True)

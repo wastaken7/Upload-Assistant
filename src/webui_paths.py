@@ -53,6 +53,8 @@ def validate_argument_paths(args: Sequence[str], roots: Sequence[str], *, inspec
         raise ValueError("Additional paths must be entered one per line in the path field")
     if options.webui or options.site_upload or options.unit3d or options.cleanup:
         raise ValueError("This operation is only available in CLI mode")
+    if options.torrenthash:
+        raise ValueError("Torrent reuse is only available in CLI mode")
     if options.queue and (len(options.queue[0]) > 128 or any(char in options.queue[0] for char in "/\\:") or options.queue[0] in {".", ".."}):
         raise ValueError("Queue name must be a simple name, not a path")
     for value in [*(options.description_file or []), *(options.comparison or [])]:

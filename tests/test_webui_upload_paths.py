@@ -305,6 +305,79 @@ def test_generated_queue_without_expected_hash_is_rejected(tmp_path, monkeypatch
         read_generated_queue(str(queue))
 
 
+@pytest.mark.parametrize("flag", ["--torrenthash", "-th", "--torrenthash=../../private"])
+def test_webui_rejects_torrent_reuse_in_global_and_queue_arguments(workspace, monkeypatch, flag):
+    client, root, _, first, _ = workspace
+    args = [flag] if "=" in flag else [flag, "../../private"]
+    with pytest.raises(ValueError, match="Torrent reuse is only available in CLI mode"):
+        server._validate_upload_assistant_args(args)
+    response = client.post("/api/save_queue", json={"items": [{"path": str(first), "args": shlex.join(args)}]})
+    assert response.status_code == 400
+    monkeypatch.setenv(ROOTS_ENV, json.dumps([str(root)]))
+    with pytest.raises(ValueError, match="Torrent reuse is only available in CLI mode"):
+        validate_subprocess_queue([{"path": str(first), "args": [str(first), *args]}])
+    monkeypatch.delenv(ROOTS_ENV)
+    validate_subprocess_queue([{"path": str(first), "args": [str(first), *args]}])  # Ordinary CLI remains unrestricted.
+
+
+@pytest.mark.asyncio
+async def test_queue_skips_item_deleted_after_initial_validation_and_continues(workspace, monkeypatch):
+    import importlib
+
+    import src.stats as stats
+    import upload
+    from bin.get_mediainfo import MediaInfoBinaryManager
+
+    _, root, state, first, second = workspace
+    third = root / "Fictional Finale.mkv"
+    third.touch()
+    queue_path = state / "webui_queue_fictional.txt"
+    queue_path.touch()
+    monkeypatch.setenv(ROOTS_ENV, json.dumps([str(root)]))
+    monkeypatch.setenv(QUEUE_ENV, str(queue_path))
+    monkeypatch.setattr(sys, "argv", ["upload.py", str(queue_path)])
+    monkeypatch.setattr(importlib, "reload", lambda _module: SimpleNamespace(config={"DEFAULT": {"sanitize_meta": True}}))
+    monkeypatch.setattr(upload, "config", {})
+    monkeypatch.setattr(upload, "load_heavy_globals", Mock())
+    monkeypatch.setattr(upload, "update_notification", AsyncMock(return_value=None))
+    monkeypatch.setattr("src.prowlarr.configured_prowlarr", lambda _config: None)
+    monkeypatch.setattr("src.configvalidator.validate_config", lambda *_args: (True, [], []))
+    monkeypatch.setattr(upload, "configured_binary", lambda *_args: True)
+    monkeypatch.setattr(MediaInfoBinaryManager, "ensure_mediainfo_binary", AsyncMock())
+    monkeypatch.setattr(upload, "get_mkbrr_path", AsyncMock(return_value=None))
+
+    def parse(_args, meta):
+        meta.path = str(queue_path)
+        meta.queue = "fictional"
+        return meta, None, None
+
+    monkeypatch.setattr(upload, "parser", SimpleNamespace(parse=parse), raising=False)
+    monkeypatch.setattr(QueueManager, "handle_queue", AsyncMock(return_value=([str(first), str(second), str(third)], None)))
+    monkeypatch.setattr(upload, "cleanup_manager", SimpleNamespace(cleanup=AsyncMock(), reset_terminal=Mock()))
+    monkeypatch.setattr(upload, "cancel_and_drain_early_artifact_tasks", AsyncMock())
+    preview = Mock()
+    monkeypatch.setattr(upload, "_publish_webui_preview_target", preview)
+    for name in ("configure_stats", "set_stats_context"):
+        monkeypatch.setattr(stats, name, Mock())
+    for name in ("record_event_async", "record_release_profile_async"):
+        monkeypatch.setattr(stats, name, AsyncMock())
+    logger = Mock()
+    monkeypatch.setattr(upload, "logger", logger)
+    processed = []
+
+    async def process(meta, _base_dir):
+        processed.append(meta.path)
+        if meta.path == str(first):
+            second.unlink()
+        return False
+
+    monkeypatch.setattr(upload, "process_meta", process)
+    await upload.do_the_thing(str(state))
+    assert processed == [str(first), str(third)]
+    assert [call.args[0] for call in preview.call_args_list] == processed
+    assert any("Processed 3/3 files with 3 skipped" in str(call) for call in logger.info.call_args_list)
+
+
 def test_subprocess_validates_all_expanded_items_and_cli_is_unchanged(workspace, monkeypatch):
     _, root, _, first, _ = workspace
     external = root.parent / "external.mkv"
