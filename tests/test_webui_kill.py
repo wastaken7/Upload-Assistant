@@ -9,7 +9,7 @@ import psutil
 import web_ui.server as server
 
 
-def test_execute_replaces_running_session_process(monkeypatch) -> None:
+def test_execute_missing_path_preserves_running_session_process(monkeypatch) -> None:
     class RunningProcess:
         def poll(self):
             return None
@@ -28,7 +28,8 @@ def test_execute_replaces_running_session_process(monkeypatch) -> None:
         response = server.app.test_client().post("/api/execute", json={"path": "", "session_id": session_id})
 
         assert response.status_code == 400
-        assert terminated_processes == [process]
+        assert terminated_processes == []
+        assert server.active_processes[session_id]["process"] is process
     finally:
         with server.active_processes_lock:
             server.active_processes.pop(session_id, None)
@@ -114,7 +115,7 @@ def test_sse_disconnect_terminates_running_process_tree(tmp_path, monkeypatch) -
 
     monkeypatch.setattr(server, "_is_authenticated", lambda: True)
     monkeypatch.setattr(server, "_verify_csrf_header", lambda: True)
-    monkeypatch.setattr(server, "_resolve_user_path", lambda *_args, **_kwargs: str(tmp_path))
+    monkeypatch.setattr(server, "_validate_execution_path", lambda *_args, **_kwargs: str(tmp_path))
     monkeypatch.setattr(server, "_assert_safe_resolved_path", lambda _: None)
     monkeypatch.setattr(server, "_validate_upload_assistant_args", lambda args: args)
     monkeypatch.setattr(server, "_spawn_webui_upload_process", lambda *_args: (process, "subprocess"))

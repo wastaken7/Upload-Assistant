@@ -2278,8 +2278,7 @@ function StatsApp() {
   const [todayRefresh, setTodayRefresh] = useState(0);
 
   useEffect(() => {
-    window.UAStorage.set("ua_config_theme", isDarkMode ? "dark" : "light");
-    document.documentElement.dataset.uaMode = isDarkMode ? "dark" : "light";
+    window.setUAThemeMode(isDarkMode);
   }, [isDarkMode]);
   useEffect(() => {
     window.UAStorage.set(STATS_PERIOD_KEY, period);

@@ -16,6 +16,7 @@ import web_ui.server as server
 )
 def test_prompt_state_changes_only_when_output_flushes(output, expected_type, tmp_path, monkeypatch) -> None:
     """Keep partial log lines inactive and publish real prompts on the idle path."""
+
     class WaitingProcess:
         stdin = io.StringIO()
         stdout = io.StringIO(output)
@@ -28,7 +29,7 @@ def test_prompt_state_changes_only_when_output_flushes(output, expected_type, tm
     session_id = "flush-state-test"
     monkeypatch.setattr(server, "_is_authenticated", lambda: True)
     monkeypatch.setattr(server, "_verify_csrf_header", lambda: True)
-    monkeypatch.setattr(server, "_resolve_user_path", lambda *_args, **_kwargs: str(tmp_path))
+    monkeypatch.setattr(server, "_validate_execution_path", lambda *_args, **_kwargs: str(tmp_path))
     monkeypatch.setattr(server, "_assert_safe_resolved_path", lambda _: None)
     monkeypatch.setattr(server, "_validate_upload_assistant_args", lambda args: args)
     monkeypatch.setattr(server, "_spawn_webui_upload_process", lambda *_args: (process, "subprocess"))
@@ -84,11 +85,11 @@ def test_idle_flush_keeps_incomplete_ansi_and_progress_records(buffer) -> None:
 
 def test_browser_receives_cli_ui_marker_before_answering(tmp_path, monkeypatch) -> None:
     command = [sys.executable, "-u", "-c", "import src.console; import cli_ui; answer = cli_ui.ask_yes_no('Continue?', default=False); print(f'ANSWER={answer}', flush=True)"]
-    process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", env=server._webui_subprocess_env())
+    process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", env=server._webui_subprocess_env())  # noqa: S603 - fixed Python prompt fixture
     session_id = "prompt-marker-test"
     monkeypatch.setattr(server, "_is_authenticated", lambda: True)
     monkeypatch.setattr(server, "_verify_csrf_header", lambda: True)
-    monkeypatch.setattr(server, "_resolve_user_path", lambda *_args, **_kwargs: str(tmp_path))
+    monkeypatch.setattr(server, "_validate_execution_path", lambda *_args, **_kwargs: str(tmp_path))
     monkeypatch.setattr(server, "_assert_safe_resolved_path", lambda _: None)
     monkeypatch.setattr(server, "_validate_upload_assistant_args", lambda args: args)
     monkeypatch.setattr(server, "_spawn_webui_upload_process", lambda *_args: (process, "subprocess"))
