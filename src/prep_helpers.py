@@ -29,7 +29,7 @@ from src.imdb import imdb_manager, imdb_match_rejection
 from src.languages import languages_manager
 from src.media_extensions import VIDEO_EXTENSIONS
 from src.meta import Meta
-from src.region import get_distributor, get_region, get_service
+from src.region import get_distributor, get_mediainfo_service, get_region, get_service
 from src.sports import detect_sports
 from src.tags import get_tag, tag_override
 from src.tvmaze import tvmaze_manager
@@ -1709,6 +1709,12 @@ async def finalize_metadata(
         # Parse NFO for scene releases to get service
         if meta.scene and not meta.service and meta.category in ("TV", "MOVIE"):
             await prep_instance.parse_scene_nfo(meta)
+
+        # MediaInfo signatures are weaker evidence than explicit, filename or NFO services.
+        if not meta.service:
+            meta.service, meta.service_longname = await get_mediainfo_service(meta)
+            if meta.service:
+                logger.info(f"[green]Detected {meta.service} ({meta.service_longname}) from MediaInfo signature[/green]")
 
         # Combine genres from TMDB and IMDb
         tmdb_genres = meta.genres or []
