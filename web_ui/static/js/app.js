@@ -1084,6 +1084,10 @@ const TerminalIcon = () => (
   <LucideIcon name="square-terminal" className="w-5 h-5" />
 );
 
+const DescriptionIcon = () => (
+  <LucideIcon name="text-initial" className="w-5 h-5" />
+);
+
 const PaletteIcon = () => <WebUiIcon name="palette" />;
 
 const SettingsIcon = () => <WebUiIcon name="config" />;
@@ -1522,60 +1526,60 @@ const RefreshIcon = () => <LucideIcon name="refresh-cw" className="w-4 h-4" />;
 
 const metadataProviderStyles = {
   tmdb: {
-    light: "border-[#06B4E2] bg-transparent text-[#067A98]",
-    dark: "border-[#06B4E2]/70 bg-transparent text-[#B9F3FF]",
+    light: "border-[#06B4E2]/70 bg-[#06B4E2]/10 text-[#067A98]",
+    dark: "border-[#06B4E2]/60 bg-[#06B4E2]/20 text-[#B9F3FF]",
   },
   imdb: {
-    light: "border-[#F5C518] bg-transparent text-[#6F5700]",
-    dark: "border-[#F5C518]/70 bg-transparent text-[#FFF3B5]",
+    light: "border-[#F5C518]/70 bg-[#F5C518]/10 text-[#6F5700]",
+    dark: "border-[#F5C518]/60 bg-[#F5C518]/20 text-[#FFF3B5]",
   },
   tvdb: {
-    light: "border-[#6CD591] bg-transparent text-[#2F7D49]",
-    dark: "border-[#6CD591]/70 bg-transparent text-[#D9F9E4]",
+    light: "border-[#6CD591]/70 bg-[#6CD591]/10 text-[#2F7D49]",
+    dark: "border-[#6CD591]/60 bg-[#6CD591]/20 text-[#D9F9E4]",
   },
   tvmaze: {
-    light: "border-[#6EC4BA] bg-transparent text-[#2E7B73]",
-    dark: "border-[#6EC4BA]/70 bg-transparent text-[#D4F4EF]",
+    light: "border-[#6EC4BA]/70 bg-[#6EC4BA]/10 text-[#2E7B73]",
+    dark: "border-[#6EC4BA]/60 bg-[#6EC4BA]/20 text-[#D4F4EF]",
   },
   mal: {
-    light: "border-[#2E51A1] bg-transparent text-[#2E51A1]",
-    dark: "border-[#2E51A1]/75 bg-transparent text-[#C9D6F4]",
+    light: "border-[#2E51A1]/70 bg-[#2E51A1]/10 text-[#2E51A1]",
+    dark: "border-[#2E51A1]/60 bg-[#2E51A1]/20 text-[#C9D6F4]",
   },
   douban: {
-    light: "border-[#007610] bg-transparent text-[#007610]",
-    dark: "border-[#007610]/75 bg-transparent text-[#B9F2C2]",
+    light: "border-[#007610]/70 bg-[#007610]/10 text-[#007610]",
+    dark: "border-[#007610]/60 bg-[#007610]/20 text-[#B9F2C2]",
   },
   igdb: {
-    light: "border-[#9147FF] bg-transparent text-[#9147FF]",
-    dark: "border-[#9147FF]/75 bg-transparent text-[#E2D2FF]",
+    light: "border-[#9147FF]/70 bg-[#9147FF]/10 text-[#9147FF]",
+    dark: "border-[#9147FF]/60 bg-[#9147FF]/20 text-[#E2D2FF]",
   },
   steam: {
-    light: "border-slate-300 bg-transparent text-slate-900",
-    dark: "border-slate-700 bg-transparent text-slate-100",
+    light: "border-sky-600/80 bg-sky-600/15 text-sky-900",
+    dark: "border-sky-400/80 bg-sky-500/30 text-sky-100",
   },
   google_books: {
-    light: "border-green-300 bg-transparent text-green-900",
-    dark: "border-green-900/80 bg-transparent text-green-100",
+    light: "border-green-300/70 bg-green-300/10 text-green-900",
+    dark: "border-green-900/60 bg-green-900/20 text-green-100",
   },
   openlibrary: {
-    light: "border-orange-300 bg-transparent text-orange-900",
-    dark: "border-orange-900/80 bg-transparent text-orange-100",
+    light: "border-orange-300/70 bg-orange-300/10 text-orange-900",
+    dark: "border-orange-900/60 bg-orange-900/20 text-orange-100",
   },
   audible: {
-    light: "border-[#F7991C] bg-transparent text-[#9A4F00]",
-    dark: "border-[#F7991C]/75 bg-transparent text-[#FFD6A3]",
+    light: "border-[#F7991C]/70 bg-[#F7991C]/10 text-[#9A4F00]",
+    dark: "border-[#F7991C]/60 bg-[#F7991C]/20 text-[#FFD6A3]",
   },
   musicbrainz: {
-    light: "border-[#BA478F] bg-transparent text-[#7D205D]",
-    dark: "border-[#BA478F]/75 bg-transparent text-[#F4C7E4]",
+    light: "border-[#BA478F]/70 bg-[#BA478F]/10 text-[#7D205D]",
+    dark: "border-[#BA478F]/60 bg-[#BA478F]/20 text-[#F4C7E4]",
   },
   discogs: {
-    light: "border-slate-400 bg-transparent text-slate-900",
-    dark: "border-slate-500/80 bg-transparent text-slate-100",
+    light: "border-slate-400/70 bg-slate-400/10 text-slate-900",
+    dark: "border-slate-500/60 bg-slate-500/20 text-slate-100",
   },
   default: {
-    light: "border-gray-300 bg-transparent text-gray-900",
-    dark: "border-gray-700 bg-transparent text-gray-100",
+    light: "border-gray-300/70 bg-gray-300/10 text-gray-900",
+    dark: "border-gray-700/60 bg-gray-700/20 text-gray-100",
   },
 };
 
@@ -1632,7 +1636,7 @@ const renderMetadataProviderIcon = (key, isDarkMode) => {
       <img
         src={iconSrc}
         alt={iconAsset.alt}
-        className={`block h-3.5 w-auto max-w-[3.75rem] object-contain ${
+        className={`block h-[0.7rem] w-auto max-w-[3rem] object-contain ${
           normalizedKey === "discogs" && !isDarkMode ? "invert" : ""
         }`}
       />
@@ -1641,12 +1645,12 @@ const renderMetadataProviderIcon = (key, isDarkMode) => {
 
   switch (key) {
     case "google_books":
-      return <LucideIcon name="book-open" className="w-4 h-4" />;
+      return <LucideIcon name="book-open" className="w-[0.8rem] h-[0.8rem]" />;
     case "openlibrary":
-      return <LucideIcon name="book-open" className="w-4 h-4" />;
+      return <LucideIcon name="book-open" className="w-[0.8rem] h-[0.8rem]" />;
     default:
       return (
-        <span className="text-[11px] font-black tracking-wide">
+        <span className="text-[8.8px] font-black tracking-wide">
           {String(key || "META")
             .slice(0, 4)
             .toUpperCase()}
@@ -5726,8 +5730,9 @@ function AudionutsUAGUI() {
       ? media.genres.filter(Boolean).slice(0, 4)
       : [];
     const panelPadding = compact ? "p-3" : "p-4";
-    const titleSize = compact ? "text-base" : "text-lg";
+    const titleSize = compact ? "text-[1.4rem]" : "text-[1.575rem]";
     const posterHeight = compact ? "h-64" : "h-80";
+    const backdropUrl = media?.backdrop_url || media?.poster_url;
     const overviewText =
       category === "TV"
         ? media?.episode_overview || media?.overview
@@ -5754,47 +5759,58 @@ function AudionutsUAGUI() {
         track.language_code,
       );
 
-      if (track.format) badges.push(track.format);
-      if (kind === "audio" && track.channels) badges.push(track.channels);
-      if (kind === "audio" && track.bitrate) badges.push(track.bitrate);
-      if (track.default) badges.push("Default");
-      if (track.forced) badges.push("Forced");
-      if (track.hearing_impaired) badges.push("SDH/HI");
-      if (track.commentary) badges.push("Commentary");
+      if (track.format) badges.push({ label: track.format });
+      if (kind === "audio" && track.channels)
+        badges.push({ label: track.channels });
+      if (kind === "audio" && track.bitrate)
+        badges.push({ label: track.bitrate });
+      if (track.default) badges.push({ label: "Default", status: true });
+      if (track.forced) badges.push({ label: "Forced", status: true });
+      if (track.hearing_impaired)
+        badges.push({ label: "SDH/HI", status: true });
+      if (track.commentary) badges.push({ label: "Commentary", status: true });
+      const languageLabel =
+        track.language_code || track.language || "Unknown language";
 
       return (
         <div
           key={`${kind}-${track.index}`}
-          className="ua-processing-track rounded-lg border px-3 py-2"
+          className="ua-processing-track rounded-xl border px-3 py-3"
+          data-default={Boolean(track.default)}
         >
           <div className="flex items-start gap-2">
-            <span className="ua-processing-muted shrink-0 font-mono text-xs">
+            <span className="ua-processing-track-index ua-processing-muted shrink-0 text-sm font-semibold">
               {track.index}.
             </span>
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 text-sm font-semibold">
+                <span className="ua-processing-track-language inline-flex items-center gap-2 text-sm font-semibold">
                   {languageFlag && (
                     <img
                       src={languageFlag}
                       alt=""
                       aria-hidden="true"
-                      width="20"
-                      height="15"
-                      className="shrink-0 rounded-sm object-contain"
+                      width="24"
+                      height="18"
+                      className="ua-language-flag shrink-0 object-contain"
                     />
                   )}
-                  {track.language || "Unknown language"}
+                  {languageLabel}
                 </span>
                 {badges.map((badge, index) => (
                   <span
-                    key={`${badge}-${index}`}
-                    className="ua-accent-chip rounded border px-1.5 py-0.5 text-[10px]"
+                    key={`${badge.label}-${index}`}
+                    className={`ua-processing-track-badge rounded-md ${badge.status ? "ua-processing-track-status" : ""}`}
                   >
-                    {badge}
+                    {badge.label}
                   </span>
                 ))}
               </div>
+              {track.language && track.language !== languageLabel && (
+                <p className="ua-processing-muted mt-2 break-words text-xs">
+                  {track.language}
+                </p>
+              )}
               {track.title && (
                 <p className="ua-processing-muted mt-1 break-words text-xs">
                   {track.title}
@@ -5838,7 +5854,7 @@ function AudionutsUAGUI() {
               title={flag.language}
               width="24"
               height="18"
-              className="h-[18px] w-6 shrink-0 object-contain"
+              className="ua-language-flag h-[18px] w-6 shrink-0 object-contain"
             />
           ))}
         </div>
@@ -5864,7 +5880,29 @@ function AudionutsUAGUI() {
     return (
       <div className="ua-processing-preview flex h-full flex-col">
         <div className="flex-1 overflow-y-auto">
-          <div className="ua-processing-card min-h-full overflow-hidden">
+          <div
+            className="ua-processing-card min-h-full overflow-hidden"
+            style={{
+              "--ua-processing-artwork-height": compact ? "16rem" : "20rem",
+            }}
+          >
+            {backdropUrl && (
+              <div className="ua-processing-backdrop" aria-hidden="true">
+                <img
+                  src={backdropUrl}
+                  alt=""
+                  onError={(event) => {
+                    if (
+                      media?.poster_url &&
+                      event.currentTarget.getAttribute("src") !==
+                        media.poster_url
+                    ) {
+                      event.currentTarget.src = media.poster_url;
+                    }
+                  }}
+                />
+              </div>
+            )}
             {media?.poster_url ? (
               <div
                 className={`ua-processing-artwork relative flex w-full items-center justify-center ${posterHeight}`}
@@ -5929,7 +5967,10 @@ function AudionutsUAGUI() {
                 <h3
                   className={`ua-processing-title ${titleSize} font-bold leading-tight`}
                 >
-                  {previewTitle}
+                  {baseTitle}
+                  {media?.year && (
+                    <span className="ua-processing-year"> ({media.year})</span>
+                  )}
                 </h3>
                 {showOriginalTitle && (
                   <p className="ua-processing-muted mt-1 text-sm">
@@ -5949,17 +5990,17 @@ function AudionutsUAGUI() {
                       );
                       const content = (
                         <>
-                          <span className="inline-flex items-center justify-center min-w-[2.6rem] px-2 h-6 rounded-full">
+                          <span className="inline-flex shrink-0 items-center justify-center h-[1.2rem]">
                             {renderMetadataProviderIcon(source.key, isDarkMode)}
                           </span>
                           <span className="min-w-0">
-                            <span className="block text-[11px] font-semibold font-mono truncate">
+                            <span className="block text-[0.7rem] leading-4 font-bold tabular-nums truncate">
                               {source.value}
                             </span>
                           </span>
                         </>
                       );
-                      const sharedClassName = `inline-flex items-center gap-1.5 max-w-full rounded-full border px-2.5 py-1 transition-colors ${providerClass}`;
+                      const sharedClassName = `ua-processing-provider inline-flex items-center gap-2 max-w-full rounded-full border-[1.6px] px-[0.8rem] py-[0.3rem] transition-colors ${providerClass}`;
 
                       if (source.url) {
                         return (
@@ -5993,10 +6034,7 @@ function AudionutsUAGUI() {
               {genres.length > 0 && (
                 <div className="flex flex-wrap gap-2">
                   {genres.map((genre) => (
-                    <span
-                      key={genre}
-                      className="ua-accent-chip px-2 py-1 rounded-md border text-xs"
-                    >
+                    <span key={genre} className="ua-processing-genre">
                       {genre}
                     </span>
                   ))}
@@ -6878,7 +6916,7 @@ function AudionutsUAGUI() {
               `Screens${executionScreenshots.length ? ` (${executionScreenshots.length})` : ""}`,
             )}
           {isExecuting &&
-            navButton("description", <TerminalIcon />, "Description")}
+            navButton("description", <DescriptionIcon />, "Description")}
         </div>
       </div>
     );
@@ -7280,7 +7318,7 @@ function AudionutsUAGUI() {
                       className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors flex-shrink-0 ${isDescriptionReviewOpen ? "ua-accent-action" : isDarkMode ? "bg-gray-700 hover:bg-gray-600 text-gray-100" : "bg-gray-100 hover:bg-gray-200 text-gray-700"}`}
                       title="Review and edit the base description"
                     >
-                      <TerminalIcon />
+                      <DescriptionIcon />
                       Description
                     </button>
                     <button

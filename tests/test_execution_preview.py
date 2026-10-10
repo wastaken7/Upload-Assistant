@@ -93,6 +93,17 @@ def test_execution_preview_prefers_current_tv_artwork_url():
     assert preview["poster_url"] == "https://images.example/show-poster.jpg"  # noqa: S101
 
 
+@pytest.mark.parametrize("backdrop", ["https://images.example/backdrop.jpg", "", None])
+def test_execution_preview_exposes_backdrop_without_replacing_poster(backdrop):
+    preview = _extract_execution_preview(
+        {"category": "MOVIE", "title": "Example Movie", "poster": "https://images.example/poster.jpg", "backdrop": backdrop},
+        "C:/media/Example Movie",
+    )
+
+    assert preview["backdrop_url"] == (backdrop or "")  # noqa: S101
+    assert preview["poster_url"] == "https://images.example/poster.jpg"  # noqa: S101
+
+
 @pytest.mark.parametrize(
     ("category", "metadata", "section_key", "expected"),
     [

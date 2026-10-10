@@ -1259,23 +1259,40 @@ html.ua-upload-document #root {
 
 .ua-processing-card {
   background: var(--ua-upload-surface);
-}
-
-.ua-processing-artwork {
-  background:
-    radial-gradient(circle at 50% 35%, var(--ua-atmosphere), transparent 68%),
-    color-mix(in srgb, var(--ua-upload-bg) 86%, #000000);
-  border-bottom: 1px solid var(--ua-upload-border);
   isolation: isolate;
+  position: relative;
 }
 
-.ua-processing-artwork::after {
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.28), transparent 34%);
-  content: "";
-  inset: 0;
+.ua-processing-backdrop {
+  height: calc(var(--ua-processing-artwork-height) + 12rem);
+  inset: 0 0 auto;
+  mask-image: linear-gradient(
+    to bottom,
+    #000 0%,
+    rgba(0, 0, 0, 0.85) 40%,
+    rgba(0, 0, 0, 0.35) 72%,
+    transparent 100%
+  );
+  opacity: 0.5;
+  overflow: hidden;
   pointer-events: none;
   position: absolute;
   z-index: -1;
+}
+
+.ua-processing-backdrop img {
+  filter: blur(4px);
+  height: calc(100% + 48px);
+  left: -24px;
+  max-width: none;
+  object-fit: cover;
+  position: absolute;
+  top: -24px;
+  width: calc(100% + 48px);
+}
+
+.ua-upload-page[data-mode="light"] .ua-processing-backdrop {
+  opacity: 0.3;
 }
 
 .ua-processing-poster {
@@ -1321,6 +1338,7 @@ html.ua-upload-document #root {
 }
 
 .ua-processing-muted,
+.ua-processing-year,
 .ua-processing-source {
   color: var(--ua-upload-muted);
 }
@@ -1357,13 +1375,40 @@ html.ua-upload-document #root {
 }
 
 .ua-processing-track {
-  background: color-mix(
-    in srgb,
-    var(--ua-upload-bg) 45%,
-    var(--ua-upload-surface)
-  );
+  background: transparent;
   border-color: var(--ua-upload-border);
   overflow-wrap: anywhere;
+}
+
+.ua-processing-track[data-default="true"] {
+  background: color-mix(in srgb, var(--ua-upload-text) 8%, transparent);
+}
+
+.ua-processing-track-index {
+  line-height: 1.75rem;
+}
+
+.ua-processing-track-language {
+  min-height: 1.75rem;
+}
+
+.ua-processing-track-badge {
+  background: color-mix(in srgb, #38bdf8 16%, transparent);
+  color: color-mix(in srgb, #38bdf8 55%, var(--ua-upload-text));
+  font-size: 0.75rem;
+  line-height: 1.25rem;
+  max-width: 100%;
+  padding: 0.2rem 0.5rem;
+}
+
+.ua-processing-track-status {
+  background: color-mix(in srgb, #2dd4bf 10%, transparent);
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, #2dd4bf 70%, transparent);
+  color: color-mix(in srgb, #2dd4bf 55%, var(--ua-upload-text));
+}
+
+html[data-ua-shape="rounded"] .ua-language-flag {
+  border-radius: 0.2rem;
 }
 
 .ua-processing-detail-row {
@@ -1402,6 +1447,39 @@ html.ua-upload-document #root {
 
 .ua-processing-source {
   border-color: var(--ua-upload-border);
+}
+
+.ua-processing-genre {
+  --ua-genre-accent: #38bdf8;
+  background: color-mix(in srgb, var(--ua-genre-accent) 18%, transparent);
+  border-radius: 0.5rem;
+  color: color-mix(in srgb, var(--ua-genre-accent) 40%, var(--ua-upload-text));
+  display: inline-flex;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  line-height: 1.25rem;
+  padding: 0.2rem 0.55rem;
+}
+
+.ua-processing-genre:nth-child(2) {
+  --ua-genre-accent: #f472b6;
+}
+
+.ua-processing-genre:nth-child(3) {
+  --ua-genre-accent: #a78bfa;
+}
+
+.ua-processing-genre:nth-child(4) {
+  --ua-genre-accent: #2dd4bf;
+}
+
+.ua-processing-provider {
+  background-image: linear-gradient(
+    120deg,
+    color-mix(in srgb, currentColor 6%, transparent),
+    transparent
+  );
+  box-shadow: inset 0 1px 0 color-mix(in srgb, currentColor 8%, transparent);
 }
 
 .ua-processing-provider-section a:focus-visible,

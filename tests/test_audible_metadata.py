@@ -230,6 +230,26 @@ async def test_asin_supplied_only_by_mam_does_not_trigger_audible(tmp_path, monk
     meta = Meta(audiobook=True, edit=True, filelist=[], torrent_comments=[{"trackers": "myanonamouse.net", "comment": "MID=123"}])
     await book_prep.gather_book_prep(meta, "fictional.m4b", str(tmp_path), {"DEFAULT": {"audible_domain": "audible.com.br", "mam_api_key": "test"}})
     fetch.assert_not_awaited()
+    assert meta.audible_url == f"https://www.audible.com.br/pd/{ASIN}"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "domain,explicit_url,expected_url",
+    [
+        ("audible.com.br", "", f"https://www.audible.com.br/pd/{ASIN}"),
+        ("audible.com.br", f"https://audible.co.uk/pd/Fictional-Title/{ASIN}", f"https://www.audible.co.uk/pd/{ASIN}"),
+        ("", "", ""),
+        ("example.com", "", ""),
+    ],
+)
+async def test_prep_persists_audible_link_even_without_catalog_metadata(tmp_path, monkeypatch, domain, explicit_url, expected_url):
+    monkeypatch.setattr(book_prep, "fetch_audible_metadata", AsyncMock(return_value=None))
+    meta = Meta(audiobook=True, asin=ASIN, audible_url=explicit_url, edit=True, filelist=[])
+
+    await book_prep.gather_book_prep(meta, "fictional.m4b", str(tmp_path), {"DEFAULT": {"audible_domain": domain}})
+
+    assert meta.audible_url == expected_url
 
 
 @pytest.mark.parametrize("language,needle", [("en", "4.7/5 (21 ratings)"), ("pt-BR", "4,7/5 (21 avaliações)")])

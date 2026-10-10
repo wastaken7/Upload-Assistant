@@ -1632,8 +1632,6 @@ def _extract_preview_detail_sections(meta_data: Mapping[str, object], music: Map
             ("container", "Container", meta_data.get("container")),
             ("video_codec", "Video", video_codec),
             ("audio", "Audio", meta_data.get("audio")),
-            ("audio_languages", "Audio Languages", meta_data.get("audio_languages")),
-            ("subtitle_languages", "Subtitles", meta_data.get("subtitle_languages")),
             ("size", "Size", _format_preview_size(meta_data.get("source_size"))),
             ("files", "Files", file_count or ""),
         ),
@@ -2403,6 +2401,7 @@ def _extract_execution_preview(meta_data: Mapping[str, object], fallback_path: s
         "imdb": _extract_preview_imdb_id(meta_data),
         "metadata_sources": _extract_metadata_sources(meta_data),
         "poster_url": poster_url,
+        "backdrop_url": _stringify_preview_value(meta_data.get("backdrop")),
         "overview": _stringify_preview_value(meta_data.get("overview")),
         "genres": genres,
         "name": _stringify_preview_value(meta_data.get("name")),
@@ -2483,6 +2482,7 @@ def _find_execution_preview(session_id: str) -> ExecutionPreview | None:
         "imdb": "",
         "metadata_sources": [],
         "poster_url": "",
+        "backdrop_url": "",
         "overview": "",
         "genres": [],
         "name": "",
@@ -2699,6 +2699,7 @@ class ExecutionPreview(TypedDict, total=False):
     imdb: str
     metadata_sources: list[MetadataSource]
     poster_url: str
+    backdrop_url: str
     overview: str
     genres: list[str]
     name: str
