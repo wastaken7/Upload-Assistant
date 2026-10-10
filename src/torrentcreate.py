@@ -109,6 +109,13 @@ class TorrentCreator:
     _create_torrent_inflight = 0
     _torf_start_time = time.time()
 
+    @classmethod
+    async def rehash_torrents(cls, meta: Meta) -> None:
+        TorrentManifest(meta.base_dir, meta.uuid).clear()
+        await cls.create_torrent(meta, Path(str(meta.path)), "BASE", make_default=True)
+        if meta.subtitle_files:
+            await cls.create_torrent(meta, Path(str(meta.path)), "BASE_SUBS", make_default=True)
+
     @staticmethod
     def calculate_piece_size(
         total_size: int,
