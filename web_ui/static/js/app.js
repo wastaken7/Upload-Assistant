@@ -5809,9 +5809,18 @@ function AudionutsUAGUI() {
     const renderMediaTrackFlags = (tracks, kind) => {
       const flags = tracks.flatMap((track, index) => {
         const src = getPreviewLanguageFlag(track.language, track.language_code);
-        return src
-          ? [{ src, language: track.language || track.language_code, index }]
-          : [];
+        const language = String(track.language || "").trim();
+        const code = String(track.language_code || "").trim();
+        const label =
+          language &&
+          /[-_]/.test(code) &&
+          !language
+            .toLowerCase()
+            .replace(/_/g, "-")
+            .includes(code.toLowerCase().replace(/_/g, "-"))
+            ? `${language} (${code})`
+            : language || code;
+        return src ? [{ src, language: label, index }] : [];
       });
       if (flags.length === 0) return null;
 
