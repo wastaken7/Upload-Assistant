@@ -9,6 +9,59 @@ from src.prep_helpers import _should_lookup_torrent_properties, process_trackers
 from src.torrent_manifest import TorrentManifest
 from src.torrent_policy import MIB, TorrentPolicy
 from src.torrentcreate import TorrentCreator
+from src.trackers.common import Common
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("with_subtitles", [False, True])
+async def test_rehash_uses_current_dvd_layout_for_upload(tmp_path, with_subtitles):
+    original = tmp_path / "original" / "Movie Name 2020"
+    original.mkdir(parents=True)
+    for name in ("VIDEO_TS.IFO", "VTS_01_0.IFO", "VTS_01_1.VOB"):
+        (original / name).write_bytes(b"dvd data")
+    source = tmp_path / "client.torrent"
+    torrent = Torrent(path=original, piece_size=16 * 1024)
+    torrent.generate()
+    torrent.write(source)
+
+    release = tmp_path / "linked" / original.name
+    video_ts = release / "VIDEO_TS"
+    video_ts.mkdir(parents=True)
+    for file in original.iterdir():
+        (video_ts / file.name).hardlink_to(file)
+    subtitle = release / "movie.srt"
+    if with_subtitles:
+        subtitle.write_text("subtitle data", encoding="utf-8")
+    meta = Meta(
+        base_dir=str(tmp_path),
+        uuid="dvd-rehash",
+        path=str(release),
+        filelist=[str(file) for file in video_ts.iterdir()],
+        subtitle_files=[str(subtitle)] if with_subtitles else [],
+        category="MOVIE",
+        isdir=True,
+        is_disc="DVD",
+        rehash=True,
+        mkbrr=False,
+        trackers=["TEST"],
+    )
+    manifest = TorrentManifest(meta.base_dir, meta.uuid)
+    manifest.register(source, "base", "client:qbit")
+    manifest.register(source, "base_subs", "generated")
+    manifest.select("TEST", "base_subs")
+
+    await TorrentCreator.rehash_torrents(meta)
+
+    assert manifest.selected_path("TEST") is None
+    assert len(manifest.entries()) == (2 if with_subtitles else 1)
+    assert all(entry.origin == "generated" for entry in manifest.entries())
+    assert (manifest.default_path("base_subs") is not None) == with_subtitles
+    common = Common({"TRACKERS": {"TEST": {"allow_ext_subtitles": with_subtitles}}})
+    await common.create_torrent_for_upload(meta, "TEST", "TEST")
+    uploaded = Torrent.read(tmp_path / "tmp" / meta.uuid / "[TEST].torrent")
+    dvd_paths = [str(file) for file in uploaded.files if file.suffix != ".srt"]
+    assert sorted(dvd_paths) == sorted(f"{release.name}/VIDEO_TS/{file.name}" for file in original.iterdir())
+    assert Torrent.read(source).infohash == torrent.infohash
 
 
 @pytest.mark.asyncio

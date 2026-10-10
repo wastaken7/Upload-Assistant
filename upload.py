@@ -1930,9 +1930,7 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
 
         # 2. Re-create base torrents if rehash is True
         if meta.rehash is True and meta.nohash is False:
-            await TORRENT_CREATOR.create_torrent(meta, Path(cast(str, meta.path)), "BASE", make_default=True)
-            if has_local_subs:
-                await TORRENT_CREATOR.create_torrent(meta, Path(cast(str, meta.path)), "BASE_SUBS", make_default=True)
+            await TORRENT_CREATOR.rehash_torrents(meta)
 
         # 3. Otherwise generate if missing
         else:
