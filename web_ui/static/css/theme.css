@@ -1404,7 +1404,7 @@ html.ua-upload-document #root {
 .ua-processing-track-status {
   background: color-mix(in srgb, #2dd4bf 10%, transparent);
   box-shadow: inset 0 0 0 1.5px color-mix(in srgb, #2dd4bf 70%, transparent);
-  color: color-mix(in srgb, #2dd4bf 55%, var(--ua-upload-text));
+  color: color-mix(in srgb, #2dd4bf 40%, var(--ua-upload-text));
 }
 
 html[data-ua-shape="rounded"] .ua-language-flag {

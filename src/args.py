@@ -1128,7 +1128,11 @@ class Args:
         # this invocation are still checked for conflicts below.
         if parsed_args.get("book_asin") and not parsed_args.get("audible_url") and meta.audible_url:
             new_asin = self.list_to_string(parsed_args["book_asin"]).strip().upper()
-            if normalize_audible_url(meta.audible_url).rsplit("/", 1)[-1] != new_asin:
+            try:
+                carried_asin = normalize_audible_url(meta.audible_url).rsplit("/", 1)[-1]
+            except ValueError:
+                carried_asin = ""
+            if carried_asin != new_asin:
                 meta.audible_url = ""
         for key in parsed_args:
             value = parsed_args[key]
