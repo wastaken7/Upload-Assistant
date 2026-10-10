@@ -766,6 +766,13 @@ async def gather_book_prep(
 
     # Persist the final product link before meta is saved for the Web UI review.
     if meta.asin:
+        if meta.audible_url:
+            try:
+                url_asin = normalize_audible_url(meta.audible_url).rsplit("/", 1)[-1]
+            except ValueError:
+                url_asin = ""
+            if url_asin != str(meta.asin).strip().upper():
+                meta.audible_url = ""
         with contextlib.suppress(ValueError):
             meta.audible_url = resolve_audible_url(
                 meta.asin,

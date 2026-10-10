@@ -252,6 +252,35 @@ async def test_prep_persists_audible_link_even_without_catalog_metadata(tmp_path
     assert meta.audible_url == expected_url
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("domain", ["audible.com.br", "", "example.com"])
+@pytest.mark.parametrize("explicit_url", [f"https://www.audible.co.uk/pd/{ASIN}", "https://[invalid/pd/product"])
+async def test_prep_reconciles_audible_url_after_mam_changes_asin(tmp_path, monkeypatch, domain, explicit_url):
+    from src.myanonamouse import myanonamouse_manager
+
+    final_asin = "B0OTHER123"
+    fetch = AsyncMock(return_value=None)
+    monkeypatch.setattr(book_prep, "fetch_audible_metadata", fetch)
+    monkeypatch.setattr(myanonamouse_manager, "search_by_id", AsyncMock(return_value={"asin": final_asin}))
+    meta = Meta(
+        audiobook=True,
+        asin=ASIN,
+        audible_url=explicit_url,
+        edit=True,
+        filelist=[],
+        torrent_comments=[{"trackers": "myanonamouse.net", "comment": "MID=123"}],
+    )
+
+    await book_prep.gather_book_prep(meta, "fictional.m4b", str(tmp_path), {"DEFAULT": {"audible_domain": domain, "mam_api_key": "test"}})
+
+    assert meta.asin == final_asin
+    assert meta.audible_url == (f"https://www.audible.com.br/pd/{final_asin}" if domain == "audible.com.br" else "")
+    if explicit_url == f"https://www.audible.co.uk/pd/{ASIN}":
+        fetch.assert_awaited_once_with(ASIN, "audible.co.uk", str(tmp_path))
+    else:
+        fetch.assert_not_awaited()
+
+
 @pytest.mark.parametrize("language,needle", [("en", "4.7/5 (21 ratings)"), ("pt-BR", "4,7/5 (21 avaliações)")])
 def test_description_rating_is_plain_text_and_omitted_when_missing(language, needle):
     builder = DescriptionBuilder("TEST", {"DEFAULT": {"audible_domain": "audible.com.br"}, "TRACKERS": {"TEST": {}}}, language=language)
