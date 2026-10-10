@@ -7205,10 +7205,6 @@ def execute_command():
                             buffers[output_type] = ""
                             yield f"data: {json.dumps({'type': 'prompt_sound'})}\n\n"
                             continue
-                        if prompt_type:
-                            _set_process_awaiting_input_if_current(session_id, process_state, True, prompt_type)
-                        else:
-                            _set_process_awaiting_input_if_current(session_id, process_state, False)
                         chunk = buffers[output_type]
                         buffers[output_type] = ""
 
@@ -7217,6 +7213,13 @@ def execute_command():
                             _set_process_progress_if_current(session_id, process_state, progress_event)
                             yield f"data: {json.dumps({'type': 'progress', 'data': progress_event})}\n\n"
                             continue
+
+                        # Structured progress and its blank/ANSI separator lines
+                        # do not answer or replace an outstanding terminal prompt.
+                        if prompt_type:
+                            _set_process_awaiting_input_if_current(session_id, process_state, True, prompt_type)
+                        elif re.sub(r"\x1b\[[0-?]*[ -/]*[@-~]", "", chunk).strip():
+                            _set_process_awaiting_input_if_current(session_id, process_state, False)
 
                         # Convert to HTML fragment. If helper missing, escape and wrap in <pre>
                         try:
