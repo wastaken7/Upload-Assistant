@@ -15,6 +15,8 @@ const parseUploadPaths = (text) => {
   });
 };
 
+const getPreviewLanguageFlag = window.getUAPreviewLanguageFlag;
+
 const { useState, useRef, useEffect, useLayoutEffect, useCallback } = React;
 const THEME_KEY = "ua_config_theme";
 const LEFT_SIDEBAR_WIDTH_KEY = "ua_webui_left_sidebar_width_v2";
@@ -5747,6 +5749,10 @@ function AudionutsUAGUI() {
 
     const renderMediaTrack = (track, kind) => {
       const badges = [];
+      const languageFlag = getPreviewLanguageFlag(
+        track.language,
+        track.language_code,
+      );
 
       if (track.format) badges.push(track.format);
       if (kind === "audio" && track.channels) badges.push(track.channels);
@@ -5767,7 +5773,17 @@ function AudionutsUAGUI() {
             </span>
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-sm font-semibold">
+                <span className="inline-flex items-center gap-1.5 text-sm font-semibold">
+                  {languageFlag && (
+                    <img
+                      src={languageFlag}
+                      alt=""
+                      aria-hidden="true"
+                      width="20"
+                      height="15"
+                      className="shrink-0 rounded-sm object-contain"
+                    />
+                  )}
                   {track.language || "Unknown language"}
                 </span>
                 {badges.map((badge, index) => (
@@ -5786,6 +5802,45 @@ function AudionutsUAGUI() {
               )}
             </div>
           </div>
+        </div>
+      );
+    };
+
+    const renderMediaTrackFlags = (tracks, kind) => {
+      const flags = tracks.flatMap((track, index) => {
+        const src = getPreviewLanguageFlag(track.language, track.language_code);
+        const language = String(track.language || "").trim();
+        const code = String(track.language_code || "").trim();
+        const label =
+          language &&
+          /[-_]/.test(code) &&
+          !language
+            .toLowerCase()
+            .replace(/_/g, "-")
+            .includes(code.toLowerCase().replace(/_/g, "-"))
+            ? `${language} (${code})`
+            : language || code;
+        return src ? [{ src, language: label, index }] : [];
+      });
+      if (flags.length === 0) return null;
+
+      return (
+        <div
+          role="group"
+          aria-label={`${kind === "audio" ? "Audio" : "Subtitle"} track languages`}
+          className="flex flex-wrap items-center gap-1.5 pb-2"
+        >
+          {flags.map((flag) => (
+            <img
+              key={`${kind}-${flag.index}`}
+              src={flag.src}
+              alt={flag.language}
+              title={flag.language}
+              width="24"
+              height="18"
+              className="h-[18px] w-6 shrink-0 object-contain"
+            />
+          ))}
         </div>
       );
     };
@@ -6000,6 +6055,9 @@ function AudionutsUAGUI() {
                       </span>
                     </button>
 
+                    {!showAudioTracks &&
+                      renderMediaTrackFlags(audioTracks, "audio")}
+
                     <button
                       type="button"
                       onClick={() => setShowSubtitleTracks((value) => !value)}
@@ -6033,6 +6091,8 @@ function AudionutsUAGUI() {
                         />
                       </span>
                     </button>
+                    {!showSubtitleTracks &&
+                      renderMediaTrackFlags(subtitleTracks, "subtitle")}
                   </div>
                 </section>
               )}

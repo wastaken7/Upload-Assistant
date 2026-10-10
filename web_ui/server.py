@@ -2344,6 +2344,7 @@ def _extract_preview_media_tracks(
             {
                 "index": len(target) + 1,
                 "language": language,
+                "language_code": _preview_media_track_value(track, "Language", "language"),
                 "title": title,
                 "format": format_name,
                 "channels": channels,
