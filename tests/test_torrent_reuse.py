@@ -83,7 +83,7 @@ async def test_rehash_uses_current_dvd_layout_for_upload(tmp_path, with_subtitle
     common = Common({"TRACKERS": {"TEST": {"allow_ext_subtitles": with_subtitles}}})
     await common.create_torrent_for_upload(meta, "TEST", "TEST")
     uploaded = Torrent.read(tmp_path / "tmp" / meta.uuid / "[TEST].torrent")
-    dvd_paths = [str(file) for file in uploaded.files if file.suffix != ".srt"]
+    dvd_paths = [file.as_posix() for file in uploaded.files if file.suffix != ".srt"]
     assert sorted(dvd_paths) == sorted(f"{release.name}/VIDEO_TS/{file.name}" for file in original.iterdir())
     assert Torrent.read(source).infohash == torrent.infohash
 
@@ -372,7 +372,7 @@ async def test_season_pack_excludes_unselected_files(tmp_path, output_filename, 
     expected_files = [*videos, subtitle] if output_filename == "BASE_SUBS" else videos
 
     assert torrent.name == release.name  # noqa: S101
-    assert sorted(str(file) for file in torrent.files) == sorted(  # noqa: S101
+    assert sorted(file.as_posix() for file in torrent.files) == sorted(  # noqa: S101
         (release.name + "/" + file.relative_to(release).as_posix()) for file in expected_files
     )
     valid, _ = await Clients({}).is_valid_torrent(meta, str(torrent_path), torrent.infohash, "qbit", {})
@@ -416,7 +416,7 @@ async def test_symlinked_season_pack_preserves_release_layout(tmp_path, output_f
     torrent_path = await TorrentCreator.create_torrent(meta, str(release), output_filename)
     torrent = Torrent.read(torrent_path)
     expected = [*videos, subtitle] if output_filename == "BASE_SUBS" else videos
-    assert sorted(str(file) for file in torrent.files) == sorted(
+    assert sorted(file.as_posix() for file in torrent.files) == sorted(
         f"{release.name}/{file.relative_to(release).as_posix()}" for file in expected
     )
     clients = Clients({})
@@ -543,7 +543,8 @@ async def test_disc_reuse_matches_creation_filters(tmp_path, ignored_path, outpu
     expected_files = ["release/BDMV/STREAM/00000.m2ts"]
     if output_filename == "BASE_SUBS":
         expected_files.append("release/movie.SRT")
-    assert sorted(str(file) for file in torrent.files) == expected_files
+    # Torrent file paths use native separators; compare a portable layout.
+    assert sorted(file.as_posix() for file in torrent.files) == expected_files
     clients = Clients({})
 
     valid, _ = await clients.is_valid_torrent(meta, str(torrent_path), torrent.infohash, "qbit", {})
