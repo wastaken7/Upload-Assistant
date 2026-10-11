@@ -593,7 +593,7 @@ async def process_media_files(prep_instance: Any, meta: Meta, videoloc: str, bdi
                         continue
                     for file in files:
                         ext = Path(file).suffix.lower()
-                        if ext in subtitle_exts:
+                        if ext in subtitle_exts and not file.startswith("._"):
                             # Torrent layouts use the link's path within the release.
                             meta.subtitle_files.append(str((Path(root) / file).absolute()))
             else:

@@ -15,12 +15,13 @@ from src.video import VideoManager
 
 
 @pytest.mark.asyncio
-async def test_macos_sidecar_does_not_change_single_file_torrent_layout(tmp_path):
+@pytest.mark.parametrize("extension", ["mkv", "MKV", "avi"])
+async def test_macos_sidecar_does_not_change_single_file_torrent_layout(tmp_path, extension):
     release = tmp_path / "release"
     release.mkdir()
-    video = release / "movie.2000.mkv"
+    video = release / f"movie.2000.{extension}"
     video.write_bytes(b"video")
-    (release / "._movie.2000.mkv").write_bytes(b"macOS metadata")
+    (release / f"._{video.name}").write_bytes(b"macOS metadata")
     _, filelist = await VideoManager().get_video(str(release))
     meta = Meta(
         base_dir=str(tmp_path), uuid=release.name, path=str(release),
@@ -334,7 +335,8 @@ async def test_base_subs_excludes_unselected_subtitles(tmp_path, file_input):
 @pytest.mark.asyncio
 @pytest.mark.parametrize("output_filename", ["BASE", "BASE_SUBS"])
 @pytest.mark.parametrize("nested", [False, True])
-async def test_keep_folder_season_pack_excludes_unselected_files(tmp_path, output_filename, nested):
+@pytest.mark.parametrize("keep_folder", [False, True])
+async def test_season_pack_excludes_unselected_files(tmp_path, output_filename, nested, keep_folder):
     release = tmp_path / "Fictional.Show.[2025]"
     videos = [release / "S01" / "episode.mkv", release / "S02" / "episode.mkv"] if nested else [release / "E01.mkv", release / "E02.mkv"]
     subtitle = videos[0].with_suffix(".pt-BR.srt")
@@ -357,7 +359,7 @@ async def test_keep_folder_season_pack_excludes_unselected_files(tmp_path, outpu
         category="TV",
         isdir=True,
         tv_pack=True,
-        keep_folder=True,
+        keep_folder=keep_folder,
         keep_nfo=True,
         mkbrr=False,
         max_piece_size=1,
@@ -388,6 +390,7 @@ async def test_symlinked_season_pack_preserves_release_layout(tmp_path, output_f
     videos = [release / "E01.mkv", release / "E02.mkv"]
     subtitle = release / "Subs" / "E01.pt-BR.srt"
     subtitle.parent.mkdir()
+    (subtitle.parent / f"._{subtitle.name}").write_bytes(b"macOS metadata")
     for index, link in enumerate([*videos, subtitle]):
         target = data / f"asset-{index}.dat"
         target.write_bytes(b"test data")
