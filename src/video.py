@@ -134,7 +134,7 @@ class VideoManager:
         if Path(videoloc).is_dir():
             logger.debug("[blue]Scanning directory for video files...[/blue]")
             try:
-                entries = [p.name for p in Path(videoloc).iterdir() if p.is_file()]
+                entries = [p.name for p in Path(videoloc).iterdir() if p.is_file() and not p.name.startswith("._")]
             except Exception:
                 entries = []
 

@@ -33,6 +33,7 @@ from src.torrent_policy import hdbits_pieces_allowed as hdbits_pieces_allowed
 from src.webui_progress import complete_progress, has_progress_callback, publish_progress
 
 SUBTITLE_EXTENSIONS = (".srt", ".sub", ".vtt", ".ssa", ".ass", ".idx")
+DISC_EXCLUDE_GLOBS = ("._*", "*/._*", "*.lwi")
 
 
 def calculate_piece_size(
@@ -279,7 +280,9 @@ class TorrentCreator:
                         path_dir_path = Path(path_dir)
                         globs = [f.name for f in path_dir_path.glob("*.mkv")] + [f.name for f in path_dir_path.glob("*.mp4")] + [f.name for f in path_dir_path.glob("*.ts")]
                         no_sample_globs = [
-                            str(Path(f"{path_dir}{os.sep}{file}").resolve()) for file in globs if not file.lower().endswith("sample.mkv") or "!sample" in file.lower()
+                            str(Path(f"{path_dir}{os.sep}{file}").resolve())
+                            for file in globs
+                            if not file.startswith("._") and (not file.lower().endswith("sample.mkv") or "!sample" in file.lower())
                         ]
                         if len(no_sample_globs) == 1 and not is_subs:
                             path = meta.filelist[0]
@@ -297,6 +300,8 @@ class TorrentCreator:
                     exclude = ["*.*", "*sample.mkv", "!sample*.*"] if not meta.is_disc else []
                     include = ["*.mkv", "*.mp4", "*.ts"] if not meta.is_disc else []
 
+                if meta.is_disc:
+                    exclude.extend(DISC_EXCLUDE_GLOBS)
                 if exclude_disc_subtitles:
                     exclude.extend(f"*{extension}" for extension in SUBTITLE_EXTENSIONS)
 
@@ -366,8 +371,8 @@ class TorrentCreator:
                         if not meta.is_disc and meta.category in ("MOVIE", "TV"):
                             exclude_str = cls.build_mkbrr_exclude_string(str(path), creation_filelist, allow_subs=is_subs)
                             cmd.extend(["--exclude", exclude_str])
-                        elif exclude_disc_subtitles:
-                            cmd.extend(["--exclude", ",".join(f"*{extension}" for extension in SUBTITLE_EXTENSIONS)])
+                        elif meta.is_disc:
+                            cmd.extend(["--exclude", ",".join(exclude)])
 
                         cmd.extend(["-o", str(output_path)])
                         logger.debug(f"[cyan]mkbrr cmd: {cmd}")

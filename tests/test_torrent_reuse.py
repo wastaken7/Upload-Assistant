@@ -11,6 +11,28 @@ from src.torrent_manifest import TorrentManifest
 from src.torrent_policy import MIB, TorrentPolicy
 from src.torrentcreate import SUBTITLE_EXTENSIONS, TorrentCreator
 from src.trackers.common import Common
+from src.video import VideoManager
+
+
+@pytest.mark.asyncio
+async def test_macos_sidecar_does_not_change_single_file_torrent_layout(tmp_path):
+    release = tmp_path / "release"
+    release.mkdir()
+    video = release / "movie.2000.mkv"
+    video.write_bytes(b"video")
+    (release / "._movie.2000.mkv").write_bytes(b"macOS metadata")
+    _, filelist = await VideoManager().get_video(str(release))
+    meta = Meta(
+        base_dir=str(tmp_path), uuid=release.name, path=str(release),
+        filelist=filelist, category="MOVIE", isdir=True, mkbrr=False,
+    )
+
+    torrent_path = await TorrentCreator.create_torrent(meta, str(release), "BASE")
+    torrent = Torrent.read(torrent_path)
+
+    assert [str(file) for file in torrent.files] == [video.name]
+    valid, _ = await Clients({}).is_valid_torrent(meta, str(torrent_path), torrent.infohash, "qbit", {})
+    assert valid
 
 
 @pytest.mark.asyncio
@@ -68,14 +90,26 @@ async def test_rehash_uses_current_dvd_layout_for_upload(tmp_path, with_subtitle
 @pytest.mark.asyncio
 @pytest.mark.parametrize("backend", ["torf", "mkbrr", "mkbrr_fallback"])
 @pytest.mark.parametrize("keep_folder", [False, True])
-async def test_disc_rehash_excludes_sidecars_only_from_base(tmp_path, monkeypatch, backend, keep_folder):
+async def test_disc_rehash_filters_metadata_and_keeps_subtitles_separate(tmp_path, monkeypatch, backend, keep_folder):
     release = tmp_path / "release"
     disc_dir = release if keep_folder else release / "VIDEO_TS"
     disc_dir.mkdir(parents=True)
     video = disc_dir / "VTS_01_1.VOB"
     video.write_bytes(b"dvd data")
+    for name in ("VIDEO_TS.IFO", "VIDEO_TS.BUP"):
+        (disc_dir / name).write_bytes(b"dvd data")
     nfo = release / "release.nfo"
     nfo.write_bytes(b"nfo data")
+    metadata_files = [
+        release / ".DS_Store",
+        release / "._.DS_Store",
+        release / "._release.nfo",
+        disc_dir / "._VTS_01_1.VOB",
+        disc_dir / "._VTS_01_1.VOB.lwi",
+        disc_dir / "VTS_01_1.VOB.lwi",
+    ]
+    for file in metadata_files:
+        file.write_bytes(b"metadata")
     subtitles = []
     for index, extension in enumerate(SUBTITLE_EXTENSIONS):
         parent = release if index % 2 else disc_dir
@@ -113,14 +147,23 @@ async def test_disc_rehash_excludes_sidecars_only_from_base(tmp_path, monkeypatc
     subs = Torrent.read(manifest.default_path("base_subs"))
     assert not any(file.suffix.casefold() in SUBTITLE_EXTENSIONS for file in base.files)
     assert {file.name for file in subs.files if file.suffix.casefold() in SUBTITLE_EXTENSIONS} == {file.name for file in subtitles}
-    assert any(file.name == video.name for file in base.files)
-    assert any(file.name == nfo.name for file in base.files)
+    expected_names = {video.name, nfo.name, "VIDEO_TS.IFO", "VIDEO_TS.BUP"}
+    assert {file.name for file in base.files} == expected_names
+    assert {file.name for file in subs.files} == expected_names | {file.name for file in subtitles}
+    assert all(file.read_bytes() == b"metadata" for file in metadata_files)
     assert all(file.read_bytes() == b"subtitle data" for file in subtitles)
     assert len(commands) == {"torf": 0, "mkbrr": 2, "mkbrr_fallback": 1}[backend]
     for layout in ("base", "base_subs"):
         path = manifest.default_path(layout)
         valid, _ = await Clients({}).is_valid_torrent(meta, str(path), Torrent.read(path).infohash, "qbit", {})
         assert valid
+
+    unfiltered = Torrent(path=release, piece_size=32768)
+    unfiltered.generate()
+    unfiltered_path = tmp_path / "unfiltered.torrent"
+    unfiltered.write(unfiltered_path)
+    valid, _ = await Clients({}).is_valid_torrent(meta, str(unfiltered_path), unfiltered.infohash, "qbit", {})
+    assert not valid
 
 
 @pytest.mark.asyncio
@@ -466,16 +509,16 @@ async def test_reuse_validation_checks_single_file_root(tmp_path, mode, torrent_
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("hidden_path", [".DS_Store", "BDMV/.DS_Store", ".cache/metadata", "BDMV/.cache/metadata"])
+@pytest.mark.parametrize("ignored_path", [".DS_Store", "BDMV/.DS_Store", ".cache/metadata", "BDMV/.cache/metadata", "movie.lwi", "BDMV/STREAM/00000.m2ts.lwi"])
 @pytest.mark.parametrize("output_filename", ["BASE", "BASE_SUBS"])
-async def test_disc_reuse_matches_creation_filters(tmp_path, hidden_path, output_filename):
+async def test_disc_reuse_matches_creation_filters(tmp_path, ignored_path, output_filename):
     release = tmp_path / "release"
     video = release / "BDMV" / "STREAM" / "00000.m2ts"
     video.parent.mkdir(parents=True)
     video.write_bytes(b"video data")
-    hidden_file = release / hidden_path
-    hidden_file.parent.mkdir(parents=True, exist_ok=True)
-    hidden_file.write_bytes(b"metadata")
+    ignored_file = release / ignored_path
+    ignored_file.parent.mkdir(parents=True, exist_ok=True)
+    ignored_file.write_bytes(b"metadata")
     subtitle = release / "movie.SRT"
     subtitle.write_bytes(b"subtitle data")
     meta = Meta(

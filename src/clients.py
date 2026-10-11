@@ -20,7 +20,7 @@ from src.torrent_clients import DelugeClientMixin, QbittorrentClientMixin, Rtorr
 from src.torrent_clients.path_utils import coerce_str_list, is_path_under
 from src.torrent_manifest import TorrentManifest
 from src.torrent_policy import HDBITS_POLICY, TorrentStats, generic_reuse_allowed
-from src.torrentcreate import SUBTITLE_EXTENSIONS
+from src.torrentcreate import DISC_EXCLUDE_GLOBS, SUBTITLE_EXTENSIONS
 
 # Secure XML-RPC client using defusedxml to prevent XML attacks
 defusedxml.xmlrpc.monkey_patch()
@@ -669,7 +669,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
         root = Path(meta_path) if meta.isdir or meta.is_disc else Path(meta_path).parent
         torrent_name = torrent.metainfo["info"]["name"]
         if meta.is_disc:
-            filelist = [str(path) for path in Torrent(path=root).filepaths]
+            filelist = [str(path) for path in Torrent(path=root, exclude_globs=DISC_EXCLUDE_GLOBS).filepaths]
             candidates = [filelist, [file for file in filelist if Path(file).suffix.casefold() not in SUBTITLE_EXTENSIONS]]
         else:
             candidates = [filelist]
