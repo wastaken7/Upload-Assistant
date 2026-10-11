@@ -18,6 +18,119 @@ const parseUploadPaths = (text) => {
 const getPreviewLanguageFlag = window.getUAPreviewLanguageFlag;
 
 const { useState, useRef, useEffect, useLayoutEffect, useCallback } = React;
+const screenshotMode = window.UAScreenshotMode;
+const SCREENSHOT_POSTER_KEY = "ua_screenshot_poster";
+const SCREENSHOT_BACKDROP_KEY = "ua_screenshot_backdrop";
+
+const getStoredScreenshotArtwork = (key) => {
+  try {
+    const image = localStorage.getItem(key) || "";
+    return /^data:image\/(png|jpeg|webp);base64,/.test(image) ? image : "";
+  } catch (_error) {
+    return "";
+  }
+};
+
+function ScreenshotModeControls({ onPoster, onBackdrop }) {
+  const [visible, setVisible] = useState(true);
+  const [message, setMessage] = useState("");
+  useEffect(() => {
+    const toggle = (event) => {
+      if (
+        event.key.toLowerCase() === "h" &&
+        !event.ctrlKey &&
+        !event.altKey &&
+        !event.metaKey &&
+        !event.target.closest("input, textarea, select, [contenteditable]")
+      )
+        setVisible((value) => !value);
+    };
+    document.addEventListener("keydown", toggle);
+    return () => document.removeEventListener("keydown", toggle);
+  }, []);
+
+  const selectArtwork = (event, label, storageKey, onSelect) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (
+      !["image/png", "image/jpeg", "image/webp"].includes(file.type) ||
+      file.size > 4 * 1024 * 1024
+    ) {
+      setMessage("Choose a PNG, JPEG or WebP image up to 4 MiB.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onerror = () =>
+      setMessage(`Unable to read this ${label.toLowerCase()}.`);
+    reader.onload = () => {
+      onSelect(reader.result);
+      try {
+        localStorage.setItem(storageKey, reader.result);
+        setMessage(`${label} saved in this browser.`);
+      } catch (_error) {
+        setMessage(
+          `${label} loaded for this tab; browser storage is unavailable or full.`,
+        );
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  if (!visible) return null;
+  return (
+    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 rounded-lg border border-gray-600 bg-gray-900 text-white px-4 py-3 shadow-xl text-sm max-w-[90vw]">
+      <div className="flex flex-wrap items-center gap-3">
+        <strong>Screenshot mode</strong>
+        <label className="cursor-pointer rounded bg-gray-700 px-3 py-1">
+          Choose poster
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            onChange={(event) =>
+              selectArtwork(event, "Poster", SCREENSHOT_POSTER_KEY, onPoster)
+            }
+            className="sr-only"
+          />
+        </label>
+        <label className="cursor-pointer rounded bg-gray-700 px-3 py-1">
+          Choose backdrop
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            onChange={(event) =>
+              selectArtwork(
+                event,
+                "Backdrop",
+                SCREENSHOT_BACKDROP_KEY,
+                onBackdrop,
+              )
+            }
+            className="sr-only"
+          />
+        </label>
+        <button
+          onClick={() => setVisible(false)}
+          className="rounded bg-gray-700 px-3 py-1"
+        >
+          Hide controls (H)
+        </button>
+        <a href={window.location.pathname} className="underline">
+          Exit demo
+        </a>
+      </div>
+      <p className="mt-1 text-xs text-gray-300">
+        Frozen fictional data · API actions disabled · Press H to show/hide
+        controls.
+      </p>
+      {message && (
+        <p role="status" className="mt-1 text-xs">
+          {message}
+        </p>
+      )}
+    </div>
+  );
+}
 const THEME_KEY = "ua_config_theme";
 const LEFT_SIDEBAR_WIDTH_KEY = "ua_webui_left_sidebar_width_v2";
 const RIGHT_SIDEBAR_WIDTH_KEY = "ua_webui_right_sidebar_width";
@@ -325,6 +438,7 @@ const loadLocalCsrf = async (force = false) => {
 // Prefer shared `uaApiFetch` when available (provides CSRF handling and retry-on-auth-fail),
 // otherwise fall back to a local implementation.
 const apiFetch =
+  screenshotMode?.apiFetch ||
   (typeof window !== "undefined" && window.uaApiFetch) ||
   (async (url, options = {}) => {
     // Local fallback: load CSRF token once and retry on 401/403 once.
@@ -1739,8 +1853,8 @@ function AudionutsUAGUI() {
   const [showAllSupportedTrackers, setShowAllSupportedTrackers] =
     useState(false);
   const [failedFavicons, setFailedFavicons] = useState(new Set());
-  const [isExecuting, setIsExecuting] = useState(false);
-  const [isTerminalView, setIsTerminalView] = useState(false);
+  const [isExecuting, setIsExecuting] = useState(Boolean(screenshotMode));
+  const [isTerminalView, setIsTerminalView] = useState(Boolean(screenshotMode));
   const [expandedFolders, setExpandedFolders] = useState(
     getStoredExpandedFolders,
   );
@@ -1781,7 +1895,14 @@ function AudionutsUAGUI() {
   const [collapsedSections, setCollapsedSections] = useState(
     () => new Set(getStoredCollapsedSections()),
   );
-  const [executionPreview, setExecutionPreview] = useState(null);
+  const [executionPreview, setExecutionPreview] = useState(() => {
+    if (!screenshotMode) return null;
+    return {
+      ...screenshotMode.media,
+      poster_url: getStoredScreenshotArtwork(SCREENSHOT_POSTER_KEY),
+      backdrop_url: getStoredScreenshotArtwork(SCREENSHOT_BACKDROP_KEY),
+    };
+  });
   const [showAudioTracks, setShowAudioTracks] = useState(
     () => storage.get(SHOW_AUDIO_TRACKS_KEY) === "true",
   );
@@ -1815,7 +1936,9 @@ function AudionutsUAGUI() {
   }, [descriptionDirty]);
   const [isScreenshotReviewOpen, setIsScreenshotReviewOpen] = useState(false);
   const [isDescriptionReviewOpen, setIsDescriptionReviewOpen] = useState(false);
-  const [progressItems, setProgressItems] = useState([]);
+  const [progressItems, setProgressItems] = useState(
+    screenshotMode?.media.progress || [],
+  );
   const [selectedPaths, setSelectedPaths] = useState([]);
   const [sortBy, setSortBy] = useState(() => getStoredFileBrowserSort().by);
   const [sortOrder, setSortOrder] = useState(
@@ -1835,6 +1958,7 @@ function AudionutsUAGUI() {
       : null;
 
   useEffect(() => {
+    if (screenshotMode) return undefined;
     if (!window.loadUAUpdateStatus) return undefined;
     let cancelled = false;
     const loadUpdateStatus = () => {
@@ -1926,6 +2050,7 @@ function AudionutsUAGUI() {
   useEffect(() => {
     let cancelled = false;
     const loadArgumentPresets = async () => {
+      if (screenshotMode) return;
       try {
         const response = await apiFetch(`${API_BASE}/argument_presets`);
         if (!response.ok) return;
@@ -3077,6 +3202,7 @@ function AudionutsUAGUI() {
   }, [hasDescFile, hasDescLink]);
 
   useEffect(() => {
+    if (screenshotMode) return undefined;
     coverRequestRef.current += 1;
     if (!isExecuting || !sessionId) {
       setExecutionPreview(null);
@@ -3371,6 +3497,10 @@ function AudionutsUAGUI() {
 
   // Initial welcome message in the rich output area
   useEffect(() => {
+    if (screenshotMode) {
+      appendHtmlFragment(screenshotMode.output);
+      return;
+    }
     appendSystemMessage("Upload-Assistant Interactive Output");
     appendSystemMessage(
       '\nQuick Start:\n  1. Select a file or folder from the left panel\n  2. Add Upload-Assistant arguments (optional)\n  3. Click "Execute Upload" to start\n',
@@ -3531,6 +3661,7 @@ function AudionutsUAGUI() {
   }, []);
 
   useEffect(() => {
+    if (screenshotMode) return;
     loadBrowseRoots();
 
     const loadTrackersData = async () => {
@@ -4839,6 +4970,7 @@ function AudionutsUAGUI() {
   };
 
   const executeCommand = async () => {
+    if (screenshotMode) return;
     window.uaPromptSound?.unlock();
     if (isExecuting) return;
     const previousArgs = new Map(
@@ -4893,6 +5025,7 @@ function AudionutsUAGUI() {
   };
 
   const clearTerminal = async () => {
+    if (screenshotMode) return;
     // If a process is running, kill it first
     if (isExecuting && sessionId) {
       try {
@@ -6231,6 +6364,19 @@ function AudionutsUAGUI() {
         className={`ua-upload-page flex flex-col h-screen ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}
         data-mode={isDarkMode ? "dark" : "light"}
       >
+        {screenshotMode && (
+          <ScreenshotModeControls
+            onPoster={(poster) =>
+              setExecutionPreview((media) => ({ ...media, poster_url: poster }))
+            }
+            onBackdrop={(backdrop) =>
+              setExecutionPreview((media) => ({
+                ...media,
+                backdrop_url: backdrop,
+              }))
+            }
+          />
+        )}
         {isHelpResourcesOpen && (
           <UploadHelpResourcesModal
             updateStatus={updateStatus}
@@ -6945,6 +7091,19 @@ function AudionutsUAGUI() {
       className={`ua-upload-page flex h-screen ${isDarkMode ? "bg-gray-900" : "bg-gray-50"} overflow-hidden`}
       data-mode={isDarkMode ? "dark" : "light"}
     >
+      {screenshotMode && (
+        <ScreenshotModeControls
+          onPoster={(poster) =>
+            setExecutionPreview((media) => ({ ...media, poster_url: poster }))
+          }
+          onBackdrop={(backdrop) =>
+            setExecutionPreview((media) => ({
+              ...media,
+              backdrop_url: backdrop,
+            }))
+          }
+        />
+      )}
       {isHelpResourcesOpen && (
         <UploadHelpResourcesModal
           updateStatus={updateStatus}

@@ -1222,16 +1222,7 @@ html.ua-upload-document #root {
 }
 
 .ua-upload-context-resize-gutter {
-  background:
-    linear-gradient(
-      to right,
-      transparent calc(50% - 0.5px),
-      var(--ua-upload-border) calc(50% - 0.5px),
-      var(--ua-upload-border) calc(50% + 0.5px),
-      transparent calc(50% + 0.5px)
-    ),
-    var(--ua-upload-bg);
-  width: 0.4rem;
+  width: 0;
 }
 
 .ua-upload-context-detail {
@@ -1494,32 +1485,20 @@ html[data-ua-shape="rounded"] .ua-language-flag {
 }
 
 .ua-upload-resize-handle {
-  background:
-    linear-gradient(
-      to right,
-      transparent calc(50% - 0.5px),
-      var(--ua-upload-border) calc(50% - 0.5px),
-      var(--ua-upload-border) calc(50% + 0.5px),
-      transparent calc(50% + 0.5px)
-    ),
-    var(--ua-upload-bg) !important;
-  transition:
-    background-color 150ms ease,
-    box-shadow 150ms ease;
-  width: 0.4rem !important;
+  --ua-resize-hit-width: 0.4rem;
+  position: relative;
+  flex: 0 0 0;
+  width: 0 !important;
+  z-index: 20;
 }
 
-.ua-upload-resize-handle:hover {
-  background:
-    linear-gradient(
-      to right,
-      transparent calc(50% - 1px),
-      var(--ua-copper-bright) calc(50% - 1px),
-      var(--ua-copper-bright) calc(50% + 1px),
-      transparent calc(50% + 1px)
-    ),
-    color-mix(in srgb, var(--ua-copper) 8%, var(--ua-upload-bg)) !important;
-  box-shadow: 0 0 10px var(--ua-glow);
+.ua-upload-resize-handle::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--ua-resize-hit-width) / -2);
+  width: var(--ua-resize-hit-width);
 }
 
 .ua-upload-header-action,
@@ -2313,9 +2292,8 @@ html[data-ua-shape="rounded"] .ua-language-flag {
 }
 
 @media (pointer: coarse) and (min-width: 768px) {
-  .ua-upload-resize-handle,
-  .ua-upload-context-resize-gutter {
-    width: 0.65rem !important;
+  .ua-upload-resize-handle {
+    --ua-resize-hit-width: 0.65rem;
   }
 }
 

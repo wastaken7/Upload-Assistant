@@ -320,6 +320,7 @@
   }
 
   async function uaApiFetch(url, options = {}, retryOnAuthFail = true) {
+    if (window.UAScreenshotMode) return window.UAScreenshotMode.apiFetch();
     await loadCsrfToken();
     const headers = { ...(options.headers || {}) };
     if (uaCsrfToken) headers["X-CSRF-Token"] = uaCsrfToken;
