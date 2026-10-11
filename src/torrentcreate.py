@@ -254,16 +254,16 @@ class TorrentCreator:
                     include = []
                     exclude = []
                 elif meta.keep_folder:
-                    logger.info("--keep-folder was specified. Using complete folder for torrent creation.")
+                    logger.info("--keep-folder was specified. Preserving the root folder for torrent creation.")
                     # specific nfo catch for certain trackers. BASE catch should prevent unintentional inclusion by default
                     if meta.keep_nfo and "BASE" not in output_filename:
                         logger.info("--keep-nfo was specified. Including NFO files in torrent.")
                         include = ["*.mkv", "*.mp4", "*.ts", "*.nfo"]
                         exclude = ["*.*", "*sample.mkv"]
                         meta.mkbrr = False
-                    elif not meta.tv_pack:
-                        folder_name = Path(str(path)).name
-                        include = [glob.escape(f"{folder_name}/{Path(f).name}") for f in creation_filelist]
+                    elif not meta.is_disc:
+                        root = Path(path)
+                        include = [glob.escape((Path(root.name) / Path(f).relative_to(root)).as_posix()) for f in creation_filelist]
                         exclude = ["*", "*/**"]
 
                 elif meta.isdir:

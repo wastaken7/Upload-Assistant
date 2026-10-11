@@ -89,7 +89,7 @@ async def test_disc_rehash_excludes_sidecars_only_from_base(tmp_path, monkeypatc
         if backend == "mkbrr_fallback":
             raise OSError("mkbrr unavailable")
         patterns = command[command.index("--exclude") + 1].split(",") if "--exclude" in command else []
-        torrent = Torrent(path=command[2], exclude_globs=patterns)
+        torrent = Torrent(path=command[2], exclude_globs=patterns, piece_size=32768)
         torrent.generate()
         torrent.write(command[command.index("-o") + 1], overwrite=True)
         return SimpleNamespace(stdout=iter(()), wait=lambda: 0)
@@ -113,10 +113,13 @@ async def test_disc_rehash_excludes_sidecars_only_from_base(tmp_path, monkeypatc
     assert not any(file.suffix.casefold() in SUBTITLE_EXTENSIONS for file in base.files)
     assert {file.name for file in subs.files if file.suffix.casefold() in SUBTITLE_EXTENSIONS} == {file.name for file in subtitles}
     assert any(file.name == video.name for file in base.files)
-    if not keep_folder or backend == "mkbrr":
-        assert any(file.name == nfo.name for file in base.files)
+    assert any(file.name == nfo.name for file in base.files)
     assert all(file.read_bytes() == b"subtitle data" for file in subtitles)
     assert len(commands) == {"torf": 0, "mkbrr": 2, "mkbrr_fallback": 1}[backend]
+    for layout in ("base", "base_subs"):
+        path = manifest.default_path(layout)
+        valid, _ = await Clients({}).is_valid_torrent(meta, str(path), Torrent.read(path).infohash, "qbit", {})
+        assert valid
 
 
 @pytest.mark.asyncio
@@ -285,32 +288,172 @@ async def test_base_subs_excludes_unselected_subtitles(tmp_path, file_input):
 
 
 @pytest.mark.asyncio
-async def test_reuse_validation_rejects_same_basenames_in_different_layouts(tmp_path, monkeypatch):
-    torrent_path = tmp_path / "candidate.torrent"
-    torrent_path.write_bytes(b"placeholder")
-    local_files = [tmp_path / "release" / "season-01" / "episode.mkv", tmp_path / "release" / "season-02" / "episode.mkv"]
+@pytest.mark.parametrize("output_filename", ["BASE", "BASE_SUBS"])
+@pytest.mark.parametrize("nested", [False, True])
+async def test_keep_folder_season_pack_excludes_unselected_files(tmp_path, output_filename, nested):
+    release = tmp_path / "Fictional.Show.[2025]"
+    videos = [release / "S01" / "episode.mkv", release / "S02" / "episode.mkv"] if nested else [release / "E01.mkv", release / "E02.mkv"]
+    subtitle = videos[0].with_suffix(".pt-BR.srt")
+    unrelated_files = [
+        release / "release.nfo",
+        release / "cover.jpg",
+        release / "sample.mkv",
+        release / "unselected.srt",
+        release / "bonus" / videos[0].name,
+    ]
+    for file in [*videos, subtitle, *unrelated_files]:
+        file.parent.mkdir(parents=True, exist_ok=True)
+        file.write_bytes(b"test data")
+    meta = Meta(
+        base_dir=str(tmp_path),
+        uuid=release.name,
+        path=str(release),
+        filelist=[str(file) for file in videos],
+        subtitle_files=[str(subtitle)],
+        category="TV",
+        isdir=True,
+        tv_pack=True,
+        keep_folder=True,
+        keep_nfo=True,
+        mkbrr=False,
+        max_piece_size=1,
+        trackers=[],
+    )
+    (tmp_path / "tmp" / meta.uuid).mkdir(parents=True)
+
+    torrent_path = await TorrentCreator.create_torrent(meta, str(release), output_filename)
+    torrent = Torrent.read(torrent_path)
+    expected_files = [*videos, subtitle] if output_filename == "BASE_SUBS" else videos
+
+    assert torrent.name == release.name  # noqa: S101
+    assert sorted(str(file) for file in torrent.files) == sorted(  # noqa: S101
+        (release.name + "/" + file.relative_to(release).as_posix()) for file in expected_files
+    )
+    valid, _ = await Clients({}).is_valid_torrent(meta, str(torrent_path), torrent.infohash, "qbit", {})
+    assert valid  # noqa: S101
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("mode,torrent_name", [("regular", "release"), ("regular", "release-other"), ("disc", "release"), ("keep_folder", "release")])
+@pytest.mark.parametrize(
+    "torrent_files,expected",
+    [
+        (["season-02/episode.mkv", "season-01/episode.mkv"], True),
+        (["episode.mkv", "bonus/episode.mkv"], False),
+        (["extra/season-01/episode.mkv", "extra/season-02/episode.mkv"], False),
+        (["season-01/episode.mkv"], False),
+        (["season-01/episode.mkv", "season-02/episode.mkv", "extra.mkv"], False),
+    ],
+)
+async def test_reuse_validation_compares_file_structure(tmp_path, mode, torrent_name, torrent_files, expected):
+    release = tmp_path / "release"
+    local_files = [release / "season-01" / "episode.mkv", release / "season-02" / "episode.mkv"]
     for path in local_files:
-        path.parent.mkdir(parents=True, exist_ok=True)
+        path.parent.mkdir(parents=True)
         path.write_bytes(b"video")
 
-    fake_torrent = SimpleNamespace(files=["Release/episode.mkv", "Release/bonus/episode.mkv"])
-    monkeypatch.setattr("src.clients.Torrent.read", lambda _path: fake_torrent)
-
+    torrent = Torrent()
+    torrent.metainfo["info"] = {
+        "name": torrent_name,
+        "files": [{"path": path.split("/"), "length": 5} for path in torrent_files],
+        "piece length": 32768,
+        "pieces": b"x" * 20,
+    }
+    torrent_path = tmp_path / "candidate.torrent"
+    torrent.write(torrent_path)
     meta = Meta(
-        {
-            "path": str(tmp_path / "release"),
-            "filelist": [str(path) for path in local_files],
-            "subtitle_files": [],
-            "is_disc": "",
-            "keep_folder": False,
-            "isdir": True,
-            "uuid": "release",
-            "debug": False,
-        }
+        path=str(release),
+        uuid=release.name,
+        filelist=[] if mode == "disc" else [str(path) for path in local_files],
+        is_disc="BDMV" if mode == "disc" else "",
+        keep_folder=mode == "keep_folder",
+        isdir=True,
     )
-    client = Clients({"DEFAULT": {}, "TORRENT_CLIENTS": {}})
 
-    valid, _ = await client.is_valid_torrent(meta, str(torrent_path), "hash", "qbit", {})
+    valid, _ = await Clients({}).is_valid_torrent(meta, str(torrent_path), torrent.infohash, "qbit", {})
+
+    assert valid is expected  # noqa: S101
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "mode,torrent_root,expected",
+    [
+        ("regular", None, True),
+        ("regular", "release", False),
+        ("disc", None, False),
+        ("disc", "release", True),
+        ("disc", "release-other", False),
+        ("keep_folder", None, False),
+        ("keep_folder", "release", True),
+        ("keep_folder", "release-other", False),
+    ],
+)
+async def test_reuse_validation_checks_single_file_root(tmp_path, mode, torrent_root, expected):
+    release = tmp_path / "release"
+    release.mkdir()
+    video = release / "video.mkv"
+    video.write_bytes(b"video")
+    torrent = Torrent(path=release if torrent_root else video, piece_size=32768)
+    if torrent_root:
+        torrent.name = torrent_root
+    torrent.generate()
+    torrent_path = tmp_path / "candidate.torrent"
+    torrent.write(torrent_path)
+    meta = Meta(
+        path=str(release),
+        filelist=[] if mode == "disc" else [str(video)],
+        is_disc="BDMV" if mode == "disc" else "",
+        keep_folder=mode == "keep_folder",
+        isdir=True,
+    )
+
+    valid, _ = await Clients({}).is_valid_torrent(meta, str(torrent_path), torrent.infohash, "qbit", {})
+
+    assert valid is expected
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("hidden_path", [".DS_Store", "BDMV/.DS_Store", ".cache/metadata", "BDMV/.cache/metadata"])
+@pytest.mark.parametrize("output_filename", ["BASE", "BASE_SUBS"])
+async def test_disc_reuse_matches_creation_filters(tmp_path, hidden_path, output_filename):
+    release = tmp_path / "release"
+    video = release / "BDMV" / "STREAM" / "00000.m2ts"
+    video.parent.mkdir(parents=True)
+    video.write_bytes(b"video data")
+    hidden_file = release / hidden_path
+    hidden_file.parent.mkdir(parents=True, exist_ok=True)
+    hidden_file.write_bytes(b"metadata")
+    subtitle = release / "movie.SRT"
+    subtitle.write_bytes(b"subtitle data")
+    meta = Meta(
+        base_dir=str(tmp_path),
+        uuid=release.name,
+        path=str(release),
+        filelist=[],
+        category="MOVIE",
+        isdir=True,
+        is_disc="BDMV",
+        mkbrr=False,
+        max_piece_size=1,
+        trackers=[],
+    )
+    (tmp_path / "tmp" / meta.uuid).mkdir(parents=True)
+
+    torrent_path = await TorrentCreator.create_torrent(meta, str(release), output_filename)
+    torrent = Torrent.read(torrent_path)
+    expected_files = ["release/BDMV/STREAM/00000.m2ts"]
+    if output_filename == "BASE_SUBS":
+        expected_files.append("release/movie.SRT")
+    assert sorted(str(file) for file in torrent.files) == expected_files
+    clients = Clients({})
+
+    valid, _ = await clients.is_valid_torrent(meta, str(torrent_path), torrent.infohash, "qbit", {})
+
+    assert valid  # noqa: S101
+
+    (release / "BDMV" / "index.bdmv").write_bytes(b"index")
+    valid, _ = await clients.is_valid_torrent(meta, str(torrent_path), torrent.infohash, "qbit", {})
 
     assert not valid  # noqa: S101
 

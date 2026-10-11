@@ -639,12 +639,10 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
         """Validate a candidate torrent against files, layout, and piece limits."""
         torrent_path = str(torrent_path)
         valid = False
-        wrong_file = False
         filelist = cast(list[str], meta.filelist)
         meta_path = meta.path
         if meta_path is None:
             return False, torrent_path
-        meta_uuid = meta.uuid
 
         # Normalize the torrent hash based on the client
         if torrent_client in ("qbit", "deluge"):
@@ -665,54 +663,31 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                 logger.info(f"[bold red]Error reading torrent file: {e}")
                 return valid, torrent_path
 
-            # Reuse if disc and basename matches or --keep-folder was specified
-            if (meta.is_disc and meta.is_disc != "") or (meta.keep_folder and meta.isdir):
-                torrent_name = torrent.metainfo["info"]["name"]
-                if meta_uuid != torrent_name and meta.debug:
-                    logger.info("Modified file structure, skipping hash")
-                    valid = False
-                torrent_filepath = os.path.commonpath(torrent.files)
-                if Path(meta_path).name in torrent_filepath:
-                    valid = True
-                logger.debug(f"Torrent is valid based on disc/basename or keep-folder: {valid}")
-
-            # Otherwise we match either only videos (no subtitles) OR videos + subtitles (if subtitles are present)
+            keep_root = bool(meta.is_disc or (meta.keep_folder and meta.isdir))
+            root = Path(meta_path) if meta.isdir or meta.is_disc else Path(meta_path).parent
+            torrent_name = torrent.metainfo["info"]["name"]
+            if meta.is_disc:
+                filelist = [str(path) for path in Torrent(path=root).filepaths]
+                candidates = [filelist, [file for file in filelist if Path(file).suffix.casefold() not in SUBTITLE_EXTENSIONS]]
             else:
-                subtitle_files = meta.subtitle_files
                 candidates = [filelist]
-                if subtitle_files:
-                    candidates.append(filelist + subtitle_files)
+                if meta.subtitle_files:
+                    candidates.append(filelist + meta.subtitle_files)
 
-                for cand in candidates:
-                    # If one file, check for folder
-                    if len(torrent.files) == len(cand) == 1:
-                        if Path(torrent.files[0]).name == Path(cand[0]).name:
-                            if str(torrent.files[0]) == Path(torrent.files[0]).name:
-                                valid = True
-                                break
-                            wrong_file = True
-                        logger.debug(f"Single file match status: valid={valid}, wrong_file={wrong_file}")
-
-                    # Check complete relative layouts, not only filenames. Matching
-                    # basenames alone can reuse a torrent from a different folder
-                    # structure when releases have repeated filenames.
-                    elif len(torrent.files) == len(cand):
-
-                        def relative_layout(paths: list[str]) -> list[str]:
-                            """Normalize relative file layout for structural comparison."""
-                            root = Path(os.path.commonpath(paths))
-                            return sorted(str(Path(path).relative_to(root)).replace("\\", "/") for path in paths)
-
-                        torrent_layout = relative_layout([str(file) for file in torrent.files])
-                        candidate_layout = relative_layout([str(file) for file in cand])
-
-                        logger.debug(f"Torrent layout: {torrent_layout}")
-                        logger.debug(f"Candidate layout: {candidate_layout}")
-
-                        if torrent_layout == candidate_layout:
-                            valid = True
-                            break
-                        logger.debug(f"Multiple file match status: valid={valid}")
+            for cand in candidates:
+                if not cand or len(torrent.files) != len(cand):
+                    continue
+                if len(cand) == 1 and not keep_root:
+                    valid = str(torrent.files[0]) == Path(cand[0]).name
+                elif "files" in torrent.metainfo["info"]:
+                    try:
+                        torrent_layout = sorted(Path(file).relative_to(torrent_name).as_posix() for file in torrent.files)
+                        candidate_layout = sorted(Path(file).relative_to(root).as_posix() for file in cand)
+                    except ValueError:
+                        continue
+                    valid = torrent_layout == candidate_layout and (not keep_root or root.name == torrent_name)
+                if valid:
+                    break
 
         else:
             logger.info(f"[bold yellow]{torrent_path} was not found")
@@ -733,7 +708,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                     # Centralized piece-count, piece-size and metainfo-size validation.
                     stats = TorrentStats(piece_size, reuse_torrent.pieces, reuse_torrent.size, Path(torrent_path).stat().st_size)
                     if "HDBITS" in meta.trackers:
-                        valid = not wrong_file and HDBITS_POLICY.accepts(stats)
+                        valid = HDBITS_POLICY.accepts(stats)
                         if not valid:
                             logger.debug("[bold red]Torrent does not meet HDBits piece limits or file requirements")
                         trackers = meta.trackers.split(",") if isinstance(meta.trackers, str) else meta.trackers
@@ -741,9 +716,6 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                             return valid, torrent_path
                     if not generic_reuse_allowed(stats, meta):
                         logger.debug("[bold red]Torrent does not meet the generic reuse policy")
-                        valid = False
-                    elif wrong_file:
-                        logger.debug("[bold red]Provided .torrent has files that were not expected")
                         valid = False
                     else:
                         logger.debug(f"[bold green]REUSING .torrent with infohash: [bold yellow]{torrenthash}")
