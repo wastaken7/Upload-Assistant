@@ -8,7 +8,7 @@ from src.meta import Meta
 from src.prep_helpers import _should_lookup_torrent_properties, process_trackers_and_torrent
 from src.torrent_manifest import TorrentManifest
 from src.torrent_policy import MIB, TorrentPolicy
-from src.torrentcreate import TorrentCreator
+from src.torrentcreate import SUBTITLE_EXTENSIONS, TorrentCreator
 from src.trackers.common import Common
 
 
@@ -62,6 +62,61 @@ async def test_rehash_uses_current_dvd_layout_for_upload(tmp_path, with_subtitle
     dvd_paths = [str(file) for file in uploaded.files if file.suffix != ".srt"]
     assert sorted(dvd_paths) == sorted(f"{release.name}/VIDEO_TS/{file.name}" for file in original.iterdir())
     assert Torrent.read(source).infohash == torrent.infohash
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("backend", ["torf", "mkbrr", "mkbrr_fallback"])
+@pytest.mark.parametrize("keep_folder", [False, True])
+async def test_disc_rehash_excludes_sidecars_only_from_base(tmp_path, monkeypatch, backend, keep_folder):
+    release = tmp_path / "release"
+    disc_dir = release if keep_folder else release / "VIDEO_TS"
+    disc_dir.mkdir(parents=True)
+    video = disc_dir / "VTS_01_1.VOB"
+    video.write_bytes(b"dvd data")
+    nfo = release / "release.nfo"
+    nfo.write_bytes(b"nfo data")
+    subtitles = []
+    for index, extension in enumerate(SUBTITLE_EXTENSIONS):
+        parent = release if index % 2 else disc_dir
+        subtitle = parent / f"movie{extension.upper()}"
+        subtitle.write_bytes(b"subtitle data")
+        subtitles.append(subtitle)
+
+    commands = []
+
+    def run_mkbrr(command, **_kwargs):
+        commands.append(command)
+        if backend == "mkbrr_fallback":
+            raise OSError("mkbrr unavailable")
+        patterns = command[command.index("--exclude") + 1].split(",") if "--exclude" in command else []
+        torrent = Torrent(path=command[2], exclude_globs=patterns)
+        torrent.generate()
+        torrent.write(command[command.index("-o") + 1], overwrite=True)
+        return SimpleNamespace(stdout=iter(()), wait=lambda: 0)
+
+    monkeypatch.setattr("src.torrentcreate.subprocess.Popen", run_mkbrr)
+    binary = tmp_path / "mkbrr"
+    binary.write_bytes(b"mock binary")
+    monkeypatch.setattr(TorrentCreator, "get_mkbrr_path", staticmethod(lambda _meta: str(binary)))
+    meta = Meta(
+        base_dir=str(tmp_path), uuid="disc-sidecars", path=str(release),
+        filelist=[str(video), *map(str, subtitles)], subtitle_files=list(map(str, subtitles)),
+        category="MOVIE", isdir=True, is_disc="DVD", rehash=True,
+        keep_folder=keep_folder, mkbrr=backend != "torf", mkbrr_threads="0", trackers=["TEST"],
+    )
+
+    await TorrentCreator.rehash_torrents(meta)
+
+    manifest = TorrentManifest(meta.base_dir, meta.uuid)
+    base = Torrent.read(manifest.default_path("base"))
+    subs = Torrent.read(manifest.default_path("base_subs"))
+    assert not any(file.suffix.casefold() in SUBTITLE_EXTENSIONS for file in base.files)
+    assert {file.name for file in subs.files if file.suffix.casefold() in SUBTITLE_EXTENSIONS} == {file.name for file in subtitles}
+    assert any(file.name == video.name for file in base.files)
+    if not keep_folder or backend == "mkbrr":
+        assert any(file.name == nfo.name for file in base.files)
+    assert all(file.read_bytes() == b"subtitle data" for file in subtitles)
+    assert len(commands) == {"torf": 0, "mkbrr": 2, "mkbrr_fallback": 1}[backend]
 
 
 @pytest.mark.asyncio

@@ -235,7 +235,10 @@ class TorrentCreator:
 
                 is_subs = "BASE_SUBS" in output_filename
                 is_base = output_filename in {"BASE", "BASE_SUBS"}
+                exclude_disc_subtitles = bool(meta.is_disc) and output_filename == "BASE"
                 creation_filelist = list(meta.filelist)
+                if exclude_disc_subtitles:
+                    creation_filelist = [file for file in creation_filelist if Path(file).suffix.casefold() not in SUBTITLE_EXTENSIONS]
                 if is_subs and meta.subtitle_files:
                     creation_filelist.extend(meta.subtitle_files)
 
@@ -294,6 +297,9 @@ class TorrentCreator:
                 else:
                     exclude = ["*.*", "*sample.mkv", "!sample*.*"] if not meta.is_disc else []
                     include = ["*.mkv", "*.mp4", "*.ts"] if not meta.is_disc else []
+
+                if exclude_disc_subtitles:
+                    exclude.extend(f"*{extension}" for extension in SUBTITLE_EXTENSIONS)
 
                 # Calculate initial size
                 def calculate_size() -> int:
@@ -361,6 +367,8 @@ class TorrentCreator:
                         if not meta.is_disc and meta.category in ("MOVIE", "TV"):
                             exclude_str = cls.build_mkbrr_exclude_string(str(path), creation_filelist, allow_subs=is_subs)
                             cmd.extend(["--exclude", exclude_str])
+                        elif exclude_disc_subtitles:
+                            cmd.extend(["--exclude", ",".join(f"*{extension}" for extension in SUBTITLE_EXTENSIONS)])
 
                         cmd.extend(["-o", str(output_path)])
                         logger.debug(f"[cyan]mkbrr cmd: {cmd}")
