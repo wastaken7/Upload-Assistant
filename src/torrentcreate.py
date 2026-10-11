@@ -112,9 +112,10 @@ class TorrentCreator:
     @classmethod
     async def rehash_torrents(cls, meta: Meta) -> None:
         TorrentManifest(meta.base_dir, meta.uuid).clear()
-        await cls.create_torrent(meta, Path(str(meta.path)), "BASE", make_default=True)
+        path = Path(str(meta.path))
+        await cls.create_torrent(meta, path, "BASE")
         if meta.subtitle_files:
-            await cls.create_torrent(meta, Path(str(meta.path)), "BASE_SUBS", make_default=True)
+            await cls.create_torrent(meta, path, "BASE_SUBS")
 
     @staticmethod
     def calculate_piece_size(
@@ -237,8 +238,6 @@ class TorrentCreator:
                 is_base = output_filename in {"BASE", "BASE_SUBS"}
                 exclude_disc_subtitles = bool(meta.is_disc) and output_filename == "BASE"
                 creation_filelist = list(meta.filelist)
-                if exclude_disc_subtitles:
-                    creation_filelist = [file for file in creation_filelist if Path(file).suffix.casefold() not in SUBTITLE_EXTENSIONS]
                 if is_subs and meta.subtitle_files:
                     creation_filelist.extend(meta.subtitle_files)
 

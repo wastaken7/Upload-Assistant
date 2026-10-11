@@ -656,72 +656,69 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
             logger.debug(f"Torrent path after normalization: {torrent_path}")
 
         # Check if torrent file exists
-        if Path(torrent_path).exists():
-            try:
-                torrent = Torrent.read(torrent_path)
-            except Exception as e:
-                logger.info(f"[bold red]Error reading torrent file: {e}")
-                return valid, torrent_path
-
-            keep_root = bool(meta.is_disc or (meta.keep_folder and meta.isdir))
-            root = Path(meta_path) if meta.isdir or meta.is_disc else Path(meta_path).parent
-            torrent_name = torrent.metainfo["info"]["name"]
-            if meta.is_disc:
-                filelist = [str(path) for path in Torrent(path=root).filepaths]
-                candidates = [filelist, [file for file in filelist if Path(file).suffix.casefold() not in SUBTITLE_EXTENSIONS]]
-            else:
-                candidates = [filelist]
-                if meta.subtitle_files:
-                    candidates.append(filelist + meta.subtitle_files)
-
-            for cand in candidates:
-                if not cand or len(torrent.files) != len(cand):
-                    continue
-                if len(cand) == 1 and not keep_root:
-                    valid = str(torrent.files[0]) == Path(cand[0]).name
-                elif "files" in torrent.metainfo["info"]:
-                    try:
-                        torrent_layout = sorted(Path(file).relative_to(torrent_name).as_posix() for file in torrent.files)
-                        candidate_layout = sorted(Path(file).relative_to(root).as_posix() for file in cand)
-                    except ValueError:
-                        continue
-                    valid = torrent_layout == candidate_layout and (not keep_root or root.name == torrent_name)
-                if valid:
-                    break
-
-        else:
+        if not Path(torrent_path).exists():
             logger.info(f"[bold yellow]{torrent_path} was not found")
+            return False, torrent_path
+        try:
+            torrent = Torrent.read(torrent_path)
+        except Exception as e:
+            logger.info(f"[bold red]Error reading torrent file: {e}")
+            return False, torrent_path
+
+        keep_root = bool(meta.is_disc or (meta.keep_folder and meta.isdir))
+        root = Path(meta_path) if meta.isdir or meta.is_disc else Path(meta_path).parent
+        torrent_name = torrent.metainfo["info"]["name"]
+        if meta.is_disc:
+            filelist = [str(path) for path in Torrent(path=root).filepaths]
+            candidates = [filelist, [file for file in filelist if Path(file).suffix.casefold() not in SUBTITLE_EXTENSIONS]]
+        else:
+            candidates = [filelist]
+            if meta.subtitle_files:
+                candidates.append(filelist + meta.subtitle_files)
+
+        for cand in candidates:
+            if not cand or len(torrent.files) != len(cand):
+                continue
+            if len(cand) == 1 and not keep_root:
+                valid = str(torrent.files[0]) == Path(cand[0]).name
+            elif "files" in torrent.metainfo["info"]:
+                try:
+                    torrent_layout = sorted(Path(file).relative_to(torrent_name).as_posix() for file in torrent.files)
+                    candidate_layout = sorted(Path(file).relative_to(root).as_posix() for file in cand)
+                except ValueError:
+                    continue
+                valid = torrent_layout == candidate_layout and (not keep_root or root.name == torrent_name)
+            if valid:
+                break
 
         # Additional checks if the torrent is valid so far
         if valid:
-            if Path(torrent_path).exists():
-                try:
-                    reuse_torrent = Torrent.read(torrent_path)
-                    piece_size = reuse_torrent.piece_size
-                    piece_in_mib = piece_size / 1024 / 1024
-                    torrent_storage_dir_valid = torrent_path
-                    torrent_file_size_kib = round(Path(torrent_storage_dir_valid).stat().st_size / 1024, 2)
-                    logger.debug(
-                        f"Checking piece size, count and size: pieces={reuse_torrent.pieces}, piece_size={piece_in_mib} MiB, .torrent size={torrent_file_size_kib} KiB"
-                    )
+            try:
+                piece_size = torrent.piece_size
+                piece_in_mib = piece_size / 1024 / 1024
+                torrent_file_size = Path(torrent_path).stat().st_size
+                torrent_file_size_kib = round(torrent_file_size / 1024, 2)
+                logger.debug(
+                    f"Checking piece size, count and size: pieces={torrent.pieces}, piece_size={piece_in_mib} MiB, .torrent size={torrent_file_size_kib} KiB"
+                )
 
-                    # Centralized piece-count, piece-size and metainfo-size validation.
-                    stats = TorrentStats(piece_size, reuse_torrent.pieces, reuse_torrent.size, Path(torrent_path).stat().st_size)
-                    if "HDBITS" in meta.trackers:
-                        valid = HDBITS_POLICY.accepts(stats)
-                        if not valid:
-                            logger.debug("[bold red]Torrent does not meet HDBits piece limits or file requirements")
-                        trackers = meta.trackers.split(",") if isinstance(meta.trackers, str) else meta.trackers
-                        if not valid or all(tracker == "HDBITS" for tracker in trackers):
-                            return valid, torrent_path
-                    if not generic_reuse_allowed(stats, meta):
-                        logger.debug("[bold red]Torrent does not meet the generic reuse policy")
-                        valid = False
-                    else:
-                        logger.debug(f"[bold green]REUSING .torrent with infohash: [bold yellow]{torrenthash}")
-                except Exception as e:
-                    logger.info(f"[bold red]Error checking reuse torrent: {e}")
+                # Centralized piece-count, piece-size and metainfo-size validation.
+                stats = TorrentStats(piece_size, torrent.pieces, torrent.size, torrent_file_size)
+                if "HDBITS" in meta.trackers:
+                    valid = HDBITS_POLICY.accepts(stats)
+                    if not valid:
+                        logger.debug("[bold red]Torrent does not meet HDBits piece limits or file requirements")
+                    trackers = meta.trackers.split(",") if isinstance(meta.trackers, str) else meta.trackers
+                    if not valid or all(tracker == "HDBITS" for tracker in trackers):
+                        return valid, torrent_path
+                if not generic_reuse_allowed(stats, meta):
+                    logger.debug("[bold red]Torrent does not meet the generic reuse policy")
                     valid = False
+                else:
+                    logger.debug(f"[bold green]REUSING .torrent with infohash: [bold yellow]{torrenthash}")
+            except Exception as e:
+                logger.info(f"[bold red]Error checking reuse torrent: {e}")
+                valid = False
 
             if meta.debug:
                 logger.debug(f"Final validity after piece checks: valid={valid}")
