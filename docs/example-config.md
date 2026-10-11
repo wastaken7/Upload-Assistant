@@ -182,6 +182,7 @@ These can be [overridden per-tracker](#tracker-overridable-settings) by adding t
 
 - `custom_description_header` (str): BBCode header added at top of description section.
 - `screenshot_header` (str): BBCode header added above screenshots.
+- `hide_screenshot_header_if_only_section` (bool): Hide the generated image-section header when it is the only one rendered (default `True`). Applies to screenshots, disc menus, audio spectrograms and dynamic HDR plots. Logos, text and signatures do not count; tone-mapping notices are preserved. Set to `False` to always keep these headers.
 - `disc_menu_header` (str): BBCode header added above disc menu screenshots (discs only).
 - `audio_spectrogram_header` (str): BBCode header added above audio spectrograms.
 - `dynamic_hdr_plot_header` (str): BBCode header added above dynamic HDR metadata plots.

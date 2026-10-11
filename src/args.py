@@ -1124,6 +1124,16 @@ class Args:
 
         if meta.tmdb_manual is not None or meta.imdb_manual is not None:
             meta.tmdb_manual = meta.tmdb_id = meta.tmdb = meta.imdb_id = meta.imdb = None
+        # An ASIN correction replaces a carried product URL. Explicit URLs in
+        # this invocation are still checked for conflicts below.
+        if parsed_args.get("book_asin") and not parsed_args.get("audible_url") and meta.audible_url:
+            new_asin = self.list_to_string(parsed_args["book_asin"]).strip().upper()
+            try:
+                carried_asin = normalize_audible_url(meta.audible_url).rsplit("/", 1)[-1]
+            except ValueError:
+                carried_asin = ""
+            if carried_asin != new_asin:
+                meta.audible_url = ""
         for key in parsed_args:
             value = parsed_args[key]
             if value not in (None, []):

@@ -1488,12 +1488,12 @@ class DescriptionBuilder:
         screenshots: bool = True,
         tonemapped_header: bool = True,
         tv_info: bool = True,
-        ua_signature: bool = True,  # ci: ua_signature v4.5
+        ua_signature: bool = True,  # ci: ua_signature v4.6
         user_description: bool = True,
         music: bool = True,
         dynamic_hdr_plot: bool = True,
         approved_image_hosts: list[str] | None = None,
-        signature: str = "",  # ci: ua_signature v4.5
+        signature: str = "",  # ci: ua_signature v4.6
         desc_header: str = "",
     ) -> str:
         apply_saved_draft(meta)
@@ -1541,7 +1541,10 @@ class DescriptionBuilder:
         if logo:
             logo_url, logo_size = await self.get_logo_section(meta)
             if logo_url and logo_size:
-                desc_parts.append(f"[center][img={logo_size}]{logo_url}[/img][/center]\n")
+                if self.tracker == "TORRENTLEECH":
+                    desc_parts.append(f'<center><img src="{html.escape(logo_url, quote=True)}" width="{logo_size}"></center>\n')
+                else:
+                    desc_parts.append(f"[center][img={logo_size}]{logo_url}[/img][/center]\n")
 
         # Mediainfo / BDInfo section for trackers like BJSHARE
         if mediainfo:
@@ -1706,19 +1709,29 @@ class DescriptionBuilder:
             if not description or user_description_content.strip() != meta_description.strip():
                 desc_parts.append(user_description_content)
 
-        # Render the remaining optional sections before deciding whether a
-        # standalone screenshot section needs its heading.
+        # Render image sections before deciding whether their headings are
+        # needed to distinguish them. Logos, text and footers do not count.
         menu_section = await self.menu_section(meta) if menu_screenshots else ""
         tonemapped_section = tonemapped_header_text if tonemapped_header else ""
         audio_spectrogram_section = await self.get_audio_spectrogram_section(meta) if audio_spectrogram else ""
         dynamic_hdr_plot_section = await self.get_dynamic_hdr_plot_section(meta) if dynamic_hdr_plot else ""
         custom_signature_section = await self.get_custom_signature(meta) if custom_signature else ""
 
-        # Signatures are footers, not content sections. Ignoring them here lets
-        # the standalone-header setting work in normal runs, where UA always
-        # supplies ``meta.ua_signature``.
-        other_sections = [*desc_parts, menu_section, tonemapped_section, audio_spectrogram_section, dynamic_hdr_plot_section]
-        include_screenshot_header = not (self._get_bool_config("hide_screenshot_header_if_only_section", True, meta) and not any(part.strip() for part in other_sections))
+        discs_and_screenshots = await self._handle_discs_and_screenshots(meta, approved_image_hosts, images, multi_screens) if screenshots else ""
+        if self._get_bool_config("hide_screenshot_header_if_only_section", True, meta):
+            image_sections = [
+                (menu_section, await self.menu_screenshot_header(meta) if menu_section else ""),
+                (discs_and_screenshots, await self.screenshot_header(meta) if discs_and_screenshots else ""),
+                (audio_spectrogram_section, self._get_str_config("audio_spectrogram_header", "[center][b]Audio Spectrogram[/b][/center]", meta)),
+                (dynamic_hdr_plot_section, self._get_str_config("dynamic_hdr_plot_header", "[center][b]Dynamic HDR Metadata[/b][/center]", meta)),
+            ]
+            # Count rendered headings, including repeated headings in packs.
+            # Only remove a known generated heading from its own section.
+            header_count = sum(section.count(header) for section, header in image_sections if header.strip())
+            if header_count == 1:
+                menu_section, discs_and_screenshots, audio_spectrogram_section, dynamic_hdr_plot_section = (
+                    section.replace(header, "", 1) if header.strip() else section for section, header in image_sections
+                )
 
         # Menu Screenshots
         desc_parts.append(menu_section)
@@ -1728,7 +1741,6 @@ class DescriptionBuilder:
 
         # Discs and Screenshots
         if screenshots:
-            discs_and_screenshots = await self._handle_discs_and_screenshots(meta, approved_image_hosts, images, multi_screens, include_screenshot_header)
             desc_parts.append(discs_and_screenshots)
 
         # Audio Spectrograms
@@ -1751,7 +1763,7 @@ class DescriptionBuilder:
                 await description_file.write(self.tracker_specific_formats(self.tracker, "\n".join(part for part in (description_str, ((signature or (f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=4]{meta.ua_signature}[/size][/url][/right]" if meta.ua_signature else "")) if ua_signature else "")) if part.strip())))  # fmt: off
 
         # fmt: off
-        return self.tracker_specific_formats(self.tracker, "\n".join(part for part in (description_str, ((signature or (f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=4]{meta.ua_signature}[/size][/url][/right]" if meta.ua_signature else "")) if ua_signature else "")) if part.strip()))  # ci: ua_signature v4.5
+        return self.tracker_specific_formats(self.tracker, "\n".join(part for part in (description_str, ((signature or (f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=4]{meta.ua_signature}[/size][/url][/right]" if meta.ua_signature else "")) if ua_signature else "")) if part.strip()))  # ci: ua_signature v4.6
         # fmt: on
 
     async def _check_saved_pack_image_links(self, meta: Meta, approved_image_hosts: list[str]) -> dict[str, Any]:

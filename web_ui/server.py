@@ -1632,8 +1632,6 @@ def _extract_preview_detail_sections(meta_data: Mapping[str, object], music: Map
             ("container", "Container", meta_data.get("container")),
             ("video_codec", "Video", video_codec),
             ("audio", "Audio", meta_data.get("audio")),
-            ("audio_languages", "Audio Languages", meta_data.get("audio_languages")),
-            ("subtitle_languages", "Subtitles", meta_data.get("subtitle_languages")),
             ("size", "Size", _format_preview_size(meta_data.get("source_size"))),
             ("files", "Files", file_count or ""),
         ),
@@ -2344,6 +2342,7 @@ def _extract_preview_media_tracks(
             {
                 "index": len(target) + 1,
                 "language": language,
+                "language_code": _preview_media_track_value(track, "Language", "language"),
                 "title": title,
                 "format": format_name,
                 "channels": channels,
@@ -2402,6 +2401,7 @@ def _extract_execution_preview(meta_data: Mapping[str, object], fallback_path: s
         "imdb": _extract_preview_imdb_id(meta_data),
         "metadata_sources": _extract_metadata_sources(meta_data),
         "poster_url": poster_url,
+        "backdrop_url": _stringify_preview_value(meta_data.get("backdrop")),
         "overview": _stringify_preview_value(meta_data.get("overview")),
         "genres": genres,
         "name": _stringify_preview_value(meta_data.get("name")),
@@ -2482,6 +2482,7 @@ def _find_execution_preview(session_id: str) -> ExecutionPreview | None:
         "imdb": "",
         "metadata_sources": [],
         "poster_url": "",
+        "backdrop_url": "",
         "overview": "",
         "genres": [],
         "name": "",
@@ -2698,6 +2699,7 @@ class ExecutionPreview(TypedDict, total=False):
     imdb: str
     metadata_sources: list[MetadataSource]
     poster_url: str
+    backdrop_url: str
     overview: str
     genres: list[str]
     name: str
@@ -7204,10 +7206,6 @@ def execute_command():
                             buffers[output_type] = ""
                             yield f"data: {json.dumps({'type': 'prompt_sound'})}\n\n"
                             continue
-                        if prompt_type:
-                            _set_process_awaiting_input_if_current(session_id, process_state, True, prompt_type)
-                        else:
-                            _set_process_awaiting_input_if_current(session_id, process_state, False)
                         chunk = buffers[output_type]
                         buffers[output_type] = ""
 
@@ -7216,6 +7214,13 @@ def execute_command():
                             _set_process_progress_if_current(session_id, process_state, progress_event)
                             yield f"data: {json.dumps({'type': 'progress', 'data': progress_event})}\n\n"
                             continue
+
+                        # Structured progress and its blank/ANSI separator lines
+                        # do not answer or replace an outstanding terminal prompt.
+                        if prompt_type:
+                            _set_process_awaiting_input_if_current(session_id, process_state, True, prompt_type)
+                        elif re.sub(r"\x1b\[[0-?]*[ -/]*[@-~]", "", chunk).strip():
+                            _set_process_awaiting_input_if_current(session_id, process_state, False)
 
                         # Convert to HTML fragment. If helper missing, escape and wrap in <pre>
                         try:

@@ -72,6 +72,73 @@ def test_subprocess_yes_no_prompt_is_classified_for_dedicated_buttons() -> None:
     assert server._subprocess_prompt_type("> ") == "text"
 
 
+@pytest.mark.parametrize(
+    "background_output, expected_type",
+    [
+        ("\n", "yes_no"),
+        ("\x1b[0m\n", "yes_no"),
+        ("\n" + server.PROGRESS_STDOUT_PREFIX + '{"op":"upsert","id":"scan","label":"Scanning","current":25,"total":100}\n', "yes_no"),
+        ("\n" + server.PROGRESS_STDOUT_PREFIX + '{"op":"reset"}\n', "yes_no"),
+        (server.PROGRESS_STDOUT_PREFIX + '{"op":"reset"}\n', "yes_no"),
+        (server.PROMPT_SOUND_STDOUT_MARKER + "\n", "yes_no"),
+        ("Gathering metadata\n", None),
+        ("Enter a title:\n", "text"),
+    ],
+)
+def test_background_progress_preserves_yes_no_prompt(tmp_path, monkeypatch, background_output, expected_type) -> None:
+    class WaitingProcess:
+        stdin = io.StringIO()
+        stdout = io.StringIO("Continue? (y/N)\n" + background_output + "> ")
+        stderr = io.StringIO()
+
+        def poll(self):
+            return None
+
+    process = WaitingProcess()
+    session_id = "background-progress-prompt-test"
+    monkeypatch.setattr(server, "_is_authenticated", lambda: True)
+    monkeypatch.setattr(server, "_verify_csrf_header", lambda: True)
+    monkeypatch.setattr(server, "_verify_same_origin", lambda: True)
+    monkeypatch.setattr(server, "_validate_execution_path", lambda *_args, **_kwargs: str(tmp_path))
+    monkeypatch.setattr(server, "_assert_safe_resolved_path", lambda _: None)
+    monkeypatch.setattr(server, "_validate_upload_assistant_args", lambda args: args)
+    monkeypatch.setattr(server, "_spawn_webui_upload_process", lambda *_args: (process, "subprocess"))
+    monkeypatch.setattr(server, "_terminate_process_tree", lambda _process: True)
+    client = server.app.test_client()
+    response = client.post("/api/execute", json={"path": str(tmp_path), "session_id": session_id}, buffered=False)
+    try:
+        assert response.status_code == 200
+        deadline = time.monotonic() + 5
+        first_output = True
+        for chunk in response.response:
+            assert time.monotonic() < deadline, "Input marker never reached the browser"
+            event = json.loads(chunk.decode().removeprefix("data: "))
+            if event["type"] not in {"html", "progress"}:
+                continue
+            state = server.active_processes[session_id]
+            marker_seen = event["type"] == "html" and "&gt;" in event["data"]
+            current_type = "yes_no" if first_output else (expected_type or "text") if marker_seen else expected_type
+            assert state["awaiting_input"] is (current_type is not None)
+            assert state["input_type"] == current_type
+            preview = server._find_execution_preview(session_id)
+            assert preview["awaiting_input"] is (current_type is not None)
+            assert preview["input_type"] == current_type
+            first_output = False
+            if marker_seen:
+                break
+        else:
+            pytest.fail("No input marker received")
+
+        answer = client.post("/api/input", json={"session_id": session_id, "input": "yes"})
+        assert answer.status_code == 200
+        assert process.stdin.getvalue() == "yes\n"
+        assert state["awaiting_input"] is False
+        assert state["input_type"] is None
+    finally:
+        response.close()
+        server.active_processes.pop(session_id, None)
+
+
 @pytest.mark.parametrize("prompt", ["> ", "\x1b[32m> \x1b[0m", "Enter a title: ", "Continue? (y/N)"])
 def test_unterminated_prompts_flush_after_output_becomes_idle(prompt) -> None:
     assert not server._should_flush_subprocess_output(prompt, prompt[-1])
