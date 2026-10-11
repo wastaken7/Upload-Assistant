@@ -122,7 +122,7 @@ const CONFIG_HELP_SECTION_HEADINGS = {
 const DESCRIPTION_HELP_OVERRIDES = {
   add_logo: "Add a TMDb show or movie logo to the top of the description.",
   hide_screenshot_header_if_only_section:
-    "Hide the screenshot header when screenshots are the only section in the description.",
+    "Hide a lone image-section header (screenshots, disc menus, spectrograms or HDR plots). Logos, text and signatures do not count. Tone-mapping notices are preserved.",
 };
 
 const getConfigHelpText = (item, pathParts) => {
@@ -986,7 +986,7 @@ const DISPLAY_LABEL_OVERRIDES = {
   overlay_timestamp: "Timestamp",
   overlay_tonemapped: "Tonemapped Label",
   tag_overrides: "Release Group Overrides",
-  hide_screenshot_header_if_only_section: "Hide Standalone Screenshot Header",
+  hide_screenshot_header_if_only_section: "Hide Standalone Image Header",
   multiScreens: "Multiple Screenshots",
   charLimit: "Character Limit",
   fileLimit: "File Limit",
