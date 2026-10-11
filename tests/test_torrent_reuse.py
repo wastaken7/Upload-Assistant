@@ -1,11 +1,12 @@
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
 from torf import Torrent
 
 from src.clients import Clients
 from src.meta import Meta
-from src.prep_helpers import _should_lookup_torrent_properties, process_trackers_and_torrent
+from src.prep_helpers import _should_lookup_torrent_properties, process_media_files, process_trackers_and_torrent
 from src.torrent_manifest import TorrentManifest
 from src.torrent_policy import MIB, TorrentPolicy
 from src.torrentcreate import SUBTITLE_EXTENSIONS, TorrentCreator
@@ -331,6 +332,57 @@ async def test_keep_folder_season_pack_excludes_unselected_files(tmp_path, outpu
     )
     valid, _ = await Clients({}).is_valid_torrent(meta, str(torrent_path), torrent.infohash, "qbit", {})
     assert valid  # noqa: S101
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("output_filename", ["BASE", "BASE_SUBS"])
+@pytest.mark.parametrize("keep_folder", [False, True])
+async def test_symlinked_season_pack_preserves_release_layout(tmp_path, output_filename, keep_folder):
+    release = tmp_path / "Fictional.Show.2025"
+    release.mkdir()
+    data = tmp_path / "data"
+    data.mkdir()
+    videos = [release / "E01.mkv", release / "E02.mkv"]
+    subtitle = release / "Subs" / "E01.pt-BR.srt"
+    subtitle.parent.mkdir()
+    for index, link in enumerate([*videos, subtitle]):
+        target = data / f"asset-{index}.dat"
+        target.write_bytes(b"test data")
+        try:
+            link.symlink_to(target)
+        except OSError:
+            pytest.skip("Creating symlinks is unavailable")
+    (release / "cover.jpg").write_bytes(b"unselected artwork")
+    meta = Meta(
+        base_dir=str(tmp_path), uuid=release.name, path=str(release),
+        category="TV", isdir=True, tv_pack=True, keep_folder=keep_folder,
+        mkbrr=False, max_piece_size=1, trackers=[], edit=True, resolution="1080p",
+    )
+    prep = SimpleNamespace(
+        scene_manager=SimpleNamespace(is_scene=AsyncMock(return_value=(str(videos[0]), False, 0))),
+        name_manager=SimpleNamespace(extract_title_and_year=AsyncMock(return_value=("Fictional Show", "", 2025))),
+    )
+
+    await process_media_files(prep, meta, str(release), {})
+
+    assert meta.filelist == list(map(str, videos))
+    assert meta.subtitle_files == [str(subtitle)]
+    torrent_path = await TorrentCreator.create_torrent(meta, str(release), output_filename)
+    torrent = Torrent.read(torrent_path)
+    expected = [*videos, subtitle] if output_filename == "BASE_SUBS" else videos
+    assert sorted(str(file) for file in torrent.files) == sorted(
+        f"{release.name}/{file.relative_to(release).as_posix()}" for file in expected
+    )
+    clients = Clients({})
+    valid, _ = await clients.is_valid_torrent(meta, str(torrent_path), torrent.infohash, "qbit", {})
+    assert valid
+
+    # Matching filenames at a different depth must still fail validation.
+    torrent.metainfo["info"]["files"][0]["path"].insert(0, "extra")
+    shifted_path = tmp_path / "shifted.torrent"
+    torrent.write(shifted_path)
+    valid, _ = await clients.is_valid_torrent(meta, str(shifted_path), torrent.infohash, "qbit", {})
+    assert not valid
 
 
 @pytest.mark.asyncio

@@ -485,12 +485,12 @@ class TorrentCreator:
                     # Preserve the existing video include rules and add only the
                     # subtitle files selected for this upload, never every subtitle
                     # matching an extension below the creation root.
-                    root = Path(path).resolve()
+                    root = Path(path).absolute()
                     root_name = Path(path).name
                     selected_subtitles: list[str] = []
                     for subtitle_file in meta.subtitle_files:
                         try:
-                            relative_subtitle = Path(str(subtitle_file)).resolve().relative_to(root)
+                            relative_subtitle = Path(str(subtitle_file)).absolute().relative_to(root)
                             # torf matches paths including the torrent's root name.
                             selected_subtitles.append(glob.escape((Path(root_name) / relative_subtitle).as_posix()))
                         except ValueError:
