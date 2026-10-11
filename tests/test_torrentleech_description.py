@@ -1,7 +1,51 @@
 # ruff: noqa: S101
 import asyncio
 
+import pytest
+
 from src.get_desc import DescriptionBuilder
+from src.meta import Meta
+
+
+@pytest.mark.parametrize(
+    ("tracker", "default_size", "tracker_size", "expected"),
+    [
+        ("TORRENTLEECH", None, "", '<center><img src="https://example.test/logo.png?a=1&amp;b=2" width="300"></center>'),
+        ("TORRENTLEECH", "420", "", '<center><img src="https://example.test/logo.png?a=1&amp;b=2" width="420"></center>'),
+        ("TORRENTLEECH", "300", "500", '<center><img src="https://example.test/logo.png?a=1&amp;b=2" width="500"></center>'),
+        ("TEST", "300", "500", "[center][img=500]https://example.test/logo.png?a=1&b=2[/img][/center]"),
+    ],
+)
+def test_logo_width_survives_description_generation(tracker, default_size, tracker_size, expected):
+    defaults = {"add_logo": True}
+    if default_size is not None:
+        defaults["logo_size"] = default_size
+    builder = DescriptionBuilder(tracker, {"DEFAULT": defaults, "TRACKERS": {tracker: {"logo_size": tracker_size}}})
+    sections = dict.fromkeys(
+        (
+            "audio_spectrogram",
+            "bluray",
+            "book",
+            "custom_header",
+            "custom_signature",
+            "description",
+            "dynamic_hdr_plot",
+            "game",
+            "languages",
+            "mediainfo",
+            "menu_screenshots",
+            "music",
+            "nfo",
+            "screenshots",
+            "tonemapped_header",
+            "tv_info",
+            "ua_signature",
+            "user_description",
+        ),
+        False,
+    )
+    result = asyncio.run(builder.general_description_generator(Meta(logo="https://example.test/logo.png?a=1&b=2"), **sections))
+    assert result.strip() == expected
 
 
 def test_torrentleech_uses_original_ua_screenshot_layout() -> None:

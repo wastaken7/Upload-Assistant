@@ -1541,7 +1541,10 @@ class DescriptionBuilder:
         if logo:
             logo_url, logo_size = await self.get_logo_section(meta)
             if logo_url and logo_size:
-                desc_parts.append(f"[center][img={logo_size}]{logo_url}[/img][/center]\n")
+                if self.tracker == "TORRENTLEECH":
+                    desc_parts.append(f'<center><img src="{html.escape(logo_url, quote=True)}" width="{logo_size}"></center>\n')
+                else:
+                    desc_parts.append(f"[center][img={logo_size}]{logo_url}[/img][/center]\n")
 
         # Mediainfo / BDInfo section for trackers like BJSHARE
         if mediainfo:
