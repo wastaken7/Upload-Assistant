@@ -16,7 +16,8 @@ Upload Assistant collects metadata, generates screenshots and artwork, creates t
 
 ---
 
-<img width="5760" height="4143" alt="3" src="https://github.com/user-attachments/assets/48423f2f-216c-478e-a18a-d5e428b2cfa9" />
+<img width="5739" height="4143" alt="3" src="https://github.com/user-attachments/assets/9164de0f-7901-4a1b-a567-10f97f3cf33b" />
+
 
 ---
 
