@@ -16,6 +16,8 @@ async def test_existing_local_mkbrr_is_used_on_unsupported_platform(tmp_path: Pa
     binary_path.chmod(binary_path.stat().st_mode | stat.S_IXUSR)
     monkeypatch.setattr("bin.get_mkbrr.platform.system", lambda: "Android")
     monkeypatch.setattr("bin.get_mkbrr.platform.machine", lambda: "aarch64")
+    monkeypatch.setattr("src.torrentcreate.configured_binary", lambda _: None)
+    monkeypatch.setattr("src.torrentcreate.CODE_DIR", tmp_path)
 
     assert await MkbrrBinaryManager.ensure_mkbrr_binary(tmp_path, "v1.24.0") == str(binary_path)  # noqa: S101
     assert TorrentCreator.get_mkbrr_path(Meta(base_dir=str(tmp_path))) == str(binary_path)  # noqa: S101
