@@ -163,6 +163,33 @@ async def test_automatic_selection_carries_subheader(tmp_path, monkeypatch, regi
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize('selection', ['manual', 'automatic'])
+@pytest.mark.parametrize('region', ['', 'USA'])
+@pytest.mark.parametrize('country, code', [
+    ('Bulgaria', 'BGR'),
+    ('Chinese Taipei', 'TWN'),
+    ('Czech Republic', 'CZE'),
+    ('Denmark', 'DNK'),
+    ('Estonia', 'EST'),
+    ('Finland', 'FIN'),
+    ('Latvia', 'LVA'),
+    ('Lithuania', 'LTU'),
+    ('Slovakia', 'SVK'),
+    ('Sweden', 'SWE'),
+    ('Taiwan', 'TWN'),
+])
+async def test_release_sets_disc_region(tmp_path, select_release, selection, region, country, code):
+    selected = release() | {'country': country}
+    meta = Meta(base_dir=str(tmp_path), uuid='test', is_disc='BDMV', unattended=selection == 'automatic', bluray_single_score=1, region=region)
+
+    await select_release(meta, selected)
+
+    assert meta.region == (region or code)
+    assert meta.distributor == 'EXAMPLE STUDIO'
+    assert meta.release_url == URL
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('selection', ['manual', 'automatic'])
 @pytest.mark.parametrize('restore', [False, True])
 @pytest.mark.parametrize('overrides', [(), ('region',), ('distributor',), ('region', 'distributor')])
 async def test_reselection_refreshes_auto_metadata_and_preserves_cli_overrides(tmp_path, select_release, selection, restore, overrides):
