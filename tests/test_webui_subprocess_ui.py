@@ -1,6 +1,7 @@
 # ruff: noqa: S101
 import io
 import json
+import os
 import subprocess
 import sys
 import time
@@ -8,6 +9,95 @@ import time
 import pytest
 
 import web_ui.server as server
+
+
+def test_upload_child_publishes_preview_without_in_process_session() -> None:
+    result = subprocess.run(
+        [sys.executable, "-u", "-c", "import upload; upload._publish_webui_preview_target('Fictional Journey.mkv', 'fictional-release')"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        env=server._webui_subprocess_env(),
+        timeout=30,
+        check=True,
+    )
+    events = [server._subprocess_progress_event(line) for line in result.stdout.splitlines()]
+    assert {"op": "preview_target", "path": "Fictional Journey.mkv", "meta_uuid": "fictional-release"} in events
+
+
+def test_queue_preview_follows_child_targets(tmp_path, monkeypatch) -> None:
+    targets = [tmp_path / "Fictional Journey.mkv", tmp_path / ("a" * 200) / ("b" * 200) / "Fictional Finale.mkv"]
+    queue_path = tmp_path / "webui_queue_fictional.txt"
+    queue_path.write_text("\n".join(str(target) for target in targets), encoding="utf-8")
+    state_dir = tmp_path / "state"
+    output = "Continue? (y/N)\n"
+    for index, target in enumerate(targets):
+        meta_uuid = f"fictional-release-{index}"
+        meta_dir = state_dir / "tmp" / meta_uuid
+        meta_dir.mkdir(parents=True)
+        (meta_dir / "meta.json").write_text(
+            json.dumps({"uuid": meta_uuid, "path": str(target), "title": target.stem, "poster": f"https://example.invalid/poster-{index}.jpg"}), encoding="utf-8"
+        )
+        output += server.PROGRESS_STDOUT_PREFIX + json.dumps({"op": "preview_target", "path": str(target), "meta_uuid": meta_uuid}) + "\n\n"
+        output += server.PROGRESS_STDOUT_PREFIX + json.dumps({"op": "preview_target", "path": str(target)}) + "\n\n"
+        # Re-publish the UUID as metadata becomes available for the same item.
+        output += server.PROGRESS_STDOUT_PREFIX + json.dumps({"op": "preview_target", "path": str(target), "meta_uuid": meta_uuid}) + "\n\n"
+
+    class WaitingProcess:
+        stdin = io.StringIO()
+        stdout = io.StringIO(output)
+        stderr = io.StringIO()
+
+        def poll(self):
+            return None
+
+    session_id = "queue-preview-test"
+    monkeypatch.setattr(server, "STATE_DIR", state_dir)
+    monkeypatch.setattr(server, "_is_authenticated", lambda: True)
+    monkeypatch.setattr(server, "_verify_csrf_header", lambda: True)
+    monkeypatch.setattr(server, "_validate_execution_path", lambda *_args, **_kwargs: str(queue_path))
+    monkeypatch.setattr(server, "_generated_queues", {os.path.normcase(os.path.realpath(queue_path)): "fictional-hash"})
+    monkeypatch.setattr(server, "_assert_safe_resolved_path", lambda _: None)
+    monkeypatch.setattr(server, "_validate_upload_assistant_args", lambda args: args)
+    monkeypatch.setattr(server, "_spawn_webui_upload_process", lambda *_args: (WaitingProcess(), "subprocess"))
+    monkeypatch.setattr(server, "_terminate_process_tree", lambda _: True)
+    response = server.app.test_client().post("/api/execute", json={"path": str(queue_path), "session_id": session_id}, buffered=False)
+    seen = []
+    cleared = []
+    try:
+        deadline = time.monotonic() + 5
+        for chunk in response.response:
+            assert time.monotonic() < deadline
+            event = json.loads(chunk.decode().removeprefix("data: "))
+            if event["type"] == "html":
+                assert "preview_target" not in event["data"]
+            state = server.active_processes[session_id]
+            if state["path"] in [str(target) for target in targets] and "meta_uuid" not in state:
+                cleared.append(state["path"])
+                assert server._find_execution_preview(session_id)["status"] == "waiting"
+            if state.get("meta_uuid"):
+                preview = server._find_execution_preview(session_id)
+                assert preview["status"] == "ready"
+                assert preview["title"] == next(target.stem for target in targets if str(target) == preview["path"])
+                assert preview["poster_url"].startswith("https://example.invalid/poster-")
+                assert preview["awaiting_input"] is True
+                if preview["path"] not in seen:
+                    seen.append(preview["path"])
+                if len(seen) == 2 and len(cleared) == 2:
+                    break
+        assert seen == [str(target) for target in targets]
+        assert cleared == [str(target) for target in targets]
+    finally:
+        response.close()
+        server.active_processes.pop(session_id, None)
+
+
+def test_replaced_execution_cannot_change_preview(monkeypatch) -> None:
+    state = server._make_process_state("Fictional Finale.mkv", "")
+    monkeypatch.setattr(server, "active_processes", {"preview-session": state})
+    server.set_execution_preview_target("preview-session", "old-run-token", "Fictional Journey.mkv", "old-release")
+    assert state["path"] == "Fictional Finale.mkv"
+    assert "meta_uuid" not in state
 
 
 @pytest.mark.parametrize(
