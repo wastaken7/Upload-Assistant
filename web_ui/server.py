@@ -7212,6 +7212,12 @@ def execute_command():
 
                         progress_event = _subprocess_progress_event(chunk)
                         if progress_event is not None:
+                            if progress_event.get("op") == "preview_target":
+                                target_path = progress_event.get("path")
+                                meta_uuid = progress_event.get("meta_uuid")
+                                if isinstance(target_path, str) and (meta_uuid is None or isinstance(meta_uuid, str)):
+                                    set_execution_preview_target(session_id, str(process_state["run_token"]), target_path, meta_uuid)
+                                continue
                             _set_process_progress_if_current(session_id, process_state, progress_event)
                             yield f"data: {json.dumps({'type': 'progress', 'data': progress_event})}\n\n"
                             continue
