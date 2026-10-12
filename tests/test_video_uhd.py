@@ -40,6 +40,13 @@ async def test_standalone_uhd_marker_is_preserved(separator):
 
 
 @pytest.mark.asyncio
+async def test_1080p_encode_preserves_explicit_uhd_marker():
+    filename = "Example.Movie.2000.1080p.UHD.BluRay.x265-GROUP.mkv"
+
+    assert await VideoManager().get_uhd("ENCODE", guessit(filename), "1080p", filename) == "UHD"
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("release_type", "resolution", "expected"),
     [
