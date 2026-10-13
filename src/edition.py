@@ -14,6 +14,8 @@ from src.region import get_distributor
 guessit_module: Any = cast(Any, guessit)
 GuessitFn = Callable[[str, dict[str, Any] | None], dict[str, Any]]
 
+RELEASE_TOKEN_RE = re.compile(r"(?<![A-Z0-9])(?:(?:REPACK|PROPER)[2-9]?|RERIP)(?![A-Z0-9])", re.IGNORECASE)
+
 
 def guessit_fn(value: str, options: dict[str, Any] | None = None) -> dict[str, Any]:
     return cast(dict[str, Any], guessit_module.guessit(value, options))
@@ -31,7 +33,7 @@ def _has_release_token(value: str, token: str) -> bool:
 
 def _strip_release_tokens(value: str) -> str:
     """Remove standalone release markers while preserving adjacent text."""
-    return re.sub(r"(?<![A-Z0-9])(?:REPACK\d?|RERIP|PROPER\d?)(?![A-Z0-9])", "", value, flags=re.IGNORECASE).strip()
+    return RELEASE_TOKEN_RE.sub("", value).strip()
 
 
 async def get_edition(video: str, bdinfo: dict[str, Any] | None, filelist: list[str], manual_edition: str | list[str], meta: Meta) -> tuple[str, str, bool]:
@@ -351,9 +353,9 @@ async def get_edition(video: str, bdinfo: dict[str, Any] | None, filelist: list[
             edition = edition + " Open Matte"
 
     # Manual edition overrides everything
+    if isinstance(manual_edition, list):
+        manual_edition = " ".join(manual_edition)
     if manual_edition:
-        if isinstance(manual_edition, list):
-            manual_edition = " ".join(e for e in manual_edition)
         edition = manual_edition
 
     edition = edition.replace(",", " ")
@@ -361,26 +363,13 @@ async def get_edition(video: str, bdinfo: dict[str, Any] | None, filelist: list[
     # Handle repack info
     repack = ""
     release_text = f"{video} {edition}"
-    if _has_release_token(release_text, "REPACK") or _has_release_token(release_text, "V2"):
-        repack = "REPACK"
-    if _has_release_token(release_text, "REPACK2") or _has_release_token(release_text, "V3"):
-        repack = "REPACK2"
-    if _has_release_token(release_text, "REPACK3") or _has_release_token(release_text, "V4"):
-        repack = "REPACK3"
-    if _has_release_token(release_text, "PROPER"):
-        repack = "PROPER"
-    if _has_release_token(release_text, "PROPER2"):
-        repack = "PROPER2"
-    if _has_release_token(release_text, "PROPER3"):
-        repack = "PROPER3"
-    if _has_release_token(release_text, "RERIP"):
-        repack = "RERIP"
+    release_tokens = [token.upper() for token in RELEASE_TOKEN_RE.findall(release_text)]
+    release_tokens.extend("REPACK" if version == 2 else f"REPACK{version - 1}" for version in range(2, 11) if _has_release_token(release_text, f"V{version}"))
+    for prefix in ("REPACK", "PROPER", "RERIP"):
+        repack = max((token for token in release_tokens if token.startswith(prefix)), default=repack)
 
     # Only remove REPACK, RERIP, or PROPER from edition if not in manual edition
-    if not manual_edition or (
-        isinstance(manual_edition, str)
-        and all(tag.lower() not in ["repack", "repack2", "repack3", "proper", "proper2", "proper3", "rerip"] for tag in manual_edition.strip().lower().split())
-    ):
+    if not RELEASE_TOKEN_RE.search(manual_edition):
         edition = _strip_release_tokens(edition)
 
     if not meta.webdv:
