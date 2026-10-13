@@ -3981,7 +3981,7 @@ def _resolve_user_path(
     return safe_candidate
 
 
-def _is_hidden_browse_entry(path: Path) -> bool:
+def _is_hidden_browse_entry(path: Path | os.DirEntry[str]) -> bool:
     """Hide dotfiles and OS-maintained entries consistently in browse/search."""
     if path.name.startswith(".") or path.name.casefold() in {"$recycle.bin", "system volume information"}:
         return True
@@ -6255,20 +6255,25 @@ def browse_path():
                 return jsonify({"error": "Invalid path specified", "success": False}), 400
 
             # codeql[py/path-injection]
-            for item in sorted([p.name for p in Path(safe_path).iterdir()]):
+            with os.scandir(safe_path) as entries:
+                directory_entries = sorted(entries, key=lambda entry: entry.name)
+            for entry in directory_entries:
+                item = entry.name
                 full_path = Path(safe_path) / item
-                if _is_hidden_browse_entry(full_path):
-                    continue
-                # Explicitly assert each resolved child path is safe. If the
-                # assertion fails for a specific entry, skip it rather than
-                # failing the whole browse operation.
-                try:
-                    _assert_safe_resolved_path(full_path)
-                except ValueError:
+                if _is_hidden_browse_entry(entry):
                     continue
                 try:
+                    # Ordinary entries returned by scandir are direct children of
+                    # the validated parent. Resolve links and all Windows reparse
+                    # points (including junctions) before exposing their targets.
+                    attributes = getattr(entry.stat(follow_symlinks=False), "st_file_attributes", 0)
+                    if entry.is_symlink() or attributes & stat.FILE_ATTRIBUTE_REPARSE_POINT:
+                        try:
+                            _assert_safe_resolved_path(full_path)
+                        except ValueError:
+                            continue
                     # codeql[py/path-injection]
-                    is_dir = Path(full_path).is_dir()
+                    is_dir = entry.is_dir()
 
                     # Keep description browsing limited to known text-ish files.
                     # Default browsing should expose any file inside allowed roots
@@ -6279,7 +6284,7 @@ def browse_path():
                             continue
 
                     try:
-                        stat_res = Path(full_path).stat()
+                        stat_res = entry.stat()
                         mtime = stat_res.st_mtime
                         size = stat_res.st_size if not is_dir else 0
                     except Exception:
