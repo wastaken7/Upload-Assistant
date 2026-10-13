@@ -24,7 +24,7 @@ class OnlyEncodes(UNIT3D):
     display_name = "OnlyEncodes+"
     allows_bloated_audio = True
     base_url = "https://onlyencodes.cc"
-    approved_image_hosts = ("imgbox", "imgbb", "onlyimage", "ptscreens", "passtheimage")
+    approved_image_hosts = ("imgbox", "imgbb", "onlyimage", "ptscreens", "passtheimage", "lostimg")
     image_host_policy = ImageHostPolicy(
         {
             "ibb.co": "imgbb",
@@ -33,6 +33,7 @@ class OnlyEncodes(UNIT3D):
             "imagebam.com": "bam",
             "ptscreens.com": "ptscreens",
             "img.passtheima.ge": "passtheimage",
+            "lostimg.cc": "lostimg",
         },
         approved_image_hosts,
     )
