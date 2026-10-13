@@ -1175,8 +1175,9 @@ async def tmdb_other_meta(
 
                 # Process TVDB ID
                 if tvdb_id == 0:
-                    tvdb_id_str = external.get("tvdb_id", None)
-                    tvdb_id = (int(tvdb_id_str) if tvdb_id_str.isdigit() else 0) if isinstance(tvdb_id_str, str) and tvdb_id_str not in ["", " ", "None", "null"] else 0
+                    tvdb_id_str = str(external.get("tvdb_id") or "")
+                    tvdb_id = int(tvdb_id_str) if tvdb_id_str.isdecimal() else 0
+                    logger.debug(f"[blue]TVDB ID from TMDB external IDs: {tvdb_id}[/blue]")
             except Exception:
                 logger.info("[bold red]Failed to process external IDs[/bold red]")
 
