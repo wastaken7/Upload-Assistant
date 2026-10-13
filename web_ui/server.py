@@ -3981,7 +3981,7 @@ def _resolve_user_path(
     return safe_candidate
 
 
-def _is_hidden_browse_entry(path: Path) -> bool:
+def _is_hidden_browse_entry(path: Path | os.DirEntry[str]) -> bool:
     """Hide dotfiles and OS-maintained entries consistently in browse/search."""
     if path.name.startswith(".") or path.name.casefold() in {"$recycle.bin", "system volume information"}:
         return True
@@ -6255,20 +6255,32 @@ def browse_path():
                 return jsonify({"error": "Invalid path specified", "success": False}), 400
 
             # codeql[py/path-injection]
-            for item in sorted([p.name for p in Path(safe_path).iterdir()]):
+            with os.scandir(safe_path) as entries:
+                directory_entries = sorted(entries, key=lambda entry: entry.name)
+            for entry in directory_entries:
+                item = entry.name
                 full_path = Path(safe_path) / item
-                if _is_hidden_browse_entry(full_path):
-                    continue
-                # Explicitly assert each resolved child path is safe. If the
-                # assertion fails for a specific entry, skip it rather than
-                # failing the whole browse operation.
-                try:
-                    _assert_safe_resolved_path(full_path)
-                except ValueError:
+                if _is_hidden_browse_entry(entry):
                     continue
                 try:
-                    # codeql[py/path-injection]
-                    is_dir = Path(full_path).is_dir()
+                    # Ordinary entries returned by scandir are direct children of
+                    # the validated parent. Resolve links and all Windows reparse
+                    # points (including junctions) before exposing their targets.
+                    # Use one no-follow snapshot for both classification and
+                    # displayed metadata. DirEntry's cached type can predate a
+                    # replacement, so it must not trigger a later following stat.
+                    stat_res = entry.stat(follow_symlinks=False)
+                    attributes = getattr(stat_res, "st_file_attributes", 0)
+                    is_link = stat.S_ISLNK(stat_res.st_mode) or bool(attributes & stat.FILE_ATTRIBUTE_REPARSE_POINT)
+                    is_dir = stat.S_ISDIR(stat_res.st_mode)
+                    if is_link:
+                        # Directory symlinks remain expandable, but size/mtime
+                        # below always describe the link itself, never its target.
+                        is_dir = bool(attributes & stat.FILE_ATTRIBUTE_DIRECTORY) if sys.platform == "win32" else entry.is_dir()
+                        try:
+                            _assert_safe_resolved_path(full_path)
+                        except ValueError:
+                            continue
 
                     # Keep description browsing limited to known text-ish files.
                     # Default browsing should expose any file inside allowed roots
@@ -6278,13 +6290,8 @@ def browse_path():
                         if ext not in SUPPORTED_DESC_EXTS:
                             continue
 
-                    try:
-                        stat_res = Path(full_path).stat()
-                        mtime = stat_res.st_mtime
-                        size = stat_res.st_size if not is_dir else 0
-                    except Exception:
-                        mtime = 0.0
-                        size = 0
+                    mtime = stat_res.st_mtime
+                    size = stat_res.st_size if not is_dir else 0
 
                     items.append(
                         {
