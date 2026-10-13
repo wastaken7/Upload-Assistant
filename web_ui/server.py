@@ -6266,14 +6266,21 @@ def browse_path():
                     # Ordinary entries returned by scandir are direct children of
                     # the validated parent. Resolve links and all Windows reparse
                     # points (including junctions) before exposing their targets.
-                    attributes = getattr(entry.stat(follow_symlinks=False), "st_file_attributes", 0)
-                    if entry.is_symlink() or attributes & stat.FILE_ATTRIBUTE_REPARSE_POINT:
+                    # Use one no-follow snapshot for both classification and
+                    # displayed metadata. DirEntry's cached type can predate a
+                    # replacement, so it must not trigger a later following stat.
+                    stat_res = entry.stat(follow_symlinks=False)
+                    attributes = getattr(stat_res, "st_file_attributes", 0)
+                    is_link = stat.S_ISLNK(stat_res.st_mode) or bool(attributes & stat.FILE_ATTRIBUTE_REPARSE_POINT)
+                    is_dir = stat.S_ISDIR(stat_res.st_mode)
+                    if is_link:
+                        # Directory symlinks remain expandable, but size/mtime
+                        # below always describe the link itself, never its target.
+                        is_dir = bool(attributes & stat.FILE_ATTRIBUTE_DIRECTORY) if sys.platform == "win32" else entry.is_dir()
                         try:
                             _assert_safe_resolved_path(full_path)
                         except ValueError:
                             continue
-                    # codeql[py/path-injection]
-                    is_dir = entry.is_dir()
 
                     # Keep description browsing limited to known text-ish files.
                     # Default browsing should expose any file inside allowed roots
@@ -6283,13 +6290,8 @@ def browse_path():
                         if ext not in SUPPORTED_DESC_EXTS:
                             continue
 
-                    try:
-                        stat_res = entry.stat()
-                        mtime = stat_res.st_mtime
-                        size = stat_res.st_size if not is_dir else 0
-                    except Exception:
-                        mtime = 0.0
-                        size = 0
+                    mtime = stat_res.st_mtime
+                    size = stat_res.st_size if not is_dir else 0
 
                     items.append(
                         {

@@ -3,6 +3,7 @@ import ctypes
 import stat
 import subprocess
 import sys
+from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -137,6 +138,103 @@ def test_large_listing_reuses_metadata_and_root_resolution(browser, tmp_path, mo
     assert items[0]["type"] == "file"
     assert items[-1]["type"] == "folder"
     assert items[-1]["size"] == 0
+
+
+def test_listing_detects_replacement_link_from_nofollow_metadata(browser, tmp_path, monkeypatch):
+    """A cached non-link type must not bypass validation of a replacement link."""
+    entry_path = tmp_path / "Fictional Replacement.txt"
+    entry_path.touch()
+    inspected = []
+    original_assert = server._assert_safe_resolved_path
+
+    class ReplacedEntry:
+        name = entry_path.name
+
+        def stat(self, *, follow_symlinks=True):
+            assert not follow_symlinks
+            return SimpleNamespace(st_mode=stat.S_IFLNK, st_file_attributes=0, st_size=17, st_mtime=123)
+
+        def is_symlink(self):
+            return False  # Type from enumeration predates the replacement.
+
+        def is_dir(self):
+            return False
+
+    @contextmanager
+    def scandir(path):
+        assert Path(path) == tmp_path
+        yield iter([ReplacedEntry()])
+
+    def validate(path):
+        if Path(path) == entry_path:
+            inspected.append(path)
+            raise ValueError("Path outside allowed roots")
+        return original_assert(path)
+
+    monkeypatch.setattr(server.os, "scandir", scandir)
+    monkeypatch.setattr(server, "_assert_safe_resolved_path", validate)
+    response = browser.get("/api/browse", query_string={"path": str(tmp_path)})
+    assert response.status_code == 200
+    assert inspected == [entry_path]
+    assert response.json["items"] == []
+
+
+@pytest.mark.parametrize("directory", [False, True])
+def test_listing_never_exposes_retargeted_link_metadata(browser, tmp_path, monkeypatch, directory):
+    """Model a known symlink retargeted after its path passes validation."""
+    entry_path = tmp_path / "Fictional Link.txt"
+    entry_path.touch()
+    original_assert = server._assert_safe_resolved_path
+    attributes = stat.FILE_ATTRIBUTE_REPARSE_POINT | (stat.FILE_ATTRIBUTE_DIRECTORY if directory else 0)
+    link_stat = SimpleNamespace(st_mode=stat.S_IFLNK, st_file_attributes=attributes, st_size=17, st_mtime=123)
+    retargeted = False
+    following_reads = []
+
+    class LinkEntry:
+        name = entry_path.name
+
+        def stat(self, *, follow_symlinks=True):
+            if not follow_symlinks:
+                return link_stat
+            following_reads.append(retargeted)
+            return SimpleNamespace(st_size=987654, st_mtime=999999)
+
+        def is_symlink(self):
+            return True
+
+        def is_dir(self):
+            # A known symlink's following is_dir also populates its stat cache.
+            self.stat()
+            return directory
+
+    @contextmanager
+    def scandir(path):
+        assert Path(path) == tmp_path
+        yield iter([LinkEntry()])
+
+    def validate(path):
+        nonlocal retargeted
+        if Path(path) == entry_path:
+            retargeted = True
+            return None
+        return original_assert(path)
+
+    monkeypatch.setattr(server.os, "scandir", scandir)
+    monkeypatch.setattr(server, "_assert_safe_resolved_path", validate)
+    response = browser.get("/api/browse", query_string={"path": str(tmp_path)})
+    assert response.status_code == 200
+    assert retargeted
+    assert True not in following_reads
+    assert response.json["items"] == [
+        {
+            "name": entry_path.name,
+            "path": str(entry_path),
+            "type": "folder" if directory else "file",
+            "children": [] if directory else None,
+            "mtime": link_stat.st_mtime,
+            "size": 0 if directory else link_stat.st_size,
+        }
+    ]
 
 
 def test_listing_still_validates_directory_link_targets(browser, tmp_path):
