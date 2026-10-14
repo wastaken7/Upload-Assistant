@@ -21,7 +21,7 @@ from src.cleanup import cleanup_manager
 from src.clients import Clients
 from src.config_helpers import parse_bool
 from src.console import logger
-from src.edition import get_edition
+from src.edition import RELEASE_TOKEN_RE, get_edition
 from src.exceptions import NoAudioMediaError
 from src.exportmi import export_info, get_conformance_error, mi_resolution, validate_mediainfo
 from src.get_source import get_source
@@ -1659,11 +1659,7 @@ async def finalize_metadata(
         if meta.no_edition is False:
             manual_edition = meta.manual_edition or ""
             meta.edition, meta.repack, meta.webdv = await get_edition(meta.uuid, bdinfo, meta.filelist, manual_edition, meta)
-            if "REPACK" in meta.edition:
-                repack_match = re.search(r"REPACK[\d]?", meta.edition)
-                if repack_match:
-                    meta.repack = repack_match.group(0)
-                meta.edition = re.sub(r"REPACK[\d]?", "", meta.edition).strip().replace("  ", " ")
+            meta.edition = " ".join(RELEASE_TOKEN_RE.sub("", meta.edition).split())
         else:
             meta.edition = ""
 
