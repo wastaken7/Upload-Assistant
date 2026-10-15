@@ -5154,7 +5154,11 @@ function AudionutsUAGUI() {
       const parts = buffer.split("\n");
       buffer = parts.pop();
       parts.forEach(processSSELine);
-      if (outcome.finished) break;
+      if (outcome.finished) {
+        // Release the connection now instead of waiting for garbage collection.
+        Promise.resolve(reader.cancel?.()).catch(() => {});
+        break;
+      }
     }
     /* eslint-enable no-constant-condition */
     return outcome;

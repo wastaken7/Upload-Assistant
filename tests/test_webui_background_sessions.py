@@ -369,3 +369,42 @@ def test_killing_a_scheduled_upload_cancels_it(start_session, tmp_path, monkeypa
     response = server.app.test_client().post("/api/kill", json={"session_id": "cancel-me"})
     assert response.get_json() == {"success": True, "message": "Execution startup cancelled"}
     assert "cancel-me" not in server.active_processes
+
+
+def test_scheduling_queue_has_its_own_limit(start_session, tmp_path, monkeypatch) -> None:
+    start_session("warm-up")[0].exit(0)
+    sessions = _occupy_all_slots(tmp_path)
+    for index in range(server.MAX_SCHEDULED_SESSIONS):
+        sessions[f"waiting-{index}"] = {"content_paths": frozenset({str(tmp_path / f"Fictional Wait {index}")}), "scheduled": True}
+    monkeypatch.setattr(server, "active_processes", sessions)
+    monkeypatch.setattr(server, "_webui_session_settings", lambda: (True, 0.0))
+
+    error = _post_execute("one-too-many", schedule=True)[0]
+    assert (error["code"], error["data"]) == ("capacity", f"Maximum of {server.MAX_SCHEDULED_SESSIONS} scheduled uploads reached; wait for one to start")
+
+
+def test_replacing_a_scheduled_session_releases_it(start_session, tmp_path, monkeypatch) -> None:
+    start_session("warm-up")[0].exit(0)
+    monkeypatch.setattr(server, "active_processes", _occupy_all_slots(tmp_path))
+    monkeypatch.setattr(server, "_webui_session_settings", lambda: (True, 0.0))
+    assert _post_execute("reused-id", schedule=True) == [{"type": "scheduled"}]
+    replaced = server.active_processes["reused-id"]
+    released: list[str] = []
+    monkeypatch.setattr(server, "_remove_session_queue_file", released.append)
+    monkeypatch.setattr(server, "_execution_item_paths", lambda _path: [str(tmp_path / "Fictional Other 2024")])
+    monkeypatch.setattr(server, "_validate_execution_path", lambda *_args, **_kwargs: str(tmp_path / "Fictional Other 2024"))
+    replaced["execution_path"] = str(tmp_path / "webui_queue_old.txt")
+
+    assert _post_execute("reused-id", schedule=True) == [{"type": "scheduled"}]
+    assert server.active_processes["reused-id"] is not replaced
+    assert replaced["finished"] is True
+    assert released == [str(tmp_path / "webui_queue_old.txt")]
+
+
+def test_dismiss_requires_a_session_id(monkeypatch) -> None:
+    monkeypatch.setattr(server, "_get_bearer_from_header", lambda: None)
+    monkeypatch.setattr(server, "_is_authenticated", lambda: True)
+    monkeypatch.setattr(server, "_verify_csrf_header", lambda: True)
+    monkeypatch.setattr(server, "_verify_same_origin", lambda: True)
+    response = server.app.test_client().post("/api/session_dismiss", json={})
+    assert response.status_code == 400

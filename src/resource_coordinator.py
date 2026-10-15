@@ -25,6 +25,7 @@ import contextlib
 import functools
 import os
 import threading
+import time
 from collections.abc import AsyncGenerator, Awaitable, Callable, Coroutine
 from dataclasses import dataclass
 from pathlib import Path
@@ -69,7 +70,9 @@ def _own_key() -> str:
     global _process_key
     if _process_key is None:
         pid = os.getpid()
-        _process_key = f"{_create_time_key(pid) or '0' * 20}-{pid:010d}"
+        # A zero key would make other processes treat this ticket as stale.
+        created = _create_time_key(pid) or f"{round(time.time() * 1_000_000):020d}"
+        _process_key = f"{created}-{pid:010d}"
     return _process_key
 
 
@@ -170,7 +173,8 @@ def _try_acquire(name: str) -> bool:
         return False
     lock_file = _try_lock(LOCK_DIR / f"{name}.lock")
     if lock_file is None:
-        return False
+        # Another coroutine of this run may have just taken the lock; share it now.
+        return _join_existing_hold(name)
     with _state_lock:
         _holds[name] = _Hold(lock_file, 1)
         if not _waiters.get(name):

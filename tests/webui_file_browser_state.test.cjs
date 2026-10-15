@@ -380,6 +380,7 @@ test("file-browser persistence, restoration, refresh and execution outcomes", as
   }
 
   // A dropped connection reattaches after the last applied event.
+  let cancelledReaders = 0;
   const streamOf = (text) => ({
     ok: true,
     body: {
@@ -391,7 +392,9 @@ test("file-browser persistence, restoration, refresh and execution outcomes", as
             sent = true;
             return { done: false, value: new TextEncoder().encode(text) };
           },
-          cancel: async () => {},
+          cancel: async () => {
+            cancelledReaders++;
+          },
         };
       },
     },
@@ -416,6 +419,8 @@ test("file-browser persistence, restoration, refresh and execution outcomes", as
   ]);
   assert.equal(tabRuntime.lastSeq, 2);
   assert.equal(context.refreshCount, 1);
+  // The stream that delivered "finished" is released right away.
+  assert.equal(cancelledReaders, 1);
 
   // With every slot busy the server schedules the upload; the tab waits on the
   // session list without holding a stream open, then follows it once started.

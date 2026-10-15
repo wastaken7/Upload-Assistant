@@ -18,7 +18,6 @@ Upload Assistant collects metadata, generates screenshots and artwork, creates t
 
 <img width="5739" height="4143" alt="3" src="https://github.com/user-attachments/assets/9164de0f-7901-4a1b-a567-10f97f3cf33b" />
 
-
 ---
 
 **New here? Follow [Start here](#start-here) to install the app, configure one destination, and make your first upload through the WebUI.**

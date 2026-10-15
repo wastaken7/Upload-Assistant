@@ -6937,7 +6937,8 @@ def save_queue():
             # Bound abandoned queue registrations. Old files never become trusted
             # merely because their names have the webui_queue_ prefix.
             if len(_generated_queues) >= MAX_UPLOAD_PATHS:
-                active_queue_keys = {os.path.normcase(os.path.realpath(str(process.get("path", "")))) for process in active_processes.values()}
+                # "path" follows the current queue item; the queue file itself is the execution path.
+                active_queue_keys = {os.path.normcase(os.path.realpath(str(process.get("execution_path") or process.get("path", "")))) for process in active_processes.values()}
                 evicted_key = next((entry for entry in _generated_queues if entry not in active_queue_keys), None)
                 if evicted_key is None:
                     file_path.unlink(missing_ok=True)
@@ -7597,6 +7598,8 @@ def execute_command():
                         waiting = sum(1 for key, info in active_processes.items() if key != session_id and info.get("scheduled") and _session_is_running(info))
                         if waiting < MAX_SCHEDULED_SESSIONS:
                             conflict, scheduled = None, True
+                        else:
+                            conflict = ("capacity", f"Maximum of {MAX_SCHEDULED_SESSIONS} scheduled uploads reached; wait for one to start")
                     existing = None
                     if conflict is None:
                         existing = active_processes.pop(session_id, None)
@@ -7612,6 +7615,14 @@ def execute_command():
                     if proc and proc.poll() is None:
                         with contextlib.suppress(Exception):
                             _terminate_process_tree(proc)
+                    elif existing.get("scheduled"):
+                        # A replaced scheduled upload never started: release its
+                        # queue file (unless reused here) and end its listeners.
+                        existing_path = str(existing.get("execution_path") or "")
+                        if existing_path and os.path.normcase(os.path.realpath(existing_path)) != os.path.normcase(os.path.realpath(validated_path)):
+                            _remove_session_queue_file(existing_path)
+                        if "events_cond" in existing:
+                            _finish_session(existing, None)
 
                 command_str = subprocess.list2cmdline(command)
                 console.print(f"Running: {command_str}", markup=False)
@@ -7884,6 +7895,8 @@ def dismiss_session():
         return jsonify({"error": "CSRF/Origin validation failed", "success": False}), 403
 
     session_id = str(_request_json_dict().get("session_id", "")).strip()
+    if not session_id:
+        return jsonify({"error": "Missing session_id", "success": False}), 400
     with active_processes_lock:
         process_state = active_processes.get(session_id)
         if process_state is None:

@@ -152,6 +152,29 @@ def test_same_process_holders_share_the_slot() -> None:
     assert rc._holds == {}
 
 
+@pytest.mark.usefixtures("lock_dir")
+def test_losing_the_lock_race_to_a_sibling_coroutine_joins_its_hold(monkeypatch: pytest.MonkeyPatch) -> None:
+    sibling_lock = object()
+
+    def sibling_wins(_path: Path) -> None:
+        # Another coroutine of this run took the OS lock between our checks.
+        rc._holds["torrent-hash"] = rc._Hold(sibling_lock, 1)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(rc, "_try_lock", sibling_wins)
+    try:
+        assert rc._try_acquire("torrent-hash") is True
+        assert rc._holds["torrent-hash"].count == 2
+    finally:
+        rc._holds.clear()
+
+
+def test_own_ticket_key_never_falls_back_to_zero(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(rc, "_process_key", None)
+    monkeypatch.setattr(rc, "_create_time_key", lambda _pid: None)
+    created, _pid = rc._own_key().split("-")
+    assert int(created) > 0
+
+
 def test_unknown_resource_is_rejected() -> None:
     async def acquire() -> None:
         async with rc.resource_slot("unknown", "test"):
