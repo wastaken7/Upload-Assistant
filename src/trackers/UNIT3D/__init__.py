@@ -200,10 +200,10 @@ class UNIT3D:
                         title_releases.append(result)
                         if self._matches_local_filter(attributes, local_resolution_ids, local_type_id):
                             dupes.append(result)
-                        # Newer UNIT3D versions omit these fields from search results.
+                        # Newer UNIT3D versions omit these fields from search results (or send them empty).
                         missing_key = "bd_info" if meta.is_disc else "media_info"
                         entry_is_disc = kind_from_type_label(attributes.get("type")) == DISC
-                        if not check_pending and torrent_id and missing_key not in attributes and entry_is_disc == bool(meta.is_disc):
+                        if not check_pending and torrent_id and not attributes.get(missing_key) and entry_is_disc == bool(meta.is_disc):
                             missing_details.append(result)
                 else:
                     logger.info(f"{self.tracker}: [bold red]Failed to search torrents. HTTP Status: {response.status_code}")

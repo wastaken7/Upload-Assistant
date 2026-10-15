@@ -362,3 +362,14 @@ class TestReviewFixes:
     def test_group_without_release_group_is_none(self) -> None:
         assert prof(f"{T}.1080p.WEB-DL.H.264").group is None
         assert prof(f"{T}.1080p.WEB-DL.H.264-NOGRPA [TGx]").group == "nogrpa"
+
+
+class TestRepackIdentity:
+    def test_repack_of_another_edition_does_not_block(self) -> None:
+        upload = prof(f"{T}.1080p.BluRay.DD5.1.x264-NOGRPA")
+        assert verdict(TorrentLeechSlotRules(), upload, prof(f"{T}.Directors.Cut.REPACK.1080p.BluRay.DD5.1.x264-NOGRPA")) is ALLOW
+
+    def test_repack_of_another_kind_does_not_replace_a_holder(self) -> None:
+        upload = prof(f"{T}.REPACK.1080p.AMZN.WEB-DL.DDP5.1.H.264-NOGRPA")
+        holders = (prof(f"{T}.1080p.BluRay.REMUX.AVC.DTS-HD.MA.5.1-NOGRPA"), prof(f"{T}.1080p.NF.WEB-DL.DDP5.1.H.264-NOGRPB"))
+        assert verdict(CathodeRayTubeSlotRules(), upload, *holders) is BLOCK

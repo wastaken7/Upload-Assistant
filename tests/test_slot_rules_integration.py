@@ -187,3 +187,13 @@ async def test_interactive_review_with_conflicts_asks_even_without_basic_dupes(m
     assert is_dupe is True
     is_dupe, _meta = await helper.dupe_check([], make_meta(unattended=True), "AITHER", review)
     assert is_dupe is False
+
+
+@pytest.mark.asyncio
+async def test_episode_holding_the_slot_blocks_even_with_a_season_pack() -> None:
+    name = "Fictional Show S01E02 1080p AMZN WEB-DL DDP 5.1 H.264-NOGRPA"
+    meta = make_meta(category="TV", name=name, season="S01", episode="E02", tv_pack=0)
+    dupes = [{"name": "Fictional Show S01 1080p NF WEB-DL DDP 5.1 H.264-NOGRPB"}, {"name": "Fictional Show S01E02 1080p NF WEB-DL DDP 5.1 H.264-NOGRPC"}]
+    result = await evaluate_slots(dupes, meta, "AITHER", {"DEFAULT": {}})
+    assert result is not None
+    assert result.verdict is Verdict.BLOCK

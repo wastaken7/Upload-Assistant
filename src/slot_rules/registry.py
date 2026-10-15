@@ -120,9 +120,11 @@ async def evaluate_slots(dupes: Sequence[DupeInput], meta: Meta, tracker: str, c
             existing.append(profile_from_entry(entry, provider=await _provider(name), exact=exact))
 
         rules = rules_cls(meta)
-        if season_packs and not any(profile.exact for profile in existing):
-            return rules.decision(Verdict.REVIEW, "A season pack that contains this episode is already on the site.", season_packs)
         decision = rules.evaluate(upload, existing)
+        # Episodes on the site decide first; a season pack only adds a review when nothing blocks.
+        if season_packs and (decision is None or decision.verdict is not Verdict.BLOCK):
+            conflicts = [*season_packs, *(profile for profile in existing if decision and profile.entry in decision.conflicts)]
+            decision = rules.decision(Verdict.REVIEW, "A season pack that contains this episode is already on the site.", conflicts)
         if meta.debug:
             logger.debug(f"[slot rules] {tracker}: upload={upload}")
             logger.debug(f"[slot rules] {tracker}: decision={decision}")

@@ -48,8 +48,22 @@ def size_diff_ratio(first: ReleaseProfile, second: ReleaseProfile) -> float | No
     return abs(first.size - second.size) / larger
 
 
+def _same_or_unknown(first: object, second: object) -> bool:
+    return first is None or second is None or first == second
+
+
 def is_repack_of(upload: ReleaseProfile, existing: ReleaseProfile) -> bool:
-    return bool(upload.group and upload.group == existing.group and upload.repack > existing.repack)
+    """``upload`` is a newer REPACK/PROPER of the same release: same group, edition and format."""
+    return bool(
+        upload.group
+        and upload.group == existing.group
+        and upload.repack > existing.repack
+        and upload.edition == existing.edition
+        and _same_or_unknown(upload.resolution, existing.resolution)
+        and _same_or_unknown(upload.kind, existing.kind)
+        and _same_or_unknown(upload.codec, existing.codec)
+        and _same_or_unknown(upload.hdr, existing.hdr)
+    )
 
 
 _LABEL_WORDS = {"H264": "H.264", "H265": "H.265", "encode": "Encode", "x264 encode": "x264 Encode", "x265 encode": "x265 Encode"}
@@ -101,14 +115,7 @@ class SlotRules:
         exact = [profile for profile in existing if profile.exact]
         if exact:
             return self.decision(Verdict.BLOCK, "This exact release is already on the site.", exact)
-        newer = [
-            profile
-            for profile in existing
-            if is_repack_of(profile, upload)
-            and profile.resolution == upload.resolution
-            and profile.kind == upload.kind
-            and (profile.codec is None or upload.codec is None or profile.codec == upload.codec)
-        ]
+        newer = [profile for profile in existing if is_repack_of(profile, upload)]
         if newer:
             return self.decision(Verdict.BLOCK, "A newer REPACK/PROPER of this release is already on the site.", newer)
         try:

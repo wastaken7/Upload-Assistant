@@ -193,3 +193,25 @@ def test_search_clears_title_list_from_an_earlier_search(monkeypatch: pytest.Mon
     asyncio.run(tracker.search_existing(meta))
 
     assert meta.get("SAMARITANO_title_releases") is None  # noqa: S101
+
+
+def test_empty_mediainfo_in_search_results_is_fetched(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[str] = []
+
+    class EmptyFieldClient(DetailFakeClient):
+        async def get(self, url: str, headers: dict[str, str], params: list[tuple[str, Any]] | None = None) -> Any:
+            if url.endswith("/filter"):
+                self.calls.append(url)
+                data = [{"id": "7", "attributes": {"name": "Fictional Film 2021 1080p WEB-DL H.264-NOGRPB", "type": "WEB-DL", "resolution": "1080p", "media_info": None}}]
+                return DetailResponse({"data": data})
+            return await super().get(url, headers, params)
+
+    async def no_sleep(_seconds: float) -> None:
+        return None
+
+    monkeypatch.setattr("src.trackers.UNIT3D.httpx.AsyncClient", lambda **kwargs: EmptyFieldClient(calls, **kwargs))
+    monkeypatch.setattr("src.trackers.UNIT3D.asyncio.sleep", no_sleep)
+    tracker = Samaritano({"DEFAULT": {}, "TRACKERS": {"SAMARITANO": {"api_key": "test-key"}}})
+    dupes = asyncio.run(tracker.search_existing(Meta(category="MOVIE", tmdb=123, resolution="1080p", type="WEBDL")))
+
+    assert dupes[0]["media_info"] == "Video\nFormat : AVC (7)"  # noqa: S101
