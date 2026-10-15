@@ -61,6 +61,9 @@ class HDTorrentsSlotRules(SlotRules):
                         same.append(profile)
                 except UnknownTraitError:
                     continue
+            repacked = [profile for profile in same if is_repack_of(upload, profile)]
+            if repacked:
+                return self.decision(Verdict.ALLOW, "Your REPACK/PROPER replaces the original. Report it as a trump after uploading.", repacked)
             if len(same) >= 2:
                 return self.decision(
                     Verdict.BLOCK, "Both 1080p x264 places are already taken.", same, why="HD-Torrents keeps one from a 1080p source and one from a UHD source."

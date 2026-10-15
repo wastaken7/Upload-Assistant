@@ -135,3 +135,9 @@ def test_profile_from_meta() -> None:
 )
 def test_audio_family(value: str, family: str | None) -> None:
     assert audio_family(value) == family
+
+
+def test_channel_count_with_height_channels() -> None:
+    assert channel_count("7.1.4") == 12
+    assert channel_count("5.1.2") == 8
+    assert channel_count("5.1") == 6

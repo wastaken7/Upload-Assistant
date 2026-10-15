@@ -160,3 +160,30 @@ def test_describe_size_compares_with_the_upload() -> None:
     assert _describe_size(10 * 1024**3, upload) == "10.0 GB · about the same size as yours"
     assert _describe_size(None, upload) == ""
     assert _describe_size(500 * 1024**2, None) == "500 MB"
+
+
+@pytest.mark.asyncio
+async def test_exact_episode_wins_over_season_pack_review() -> None:
+    name = "Fictional Show S01E02 1080p AMZN WEB-DL DDP 5.1 H.264-NOGRPA"
+    meta = make_meta(category="TV", name=name, season="S01", episode="E02", tv_pack=0)
+    dupes = [{"name": "Fictional Show S01 1080p NF WEB-DL DDP 5.1 H.264-NOGRPB"}, {"name": name}]
+    result = await evaluate_slots(dupes, meta, "AITHER", {"DEFAULT": {}})
+    assert result is not None
+    assert result.verdict is Verdict.BLOCK
+    meta_pack_only = make_meta(category="TV", name=name, season="S01", episode="E02", tv_pack=0)
+    result = await evaluate_slots(dupes[:1], meta_pack_only, "AITHER", {"DEFAULT": {}})
+    assert result is not None
+    assert result.verdict is Verdict.REVIEW
+
+
+@pytest.mark.asyncio
+async def test_interactive_review_with_conflicts_asks_even_without_basic_dupes(monkeypatch: pytest.MonkeyPatch) -> None:
+    prompts: list[tuple[str, bool]] = []
+    helper = make_helper(monkeypatch, [], prompts)
+    review = decision(Verdict.REVIEW)
+    review.conflicts = [{"name": "Fictional Film 2021 1080p BluRay x264-NOGRPB"}]
+    is_dupe, _meta = await helper.dupe_check([], make_meta(), "AITHER", review)
+    assert prompts == [("Upload to AITHER anyway?", False)]
+    assert is_dupe is True
+    is_dupe, _meta = await helper.dupe_check([], make_meta(unattended=True), "AITHER", review)
+    assert is_dupe is False

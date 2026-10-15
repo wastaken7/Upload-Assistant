@@ -76,6 +76,9 @@ class SkipTheCommercialsSlotRules(SlotRules):
 
     def key(self, profile: ReleaseProfile) -> SlotKey:
         res = self.require(profile.resolution, "resolution")
+        kind = self.require(profile.kind, "release type")
+        if kind not in (WEBDL, WEBRIP):
+            return (res, kind)
         return (
             res,
             "WEB",

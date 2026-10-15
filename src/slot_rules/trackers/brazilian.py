@@ -100,6 +100,7 @@ class CapybaraBRSlotRules(SlotRules):
             category = str(getattr(self.meta, "category", "") or "")
             min_gap = (6 if category == "TV" else 2) * GIB
             results: list[tuple[ReleaseProfile, Verdict, str]] = []
+            trumps_a_holder = False
             for holder in holders:
                 verdict, reason = self.audio_trump(upload, holder)
                 if verdict is Verdict.BLOCK and reason == COMPLETE_DUAL_RULE:
@@ -112,9 +113,11 @@ class CapybaraBRSlotRules(SlotRules):
                 elif upload.size is None or holder.size is None:
                     results.append((holder, Verdict.REVIEW, "The size of a release on the site could not be compared."))
                 else:
+                    trumps_a_holder = trumps_a_holder or verdict is Verdict.ALLOW
                     results.append((holder, verdict, reason))
             verdict, reason, conflicts = _combine(results)
-            if verdict is Verdict.ALLOW and len(holders) >= 2 and not any(is_repack_of(upload, holder) for holder in holders):
+            replaces_one = trumps_a_holder or any(is_repack_of(upload, holder) for holder in holders)
+            if verdict is Verdict.ALLOW and len(holders) >= 2 and not replaces_one:
                 return self.decision(Verdict.BLOCK, "Both 1080p WEB-DL places are already taken.", holders, why="CapybaraBR keeps at most two 1080p WEB-DLs per title.")
             return self.decision(verdict, SUMMARIES[verdict], conflicts, why=reason)
 

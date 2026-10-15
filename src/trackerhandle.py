@@ -199,6 +199,9 @@ async def process_trackers(
                             if slot_decision is not None and slot_decision.verdict is Verdict.ALLOW:
                                 logger.info(f"[green]{tracker_name}: new releases appeared during the wait, but slot rules still allow this upload.[/green]")
                                 return True
+                            if slot_decision is not None and slot_decision.verdict is Verdict.BLOCK:
+                                logger.info(f"[red]{tracker_name}: a release that fills this slot appeared during the wait. Automatically skipping upload.[/red]")
+                                return False
                             dupe_checker = DupeChecker(config)
                             real_new_dupes = cast(list[Any], await dupe_checker.filter_dupes(real_new_dupes, meta, tracker_name))
                             if real_new_dupes:

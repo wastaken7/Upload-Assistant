@@ -20,6 +20,9 @@ class CathodeRayTubeSlotRules(SlotRules):
             holders = [profile for profile in same_edition if profile.kind in (REMUX, WEBDL)]
             if not holders:
                 return self.decision(Verdict.ALLOW, f"No {res} remux or WEB-DL is on the site for this edition yet.")
+            repacked = [profile for profile in holders if is_repack_of(upload, profile)]
+            if repacked:
+                return self.decision(Verdict.ALLOW, "Your REPACK/PROPER replaces the original. Report it as a trump after uploading.", repacked)
             if len(holders) >= 2:
                 return self.decision(
                     Verdict.BLOCK,

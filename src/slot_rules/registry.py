@@ -102,6 +102,7 @@ async def evaluate_slots(dupes: Sequence[DupeInput], meta: Meta, tracker: str, c
             return None
 
         existing: list[ReleaseProfile] = []
+        season_packs: list[ReleaseProfile] = []
         for dupe in dupes:
             entry = _as_entry(dupe)
             name = str(entry.get("name") or "")
@@ -113,15 +114,14 @@ async def evaluate_slots(dupes: Sequence[DupeInput], meta: Meta, tracker: str, c
                 if not matches:
                     continue
                 if is_season_pack and meta.episode and not meta.tv_pack:
-                    return rules_cls(meta).decision(
-                        Verdict.REVIEW,
-                        "A season pack that contains this episode is already on the site.",
-                        [profile_from_entry(entry)],
-                    )
+                    season_packs.append(profile_from_entry(entry))
+                    continue
             exact = await DupeChecker.is_exact_match(entry, meta) or name.strip().lower() == (meta.name or "").strip().lower()
             existing.append(profile_from_entry(entry, provider=await _provider(name), exact=exact))
 
         rules = rules_cls(meta)
+        if season_packs and not any(profile.exact for profile in existing):
+            return rules.decision(Verdict.REVIEW, "A season pack that contains this episode is already on the site.", season_packs)
         decision = rules.evaluate(upload, existing)
         if meta.debug:
             logger.debug(f"[slot rules] {tracker}: upload={upload}")

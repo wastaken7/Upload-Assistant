@@ -104,7 +104,10 @@ class SlotRules:
         newer = [
             profile
             for profile in existing
-            if is_repack_of(profile, upload) and profile.resolution == upload.resolution and profile.kind == upload.kind and profile.codec == upload.codec
+            if is_repack_of(profile, upload)
+            and profile.resolution == upload.resolution
+            and profile.kind == upload.kind
+            and (profile.codec is None or upload.codec is None or profile.codec == upload.codec)
         ]
         if newer:
             return self.decision(Verdict.BLOCK, "A newer REPACK/PROPER of this release is already on the site.", newer)

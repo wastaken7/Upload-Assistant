@@ -245,11 +245,14 @@ def editions_from_text(text: str | None) -> frozenset[str]:
 
 def group_from_name(name: str) -> str | None:
     stem = re.sub(r"\.(mkv|mp4|avi|ts|m2ts|iso)$", "", name.strip(), flags=re.IGNORECASE)
+    # Site tags such as "[TGx]" may follow the group.
+    stem = re.sub(r"(?:\s*\[[^\]]*\])+$", "", stem)
     match = re.search(r"-([A-Za-z0-9][A-Za-z0-9_@!.&]*)$", stem)
     if not match:
         return None
     group = match.group(1)
-    if re.fullmatch(r"(dl|rip|hd|ray|\d+)", group, re.IGNORECASE):
+    # Hyphens inside source/codec tokens ("WEB-DL.H.264", "Blu-ray.x264") are not a group.
+    if re.match(r"(?:dl|rip|hd|ray|ma|\d+)(?:\.|$)", group, re.IGNORECASE):
         return None
     return group.lower()
 
@@ -547,11 +550,10 @@ def audio_family(value: str | None) -> str | None:
 
 
 def channel_count(value: str | None) -> int | None:
-    """Total channels from "5.1", "7.1", "2.0" or MediaInfo's "6"."""
+    """Total channels from "5.1", "7.1.4", "2.0" or MediaInfo's "6"."""
     if not value:
         return None
-    match = re.fullmatch(r"\s*(\d+)(?:\.(\d))?\s*", str(value))
+    match = re.fullmatch(r"\s*(\d+)(?:\.(\d))?(?:\.(\d))?\s*", str(value))
     if not match:
         return None
-    main = int(match.group(1))
-    return main + int(match.group(2)) if match.group(2) is not None else main
+    return sum(int(part) for part in match.groups() if part is not None)

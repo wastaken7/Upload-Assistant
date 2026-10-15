@@ -418,12 +418,16 @@ class UploadHelper:
         slot_verdict = slot_decision.verdict if slot_decision is not None else None
         interactive = (not meta.unattended or (meta.unattended and meta.unattended_confirm)) and not meta.ask_dupe
         if not dupes_list:
-            if slot_decision is not None and slot_verdict is Verdict.BLOCK:
-                # The basic check found nothing, but the release would sit in a filled slot.
+            needs_answer = slot_verdict is Verdict.BLOCK or (slot_verdict is Verdict.REVIEW and bool(slot_decision and slot_decision.conflicts))
+            if slot_decision is not None and needs_answer:
+                # The basic check found nothing, but the slot rules see a conflict.
                 self._show_slot_decision(slot_decision, meta)
                 if meta.dupe is not False:
                     return False, meta
                 if not interactive:
+                    if slot_verdict is Verdict.REVIEW:
+                        # Unattended review keeps the basic result, which found no dupes.
+                        return False, meta
                     logger.info(f"[bold red]{tracker_name}: skipping upload, slot rules recommend against it.[/bold red]")
                     return True, meta
                 try:

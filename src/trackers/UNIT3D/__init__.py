@@ -75,6 +75,8 @@ class UNIT3D:
         dupes: list[dict[str, Any]] = []
         params_list: ParamsList | None = None
         category = meta.category
+        # Slot rules must only see a title list produced by this search.
+        meta.pop(f"{self.tracker}_title_releases", None)
 
         # Ensure tracker_status keys exist before any potential writes
         meta.setdefault("tracker_status", {})

@@ -181,3 +181,15 @@ class AsyncMockValue:
 
     async def __call__(self, *_args: Any, **_kwargs: Any) -> Any:
         return self.value
+
+
+def test_search_clears_title_list_from_an_earlier_search(monkeypatch: pytest.MonkeyPatch) -> None:
+    requests: list[list[tuple[str, Any]]] = []
+    monkeypatch.setattr("src.trackers.UNIT3D.httpx.AsyncClient", lambda **kwargs: FakeAsyncClient(requests, **kwargs))
+    tracker = Samaritano({"DEFAULT": {}, "TRACKERS": {"SAMARITANO": {"api_key": "test-key"}}})
+    meta = Meta(category="MOVIE", tmdb=123, resolution="1080p", type="WEBDL")
+    meta["SAMARITANO_title_releases"] = [{"name": "stale"}]
+
+    asyncio.run(tracker.search_existing(meta))
+
+    assert meta.get("SAMARITANO_title_releases") is None  # noqa: S101

@@ -4,7 +4,7 @@
 from collections.abc import Sequence
 from typing import cast
 
-from src.slot_rules.base import SlotKey, SlotRules, UnknownTraitError
+from src.slot_rules.base import SlotKey, SlotRules, UnknownTraitError, is_repack_of
 from src.slot_rules.models import SlotDecision, Verdict
 from src.slot_rules.profile import AV1, DV, REMUX, SD, WEBDL, WEBRIP, ReleaseProfile
 
@@ -85,7 +85,9 @@ class AnthelionSlotRules(SlotRules):
                     why="ANT prefers encodes: once a tier has an encode with the same dynamic range, new WEB releases are refused. Staff can give a slot override token.",
                 )
 
-        def trump(_new: ReleaseProfile, _old: ReleaseProfile) -> tuple[Verdict, str]:
+        def trump(new: ReleaseProfile, old: ReleaseProfile) -> tuple[Verdict, str]:
+            if is_repack_of(new, old):
+                return Verdict.BLOCK, "ANT refuses uploads into a filled slot, even a REPACK/PROPER of the same group. Ask staff for a slot override token."
             return Verdict.BLOCK, "The first upload keeps the slot. If yours is better, ask staff for a slot override token, with comparisons."
 
         return self.by_slot(upload, existing, self.key, self.label(upload_key), trump=trump)

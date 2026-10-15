@@ -327,3 +327,38 @@ class TestCapybaraCompleteDual:
         assert verdict(CapybaraBRSlotRules(Meta(category="MOVIE")), dual_remux, self.dual_web) is None
         portuguese = replace(self.subbed_remux, audio_languages=frozenset({"pt"}))
         assert verdict(CapybaraBRSlotRules(Meta(category="MOVIE", original_language="pt")), portuguese, self.dual_web) is None
+
+
+class TestReviewFixes:
+    def test_capybara_trump_does_not_need_a_free_place(self) -> None:
+        rules = CapybaraBRSlotRules(Meta(category="MOVIE"))
+        upload = replace(prof(f"{T}.1080p.AMZN.WEB-DL.DDP5.1.H.264-NOGRPA", 6), audio_languages=frozenset({"en", "pt"}), subtitle_languages=frozenset({"pt"}))
+        first = prof(f"{T}.1080p.NF.WEB-DL.DDP5.1.H.264-NOGRPB", 6, media_info=mediainfo(audio=("English",)))
+        second = prof(f"{T}.1080p.HMAX.WEB-DL.DDP5.1.H.264-NOGRPC", 10, media_info=mediainfo(audio=("English",)))
+        assert verdict(rules, upload, first, second) is ALLOW
+
+    def test_repack_replaces_a_holder_when_places_are_full(self) -> None:
+        crt_upload = prof(f"{T}.REPACK.1080p.BluRay.REMUX.AVC.DTS-HD.MA.5.1-NOGRPA")
+        crt_holders = (prof(f"{T}.1080p.BluRay.REMUX.AVC.DTS-HD.MA.5.1-NOGRPA"), prof(f"{T}.1080p.AMZN.WEB-DL.DDP5.1.H.264-NOGRPB"))
+        assert verdict(CathodeRayTubeSlotRules(), crt_upload, *crt_holders) is ALLOW
+        hdt_upload = prof(f"{T}.REPACK.1080p.BluRay.DD5.1.x264-NOGRPA")
+        hdt_holders = (prof(f"{T}.1080p.BluRay.DD5.1.x264-NOGRPA"), prof(f"{T}.1080p.BluRay.DTS.x264-NOGRPB"))
+        assert verdict(HDTorrentsSlotRules(), hdt_upload, *hdt_holders) is ALLOW
+
+    def test_ant_repack_into_filled_slot_still_needs_a_token(self) -> None:
+        decision = AnthelionSlotRules().evaluate(prof(f"{T}.REPACK.2160p.BluRay.DV.x265-NOGRPA"), [prof(f"{T}.2160p.BluRay.DV.x265-NOGRPA")])
+        assert decision is not None
+        assert decision.verdict is BLOCK
+        assert "slot override token" in decision.why
+
+    def test_newer_repack_without_codec_in_name(self) -> None:
+        upload = prof(f"{T}.1080p.AMZN.WEB-DL.DDP5.1.H.264-NOGRPA")
+        assert verdict(TorrentLeechSlotRules(), upload, prof(f"{T}.REPACK.1080p.AMZN.WEB-DL.DDP5.1-NOGRPA")) is BLOCK
+
+    def test_skipthecommercials_ignores_non_web_releases_for_web_uploads(self) -> None:
+        upload = prof(f"{T}.1080p.AMZN.WEB-DL.DDP5.1.H.264-NOGRPA")
+        assert verdict(SkipTheCommercialsSlotRules(), upload, prof(f"{T}.1080p.BluRay.DD5.1.x264-NOGRPB")) is ALLOW
+
+    def test_group_without_release_group_is_none(self) -> None:
+        assert prof(f"{T}.1080p.WEB-DL.H.264").group is None
+        assert prof(f"{T}.1080p.WEB-DL.H.264-NOGRPA [TGx]").group == "nogrpa"
