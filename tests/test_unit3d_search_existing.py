@@ -74,3 +74,110 @@ def test_missing_tmdb_keeps_category_filter(monkeypatch: pytest.MonkeyPatch) -> 
     asyncio.run(tracker.search_existing(meta))
 
     assert ("categories[]", "2") in requests[0]  # noqa: S101
+
+
+class DetailFakeClient:
+    """Search results without MediaInfo (newer UNIT3D), with a per-torrent detail endpoint."""
+
+    def __init__(self, calls: list[str], **_kwargs: Any) -> None:
+        self.calls = calls
+
+    async def __aenter__(self) -> DetailFakeClient:
+        return self
+
+    async def __aexit__(self, *_args: Any) -> None:
+        pass
+
+    async def get(self, url: str, headers: dict[str, str], params: list[tuple[str, Any]] | None = None) -> Any:
+        _ = (headers, params)
+        self.calls.append(url)
+        if url.endswith("/filter"):
+            data = [
+                {"id": "1", "attributes": {"name": "Fictional Film 2021 1080p Blu-ray AVC", "type": "Full Disc", "resolution": "1080p", "size": 1}},
+                {"id": "2", "attributes": {"name": "Fictional Film 2021 2160p WEB-DL H.265-NOGRPA", "type": "WEB-DL", "resolution": "2160p", "size": 1}},
+                {"id": "3", "attributes": {"name": "Fictional Film 2021 1080p WEB-DL H.264-NOGRPB", "type": "WEB-DL", "resolution": "1080p", "size": 1}},
+            ]
+            return DetailResponse({"data": data})
+        torrent_id = url.rsplit("/", 1)[1]
+        return DetailResponse({"type": "torrent", "id": torrent_id, "attributes": {"media_info": f"Video\nFormat : AVC ({torrent_id})", "bd_info": "", "description": ""}})
+
+
+class DetailResponse:
+    status_code = 200
+
+    def __init__(self, payload: dict[str, Any]) -> None:
+        self.payload = payload
+
+    def raise_for_status(self) -> None:
+        pass
+
+    def json(self) -> dict[str, Any]:
+        return self.payload
+
+
+def test_missing_mediainfo_is_fetched_per_torrent(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[str] = []
+    monkeypatch.setattr("src.trackers.UNIT3D.httpx.AsyncClient", lambda **kwargs: DetailFakeClient(calls, **kwargs))
+
+    async def no_sleep(_seconds: float) -> None:
+        return None
+
+    monkeypatch.setattr("src.trackers.UNIT3D.asyncio.sleep", no_sleep)
+
+    tracker = Samaritano({"DEFAULT": {}, "TRACKERS": {"SAMARITANO": {"api_key": "test-key"}}})
+    meta = Meta(category="MOVIE", tmdb=123, resolution="1080p", type="WEBDL")
+    dupes = asyncio.run(tracker.search_existing(meta))
+
+    detail_calls = [call for call in calls if not call.endswith("/filter")]
+    # The full disc is skipped and the upload's resolution is fetched first.
+    assert [call.rsplit("/", 1)[1] for call in detail_calls] == ["3", "2"]  # noqa: S101
+    by_id = {dupe["id"]: dupe for dupe in dupes}
+    assert by_id["3"]["media_info"] == "Video\nFormat : AVC (3)"  # noqa: S101
+    assert by_id["1"]["media_info"] is None  # noqa: S101
+
+
+def test_missing_mediainfo_is_not_fetched_without_slot_rules(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[str] = []
+    monkeypatch.setattr("src.trackers.UNIT3D.httpx.AsyncClient", lambda **kwargs: DetailFakeClient(calls, **kwargs))
+
+    tracker = Samaritano({"DEFAULT": {"slot_rules": False}, "TRACKERS": {"SAMARITANO": {"api_key": "test-key"}}})
+    asyncio.run(tracker.search_existing(Meta(category="MOVIE", tmdb=123, resolution="1080p", type="WEBDL")))
+
+    assert all(call.endswith("/filter") for call in calls)  # noqa: S101
+
+
+def test_whole_title_search_keeps_basic_results_filtered(monkeypatch: pytest.MonkeyPatch) -> None:
+    from src.trackers.UNIT3D.capybarabr import CapybaraBR
+
+    requests: list[list[tuple[str, Any]]] = []
+
+    class TitleClient(FakeAsyncClient):
+        async def get(self, *, url: str, headers: dict[str, str], params: list[tuple[str, Any]]) -> Any:
+            _ = (url, headers)
+            self.requests.append(params)
+            data = [
+                {"id": "1", "attributes": {"name": "Fictional Film 2021 1080p WEB-DL DUAL-NOGRPA", "type_id": 4, "resolution_id": 3, "media_info": "x"}},
+                {"id": "2", "attributes": {"name": "Fictional Film 2021 1080p BluRay REMUX-NOGRPB", "type_id": 3, "resolution_id": 3, "media_info": "x"}},
+                {"id": "3", "attributes": {"name": "Fictional Film 2021 2160p BluRay REMUX-NOGRPC", "type_id": 3, "resolution_id": 2, "media_info": "x"}},
+            ]
+            return DetailResponse({"data": data})
+
+    monkeypatch.setattr("src.trackers.UNIT3D.httpx.AsyncClient", lambda **kwargs: TitleClient(requests, **kwargs))
+    tracker = CapybaraBR({"DEFAULT": {}, "TRACKERS": {"CAPYBARABR": {"api_key": "test-key"}}})
+    meta = Meta(category="MOVIE", tmdb=123, resolution="1080p", type="REMUX")
+    monkeypatch.setattr(tracker, "get_type_id", AsyncMockValue({"type_id": "3"}))
+    monkeypatch.setattr(tracker, "get_resolution_id", AsyncMockValue({"resolution_id": "3"}))
+
+    dupes = asyncio.run(tracker.search_existing(meta))
+
+    assert not any(key in ("types[]", "resolutions[]") for key, _value in requests[0])  # noqa: S101
+    assert [dupe["id"] for dupe in dupes] == ["2"]  # noqa: S101
+    assert [release["id"] for release in meta["CAPYBARABR_title_releases"]] == ["1", "2", "3"]  # noqa: S101
+
+
+class AsyncMockValue:
+    def __init__(self, value: Any) -> None:
+        self.value = value
+
+    async def __call__(self, *_args: Any, **_kwargs: Any) -> Any:
+        return self.value

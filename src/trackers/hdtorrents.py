@@ -200,6 +200,9 @@ class HDTorrents:
                 continue
 
             name_tag = row.find("a", attrs={"href": re.compile(r"details\.php\?id=")})
+            # Every page shows a "latest torrents" widget; its links are not search results.
+            if name_tag is not None and name_tag.find_parent("div", id="view_torrents") is not None:
+                continue
 
             name = name_tag.text.strip() if name_tag else None
             link = f"{self.base_url}/{name_tag['href']}" if name_tag else None
