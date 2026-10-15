@@ -21,6 +21,7 @@
     "cinematik.net": "cinematik",
     "darkpeers.org": "darkpeers",
     "dreadvault.org": "dreadvault",
+    "echelonhd.me": "echelonhd",
     "eiga.moi": "asiancinema",
     "emuwarez.com": "emuwarez",
     "hawke.uno": "hawkeuno",

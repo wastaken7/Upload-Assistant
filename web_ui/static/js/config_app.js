@@ -1364,6 +1364,7 @@ const trackerNameMap = {
   DIGITALCORE: "DigitalCore",
   DREADVAULT: "DreadVault",
   DRUNKENSLUG: "DrunkenSlug",
+  ECHELONHD: "EchelonHD",
   EMUWAREZ: "eMuwarez",
   FILELIST: "FileList",
   FLOOD: "Flood",
