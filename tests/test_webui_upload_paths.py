@@ -484,6 +484,25 @@ def test_eviction_removes_abandoned_queue_files_and_protects_active_ones(workspa
     assert set(active.parent.glob("webui_queue_*.txt")) == {active, newest}
 
 
+def test_eviction_protects_a_running_queue_while_it_shows_its_current_item(workspace, monkeypatch):
+    client, _, _, first, _ = workspace
+    monkeypatch.setattr(server, "MAX_UPLOAD_PATHS", 2)
+    monkeypatch.setattr(server, "active_processes", {})
+
+    def create():
+        return client.post("/api/save_queue", json={"items": [{"path": str(first)}]})
+
+    running = Path(create().json["path"])
+    # During a queue run the preview target replaces "path" with the current item.
+    server.active_processes["running-queue"] = {"path": str(first), "execution_path": str(running)}
+    other = Path(create().json["path"])
+    newest = Path(create().json["path"])
+
+    assert running.exists()
+    assert not other.exists()
+    assert newest.exists()
+
+
 def test_queue_cleanup_never_deletes_outside_the_state_tmp_directory(workspace):
     _, root, _, _, _ = workspace
     outside = root / "webui_queue_external.txt"

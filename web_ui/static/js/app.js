@@ -160,6 +160,116 @@ const isMobileBrowserSession = () => {
 const shouldUseMobileLayout = () =>
   window.innerWidth < COMPACT_LAYOUT_BREAKPOINT || isMobileBrowserSession();
 
+// Each running tab holds one SSE stream; the server enforces the same limit.
+// Idle tabs are cheap; only running uploads hold connections and server slots.
+const MAX_UPLOAD_TABS = 24;
+const DEFAULT_MAX_RUNNING_UPLOADS = 4;
+const SCHEDULE_POLL_MS = 3000;
+// One /api/sessions request per interval serves every scheduled tab.
+const sharedSessionsPoll = { promise: null, at: 0 };
+const UPLOAD_TAB_DRAFTS_KEY = "ua.uploadTabDrafts.v1";
+const BUSY_UPLOAD_STATUSES = ["running", "waiting", "input"];
+// The server sends a keepalive every second; silence this long means a dead connection.
+const SESSION_STREAM_STALL_MS = 20000;
+const SESSION_RECONNECT_ATTEMPTS = 60;
+
+const UPLOAD_TAB_STATUS_LABELS = {
+  idle: "Idle",
+  running: "Running",
+  waiting: "Waiting for another tab to free a shared resource",
+  input: "Waiting for your input",
+  scheduled: "Scheduled: starts when an upload slot frees",
+  done: "Finished",
+  error: "Failed",
+};
+
+const createUploadTabForm = () => ({
+  selectedPath: "",
+  selectedPaths: [],
+  manualPathsText: null,
+  customArgs: "",
+  pathInputError: "",
+  selectedArgumentPreset: "",
+  userInput: "",
+});
+
+/** Per-tab state that must survive while the tab is not displayed. */
+const createUploadTabRuntime = () => ({
+  output: document.createElement("div"),
+  controller: null,
+  lastFullHash: "",
+  // Last session event applied, so reconnects replay only what was missed.
+  lastSeq: 0,
+  // Server session shown in this tab; dismissed when the tab moves on.
+  sessionRecord: "",
+  // Waiting on the server for a free upload slot.
+  scheduled: false,
+  // Authoritative for every tab; React state mirrors only the active tab.
+  run: { sessionId: "", isExecuting: false },
+  // Snapshot of view state, read while the tab is in the background.
+  view: {
+    isTerminalView: false,
+    progressItems: [],
+    form: createUploadTabForm(),
+  },
+  awaiting: false,
+  waiting: new Set(),
+  result: "",
+});
+
+const getUploadTabStatus = (runtime) => {
+  if (!runtime.run.isExecuting) return runtime.result || "idle";
+  if (runtime.scheduled) return "scheduled";
+  if (runtime.awaiting) return "input";
+  return runtime.waiting.size ? "waiting" : "running";
+};
+
+const uploadTabFormHasContent = (form) =>
+  Boolean(
+    form &&
+    (form.selectedPath ||
+      form.selectedPaths?.length ||
+      form.manualPathsText ||
+      form.customArgs),
+  );
+
+/** Read prepared-but-not-started tab forms saved by this browser. */
+const loadUploadTabDrafts = () => {
+  try {
+    const drafts = JSON.parse(
+      window.localStorage.getItem(UPLOAD_TAB_DRAFTS_KEY) || "[]",
+    );
+    return Array.isArray(drafts)
+      ? drafts.filter((draft) => uploadTabFormHasContent(draft?.form))
+      : [];
+  } catch (error) {
+    return [];
+  }
+};
+
+const saveUploadTabDrafts = (drafts) => {
+  try {
+    if (drafts.length) {
+      window.localStorage.setItem(
+        UPLOAD_TAB_DRAFTS_KEY,
+        JSON.stringify(drafts),
+      );
+    } else {
+      window.localStorage.removeItem(UPLOAD_TAB_DRAFTS_KEY);
+    }
+  } catch (error) {
+    /* Storage can be unavailable (private mode, quota); drafts are a convenience. */
+  }
+};
+
+const getUploadTabTitle = (items) => {
+  if (items.length !== 1) return `Queue (${items.length})`;
+  const parts = String(items[0].path || "")
+    .split(/[\\/]/)
+    .filter(Boolean);
+  return parts[parts.length - 1] || items[0].path;
+};
+
 const storage = window.UAStorage;
 const getStoredTheme = window.getUAStoredTheme;
 const colorThemes = window.UAThemes || [];
@@ -1859,6 +1969,16 @@ function AudionutsUAGUI() {
     getStoredExpandedFolders,
   );
   const [sessionId, setSessionId] = useState("");
+  const [uploadTabs, setUploadTabs] = useState([
+    { id: "tab-1", number: 1, title: "", status: "idle" },
+  ]);
+  const [activeTabId, setActiveTabId] = useState("tab-1");
+  const [pendingCloseTabId, setPendingCloseTabId] = useState("");
+  const [maxRunningUploads, setMaxRunningUploads] = useState(
+    DEFAULT_MAX_RUNNING_UPLOADS,
+  );
+  const [schedulingEnabled, setSchedulingEnabled] = useState(true);
+  const [uploadTabsRestored, setUploadTabsRestored] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(() =>
     getStoredSidebarWidth(
       LEFT_SIDEBAR_WIDTH_KEY,
@@ -2357,10 +2477,88 @@ function AudionutsUAGUI() {
   const [descLinkFocused, setDescLinkFocused] = useState(false);
 
   const richOutputRef = useRef(null);
-  const lastFullHashRef = useRef("");
   const inputRef = useRef(null);
   const isSendingInputRef = useRef(false);
-  const sseAbortControllerRef = useRef(null);
+  const activeTabIdRef = useRef("tab-1");
+  const uploadTabCounterRef = useRef(1);
+  const tabRuntimeRef = useRef(null);
+  if (tabRuntimeRef.current === null) {
+    const firstTab = createUploadTabRuntime();
+    firstTab.run.isExecuting = Boolean(screenshotMode);
+    tabRuntimeRef.current = new Map([["tab-1", firstTab]]);
+  }
+
+  const getTabRuntime = (tabId) => tabRuntimeRef.current.get(tabId);
+
+  const refreshUploadTabStatus = (tabId) => {
+    const runtime = getTabRuntime(tabId);
+    if (!runtime) return;
+    const status = getUploadTabStatus(runtime);
+    setUploadTabs((tabs) =>
+      tabs.map((tab) =>
+        tab.id === tabId && tab.status !== status ? { ...tab, status } : tab,
+      ),
+    );
+  };
+
+  /**
+   * Update a tab's run state. Background tabs keep it in their runtime; the
+   * active tab also mirrors it into React state so the existing UI renders it.
+   */
+  const updateTabRun = (tabId, patch) => {
+    const runtime = getTabRuntime(tabId);
+    if (!runtime) return;
+    const isActive = tabId === activeTabIdRef.current;
+    if ("sessionId" in patch) {
+      runtime.run.sessionId = patch.sessionId;
+      if (isActive) setSessionId(patch.sessionId);
+    }
+    if ("isExecuting" in patch) {
+      runtime.run.isExecuting = patch.isExecuting;
+      if (isActive) setIsExecuting(patch.isExecuting);
+    }
+    if ("progressItems" in patch) {
+      const value = patch.progressItems;
+      if (isActive) setProgressItems(value);
+      else
+        runtime.view.progressItems =
+          typeof value === "function"
+            ? value(runtime.view.progressItems)
+            : value;
+    }
+    refreshUploadTabStatus(tabId);
+  };
+
+  const scrollTabOutput = (tabId) => {
+    if (tabId !== activeTabIdRef.current) return;
+    const host = richOutputRef.current;
+    if (!host) return;
+    // Scroll only the terminal, including while its view is hidden.
+    setTimeout(() => {
+      host.scrollTop = host.scrollHeight;
+    }, 0);
+  };
+
+  const mountActiveTabOutput = () => {
+    const host = richOutputRef.current;
+    const runtime = getTabRuntime(activeTabIdRef.current);
+    if (!host || !runtime) return;
+    if (host.firstChild !== runtime.output || host.childNodes.length !== 1) {
+      host.replaceChildren(runtime.output);
+    }
+    host.scrollTop = host.scrollHeight;
+  };
+
+  // Each tab owns a detached output node; the visible terminal shows the active one.
+  const attachRichOutputHost = useCallback((node) => {
+    richOutputRef.current = node;
+    if (node) mountActiveTabOutput();
+  }, []);
+
+  useEffect(() => {
+    mountActiveTabOutput();
+  }, [activeTabId]);
+
   const visibleProgressItems = progressItems.filter(
     (item) => item.status !== "completed",
   );
@@ -2389,21 +2587,30 @@ function AudionutsUAGUI() {
     return sortProgressItems([...itemsById.values()]);
   };
 
-  const applyProgressEvent = (event) => {
+  const applyProgressEvent = (event, tabId = activeTabIdRef.current) => {
     if (!event || typeof event !== "object") return;
+    const runtime = getTabRuntime(tabId);
     if (event.op === "reset") {
-      setProgressItems([]);
+      runtime?.waiting.clear();
+      updateTabRun(tabId, { progressItems: [] });
       return;
     }
     if (!event.id) return;
-    setProgressItems((prev) => {
-      const existingIndex = prev.findIndex((item) => item.id === event.id);
-      if (existingIndex === -1) {
-        return sortProgressItems([...prev, event]);
-      }
-      const next = [...prev];
-      next[existingIndex] = { ...next[existingIndex], ...event };
-      return sortProgressItems(next);
+    // The backend reports cross-tab resource waits as "wait-<resource>" items.
+    if (runtime && String(event.id).startsWith("wait-")) {
+      if (event.status === "waiting") runtime.waiting.add(event.id);
+      else runtime.waiting.delete(event.id);
+    }
+    updateTabRun(tabId, {
+      progressItems: (prev) => {
+        const existingIndex = prev.findIndex((item) => item.id === event.id);
+        if (existingIndex === -1) {
+          return sortProgressItems([...prev, event]);
+        }
+        const next = [...prev];
+        next[existingIndex] = { ...next[existingIndex], ...event };
+        return sortProgressItems(next);
+      },
     });
   };
 
@@ -3443,21 +3650,22 @@ function AudionutsUAGUI() {
     setCustomArgs((prev) => updateArgValue(prev, "--desclink", url));
   };
 
-  const appendHtmlFragment = (rawHtml) => {
-    const container = richOutputRef.current;
-    if (container) {
-      const wrapper = createUploadOutputFragment((rawHtml || "").trim());
-      container.appendChild(wrapper);
-      // Scroll only the terminal, including while its view is hidden.
-      setTimeout(() => {
-        container.scrollTop = container.scrollHeight;
-      }, 0);
-    }
+  const appendHtmlFragment = (rawHtml, tabId = activeTabIdRef.current) => {
+    const runtime = getTabRuntime(tabId);
+    if (!runtime) return;
+    runtime.output.appendChild(
+      createUploadOutputFragment((rawHtml || "").trim()),
+    );
+    scrollTabOutput(tabId);
   };
 
-  const appendSystemMessage = (text, kind = "info") => {
-    const rootContainer = richOutputRef.current;
-    if (!rootContainer) return;
+  const appendSystemMessage = (
+    text,
+    kind = "info",
+    tabId = activeTabIdRef.current,
+  ) => {
+    const runtime = getTabRuntime(tabId);
+    if (!runtime) return;
     const el = document.createElement("div");
     // Support multiple kinds: error, user-input, and default info
     if (kind === "error") el.className = "text-red-400";
@@ -3465,17 +3673,29 @@ function AudionutsUAGUI() {
     else el.className = "text-blue-300";
     el.style.whiteSpace = "pre-wrap";
     el.textContent = text;
-    rootContainer.appendChild(el);
-    // ensure fully visible
-    setTimeout(() => {
-      rootContainer.scrollTop = rootContainer.scrollHeight;
-    }, 0);
+    runtime.output.appendChild(el);
+    scrollTabOutput(tabId);
+  };
+
+  const appendWelcomeMessage = (tabId = activeTabIdRef.current) => {
+    appendSystemMessage("Upload-Assistant Interactive Output", "info", tabId);
+    appendSystemMessage(
+      '\nQuick Start:\n  1. Select a file or folder from the left panel\n  2. Add Upload-Assistant arguments (optional)\n  3. Click "Execute Upload" to start\n',
+      "info",
+      tabId,
+    );
   };
 
   const sendInput = async (session_id, input) => {
     if (isSendingInputRef.current || !session_id) return;
     isSendingInputRef.current = true;
     setIsSendingInput(true);
+    const tabId = activeTabIdRef.current;
+    const runtime = getTabRuntime(tabId);
+    if (runtime) {
+      runtime.awaiting = false;
+      refreshUploadTabStatus(tabId);
+    }
     // Optimistically echo the user's input locally so it appears before
     // any subsequent server-generated prompt / output.
     appendSystemMessage("> " + input, "user-input");
@@ -3501,10 +3721,7 @@ function AudionutsUAGUI() {
       appendHtmlFragment(screenshotMode.output);
       return;
     }
-    appendSystemMessage("Upload-Assistant Interactive Output");
-    appendSystemMessage(
-      '\nQuick Start:\n  1. Select a file or folder from the left panel\n  2. Add Upload-Assistant arguments (optional)\n  3. Click "Execute Upload" to start\n',
-    );
+    appendWelcomeMessage();
   }, []);
 
   const loadBrowseRoots = async () => {
@@ -4786,60 +5003,410 @@ function AudionutsUAGUI() {
     });
   };
 
-  const executeSinglePath = async (path, newSessionId, itemArgs = "") => {
+  /** Show the server's label (e.g. "Title (2024)") and full release name for a tab. */
+  const setUploadTabTitle = (tabId, title, detail = "") => {
+    if (!title) return;
+    setUploadTabs((tabs) =>
+      tabs.map((tab) =>
+        tab.id === tabId
+          ? { ...tab, title: String(title), detail: String(detail || "") }
+          : tab,
+      ),
+    );
+  };
+
+  /** Wait without blocking an abort of the tab's session. */
+  const waitForReconnect = (milliseconds, signal) =>
+    new Promise((resolve) => {
+      // An already-aborted signal never fires "abort" again.
+      if (signal.aborted) {
+        resolve();
+        return;
+      }
+      const timer = setTimeout(resolve, milliseconds);
+      signal.addEventListener(
+        "abort",
+        () => {
+          clearTimeout(timer);
+          resolve();
+        },
+        { once: true },
+      );
+    });
+
+  /** Read one chunk, giving up on a connection that stopped sending keepalives. */
+  const readSessionChunk = (reader) =>
+    new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        reader.cancel().catch(() => {});
+        reject(new Error("Session stream stalled"));
+      }, SESSION_STREAM_STALL_MS);
+      reader.read().then(
+        (chunk) => {
+          clearTimeout(timer);
+          resolve(chunk);
+        },
+        (error) => {
+          clearTimeout(timer);
+          reject(error);
+        },
+      );
+    });
+
+  /**
+   * Apply one SSE response to a tab. Events before "replay_done" are history
+   * from the server's session log, so they do not replay prompt sounds.
+   */
+  const readSessionStream = async (tabId, response, controller) => {
+    const outcome = {
+      exitCode: null,
+      finished: false,
+      error: false,
+      started: false,
+    };
+    const runtime = getTabRuntime(tabId);
+    if (!runtime) return outcome;
+    let live = false;
+
+    const handleEvent = (data) => {
+      if (Number.isInteger(data.seq)) {
+        // Reconnects replay from the last sequence number; skip any overlap.
+        if (data.seq <= runtime.lastSeq) return;
+        runtime.lastSeq = data.seq;
+        outcome.started = true;
+      }
+      if (data.type === "html" || data.type === "html_full") {
+        try {
+          const clean = sanitizeHtml(data.data || "");
+          if (data.type === "html_full") {
+            const key = `${clean.length}:${clean.slice(0, 200)}`;
+            if (runtime.lastFullHash !== key) {
+              runtime.lastFullHash = key;
+              runtime.output.appendChild(createUploadOutputFragment(clean));
+              scrollTabOutput(tabId);
+            }
+            return;
+          }
+          appendHtmlFragment(clean, tabId);
+        } catch (e) {
+          console.error("Failed to render HTML fragment:", e);
+        }
+      } else if (data.type === "progress") {
+        applyProgressEvent(data.data || {}, tabId);
+      } else if (data.type === "prompt_sound") {
+        if (live) window.uaPromptSound?.play();
+      } else if (data.type === "prompt_state") {
+        runtime.awaiting = Boolean(data.awaiting);
+        refreshUploadTabStatus(tabId);
+      } else if (data.type === "replay_done") {
+        live = true;
+        outcome.started = true;
+      } else if (data.type === "label") {
+        setUploadTabTitle(tabId, data.label, data.detail);
+      } else if (data.type === "truncated") {
+        appendSystemMessage(
+          "Earlier output was trimmed on the server.",
+          "info",
+          tabId,
+        );
+      } else if (data.type === "error") {
+        outcome.error = true;
+        appendSystemMessage(`Error: ${data.data}`, "error", tabId);
+      } else if (data.type === "exit") {
+        appendSystemMessage("", "info", tabId);
+        appendSystemMessage(
+          `Success: Process exited with code ${data.code}`,
+          "info",
+          tabId,
+        );
+        outcome.exitCode = data.code;
+      } else if (data.type === "scheduled") {
+        outcome.scheduled = true;
+      } else if (data.type === "started") {
+        appendSystemMessage("Scheduled upload started.", "info", tabId);
+      } else if (data.type === "finished") {
+        outcome.finished = true;
+        if (outcome.exitCode === null && Number.isInteger(data.exit_code)) {
+          outcome.exitCode = data.exit_code;
+        }
+      }
+    };
+
+    const processSSELine = (line) => {
+      if (controller.signal.aborted) return;
+      if (!line.trim() || !line.startsWith("data: ")) return;
+      try {
+        handleEvent(JSON.parse(line.substring(6)));
+      } catch (e) {
+        console.error("Parse error:", e);
+      }
+    };
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    /* eslint-disable no-constant-condition */
+    while (true) {
+      const { done, value } = await readSessionChunk(reader);
+      if (done) {
+        if (buffer) buffer.split("\n").forEach(processSSELine);
+        break;
+      }
+      buffer += decoder.decode(value, { stream: true });
+      const parts = buffer.split("\n");
+      buffer = parts.pop();
+      parts.forEach(processSSELine);
+      if (outcome.finished) {
+        // Release the connection now instead of waiting for garbage collection.
+        Promise.resolve(reader.cancel?.()).catch(() => {});
+        break;
+      }
+    }
+    /* eslint-enable no-constant-condition */
+    return outcome;
+  };
+
+  /**
+   * Follow a tab's session until the upload ends. A dropped connection only
+   * detaches the browser; the server keeps the upload running, so reconnect
+   * and replay whatever was missed.
+   */
+  const followSession = async (tabId, controller, firstResponse = null) => {
+    const { signal } = controller;
+    const result = { exitCode: null, error: false, lost: false };
+    let response = firstResponse;
+    let failures = 0;
+    for (;;) {
+      const runtime = getTabRuntime(tabId);
+      if (signal.aborted || !runtime) return { ...result, aborted: true };
+      if (response) {
+        let outcome = null;
+        try {
+          outcome = await readSessionStream(tabId, response, controller);
+        } catch (error) {
+          if (signal.aborted) return { ...result, aborted: true };
+        }
+        if (signal.aborted) return { ...result, aborted: true };
+        if (outcome) {
+          if (outcome.exitCode !== null) result.exitCode = outcome.exitCode;
+          if (outcome.error) result.error = true;
+          if (outcome.scheduled) return { ...result, scheduled: true };
+          if (outcome.finished || outcome.exitCode !== null) return result;
+          // Rejected before a session existed (limit, duplicate content, ...).
+          if (!outcome.started && outcome.error) return result;
+          if (outcome.started) failures = 0;
+        }
+      }
+
+      if (response || failures > 0) {
+        failures += 1;
+        if (failures > SESSION_RECONNECT_ATTEMPTS) {
+          result.lost = true;
+          appendSystemMessage(
+            "Error: Lost the connection to this upload. It keeps running on the server; reload the page to reattach.",
+            "error",
+            tabId,
+          );
+          return result;
+        }
+        if (failures === 1) {
+          appendSystemMessage(
+            "Connection lost; reconnecting to the upload...",
+            "info",
+            tabId,
+          );
+        }
+        await waitForReconnect(Math.min(10000, 1000 * failures), signal);
+        if (signal.aborted) return { ...result, aborted: true };
+      } else {
+        failures = 1;
+      }
+
+      response = null;
+      try {
+        const candidate = await apiFetch(
+          `${API_BASE}/session_stream?session_id=${encodeURIComponent(runtime.run.sessionId)}&after=${runtime.lastSeq}`,
+          { cache: "no-store", signal },
+        );
+        if (candidate.status === 404) {
+          result.lost = true;
+          appendSystemMessage(
+            "Error: This upload is no longer available on the server.",
+            "error",
+            tabId,
+          );
+          return result;
+        }
+        if (candidate.ok && candidate.body) response = candidate;
+      } catch (error) {
+        if (signal.aborted) return { ...result, aborted: true };
+      }
+    }
+  };
+
+  /** Fetch the session list at most once per poll interval, shared by all tabs. */
+  const pollSessionsShared = () => {
+    if (
+      sharedSessionsPoll.promise &&
+      Date.now() - sharedSessionsPoll.at < SCHEDULE_POLL_MS / 2
+    ) {
+      return sharedSessionsPoll.promise;
+    }
+    sharedSessionsPoll.at = Date.now();
+    sharedSessionsPoll.promise = apiFetch(`${API_BASE}/sessions`, {
+      cache: "no-store",
+    })
+      .then((response) => (response.ok ? response.json() : null))
+      .catch(() => null);
+    return sharedSessionsPoll.promise;
+  };
+
+  /**
+   * Poll the session list until a scheduled upload starts ("started"), is
+   * cancelled elsewhere ("gone"), or this tab stops waiting ("aborted").
+   */
+  const waitForScheduledStart = async (tabId, controller) => {
+    const { signal } = controller;
+    const runtime = getTabRuntime(tabId);
+    if (!runtime) return "aborted";
+    runtime.scheduled = true;
+    refreshUploadTabStatus(tabId);
+    try {
+      for (;;) {
+        await waitForReconnect(SCHEDULE_POLL_MS, signal);
+        if (signal.aborted || !getTabRuntime(tabId)) return "aborted";
+        const data = await pollSessionsShared();
+        if (signal.aborted) return "aborted";
+        if (!data || !Array.isArray(data.sessions)) continue;
+        const session = data.sessions.find(
+          (item) => item.session_id === runtime.run.sessionId,
+        );
+        if (!session) return "gone";
+        if (!session.scheduled) return "started";
+      }
+    } finally {
+      runtime.scheduled = false;
+      refreshUploadTabStatus(tabId);
+    }
+  };
+
+  /** Follow a session through an optional scheduled wait until it ends. */
+  const followScheduledSession = async (tabId, controller, result) => {
+    if (!result.scheduled) return result;
+    appendSystemMessage(
+      "All upload slots are busy. This upload is scheduled and starts automatically when one frees, even if you close the page.",
+      "info",
+      tabId,
+    );
+    const state = await waitForScheduledStart(tabId, controller);
+    if (state === "aborted") return { ...result, aborted: true };
+    if (state === "gone") {
+      appendSystemMessage("Scheduled upload was cancelled.", "error", tabId);
+      return { exitCode: null, error: true, lost: false };
+    }
+    return followSession(tabId, controller);
+  };
+
+  const finishTabSession = async (
+    tabId,
+    controller,
+    result,
+    { refreshFiles = false } = {},
+  ) => {
+    const runtime = getTabRuntime(tabId);
+    if (!runtime || result.aborted || controller.signal.aborted) return false;
+    if (!result.lost && (result.exitCode !== null || !result.error)) {
+      appendSystemMessage("Success: Execution completed", "info", tabId);
+    }
+    appendSystemMessage("", "info", tabId);
+    if (refreshFiles && result.exitCode === 0) {
+      await refreshFileBrowserAfterUpload(controller.signal);
+    }
+    const succeeded =
+      !result.lost &&
+      (result.exitCode === 0 || (result.exitCode === null && !result.error));
+    runtime.result = succeeded ? "done" : "error";
+    return succeeded;
+  };
+
+  /** Forget this tab's finished server session so it is not restored again. */
+  const dismissTabSession = (tabId) => {
+    const runtime = getTabRuntime(tabId);
+    const sessionId = runtime?.sessionRecord;
+    if (!sessionId || runtime.run.isExecuting) return;
+    runtime.sessionRecord = "";
+    apiFetch(`${API_BASE}/session_dismiss`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session_id: sessionId }),
+    }).catch((error) => console.error("Failed to dismiss session:", error));
+  };
+
+  const executeSinglePath = async (
+    path,
+    newSessionId,
+    itemArgs = "",
+    tabId = activeTabIdRef.current,
+    label = "",
+  ) => {
     const executionArgs = [customArgs, itemArgs].filter(Boolean).join(" ");
+    const reportError = (message) => {
+      appendSystemMessage(message, "error", tabId);
+      return false;
+    };
     // Validate --descfile: must have a valid description file path
     if (hasDescFile) {
       if (!descFilePath) {
-        appendSystemMessage(
+        return reportError(
           "Error: Please select or enter a description file path when using --descfile",
-          "error",
         );
-        return false;
       }
       const pathValidation = isValidDescFilePath(descFilePath);
       if (!pathValidation.valid) {
-        appendSystemMessage(
+        return reportError(
           `Error: Invalid description file: ${pathValidation.error}`,
-          "error",
         );
-        return false;
       }
     }
 
     // Validate --desclink: must have a valid URL
     if (hasDescLink) {
       if (!descLinkUrl) {
-        appendSystemMessage(
+        return reportError(
           "Error: Please enter a description URL when using --desclink",
-          "error",
         );
-        return false;
       }
       if (!isValidUrl(descLinkUrl)) {
-        appendSystemMessage(
+        return reportError(
           "Error: Please enter a valid paste URL for --desclink (pastebin, hastebin, etc.)",
-          "error",
         );
-        return false;
       }
     }
 
-    setSessionId(newSessionId);
-    setProgressItems([]);
-    if (lastFullHashRef) lastFullHashRef.current = "";
+    const runtime = getTabRuntime(tabId);
+    // The tab was closed while its queue was being prepared.
+    if (!runtime) return false;
+    dismissTabSession(tabId);
+    runtime.lastFullHash = "";
+    runtime.lastSeq = 0;
+    runtime.awaiting = false;
+    runtime.waiting.clear();
+    runtime.result = "";
+    runtime.sessionRecord = newSessionId;
+    updateTabRun(tabId, { sessionId: newSessionId, progressItems: [] });
 
-    appendSystemMessage("");
-    appendSystemMessage(`$ python upload.py "${path}" ${executionArgs}`);
-    appendSystemMessage("Starting execution...");
+    appendSystemMessage("", "info", tabId);
+    appendSystemMessage(
+      `$ python upload.py "${path}" ${executionArgs}`,
+      "info",
+      tabId,
+    );
+    appendSystemMessage("Starting execution...", "info", tabId);
 
-    let localController = null;
+    const controller = new AbortController();
+    runtime.controller = controller;
 
     try {
-      const controller = new AbortController();
-      sseAbortControllerRef.current = controller;
-      localController = controller;
-
       const response = await apiFetch(`${API_BASE}/execute`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -4847,132 +5414,209 @@ function AudionutsUAGUI() {
           path: path,
           args: executionArgs,
           session_id: newSessionId,
+          label,
+          // The server starts it now, or schedules it if every slot is busy.
+          schedule: schedulingEnabled,
         }),
         signal: controller.signal,
       });
 
       if (!response.ok) {
         const errText = await response.text();
-        appendSystemMessage(
+        runtime.result = "error";
+        return reportError(
           `Error: Execute failed (${response.status}): ${errText || "Request failed"}`,
-          "error",
         );
-        return false;
       }
       if (!response.body) {
-        appendSystemMessage(
-          "Error: Execute failed: empty response body",
-          "error",
-        );
-        return false;
+        runtime.result = "error";
+        return reportError("Error: Execute failed: empty response body");
       }
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let exitCode = null;
-
-      const processSSELine = (line) => {
-        if (localController && localController.signal.aborted) return;
-        if (!line.trim() || !line.startsWith("data: ")) return;
-        try {
-          const data = JSON.parse(line.substring(6));
-          if (data.type === "html" || data.type === "html_full") {
-            try {
-              const rawHtml = data.data || "";
-              const clean = sanitizeHtml(rawHtml);
-              const rootContainer = richOutputRef.current;
-              if (data.type === "html_full") {
-                const shortSample = clean.slice(0, 200);
-                const key = `${clean.length}:${shortSample}`;
-                if (lastFullHashRef.current !== key) {
-                  lastFullHashRef.current = key;
-                  const wrapper = createUploadOutputFragment(clean);
-                  if (rootContainer) rootContainer.appendChild(wrapper);
-                  setTimeout(() => {
-                    if (rootContainer)
-                      rootContainer.scrollTop = rootContainer.scrollHeight;
-                  }, 0);
-                }
-                return;
-              }
-              appendHtmlFragment(clean);
-            } catch (e) {
-              console.error("Failed to render HTML fragment:", e);
-            }
-          } else if (data.type === "progress") {
-            applyProgressEvent(data.data || {});
-          } else if (data.type === "prompt_sound") {
-            window.uaPromptSound?.play();
-          } else if (data.type === "exit") {
-            if (!(localController && localController.signal.aborted)) {
-              appendSystemMessage("");
-              appendSystemMessage(
-                `Success: Process exited with code ${data.code}`,
-              );
-              exitCode = data.code;
-            }
-          }
-        } catch (e) {
-          console.error("Parse error:", e);
-        }
-      };
-
-      /* eslint-disable no-constant-condition */
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) {
-          if (buffer) {
-            const finalLines = buffer.split("\n");
-            for (const line of finalLines) {
-              processSSELine(line);
-            }
-          }
-          break;
-        }
-
-        buffer += decoder.decode(value, { stream: true });
-        const parts = buffer.split("\n");
-        buffer = parts.pop();
-
-        for (const line of parts) {
-          processSSELine(line);
-        }
-      }
-      /* eslint-enable no-constant-condition */
-
-      if (!(localController && localController.signal.aborted)) {
-        appendSystemMessage("Success: Execution completed");
-        appendSystemMessage("");
-        if (exitCode === 0) {
-          await refreshFileBrowserAfterUpload(localController.signal);
-        }
-        return exitCode === 0 || exitCode === null;
-      }
-      return false;
+      const result = await followScheduledSession(
+        tabId,
+        controller,
+        await followSession(tabId, controller, response),
+      );
+      return await finishTabSession(tabId, controller, result, {
+        refreshFiles: true,
+      });
     } catch (error) {
-      if (!(localController && localController.signal.aborted)) {
+      if (!controller.signal.aborted) {
+        runtime.result = "error";
         appendSystemMessage(
           "Error: Execution failed: " + error.message,
           "error",
+          tabId,
         );
       }
       return false;
     } finally {
-      setProgressItems([]);
-      try {
-        if (sseAbortControllerRef.current === localController) {
-          sseAbortControllerRef.current = null;
-        }
-      } catch (e) {
-        /* ignore */
-      }
+      runtime.awaiting = false;
+      runtime.waiting.clear();
+      if (runtime.controller === controller) runtime.controller = null;
+      updateTabRun(tabId, { progressItems: [] });
     }
+  };
+
+  /** Show a server session in a tab and follow it until it ends. */
+  const attachRestoredSession = async (tabId) => {
+    const runtime = getTabRuntime(tabId);
+    if (!runtime) return;
+    const controller = new AbortController();
+    runtime.controller = controller;
+    try {
+      const result = runtime.scheduled
+        ? await followScheduledSession(tabId, controller, { scheduled: true })
+        : await followSession(tabId, controller);
+      await finishTabSession(tabId, controller, result);
+    } finally {
+      runtime.awaiting = false;
+      runtime.waiting.clear();
+      if (runtime.controller === controller) runtime.controller = null;
+      updateTabRun(tabId, {
+        isExecuting: false,
+        sessionId: "",
+        progressItems: [],
+      });
+    }
+  };
+
+  /**
+   * Recreate tabs for uploads still known to the server, plus forms this
+   * browser had prepared, so closing or reloading the page loses neither.
+   */
+  const restoreUploadSessions = async () => {
+    let sessions = [];
+    try {
+      const response = await apiFetch(`${API_BASE}/sessions`, {
+        cache: "no-store",
+      });
+      const data = await response.json();
+      if (response.ok && Array.isArray(data.sessions)) sessions = data.sessions;
+      if (Number.isInteger(data.max_running) && data.max_running > 0) {
+        setMaxRunningUploads(data.max_running);
+      }
+      if (typeof data.scheduling === "boolean") {
+        setSchedulingEnabled(data.scheduling);
+      }
+    } catch (error) {
+      console.error("Failed to load upload sessions:", error);
+    }
+    const drafts = loadUploadTabDrafts();
+
+    const firstTab = getTabRuntime("tab-1");
+    const replaceFirstTab =
+      firstTab &&
+      !firstTab.run.isExecuting &&
+      !firstTab.sessionRecord &&
+      !uploadTabFormHasContent({
+        selectedPath,
+        selectedPaths,
+        manualPathsText,
+        customArgs,
+      });
+    const room = MAX_UPLOAD_TABS - (replaceFirstTab ? 0 : 1);
+    const newTab = (runtime, title = "", detail = "") => {
+      uploadTabCounterRef.current += 1;
+      const number = uploadTabCounterRef.current;
+      const id = `tab-${number}`;
+      tabRuntimeRef.current.set(id, runtime);
+      return { id, number, title, detail, status: getUploadTabStatus(runtime) };
+    };
+    const restoredSessions = sessions.slice(0, room).map((session) => {
+      const runtime = createUploadTabRuntime();
+      runtime.run = {
+        sessionId: String(session.session_id),
+        isExecuting: Boolean(session.running),
+      };
+      runtime.sessionRecord = String(session.session_id);
+      runtime.scheduled = Boolean(session.scheduled);
+      runtime.awaiting = Boolean(session.awaiting_input);
+      if (!session.running)
+        runtime.result = session.exit_code === 0 ? "done" : "error";
+      return newTab(
+        runtime,
+        String(session.label || ""),
+        String(session.label_detail || ""),
+      );
+    });
+    const restoredDrafts = drafts
+      .slice(0, room - restoredSessions.length)
+      .map((draft) => {
+        const runtime = createUploadTabRuntime();
+        runtime.view.form = { ...createUploadTabForm(), ...draft.form };
+        return newTab(runtime);
+      });
+    const restored = [...restoredSessions, ...restoredDrafts];
+
+    if (restored.length && replaceFirstTab) {
+      switchUploadTab(restored[0].id);
+      tabRuntimeRef.current.delete("tab-1");
+      setUploadTabs(restored);
+    } else if (restored.length) {
+      setUploadTabs((tabs) => [...tabs, ...restored]);
+    }
+    // Run state must reach React for the visible tab; background tabs keep it in their runtime.
+    const visible = getTabRuntime(activeTabIdRef.current);
+    if (visible) {
+      setSessionId(visible.run.sessionId);
+      setIsExecuting(visible.run.isExecuting);
+    }
+    restoredSessions.forEach((tab) => attachRestoredSession(tab.id));
+    setUploadTabsRestored(true);
+  };
+
+  useEffect(() => {
+    if (screenshotMode) return;
+    restoreUploadSessions();
+  }, []);
+
+  useEffect(() => {
+    if (screenshotMode || !uploadTabsRestored) return;
+    const drafts = [];
+    uploadTabs.forEach((tab) => {
+      const runtime = getTabRuntime(tab.id);
+      // Running and finished tabs are restored from the server instead.
+      if (!runtime || runtime.run.isExecuting || runtime.sessionRecord) return;
+      const form =
+        tab.id === activeTabId
+          ? { selectedPath, selectedPaths, manualPathsText, customArgs }
+          : runtime.view.form;
+      if (!uploadTabFormHasContent(form)) return;
+      drafts.push({
+        form: {
+          selectedPath: form.selectedPath || "",
+          selectedPaths: form.selectedPaths || [],
+          manualPathsText: form.manualPathsText ?? null,
+          customArgs: form.customArgs || "",
+        },
+      });
+    });
+    saveUploadTabDrafts(drafts);
+  }, [
+    uploadTabsRestored,
+    uploadTabs,
+    activeTabId,
+    selectedPath,
+    selectedPaths,
+    manualPathsText,
+    customArgs,
+  ]);
+
+  const reportTabPathError = (tabId, message) => {
+    if (tabId === activeTabIdRef.current) {
+      setPathInputError(message);
+      return;
+    }
+    const runtime = getTabRuntime(tabId);
+    if (runtime) runtime.view.form.pathInputError = message;
   };
 
   const executeCommand = async () => {
     if (screenshotMode) return;
     window.uaPromptSound?.unlock();
     if (isExecuting) return;
+    const tabId = activeTabIdRef.current;
     const previousArgs = new Map(
       selectedPaths.map((item) => [item.path, item.args]),
     );
@@ -4995,7 +5639,14 @@ function AudionutsUAGUI() {
       return;
     }
     setPathInputError("");
-    setIsExecuting(true);
+    updateTabRun(tabId, { isExecuting: true });
+    setUploadTabs((tabs) =>
+      tabs.map((tab) =>
+        tab.id === tabId
+          ? { ...tab, title: getUploadTabTitle(items), detail: "" }
+          : tab,
+      ),
+    );
     try {
       const response = await apiFetch(`${API_BASE}/save_queue`, {
         method: "POST",
@@ -5006,36 +5657,39 @@ function AudionutsUAGUI() {
       if (!response.ok || !data.success || !data.path) {
         const line = items[data.item - 1]?.line;
         const error = `${line ? `Line ${line}: ` : ""}${data.error || "Could not validate upload paths"}`;
-        setPathInputError(error);
+        reportTabPathError(tabId, error);
         return;
       }
-      const rootContainer = richOutputRef.current;
-      if (rootContainer) rootContainer.innerHTML = "";
+      const runtime = getTabRuntime(tabId);
+      if (!runtime) return;
+      runtime.output.replaceChildren();
       await executeSinglePath(
         data.path,
-        "session_" + Date.now(),
+        `session_${tabId}_${Date.now()}`,
         items.length === 1 ? items[0].args : "",
+        tabId,
+        getUploadTabTitle(items),
       );
     } catch (error) {
-      setPathInputError(`Could not prepare upload: ${error.message}`);
+      reportTabPathError(tabId, `Could not prepare upload: ${error.message}`);
     } finally {
-      setIsExecuting(false);
-      setSessionId("");
+      updateTabRun(tabId, { isExecuting: false, sessionId: "" });
     }
   };
 
   const clearTerminal = async () => {
     if (screenshotMode) return;
+    const tabId = activeTabIdRef.current;
+    const runtime = getTabRuntime(tabId);
+    if (!runtime) return;
     // If a process is running, kill it first
     if (isExecuting && sessionId) {
       try {
         // Abort the SSE fetch so the client stops processing incoming events
-        if (sseAbortControllerRef.current) {
-          try {
-            sseAbortControllerRef.current.abort();
-          } catch (e) {
-            /* ignore */
-          }
+        try {
+          runtime.controller?.abort();
+        } catch (e) {
+          /* ignore */
         }
         await apiFetch(`${API_BASE}/kill`, {
           method: "POST",
@@ -5043,26 +5697,272 @@ function AudionutsUAGUI() {
           body: JSON.stringify({ session_id: sessionId }),
         });
 
-        appendSystemMessage("Error: Process terminated by user", "error");
+        appendSystemMessage(
+          "Error: Process terminated by user",
+          "error",
+          tabId,
+        );
 
-        setIsExecuting(false);
-        setSessionId("");
-        setProgressItems([]);
+        runtime.result = "";
+        updateTabRun(tabId, {
+          isExecuting: false,
+          sessionId: "",
+          progressItems: [],
+        });
       } catch (error) {
         console.error("Failed to kill process:", error);
       }
     }
 
-    // Clear the rich output container
-    const container = richOutputRef.current;
-    if (container) {
-      container.innerHTML = "";
-      setProgressItems([]);
-      appendSystemMessage("Upload-Assistant Interactive Output");
-      appendSystemMessage(
-        '\nQuick Start:\n  1. Select a file or folder from the left panel\n  2. Add Upload-Assistant arguments (optional)\n  3. Click "Execute Upload" to start\n',
-      );
+    dismissTabSession(tabId);
+
+    // Clear this tab's output
+    runtime.output.replaceChildren();
+    updateTabRun(tabId, { progressItems: [] });
+    appendWelcomeMessage(tabId);
+  };
+
+  /** Show another tab: park the current view state and restore the target's. */
+  const switchUploadTab = (nextId) => {
+    const currentId = activeTabIdRef.current;
+    const next = getTabRuntime(nextId);
+    if (nextId === currentId || !next) return;
+    const current = getTabRuntime(currentId);
+    if (current) {
+      current.view = {
+        isTerminalView,
+        progressItems,
+        form: {
+          selectedPath,
+          selectedPaths,
+          manualPathsText,
+          customArgs,
+          pathInputError,
+          selectedArgumentPreset,
+          userInput,
+        },
+      };
     }
+    activeTabIdRef.current = nextId;
+    const { form } = next.view;
+    setSessionId(next.run.sessionId);
+    setIsExecuting(next.run.isExecuting);
+    setIsTerminalView(next.view.isTerminalView);
+    setProgressItems(next.view.progressItems);
+    setSelectedPath(form.selectedPath);
+    setSelectedPaths(form.selectedPaths);
+    setManualPathsText(form.manualPathsText);
+    setCustomArgs(form.customArgs);
+    setPathInputError(form.pathInputError);
+    setSelectedArgumentPreset(form.selectedArgumentPreset);
+    setUserInput(form.userInput);
+    setActiveTabId(nextId);
+  };
+
+  /** Create an empty tab's runtime; the caller adds it to the tab bar. */
+  const createEmptyUploadTab = (number = null) => {
+    uploadTabCounterRef.current += 1;
+    const id = `tab-${uploadTabCounterRef.current}`;
+    tabRuntimeRef.current.set(id, createUploadTabRuntime());
+    appendWelcomeMessage(id);
+    return {
+      id,
+      number: number ?? uploadTabCounterRef.current,
+      title: "",
+      status: "idle",
+    };
+  };
+
+  const addUploadTab = () => {
+    if (screenshotMode || uploadTabs.length >= MAX_UPLOAD_TABS) return;
+    const tab = createEmptyUploadTab();
+    setUploadTabs((tabs) => [...tabs, tab]);
+    switchUploadTab(tab.id);
+  };
+
+  const closeUploadTab = async (tabId) => {
+    setPendingCloseTabId("");
+    const runtime = getTabRuntime(tabId);
+    const index = uploadTabs.findIndex((tab) => tab.id === tabId);
+    if (!runtime || index === -1) return;
+    if (!runtime.run.isExecuting) dismissTabSession(tabId);
+    if (uploadTabs.length <= 1) {
+      // The bar always keeps one tab, so "closing" the last one resets it.
+      const replacement = createEmptyUploadTab(uploadTabs[index].number);
+      switchUploadTab(replacement.id);
+      tabRuntimeRef.current.delete(tabId);
+      setUploadTabs([replacement]);
+    } else {
+      if (tabId === activeTabIdRef.current) {
+        const neighbor = uploadTabs[index + 1] || uploadTabs[index - 1];
+        switchUploadTab(neighbor.id);
+      }
+      tabRuntimeRef.current.delete(tabId);
+      setUploadTabs((tabs) => tabs.filter((tab) => tab.id !== tabId));
+    }
+    if (!runtime.run.isExecuting) return;
+    try {
+      runtime.controller?.abort();
+    } catch (e) {
+      /* ignore */
+    }
+    if (!runtime.run.sessionId) return;
+    try {
+      await apiFetch(`${API_BASE}/kill`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: runtime.run.sessionId }),
+      });
+    } catch (error) {
+      console.error("Failed to kill closed tab process:", error);
+    }
+  };
+
+  const requestCloseUploadTab = (tabId) => {
+    if (getTabRuntime(tabId)?.run.isExecuting) {
+      setPendingCloseTabId(tabId);
+      return;
+    }
+    closeUploadTab(tabId);
+  };
+
+  const getUploadTabLabel = (tab) => tab.title || `Upload ${tab.number}`;
+
+  const busyUploadCount = uploadTabs.filter((tab) =>
+    BUSY_UPLOAD_STATUSES.includes(tab.status),
+  ).length;
+  const uploadSlotsFull = busyUploadCount >= maxRunningUploads;
+  const activeTabScheduled =
+    uploadTabs.find((tab) => tab.id === activeTabId)?.status === "scheduled";
+  const executeDisabled =
+    (!selectedPath && selectedPaths.length === 0) ||
+    isExecuting ||
+    (uploadSlotsFull && !schedulingEnabled);
+  const executeButtonTitle = uploadSlotsFull
+    ? schedulingEnabled
+      ? `All ${maxRunningUploads} upload slots are busy; this upload starts automatically when one frees.`
+      : `All ${maxRunningUploads} upload slots are busy; wait for an upload to finish.`
+    : undefined;
+  const getExecuteButtonLabel = () => {
+    if (isExecuting) return activeTabScheduled ? "Scheduled" : "Executing...";
+    const noun = selectedPaths.length > 1 ? "Queue" : "Upload";
+    if (!uploadSlotsFull) return `Execute ${noun}`;
+    return schedulingEnabled ? `Schedule ${noun}` : "All upload slots busy";
+  };
+  const killButtonLabel = activeTabScheduled ? "Cancel" : "Kill";
+
+  const renderCloseUploadTabDialog = () => {
+    const tab = uploadTabs.find((item) => item.id === pendingCloseTabId);
+    if (!tab) return null;
+    const isLastTab = uploadTabs.length <= 1;
+    return (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="ua-close-tab-title"
+        onClick={() => setPendingCloseTabId("")}
+      >
+        <div
+          className="ua-upload-tab-dialog w-full max-w-sm rounded-lg border p-5 shadow-xl"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <h2 id="ua-close-tab-title" className="text-base font-semibold">
+            Stop this upload?
+          </h2>
+          <p className="ua-upload-tab-dialog-text mt-2 text-sm">
+            &ldquo;{getUploadTabLabel(tab)}&rdquo; is still running.{" "}
+            {isLastTab
+              ? "Resetting the tab kills its process."
+              : "Closing the tab kills its process."}
+          </p>
+          <div className="mt-4 flex justify-end gap-2">
+            <button
+              onClick={() => setPendingCloseTabId("")}
+              className="ua-upload-tab-dialog-cancel rounded-md px-3 py-1.5 text-sm"
+              data-ua-modal-initial-focus
+            >
+              Keep running
+            </button>
+            <button
+              onClick={() => closeUploadTab(tab.id)}
+              className="rounded-md bg-red-600 px-3 py-1.5 text-sm text-white hover:bg-red-700"
+            >
+              {isLastTab ? "Kill and reset" : "Kill and close"}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderUploadTabs = () => {
+    if (screenshotMode) return null;
+    const canAddTab = uploadTabs.length < MAX_UPLOAD_TABS;
+    return (
+      <>
+        <div className="ua-upload-tabs" role="tablist" aria-label="Uploads">
+          {uploadTabs.map((tab) => {
+            const isActive = tab.id === activeTabId;
+            const label = getUploadTabLabel(tab);
+            const statusLabel = UPLOAD_TAB_STATUS_LABELS[tab.status] || "";
+            return (
+              <div
+                key={tab.id}
+                className="ua-upload-tab"
+                data-active={isActive ? "true" : "false"}
+              >
+                <button
+                  role="tab"
+                  aria-selected={isActive}
+                  onClick={() => switchUploadTab(tab.id)}
+                  className="ua-upload-tab-button"
+                  title={[label, tab.detail, statusLabel]
+                    .filter(Boolean)
+                    .join("\n")}
+                >
+                  <span
+                    className="ua-upload-tab-dot"
+                    data-status={tab.status}
+                    role="img"
+                    aria-label={statusLabel}
+                  />
+                  <span className="ua-upload-tab-label">{label}</span>
+                </button>
+                <button
+                  onClick={() => requestCloseUploadTab(tab.id)}
+                  className="ua-upload-tab-close"
+                  aria-label={
+                    uploadTabs.length > 1 ? `Close ${label}` : `Reset ${label}`
+                  }
+                  title={
+                    uploadTabs.length > 1
+                      ? "Close tab"
+                      : "Reset tab (kills a running upload)"
+                  }
+                >
+                  <LucideIcon name="x" className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            );
+          })}
+          <button
+            onClick={addUploadTab}
+            disabled={!canAddTab}
+            className="ua-upload-tab-add"
+            aria-label="New upload tab"
+            title={
+              canAddTab
+                ? "New upload tab"
+                : `Up to ${MAX_UPLOAD_TABS} upload tabs`
+            }
+          >
+            <LucideIcon name="plus" className="h-4 w-4" />
+          </button>
+        </div>
+        {renderCloseUploadTabDialog()}
+      </>
+    );
   };
 
   // Sidebar resizing
@@ -6633,10 +7533,11 @@ function AudionutsUAGUI() {
           <div
             className={`flex flex-col h-full ${activePanel === "main" ? "" : "hidden"}`}
           >
+            {renderUploadTabs()}
             {/* Top controls */}
             {!isExecuting && !isTerminalView && (
               <div
-                className={`p-3 space-y-3 border-b flex-1 min-h-0 overflow-y-auto ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}`}
+                className={`ua-upload-workspace-main p-3 space-y-3 border-b flex-1 min-h-0 overflow-y-auto ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}`}
               >
                 {renderSelectedPathOrQueue(true)}
 
@@ -6708,18 +7609,12 @@ function AudionutsUAGUI() {
                 <div className="flex gap-2">
                   <button
                     onClick={executeCommand}
-                    disabled={
-                      (!selectedPath && selectedPaths.length === 0) ||
-                      isExecuting
-                    }
+                    disabled={executeDisabled}
+                    title={executeButtonTitle}
                     className="ua-accent-action flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg disabled:bg-gray-400 disabled:cursor-not-allowed font-medium"
                   >
                     <PlayIcon />
-                    {isExecuting
-                      ? "Executing..."
-                      : selectedPaths.length > 1
-                        ? "Execute Queue"
-                        : "Execute Upload"}
+                    {getExecuteButtonLabel()}
                   </button>
                   <button
                     onClick={clearTerminal}
@@ -6748,7 +7643,7 @@ function AudionutsUAGUI() {
 
             {/* Terminal output */}
             <div
-              className={`${isExecuting || isTerminalView ? "flex-1 p-3" : "flex-none p-2"} flex flex-col min-h-0 overflow-hidden ${isDarkMode ? "bg-gray-900" : "bg-gray-100"}`}
+              className={`ua-upload-output-panel ${isExecuting || isTerminalView ? "flex-1 p-3" : "flex-none p-2"} flex flex-col min-h-0 overflow-hidden ${isDarkMode ? "bg-gray-900" : "bg-gray-100"}`}
             >
               <div
                 className={`flex items-center gap-2 ${isExecuting || isTerminalView ? "mb-2" : ""} flex-shrink-0`}
@@ -6764,7 +7659,7 @@ function AudionutsUAGUI() {
                 {isExecuting && (
                   <span className="ml-auto inline-flex items-center gap-1 text-xs text-green-400 animate-pulse">
                     <LucideIcon name="circle" className="h-2.5 w-2.5" />
-                    Running
+                    {activeTabScheduled ? "Scheduled" : "Running"}
                   </span>
                 )}
                 {isExecuting && (
@@ -6775,7 +7670,7 @@ function AudionutsUAGUI() {
                     className="flex items-center gap-1 rounded px-2 py-1 text-xs bg-red-600 hover:bg-red-700 text-white"
                   >
                     <TrashIcon />
-                    Kill
+                    {killButtonLabel}
                   </button>
                 )}
                 {!isExecuting && (
@@ -6797,7 +7692,7 @@ function AudionutsUAGUI() {
                 )}
               </div>
               <div
-                ref={richOutputRef}
+                ref={attachRichOutputHost}
                 id="rich-output"
                 className={`min-h-0 rounded-lg overflow-auto p-2 border text-sm bg-black border-gray-700 text-white ${isExecuting || isTerminalView ? "flex-1" : "hidden"}`}
               ></div>
@@ -7073,7 +7968,9 @@ function AudionutsUAGUI() {
   const desktopUploadStatusTitle = isAwaitingTerminalInput
     ? "Input required"
     : isExecuting
-      ? "Upload running"
+      ? activeTabScheduled
+        ? "Upload scheduled"
+        : "Upload running"
       : selectedPaths.length > 0 || selectedPath
         ? "Ready to upload"
         : "Ready";
@@ -7156,8 +8053,8 @@ function AudionutsUAGUI() {
             </div>
           </div>
           <div className="ua-upload-context-resize-gutter shrink-0" />
-          <div className="ua-upload-context-status flex min-w-0 flex-1 items-center px-4 sm:px-6 lg:px-8">
-            <div className="min-w-0">
+          <div className="ua-upload-context-status flex min-w-0 flex-1 items-center gap-4 px-4 sm:px-6 lg:px-8">
+            <div className="min-w-0 flex-1">
               <div className="flex min-w-0 items-center gap-2">
                 <h2 className="truncate text-lg font-bold sm:text-xl">
                   {desktopUploadStatusTitle}
@@ -7171,7 +8068,7 @@ function AudionutsUAGUI() {
                       className="ua-workspace-run-dot animate-pulse"
                       aria-hidden="true"
                     ></span>
-                    Running
+                    {activeTabScheduled ? "Scheduled" : "Running"}
                   </span>
                 )}
               </div>
@@ -7186,6 +8083,54 @@ function AudionutsUAGUI() {
                 {desktopUploadStatusDetail}
               </p>
             </div>
+            {isExecuting && (
+              <div className="flex shrink-0 items-center gap-2">
+                <button
+                  onClick={() => {
+                    setIsScreenshotReviewOpen((open) => !open);
+                    setIsDescriptionReviewOpen(false);
+                  }}
+                  aria-pressed={isScreenshotReviewOpen}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${isScreenshotReviewOpen ? "ua-accent-action" : isDarkMode ? "bg-gray-700 hover:bg-gray-600 text-gray-100" : "bg-gray-100 hover:bg-gray-200 text-gray-700"}`}
+                  title="Review generated screenshots"
+                >
+                  <ScreenshotsIcon />
+                  Screenshots
+                  {executionScreenshots.length
+                    ? ` (${executionScreenshots.length})`
+                    : ""}
+                </button>
+                <button
+                  onClick={() => {
+                    setIsDescriptionReviewOpen((open) => !open);
+                    setIsScreenshotReviewOpen(false);
+                  }}
+                  aria-pressed={isDescriptionReviewOpen}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${isDescriptionReviewOpen ? "ua-accent-action" : isDarkMode ? "bg-gray-700 hover:bg-gray-600 text-gray-100" : "bg-gray-100 hover:bg-gray-200 text-gray-700"}`}
+                  title="Review and edit the base description"
+                >
+                  <DescriptionIcon />
+                  Description
+                </button>
+                <button
+                  onClick={clearTerminal}
+                  aria-label={
+                    activeTabScheduled
+                      ? "Cancel scheduled upload"
+                      : "Kill process and clear terminal"
+                  }
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg transition-colors bg-red-600 hover:bg-red-700 text-white"
+                  title={
+                    activeTabScheduled
+                      ? "Cancel scheduled upload"
+                      : "Kill process and clear terminal"
+                  }
+                >
+                  <TrashIcon />
+                  {killButtonLabel}
+                </button>
+              </div>
+            )}
           </div>
         </header>
 
@@ -7444,53 +8389,13 @@ function AudionutsUAGUI() {
 
           {/* Main Content */}
           <div className="relative flex-1 flex flex-col min-w-0 overflow-hidden">
+            {renderUploadTabs()}
             {/* Top Panel */}
             <div
-              className={`ua-upload-workspace-main ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"} border-b ${isExecuting ? "p-3" : "p-4"} ${isExecuting ? "flex-shrink-0" : isTerminalView ? "hidden" : "flex-1 min-h-0 overflow-y-auto"}`}
+              className={`ua-upload-workspace-main ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"} border-b p-4 ${isExecuting || isTerminalView ? "hidden" : "flex-1 min-h-0 overflow-y-auto"}`}
             >
-              <div
-                className={`${isExecuting ? "w-full" : "mx-auto max-w-6xl"} space-y-4`}
-              >
-                {isExecuting ? (
-                  <div className="flex flex-wrap items-center justify-end gap-4">
-                    <button
-                      onClick={() => {
-                        setIsScreenshotReviewOpen((open) => !open);
-                        setIsDescriptionReviewOpen(false);
-                      }}
-                      aria-pressed={isScreenshotReviewOpen}
-                      className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors flex-shrink-0 ${isScreenshotReviewOpen ? "ua-accent-action" : isDarkMode ? "bg-gray-700 hover:bg-gray-600 text-gray-100" : "bg-gray-100 hover:bg-gray-200 text-gray-700"}`}
-                      title="Review generated screenshots"
-                    >
-                      <ScreenshotsIcon />
-                      Screenshots
-                      {executionScreenshots.length
-                        ? ` (${executionScreenshots.length})`
-                        : ""}
-                    </button>
-                    <button
-                      onClick={() => {
-                        setIsDescriptionReviewOpen((open) => !open);
-                        setIsScreenshotReviewOpen(false);
-                      }}
-                      aria-pressed={isDescriptionReviewOpen}
-                      className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors flex-shrink-0 ${isDescriptionReviewOpen ? "ua-accent-action" : isDarkMode ? "bg-gray-700 hover:bg-gray-600 text-gray-100" : "bg-gray-100 hover:bg-gray-200 text-gray-700"}`}
-                      title="Review and edit the base description"
-                    >
-                      <DescriptionIcon />
-                      Description
-                    </button>
-                    <button
-                      onClick={clearTerminal}
-                      aria-label="Kill process and clear terminal"
-                      className="flex items-center gap-2 px-4 py-2 rounded-lg transition-colors bg-red-600 hover:bg-red-700 text-white flex-shrink-0"
-                      title="Kill process and clear terminal"
-                    >
-                      <TrashIcon />
-                      Kill
-                    </button>
-                  </div>
-                ) : (
+              <div className="mx-auto max-w-6xl space-y-4">
+                {!isExecuting && (
                   <>
                     {/* Selected Path Display / Queue */}
                     {renderSelectedPathOrQueue(false)}
@@ -7615,18 +8520,12 @@ function AudionutsUAGUI() {
                     <div className="flex gap-2">
                       <button
                         onClick={executeCommand}
-                        disabled={
-                          (!selectedPath && selectedPaths.length === 0) ||
-                          isExecuting
-                        }
+                        disabled={executeDisabled}
+                        title={executeButtonTitle}
                         className="ua-accent-action flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg disabled:bg-gray-400 disabled:cursor-not-allowed font-medium text-lg"
                       >
                         <PlayIcon />
-                        {isExecuting
-                          ? "Executing..."
-                          : selectedPaths.length > 1
-                            ? "Execute Queue"
-                            : "Execute Upload"}
+                        {getExecuteButtonLabel()}
                       </button>
                       <button
                         onClick={clearTerminal}
@@ -7668,24 +8567,20 @@ function AudionutsUAGUI() {
               <div
                 className={`max-w-6xl mx-auto w-full ${isExecuting || isTerminalView ? "flex-1" : "flex-none"} flex flex-col min-h-0`}
               >
-                <div
-                  className={`flex items-center gap-2 ${isExecuting || isTerminalView ? "mb-3" : ""} flex-shrink-0`}
-                >
-                  <span className={isDarkMode ? "text-white" : "text-gray-800"}>
-                    <TerminalIcon />
-                  </span>
-                  <h3
-                    className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-gray-800"}`}
+                {!isExecuting && (
+                  <div
+                    className={`flex items-center gap-2 ${isTerminalView ? "mb-3" : ""} flex-shrink-0`}
                   >
-                    Execution Output
-                  </h3>
-                  {isExecuting && (
-                    <span className="ml-auto inline-flex items-center gap-1 text-sm text-green-400 animate-pulse">
-                      <LucideIcon name="circle" className="h-3 w-3" />
-                      Running
+                    <span
+                      className={isDarkMode ? "text-white" : "text-gray-800"}
+                    >
+                      <TerminalIcon />
                     </span>
-                  )}
-                  {!isExecuting && (
+                    <h3
+                      className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-gray-800"}`}
+                    >
+                      Execution Output
+                    </h3>
                     <button
                       onClick={() => setIsTerminalView((expanded) => !expanded)}
                       aria-expanded={isTerminalView}
@@ -7701,11 +8596,11 @@ function AudionutsUAGUI() {
                       )}
                       {isTerminalView ? "Back to preparation" : "View terminal"}
                     </button>
-                  )}
-                </div>
+                  </div>
+                )}
                 {/* Rich HTML output (rendered from Rich export_html fragments) */}
                 <div
-                  ref={richOutputRef}
+                  ref={attachRichOutputHost}
                   id="rich-output"
                   className={`min-h-0 rounded-lg overflow-auto p-3 border bg-black border-gray-700 text-white ${isExecuting || isTerminalView ? "flex-1" : "hidden"}`}
                 ></div>

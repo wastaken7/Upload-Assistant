@@ -38,6 +38,8 @@ const context = vm.createContext({
   AbortController,
   TextDecoder,
   Date,
+  setTimeout,
+  clearTimeout,
 });
 function load(name) {
   const n = declarations.get(name);
@@ -292,23 +294,56 @@ test("file-browser persistence, restoration, refresh and execution outcomes", as
   assert.equal(context.fileBrowserRef.current.scrollTop, 567);
 
   // Execute the actual SSE reader with minimal UI stubs.
+  // Reconnect backoff needs real timers; the refresh check above faked them.
+  context.setTimeout = setTimeout;
+  context.clearTimeout = clearTimeout;
+  const tabRuntime = {
+    controller: null,
+    lastFullHash: "",
+    lastSeq: 0,
+    sessionRecord: "",
+    run: { sessionId: "", isExecuting: true },
+    output: { appendChild: () => {} },
+    awaiting: false,
+    waiting: new Set(),
+    result: "",
+  };
   Object.assign(context, {
     hasDescFile: false,
     hasDescLink: false,
     customArgs: "",
-    setSessionId: () => {},
-    setProgressItems: () => {},
-    lastFullHashRef: { current: "" },
+    activeTabIdRef: { current: "tab-1" },
+    getTabRuntime: () => tabRuntime,
+    updateTabRun: () => {},
+    refreshUploadTabStatus: () => {},
     appendSystemMessage: () => {},
-    sseAbortControllerRef: { current: null },
     applyProgressEvent: () => {},
+    appendHtmlFragment: () => {},
+    sanitizeHtml: (html) => html,
+    dismissTabSession: () => {},
+    schedulingEnabled: true,
     window: {},
     refreshCount: 0,
   });
   context.refreshFileBrowserAfterUpload = async () => {
     context.refreshCount++;
   };
-  load("executeSinglePath");
+  for (const name of [
+    "SESSION_STREAM_STALL_MS",
+    "SESSION_RECONNECT_ATTEMPTS",
+    "SCHEDULE_POLL_MS",
+    "sharedSessionsPoll",
+    "pollSessionsShared",
+    "waitForReconnect",
+    "waitForScheduledStart",
+    "followScheduledSession",
+    "readSessionChunk",
+    "readSessionStream",
+    "followSession",
+    "finishTabSession",
+    "executeSinglePath",
+  ])
+    load(name);
   for (const [code, count, aborted] of [
     [0, 1, false],
     [1, 0, false],
@@ -324,12 +359,12 @@ test("file-browser persistence, restoration, refresh and execution outcomes", as
           read: async () => {
             if (read) return { done: true };
             read = true;
-            if (aborted) context.sseAbortControllerRef.current.abort();
+            if (aborted) tabRuntime.controller.abort();
             return {
               done: false,
               value: new TextEncoder().encode(
                 code === null
-                  ? ""
+                  ? `data: {"type":"finished","exit_code":null}\n`
                   : `data: {"type":"exit","code":${code}}\ndata: {"type":"exit","code":${code}}\n`,
               ),
             };
@@ -339,7 +374,88 @@ test("file-browser persistence, restoration, refresh and execution outcomes", as
     });
     await context.executeSinglePath("/data/a", "session");
     assert.equal(context.refreshCount, count);
+    assert.equal(
+      tabRuntime.result,
+      aborted ? "" : code === 0 || code === null ? "done" : "error",
+    );
+    tabRuntime.result = "";
   }
+
+  // A dropped connection reattaches after the last applied event.
+  let cancelledReaders = 0;
+  const streamOf = (text) => ({
+    ok: true,
+    body: {
+      getReader: () => {
+        let sent = false;
+        return {
+          read: async () => {
+            if (sent) return { done: true };
+            sent = true;
+            return { done: false, value: new TextEncoder().encode(text) };
+          },
+          cancel: async () => {
+            cancelledReaders++;
+          },
+        };
+      },
+    },
+  });
+  const streamRequests = [];
+  context.apiFetch = async (url) => {
+    streamRequests.push(url);
+    if (url.endsWith("/execute"))
+      return streamOf(
+        'data: {"type":"replay_done"}\ndata: {"type":"html","data":"first","seq":1}\n',
+      );
+    return streamOf(
+      'data: {"type":"html","data":"first","seq":1}\ndata: {"type":"exit","code":0,"seq":2}\ndata: {"type":"finished","exit_code":0}\n',
+    );
+  };
+  tabRuntime.run.sessionId = "session";
+  context.refreshCount = 0;
+  assert.equal(await context.executeSinglePath("/data/a", "session"), true);
+  assert.deepEqual(streamRequests, [
+    "/api/execute",
+    "/api/session_stream?session_id=session&after=1",
+  ]);
+  assert.equal(tabRuntime.lastSeq, 2);
+  assert.equal(context.refreshCount, 1);
+  // The stream that delivered "finished" is released right away.
+  assert.equal(cancelledReaders, 1);
+
+  // With every slot busy the server schedules the upload; the tab waits on the
+  // session list without holding a stream open, then follows it once started.
+  context.SCHEDULE_POLL_MS = 5;
+  const scheduledRequests = [];
+  let polls = 0;
+  context.apiFetch = async (url, options = {}) => {
+    scheduledRequests.push(url);
+    if (url.endsWith("/execute")) {
+      assert.equal(JSON.parse(options.body).schedule, true);
+      return streamOf('data: {"type":"scheduled"}\n');
+    }
+    if (url.endsWith("/sessions")) {
+      polls++;
+      return {
+        ok: true,
+        json: async () => ({
+          sessions: [{ session_id: "session", scheduled: polls < 2 }],
+        }),
+      };
+    }
+    return streamOf(
+      'data: {"type":"started","seq":1}\ndata: {"type":"exit","code":0,"seq":2}\ndata: {"type":"finished","exit_code":0}\n',
+    );
+  };
+  assert.equal(await context.executeSinglePath("/data/a", "session"), true);
+  assert.deepEqual(scheduledRequests, [
+    "/api/execute",
+    "/api/sessions",
+    "/api/sessions",
+    "/api/session_stream?session_id=session&after=0",
+  ]);
+  assert.equal(tabRuntime.scheduled, false);
 });
 
 test("external HTTP(S) output anchors get safe targets without changing internal links or styling", () => {

@@ -26,6 +26,7 @@ from src.app_paths import CODE_DIR
 from src.binaries import configured_binary
 from src.console import console, is_cli_progress_suppressed, logger, progress_display
 from src.meta import Meta
+from src.resource_coordinator import resource_slot
 from src.stats import record_event, record_event_async
 from src.torrent_manifest import TorrentManifest
 from src.torrent_policy import PIECE_SIZE_MAX, PIECE_SIZE_MIN, hdbits_piece_size
@@ -433,7 +434,8 @@ class TorrentCreator:
                                     )
                                 return result
 
-                        result = await asyncio.to_thread(run_mkbrr)
+                        async with resource_slot("torrent-hash", "torrent hashing"):
+                            result = await asyncio.to_thread(run_mkbrr)
 
                         # Verify the torrent was actually created
                         if result != 0:
@@ -514,7 +516,8 @@ class TorrentCreator:
                     torrent.verify_filesize(path)
 
                 try:
-                    await asyncio.to_thread(generate_torrent)
+                    async with resource_slot("torrent-hash", "torrent hashing"):
+                        await asyncio.to_thread(generate_torrent)
                 except Exception as error:
                     publish_progress(progress_id, progress_label, detail=str(error), status="failed", group="media", unit="pieces")
                     raise

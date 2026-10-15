@@ -21,6 +21,7 @@ from rich.progress import BarColumn, TaskID, TaskProgressColumn, TextColumn
 
 from src.console import console, logger, progress_display
 from src.meta import Meta
+from src.resource_coordinator import resource_slot
 from src.stats import record_event_async
 from src.webui_progress import complete_progress, has_progress_callback, publish_progress
 
@@ -1380,7 +1381,8 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
                     await f.write(b"mock 7z volume content")
                 upload_files = [Path(mock_7z)]
             else:
-                await run_7z_with_progress(cmd_7z, usenet_dir, archive_name, volume_size, total_size)
+                async with resource_slot("usenet-prep", "Usenet archive/PAR2 creation"):
+                    await run_7z_with_progress(cmd_7z, usenet_dir, archive_name, volume_size, total_size)
         else:
             logger.info("[cyan]Copying single file for upload...[/cyan]")
             dest_file = Path(usenet_dir) / Path(input_path).name
@@ -1419,7 +1421,8 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
                 async with aiofiles.open(mock_par2, "wb") as f:
                     await f.write(b"mock par2 content")
             else:
-                await run_par2_with_progress(cmd_par2, cwd=str(upload_root))
+                async with resource_slot("usenet-prep", "Usenet archive/PAR2 creation"):
+                    await run_par2_with_progress(cmd_par2, cwd=str(upload_root))
 
             generated_par2_files = [file_path for file_path in sorted(Path(par2_output_dir).glob(f"{archive_name}.par2*")) if file_path.is_file()]
             upload_files.extend(file_path for file_path in generated_par2_files if file_path not in upload_files)
@@ -1657,7 +1660,8 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
         else:
             post_started = time.monotonic()
             try:
-                await run_pesto_with_progress(cmd_pesto, cwd=str(upload_root), env=pesto_env)
+                async with resource_slot("usenet-post", "Usenet posting"):
+                    await run_pesto_with_progress(cmd_pesto, cwd=str(upload_root), env=pesto_env)
                 nntp_duration_ms = (time.monotonic() - post_started) * 1000
             except Exception:
                 # pesto writes the NZB to --out before it knows the post-check
@@ -1757,7 +1761,8 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
         else:
             post_started = time.monotonic()
             try:
-                await run_nyuu_with_progress(cmd_nyuu, cwd=str(upload_root))
+                async with resource_slot("usenet-post", "Usenet posting"):
+                    await run_nyuu_with_progress(cmd_nyuu, cwd=str(upload_root))
                 nntp_duration_ms = (time.monotonic() - post_started) * 1000
             except Exception:
                 # nyuu writes the NZB progressively as files are posted, before

@@ -2,8 +2,10 @@
 import io
 import json
 import os
+import queue
 import subprocess
 import sys
+import threading
 import time
 
 import pytest
@@ -25,12 +27,32 @@ def test_upload_child_publishes_preview_without_in_process_session() -> None:
     assert {"op": "preview_target", "path": "Fictional Journey.mkv", "meta_uuid": "fictional-release"} in events
 
 
+class FeedStream:
+    """Blocking stdout whose content the test releases step by step."""
+
+    def __init__(self) -> None:
+        self._chars: queue.Queue[str] = queue.Queue()
+
+    def feed(self, text: str) -> None:
+        for char in text:
+            self._chars.put(char)
+
+    def read(self, _size: int = 1) -> str:
+        return self._chars.get()
+
+
+def _wait_for(condition, timeout: float = 5.0) -> None:
+    deadline = time.monotonic() + timeout
+    while not condition():
+        assert time.monotonic() < deadline, "condition not met in time"
+        time.sleep(0.02)
+
+
 def test_queue_preview_follows_child_targets(tmp_path, monkeypatch) -> None:
     targets = [tmp_path / "Fictional Journey.mkv", tmp_path / ("a" * 200) / ("b" * 200) / "Fictional Finale.mkv"]
     queue_path = tmp_path / "webui_queue_fictional.txt"
     queue_path.write_text("\n".join(str(target) for target in targets), encoding="utf-8")
     state_dir = tmp_path / "state"
-    output = "Continue? (y/N)\n"
     for index, target in enumerate(targets):
         meta_uuid = f"fictional-release-{index}"
         meta_dir = state_dir / "tmp" / meta_uuid
@@ -38,19 +60,22 @@ def test_queue_preview_follows_child_targets(tmp_path, monkeypatch) -> None:
         (meta_dir / "meta.json").write_text(
             json.dumps({"uuid": meta_uuid, "path": str(target), "title": target.stem, "poster": f"https://example.invalid/poster-{index}.jpg"}), encoding="utf-8"
         )
-        output += server.PROGRESS_STDOUT_PREFIX + json.dumps({"op": "preview_target", "path": str(target), "meta_uuid": meta_uuid}) + "\n\n"
-        output += server.PROGRESS_STDOUT_PREFIX + json.dumps({"op": "preview_target", "path": str(target)}) + "\n\n"
-        # Re-publish the UUID as metadata becomes available for the same item.
-        output += server.PROGRESS_STDOUT_PREFIX + json.dumps({"op": "preview_target", "path": str(target), "meta_uuid": meta_uuid}) + "\n\n"
+
+    def preview_target(target, meta_uuid=None) -> str:
+        event = {"op": "preview_target", "path": str(target)}
+        if meta_uuid:
+            event["meta_uuid"] = meta_uuid
+        return server.PROGRESS_STDOUT_PREFIX + json.dumps(event) + "\n\n"
 
     class WaitingProcess:
         stdin = io.StringIO()
-        stdout = io.StringIO(output)
+        stdout = FeedStream()
         stderr = io.StringIO()
 
         def poll(self):
             return None
 
+    process = WaitingProcess()
     session_id = "queue-preview-test"
     monkeypatch.setattr(server, "STATE_DIR", state_dir)
     monkeypatch.setattr(server, "_is_authenticated", lambda: True)
@@ -59,34 +84,34 @@ def test_queue_preview_follows_child_targets(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(server, "_generated_queues", {os.path.normcase(os.path.realpath(queue_path)): "fictional-hash"})
     monkeypatch.setattr(server, "_assert_safe_resolved_path", lambda _: None)
     monkeypatch.setattr(server, "_validate_upload_assistant_args", lambda args: args)
-    monkeypatch.setattr(server, "_spawn_webui_upload_process", lambda *_args: (WaitingProcess(), "subprocess"))
+    monkeypatch.setattr(server, "_spawn_webui_upload_process", lambda *_args: (process, "subprocess"))
     monkeypatch.setattr(server, "_terminate_process_tree", lambda _: True)
     response = server.app.test_client().post("/api/execute", json={"path": str(queue_path), "session_id": session_id}, buffered=False)
-    seen = []
-    cleared = []
     try:
-        deadline = time.monotonic() + 5
-        for chunk in response.response:
-            assert time.monotonic() < deadline
-            event = json.loads(chunk.decode().removeprefix("data: "))
-            if event["type"] == "html":
-                assert "preview_target" not in event["data"]
-            state = server.active_processes[session_id]
-            if state["path"] in [str(target) for target in targets] and "meta_uuid" not in state:
-                cleared.append(state["path"])
-                assert server._find_execution_preview(session_id)["status"] == "waiting"
-            if state.get("meta_uuid"):
-                preview = server._find_execution_preview(session_id)
-                assert preview["status"] == "ready"
-                assert preview["title"] == next(target.stem for target in targets if str(target) == preview["path"])
-                assert preview["poster_url"].startswith("https://example.invalid/poster-")
-                assert preview["awaiting_input"] is True
-                if preview["path"] not in seen:
-                    seen.append(preview["path"])
-                if len(seen) == 2 and len(cleared) == 2:
-                    break
-        assert seen == [str(target) for target in targets]
-        assert cleared == [str(target) for target in targets]
+        next(response.response)
+        state = server.active_processes[session_id]
+        process.stdout.feed("Continue? (y/N)\n")
+        _wait_for(lambda: state["awaiting_input"] is True)
+        for index, target in enumerate(targets):
+            meta_uuid = f"fictional-release-{index}"
+            # A new target without its UUID yet clears the previous item's preview.
+            process.stdout.feed(preview_target(target, meta_uuid) + preview_target(target))
+            _wait_for(lambda target=target: state["path"] == str(target) and "meta_uuid" not in state)
+            assert server._find_execution_preview(session_id)["status"] == "waiting"
+
+            # Re-publish the UUID as metadata becomes available for the same item.
+            process.stdout.feed(preview_target(target, meta_uuid))
+            _wait_for(lambda meta_uuid=meta_uuid: state.get("meta_uuid") == meta_uuid)
+            preview = server._find_execution_preview(session_id)
+            assert preview["status"] == "ready"
+            assert preview["path"] == str(target)
+            assert preview["title"] == target.stem
+            assert preview["poster_url"].startswith("https://example.invalid/poster-")
+            assert preview["awaiting_input"] is True
+
+        with server._session_condition(state):
+            logged = "".join(payload for _seq, payload in server._session_events(state))
+        assert "preview_target" not in logged
     finally:
         response.close()
         server.active_processes.pop(session_id, None)
@@ -126,10 +151,16 @@ def test_prompt_state_changes_only_when_output_flushes(output, expected_type, tm
     monkeypatch.setattr(server, "_terminate_process_tree", lambda _process: True)
     original_flush = server._should_flush_subprocess_output
     states_before_flush = []
+    flushed = threading.Event()
 
     def observe_flush(buffer, char, *, idle=False):
-        states_before_flush.append(server.active_processes[session_id]["awaiting_input"])
-        return original_flush(buffer, char, idle=idle)
+        # The session thread keeps polling after the flush; only earlier states matter.
+        if not flushed.is_set():
+            states_before_flush.append(server.active_processes[session_id]["awaiting_input"])
+        should_flush = original_flush(buffer, char, idle=idle)
+        if should_flush:
+            flushed.set()
+        return should_flush
 
     monkeypatch.setattr(server, "_should_flush_subprocess_output", observe_flush)
     response = server.app.test_client().post("/api/execute", json={"path": str(tmp_path), "session_id": session_id}, buffered=False)
@@ -200,24 +231,32 @@ def test_background_progress_preserves_yes_no_prompt(tmp_path, monkeypatch, back
         assert response.status_code == 200
         deadline = time.monotonic() + 5
         first_output = True
+        # The browser learns the prompt state from prompt_state events, which
+        # precede the output that caused them.
+        streamed_type = None
         for chunk in response.response:
             assert time.monotonic() < deadline, "Input marker never reached the browser"
             event = json.loads(chunk.decode().removeprefix("data: "))
+            if event["type"] == "prompt_state":
+                streamed_type = event["input_type"] if event["awaiting"] else None
+                continue
             if event["type"] not in {"html", "progress"}:
                 continue
-            state = server.active_processes[session_id]
             marker_seen = event["type"] == "html" and "&gt;" in event["data"]
             current_type = "yes_no" if first_output else (expected_type or "text") if marker_seen else expected_type
-            assert state["awaiting_input"] is (current_type is not None)
-            assert state["input_type"] == current_type
-            preview = server._find_execution_preview(session_id)
-            assert preview["awaiting_input"] is (current_type is not None)
-            assert preview["input_type"] == current_type
+            assert streamed_type == current_type
             first_output = False
             if marker_seen:
                 break
         else:
             pytest.fail("No input marker received")
+
+        state = server.active_processes[session_id]
+        assert state["awaiting_input"] is (current_type is not None)
+        assert state["input_type"] == current_type
+        preview = server._find_execution_preview(session_id)
+        assert preview["awaiting_input"] is (current_type is not None)
+        assert preview["input_type"] == current_type
 
         answer = client.post("/api/input", json={"session_id": session_id, "input": "yes"})
         assert answer.status_code == 200
@@ -313,6 +352,7 @@ def test_nyuu_webui_progress_does_not_render_terminal_progress() -> None:
     script = """
 import asyncio
 import sys
+import threading
 
 from src.usenetcreate import run_nyuu_with_progress
 
@@ -338,6 +378,7 @@ def test_pesto_webui_progress_does_not_render_terminal_progress() -> None:
     script = """
 import asyncio
 import sys
+import threading
 
 from src.usenetcreate import run_pesto_with_progress
 
@@ -364,6 +405,7 @@ def test_bdinfo_webui_progress_does_not_render_terminal_progress() -> None:
     script = """
 import asyncio
 import sys
+import threading
 
 from src.discparse import DiscParse
 

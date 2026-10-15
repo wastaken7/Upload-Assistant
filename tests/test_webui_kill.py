@@ -2,6 +2,7 @@
 import io
 import subprocess
 import sys
+import threading
 import time
 
 import psutil
@@ -99,7 +100,7 @@ def test_kill_keeps_session_when_process_tree_termination_fails(monkeypatch) -> 
             server.active_processes.pop(session_id, None)
 
 
-def test_sse_disconnect_terminates_running_process_tree(tmp_path, monkeypatch) -> None:
+def test_sse_disconnect_terminates_running_process_tree_when_keep_running_is_disabled(tmp_path, monkeypatch) -> None:
     class RunningProcess:
         pid = 1
         stdin = io.StringIO()
@@ -121,15 +122,34 @@ def test_sse_disconnect_terminates_running_process_tree(tmp_path, monkeypatch) -
     monkeypatch.setattr(server, "_spawn_webui_upload_process", lambda *_args: (process, "subprocess"))
     monkeypatch.setattr(server, "_terminate_process_tree", terminated_processes.append)
     monkeypatch.setattr(server, "_close_webui_process_io", lambda _: None)
+    monkeypatch.setattr(server, "_webui_session_settings", lambda: (False, 0.0))
 
     response = server.app.test_client().post("/api/execute", json={"path": str(tmp_path), "session_id": session_id}, buffered=False)
     try:
-        next(response.response)  # Initial system event, before process startup.
-        next(response.response)  # Starts the controller, then emits a keepalive.
+        next(response.response)  # Logged "Executing" event, replayed after startup.
+        next(response.response)  # End of the replayed backlog.
         response.close()
 
-        assert terminated_processes == [process]
+        # The session pump may terminate the orphaned tree again; the stream does it first.
+        assert terminated_processes[0] is process
+        assert session_id not in server.active_processes
     finally:
         response.close()
         with server.active_processes_lock:
             server.active_processes.pop(session_id, None)
+        # The session thread must finish while this test's patches are active.
+        for thread in threading.enumerate():
+            if thread.name == f"webui-session-{session_id}":
+                thread.join(timeout=10)
+                assert not thread.is_alive()
+
+
+def test_process_tree_termination_refuses_init_and_idle_pids() -> None:
+    class InitLookalike:
+        pid = 1
+
+        def poll(self):
+            return None
+
+    # Walking PID 1's children would stop every process on the machine.
+    assert server._terminate_process_tree(InitLookalike()) is False
