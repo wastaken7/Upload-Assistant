@@ -36,7 +36,15 @@ function setup() {
     isExecuting: false,
     directories: [],
     getVisiblePaths: () => [],
-    richOutputRef: { current: { innerHTML: "previous output" } },
+    screenshotMode: null,
+    tabOutputClears: 0,
+    activeTabIdRef: { current: "tab-1" },
+    uploadTabs: [{ id: "tab-1", number: 1, title: "", status: "idle" }],
+    setUploadTabs: (value) => {
+      context.uploadTabs =
+        typeof value === "function" ? value(context.uploadTabs) : value;
+    },
+    setProgressItems: () => {},
     API_BASE: "/api",
     setSelectedPath: (value) => {
       context.selectedPath = value;
@@ -57,7 +65,32 @@ function setup() {
     },
     setSessionId: () => {},
   });
+  context.tabRuntimeRef = {
+    current: new Map([
+      [
+        "tab-1",
+        {
+          output: {
+            replaceChildren: () => {
+              context.tabOutputClears++;
+            },
+          },
+          run: { sessionId: "", isExecuting: false },
+          view: { form: {} },
+          awaiting: false,
+          waiting: new Set(),
+          result: "",
+        },
+      ],
+    ]),
+  };
   for (const name of [
+    "getUploadTabStatus",
+    "getUploadTabTitle",
+    "getTabRuntime",
+    "refreshUploadTabStatus",
+    "updateTabRun",
+    "reportTabPathError",
     "parseUploadPaths",
     "handlePathInputChange",
     "executeCommand",
@@ -128,7 +161,7 @@ test("all pasted paths are prepared before execution and line errors prevent any
   await context.executeCommand();
   assert.equal(uploads, 0);
   assert.match(context.pathInputError, /^Line 3:/);
-  assert.equal(context.richOutputRef.current.innerHTML, "previous output");
+  assert.equal(context.tabOutputClears, 0);
   assert.equal(context.isExecuting, false);
 });
 
@@ -153,6 +186,12 @@ test("multiline input executes the issued queue and single input executes its va
     await context.executeCommand();
     assert.deepEqual(uploads, [issuedPath]);
     assert.equal(context.isExecuting, false);
+    assert.equal(context.tabOutputClears, 1);
+    assert.equal(
+      context.uploadTabs[0].title,
+      text.includes("\n") ? "Queue (2)" : "first.mkv",
+    );
+    assert.equal(context.uploadTabs[0].status, "idle");
   }
 });
 

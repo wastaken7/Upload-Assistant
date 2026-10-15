@@ -21,6 +21,7 @@ from src.console import console, logger, progress_display, prompt_in_thread
 from src.exportmi import find_dvd_mediainfo
 from src.mediainfo import MediaInfo
 from src.meta import Meta
+from src.resource_coordinator import holds_slot
 from src.webui_progress import complete_progress, has_progress_callback, publish_progress
 
 PlaylistItem = dict[str, Any]
@@ -104,6 +105,7 @@ class DiscParse:
             return str(self.mediainfo_config["cli"]), os.environ.copy()
         return None
 
+    @holds_slot("bdinfo", "BDInfo disc scan")
     async def _run_bdinfo_with_progress(self, command: list[str], progress_id: str) -> int:
         """Run go-bdinfo and forward its stream-scan progress to CLI and Web UI."""
         progress_pattern = re.compile(

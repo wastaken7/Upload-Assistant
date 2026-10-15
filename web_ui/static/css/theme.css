@@ -1164,6 +1164,11 @@ html.ua-upload-document #root {
 .ua-upload-page[data-mode="dark"] {
   --ua-upload-bg: var(--ua-obsidian);
   --ua-upload-surface: color-mix(in srgb, var(--ua-charcoal) 94%, transparent);
+  --ua-upload-surface-solid: color-mix(
+    in srgb,
+    var(--ua-charcoal) 94%,
+    var(--ua-upload-bg)
+  );
   --ua-upload-surface-raised: color-mix(
     in srgb,
     var(--ua-stone) 74%,
@@ -1178,6 +1183,7 @@ html.ua-upload-document #root {
 .ua-upload-page[data-mode="light"] {
   --ua-upload-bg: color-mix(in srgb, var(--ua-light-panel-start) 30%, #f5f5f4);
   --ua-upload-surface: rgba(255, 255, 255, 0.94);
+  --ua-upload-surface-solid: color-mix(in srgb, #fff 94%, var(--ua-upload-bg));
   --ua-upload-surface-raised: #ffffff;
   --ua-upload-text: #1c1917;
   --ua-upload-muted: #57534e;
@@ -1231,7 +1237,7 @@ html.ua-upload-document #root {
 
 .ua-upload-panel,
 .ua-upload-workspace-main {
-  background: var(--ua-upload-surface) !important;
+  background: var(--ua-upload-surface-solid) !important;
   border-color: var(--ua-upload-border) !important;
 }
 
@@ -1480,8 +1486,231 @@ html[data-ua-shape="rounded"] .ua-language-flag {
 }
 
 .ua-upload-output-panel {
-  background: var(--ua-upload-bg) !important;
+  /* Same surface as the form, so the content area (and its tab) keeps one colour. */
+  background: var(--ua-upload-surface-solid) !important;
   border-color: var(--ua-upload-border) !important;
+}
+
+/* Upload tabs: a browser-style strip. The active tab takes the colour of the
+   content panels right below it, so tab and panel read as one surface. */
+.ua-upload-page[data-mode="dark"] .ua-upload-tabs {
+  --ua-tab-strip-bg: color-mix(in srgb, var(--ua-upload-bg) 70%, #000);
+}
+
+.ua-upload-page[data-mode="light"] .ua-upload-tabs {
+  --ua-tab-strip-bg: color-mix(in srgb, var(--ua-upload-bg) 86%, #57534e);
+}
+
+.ua-upload-tabs {
+  --ua-tab-active-bg: var(--ua-upload-surface-solid);
+  --ua-tab-radius: 0.6rem;
+  align-items: flex-end;
+  background: var(--ua-tab-strip-bg);
+  display: flex;
+  flex: 0 0 auto;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.45rem 0.75rem 0;
+  scrollbar-width: thin;
+}
+
+html[data-ua-shape="square"] .ua-upload-tabs {
+  --ua-tab-radius: 0.125rem;
+}
+
+.ua-upload-tab {
+  align-items: center;
+  background: transparent;
+  border-radius: var(--ua-tab-radius) var(--ua-tab-radius) 0 0;
+  color: var(--ua-upload-muted);
+  display: flex;
+  flex: 0 1 14rem;
+  min-width: 7rem;
+  position: relative;
+}
+
+/* Separators between inactive tabs, hidden next to the active or hovered tab. */
+.ua-upload-tab:not([data-active="true"])::after {
+  background: var(--ua-upload-border);
+  content: "";
+  height: 50%;
+  position: absolute;
+  right: 0;
+  top: 25%;
+  width: 1px;
+}
+
+.ua-upload-tab:not([data-active="true"]):last-of-type::after,
+.ua-upload-tab:not([data-active="true"]):hover::after,
+.ua-upload-tab:not([data-active="true"]):has(+ .ua-upload-tab:hover)::after,
+.ua-upload-tab:not([data-active="true"]):has(
+    + .ua-upload-tab[data-active="true"]
+  )::after {
+  opacity: 0;
+}
+
+.ua-upload-tab:not([data-active="true"]):hover {
+  background: color-mix(
+    in srgb,
+    var(--ua-tab-active-bg) 45%,
+    var(--ua-tab-strip-bg)
+  );
+  color: var(--ua-upload-text);
+}
+
+.ua-upload-tab[data-active="true"] {
+  background: var(--ua-tab-active-bg);
+  color: var(--ua-upload-text);
+  z-index: 1;
+}
+
+/* Rounded mode: concave corners where the active tab meets the panel. */
+html:not([data-ua-shape="square"]) .ua-upload-tab[data-active="true"]::before,
+html:not([data-ua-shape="square"]) .ua-upload-tab[data-active="true"]::after {
+  bottom: 0;
+  content: "";
+  height: var(--ua-tab-radius);
+  pointer-events: none;
+  position: absolute;
+  width: var(--ua-tab-radius);
+}
+
+html:not([data-ua-shape="square"]) .ua-upload-tab[data-active="true"]::before {
+  background: radial-gradient(
+    circle at 0 0,
+    transparent calc(var(--ua-tab-radius) - 0.5px),
+    var(--ua-tab-active-bg) var(--ua-tab-radius)
+  );
+  left: calc(var(--ua-tab-radius) * -1);
+}
+
+html:not([data-ua-shape="square"]) .ua-upload-tab[data-active="true"]::after {
+  background: radial-gradient(
+    circle at 100% 0,
+    transparent calc(var(--ua-tab-radius) - 0.5px),
+    var(--ua-tab-active-bg) var(--ua-tab-radius)
+  );
+  right: calc(var(--ua-tab-radius) * -1);
+}
+
+.ua-upload-tab-button {
+  align-items: center;
+  display: flex;
+  flex: 1 1 auto;
+  font-size: 0.8125rem;
+  gap: 0.45rem;
+  min-width: 0;
+  padding: 0.5rem 0.25rem 0.55rem 0.8rem;
+  text-align: left;
+}
+
+.ua-upload-tab-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ua-upload-tab-close,
+.ua-upload-tab-add {
+  align-items: center;
+  border-radius: 999px;
+  color: var(--ua-upload-muted);
+  display: inline-flex;
+  flex: 0 0 auto;
+  justify-content: center;
+}
+
+html[data-ua-shape="square"] .ua-upload-tab-close,
+html[data-ua-shape="square"] .ua-upload-tab-add {
+  border-radius: 0.125rem;
+}
+
+.ua-upload-tab-close {
+  height: 1.35rem;
+  margin-right: 0.35rem;
+  width: 1.35rem;
+}
+
+.ua-upload-tab-add {
+  align-self: center;
+  height: 1.75rem;
+  margin-left: 0.35rem;
+  width: 1.75rem;
+}
+
+.ua-upload-tab-close:hover,
+.ua-upload-tab-add:not(:disabled):hover {
+  background: color-mix(in srgb, var(--ua-upload-text) 14%, transparent);
+  color: var(--ua-upload-text);
+}
+
+.ua-upload-tab-add:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.ua-upload-tab-dot {
+  background: #94a3b8;
+  border-radius: 999px;
+  flex: 0 0 auto;
+  height: 0.5rem;
+  width: 0.5rem;
+}
+
+.ua-upload-tab-dot[data-status="running"] {
+  background: #22c55e;
+  animation: ua-upload-tab-pulse 1.6s ease-in-out infinite;
+}
+
+.ua-upload-tab-dot[data-status="waiting"] {
+  background: #f59e0b;
+}
+
+.ua-upload-tab-dot[data-status="input"] {
+  background: #38bdf8;
+  animation: ua-upload-tab-pulse 1s ease-in-out infinite;
+}
+
+.ua-upload-tab-dot[data-status="scheduled"] {
+  background: #a78bfa;
+}
+
+.ua-upload-tab-dot[data-status="done"] {
+  background: #16a34a;
+}
+
+.ua-upload-tab-dot[data-status="error"] {
+  background: #ef4444;
+}
+
+@keyframes ua-upload-tab-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ua-upload-tab-dot {
+    animation: none !important;
+  }
+}
+
+.ua-upload-tab-dialog {
+  background: var(--ua-upload-surface-raised);
+  border-color: var(--ua-upload-border);
+  color: var(--ua-upload-text);
+}
+
+.ua-upload-tab-dialog-text {
+  color: var(--ua-upload-muted);
+}
+
+.ua-upload-tab-dialog-cancel {
+  border: 1px solid var(--ua-upload-border);
+}
+
+.ua-upload-tab-dialog-cancel:hover {
+  background: var(--ua-upload-hover);
 }
 
 .ua-upload-resize-handle {

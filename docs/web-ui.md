@@ -156,6 +156,26 @@ After selecting content and reviewing the command:
 
 The WebUI runs the upload controller in an isolated subprocess so that **Kill** can stop its process tree and interactive input can be forwarded to it.
 
+### Upload tabs
+
+The tab bar above the workspace runs several uploads side by side; for example, an unattended queue in one tab while you prepare other uploads in another. Choose **+** to open a tab; you can prepare many uploads this way. Each tab has its own selection, arguments, output, and prompts. A tab's status dot shows whether it is idle, running, scheduled, waiting for another tab, waiting for your input, finished, or failed. Once metadata is found, the tab is named after the release: `Title (2024)` for films, `Title S01E02` or `Title S01` for series, `Artist – Album` for music, and `Author – Title` for books; queues add the current position, such as `[3/12]`. Until then it shows the file or folder name. Hover over a tab to see the full release name. Closing a running tab asks for confirmation and kills its process. When only one tab is open, its **×** resets it instead: the upload is killed (or a scheduled one cancelled) and the tab starts over empty.
+
+The same content cannot run in two tabs at once, and at most four uploads run at the same time. When all four slots are busy, **Execute Upload** becomes **Schedule Upload**: the upload is checked and queued on the server, and starts automatically, oldest first, as soon as a slot frees, even if no browser is open. A scheduled tab shows **Cancel** instead of **Kill**. Scheduling requires `webui_keep_uploads_on_disconnect`; with it disabled, the button is unavailable until a slot frees.
+
+Tabs you have prepared but not started are saved in the browser, so they come back after a reload together with the running, scheduled, and finished uploads from the server. They are saved per browser, not on the server.
+
+Heavy work is shared between tabs one at a time, so parallel tabs do not overload the machine or the Usenet provider: torrent hashing (mkbrr/torf), Usenet archive and PAR2 creation, Usenet posting, screenshot capture, and BDInfo scans. When two tabs need the same resource, the upload that started first goes first, and the other tab shows **Waiting** until the resource is free. The same limits apply to CLI runs started while the WebUI is busy.
+
+qBittorrent bandwidth control works the same way across tabs; see [Upload Order and qBittorrent Bandwidth Control](upload-order-and-bandwidth-control.md#multiple-concurrent-uploads).
+
+### Leaving the page
+
+Uploads keep running on the server when you close the browser tab, reload the page, or lose the connection (for example when a phone locks its screen). Open the WebUI again, from any browser signed in to it, and each running or recently finished upload reappears in its own tab. Missed output is replayed, and a pending prompt can still be answered. If the connection drops while the page stays open, the tab reconnects by itself.
+
+A finished upload stays available until you close its tab, clear it, or start another upload in it; finished uploads are also dropped after 24 hours or when their slot is needed for a new upload. Closing a running tab still kills its upload.
+
+An upload left waiting at a prompt with no browser connected is killed after `webui_unattended_prompt_timeout` minutes (60 by default), so it cannot hold shared resources indefinitely. Set `webui_keep_uploads_on_disconnect` to `False` to restore the previous behaviour, where closing or disconnecting a tab kills its upload. See [`DEFAULT` options](example-config.md#ux--safety-toggles). Restarting the WebUI server still stops every upload.
+
 ## Monitoring and reviewing a run
 
 While an upload is active, the workspace changes from setup controls to live run information.

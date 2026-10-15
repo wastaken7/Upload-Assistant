@@ -31,6 +31,7 @@ from src.console import logger
 from src.media_extensions import VIDEO_EXTENSIONS
 from src.mediainfo import MediaInfo
 from src.meta import Meta
+from src.resource_coordinator import holds_slot
 from src.screenshot_manifest import capture_timestamps
 from src.screenshot_manifest import clear_group as clear_screenshot_group
 from src.screenshot_manifest import files as manifest_files
@@ -480,6 +481,7 @@ def screenshot_par_scale_factors(
     return pixel_aspect_ratio, 1.0
 
 
+@holds_slot("screenshots", "screenshot capture")
 async def disc_screenshots(
     meta: Meta,
     filename: str,
@@ -856,6 +858,7 @@ async def matching_dvd_title(disc_path: Path, expected_duration: float) -> int |
     return None
 
 
+@holds_slot("screenshots", "screenshot capture")
 async def dvd_screenshots(
     meta: Meta,
     disc_num: int,
@@ -1803,6 +1806,7 @@ async def generate_ebook_screenshots(
     return [str(screen) for screen in screenshots]
 
 
+@holds_slot("screenshots", "screenshot capture")
 async def screenshots(
     path: str,
     filename: str,
