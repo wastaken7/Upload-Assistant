@@ -196,13 +196,28 @@ def _release(name: str) -> None:
             _remove_ticket(name)
 
 
+async def _acquire_once(name: str) -> bool:
+    """Try the slot in a worker thread without leaking it if this coroutine is cancelled."""
+    future = asyncio.ensure_future(asyncio.to_thread(_try_acquire, name))
+    try:
+        return await asyncio.shield(future)
+    except asyncio.CancelledError:
+        # The thread keeps running; if it still wins the slot, give it back.
+        def _undo(done: asyncio.Future[bool]) -> None:
+            if not done.cancelled() and done.exception() is None and done.result():
+                _release(name)
+
+        future.add_done_callback(_undo)
+        raise
+
+
 @contextlib.asynccontextmanager
 async def resource_slot(name: str, label: str) -> AsyncGenerator[None]:
     """Hold ``name`` across processes; the oldest waiting run acquires it first."""
     if name not in RESOURCES:
         raise ValueError(f"Unknown resource slot: {name}")
 
-    if not await asyncio.to_thread(_try_acquire, name):
+    if not await _acquire_once(name):
         with _state_lock:
             _waiters[name] = _waiters.get(name, 0) + 1
         progress_id = f"wait-{name}"
@@ -211,7 +226,7 @@ async def resource_slot(name: str, label: str) -> AsyncGenerator[None]:
         try:
             while True:
                 await asyncio.sleep(POLL_SECONDS)
-                if await asyncio.to_thread(_try_acquire, name):
+                if await _acquire_once(name):
                     break
         finally:
             with _state_lock:

@@ -5,6 +5,7 @@ import os
 import queue
 import subprocess
 import sys
+import threading
 import time
 
 import pytest
@@ -150,10 +151,16 @@ def test_prompt_state_changes_only_when_output_flushes(output, expected_type, tm
     monkeypatch.setattr(server, "_terminate_process_tree", lambda _process: True)
     original_flush = server._should_flush_subprocess_output
     states_before_flush = []
+    flushed = threading.Event()
 
     def observe_flush(buffer, char, *, idle=False):
-        states_before_flush.append(server.active_processes[session_id]["awaiting_input"])
-        return original_flush(buffer, char, idle=idle)
+        # The session thread keeps polling after the flush; only earlier states matter.
+        if not flushed.is_set():
+            states_before_flush.append(server.active_processes[session_id]["awaiting_input"])
+        should_flush = original_flush(buffer, char, idle=idle)
+        if should_flush:
+            flushed.set()
+        return should_flush
 
     monkeypatch.setattr(server, "_should_flush_subprocess_output", observe_flush)
     response = server.app.test_client().post("/api/execute", json={"path": str(tmp_path), "session_id": session_id}, buffered=False)
@@ -345,6 +352,7 @@ def test_nyuu_webui_progress_does_not_render_terminal_progress() -> None:
     script = """
 import asyncio
 import sys
+import threading
 
 from src.usenetcreate import run_nyuu_with_progress
 
@@ -370,6 +378,7 @@ def test_pesto_webui_progress_does_not_render_terminal_progress() -> None:
     script = """
 import asyncio
 import sys
+import threading
 
 from src.usenetcreate import run_pesto_with_progress
 
@@ -396,6 +405,7 @@ def test_bdinfo_webui_progress_does_not_render_terminal_progress() -> None:
     script = """
 import asyncio
 import sys
+import threading
 
 from src.discparse import DiscParse
 

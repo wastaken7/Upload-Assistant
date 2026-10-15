@@ -4,6 +4,7 @@ import asyncio
 import contextlib
 import subprocess
 import sys
+import threading
 import time
 from collections.abc import AsyncIterator, Callable
 from pathlib import Path
@@ -173,6 +174,45 @@ def test_own_ticket_key_never_falls_back_to_zero(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setattr(rc, "_create_time_key", lambda _pid: None)
     created, _pid = rc._own_key().split("-")
     assert int(created) > 0
+
+
+def test_slot_won_after_cancellation_is_given_back(lock_dir: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    gate = threading.Event()
+    real_try_acquire = rc._try_acquire
+
+    acquired_after_cancel: list[bool] = []
+
+    def slow_try_acquire(name: str) -> bool:
+        gate.wait(timeout=10)
+        won = real_try_acquire(name)
+        acquired_after_cancel.append(won)
+        return won
+
+    monkeypatch.setattr(rc, "_try_acquire", slow_try_acquire)
+
+    async def main() -> None:
+        async def acquire() -> None:
+            async with rc.resource_slot("bdinfo", "test"):
+                pass
+
+        task = asyncio.ensure_future(acquire())
+        await asyncio.sleep(0.05)
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
+        # The worker thread now wins the slot after its caller was cancelled.
+        gate.set()
+        for _ in range(200):
+            await asyncio.sleep(0.01)
+            if acquired_after_cancel and "bdinfo" not in rc._holds:
+                break
+
+    asyncio.run(main())
+    assert "bdinfo" not in rc._holds
+    # The OS lock was released too: another acquirer gets it immediately.
+    lock_file = rc._try_lock(lock_dir / "bdinfo.lock")
+    assert lock_file is not None
+    rc._unlock(lock_file)
 
 
 def test_unknown_resource_is_rejected() -> None:

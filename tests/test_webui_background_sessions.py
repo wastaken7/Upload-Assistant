@@ -3,6 +3,7 @@ import io
 import json
 import os
 import queue
+import threading
 import time
 from collections.abc import Callable, Iterator
 
@@ -115,6 +116,11 @@ def start_session(tmp_path, monkeypatch):
     yield start
     for process in processes:
         process.exit(0)
+    # Session threads must finish before this test's patches are undone; a late
+    # one would otherwise run against the next test's state.
+    for thread in threading.enumerate():
+        if thread.name.startswith("webui-session-"):
+            thread.join(timeout=10)
 
 
 def test_closed_tab_keeps_upload_running_and_reattach_replays_missed_output(start_session) -> None:
@@ -408,3 +414,18 @@ def test_dismiss_requires_a_session_id(monkeypatch) -> None:
     monkeypatch.setattr(server, "_verify_same_origin", lambda: True)
     response = server.app.test_client().post("/api/session_dismiss", json={})
     assert response.status_code == 400
+
+
+def test_session_settings_are_reparsed_only_when_a_config_changes(monkeypatch) -> None:
+    calls: list[object] = []
+    real_load = server._load_config_from_file
+
+    def counting_load(path):
+        calls.append(path)
+        return real_load(path)
+
+    monkeypatch.setattr(server, "_session_settings_cache", None)
+    monkeypatch.setattr(server, "_load_config_from_file", counting_load)
+    first = server._webui_session_settings()
+    assert server._webui_session_settings() == first
+    assert len(calls) == 2  # user and example config, parsed once

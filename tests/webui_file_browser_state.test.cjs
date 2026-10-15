@@ -332,6 +332,8 @@ test("file-browser persistence, restoration, refresh and execution outcomes", as
     "SESSION_STREAM_STALL_MS",
     "SESSION_RECONNECT_ATTEMPTS",
     "SCHEDULE_POLL_MS",
+    "sharedSessionsPoll",
+    "pollSessionsShared",
     "waitForReconnect",
     "waitForScheduledStart",
     "followScheduledSession",

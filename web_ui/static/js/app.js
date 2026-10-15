@@ -165,6 +165,8 @@ const shouldUseMobileLayout = () =>
 const MAX_UPLOAD_TABS = 24;
 const DEFAULT_MAX_RUNNING_UPLOADS = 4;
 const SCHEDULE_POLL_MS = 3000;
+// One /api/sessions request per interval serves every scheduled tab.
+const sharedSessionsPoll = { promise: null, at: 0 };
 const UPLOAD_TAB_DRAFTS_KEY = "ua.uploadTabDrafts.v1";
 const BUSY_UPLOAD_STATUSES = ["running", "waiting", "input"];
 // The server sends a keepalive every second; silence this long means a dead connection.
@@ -5242,6 +5244,23 @@ function AudionutsUAGUI() {
     }
   };
 
+  /** Fetch the session list at most once per poll interval, shared by all tabs. */
+  const pollSessionsShared = () => {
+    if (
+      sharedSessionsPoll.promise &&
+      Date.now() - sharedSessionsPoll.at < SCHEDULE_POLL_MS / 2
+    ) {
+      return sharedSessionsPoll.promise;
+    }
+    sharedSessionsPoll.at = Date.now();
+    sharedSessionsPoll.promise = apiFetch(`${API_BASE}/sessions`, {
+      cache: "no-store",
+    })
+      .then((response) => (response.ok ? response.json() : null))
+      .catch(() => null);
+    return sharedSessionsPoll.promise;
+  };
+
   /**
    * Poll the session list until a scheduled upload starts ("started"), is
    * cancelled elsewhere ("gone"), or this tab stops waiting ("aborted").
@@ -5256,21 +5275,14 @@ function AudionutsUAGUI() {
       for (;;) {
         await waitForReconnect(SCHEDULE_POLL_MS, signal);
         if (signal.aborted || !getTabRuntime(tabId)) return "aborted";
-        try {
-          const response = await apiFetch(`${API_BASE}/sessions`, {
-            cache: "no-store",
-            signal,
-          });
-          const data = await response.json();
-          if (!response.ok || !Array.isArray(data.sessions)) continue;
-          const session = data.sessions.find(
-            (item) => item.session_id === runtime.run.sessionId,
-          );
-          if (!session) return "gone";
-          if (!session.scheduled) return "started";
-        } catch (error) {
-          if (signal.aborted) return "aborted";
-        }
+        const data = await pollSessionsShared();
+        if (signal.aborted) return "aborted";
+        if (!data || !Array.isArray(data.sessions)) continue;
+        const session = data.sessions.find(
+          (item) => item.session_id === runtime.run.sessionId,
+        );
+        if (!session) return "gone";
+        if (!session.scheduled) return "started";
       }
     } finally {
       runtime.scheduled = false;

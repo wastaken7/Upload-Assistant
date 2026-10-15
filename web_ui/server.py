@@ -1369,6 +1369,9 @@ def _terminate_process_tree(process: _WebUIProcess, timeout: float = 2.0) -> boo
     """Terminate an upload controller and every child it has started."""
     if process.poll() is not None:
         return True
+    # An upload controller is never PID 0/1; walking that tree would stop the whole system.
+    if int(getattr(process, "pid", 0) or 0) <= 1:
+        return False
 
     try:
         root = psutil.Process(process.pid)
@@ -6972,10 +6975,27 @@ FINISHED_SESSION_TTL_SECONDS = 24 * 60 * 60
 SESSION_LABEL_MAX_LENGTH = 200
 
 
+_session_settings_cache: tuple[tuple[str, int, str, int], tuple[bool, float]] | None = None
+
+
+def _config_mtime_ns(path: Path) -> int:
+    try:
+        return path.stat().st_mtime_ns
+    except OSError:
+        return 0
+
+
 def _webui_session_settings() -> tuple[bool, float]:
     """Return (keep uploads running on disconnect, unattended prompt timeout in seconds)."""
-    user_config = _load_config_from_file(STATE_DIR / "data" / "config.py") or {}
-    example_config = _load_config_from_file(CODE_DIR / "data" / "example_config.py") or {}
+    global _session_settings_cache
+    user_path = STATE_DIR / "data" / "config.py"
+    example_path = CODE_DIR / "data" / "example_config.py"
+    # Polled often (session list, every execute); reparse only when a file changes.
+    key = (str(user_path), _config_mtime_ns(user_path), str(example_path), _config_mtime_ns(example_path))
+    if _session_settings_cache is not None and _session_settings_cache[0] == key:
+        return _session_settings_cache[1]
+    user_config = _load_config_from_file(user_path) or {}
+    example_config = _load_config_from_file(example_path) or {}
     user_defaults = _as_dict(user_config.get("DEFAULT")) or {}
     example_defaults = _as_dict(example_config.get("DEFAULT")) or {}
 
@@ -6987,7 +7007,9 @@ def _webui_session_settings() -> tuple[bool, float]:
         timeout_minutes = max(0.0, float(timeout_value))
     except TypeError, ValueError:
         timeout_minutes = 60.0
-    return keep_running, timeout_minutes * 60
+    result = (keep_running, timeout_minutes * 60)
+    _session_settings_cache = (key, result)
+    return result
 
 
 def _init_session_events(process_state: dict[str, object], *, label: str, keep_running: bool, prompt_timeout: float) -> None:
