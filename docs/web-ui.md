@@ -214,7 +214,7 @@ Configuration is arranged by task rather than mirroring the raw Python dictionar
 
 | Group          | Page                   | Includes                                                                                   |
 | -------------- | ---------------------- | ------------------------------------------------------------------------------------------ |
-| Settings       | General                | Main settings, logging, and external tool paths.                                           |
+| Settings       | General                | Main settings, WebUI settings, logging, and external tool paths.                           |
 | Settings       | Torrent Clients        | qBittorrent, rTorrent, Deluge, Transmission, and related client definitions.               |
 | Settings       | Metadata Services      | Metadata credentials, Arr integration, caching, and music metadata.                        |
 | Settings       | Image Hosting          | Image-host priority and host credentials.                                                  |
@@ -229,6 +229,8 @@ Configuration is arranged by task rather than mirroring the raw Python dictionar
 | Administration | Access Log             | IP controls, logging level, and recent access activity.                                    |
 
 Hover or focus an information icon beside a setting to read its description. The [configuration reference](example-config.md) remains the authoritative detailed reference for defaults and implementation notes.
+
+Under **Configuration → General → WebUI Settings**, **Keep Uploads on Disconnect** controls whether uploads continue after their browser closes, reloads, or loses its connection. **Unattended Prompt Timeout (minutes)** limits how long an upload may wait at an unanswered prompt while no browser is connected; the default is 60 minutes, and `0` waits indefinitely. Saved changes apply to newly started uploads.
 
 The editor combines bundled defaults from `data/example_config.py` with overrides from the user-state `data/config.py`. If no usable `config.py` exists, the interface displays the example defaults and warns that they have not yet been saved. Successful configuration writes are recorded in `data/config_audit.log`; sensitive values are redacted from that audit trail.
 
@@ -381,7 +383,7 @@ Help links to the documentation home, this WebUI guide, configuration and CLI re
 
 When update notifications are enabled, the WebUI checks GitHub when the page loads or becomes visible and polls again every 30 minutes while it remains open. A successful result is reused for `update_notification_cache_hours` (four hours by default), so polling does not normally make a new GitHub request every time. An available update is shown on the application rail.
 
-Open **Help & Resources** and choose **Check now** to bypass the normal cache. **View changelog** opens release history with filters for WebUI, Core, Trackers, and Configuration changes. A separate, collapsed **Development — Unreleased** panel lists commits merged into the development branch since the latest official release; its commits use the same area filters and change-type badges as released entries, but may change before publication. The current installed release and latest release have separate badges. If GitHub cannot be reached, cached or bundled release information is used when available.
+Open **Help & Resources** and choose **Check now** to bypass the normal cache. **View changelog** opens release history with filters for WebUI, Core, Trackers, Configuration, and Dependencies changes. Dependency updates, including bundled tools and development packages, appear in their own section while retaining contributor attribution and pull request links. A separate, collapsed **Development — Unreleased** panel lists commits merged into the development branch since the latest official release; its commits use the same area filters and change-type badges as released entries, but may change before publication. The current installed release and latest release have separate badges. If GitHub cannot be reached, cached or bundled release information is used when available.
 
 The changelog is derived from the normal Upload Assistant releases; WebUI changes are categorized within those releases rather than using a separate version number.
 
