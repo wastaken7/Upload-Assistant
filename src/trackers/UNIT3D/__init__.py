@@ -144,6 +144,7 @@ class UNIT3D:
         urls_to_check = await self.get_search_urls(meta, request_params)
 
         missing_details: list[dict[str, Any]] = []
+        disc_type_ids: list[str | None] = []
         title_releases: list[dict[str, Any]] = []
         async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
             for url, params, check_pending in urls_to_check:
@@ -202,7 +203,14 @@ class UNIT3D:
                             dupes.append(result)
                         # Newer UNIT3D versions omit these fields from search results (or send them empty).
                         missing_key = "bd_info" if meta.is_disc else "media_info"
-                        entry_is_disc = kind_from_type_label(attributes.get("type")) == DISC
+                        type_label = attributes.get("type")
+                        if type_label:
+                            entry_is_disc = kind_from_type_label(type_label) == DISC
+                        else:
+                            if not disc_type_ids:
+                                disc_type_ids.append(await self._disc_type_id(meta))
+                            entry_type_id = attributes.get("type_id")
+                            entry_is_disc = entry_type_id is not None and disc_type_ids[0] is not None and str(entry_type_id) == disc_type_ids[0]
                         if not check_pending and torrent_id and not attributes.get(missing_key) and entry_is_disc == bool(meta.is_disc):
                             missing_details.append(result)
                 else:
@@ -216,6 +224,15 @@ class UNIT3D:
         if self.search_whole_title and category in ("MOVIE", "TV"):
             meta[f"{self.tracker}_title_releases"] = title_releases
         return dupes
+
+    async def _disc_type_id(self, meta: Meta) -> str | None:
+        """The tracker's Full Disc type id, or None when its type mapping can't say."""
+        try:
+            mapping = await self.get_type_id(meta, mapping_only=True)
+        except Exception:
+            return None
+        disc_id = mapping.get("DISC") if isinstance(mapping, dict) else None
+        return str(disc_id) if disc_id else None
 
     @staticmethod
     def _matches_local_filter(attributes: dict[str, Any], resolution_ids: set[str] | None, type_id: str | None) -> bool:

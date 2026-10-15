@@ -215,3 +215,42 @@ def test_empty_mediainfo_in_search_results_is_fetched(monkeypatch: pytest.Monkey
     dupes = asyncio.run(tracker.search_existing(Meta(category="MOVIE", tmdb=123, resolution="1080p", type="WEBDL")))
 
     assert dupes[0]["media_info"] == "Video\nFormat : AVC (7)"  # noqa: S101
+
+
+class TypeIdOnlyClient(DetailFakeClient):
+    async def get(self, url: str, headers: dict[str, str], params: list[tuple[str, Any]] | None = None) -> Any:
+        if url.endswith("/filter"):
+            self.calls.append(url)
+            data = [{"id": "9", "attributes": {"name": "Fictional Film 2021 1080p Blu-ray AVC", "type_id": 1, "resolution": "1080p", "size": 1}}]
+            return DetailResponse({"data": data})
+        return await super().get(url, headers, params)
+
+
+def test_disc_without_type_label_uses_type_id(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[str] = []
+    monkeypatch.setattr("src.trackers.UNIT3D.httpx.AsyncClient", lambda **kwargs: TypeIdOnlyClient(calls, **kwargs))
+    tracker = Samaritano({"DEFAULT": {}, "TRACKERS": {"SAMARITANO": {"api_key": "test-key"}}})
+    disc_meta = Meta(category="MOVIE", tmdb=123, resolution="1080p", type="DISC", is_disc="BDMV")
+
+    asyncio.run(tracker.search_existing(disc_meta))
+
+    assert any(call.endswith("/9") for call in calls)  # noqa: S101
+
+
+def test_type_mapping_errors_do_not_break_the_search(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[str] = []
+    monkeypatch.setattr("src.trackers.UNIT3D.httpx.AsyncClient", lambda **kwargs: TypeIdOnlyClient(calls, **kwargs))
+    tracker = Samaritano({"DEFAULT": {}, "TRACKERS": {"SAMARITANO": {"api_key": "test-key"}}})
+    real_get_type_id = tracker.get_type_id
+
+    async def failing_mapping(meta: Meta, type: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
+        if mapping_only:
+            raise ValueError("mapping not supported")
+        return await real_get_type_id(meta, type, reverse)
+
+    monkeypatch.setattr(tracker, "get_type_id", failing_mapping)
+    disc_meta = Meta(category="MOVIE", tmdb=123, resolution="1080p", type="DISC", is_disc="BDMV")
+
+    dupes = asyncio.run(tracker.search_existing(disc_meta))
+
+    assert len(dupes) == 1  # noqa: S101

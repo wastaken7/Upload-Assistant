@@ -351,9 +351,14 @@ class TestReviewFixes:
         assert decision.verdict is BLOCK
         assert "slot override token" in decision.why
 
-    def test_newer_repack_without_codec_in_name(self) -> None:
+    def test_newer_repack_without_codec_in_name_needs_review(self) -> None:
         upload = prof(f"{T}.1080p.AMZN.WEB-DL.DDP5.1.H.264-NOGRPA")
-        assert verdict(TorrentLeechSlotRules(), upload, prof(f"{T}.REPACK.1080p.AMZN.WEB-DL.DDP5.1-NOGRPA")) is BLOCK
+        assert verdict(TorrentLeechSlotRules(), upload, prof(f"{T}.REPACK.1080p.AMZN.WEB-DL.DDP5.1-NOGRPA")) is REVIEW
+
+    def test_unconfirmed_repack_does_not_replace_a_holder(self) -> None:
+        upload = prof(f"{T}.REPACK.1080p.BluRay.DD5.1-NOGRPA")
+        holders = (prof(f"{T}.1080p.BluRay.DD5.1.x264-NOGRPA"), prof(f"{T}.1080p.BluRay.DTS.x264-NOGRPB"))
+        assert verdict(HDTorrentsSlotRules(), replace(upload, codec=None), *holders) is not ALLOW
 
     def test_skipthecommercials_ignores_non_web_releases_for_web_uploads(self) -> None:
         upload = prof(f"{T}.1080p.AMZN.WEB-DL.DDP5.1.H.264-NOGRPA")

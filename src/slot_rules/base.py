@@ -48,22 +48,27 @@ def size_diff_ratio(first: ReleaseProfile, second: ReleaseProfile) -> float | No
     return abs(first.size - second.size) / larger
 
 
-def _same_or_unknown(first: object, second: object) -> bool:
-    return first is None or second is None or first == second
+def _repack_traits(profile: ReleaseProfile) -> tuple[object, ...]:
+    return (profile.resolution, profile.kind, profile.codec, profile.hdr)
+
+
+def _newer_from_same_group(upload: ReleaseProfile, existing: ReleaseProfile) -> bool:
+    return bool(upload.group and upload.group == existing.group and upload.repack > existing.repack and upload.edition == existing.edition)
 
 
 def is_repack_of(upload: ReleaseProfile, existing: ReleaseProfile) -> bool:
-    """``upload`` is a newer REPACK/PROPER of the same release: same group, edition and format."""
-    return bool(
-        upload.group
-        and upload.group == existing.group
-        and upload.repack > existing.repack
-        and upload.edition == existing.edition
-        and _same_or_unknown(upload.resolution, existing.resolution)
-        and _same_or_unknown(upload.kind, existing.kind)
-        and _same_or_unknown(upload.codec, existing.codec)
-        and _same_or_unknown(upload.hdr, existing.hdr)
-    )
+    """``upload`` is a confirmed newer REPACK/PROPER of the same release: same group, edition and format."""
+    traits = zip(_repack_traits(upload), _repack_traits(existing), strict=True)
+    return _newer_from_same_group(upload, existing) and all(first is not None and first == second for first, second in traits)
+
+
+def may_be_repack_of(upload: ReleaseProfile, existing: ReleaseProfile) -> bool:
+    """Like ``is_repack_of``, but some format traits are unknown, so it cannot be confirmed."""
+    if not _newer_from_same_group(upload, existing):
+        return False
+    traits = list(zip(_repack_traits(upload), _repack_traits(existing), strict=True))
+    has_unknown = any(first is None or second is None for first, second in traits)
+    return has_unknown and all(first is None or second is None or first == second for first, second in traits)
 
 
 _LABEL_WORDS = {"H264": "H.264", "H265": "H.265", "encode": "Encode", "x264 encode": "x264 Encode", "x265 encode": "x265 Encode"}
@@ -118,6 +123,14 @@ class SlotRules:
         newer = [profile for profile in existing if is_repack_of(profile, upload)]
         if newer:
             return self.decision(Verdict.BLOCK, "A newer REPACK/PROPER of this release is already on the site.", newer)
+        possibly_newer = [profile for profile in existing if may_be_repack_of(profile, upload)]
+        if possibly_newer:
+            return self.decision(
+                Verdict.REVIEW,
+                "A newer REPACK/PROPER from the same group may already be on the site.",
+                possibly_newer,
+                why="Its name is missing the resolution, type, codec or HDR, so it could not be confirmed as the same release.",
+            )
         try:
             return self.decide(upload, [profile for profile in existing if profile.kind != DISC])
         except UnknownTraitError as e:
