@@ -625,7 +625,8 @@
           normalizedSummary,
         ) &&
         (/\bdependenc(?:y|ies)\b/.test(normalizedSummary) ||
-          (/\b(?:from|to)\s+\S*\d/.test(normalizedSummary) &&
+          ((/\b(?:from|to)\s+\S*\d/.test(normalizedSummary) ||
+            /\bgroup\b.*\b\d+\s+updates?\b/.test(normalizedSummary)) &&
             /@(?:github-actions|dependabot|renovate)(?:\[bot\])?\b/.test(
               normalizedSummary,
             ))))

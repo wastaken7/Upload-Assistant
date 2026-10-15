@@ -106,3 +106,55 @@ test("prompt timeout is numeric with a 60-minute default and accepts zero, fract
     commitValue();
   }
 });
+
+test("negative timeout drafts restore the previous value without staging an indefinite wait", () => {
+  const context = vm.createContext({});
+  load(context, ["getFieldLimits"]);
+  const limits = vm.runInContext(
+    'getFieldLimits("webui_unattended_prompt_timeout")',
+    context,
+  );
+  const staged = [];
+  let displayed;
+  Object.assign(context, limits, {
+    isEditing: { current: true },
+    cancelCommit: { current: false },
+    normalizedValue: 60,
+    setDraftValue: (value) => {
+      displayed = value;
+    },
+    onChange: (value) => staged.push(value),
+  });
+  const commit = declarations.get("commitDraftValue");
+  const commitValue = vm.runInContext(
+    `(${source.slice(commit.start, commit.end)})`,
+    context,
+  );
+  for (const draft of ["-1", "-0.5"]) {
+    context.draftValue = draft;
+    commitValue();
+    assert.deepEqual(staged, []);
+    assert.equal(displayed, "60");
+  }
+});
+
+test("other numeric settings retain their existing clamping behaviour", () => {
+  const context = vm.createContext({});
+  load(context, ["getFieldLimits"]);
+  const limits = vm.runInContext('getFieldLimits("screens")', context);
+  let staged;
+  Object.assign(context, limits, {
+    rejectOutOfRange: false,
+    isEditing: { current: true },
+    cancelCommit: { current: false },
+    normalizedValue: 6,
+    draftValue: "-1",
+    setDraftValue: () => {},
+    onChange: (value) => {
+      staged = value;
+    },
+  });
+  const commit = declarations.get("commitDraftValue");
+  vm.runInContext(`(${source.slice(commit.start, commit.end)})()`, context);
+  assert.equal(staged, 1);
+});

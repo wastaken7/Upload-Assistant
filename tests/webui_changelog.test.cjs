@@ -37,12 +37,21 @@ for (const summary of [
   "chore(dependency): pin an image host library",
   "update mkbrr to v1.26.0 by @github-actions[bot]",
   "Update Python dependencies",
+  "Bump the npm_and_yarn group across 1 directory with 2 updates by @dependabot[bot]",
+  "Bump the npm_and_yarn group across 1 directory with 2 updates by `@dependabot`[bot]",
 ]) {
   test(`dependency changes get their own area: ${summary}`, () => {
     const entry = context.parseUAReleaseNotes(`* ${summary}`).entries[0];
     assert.equal(entry.area, "dependencies");
   });
 }
+
+test("unscoped human group updates remain in Core", () => {
+  const parsed = context.parseUAReleaseNotes(
+    "* Bump the UI group with 2 updates by @someone",
+  );
+  assert.equal(parsed.entries[0].area, "core");
+});
 
 test("grouping preserves contributor attribution, type, scope, and PR link", () => {
   const url = "https://github.com/wastaken7/Upload-Assistant/pull/644";

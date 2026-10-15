@@ -1528,6 +1528,7 @@ const NumberInput = ({
   min = 0,
   max = 100,
   step = 1,
+  rejectOutOfRange = false,
   className = "",
   isDarkMode = false,
 }) => {
@@ -1555,7 +1556,11 @@ const NumberInput = ({
       return;
     }
     const numValue = Number(draftValue);
-    if (draftValue.trim() === "" || !Number.isFinite(numValue)) {
+    if (
+      draftValue.trim() === "" ||
+      !Number.isFinite(numValue) ||
+      (rejectOutOfRange && (numValue < min || numValue > max))
+    ) {
       setDraftValue(String(normalizedValue));
       return;
     }
@@ -2955,7 +2960,12 @@ function ConfigLeafEditor({
     const getFieldLimits = (key) => {
       switch (key) {
         case "webui_unattended_prompt_timeout":
-          return { min: 0, max: Number.MAX_SAFE_INTEGER, step: "any" };
+          return {
+            min: 0,
+            max: Number.MAX_SAFE_INTEGER,
+            step: "any",
+            rejectOutOfRange: true,
+          };
         case "tracker_pass_checks":
           return { min: 1, max: 20, step: 1 };
         case "mkbrr_threads":
@@ -3050,6 +3060,7 @@ function ConfigLeafEditor({
             min={limits.min}
             max={limits.max}
             step={limits.step}
+            rejectOutOfRange={limits.rejectOutOfRange}
             isDarkMode={isDarkMode}
           />
         </div>

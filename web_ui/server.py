@@ -5756,6 +5756,12 @@ def _apply_config_update(source: str, example_config: dict[str, Any], data: dict
 
     is_webui_prompt_timeout = path == ["DEFAULT", "webui_unattended_prompt_timeout"]
     if is_webui_prompt_timeout:
+        if (
+            isinstance(raw_value, bool)
+            or not isinstance(raw_value, (str, int, float))
+            or (isinstance(raw_value, str) and not raw_value.strip())
+        ):
+            raise ValueError("Enter a timeout in minutes, or 0 to wait indefinitely")
         # The runtime accepts fractional minutes even though the example is 60.
         example_value = 60.0
     coerced_value = None if inherit_tracker_override else _coerce_config_value(raw_value, example_value)
