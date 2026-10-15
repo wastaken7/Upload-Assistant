@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
@@ -56,4 +57,27 @@ def test_failed_replace_preserves_existing_meta(tmp_path, monkeypatch):
         asyncio.run(write_meta_file(meta))
 
     assert meta_file.read_text(encoding="utf-8") == previous
+    assert list(meta_file.parent.glob(".meta-*.json")) == []
+
+
+def test_replace_retries_while_meta_is_locked(tmp_path, monkeypatch):
+    meta, meta_file = _meta(tmp_path)
+    meta_file.write_text('{"title": "Previous fictional release"}', encoding="utf-8")
+    meta.title = "New fictional release"
+    original_replace = Path.replace
+    calls = []
+
+    def locked_once(source, destination):
+        calls.append(destination)
+        if len(calls) == 1:
+            raise PermissionError("file in use")
+        return original_replace(source, destination)
+
+    monkeypatch.setattr("src.meta_file.Path.replace", locked_once)
+    monkeypatch.setattr("src.meta_file._REPLACE_RETRY_DELAY", 0)
+
+    asyncio.run(write_meta_file(meta))
+
+    assert len(calls) == 2
+    assert json.loads(meta_file.read_text(encoding="utf-8"))["title"] == "New fictional release"
     assert list(meta_file.parent.glob(".meta-*.json")) == []
