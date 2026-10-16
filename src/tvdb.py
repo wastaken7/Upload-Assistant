@@ -36,7 +36,7 @@ def _normalized_series_title(value: str) -> str:
     value = unicodedata.normalize("NFKD", value).casefold()
     value = "".join(char for char in value if not unicodedata.combining(char))
     # Release names drop apostrophes ("Examples Show" for "Example's Show").
-    value = re.sub(r"['\u2019`]", "", value)
+    value = re.sub(r"['\u2019]", "", value)
     return " ".join(re.findall(r"[^\W_]+", value))
 
 
