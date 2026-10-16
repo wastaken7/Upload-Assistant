@@ -2,10 +2,12 @@
 """Regression tests for TorrentHR's UNIT3D mappings."""
 
 import asyncio
+from unittest.mock import AsyncMock
 
 import pytest
 
 from src.meta import Meta
+from src.rehostimages import check_tracker_image_hosts, select_common_image_host
 from src.trackers.UNIT3D.torrenthr import TorrentHR
 from src.trackersetup import tracker_class_map
 
@@ -33,3 +35,22 @@ def test_torrenthr_category_mappings(meta: Meta, expected: str) -> None:
 
 def test_torrenthr_is_registered() -> None:
     assert tracker_class_map["TORRENTHR"] is TorrentHR
+
+
+def test_torrenthr_selects_required_image_host() -> None:
+    assert (
+        select_common_image_host(
+            {"img_host_1": "imgbox", "img_host_2": "thrimg"},
+            ["TORRENTHR"],
+            tracker_class_map,
+        )
+        == "thrimg"
+    )
+
+
+def test_torrenthr_checks_image_host_policy() -> None:
+    tracker = _tracker()
+    tracker.rehost_images_manager = AsyncMock()
+    meta = Meta(category="MOVIE")
+    asyncio.run(check_tracker_image_hosts(meta, tracker))
+    tracker.rehost_images_manager.check_policy.assert_awaited_once_with(meta, "TORRENTHR", tracker.image_host_policy)

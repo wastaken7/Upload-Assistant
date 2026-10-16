@@ -182,6 +182,7 @@ These can be [overridden per-tracker](#tracker-overridable-settings) by adding t
 
 - `custom_description_header` (str): BBCode header added at top of description section.
 - `screenshot_header` (str): BBCode header added above screenshots.
+- `hide_screenshot_header_if_only_section` (bool): Hide the generated image-section header when it is the only one rendered (default `True`). Applies to screenshots, disc menus, audio spectrograms and dynamic HDR plots. Logos, text and signatures do not count; tone-mapping notices are preserved. Set to `False` to always keep these headers.
 - `disc_menu_header` (str): BBCode header added above disc menu screenshots (discs only).
 - `audio_spectrogram_header` (str): BBCode header added above audio spectrograms.
 - `dynamic_hdr_plot_header` (str): BBCode header added above dynamic HDR metadata plots.
@@ -189,11 +190,33 @@ These can be [overridden per-tracker](#tracker-overridable-settings) by adding t
 - `image_tag_blacklist` (list[str]): Tracker-specific screenshot attributes rejected by this tracker. Any listed tag excludes the image; this setting is read from the tracker block and is not inherited from `DEFAULT`.
 - `tonemapped_header` (str): BBCode header added for tone-mapped releases.
 - `custom_signature` (str): BBCode signature appended at bottom of description.
-- `tag_overrides` (dict): Per-release-group overrides for these text fields. The
+- `tag_overrides` (dict): Per-release-group overrides for description presentation settings. The
   group key is matched against `meta.tag` case-insensitively and may be written
   with or without its leading hyphen. A tracker-level `tag_overrides` entry has
   precedence over a `DEFAULT` entry; unspecified fields use their normal
-  tracker/default value.
+  tracker/default value. `None` inherits the next source; `False` and `0`
+  are explicit overrides. Priority per field: tracker group, DEFAULT group,
+  ordinary tracker setting, ordinary DEFAULT setting.
+
+  In addition to the text fields above, supported options are:
+  `thumbnail_size`, `screens_per_row`, `pack_thumb_size`, `multiScreens`,
+  `logo_size`, `bluray_image_size`, `episode_overview`, `add_logo`,
+  `full_mediainfo`, `add_bluray_link`, `use_bluray_images`,
+  `add_audio_spectrogram`, `add_dynamic_hdr_plot`, and
+  `hide_screenshot_header_if_only_section`. Numbers may be integers or
+  numeric strings. Image sizes (`thumbnail_size`, `pack_thumb_size`,
+  `logo_size`, `bluray_image_size`) must be at least 1; `screens_per_row`
+  and `multiScreens` also accept 0. Clearing an image-size override in the
+  editor restores a positive inherited value, or 1 if none is available.
+  Booleans may be Python booleans or boolean strings.
+
+  These overrides control description rendering. Images and episode data
+  must already be available from preparation; enabling a rendering option
+  does not generate or fetch missing assets. Explicit command-line flags
+  and tracker-specific formats/limits retain their existing behavior.
+  For example, TorrentLeech still uses two screenshots per row and its
+  fixed thumbnail width. Tracker limits (`charLimit`, `fileLimit`,
+  `processLimit`) are not release-group overrides.
 
   Default overrides apply to every tracker that supports the description field:
 
@@ -204,6 +227,9 @@ These can be [overridden per-tracker](#tracker-overridable-settings) by adding t
               "MyAwesomeGroupTag": {
                   "custom_signature": "[center]Group signature[/center]",
                   "screenshot_header": "[h2]Group screenshots[/h2]",
+                  "thumbnail_size": "400",
+                  "screens_per_row": "3",
+                  "episode_overview": False,
               },
           },
       },
@@ -242,6 +268,8 @@ Implementation notes:
 ### UX / safety toggles
 
 - `sfx_on_prompt` (bool, default `True`): Play a bell before release confirmation. CLI runs use the terminal bell; WebUI runs play the sound in the browser after clicking Execute. Allow site audio and keep the tab unmuted. Fully unattended runs skip the sound along with confirmation.
+- `webui_keep_uploads_on_disconnect` (bool, default `True`): Keep a WebUI upload running after its browser tab closes, reloads, or loses the connection. Reopen the WebUI to see its tab again. Set to `False` to kill an upload as soon as its tab disconnects.
+- `webui_unattended_prompt_timeout` (number, default `60`): Minutes a WebUI upload may wait at an unanswered prompt while no browser is connected before it is killed. Set `0` to wait indefinitely.
 - `embed_links` (bool): Set true to embed terminal links using terminal hyperlinks (OSC 8). Set false to display the full raw URLs. `embed_dupe_links` remains supported temporarily as a deprecated alias.
 - `tracker_pass_checks` (str): Minimum number of trackers that must pass checks to continue upload.
 - `use_largest_playlist` (bool): Always use the largest Blu-ray playlist without prompting.
@@ -254,6 +282,7 @@ Implementation notes:
 - `tracker_pass_checks` is used to determine how many trackers must pass early validation before continuing (see `upload.py`).
 - `tracker_description_mode` is the only configuration that controls imported tracker description text and screenshots. `--onlyID` temporarily forces `ids` for that execution.
 - `tracker_comment_only` does not disable explicit IDs supplied through `--tracker-id`.
+- See [Importing IDs and Descriptions from Other Trackers](tracker-metadata-import.md) for the full workflow, supported source trackers and troubleshooting.
 
 ### Sonarr / Radarr integration
 

@@ -207,7 +207,11 @@ def test_stats_tables_fit_their_panels_and_theme_required_scrollbars():
 
     assert 'className="ua-stats-table-scroll overflow-x-auto"' in stats_app
     assert 'className="ua-stats-table w-full text-left text-sm"' in stats_app
-    assert ".ua-stats-table-scroll::-webkit-scrollbar" in theme_css
+    assert "*::-webkit-scrollbar" in theme_css
+    assert "scrollbar-color: var(--ua-scrollbar-thumb) transparent;" in theme_css
+    assert 'html[data-ua-mode="light"]' in theme_css
+    assert ".ua-stats-table-scroll," in theme_css
+    assert "scrollbar-width: thin;" in theme_css
     assert ".ua-stats-table tbody tr:nth-child(even)" in theme_css
     assert 'className="border-b last:border-0"' not in stats_app
 

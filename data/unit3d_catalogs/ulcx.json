@@ -1,0 +1,52 @@
+{
+  "regions": {},
+  "distributors": {
+    "966": "Crunchyroll, LLC",
+    "967": "Plaion Pictures",
+    "968": "I Wonder Pictures",
+    "969": "CG Entertainment",
+    "970": "A24",
+    "971": "Radiance Films",
+    "972": "ADV Films",
+    "973": "Old Gold Media"
+  },
+  "categories": {
+    "1": "Movies",
+    "2": "TV"
+  },
+  "types": {
+    "1": "Full Disc",
+    "2": "Remux",
+    "3": "Encode",
+    "4": "WEB-DL",
+    "5": "WEBRip",
+    "6": "HDTV",
+    "7": "Other"
+  },
+  "resolutions": {
+    "1": "4320p",
+    "2": "2160p",
+    "3": "1080p",
+    "4": "1080i",
+    "5": "720p",
+    "6": "576p",
+    "7": "576i",
+    "8": "480p",
+    "9": "480i",
+    "10": "Other"
+  },
+  "regions_complete": true,
+  "distributors_complete": true,
+  "default_ids": {
+    "regions": [
+      "1-244"
+    ],
+    "distributors": [
+      "1-965"
+    ]
+  },
+  "aliases": {
+    "CRUNCHYROLL LLC": 966,
+    "CRUNCHYROLL": 966
+  }
+}

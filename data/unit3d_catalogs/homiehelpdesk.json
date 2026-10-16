@@ -1,0 +1,17 @@
+{
+  "regions": {},
+  "distributors": {},
+  "categories": {},
+  "types": {},
+  "resolutions": {},
+  "regions_complete": true,
+  "distributors_complete": true,
+  "default_ids": {
+    "regions": [
+      "1-244"
+    ],
+    "distributors": [
+      "1-965"
+    ]
+  }
+}

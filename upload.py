@@ -126,6 +126,7 @@ from src.tvdb import close_tvdb
 from src.uphelper import UploadHelper
 from src.uploadorder import run_upload_order
 from src.uploadscreens import UploadScreensManager
+from src.webui_paths import is_generated_queue_path, subprocess_roots, validate_argument_paths, validate_subprocess_path, validate_subprocess_queue
 
 # Runtime artifacts are user-owned; CODE_DIR remains the read-only checkout.
 base_dir = str(STATE_DIR)
@@ -182,6 +183,11 @@ def set_webui_session_id(session_id: str | None, run_token: str | None = None) -
 
 def _publish_webui_preview_target(path: str, meta_uuid: str | None = None) -> None:
     """Push the current queue item to the Web UI execution preview, when active."""
+    if path and os.environ.get("UA_WEBUI_PROGRESS_STDOUT") == "1":
+        from src.webui_progress import publish_preview_target
+
+        publish_preview_target(path, meta_uuid)
+        return
     if not _is_webui_mode or not _webui_session_id or not _webui_run_token or not path:
         return
     try:
@@ -533,6 +539,11 @@ async def _prompt_book_meta(meta: Meta) -> None:
                         meta.artwork_url = value
                         break
                     path_obj = Path(value).expanduser()
+                    try:
+                        validate_subprocess_path(str(path_obj))
+                    except ValueError as error:
+                        logger.info("%s", error, extra={"markup": False})
+                        continue
                     if path_obj.is_file():
                         meta.artwork_path = str(path_obj.resolve())
                         break
@@ -992,6 +1003,11 @@ async def _prompt_music_meta(meta: Meta) -> None:
                         changed = True
                         break
                     path_obj = Path(value).expanduser()
+                    try:
+                        validate_subprocess_path(str(path_obj))
+                    except ValueError as error:
+                        logger.info("%s", error, extra={"markup": False})
+                        continue
                     if is_valid_cover_image(path_obj):
                         meta.artwork_path = str(path_obj.resolve())
                         _set_music_field(meta, "cover_url", meta.artwork_path, source="user")
@@ -1161,11 +1177,28 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
             logger.info("[red]Bad input detected[/red]")
             confirm = False
             continue
+        webui_roots = subprocess_roots()
+        if webui_roots is not None:
+            try:
+                validate_argument_paths(editargs, webui_roots)
+            except ValueError as error:
+                logger.info("%s", error, extra={"markup": False})
+                continue
         # Tracks multiple edits
-        editargs_tracking = editargs_tracking + editargs
+        next_editargs = editargs_tracking + editargs
         # Carry original args over, let parse handle duplicates
         original_args = meta.item_args if meta.item_args is not None else list(sys.argv[1:])
-        meta, _help, _before_args = cast(tuple[Meta, Any, Any], parser.parse(list(original_args) + list(editargs_tracking), meta))
+        edited_meta, _help, _before_args = cast(
+            tuple[Meta, Any, Any], parser.parse(list(original_args) + list(next_editargs), meta.copy() if webui_roots is not None else meta)
+        )
+        if webui_roots is not None:
+            try:
+                edited_meta.path = validate_subprocess_path(cast(str, edited_meta.path))
+            except ValueError as error:
+                logger.info("%s", error, extra={"markup": False})
+                continue
+        meta = edited_meta
+        editargs_tracking = next_editargs
         if not meta.trackers:
             meta.trackers = previous_trackers
         if isinstance(meta.trackers, str):
@@ -1576,6 +1609,7 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
                     "ONLYENCODES",
                     "PASSTHEPOPCORN",
                     "SKIPTHECOMMERCIALS",
+                    "TORRENTHR",
                     "TVCHAOSUK",
                 }
 
@@ -1901,9 +1935,7 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
 
         # 2. Re-create base torrents if rehash is True
         if meta.rehash is True and meta.nohash is False:
-            await TORRENT_CREATOR.create_torrent(meta, Path(cast(str, meta.path)), "BASE", make_default=True)
-            if has_local_subs:
-                await TORRENT_CREATOR.create_torrent(meta, Path(cast(str, meta.path)), "BASE_SUBS", make_default=True)
+            await TORRENT_CREATOR.rehash_torrents(meta)
 
         # 3. Otherwise generate if missing
         else:
@@ -2157,6 +2189,9 @@ def load_heavy_globals() -> None:
 
 
 async def do_the_thing(base_dir: str) -> None:
+    webui_roots = subprocess_roots()
+    if webui_roots is not None:
+        validate_argument_paths(sys.argv[2:], webui_roots)
     from src.api_key_expiry import reset_api_key_expiry_warnings
     from src.stats import accumulate_upload_durations, configure_stats, record_completed_item_stats_async, record_event_async, record_release_profile_async, set_stats_context
 
@@ -2417,6 +2452,8 @@ async def do_the_thing(base_dir: str) -> None:
         path = str(Path(path).resolve())
         if path.endswith('"'):
             path = path[:-1]
+        if webui_roots is not None and not is_generated_queue_path(path):
+            path = validate_subprocess_path(path)
 
         is_binary = await get_mkbrr_path(base_dir)
         if not meta.mkbrr:
@@ -2433,6 +2470,7 @@ async def do_the_thing(base_dir: str) -> None:
 
         queue, log_file = await QueueManager.handle_queue(path, meta, paths, base_dir)
         queue_list = cast(list[Any], queue)
+        validate_subprocess_queue(queue_list)
 
         processed_files_count = 0
         skipped_files_count = 0
@@ -2488,6 +2526,15 @@ async def do_the_thing(base_dir: str) -> None:
                     else:
                         meta.item_args = list(sys.argv[1:])
 
+                try:
+                    path = validate_subprocess_path(path)
+                except ValueError as error:
+                    logger.info(f"[red]Skipping '{escape(path)}': {escape(str(error))}[/red]")
+                    if "queue" in meta and meta.queue is not None:
+                        processed_files_count += 1
+                        skipped_files_count += 1
+                        logger.info(f"[cyan]Processed {processed_files_count}/{total_files} files with {skipped_files_count} skipped uploading.\n\n")
+                    continue
                 meta.path = path
                 meta.uuid = ""
                 set_stats_context(debug=bool(meta.debug), category="")

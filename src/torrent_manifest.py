@@ -51,6 +51,10 @@ class TorrentManifest:
     def _empty(self) -> dict[str, Any]:
         return {"version": self.VERSION, "torrents": {}, "defaults": {}, "selections": {}}
 
+    def clear(self) -> None:
+        with self._lock:
+            self._save(self._empty())
+
     def _load(self) -> dict[str, Any]:
         try:
             value = json.loads(self.path.read_text(encoding="utf-8"))

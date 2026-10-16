@@ -1,4 +1,5 @@
 [Configuration](configuration.md)
+[Importing IDs and Descriptions from Other Trackers](tracker-metadata-import.md)
 [Screenshot Overlays](screenshot-overlays.md)
 [Custom Hooks](custom-hooks.md)
 [Upload Order and qBittorrent Bandwidth Control](upload-order-and-bandwidth-control.md)

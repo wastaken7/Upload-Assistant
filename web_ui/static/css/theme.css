@@ -14,6 +14,45 @@
   --ua-light-panel-end: #fffbeb;
   --ua-atmosphere: rgba(180, 83, 9, 0.1);
   --ua-card-glow: rgba(180, 83, 9, 0.08);
+  --ua-scrollbar-thumb: color-mix(in srgb, var(--ua-muted) 75%, transparent);
+  --ua-scrollbar-thumb-hover: var(--ua-copper-bright);
+  --ua-scrollbar-size: 10px;
+  color-scheme: dark;
+  scrollbar-color: var(--ua-scrollbar-thumb) transparent;
+}
+
+html[data-ua-mode="light"] {
+  --ua-scrollbar-thumb: color-mix(in srgb, var(--ua-muted) 65%, #334155);
+  color-scheme: light;
+}
+
+/* Native scrollbars inherit the shared palette, including body portals and
+   textareas. Older WebKit browsers use the same colours through pseudo-elements. */
+@supports not (scrollbar-color: gray transparent) {
+  *::-webkit-scrollbar {
+    width: var(--ua-scrollbar-size);
+    height: var(--ua-scrollbar-size);
+  }
+
+  *::-webkit-scrollbar-track,
+  *::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background: var(--ua-scrollbar-thumb);
+    border-radius: 999px;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background: var(--ua-scrollbar-thumb-hover);
+  }
+}
+
+@media (forced-colors: active) {
+  :root {
+    scrollbar-color: auto;
+  }
 }
 
 [data-ua-theme="graphite"] {
@@ -1125,6 +1164,11 @@ html.ua-upload-document #root {
 .ua-upload-page[data-mode="dark"] {
   --ua-upload-bg: var(--ua-obsidian);
   --ua-upload-surface: color-mix(in srgb, var(--ua-charcoal) 94%, transparent);
+  --ua-upload-surface-solid: color-mix(
+    in srgb,
+    var(--ua-charcoal) 94%,
+    var(--ua-upload-bg)
+  );
   --ua-upload-surface-raised: color-mix(
     in srgb,
     var(--ua-stone) 74%,
@@ -1139,6 +1183,7 @@ html.ua-upload-document #root {
 .ua-upload-page[data-mode="light"] {
   --ua-upload-bg: color-mix(in srgb, var(--ua-light-panel-start) 30%, #f5f5f4);
   --ua-upload-surface: rgba(255, 255, 255, 0.94);
+  --ua-upload-surface-solid: color-mix(in srgb, #fff 94%, var(--ua-upload-bg));
   --ua-upload-surface-raised: #ffffff;
   --ua-upload-text: #1c1917;
   --ua-upload-muted: #57534e;
@@ -1183,16 +1228,7 @@ html.ua-upload-document #root {
 }
 
 .ua-upload-context-resize-gutter {
-  background:
-    linear-gradient(
-      to right,
-      transparent calc(50% - 0.5px),
-      var(--ua-upload-border) calc(50% - 0.5px),
-      var(--ua-upload-border) calc(50% + 0.5px),
-      transparent calc(50% + 0.5px)
-    ),
-    var(--ua-upload-bg);
-  width: 0.4rem;
+  width: 0;
 }
 
 .ua-upload-context-detail {
@@ -1201,7 +1237,7 @@ html.ua-upload-document #root {
 
 .ua-upload-panel,
 .ua-upload-workspace-main {
-  background: var(--ua-upload-surface) !important;
+  background: var(--ua-upload-surface-solid) !important;
   border-color: var(--ua-upload-border) !important;
 }
 
@@ -1220,23 +1256,40 @@ html.ua-upload-document #root {
 
 .ua-processing-card {
   background: var(--ua-upload-surface);
-}
-
-.ua-processing-artwork {
-  background:
-    radial-gradient(circle at 50% 35%, var(--ua-atmosphere), transparent 68%),
-    color-mix(in srgb, var(--ua-upload-bg) 86%, #000000);
-  border-bottom: 1px solid var(--ua-upload-border);
   isolation: isolate;
+  position: relative;
 }
 
-.ua-processing-artwork::after {
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.28), transparent 34%);
-  content: "";
-  inset: 0;
+.ua-processing-backdrop {
+  height: calc(var(--ua-processing-artwork-height) + 12rem);
+  inset: 0 0 auto;
+  mask-image: linear-gradient(
+    to bottom,
+    #000 0%,
+    rgba(0, 0, 0, 0.85) 40%,
+    rgba(0, 0, 0, 0.35) 72%,
+    transparent 100%
+  );
+  opacity: 0.5;
+  overflow: hidden;
   pointer-events: none;
   position: absolute;
   z-index: -1;
+}
+
+.ua-processing-backdrop img {
+  filter: blur(4px);
+  height: calc(100% + 48px);
+  left: -24px;
+  max-width: none;
+  object-fit: cover;
+  position: absolute;
+  top: -24px;
+  width: calc(100% + 48px);
+}
+
+.ua-upload-page[data-mode="light"] .ua-processing-backdrop {
+  opacity: 0.3;
 }
 
 .ua-processing-poster {
@@ -1282,6 +1335,7 @@ html.ua-upload-document #root {
 }
 
 .ua-processing-muted,
+.ua-processing-year,
 .ua-processing-source {
   color: var(--ua-upload-muted);
 }
@@ -1318,13 +1372,40 @@ html.ua-upload-document #root {
 }
 
 .ua-processing-track {
-  background: color-mix(
-    in srgb,
-    var(--ua-upload-bg) 45%,
-    var(--ua-upload-surface)
-  );
+  background: transparent;
   border-color: var(--ua-upload-border);
   overflow-wrap: anywhere;
+}
+
+.ua-processing-track[data-default="true"] {
+  background: color-mix(in srgb, var(--ua-upload-text) 8%, transparent);
+}
+
+.ua-processing-track-index {
+  line-height: 1.75rem;
+}
+
+.ua-processing-track-language {
+  min-height: 1.75rem;
+}
+
+.ua-processing-track-badge {
+  background: color-mix(in srgb, #38bdf8 16%, transparent);
+  color: color-mix(in srgb, #38bdf8 55%, var(--ua-upload-text));
+  font-size: 0.75rem;
+  line-height: 1.25rem;
+  max-width: 100%;
+  padding: 0.2rem 0.5rem;
+}
+
+.ua-processing-track-status {
+  background: color-mix(in srgb, #2dd4bf 10%, transparent);
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, #2dd4bf 70%, transparent);
+  color: color-mix(in srgb, #2dd4bf 40%, var(--ua-upload-text));
+}
+
+html[data-ua-shape="rounded"] .ua-language-flag {
+  border-radius: 0.2rem;
 }
 
 .ua-processing-detail-row {
@@ -1365,6 +1446,39 @@ html.ua-upload-document #root {
   border-color: var(--ua-upload-border);
 }
 
+.ua-processing-genre {
+  --ua-genre-accent: #38bdf8;
+  background: color-mix(in srgb, var(--ua-genre-accent) 18%, transparent);
+  border-radius: 0.5rem;
+  color: color-mix(in srgb, var(--ua-genre-accent) 40%, var(--ua-upload-text));
+  display: inline-flex;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  line-height: 1.25rem;
+  padding: 0.2rem 0.55rem;
+}
+
+.ua-processing-genre:nth-child(2) {
+  --ua-genre-accent: #f472b6;
+}
+
+.ua-processing-genre:nth-child(3) {
+  --ua-genre-accent: #a78bfa;
+}
+
+.ua-processing-genre:nth-child(4) {
+  --ua-genre-accent: #2dd4bf;
+}
+
+.ua-processing-provider {
+  background-image: linear-gradient(
+    120deg,
+    color-mix(in srgb, currentColor 6%, transparent),
+    transparent
+  );
+  box-shadow: inset 0 1px 0 color-mix(in srgb, currentColor 8%, transparent);
+}
+
 .ua-processing-provider-section a:focus-visible,
 .ua-processing-cover-action:focus-visible {
   outline: 2px solid var(--ua-gold);
@@ -1372,37 +1486,248 @@ html.ua-upload-document #root {
 }
 
 .ua-upload-output-panel {
-  background: var(--ua-upload-bg) !important;
+  /* Same surface as the form, so the content area (and its tab) keeps one colour. */
+  background: var(--ua-upload-surface-solid) !important;
   border-color: var(--ua-upload-border) !important;
 }
 
-.ua-upload-resize-handle {
-  background:
-    linear-gradient(
-      to right,
-      transparent calc(50% - 0.5px),
-      var(--ua-upload-border) calc(50% - 0.5px),
-      var(--ua-upload-border) calc(50% + 0.5px),
-      transparent calc(50% + 0.5px)
-    ),
-    var(--ua-upload-bg) !important;
-  transition:
-    background-color 150ms ease,
-    box-shadow 150ms ease;
-  width: 0.4rem !important;
+/* Upload tabs: a browser-style strip. The active tab takes the colour of the
+   content panels right below it, so tab and panel read as one surface. */
+.ua-upload-page[data-mode="dark"] .ua-upload-tabs {
+  --ua-tab-strip-bg: color-mix(in srgb, var(--ua-upload-bg) 70%, #000);
 }
 
-.ua-upload-resize-handle:hover {
-  background:
-    linear-gradient(
-      to right,
-      transparent calc(50% - 1px),
-      var(--ua-copper-bright) calc(50% - 1px),
-      var(--ua-copper-bright) calc(50% + 1px),
-      transparent calc(50% + 1px)
-    ),
-    color-mix(in srgb, var(--ua-copper) 8%, var(--ua-upload-bg)) !important;
-  box-shadow: 0 0 10px var(--ua-glow);
+.ua-upload-page[data-mode="light"] .ua-upload-tabs {
+  --ua-tab-strip-bg: color-mix(in srgb, var(--ua-upload-bg) 86%, #57534e);
+}
+
+.ua-upload-tabs {
+  --ua-tab-active-bg: var(--ua-upload-surface-solid);
+  --ua-tab-radius: 0.6rem;
+  align-items: flex-end;
+  background: var(--ua-tab-strip-bg);
+  display: flex;
+  flex: 0 0 auto;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.45rem 0.75rem 0;
+  scrollbar-width: thin;
+}
+
+html[data-ua-shape="square"] .ua-upload-tabs {
+  --ua-tab-radius: 0.125rem;
+}
+
+.ua-upload-tab {
+  align-items: center;
+  background: transparent;
+  border-radius: var(--ua-tab-radius) var(--ua-tab-radius) 0 0;
+  color: var(--ua-upload-muted);
+  display: flex;
+  flex: 0 1 14rem;
+  min-width: 7rem;
+  position: relative;
+}
+
+/* Separators between inactive tabs, hidden next to the active or hovered tab. */
+.ua-upload-tab:not([data-active="true"])::after {
+  background: var(--ua-upload-border);
+  content: "";
+  height: 50%;
+  position: absolute;
+  right: 0;
+  top: 25%;
+  width: 1px;
+}
+
+.ua-upload-tab:not([data-active="true"]):last-of-type::after,
+.ua-upload-tab:not([data-active="true"]):hover::after,
+.ua-upload-tab:not([data-active="true"]):has(+ .ua-upload-tab:hover)::after,
+.ua-upload-tab:not([data-active="true"]):has(
+    + .ua-upload-tab[data-active="true"]
+  )::after {
+  opacity: 0;
+}
+
+.ua-upload-tab:not([data-active="true"]):hover {
+  background: color-mix(
+    in srgb,
+    var(--ua-tab-active-bg) 45%,
+    var(--ua-tab-strip-bg)
+  );
+  color: var(--ua-upload-text);
+}
+
+.ua-upload-tab[data-active="true"] {
+  background: var(--ua-tab-active-bg);
+  color: var(--ua-upload-text);
+  z-index: 1;
+}
+
+/* Rounded mode: concave corners where the active tab meets the panel. */
+html:not([data-ua-shape="square"]) .ua-upload-tab[data-active="true"]::before,
+html:not([data-ua-shape="square"]) .ua-upload-tab[data-active="true"]::after {
+  bottom: 0;
+  content: "";
+  height: var(--ua-tab-radius);
+  pointer-events: none;
+  position: absolute;
+  width: var(--ua-tab-radius);
+}
+
+html:not([data-ua-shape="square"]) .ua-upload-tab[data-active="true"]::before {
+  background: radial-gradient(
+    circle at 0 0,
+    transparent calc(var(--ua-tab-radius) - 0.5px),
+    var(--ua-tab-active-bg) var(--ua-tab-radius)
+  );
+  left: calc(var(--ua-tab-radius) * -1);
+}
+
+html:not([data-ua-shape="square"]) .ua-upload-tab[data-active="true"]::after {
+  background: radial-gradient(
+    circle at 100% 0,
+    transparent calc(var(--ua-tab-radius) - 0.5px),
+    var(--ua-tab-active-bg) var(--ua-tab-radius)
+  );
+  right: calc(var(--ua-tab-radius) * -1);
+}
+
+.ua-upload-tab-button {
+  align-items: center;
+  display: flex;
+  flex: 1 1 auto;
+  font-size: 0.8125rem;
+  gap: 0.45rem;
+  min-width: 0;
+  padding: 0.5rem 0.25rem 0.55rem 0.8rem;
+  text-align: left;
+}
+
+.ua-upload-tab-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ua-upload-tab-close,
+.ua-upload-tab-add {
+  align-items: center;
+  border-radius: 999px;
+  color: var(--ua-upload-muted);
+  display: inline-flex;
+  flex: 0 0 auto;
+  justify-content: center;
+}
+
+html[data-ua-shape="square"] .ua-upload-tab-close,
+html[data-ua-shape="square"] .ua-upload-tab-add {
+  border-radius: 0.125rem;
+}
+
+.ua-upload-tab-close {
+  height: 1.35rem;
+  margin-right: 0.35rem;
+  width: 1.35rem;
+}
+
+.ua-upload-tab-add {
+  align-self: center;
+  height: 1.75rem;
+  margin-left: 0.35rem;
+  width: 1.75rem;
+}
+
+.ua-upload-tab-close:hover,
+.ua-upload-tab-add:not(:disabled):hover {
+  background: color-mix(in srgb, var(--ua-upload-text) 14%, transparent);
+  color: var(--ua-upload-text);
+}
+
+.ua-upload-tab-add:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.ua-upload-tab-dot {
+  background: #94a3b8;
+  border-radius: 999px;
+  flex: 0 0 auto;
+  height: 0.5rem;
+  width: 0.5rem;
+}
+
+.ua-upload-tab-dot[data-status="running"] {
+  background: #22c55e;
+  animation: ua-upload-tab-pulse 1.6s ease-in-out infinite;
+}
+
+.ua-upload-tab-dot[data-status="waiting"] {
+  background: #f59e0b;
+}
+
+.ua-upload-tab-dot[data-status="input"] {
+  background: #38bdf8;
+  animation: ua-upload-tab-pulse 1s ease-in-out infinite;
+}
+
+.ua-upload-tab-dot[data-status="scheduled"] {
+  background: #a78bfa;
+}
+
+.ua-upload-tab-dot[data-status="done"] {
+  background: #16a34a;
+}
+
+.ua-upload-tab-dot[data-status="error"] {
+  background: #ef4444;
+}
+
+@keyframes ua-upload-tab-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ua-upload-tab-dot {
+    animation: none !important;
+  }
+}
+
+.ua-upload-tab-dialog {
+  background: var(--ua-upload-surface-raised);
+  border-color: var(--ua-upload-border);
+  color: var(--ua-upload-text);
+}
+
+.ua-upload-tab-dialog-text {
+  color: var(--ua-upload-muted);
+}
+
+.ua-upload-tab-dialog-cancel {
+  border: 1px solid var(--ua-upload-border);
+}
+
+.ua-upload-tab-dialog-cancel:hover {
+  background: var(--ua-upload-hover);
+}
+
+.ua-upload-resize-handle {
+  --ua-resize-hit-width: 0.4rem;
+  position: relative;
+  flex: 0 0 0;
+  width: 0 !important;
+  z-index: 20;
+}
+
+.ua-upload-resize-handle::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--ua-resize-hit-width) / -2);
+  width: var(--ua-resize-hit-width);
 }
 
 .ua-upload-header-action,
@@ -2196,9 +2521,8 @@ html.ua-upload-document #root {
 }
 
 @media (pointer: coarse) and (min-width: 768px) {
-  .ua-upload-resize-handle,
-  .ua-upload-context-resize-gutter {
-    width: 0.65rem !important;
+  .ua-upload-resize-handle {
+    --ua-resize-hit-width: 0.65rem;
   }
 }
 
@@ -2609,8 +2933,7 @@ html.ua-upload-document #root {
 
 .ua-stats-table-scroll,
 .ua-stats-chart-scroll {
-  scrollbar-color: color-mix(in srgb, var(--ua-config-muted) 55%, transparent)
-    transparent;
+  --ua-scrollbar-size: 6px;
   scrollbar-width: thin;
 }
 
@@ -2653,35 +2976,6 @@ html.ua-upload-document #root {
   );
 }
 
-.ua-stats-table-scroll::-webkit-scrollbar,
-.ua-stats-chart-scroll::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-.ua-stats-table-scroll::-webkit-scrollbar-track,
-.ua-stats-chart-scroll::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.ua-stats-table-scroll::-webkit-scrollbar-thumb,
-.ua-stats-chart-scroll::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--ua-config-muted) 55%, transparent);
-  border-radius: 999px;
-}
-
-.ua-stats-table-scroll::-webkit-scrollbar-thumb:hover,
-.ua-stats-chart-scroll::-webkit-scrollbar-thumb:hover {
-  background: color-mix(in srgb, var(--ua-copper-bright) 70%, transparent);
-}
-
-.ua-stats-table-scroll::-webkit-scrollbar-button,
-.ua-stats-chart-scroll::-webkit-scrollbar-button {
-  display: none;
-  width: 0;
-  height: 0;
-}
-
 .ua-config-sidebar,
 .ua-config-header {
   background: var(--ua-config-surface);
@@ -2710,8 +3004,8 @@ html.ua-upload-document #root {
 }
 
 .ua-config-sidebar-nav {
+  --ua-scrollbar-size: 6px;
   overscroll-behavior-y: contain;
-  scrollbar-color: var(--ua-config-border) transparent;
   scrollbar-width: thin;
 }
 
@@ -3590,6 +3884,8 @@ html[data-ua-shape="square"]
     [class~="rounded-full"],
     [class~="rounded-t"],
     [class~="rounded-b"],
+    .ua-processing-poster,
+    .ua-processing-genre,
     .ua-config-nav-button,
     .ua-config-nav-indicator,
     .ua-config-icon-button,

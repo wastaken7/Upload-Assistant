@@ -869,6 +869,36 @@ class BJShare:
         torrent_search_table: Tag | None = soup.find("table", id="torrent_table")
 
         if torrent_details_table:
+            if category in ("TV", "MOVIE"):
+                audio_labels = (
+                    {"dual áudio": "Dual Áudio", "legendado": "Legendado", "dublado": "Dublado"}
+                    if category == "TV"
+                    else {"torrents dual áudios": "Dual Áudio", "torrents legendados": "Legendado", "torrents dublados": "Dublado"}
+                )
+                existing_audio = set()
+                for header in torrent_details_table.select("table.torrent_table td.audio_header"):
+                    if category == "TV":
+                        season = getattr(meta, "season_int", None)
+                        if not isinstance(season, int) or season < 0:
+                            continue
+                        if not any((match := re.fullmatch(r"season_(\d+)", str(css_class))) and int(match.group(1)) == season for css_class in header.get("class", [])):
+                            continue
+                    label = " ".join(header.get_text(" ", strip=True).split()).casefold()
+                    if label in audio_labels:
+                        existing_audio.add(audio_labels[label])
+
+                if existing_audio:
+                    upload_audio = await self.get_audio(meta)
+                    incompatible_audio = {
+                        "Legendado": ("Dual Áudio", "Dublado"),
+                        "Dublado": ("Dual Áudio", "Legendado"),
+                    }
+                    for existing in incompatible_audio.get(upload_audio, ()):
+                        if existing in existing_audio:
+                            logger.info(f"{self.tracker}: Skipping {upload_audio} upload because a {existing} version already exists.")
+                            meta.skipping = self.tracker
+                            return dupes
+
             BJShare.already_has_the_info = True
             BJShare.database_title = self.get_database_title(soup)
             BJShare.database_identifier = self.get_database_identifier(soup)

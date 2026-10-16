@@ -79,17 +79,6 @@ class Locadora(UNIT3D):
 
         return {"name": name}
 
-    async def get_region_id(self, meta: Meta) -> dict[str, str]:
-        if meta.region == "EUR":
-            return {}
-
-        region_value = str(meta.region)
-        region_id = await self.common.unit3d_region_ids(region_value)
-        if region_id:
-            return {"region_id": region_id}
-
-        return {}
-
     async def get_mediainfo(self, meta: Meta) -> dict[str, str]:
         if meta.is_disc == "BDMV":
             mediainfo = await self.common.get_bdmv_mediainfo(meta, remove=["File size", "Overall bit rate"], char_limit=20000)

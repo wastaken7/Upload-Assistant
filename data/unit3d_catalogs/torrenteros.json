@@ -1,0 +1,40 @@
+{
+  "regions": {},
+  "distributors": {},
+  "categories": {
+    "1": "Movies",
+    "2": "TV",
+    "3": "Musica",
+    "4": "Conciertos"
+  },
+  "types": {
+    "1": "Full Disc",
+    "2": "Remux",
+    "3": "Encode",
+    "4": "WEB-DL",
+    "5": "WEBRip",
+    "6": "HDTV"
+  },
+  "resolutions": {
+    "1": "4320p",
+    "2": "2160p",
+    "3": "1080p",
+    "4": "1080i",
+    "5": "720p",
+    "6": "576p",
+    "7": "576i",
+    "8": "480p",
+    "9": "480i",
+    "10": "Other"
+  },
+  "regions_complete": true,
+  "distributors_complete": true,
+  "default_ids": {
+    "regions": [
+      "1-242"
+    ],
+    "distributors": [
+      "1-965"
+    ]
+  }
+}

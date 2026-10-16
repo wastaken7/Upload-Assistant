@@ -1,6 +1,8 @@
 import ast
 from pathlib import Path
 
+import pytest
+
 import web_ui.server as server
 
 
@@ -65,7 +67,7 @@ def test_stats_enabled_is_grouped_with_main_settings_only_in_webui() -> None:
     items = server._build_config_items(prepared, {"stats_enabled": True}, comments, subsections, ["DEFAULT"])
 
     headings = [item["key"] for item in items if item.get("subsection")]
-    assert headings[:2] == ["MAIN SETTINGS", "LOGGING"]
+    assert headings[:3] == ["MAIN SETTINGS", "WEBUI SETTINGS", "LOGGING"]
     assert headings.count("MAIN SETTINGS") == 1
     assert "LOCAL STATISTICS" not in headings
     main_settings = next(item for item in items if item["key"] == "MAIN SETTINGS")
@@ -92,6 +94,38 @@ def test_removed_keep_meta_is_not_exposed_from_existing_config() -> None:
     assert items[0]["children"][0]["value"] is True
     assert items[1]["value"] == "preserved"
     assert user_section["keep_meta"] is True
+
+
+@pytest.mark.parametrize("keep_running,timeout", [(True, 60), (False, 0), (True, 150.5)])
+def test_webui_session_settings_are_grouped_without_changing_saved_paths(keep_running, timeout) -> None:
+    example_path = server.CODE_DIR / "data" / "example_config.py"
+    example_config = server._load_config_from_file(example_path)
+    assert example_config is not None
+    defaults = example_config["DEFAULT"]
+    original_defaults = dict(defaults)
+    comments, subsections = server._extract_example_metadata(example_path)
+    user_defaults = {
+        "webui_keep_uploads_on_disconnect": keep_running,
+        "webui_unattended_prompt_timeout": timeout,
+    }
+
+    prepared = server._prepare_default_webui_section(defaults, comments, subsections)
+    items = server._build_config_items(prepared, user_defaults, comments, subsections, ["DEFAULT"])
+
+    assert [item["key"] for item in items[:3]] == ["MAIN SETTINGS", "WEBUI SETTINGS", "LOGGING"]
+    session_sections = [item for item in items if item["key"] == "WEBUI SETTINGS"]
+    assert len(session_sections) == 1
+    assert session_sections[0]["subsection"] is True
+    fields = {child["key"]: child for child in session_sections[0]["children"]}
+    assert set(fields) == set(user_defaults)
+    for key, value in user_defaults.items():
+        assert fields[key]["value"] == value
+        assert fields[key]["example_value"] == defaults[key]
+        assert fields[key]["source"] == "config"
+        assert fields[key]["help"] == comments[f"DEFAULT/{key}"]
+    main_settings = next(item for item in items if item["key"] == "MAIN SETTINGS")
+    assert not any(child["key"].startswith("webui_") for child in main_settings["children"])
+    assert defaults == original_defaults
 
 
 def test_current_example_config_exposes_merged_metadata_settings() -> None:

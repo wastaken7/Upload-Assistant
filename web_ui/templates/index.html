@@ -167,12 +167,17 @@
       integrity="sha384-WDYMYmCuXkFj0FX/C0kpV1U5pxmo83sVh+ZFvGHm+4umR3+3JkUokAhJrfXmj3Cj"
       crossorigin="anonymous"
     ></script>
+    {% if screenshot_mode %}
+    <script src="{{ url_for('static', filename='js/screenshot_mode.js') }}"></script>
+    {% endif %}
     <script
       type="text/javascript"
       src="{{ url_for('static', filename='js/shared_utils.js') }}"
     ></script>
     <script src="{{ url_for('static', filename='js/api_key_status.js') }}"></script>
     <script src="{{ url_for('static', filename='js/prompt_sound.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/language_flags_data.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/language_flags.js') }}"></script>
     <script
       type="text/babel"
       src="{{ url_for('static', filename='js/app.js') }}"

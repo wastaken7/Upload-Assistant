@@ -1,0 +1,82 @@
+{
+  "regions": {
+    "243": "CZE",
+    "244": "EUR"
+  },
+  "distributors": {
+    "20": "A&amp;E Home Video",
+    "21": "A&amp;M Records",
+    "87": "Astro Records &amp; Filmworks",
+    "225": "D&#039;ailly Company",
+    "228": "Dall&#039;Angelo Pictures",
+    "240": "Delta Music &amp; Entertainment",
+    "289": "Ein&#039;s M&amp;M CO",
+    "395": "Gunpowder &amp; Sky",
+    "404": "Hell &amp; Back Recordings",
+    "405": "Hen&#039;s Tooth Video",
+    "452": "J&amp;R Adventures",
+    "461": "Kam &amp; Ronson Enterprises",
+    "484": "L&#039;atelier d&#039;images",
+    "506": "Loud &amp; Proud Records",
+    "679": "Polyband &amp; Toppic Video/WVG",
+    "686": "Pride &amp; Joy",
+    "717": "Reliance Home Video &amp; Games",
+    "890": "Uncork&#039;d Entertainment",
+    "898": "Universe Laser &amp; Video Co.",
+    "924": "Virgil Films &amp; Entertainment"
+  },
+  "categories": {
+    "1": "Filmes",
+    "2": "Series",
+    "6": "Animes",
+    "7": "Shows"
+  },
+  "types": {
+    "1": "Full Disc",
+    "2": "Remux",
+    "3": "Encode",
+    "4": "WEB-DL",
+    "5": "WEBRip",
+    "6": "HDTV"
+  },
+  "resolutions": {
+    "1": "4320p",
+    "2": "2160p",
+    "3": "1080p",
+    "4": "1080i",
+    "5": "720p",
+    "6": "576p",
+    "7": "576i",
+    "8": "480p",
+    "9": "480i",
+    "10": "Other"
+  },
+  "regions_complete": true,
+  "distributors_complete": true,
+  "default_ids": {
+    "regions": [
+      "1-242"
+    ],
+    "distributors": [
+      "1-19",
+      "22-86",
+      "88-224",
+      "226-227",
+      "229-239",
+      "241-288",
+      "290-394",
+      "396-403",
+      "406-451",
+      "453-460",
+      "462-483",
+      "485-505",
+      "507-678",
+      "680-685",
+      "687-716",
+      "718-889",
+      "891-897",
+      "899-923",
+      "925-965"
+    ]
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "regions": {},
+  "distributors": {
+    "966": "Cinématographe"
+  },
+  "categories": {
+    "1": "Movies"
+  },
+  "types": {
+    "1": "Full BluRay",
+    "2": "BluRay Remux",
+    "3": "Full DVD",
+    "4": "DVD Remux",
+    "5": "Bluray Encode",
+    "6": "DVDRip",
+    "7": "WEB-DL",
+    "8": "WEBRip",
+    "9": "UHDTV",
+    "10": "HDTV",
+    "11": "SDTV",
+    "12": "VHS / LD / WOC",
+    "14": "Upscale",
+    "15": "Restoration",
+    "17": "SoundTrack"
+  },
+  "resolutions": {
+    "1": "4320p",
+    "2": "2160p",
+    "3": "1080p",
+    "4": "1080i",
+    "5": "720p",
+    "6": "576p",
+    "7": "576i",
+    "8": "480p",
+    "9": "480i",
+    "10": "360p",
+    "11": "540p",
+    "12": "FLAC",
+    "13": "Other RES"
+  },
+  "regions_complete": true,
+  "distributors_complete": true,
+  "default_ids": {
+    "regions": [
+      "1-244"
+    ],
+    "distributors": [
+      "1-965"
+    ]
+  }
+}

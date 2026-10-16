@@ -1,3 +1,5 @@
+# ruff: noqa: S101
+
 import json
 import shutil
 from pathlib import Path
@@ -25,7 +27,7 @@ def test_copied_example_documents_groups_without_enabling_them(tmp_path, monkeyp
     assert example_path.read_bytes() == original_example
     generated_source = config_path.read_text(encoding="utf-8")
     assert '# "MyAwesomeGroupTag": {' in generated_source
-    assert "# Override description text fields for specific release groups." in generated_source
+    assert "# Override description presentation settings for specific release groups." in generated_source
     assert "# Per-tracker tag_overrides take precedence over these DEFAULT overrides." in generated_source
     assert "# Set to True to display a notice when an update is available." in generated_source
     items = server._build_config_items(example["DEFAULT"], saved["DEFAULT"], {}, {}, ["DEFAULT"])
@@ -61,7 +63,7 @@ def config_files(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(server, "_is_authenticated", lambda: True)
     monkeypatch.setattr(server, "_verify_csrf_header", lambda: True)
     monkeypatch.setattr(server, "_verify_same_origin", lambda: True)
-    monkeypatch.setattr(server, "_write_audit_log", lambda *args, **kwargs: None)
+    monkeypatch.setattr(server, "_write_audit_log", lambda *_args, **_kwargs: None)
     return example_path, config_path
 
 
@@ -81,8 +83,27 @@ def test_metadata_uses_only_saved_groups(user):
     assert items[0]["example_value"] == {}
     assert items[0]["children"] == []
     assert {field["key"] for field in items[0]["override_fields"]} == {
-        "custom_description_header", "screenshot_header", "disc_menu_header", "audio_spectrogram_header",
-        "dynamic_hdr_plot_header", "tonemapped_header", "custom_signature",
+        "custom_description_header",
+        "screenshot_header",
+        "disc_menu_header",
+        "audio_spectrogram_header",
+        "dynamic_hdr_plot_header",
+        "tonemapped_header",
+        "custom_signature",
+        "thumbnail_size",
+        "screens_per_row",
+        "pack_thumb_size",
+        "multiScreens",
+        "logo_size",
+        "bluray_image_size",
+        "episode_overview",
+        "add_logo",
+        "full_mediainfo",
+        "add_bluray_link",
+        "use_bluray_images",
+        "add_audio_spectrogram",
+        "add_dynamic_hdr_plot",
+        "hide_screenshot_header_if_only_section",
     }
 
 
@@ -104,6 +125,11 @@ def test_create_edit_rename_and_remove_round_trip(config_files, path):
         "disc_menu_header": "",
         "screenshot_header": None,
         "future_text_field": "preserve existing fields",
+        "thumbnail_size": "400",
+        "screens_per_row": 3,
+        "episode_overview": False,
+        "add_logo": "true",
+        "multiScreens": 0,
     }
     for groups in ({"CustomGroup": {}}, {"CustomGroup": fields}, {"RenamedGroup": fields}, {}):
         result, status = update(path, json.dumps(groups))
@@ -118,13 +144,34 @@ def test_create_edit_rename_and_remove_round_trip(config_files, path):
             assert builder._get_str_config("custom_signature", "fallback", meta) == fields["custom_signature"]
             assert builder._get_str_config("disc_menu_header", "fallback", meta) == ""
             assert builder._get_str_config("screenshot_header", "fallback", meta) == "inherited screenshots"
+            assert builder._get_int_config("thumbnail_size", 350, meta) == 400
+            assert builder._get_int_config("screens_per_row", 2, meta) == 3
+            assert builder._get_bool_config("episode_overview", True, meta) is False
+            assert builder._get_bool_config("add_logo", False, meta) is True
+            assert builder._get_int_config("multiScreens", 2, meta) == 0
     assert example_path.read_bytes() == original_example
 
 
-@pytest.mark.parametrize("value", [
-    "{invalid json", [], {"Group": []}, {"Group": {"custom_signature": 12}},
-    {"": {}}, {"---": {}}, {"Bad\nName": {}}, {"Group": {}, "-gRoUp": {}}, {"Straße": {}, "STRASSE": {}},
-])
+@pytest.mark.parametrize(
+    "value",
+    [
+        "{invalid json",
+        [],
+        {"Group": []},
+        {"Group": {"custom_signature": 12}},
+        {"Group": {"episode_overview": []}},
+        {"Group": {"episode_overview": "invalid"}},
+        {"Group": {"thumbnail_size": True}},
+        {"Group": {"screens_per_row": -1}},
+        {"Group": {"thumbnail_size": "400.5"}},
+        {"Group": {"thumbnail_size": 400.5}},
+        {"": {}},
+        {"---": {}},
+        {"Bad\nName": {}},
+        {"Group": {}, "-gRoUp": {}},
+        {"Straße": {}, "STRASSE": {}},
+    ],
+)
 def test_invalid_maps_do_not_modify_config(config_files, value):
     _, config_path = config_files
     original = config_path.read_bytes()
@@ -156,3 +203,26 @@ def test_updates_require_authenticated_same_origin_session(config_files, monkeyp
 
     assert actual_status == status
     assert config_path.read_bytes() == original
+
+
+@pytest.mark.parametrize("field", ["thumbnail_size", "pack_thumb_size", "logo_size", "bluray_image_size"])
+@pytest.mark.parametrize("value", [0, "0", -1, "", True])
+def test_invalid_image_sizes_do_not_modify_config(config_files, field, value):
+    _, config_path = config_files
+    original = config_path.read_bytes()
+    _, status = update(["DEFAULT", "tag_overrides"], {"FictionalGroup": {field: value}})
+    assert status == 400
+    assert config_path.read_bytes() == original
+
+
+@pytest.mark.parametrize("field,minimum", [("thumbnail_size", 1), ("pack_thumb_size", 1), ("logo_size", 1), ("bluray_image_size", 1), ("screens_per_row", 0), ("multiScreens", 0)])
+def test_numeric_bounds_match_editor_and_allow_minimum(config_files, field, minimum):
+    _, config_path = config_files
+    for value in (minimum, str(minimum), None):
+        _, status = update(["DEFAULT", "tag_overrides"], {"FictionalGroup": {field: value}})
+        assert status == 200
+        saved = server._load_config_from_file(config_path)
+        assert saved["DEFAULT"]["tag_overrides"]["FictionalGroup"][field] == value
+    items = server._build_config_items({"tag_overrides": {}}, {}, {}, {}, ["DEFAULT"])
+    metadata = next(entry for entry in items[0]["override_fields"] if entry["key"] == field)
+    assert metadata["field_min"] == minimum

@@ -20,7 +20,7 @@
     trackerItems = [],
     pendingChanges = new Map(),
   }) => {
-    const defaultValue = String(defaults[key] ?? "");
+    const defaultValue = defaults[key] ?? "";
     if (pathParts[0] !== "TRACKERS") {
       return {
         value: defaultValue,
@@ -32,7 +32,7 @@
     }
 
     const result = (value, source) => ({
-      value: String(value),
+      value,
       preview: String(value),
       placeholder: "",
       inheritedLabel: `Inherits ${source}`,
@@ -45,7 +45,7 @@
         preview: "",
         placeholder: "Check global release-group settings",
         inheritedLabel: "Inherited source unavailable",
-        overrideLabel: "Overrides inherited text",
+        overrideLabel: "Overrides inherited values",
       };
     }
     for (const [groupName, fields] of Object.entries(globalGroups)) {

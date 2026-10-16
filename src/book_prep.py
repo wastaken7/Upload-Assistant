@@ -20,7 +20,7 @@ from urllib.parse import urlparse, urlsplit
 
 import langcodes
 
-from src.audible import fetch_audible_metadata, normalize_audible_domain, normalize_audible_url
+from src.audible import fetch_audible_metadata, normalize_audible_domain, normalize_audible_url, resolve_audible_url
 from src.book_extractors import (
     extract_audiobook_series_from_title as _extract_audiobook_series_from_title,
 )
@@ -763,6 +763,22 @@ async def gather_book_prep(
                 meta.audible_rating_count = audible_data.get("rating_count")
                 if not cli_overrides["author"]:
                     meta.audible_authors = audible_data.get("audible_authors", [])
+
+    # Persist the final product link before meta is saved for the Web UI review.
+    if meta.asin:
+        if meta.audible_url:
+            try:
+                url_asin = normalize_audible_url(meta.audible_url).rsplit("/", 1)[-1]
+            except ValueError:
+                url_asin = ""
+            if url_asin != str(meta.asin).strip().upper():
+                meta.audible_url = ""
+        with contextlib.suppress(ValueError):
+            meta.audible_url = resolve_audible_url(
+                meta.asin,
+                explicit_url=meta.audible_url,
+                domain=(config or {}).get("DEFAULT", {}).get("audible_domain", ""),
+            )
 
     if meta.audiobook:
         filelist = meta.filelist

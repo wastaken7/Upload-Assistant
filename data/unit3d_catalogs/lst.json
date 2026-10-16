@@ -1,0 +1,94 @@
+{
+  "regions": {
+    "245": "FIN",
+    "246": "SWE"
+  },
+  "distributors": {
+    "966": "Crunchyroll, LLC",
+    "967": "VIZ Media, LLC",
+    "968": "A24",
+    "969": "Adult Source Media (ASM)",
+    "970": "Radiance Films",
+    "971": "SoftCel Pictures",
+    "972": "Xenon Pictures",
+    "973": "Studio N",
+    "974": "Artisan Entertainment",
+    "975": "Deaf Crocodile Films",
+    "976": "Cinématographe",
+    "977": "Klubb Super 8",
+    "978": "Kani",
+    "979": "Distribpix",
+    "980": "Epicentre Films",
+    "981": "Hammer Films",
+    "982": "ADV Films",
+    "983": "Bandai Entertainment",
+    "984": "Central Park Media",
+    "985": "Manga Corps",
+    "986": "Blue Light",
+    "987": "WMM",
+    "988": "Whole Grain Pictures",
+    "989": "Fox Video (Italy)",
+    "990": "Plaion Pictures",
+    "991": "Icon Productions",
+    "992": "Terror Vision",
+    "993": "KimStim",
+    "994": "MovieOn",
+    "995": "Angel Studios",
+    "996": "Palm Pictures",
+    "997": "CG Entertainment",
+    "998": "Finnkino",
+    "999": "ETR Media",
+    "1000": "Budapest Film Kft"
+  },
+  "categories": {
+    "1": "Movies",
+    "2": "TV",
+    "3": "Music",
+    "4": "Game",
+    "8": "XXX",
+    "9": "Ebook/Manga",
+    "10": "Education",
+    "11": "FANRES"
+  },
+  "types": {
+    "1": "Full Disc",
+    "2": "Remux",
+    "3": "Encode",
+    "4": "WEB-DL",
+    "5": "WEBRip",
+    "6": "HDTV",
+    "7": "FLAC",
+    "8": "ALAC",
+    "9": "AC3",
+    "10": "AAC",
+    "11": "MP3",
+    "12": "Mac",
+    "13": "Windows",
+    "14": "Linux",
+    "15": "Other",
+    "16": "SDTV"
+  },
+  "resolutions": {
+    "1": "4320p",
+    "2": "2160p",
+    "3": "1080p",
+    "4": "1080i",
+    "5": "720p",
+    "6": "576p",
+    "7": "576i",
+    "8": "480p",
+    "9": "480i",
+    "10": "Other",
+    "11": "Extras"
+  },
+  "regions_complete": true,
+  "distributors_complete": true,
+  "default_ids": {
+    "regions": [
+      "1-244"
+    ],
+    "distributors": [
+      "1-965"
+    ]
+  }
+}

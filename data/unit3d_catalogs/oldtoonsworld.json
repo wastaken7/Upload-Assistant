@@ -1,0 +1,71 @@
+{
+  "regions": {},
+  "distributors": {
+    "966": "Deaf Crocodile",
+    "967": "Rhino Home Video",
+    "968": "US Manga Corps",
+    "969": "ADV Films",
+    "970": "Crunchyroll"
+  },
+  "categories": {
+    "1": "Movies",
+    "2": "TV",
+    "3": "Books",
+    "4": "Audio",
+    "5": "Games",
+    "6": "WOC",
+    "7": "Anime Movies",
+    "8": "Anime TV"
+  },
+  "types": {
+    "1": "Full Blu-Ray",
+    "2": "Remux",
+    "3": "Encode",
+    "4": "WEB-DL",
+    "5": "WEBRip",
+    "6": "HDTV",
+    "7": "Full DVD",
+    "8": "DVDRip",
+    "9": "Comics",
+    "10": "Manga",
+    "11": "SoundTrack",
+    "12": "For Kids",
+    "13": "Pack",
+    "14": "VHSRip",
+    "15": "Games",
+    "16": "Upscale",
+    "17": "TV Rip",
+    "18": "WOC",
+    "19": "LaserDisc",
+    "21": "AudioBooks"
+  },
+  "resolutions": {
+    "1": "4320p",
+    "2": "2160p",
+    "3": "1080p",
+    "4": "1080i",
+    "5": "720p",
+    "6": "576p",
+    "7": "576i",
+    "8": "480p",
+    "9": "480i",
+    "10": "Other",
+    "11": "640p",
+    "12": "Undefined"
+  },
+  "regions_complete": true,
+  "distributors_complete": true,
+  "default_ids": {
+    "regions": [
+      "1-242"
+    ],
+    "distributors": [
+      "1-965"
+    ]
+  },
+  "aliases": {
+    "CRUNCHYROLL LLC": 970,
+    "CRUNCHYROLL, LLC": 970,
+    "U.S. MANGA CORPS": 968
+  }
+}

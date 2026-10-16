@@ -412,6 +412,7 @@ class Args:
                 "midnightscene": "MidnightScene",
                 "passtheimage": "PassTheImage",
                 "seedpool_cdn": "Seedpool CDN",
+                "thrimg": "THRImg",
                 "utppm": "UTPPM",
                 "lostimg": "LostImg",
             }
@@ -848,6 +849,7 @@ class Args:
                 "midnightscene",
                 "passtheimage",
                 "seedpool_cdn",
+                "thrimg",
                 "utppm",
                 "lostimg",
             ],
@@ -1122,6 +1124,16 @@ class Args:
 
         if meta.tmdb_manual is not None or meta.imdb_manual is not None:
             meta.tmdb_manual = meta.tmdb_id = meta.tmdb = meta.imdb_id = meta.imdb = None
+        # An ASIN correction replaces a carried product URL. Explicit URLs in
+        # this invocation are still checked for conflicts below.
+        if parsed_args.get("book_asin") and not parsed_args.get("audible_url") and meta.audible_url:
+            new_asin = self.list_to_string(parsed_args["book_asin"]).strip().upper()
+            try:
+                carried_asin = normalize_audible_url(meta.audible_url).rsplit("/", 1)[-1]
+            except ValueError:
+                carried_asin = ""
+            if carried_asin != new_asin:
+                meta.audible_url = ""
         for key in parsed_args:
             value = parsed_args[key]
             if value not in (None, []):
@@ -1130,6 +1142,9 @@ class Args:
                     value2 = self.list_to_string(value_list)
                     if key == "manual_type":
                         meta.manual_type = value2.upper().replace("-", "")
+                    elif key in ("region", "distributor"):
+                        meta[key] = value2.strip().upper()
+                        meta[f"bluray_auto_{key}"] = None
                     elif key == "tag":
                         meta[key] = f"-{value2}"
                     elif key == "description_file" or key == "comparison":

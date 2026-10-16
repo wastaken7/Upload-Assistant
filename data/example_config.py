@@ -13,6 +13,12 @@ config: dict[str, Any] = {
         # Set to True to play a bell sound before release confirmation (CLI and WebUI).
         # WebUI sound plays in the browser; allow site audio and keep the tab unmuted.
         "sfx_on_prompt": True,
+        # Set to True to keep WebUI uploads running after their browser tab closes or disconnects.
+        # Reopen the WebUI to resume watching them. Set to False to kill an upload when its tab disconnects.
+        "webui_keep_uploads_on_disconnect": True,
+        # Minutes a WebUI upload may wait at an unanswered prompt with no browser connected before it is killed.
+        # Set to 0 to wait indefinitely.
+        "webui_unattended_prompt_timeout": 60,
         # Set to True to apply argument overrides from data/templates/user-args.json.
         "user_overrides": False,
         # Apply --personalrelease when the detected release group matches any tag (case-insensitive).
@@ -226,7 +232,7 @@ config: dict[str, Any] = {
         "prowlarr_api_key": "",
         # --- IMAGE HOSTING ---
         # Order of image hosts, with the primary host first and backups after it.
-        # Available image hosts: catbox, dalexni, imgbb, imgbox, lensdump, lostimg, midnightscene, onlyimage, passtheimage, pixhost, ptscreens, seedpool_cdn, sharex, utppm, zipline
+        # Available image hosts: catbox, dalexni, imgbb, imgbox, lensdump, lostimg, midnightscene, onlyimage, passtheimage, pixhost, ptscreens, seedpool_cdn, sharex, thrimg, utppm, zipline
         "img_host_1": "",
         "img_host_2": "",
         "img_host_3": "",
@@ -261,6 +267,7 @@ config: dict[str, Any] = {
         # ShareX-style image host (IMageHosting) token
         "sharex_url": "https://img.digitalcore.club/api/upload",
         "sharex_api_key": "",
+        "thrimg_api": "",
         # utp.pm API key
         "utppm_api": "",
         # Custom Zipline URL and API key
@@ -398,7 +405,8 @@ config: dict[str, Any] = {
         # Header added above the screenshot section where supported.
         # Can be overridden per tracker by adding the same setting to its configuration.
         "screenshot_header": "[h2]Screenshots[/h2]",
-        # Set to False to keep the screenshot header even when screenshots are the only section.
+        # Hide a lone generated image-section header; logos, text and signatures do not count.
+        # Set to False to always keep image-section headers.
         "hide_screenshot_header_if_only_section": True,
         # Header added above screenshots after HDR tone mapping.
         # Can be overridden per tracker by adding the same setting to its configuration.
@@ -414,7 +422,7 @@ config: dict[str, Any] = {
         # Custom signature added to the bottom of the description.
         # Can be overridden per tracker by adding the same setting to its configuration.
         "custom_signature": "",
-        # Override description text fields for specific release groups. Tags are matched
+        # Override description presentation settings for specific release groups. Tags are matched
         # case-insensitively, with or without their leading hyphen.
         # Per-tracker tag_overrides take precedence over these DEFAULT overrides.
         "tag_overrides": {
@@ -427,6 +435,9 @@ config: dict[str, Any] = {
             #     "dynamic_hdr_plot_header": "[h2]MyAwesomeGroupTag Dynamic HDR Metadata[/h2]",
             #     "tonemapped_header": "[center]MyAwesomeGroupTag SDR reference screenshots[/center]",
             #     "custom_signature": "[center]MyAwesomeGroupTag signature[/center]",
+            #     "thumbnail_size": "400",
+            #     "screens_per_row": "3",
+            #     "episode_overview": False,
             # },
         },
         # --- BLU-RAY SETTINGS ---
@@ -494,6 +505,11 @@ config: dict[str, Any] = {
         # For example, 20 excludes a duplicate that is at least 20% larger or smaller.
         # Set to None or remove this setting to disable the feature.
         "dupe_size_difference_tolerance": None,
+        # Check MOVIE and TV duplicates against each tracker's slot rules, where Upload Assistant has them.
+        # Shows a recommendation (upload / don't upload / review) with the date of the rules it is based on.
+        # In unattended mode the recommendation decides whether to upload; when it can't decide, the basic check is used.
+        # Default: True (also when this setting is missing).
+        "slot_rules": True,
         # See docs/upload-order-and-bandwidth-control.md for workflows and qBittorrent requirements.
         "upload_order": "concurrent",
         "qbit_bandwidth_control": False,
@@ -550,7 +566,7 @@ config: dict[str, Any] = {
         #   DREADVAULT, DRUNKENSLUG, EMUWAREZ, FILELIST, FLOOD, FUNFILE, GREATPOSTERWALL, HAWKEUNO, HDBITS, HDSPACE, HDTORRENTS, HOMIEHELPDESK,
         #   IMMORTALSEED, INFINITYHD, IPTORRENTS, ITATORRENTS, LAJIDUI, LASTDIGITALUNDERGROUND, LATTEAM, LEMONHD, LOCADORA, LONGPT, LST,
         #   LUMINARR, MAKINGOFF, MIDNIGHTSCENE, MTEAM, NEBULANCE, NORDICQUALITY, NZBGEEK, NZBNEST, OLDTOONSWORLD, ONLYENCODES, ORPHEUS, PASSTHEPOPCORN,
-        #   PEERGARDEN, POLISHTORRENT, PORTUGAS, PRIVATEHD, PTCAFE, PTERCLUB, PTFANS, PTGTK, PTSKIT, PTZONE, RACING4EVERYONE, RAILGUNPT,
+        #   PEERGARDEN, POLISHTORRENT, PORTUGAS, PRIVATEHD, PTCAFE, PTERCLUB, PTFANS, PTGTK, PTSKIT, PTZONE, QINGWA, RACING4EVERYONE, RAILGUNPT,
         #   RASTASTUGAN, REELFLIX, RETROFLIX, RETROMOVIESCLUB, ROCKETHD, SAMARITANO, SEEDPOOL, SHAREISLAND, SKIPTHECOMMERCIALS, SPEEDAPP,
         #   SUIO, SWARMAZON, THELEACHZONE, THEOLDSCHOOL, TORRENTEROS, TORRENTHR, TORRENTLEECH, TOTHEGLORY, TVCHAOSUK, ULCX, UTOPIA,
         #   XINGYUNGEPT, YUSCENE, ZENITH
@@ -2574,6 +2590,39 @@ config: dict[str, Any] = {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # Cookies required (export from https://ptzone.xyz/ to data/cookies/PTZONE.txt).
+            # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md#how-to-export-cookies
+            "announce_url": "",
+            "anon": True,
+            # The configurations below override the DEFAULT configuration
+            "add_logo": True,
+            "logo_size": "",
+            "thumbnail_size": "",
+            "screens_per_row": "",
+            "episode_overview": True,
+            "multiScreens": "",
+            "pack_thumb_size": "",
+            "charLimit": "",
+            "fileLimit": "",
+            "processLimit": "",
+            "custom_description_header": "",
+            "screenshot_header": "",
+            "disc_menu_header": "",
+            "mediainfo_header": "",
+            "audio_spectrogram_header": "",
+            "custom_signature": "",
+            "user_description": "",
+            "custom_header": "",
+            "custom_footer": "",
+            "use_bluray_images": True,
+            "bluray_image_size": "",
+            "add_audio_spectrogram": True,
+            "inject_delay": 0,
+        },
+        "QINGWA": {
+            "cli_alias": "QW",
+            # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
+            "link_dir_name": "",
+            # Cookies required (export from https://www.qingwapt.com/ to data/cookies/QINGWA.txt).
             # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md#how-to-export-cookies
             "announce_url": "",
             "anon": True,

@@ -30,6 +30,43 @@ def test_audible_url_argument_rejects_conflicting_asin(tmp_path):
         )
 
 
+def test_asin_correction_clears_carried_audible_url(tmp_path):
+    meta = Meta(asin="B000000001", audible_url="https://www.audible.com.br/pd/B000000001")
+
+    meta, _, _ = Args({"DEFAULT": {"screens": 1}}).parse([str(tmp_path), "--asin", "B0TEST1234"], meta)
+
+    assert meta.asin == "B0TEST1234"
+    assert meta.audible_url == ""
+
+
+def test_unchanged_asin_preserves_carried_audible_marketplace(tmp_path):
+    meta = Meta(asin="B0TEST1234", audible_url="https://www.audible.co.uk/pd/B0TEST1234")
+
+    meta, _, _ = Args({"DEFAULT": {"screens": 1}}).parse([str(tmp_path), "--asin", "B0TEST1234"], meta)
+
+    assert meta.audible_url == "https://www.audible.co.uk/pd/B0TEST1234"
+
+
+@pytest.mark.parametrize(
+    "carried_url",
+    [
+        "not-a-url",
+        "http://www.audible.com/pd/B0TEST1234",
+        "https://example.com/pd/B0TEST1234",
+        "https://www.audible.com/pd/not-an-asin",
+        "https://[invalid/pd/B0TEST1234",
+    ],
+)
+def test_asin_correction_clears_invalid_carried_audible_url(tmp_path, carried_url):
+    meta = Meta(asin="B000000001", audible_url=carried_url)
+
+    meta, _, _ = Args({"DEFAULT": {"screens": 1}}).parse([str(tmp_path), "--asin", "B0TEST1234"], meta)
+
+    assert meta.asin == "B0TEST1234"
+    assert meta.book_asin == "B0TEST1234"
+    assert meta.audible_url == ""
+
+
 def test_audible_helpers_support_regional_marketplaces():
     assert build_audible_url("B0TEST1234", "audible.com.br") == "https://www.audible.com.br/pd/B0TEST1234"
     assert normalize_audible_url("https://audible.co.uk/pd/Title/B0TEST1234") == "https://www.audible.co.uk/pd/B0TEST1234"

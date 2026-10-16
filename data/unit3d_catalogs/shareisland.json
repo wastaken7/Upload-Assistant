@@ -1,0 +1,17 @@
+{
+  "distributors": {
+    "966": "Fandango",
+    "967": "Universal Pictures Home Entertainment",
+    "968": "Warner Home Video",
+    "969": "Cecchi Gori Home Video",
+    "970": "Terminal Video",
+    "971": "CG Entertainment"
+  },
+  "aliases": {
+    "UNIVERSAL HOME": 967,
+    "UNIVERSAL HOME ENTERTAINMENT": 967
+  },
+  "excluded_aliases": [
+    "UNIVERSAL ENTERTAINMENT"
+  ]
+}

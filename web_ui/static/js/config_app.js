@@ -122,7 +122,7 @@ const CONFIG_HELP_SECTION_HEADINGS = {
 const DESCRIPTION_HELP_OVERRIDES = {
   add_logo: "Add a TMDb show or movie logo to the top of the description.",
   hide_screenshot_header_if_only_section:
-    "Hide the screenshot header when screenshots are the only section in the description.",
+    "Hide a lone image-section header (screenshots, disc menus, spectrograms or HDR plots). Logos, text and signatures do not count. Tone-mapping notices are preserved.",
 };
 
 const getConfigHelpText = (item, pathParts) => {
@@ -544,7 +544,12 @@ const DEFAULT_WORKFLOW_GROUPS = [
   {
     id: "general",
     label: "General",
-    headings: ["MAIN SETTINGS", "LOGGING", "EXTERNAL TOOL PATHS"],
+    headings: [
+      "MAIN SETTINGS",
+      "WEBUI SETTINGS",
+      "LOGGING",
+      "EXTERNAL TOOL PATHS",
+    ],
   },
   {
     id: "metadata",
@@ -715,6 +720,7 @@ const METADATA_CACHE_SERVICE_GROUPS = [
 
 const CONFIG_HEADING_LABELS = {
   "MAIN SETTINGS": "Main Settings",
+  "WEBUI SETTINGS": "WebUI Settings",
   LOGGING: "Logging",
   "METADATA API CREDENTIALS": "Metadata API Credentials",
   "ARR INTEGRATION": "ARR Integration",
@@ -749,6 +755,8 @@ const CONFIG_HEADING_LABELS = {
 };
 
 const CONFIG_HEADING_DESCRIPTIONS = {
+  "WEBUI SETTINGS":
+    "Control uploads when their browser disconnects. Saved changes apply to newly started uploads. Set the prompt timeout to 0 to wait indefinitely.",
   "EXTERNAL TOOL PATHS":
     "Optional executable overrides. Leave fields blank to use automatically managed tools or executables on the system PATH. Check Tools detects their availability without downloading or installing anything.",
   "PROWLARR CREDENTIAL FALLBACK":
@@ -978,6 +986,8 @@ const SCREENSHOT_OVERLAY_CHOICES = {
   ],
 };
 const DISPLAY_LABEL_OVERRIDES = {
+  webui_keep_uploads_on_disconnect: "Keep Uploads on Disconnect",
+  webui_unattended_prompt_timeout: "Unattended Prompt Timeout (minutes)",
   frame_overlay: "Enable Frame Overlay",
   overlay_position: "Alignment",
   overlay_layout: "Layout",
@@ -986,7 +996,7 @@ const DISPLAY_LABEL_OVERRIDES = {
   overlay_timestamp: "Timestamp",
   overlay_tonemapped: "Tonemapped Label",
   tag_overrides: "Release Group Overrides",
-  hide_screenshot_header_if_only_section: "Hide Standalone Screenshot Header",
+  hide_screenshot_header_if_only_section: "Hide Standalone Image Header",
   multiScreens: "Multiple Screenshots",
   charLimit: "Character Limit",
   fileLimit: "File Limit",
@@ -1002,6 +1012,7 @@ const DISPLAY_LABEL_OVERRIDES = {
   ptscreens_api: "PTScreens API Key",
   seedpool_cdn_api: "Seedpool CDN API Key",
   sharex_api_key: "ShareX API Key",
+  thrimg_api: "THRImg API Key",
   utppm_api: "UTPPM API Key",
   zipline_api_key: "Zipline API Key",
   ggn_api_key: "GazelleGames API Key",
@@ -1268,6 +1279,7 @@ const imageHostApiKeys = {
   midnightscene: ["midnightscene_api_key"],
   seedpool_cdn: ["seedpool_cdn_api"],
   sharex: ["sharex_url", "sharex_api_key"],
+  thrimg: ["thrimg_api"],
   utppm: ["utppm_api"],
 };
 
@@ -1297,6 +1309,7 @@ const IMAGE_HOST_LABELS = {
   ptscreens: "PTScreens",
   seedpool_cdn: "Seedpool CDN",
   sharex: "ShareX",
+  thrimg: "THRImg",
   utppm: "UTPPM",
   zipline: "Zipline",
 };
@@ -1405,6 +1418,7 @@ const trackerNameMap = {
   PTGTK: "PT GTK",
   PTSKIT: "PTSKIT",
   PTZONE: "PTZone",
+  QINGWA: "QingWa",
   RACING4EVERYONE: "Racing4Everyone",
   RAILGUNPT: "RailgunPT",
   RASTASTUGAN: "Rastastugan",
@@ -1514,6 +1528,7 @@ const NumberInput = ({
   min = 0,
   max = 100,
   step = 1,
+  rejectOutOfRange = false,
   className = "",
   isDarkMode = false,
 }) => {
@@ -1541,7 +1556,11 @@ const NumberInput = ({
       return;
     }
     const numValue = Number(draftValue);
-    if (draftValue.trim() === "" || !Number.isFinite(numValue)) {
+    if (
+      draftValue.trim() === "" ||
+      !Number.isFinite(numValue) ||
+      (rejectOutOfRange && (numValue < min || numValue > max))
+    ) {
       setDraftValue(String(normalizedValue));
       return;
     }
@@ -2578,6 +2597,7 @@ function ConfigLeafEditor({
       "rehash_cooldown",
       "custom_layout",
       "screens_per_row",
+      "webui_unattended_prompt_timeout",
     ];
     return numericFields.includes(key);
   };
@@ -2614,6 +2634,8 @@ function ConfigLeafEditor({
   // Hooks for numeric values
   const getDefaultValue = (key) => {
     switch (key) {
+      case "webui_unattended_prompt_timeout":
+        return 60;
       case "mkbrr_threads":
       case "rehash_cooldown":
         return 0;
@@ -2937,6 +2959,13 @@ function ConfigLeafEditor({
     // Define min/max for different fields
     const getFieldLimits = (key) => {
       switch (key) {
+        case "webui_unattended_prompt_timeout":
+          return {
+            min: 0,
+            max: Number.MAX_SAFE_INTEGER,
+            step: "any",
+            rejectOutOfRange: true,
+          };
         case "tracker_pass_checks":
           return { min: 1, max: 20, step: 1 };
         case "mkbrr_threads":
@@ -3031,6 +3060,7 @@ function ConfigLeafEditor({
             min={limits.min}
             max={limits.max}
             step={limits.step}
+            rejectOutOfRange={limits.rejectOutOfRange}
             isDarkMode={isDarkMode}
           />
         </div>
@@ -4038,11 +4068,21 @@ function ReleaseGroupOverrides({
   const setFieldEnabled = (name, key, enabled) => {
     const nextValues = { ...groups[name] };
     if (enabled) {
-      nextValues[key] =
+      const value =
         draftCache.current.get(pathKey)?.get(name)?.get(key) ??
         inheritedField(name, key).value;
+      const field = fields.find((field) => field.key === key);
+      const fieldType = field?.field_type;
+      nextValues[key] =
+        fieldType === "boolean"
+          ? ["true", "1", "yes", "on"].includes(
+              String(value).trim().toLowerCase(),
+            )
+          : fieldType === "number" && value === ""
+            ? field.field_min
+            : value;
     } else {
-      // Remember disabled text only for this editing session, outside the saved map.
+      // Remember disabled values only for this editing session, outside the saved map.
       const scopeDrafts = draftCache.current.get(pathKey) || new Map();
       const groupDrafts = scopeDrafts.get(name) || new Map();
       groupDrafts.set(key, nextValues[key]);
@@ -4131,8 +4171,8 @@ function ReleaseGroupOverrides({
           </span>
           <span className="ua-config-service-description mt-1 block text-xs font-normal">
             {pathParts[0] === "TRACKERS"
-              ? "Override description text for release groups on this tracker."
-              : "Override description text for specific release groups."}
+              ? "Override description presentation settings for release groups on this tracker."
+              : "Override description presentation settings for specific release groups."}
           </span>
         </span>
         <span className="ua-config-service-action shrink-0 text-xs font-medium">
@@ -4158,12 +4198,12 @@ function ReleaseGroupOverrides({
               <p className="ua-config-service-description text-xs leading-relaxed">
                 Names are matched without case or leading hyphens. Tick a field
                 to enable its override. Disabled fields inherit their usual
-                text; an enabled field left empty uses blank text.
+                values; an enabled text field left empty uses blank text.
               </p>
               {pathParts[0] !== "TRACKERS" && (
                 <p className="ua-config-service-description text-xs leading-relaxed">
-                  Inherited text varies by tracker. New overrides start with
-                  DEFAULT text; tracker-specific release-group overrides still
+                  Inherited values vary by tracker. New overrides start with
+                  DEFAULT values; tracker-specific release-group overrides still
                   take priority.
                 </p>
               )}
@@ -4342,31 +4382,109 @@ function ReleaseGroupOverrides({
                                     </Tooltip>
                                   )}
                                 </div>
-                                <input
-                                  id={textId}
-                                  type="text"
-                                  aria-label={`${label} for ${name}`}
-                                  aria-describedby={`${textId}--source`}
-                                  disabled={!enabled}
-                                  value={
-                                    enabled
-                                      ? values[field.key]
-                                      : inherited.preview
-                                  }
-                                  placeholder={
-                                    enabled ? "" : inherited.placeholder
-                                  }
-                                  className="ua-config-input mt-auto w-full rounded-md border px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
-                                  onChange={(event) =>
-                                    updateGroups({
-                                      ...groups,
-                                      [name]: {
-                                        ...values,
-                                        [field.key]: event.target.value,
-                                      },
-                                    })
-                                  }
-                                />
+                                {field.field_type === "boolean" ? (
+                                  <select
+                                    id={textId}
+                                    aria-label={`${label} for ${name}`}
+                                    aria-describedby={`${textId}--source`}
+                                    disabled={!enabled}
+                                    value={
+                                      !enabled && inherited.preview === ""
+                                        ? ""
+                                        : ["true", "1", "yes", "on"].includes(
+                                              String(
+                                                enabled
+                                                  ? values[field.key]
+                                                  : inherited.value,
+                                              )
+                                                .trim()
+                                                .toLowerCase(),
+                                            )
+                                          ? "true"
+                                          : "false"
+                                    }
+                                    className="ua-config-input mt-auto w-full rounded-md border px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                                    onChange={(event) =>
+                                      updateGroups({
+                                        ...groups,
+                                        [name]: {
+                                          ...values,
+                                          [field.key]:
+                                            event.target.value === "true",
+                                        },
+                                      })
+                                    }
+                                  >
+                                    {!enabled && inherited.preview === "" && (
+                                      <option value="">
+                                        {inherited.placeholder}
+                                      </option>
+                                    )}
+                                    <option value="true">True</option>
+                                    <option value="false">False</option>
+                                  </select>
+                                ) : (
+                                  <input
+                                    id={textId}
+                                    type={
+                                      field.field_type === "number"
+                                        ? "number"
+                                        : "text"
+                                    }
+                                    min={
+                                      field.field_type === "number"
+                                        ? field.field_min
+                                        : undefined
+                                    }
+                                    step={
+                                      field.field_type === "number"
+                                        ? 1
+                                        : undefined
+                                    }
+                                    aria-label={`${label} for ${name}`}
+                                    aria-describedby={`${textId}--source`}
+                                    disabled={!enabled}
+                                    value={
+                                      enabled
+                                        ? values[field.key]
+                                        : inherited.preview
+                                    }
+                                    placeholder={
+                                      enabled ? "" : inherited.placeholder
+                                    }
+                                    className="ua-config-input mt-auto w-full rounded-md border px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                                    onChange={(event) =>
+                                      updateGroups({
+                                        ...groups,
+                                        [name]: {
+                                          ...values,
+                                          [field.key]: event.target.value,
+                                        },
+                                      })
+                                    }
+                                    onBlur={(event) => {
+                                      if (
+                                        field.field_type === "number" &&
+                                        event.target.value === ""
+                                      ) {
+                                        updateGroups({
+                                          ...groups,
+                                          [name]: {
+                                            ...values,
+                                            [field.key]:
+                                              field.field_min > 0
+                                                ? Math.max(
+                                                    field.field_min,
+                                                    Number(inherited.value) ||
+                                                      field.field_min,
+                                                  )
+                                                : 0,
+                                          },
+                                        });
+                                      }
+                                    }}
+                                  />
+                                )}
                                 <span
                                   id={`${textId}--source`}
                                   className="ua-config-service-description text-xs"
@@ -11567,7 +11685,7 @@ function ConfigApp() {
   }, []);
 
   useEffect(() => {
-    storage.set(THEME_KEY, isDarkMode ? "dark" : "light");
+    window.setUAThemeMode(isDarkMode);
   }, [isDarkMode]);
 
   useEffect(() => {

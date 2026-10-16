@@ -554,13 +554,21 @@ class BroadcasTheNet:
         except (httpx.HTTPError, KeyError, ValueError, TypeError) as exc:
             raise UploadError(f"BTN duplicate lookup failed: {exc}", "red") from exc
 
-    async def _uploaded_torrent_id(self, release_name: str, group_id: str) -> str:
+    async def _uploaded_torrent_id(self, release_name: str, group_id: str, meta: Meta) -> str:
         if not self.api_key:
             raise UploadError("BTN needs an API key to identify the uploaded torrent on a group page", "red")
+        # BTN's getTorrents does not filter by group or release name, so search the
+        # series and match the uploaded release inside its group locally.
+        filters: dict[str, Any] = {}
+        if int(meta.tvdb_id or 0):
+            filters["tvdb"] = str(meta.tvdb_id)
+        elif int(meta.imdb_id or 0):
+            filters["imdb"] = str(meta.imdb_id)
+        expected_release = release_name.strip().casefold()
         for attempt in range(4):
             if attempt:
                 await asyncio.sleep(2)
-            result = await self._api("getTorrents", {"search": {"group_id": group_id, "release": release_name}, "results": 1000, "offset": 0})
+            result = await self._api("getTorrents", {"search": filters, "results": 1000, "offset": 0})
             payload = result.get("result")
             torrents = payload.get("torrents") if isinstance(payload, dict) else None
             if not isinstance(torrents, dict):
@@ -569,13 +577,12 @@ class BroadcasTheNet:
                 str(torrent_id)
                 for torrent_id, item in torrents.items()
                 if isinstance(item, dict)
-                and str(item.get("GroupID") or item.get("groupId") or "") == group_id
-                and str(item.get("ReleaseName") or item.get("releaseName") or "").casefold() == release_name.casefold()
+                and str(item.get("GroupID") or item.get("groupId") or item.get("GroupId") or "").strip() == group_id
+                and any(str(item.get(field) or "").strip().casefold() == expected_release for field in ("ReleaseName", "releaseName", "TorrentName", "Name", "Release"))
             ]
-            if len(matches) == 1:
-                return matches[0]
-            if len(matches) > 1:
-                raise UploadError("BTN returned multiple torrents matching the uploaded release", "red")
+            if matches:
+                # Prefer the newest torrent when an older copy shares the release name.
+                return max(matches, key=lambda torrent_id: int(torrent_id) if torrent_id.isdigit() else -1)
         raise UploadError("BTN did not return the uploaded torrent ID after four API checks", "red")
 
     @staticmethod
@@ -749,7 +756,7 @@ class BroadcasTheNet:
                     raise UploadError(f"BTN upload did not return a registered torrent ID. See {failure_path}", "red")
 
                 if not torrent_id:
-                    torrent_id = await self._uploaded_torrent_id(release_name, group_id)
+                    torrent_id = await self._uploaded_torrent_id(release_name, group_id, meta)
 
                 download = await client.get(f"{self.base_url}/torrents.php?action=download&id={torrent_id}")
                 download.raise_for_status()

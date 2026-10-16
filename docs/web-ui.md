@@ -28,6 +28,14 @@ python upload.py "/path/to/media" --webui 127.0.0.1:5000
 
 Open <http://127.0.0.1:5000> in a browser. The address defaults to `127.0.0.1:5000`; include `HOST:PORT` only when overriding it.
 
+### Screenshot mode
+
+To capture the current interface for documentation, sign in normally and open the Upload page with `?screenshot=1`, for example `http://127.0.0.1:5000/?screenshot=1`.
+
+This browser-only demo shows the fictional **The Automation Menace (1968)** release with frozen FFmpeg, mkbrr, Usenet, spectrogram, and HDR progress. It does not start an upload, run external tools, load your files or tracker configuration, or send API actions. Existing uploads in other tabs continue normally. Authentication is still required.
+
+Use **Choose poster** and **Choose backdrop** to select your fictional artwork (PNG, JPEG, or WebP, up to 4 MiB per image). The backdrop appears behind the poster. Both images stay in your browser and are remembered there independently when storage is available. The demo includes ten subtitle languages with different flags. Choose the theme and resize the panels normally, then click **Hide controls (H)** before taking the screenshot. Press **H** outside a text field to bring the controls back. **Exit demo**, or removing the query parameter, returns to the normal app.
+
 ### Browse roots
 
 Browse roots define the parts of the filesystem visible in the File Browser. They do not grant access to unrelated directories.
@@ -106,6 +114,14 @@ The File Browser lists only content inside the configured browse roots. Use it t
 
 Normal browsing shows non-hidden files and folders inside the permitted roots so that video, disc, book, game, ISO, and other supported upload types remain available. The separate description-file picker is limited to `.txt`, `.nfo`, and `.md` files.
 
+Listings and searches omit dot-prefixed entries, Windows entries marked Hidden or System, and known system folders such as `$RECYCLE.BIN` and `System Volume Information`. Searches do not descend into those folders.
+
+You can also type or paste paths into **Upload paths** on desktop or mobile. Use server paths, one file or folder per line. Enter adds a line; use the execution button to start. One path runs individually, and multiple paths create a WebUI queue. Blank lines and duplicate paths are ignored, surrounding quotes are accepted, and each queue item can have its own arguments. The limit is 1,000 paths per upload.
+
+The server validates the complete selection before starting, and reports the invalid item (or original text line). Paths must exist inside the configured browse roots. Upload folders are inspected for escaping file links and reject directory links and Windows junctions. Local description, comparison, disc menu, poster and banner paths also use the permitted roots. Additional content paths belong in the path field, not in Additional Arguments.
+
+For text queues, paste their paths into **Upload paths** instead of selecting a `.txt` or `.log` queue file. Only temporary queues issued by the running WebUI are accepted outside the content roots; their contents are checked for modifications and their items are revalidated by the upload process. Ordinary CLI queue handling is unchanged. These checks constrain WebUI inputs; OS permissions remain the boundary against concurrent filesystem changes by other server processes or users.
+
 File browsing has no hourly or daily request quota. Folder listings and recursive searches use minute-based limits, while listing the configured roots is exempt. See [Request limits](#request-limits) for the allowances used throughout the WebUI.
 
 #### Custom root order
@@ -139,6 +155,26 @@ After selecting content and reviewing the command:
 4. Answer prompts with the input controls shown at the bottom of the output panel.
 
 The WebUI runs the upload controller in an isolated subprocess so that **Kill** can stop its process tree and interactive input can be forwarded to it.
+
+### Upload tabs
+
+The tab bar above the workspace runs several uploads side by side; for example, an unattended queue in one tab while you prepare other uploads in another. Choose **+** to open a tab; you can prepare many uploads this way. Each tab has its own selection, arguments, output, and prompts. A tab's status dot shows whether it is idle, running, scheduled, waiting for another tab, waiting for your input, finished, or failed. Once metadata is found, the tab is named after the release: `Title (2024)` for films, `Title S01E02` or `Title S01` for series, `Artist – Album` for music, and `Author – Title` for books; queues add the current position, such as `[3/12]`. Until then it shows the file or folder name. Hover over a tab to see the full release name. Closing a running tab asks for confirmation and kills its process. When only one tab is open, its **×** resets it instead: the upload is killed (or a scheduled one cancelled) and the tab starts over empty.
+
+The same content cannot run in two tabs at once, and at most four uploads run at the same time. When all four slots are busy, **Execute Upload** becomes **Schedule Upload**: the upload is checked and queued on the server, and starts automatically, oldest first, as soon as a slot frees, even if no browser is open. A scheduled tab shows **Cancel** instead of **Kill**. Scheduling requires `webui_keep_uploads_on_disconnect`; with it disabled, the button is unavailable until a slot frees.
+
+Tabs you have prepared but not started are saved in the browser, so they come back after a reload together with the running, scheduled, and finished uploads from the server. They are saved per browser, not on the server.
+
+Heavy work is shared between tabs one at a time, so parallel tabs do not overload the machine or the Usenet provider: torrent hashing (mkbrr/torf), Usenet archive and PAR2 creation, Usenet posting, screenshot capture, and BDInfo scans. When two tabs need the same resource, the upload that started first goes first, and the other tab shows **Waiting** until the resource is free. The same limits apply to CLI runs started while the WebUI is busy.
+
+qBittorrent bandwidth control works the same way across tabs; see [Upload Order and qBittorrent Bandwidth Control](upload-order-and-bandwidth-control.md#multiple-concurrent-uploads).
+
+### Leaving the page
+
+Uploads keep running on the server when you close the browser tab, reload the page, or lose the connection (for example when a phone locks its screen). Open the WebUI again, from any browser signed in to it, and each running or recently finished upload reappears in its own tab. Missed output is replayed, and a pending prompt can still be answered. If the connection drops while the page stays open, the tab reconnects by itself.
+
+A finished upload stays available until you close its tab, clear it, or start another upload in it; finished uploads are also dropped after 24 hours or when their slot is needed for a new upload. Closing a running tab still kills its upload.
+
+An upload left waiting at a prompt with no browser connected is killed after `webui_unattended_prompt_timeout` minutes (60 by default), so it cannot hold shared resources indefinitely. Set `webui_keep_uploads_on_disconnect` to `False` to restore the previous behaviour, where closing or disconnecting a tab kills its upload. See [`DEFAULT` options](example-config.md#ux--safety-toggles). Restarting the WebUI server still stops every upload.
 
 ## Monitoring and reviewing a run
 
@@ -178,7 +214,7 @@ Configuration is arranged by task rather than mirroring the raw Python dictionar
 
 | Group          | Page                   | Includes                                                                                   |
 | -------------- | ---------------------- | ------------------------------------------------------------------------------------------ |
-| Settings       | General                | Main settings, logging, and external tool paths.                                           |
+| Settings       | General                | Main settings, WebUI settings, logging, and external tool paths.                           |
 | Settings       | Torrent Clients        | qBittorrent, rTorrent, Deluge, Transmission, and related client definitions.               |
 | Settings       | Metadata Services      | Metadata credentials, Arr integration, caching, and music metadata.                        |
 | Settings       | Image Hosting          | Image-host priority and host credentials.                                                  |
@@ -193,6 +229,8 @@ Configuration is arranged by task rather than mirroring the raw Python dictionar
 | Administration | Access Log             | IP controls, logging level, and recent access activity.                                    |
 
 Hover or focus an information icon beside a setting to read its description. The [configuration reference](example-config.md) remains the authoritative detailed reference for defaults and implementation notes.
+
+Under **Configuration → General → WebUI Settings**, **Keep Uploads on Disconnect** controls whether uploads continue after their browser closes, reloads, or loses its connection. **Unattended Prompt Timeout (minutes)** limits how long an upload may wait at an unanswered prompt while no browser is connected; the default is 60 minutes, and `0` waits indefinitely. Saved changes apply to newly started uploads.
 
 The editor combines bundled defaults from `data/example_config.py` with overrides from the user-state `data/config.py`. If no usable `config.py` exists, the interface displays the example defaults and warns that they have not yet been saved. Successful configuration writes are recorded in `data/config_audit.log`; sensitive values are redacted from that audit trail.
 
@@ -345,7 +383,7 @@ Help links to the documentation home, this WebUI guide, configuration and CLI re
 
 When update notifications are enabled, the WebUI checks GitHub when the page loads or becomes visible and polls again every 30 minutes while it remains open. A successful result is reused for `update_notification_cache_hours` (four hours by default), so polling does not normally make a new GitHub request every time. An available update is shown on the application rail.
 
-Open **Help & Resources** and choose **Check now** to bypass the normal cache. **View changelog** opens release history with filters for WebUI, Core, Trackers, and Configuration changes. A separate, collapsed **Development — Unreleased** panel lists commits merged into the development branch since the latest official release; its commits use the same area filters and change-type badges as released entries, but may change before publication. The current installed release and latest release have separate badges. If GitHub cannot be reached, cached or bundled release information is used when available.
+Open **Help & Resources** and choose **Check now** to bypass the normal cache. **View changelog** opens release history with filters for WebUI, Core, Trackers, Configuration, and Dependencies changes. Dependency updates, including bundled tools and development packages, appear in their own section while retaining contributor attribution and pull request links. A separate, collapsed **Development — Unreleased** panel lists commits merged into the development branch since the latest official release; its commits use the same area filters and change-type badges as released entries, but may change before publication. The current installed release and latest release have separate badges. If GitHub cannot be reached, cached or bundled release information is used when available.
 
 The changelog is derived from the normal Upload Assistant releases; WebUI changes are categorized within those releases rather than using a separate version number.
 

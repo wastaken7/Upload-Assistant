@@ -92,6 +92,7 @@ def test_extract_preview_media_tracks_supports_alternate_track_layout_and_flags(
         {
             "index": 1,
             "language": "English",
+            "language_code": "English",
             "title": "Director Commentary",
             "format": "AC-3",
             "channels": "2",
@@ -153,3 +154,14 @@ def test_extract_preview_media_tracks_skips_empty_placeholders_for_fallback_valu
     assert audio[0]["bitrate"] == "256 kbps"
     assert audio[0]["default"] is True
     assert subtitles[0]["title"] == "SDH"
+
+
+@pytest.mark.parametrize("track_type", ["Audio", "Text"])
+def test_extract_preview_media_tracks_preserves_regional_language_code(track_type) -> None:
+    meta = {"mediainfo": {"tracks": [{"@type": track_type, "Language_String": "Portuguese", "Language": "pt-BR"}]}}
+
+    audio, subtitles = _extract_preview_media_tracks(meta)
+
+    track = (audio or subtitles)[0]
+    assert track["language"] == "Portuguese"
+    assert track["language_code"] == "pt-BR"

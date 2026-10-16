@@ -159,39 +159,6 @@ class AsianCinema(UNIT3D):
 
         return {"keywords": ", ".join(keywords_list[:10])}
 
-    async def get_region_id(self, meta: Meta) -> dict[str, str]:
-        region_map = {
-            "KOR": "1",
-            "JPN": "3",
-            "CHN": "2",
-            "TWN": "4",
-            "SGP": "5",
-            "PHI": "6",
-            "THA": "7",
-            "VIE": "8",
-            "MAS": "9",
-            "IDN": "10",
-            "CAM": "11",
-            "LAO": "12",
-            "HKG": "13",
-            "USA": "14",
-            "GBR": "15",
-            "ESP": "16",
-            "GER": "17",
-            "FRA": "18",
-            "EUR": "19",
-            "MEX": "20",
-            "AUS": "21",
-            "IND": "22",
-            "RUS": "23",
-            "AUT": "24",
-            "NLD": "25",
-            "POL": "26",
-        }
-        region = meta.region
-
-        return {"region_id": region_map.get(region, "")}
-
     async def get_name(self, meta: Meta) -> dict[str, str]:
         name: str = meta.name
         aka: str = meta.aka
