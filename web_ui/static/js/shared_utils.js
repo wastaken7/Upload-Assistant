@@ -519,6 +519,7 @@
     { id: "core", label: "Core" },
     { id: "trackers", label: "Trackers" },
     { id: "configuration", label: "Configuration" },
+    { id: "dependencies", label: "Dependencies" },
   ]);
   const UA_CHANGELOG_TYPES = Object.freeze({
     feat: "Feature",
@@ -579,8 +580,6 @@
     "core",
     "database",
     "db",
-    "dependencies",
-    "dependency",
     "description",
     "docker",
     "docs",
@@ -619,6 +618,21 @@
       .trim()
       .toLowerCase();
     const normalizedSummary = String(summary || "").toLowerCase();
+    if (
+      /^(?:deps(?:[-/].*)?|dependency|dependencies)$/.test(normalizedScope) ||
+      (!normalizedScope &&
+        /^(?:bump|update|upgrade|downgrade|pin|unpin)\b/.test(
+          normalizedSummary,
+        ) &&
+        (/\bdependenc(?:y|ies)\b/.test(normalizedSummary) ||
+          ((/\b(?:from|to)\s+\S*\d/.test(normalizedSummary) ||
+            /\bgroup\b.*\b\d+\s+updates?\b/.test(normalizedSummary)) &&
+            /@(?:github-actions|dependabot|renovate)(?:\[bot\])?\b/.test(
+              normalizedSummary,
+            ))))
+    ) {
+      return "dependencies";
+    }
     if (
       ["webui", "web-ui", "ui", "frontend"].includes(normalizedScope) ||
       /\bweb\s*ui\b/.test(normalizedSummary)
@@ -699,7 +713,9 @@
   }
 
   function getUAChangelogAreaCounts(parsedReleases) {
-    const counts = { all: 0, webui: 0, core: 0, trackers: 0, configuration: 0 };
+    const counts = Object.fromEntries(
+      UA_CHANGELOG_AREAS.map(({ id }) => [id, 0]),
+    );
     parsedReleases.forEach(({ parsed }) => {
       parsed.entries.forEach((entry) => {
         counts.all += 1;

@@ -9,6 +9,7 @@ import importlib
 import hashlib
 import hmac
 import json
+import math
 import mimetypes
 import time
 import os
@@ -3700,7 +3701,14 @@ def _prepare_default_webui_section(
         main_settings = {key: value for key, value in prepared.items() if subsection_map.get(f"DEFAULT/{key}") == "MAIN SETTINGS"}
         prepared = {**main_settings, **prepared}
 
-    return prepared
+    # Keep WebUI-only options together for presentation while saving their
+    # values at the original DEFAULT paths used by the upload session manager.
+    webui_settings = {key: value for key, value in prepared.items() if key.startswith("webui_")}
+    for key in webui_settings:
+        subsection_map[f"DEFAULT/{key}"] = "WEBUI SETTINGS"
+    main_settings = {key: value for key, value in prepared.items() if subsection_map.get(f"DEFAULT/{key}") == "MAIN SETTINGS"}
+    other_settings = {key: value for key, value in prepared.items() if key not in main_settings and key not in webui_settings}
+    return {**main_settings, **webui_settings, **other_settings}
 
 
 def _torrent_client_template(
@@ -5746,7 +5754,19 @@ def _apply_config_update(source: str, example_config: dict[str, Any], data: dict
     elif example_value is None:
         raise ValueError("Path not found in example config")
 
+    is_webui_prompt_timeout = path == ["DEFAULT", "webui_unattended_prompt_timeout"]
+    if is_webui_prompt_timeout:
+        if (
+            isinstance(raw_value, bool)
+            or not isinstance(raw_value, (str, int, float))
+            or (isinstance(raw_value, str) and not raw_value.strip())
+        ):
+            raise ValueError("Enter a timeout in minutes, or 0 to wait indefinitely")
+        # The runtime accepts fractional minutes even though the example is 60.
+        example_value = 60.0
     coerced_value = None if inherit_tracker_override else _coerce_config_value(raw_value, example_value)
+    if is_webui_prompt_timeout and (not math.isfinite(coerced_value) or coerced_value < 0):
+        raise ValueError("Unattended prompt timeout must be a finite number of minutes greater than or equal to 0")
     overlay_choices = {"overlay_position": {"left", "right"}, "overlay_layout": {"stacked", "single_line"}}
     if path[:1] == ["DEFAULT"] and len(path) == 2 and key in overlay_choices and (not isinstance(coerced_value, str) or coerced_value not in overlay_choices[key]):
         raise ValueError(f"Invalid {key} value")
