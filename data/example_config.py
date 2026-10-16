@@ -101,9 +101,6 @@ config: dict[str, Any] = {
         "ffmpeg_path": "",
         "ffprobe_path": "",
         "mediainfo_path": "",
-        # The DVD-specific MediaInfo executable must remain on version 23.04 because
-        # newer releases do not preserve its DVD parsing behavior.
-        "dvd_mediainfo_path": "",
         "bdinfo_path": "",
         "mkbrr_path": "",
         "dovi_tool_path": "",

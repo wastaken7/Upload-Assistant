@@ -1,88 +1,14 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-import asyncio
 import json
-import os
-import platform
-import subprocess
 from pathlib import Path
 from typing import Any, cast
 
 import aiofiles
 
-from src.binaries import configured_binary
 from src.console import logger
 from src.exceptions import NoAudioMediaError
 from src.mediainfo import MediaInfo
 from src.meta import Meta
-
-
-def validate_file_path(file_path: str) -> str:
-    if not file_path:
-        raise ValueError("File path cannot be empty")
-
-    # Convert to Path object for safer handling
-    try:
-        path = Path(file_path).resolve()
-    except (OSError, ValueError) as e:
-        raise ValueError(f"Invalid file path: {e}") from e
-
-    # Check if path exists
-    if not path.exists():
-        raise ValueError(f"File does not exist: {path}")
-
-    # Ensure it's a file (not a directory, unless specifically allowed)
-    # Allow directories for DVD/Blu-ray structures
-    if not path.is_file() and not path.is_dir():
-        raise ValueError(f"Path is neither a file nor directory: {path}")
-
-    # Convert back to string
-    return str(path)
-
-
-def find_dvd_mediainfo(base_dir: str | Path) -> dict[str, Any] | None:
-    """Return the MediaInfo components installed for DVD processing."""
-    if configured := configured_binary("dvd_mediainfo_path"):
-        return {"cli": Path(configured), "lib": None, "lib_dir": None}
-    system = platform.system().lower()
-    binary_root = Path(base_dir) / "bin" / "MI"
-
-    if system == "windows":
-        cli_path = binary_root / "windows" / "dvd" / "MediaInfo.exe"
-        if cli_path.exists():
-            logger.debug(f"[blue]Windows MediaInfo CLI: {cli_path} (found)[/blue]")
-            return {
-                "cli": cli_path,
-                "lib": None,  # Windows uses CLI only
-                "lib_dir": None,
-            }
-        logger.debug(f"[yellow]Windows MediaInfo CLI: {cli_path} (not found)[/yellow]")
-        return None
-
-    if system == "linux":
-        lib_dir = binary_root / "linux" / "dvd"
-
-        mediainfo_lib = Path(lib_dir) / "libmediainfo.so.0"
-        mediainfo_cli = Path(lib_dir) / "mediainfo"
-        cli_available = Path(mediainfo_cli).exists()
-        lib_available = Path(mediainfo_lib).exists()
-
-        logger.debug(f"[blue]MediaInfo CLI binary: {mediainfo_cli} ({'found' if cli_available else 'not found'})[/blue]")
-        logger.debug(f"[blue]MediaInfo library: {mediainfo_lib} ({'found' if lib_available else 'not found'})[/blue]")
-
-        if lib_available:
-            # Set library directory for LD_LIBRARY_PATH
-            lib_dir_str = str(lib_dir)
-            current_ld_path = os.environ.get("LD_LIBRARY_PATH", "")
-            current_paths = current_ld_path.split(os.pathsep) if current_ld_path else []
-            if lib_dir_str not in current_paths:
-                if current_ld_path:
-                    os.environ["LD_LIBRARY_PATH"] = f"{lib_dir_str}{os.pathsep}{current_ld_path}"
-                else:
-                    os.environ["LD_LIBRARY_PATH"] = lib_dir_str
-                logger.debug(f"[blue]Updated LD_LIBRARY_PATH to include: {lib_dir_str}[/blue]")
-
-        return {"cli": mediainfo_cli if cli_available else None, "lib": mediainfo_lib if lib_available else None, "lib_dir": lib_dir}
-    return None
 
 
 async def mi_resolution(
@@ -167,7 +93,7 @@ async def export_info(
     isdir: bool,  # noqa: ARG001 - retained for existing callers
     folder_id: str,
     base_dir: str,
-    is_dvd: bool = False,
+    is_dvd: bool = False,  # noqa: ARG001 - retained for existing callers
 ) -> dict[str, Any]:
     def filter_mediainfo(data: dict[str, Any]) -> dict[str, Any]:
         media = data.get("media")
@@ -395,57 +321,8 @@ async def export_info(
                 )
         return filtered
 
-    mediainfo_cmd = None
-
-    if is_dvd:
-        logger.debug("[bold yellow]DVD detected, using specialized MediaInfo...")
-
-        current_platform = platform.system().lower()
-
-        if current_platform in ["linux", "windows"]:
-            mediainfo_config = find_dvd_mediainfo(base_dir)
-            if mediainfo_config:
-                if mediainfo_config["cli"]:
-                    mediainfo_cmd = mediainfo_config["cli"]
-                else:
-                    logger.debug("[yellow]DVD MediaInfo CLI not available[/yellow]")
-            else:
-                logger.debug("[yellow]No specialized MediaInfo components found, using system MediaInfo[/yellow]")
-        else:
-            logger.debug(f"[yellow]DVD processing on {current_platform} not supported with specialized MediaInfo[/yellow]")
-
     logger.debug("[bold yellow]Exporting MediaInfo...")
-    media_info_json = ""
-    if mediainfo_cmd and is_dvd:
-        result: subprocess.CompletedProcess[str] | None = None
-        try:
-            # Validate and sanitize the video path
-            safe_video_path = validate_file_path(video)
-            safe_mediainfo_cmd = validate_file_path(mediainfo_cmd)
-            cmd = [safe_mediainfo_cmd, safe_video_path]
-            result = cast(subprocess.CompletedProcess[str], await asyncio.to_thread(subprocess.run, cmd, capture_output=True, text=True, timeout=30))
-
-            if result.returncode == 0 and result.stdout:
-                media_info = result.stdout
-            else:
-                raise subprocess.CalledProcessError(result.returncode, cmd, result.stdout, result.stderr)
-
-        except subprocess.TimeoutExpired:
-            logger.info("[bold red]Specialized MediaInfo timed out (30s) - falling back to standard MediaInfo[/bold red]")
-            media_info = MediaInfo.parse(video, output="STRING", full=False)
-        except ValueError as e:
-            logger.info(f"[bold red]Path validation error: {e}[/bold red]")
-            logger.info("[bold yellow]Falling back to standard MediaInfo for text...")
-            media_info = MediaInfo.parse(video, output="STRING", full=False)
-        except (subprocess.CalledProcessError, Exception) as e:
-            logger.info(f"[bold red]Error getting text from specialized MediaInfo: {e}")
-            if result is not None:
-                logger.debug(f"[red]Subprocess stderr: {result.stderr}[/red]")
-                logger.debug(f"[red]Subprocess returncode: {result.returncode}[/red]")
-            logger.info("[bold yellow]Falling back to standard MediaInfo for text...")
-            media_info = MediaInfo.parse(video, output="STRING", full=False)
-    else:
-        media_info = cast(str, MediaInfo.parse(video, output="STRING", full=False))
+    media_info = cast(str, MediaInfo.parse(video, output="STRING", full=False))
 
     # Keep the CLI footer so every exported text report identifies its MediaInfo version.
     filtered_media_info = media_info
@@ -456,44 +333,8 @@ async def export_info(
         await export_cleanpath.write(filtered_media_info.replace(video, Path(video).name))
     logger.debug("[bold green]MediaInfo Exported.")
 
-    if mediainfo_cmd and is_dvd:
-        result: subprocess.CompletedProcess[str] | None = None
-        result2: subprocess.CompletedProcess[str] | None = None
-        try:
-            # Validate and sanitize the video path
-            safe_video_path = validate_file_path(video)
-            safe_mediainfo_cmd = validate_file_path(mediainfo_cmd)
-            cmd = [safe_mediainfo_cmd, "--Output=JSON", safe_video_path]
-            result2 = cast(subprocess.CompletedProcess[str], await asyncio.to_thread(subprocess.run, cmd, capture_output=True, text=True, timeout=30))
-
-            if result2.returncode == 0 and result2.stdout:
-                media_info_json = result2.stdout
-                media_info_dict = json.loads(media_info_json)
-            else:
-                raise subprocess.CalledProcessError(result2.returncode, cmd, result2.stdout, result2.stderr)
-
-        except ValueError as e:
-            logger.info(f"[bold red]Path validation error: {e}[/bold red]")
-            logger.info("[bold yellow]Falling back to standard MediaInfo for JSON...")
-            media_info_json = MediaInfo.parse(video, output="JSON")
-            media_info_dict = json.loads(media_info_json)
-        except subprocess.TimeoutExpired:
-            logger.info("[bold red]Specialized MediaInfo timed out (30s) - falling back to standard MediaInfo[/bold red]")
-            media_info_json = MediaInfo.parse(video, output="JSON")
-            media_info_dict = json.loads(media_info_json)
-        except (subprocess.CalledProcessError, json.JSONDecodeError, Exception) as e:
-            logger.info(f"[bold red]Error getting JSON from specialized MediaInfo: {e}")
-            if result2 is not None:
-                logger.debug(f"[red]Subprocess stderr: {result2.stderr}[/red]")
-                logger.debug(f"[red]Subprocess returncode: {result2.returncode}[/red]")
-                if result2.stdout:
-                    logger.debug(f"[red]Subprocess stdout preview: {result2.stdout[:200]}...[/red]")
-            logger.info("[bold yellow]Falling back to standard MediaInfo for JSON...[/bold yellow]")
-            media_info_json = MediaInfo.parse(video, output="JSON")
-            media_info_dict = json.loads(media_info_json)
-    else:
-        media_info_json = cast(str, MediaInfo.parse(video, output="JSON"))
-        media_info_dict = json.loads(media_info_json)
+    media_info_json = cast(str, MediaInfo.parse(video, output="JSON"))
+    media_info_dict = json.loads(media_info_json)
 
     filtered_info = filter_mediainfo(media_info_dict)
 

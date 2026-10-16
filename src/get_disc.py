@@ -8,7 +8,6 @@ from typing import Any, cast
 import aiofiles
 
 from bin.get_bdinfo import BDInfoBinaryManager
-from bin.get_dvd_mediainfo import download_dvd_mediainfo
 from src.console import logger
 from src.discparse import DiscParse
 from src.meta import Meta
@@ -55,8 +54,7 @@ class DiscInfoManager:
             else:
                 discs, bdinfo = await self._parser.get_bdinfo(meta, meta.discs, meta.uuid, meta.base_dir, meta.discs)
         elif is_disc == "DVD":
-            download_dvd_mediainfo(meta.base_dir)
-            discs = cast(list[Disc], await cast(Any, self._parser).get_dvdinfo(discs, base_dir=meta.base_dir))
+            discs = cast(list[Disc], await cast(Any, self._parser).get_dvdinfo(discs))
         elif is_disc == "HDDVD":
             discs = await self._parser.get_hddvd_info(discs, meta)
             async with aiofiles.open(
