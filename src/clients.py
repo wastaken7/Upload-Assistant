@@ -698,9 +698,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                 piece_in_mib = piece_size / 1024 / 1024
                 torrent_file_size = Path(torrent_path).stat().st_size
                 torrent_file_size_kib = round(torrent_file_size / 1024, 2)
-                logger.debug(
-                    f"Checking piece size, count and size: pieces={torrent.pieces}, piece_size={piece_in_mib} MiB, .torrent size={torrent_file_size_kib} KiB"
-                )
+                logger.debug(f"Checking piece size, count and size: pieces={torrent.pieces}, piece_size={piece_in_mib} MiB, .torrent size={torrent_file_size_kib} KiB")
 
                 # Centralized piece-count, piece-size and metainfo-size validation.
                 stats = TorrentStats(piece_size, torrent.pieces, torrent.size, torrent_file_size)
