@@ -25,6 +25,7 @@ class DupeEntry(TypedDict, total=False):
     internal: int | bool
     bd_info: str | None
     description: str | None
+    media_info: str | None
 
 
 type DupeInput = str | DupeEntry | MutableMapping[str, Any]

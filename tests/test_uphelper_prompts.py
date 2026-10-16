@@ -67,13 +67,23 @@ async def test_dupe_check_keeps_each_result_list_with_its_prompt(monkeypatch: py
 
     second = asyncio.create_task(helper.dupe_check(["second dupe"], Meta(category="TV", name="Second"), "SECOND"))
     await asyncio.sleep(0)
-    assert messages == ["[bold blue]FIRST[/bold blue]: Check if these are actually dupes:", "", "[bold cyan]first dupe[/bold cyan]"]
+    assert messages == [
+        "[dim]FIRST: slot rules are not implemented for this tracker; using the basic dupe check.[/dim]",
+        "[bold blue]FIRST[/bold blue]: Check if these are actually dupes:",
+        "",
+        "[bold cyan]first dupe[/bold cyan]",
+    ]
 
     release_first.set()
     await asyncio.gather(first, second)
 
     assert prompts == ["Upload to FIRST anyway?", "Upload to SECOND anyway?"]
-    assert messages[-3:] == ["[bold blue]SECOND[/bold blue]: Check if these are actually dupes:", "", "[bold cyan]second dupe[/bold cyan]"]
+    assert messages[-4:] == [
+        "[dim]SECOND: slot rules are not implemented for this tracker; using the basic dupe check.[/dim]",
+        "[bold blue]SECOND[/bold blue]: Check if these are actually dupes:",
+        "",
+        "[bold cyan]second dupe[/bold cyan]",
+    ]
 
 
 @pytest.mark.asyncio

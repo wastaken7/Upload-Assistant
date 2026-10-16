@@ -17,6 +17,8 @@ from src.get_desc import DescriptionBuilder
 from src.languages import languages_manager
 from src.meta import Meta
 from src.rehostimages import RehostImagesManager
+from src.slot_rules.registry import slot_rules_apply
+from src.slot_rules.trackers.greatposterwall import EMPTY_SLOTS_KEY
 from src.tmdb import TmdbManager
 from src.tracker_images import get_tracker_image_collection, set_tracker_image_collection
 from src.trackers.common import Common
@@ -466,6 +468,11 @@ class GreatPosterWall:
 
         soup = BeautifulSoup(response.text, "html.parser")
 
+        # Read by the GPW slot rules, which show these slots in the dupe recommendation.
+        empty_slots: dict[str, list[str]] = {}
+        meta[EMPTY_SLOTS_KEY] = empty_slots
+        show_in_log = not slot_rules_apply(meta, self.config)
+
         empty_slot_rows = soup.find_all("tr", class_="TableTorrent-rowEmptySlotNote")
 
         for row in empty_slot_rows:
@@ -498,12 +505,15 @@ class GreatPosterWall:
                     slot_names.append(icon.get_text(strip=True))
 
             final_slots_list = sorted(set(slot_names))
+            cleaned_slots = [slot.replace("Slot", "").replace("Empty slots:", "").strip() for slot in final_slots_list]
+            if resolution:
+                empty_slots.setdefault(resolution, []).extend(slot for slot in cleaned_slots if slot)
             formatted_slots = [f"- {slot}" for slot in final_slots_list]
             final_slots = "\n".join(formatted_slots)
 
             if final_slots:
                 final_slots = final_slots.replace("Slot", "").replace("Empty slots:", "").strip()
-                if resolution == meta.resolution:
+                if show_in_log and resolution == meta.resolution:
                     logger.info(f"{self.tracker}: \n[green]Available Slots for[/green] {resolution}:")
                     logger.info(f"{self.tracker}: {final_slots}\n")
 

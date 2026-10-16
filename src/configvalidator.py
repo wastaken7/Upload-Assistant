@@ -108,6 +108,7 @@ DEFAULT_KEY_TYPES: dict[str, tuple[type, ...]] = {
     "embed_dupe_links": (bool,),
     "show_dupe_size_diff": (bool,),
     "dupe_size_difference_tolerance": (float, int),
+    "slot_rules": (bool,),
     "tracker_pass_checks": (str, int),
     "use_largest_playlist": (bool,),
     "tracker_description_mode": (str,),
