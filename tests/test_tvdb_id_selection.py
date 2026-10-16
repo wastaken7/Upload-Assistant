@@ -183,3 +183,20 @@ async def test_tvdb_matches_without_year(tvdb_search, query):
     _, selected_id = await handler.search_tvdb_series(query)
 
     assert selected_id == 456
+
+
+@pytest.mark.parametrize(
+    ("query", "name"),
+    [
+        ("Examples Show", "Example's Show"),
+        ("Examples Show", "Example\u2019s Show"),
+        ("Example's Show", "Examples Show"),
+    ],
+)
+async def test_tvdb_matches_titles_without_apostrophes(tvdb_search, query, name):
+    handler, search = tvdb_search
+    search.return_value = [{"tvdb_id": "456", "name": name, "year": "2025"}]
+
+    _, selected_id = await handler.search_tvdb_series(query, "2025")
+
+    assert selected_id == 456
