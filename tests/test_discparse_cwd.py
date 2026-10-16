@@ -22,10 +22,7 @@ def test_dvd_info_uses_disc_paths_without_changing_process_directory(tmp_path: P
 
     starting_directory = Path.cwd()
     parser = DiscParse({"DEFAULT": {}})
-    with (
-        patch.object(parser, "setup_mediainfo_for_dvd", return_value=None),
-        patch("src.discparse.MediaInfo.parse", side_effect=fake_parse),
-    ):
+    with patch("src.discparse.MediaInfo.parse", side_effect=fake_parse):
         result = asyncio.run(parser.get_dvdinfo([{"path": str(disc_dir)}]))
 
     assert Path.cwd() == starting_directory

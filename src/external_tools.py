@@ -17,12 +17,12 @@ from pathlib import Path
 from typing import Any
 
 from bin.binary_dependencies import DEPENDENCY_VERSIONS
+from bin.get_mediainfo import MediaInfoBinaryManager
 
 EXTERNAL_TOOL_KEYS = (
     "ffmpeg_path",
     "ffprobe_path",
     "mediainfo_path",
-    "dvd_mediainfo_path",
     "bdinfo_path",
     "mkbrr_path",
     "dovi_tool_path",
@@ -34,7 +34,6 @@ _LABELS = {
     "ffmpeg_path": "FFmpeg",
     "ffprobe_path": "FFprobe",
     "mediainfo_path": "MediaInfo",
-    "dvd_mediainfo_path": "DVD MediaInfo",
     "bdinfo_path": "BDInfo",
     "mkbrr_path": "mkbrr",
     "dovi_tool_path": "Dolby Vision Tool",
@@ -107,29 +106,6 @@ def _result(
 
 def _available_result(key: str, path: Path | str, source: str, *, version: str = "") -> dict[str, str]:
     path_text = str(path)
-    if key == "dvd_mediainfo_path":
-        if not version:
-            return _result(
-                key,
-                state="warning",
-                badge="Check version",
-                tone="warning",
-                message="The executable is available, but its version could not be confirmed. DVD parsing requires MediaInfo 23.04.",
-                path=path_text,
-                source=source,
-            )
-        if version != "23.04":
-            return _result(
-                key,
-                state="warning",
-                badge="Wrong version",
-                tone="warning",
-                message=f"MediaInfo {version} is available, but DVD parsing requires version 23.04.",
-                path=path_text,
-                source=source,
-                version=version,
-            )
-
     badge = "Configured" if source == "Configured path" else "Managed" if source == "Managed by Upload Assistant" else "Detected"
     return _result(
         key,
@@ -185,15 +161,8 @@ def _managed_paths(key: str, state_dir: Path, code_dir: Path) -> list[tuple[Path
             folder = "macos"
         if folder:
             binary = state_dir / "bin" / "MI" / folder / executable
-            return [(binary, binary.parent / "version_26.05", "26.05")]
-
-    if key == "dvd_mediainfo_path":
-        if system == "windows" and machine in {"amd64", "x86_64"}:
-            binary = state_dir / "bin" / "MI" / "windows" / "dvd" / "MediaInfo.exe"
-            return [(binary, binary.parent / "version_23.04", "23.04")]
-        if system == "linux" and machine in {"amd64", "x86_64", "arm64", "aarch64"}:
-            binary = state_dir / "bin" / "MI" / "linux" / "dvd" / "mediainfo"
-            return [(binary, binary.parent / "version_23.04", "23.04")]
+            version = MediaInfoBinaryManager.VERSION
+            return [(binary, binary.parent / f"version_{version}", version)]
 
     platform_folders = {
         "windows": {"amd64": "windows/x86_64", "x86_64": "windows/x86_64"},
@@ -248,8 +217,7 @@ def _managed_paths(key: str, state_dir: Path, code_dir: Path) -> list[tuple[Path
 def _automatic_message(key: str) -> str:
     messages = {
         "ffmpeg_path": f"Upload Assistant will download FFmpeg {DEPENDENCY_VERSIONS['ffmpeg']} automatically before an upload on Windows.",
-        "mediainfo_path": "Upload Assistant will download MediaInfo CLI 26.05 automatically before an upload.",
-        "dvd_mediainfo_path": "Upload Assistant will download the separate MediaInfo 23.04 build automatically when a DVD is processed.",
+        "mediainfo_path": f"Upload Assistant will download MediaInfo CLI {MediaInfoBinaryManager.VERSION} automatically before an upload.",
         "bdinfo_path": "Upload Assistant will download BDInfo automatically when a Blu-ray disc is processed.",
         "mkbrr_path": "Upload Assistant will download mkbrr automatically when it is required.",
         "dovi_tool_path": "Upload Assistant will download the Dolby Vision tool automatically when a Dolby Vision plot is requested.",
@@ -263,11 +231,6 @@ def _is_automatically_managed(key: str) -> bool:
     if key == "ffmpeg_path":
         return system == "windows" and machine in {"amd64", "x86_64"}
     if key == "mediainfo_path":
-        return bool(_managed_paths(key, Path(), Path()))
-    if key == "dvd_mediainfo_path":
-        # The runtime downloader does not yet normalize the Linux aarch64 alias.
-        if system == "linux" and machine == "aarch64":
-            return False
         return bool(_managed_paths(key, Path(), Path()))
     if key in {"bdinfo_path", "mkbrr_path", "dovi_tool_path", "hdr10plus_tool_path"}:
         return bool(_managed_paths(key, Path(), Path()))
@@ -320,7 +283,7 @@ def check_external_tools(
         if managed_ready:
             continue
 
-        if key in {"mediainfo_path", "dvd_mediainfo_path", "bdinfo_path"} and _is_automatically_managed(key):
+        if key in {"mediainfo_path", "bdinfo_path"} and _is_automatically_managed(key):
             statuses[key] = _result(
                 key,
                 state="automatic",

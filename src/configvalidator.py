@@ -78,7 +78,6 @@ DEFAULT_KEY_TYPES: dict[str, tuple[type, ...]] = {
     "ffmpeg_path": (str,),
     "ffprobe_path": (str,),
     "mediainfo_path": (str,),
-    "dvd_mediainfo_path": (str,),
     "bdinfo_path": (str,),
     "mkbrr_path": (str,),
     "dovi_tool_path": (str,),

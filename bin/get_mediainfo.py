@@ -31,7 +31,7 @@ except ImportError:
 class MediaInfoBinaryManager:
     """Install the pinned official MediaInfo CLI into ``bin/MI``."""
 
-    VERSION = "26.05"
+    VERSION = "26.10"
     BASE_URL = "https://old.mediaarea.net/download/binary/mediainfo"
 
     @staticmethod
@@ -47,15 +47,15 @@ class MediaInfoBinaryManager:
         system = platform.system().lower()
         machine = platform.machine().lower()
         if system == "windows" and machine in {"amd64", "x86_64"}:
-            return "windows", "MediaInfo_CLI_26.05_Windows_x64.zip", "MediaInfo.exe", "zip"
+            return "windows", f"MediaInfo_CLI_{cls.VERSION}_Windows_x64.zip", "MediaInfo.exe", "zip"
         if system == "windows" and machine in {"arm64", "aarch64"}:
-            return "windows/arm64", "MediaInfo_CLI_26.05_Windows_ARM64.zip", "MediaInfo.exe", "zip"
+            return "windows/arm64", f"MediaInfo_CLI_{cls.VERSION}_Windows_ARM64.zip", "MediaInfo.exe", "zip"
         if system == "linux" and machine in {"amd64", "x86_64"}:
-            return "linux", "MediaInfo_CLI_26.05_Lambda_x86_64.zip", "mediainfo", "zip"
+            return "linux", f"MediaInfo_CLI_{cls.VERSION}_Lambda_x86_64.zip", "mediainfo", "zip"
         if system == "linux" and machine in {"arm64", "aarch64"}:
-            return "linux/arm64", "MediaInfo_CLI_26.05_Lambda_arm64.zip", "mediainfo", "zip"
+            return "linux/arm64", f"MediaInfo_CLI_{cls.VERSION}_Lambda_arm64.zip", "mediainfo", "zip"
         if system == "darwin" and machine in {"amd64", "x86_64", "arm64", "aarch64"}:
-            return "macos", "MediaInfo_CLI_26.05_Mac.dmg", "mediainfo", "dmg"
+            return "macos", f"MediaInfo_CLI_{cls.VERSION}_Mac.dmg", "mediainfo", "dmg"
         raise RuntimeError(f"Unsupported MediaInfo platform: {system} {machine}")
 
     @classmethod
