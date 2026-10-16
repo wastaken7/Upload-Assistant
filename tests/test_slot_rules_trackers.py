@@ -378,3 +378,9 @@ class TestRepackIdentity:
         upload = prof(f"{T}.REPACK.1080p.AMZN.WEB-DL.DDP5.1.H.264-NOGRPA")
         holders = (prof(f"{T}.1080p.BluRay.REMUX.AVC.DTS-HD.MA.5.1-NOGRPA"), prof(f"{T}.1080p.NF.WEB-DL.DDP5.1.H.264-NOGRPB"))
         assert verdict(CathodeRayTubeSlotRules(), upload, *holders) is BLOCK
+
+
+def test_repack_from_another_provider_is_a_different_release() -> None:
+    upload = prof(f"{T}.1080p.AMZN.WEB-DL.DDP5.1.H.264-NOGRPA")
+    assert verdict(TorrentLeechSlotRules(), upload, prof(f"{T}.REPACK.1080p.NF.WEB-DL.DDP5.1.H.264-NOGRPA")) is ALLOW
+    assert verdict(TorrentLeechSlotRules(), upload, prof(f"{T}.REPACK.1080p.AMZN.WEB-DL.DDP5.1.H.264-NOGRPA")) is BLOCK

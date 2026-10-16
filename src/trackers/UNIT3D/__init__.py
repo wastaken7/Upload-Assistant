@@ -144,7 +144,7 @@ class UNIT3D:
         urls_to_check = await self.get_search_urls(meta, request_params)
 
         missing_details: list[dict[str, Any]] = []
-        disc_type_ids: list[str | None] = []
+        disc_type_ids: list[set[str]] = []
         title_releases: list[dict[str, Any]] = []
         async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
             for url, params, check_pending in urls_to_check:
@@ -208,9 +208,9 @@ class UNIT3D:
                             entry_is_disc = kind_from_type_label(type_label) == DISC
                         else:
                             if not disc_type_ids:
-                                disc_type_ids.append(await self._disc_type_id(meta))
+                                disc_type_ids.append(await self._disc_type_ids(meta))
                             entry_type_id = attributes.get("type_id")
-                            entry_is_disc = entry_type_id is not None and disc_type_ids[0] is not None and str(entry_type_id) == disc_type_ids[0]
+                            entry_is_disc = entry_type_id is not None and str(entry_type_id) in disc_type_ids[0]
                         if not check_pending and torrent_id and not attributes.get(missing_key) and entry_is_disc == bool(meta.is_disc):
                             missing_details.append(result)
                 else:
@@ -225,14 +225,25 @@ class UNIT3D:
             meta[f"{self.tracker}_title_releases"] = title_releases
         return dupes
 
-    async def _disc_type_id(self, meta: Meta) -> str | None:
-        """The tracker's Full Disc type id, or None when its type mapping can't say."""
+    async def _disc_type_ids(self, meta: Meta) -> set[str]:
+        """The tracker's Full Disc type ids; empty when its type mapping can't say."""
+        ids: set[str] = set()
         try:
             mapping = await self.get_type_id(meta, mapping_only=True)
+            disc_id = mapping.get("DISC") if isinstance(mapping, dict) else None
+            if disc_id:
+                ids.add(str(disc_id))
         except Exception:
-            return None
-        disc_id = mapping.get("DISC") if isinstance(mapping, dict) else None
-        return str(disc_id) if disc_id else None
+            logger.debug(f"{self.tracker}: type mapping unavailable for disc detection")
+        if meta.is_disc:
+            # Some trackers only map the upload's own type; for a disc upload that is the disc type.
+            try:
+                upload_type = (await self.get_type_id(meta)).get("type_id")
+                if upload_type and upload_type != "0":
+                    ids.add(str(upload_type))
+            except Exception:
+                logger.debug(f"{self.tracker}: could not resolve the upload's type id for disc detection")
+        return ids
 
     @staticmethod
     def _matches_local_filter(attributes: dict[str, Any], resolution_ids: set[str] | None, type_id: str | None) -> bool:

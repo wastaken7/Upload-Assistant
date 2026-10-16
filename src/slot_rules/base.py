@@ -6,7 +6,7 @@ from datetime import date
 from typing import Any, ClassVar
 
 from src.slot_rules.models import SlotDecision, Verdict
-from src.slot_rules.profile import DISC, DV, HDR10, HDR10P, HLG, PQ10, ReleaseProfile
+from src.slot_rules.profile import DISC, DV, HDR10, HDR10P, HLG, PQ10, WEBDL, WEBRIP, ReleaseProfile
 
 # Rules transcribed from the tracker pages on this date.
 RULES_DATE_2026_10_15 = date(2026, 10, 15)
@@ -53,7 +53,11 @@ def _repack_traits(profile: ReleaseProfile) -> tuple[object, ...]:
 
 
 def _newer_from_same_group(upload: ReleaseProfile, existing: ReleaseProfile) -> bool:
-    return bool(upload.group and upload.group == existing.group and upload.repack > existing.repack and upload.edition == existing.edition)
+    if not (upload.group and upload.group == existing.group and upload.repack > existing.repack and upload.edition == existing.edition):
+        return False
+    # A group's WEB releases from different providers are different releases.
+    both_web = upload.kind in (WEBDL, WEBRIP) and existing.kind in (WEBDL, WEBRIP)
+    return not (both_web and upload.provider and existing.provider and upload.provider != existing.provider)
 
 
 def is_repack_of(upload: ReleaseProfile, existing: ReleaseProfile) -> bool:

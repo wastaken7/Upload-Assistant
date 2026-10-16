@@ -254,3 +254,17 @@ def test_type_mapping_errors_do_not_break_the_search(monkeypatch: pytest.MonkeyP
     dupes = asyncio.run(tracker.search_existing(disc_meta))
 
     assert len(dupes) == 1  # noqa: S101
+
+
+def test_disc_detected_by_upload_type_id_when_mapping_has_no_disc(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[str] = []
+    monkeypatch.setattr("src.trackers.UNIT3D.httpx.AsyncClient", lambda **kwargs: TypeIdOnlyClient(calls, **kwargs))
+    tracker = Samaritano({"DEFAULT": {}, "TRACKERS": {"SAMARITANO": {"api_key": "test-key"}}})
+
+    async def upload_type_only(meta: Meta, type: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:  # noqa: ARG001
+        return {"type_id": "1"}
+
+    monkeypatch.setattr(tracker, "get_type_id", upload_type_only)
+    asyncio.run(tracker.search_existing(Meta(category="MOVIE", tmdb=123, resolution="1080p", type="DISC", is_disc="BDMV")))
+
+    assert any(call.endswith("/9") for call in calls)  # noqa: S101
