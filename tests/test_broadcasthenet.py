@@ -105,7 +105,7 @@ def test_btn_group_page_does_not_identify_an_older_torrent() -> None:
 def test_btn_finds_uploaded_release_in_its_group(monkeypatch) -> None:
     async def fake_api(method: str, params: dict[str, object]) -> dict[str, object]:
         assert method == "getTorrents"  # noqa: S101
-        assert params == {"search": {"group_id": "123", "release": "Show.S01E01.1080p-GRP"}, "results": 1000, "offset": 0}  # noqa: S101
+        assert params == {"search": {"tvdb": "42"}, "results": 1000, "offset": 0}  # noqa: S101
         return {
             "result": {
                 "torrents": {
@@ -119,7 +119,25 @@ def test_btn_finds_uploaded_release_in_its_group(monkeypatch) -> None:
     btn = tracker()
     monkeypatch.setattr(btn, "_api", fake_api)
 
-    assert asyncio.run(btn._uploaded_torrent_id("Show.S01E01.1080p-GRP", "123")) == "456"  # noqa: S101
+    assert asyncio.run(btn._uploaded_torrent_id("Show.S01E01.1080p-GRP", "123", Meta(category="TV", tvdb_id=42))) == "456"  # noqa: S101
+
+
+def test_btn_uploaded_release_lookup_falls_back_to_imdb_and_prefers_newest(monkeypatch) -> None:
+    async def fake_api(_method: str, params: dict[str, object]) -> dict[str, object]:
+        assert params["search"] == {"imdb": "77"}  # noqa: S101
+        return {
+            "result": {
+                "torrents": {
+                    "100": {"GroupID": "123", "ReleaseName": "Show.S01E01.1080p-GRP"},
+                    "200": {"groupId": "123", "releaseName": "show.s01e01.1080p-grp"},
+                }
+            }
+        }
+
+    btn = tracker()
+    monkeypatch.setattr(btn, "_api", fake_api)
+
+    assert asyncio.run(btn._uploaded_torrent_id("Show.S01E01.1080p-GRP", "123", Meta(category="TV", imdb_id=77))) == "200"  # noqa: S101
 
 
 def test_btn_api_sends_named_search_parameters(monkeypatch) -> None:
