@@ -27,9 +27,7 @@ def test_upload_screens_manager_does_not_count_a_reused_image_list() -> None:
             patch("src.uploadscreens._upload_screens", new=fake_upload),
             patch("src.uploadscreens.record_event_async", new=recorder),
         ):
-            await UploadScreensManager({"DEFAULT": {"img_host_1": "imgbox"}}).upload_screens(
-                meta, 1, 1, 0, 1, [], {}
-            )
+            await UploadScreensManager({"DEFAULT": {"img_host_1": "imgbox"}}).upload_screens(meta, 1, 1, 0, 1, [], {})
         recorder.assert_not_awaited()
 
     asyncio.run(exercise())
@@ -52,9 +50,7 @@ def test_upload_screens_manager_records_the_final_host_and_actual_success() -> N
             patch("src.uploadscreens._upload_screens", new=fake_upload),
             patch("src.uploadscreens.record_event_async", new=recorder),
         ):
-            await UploadScreensManager({"DEFAULT": {"img_host_1": "imgbox"}}).upload_screens(
-                meta, 1, 1, 0, 1, [], {}
-            )
+            await UploadScreensManager({"DEFAULT": {"img_host_1": "imgbox"}}).upload_screens(meta, 1, 1, 0, 1, [], {})
         recorder.assert_awaited_once()
         assert recorder.await_args.kwargs["service"] == "ptscreens"
         assert recorder.await_args.kwargs["outcome"] == "success"
@@ -77,9 +73,7 @@ def test_upload_screens_manager_records_an_attempted_failure() -> None:
             patch("src.uploadscreens._upload_screens", new=fake_upload),
             patch("src.uploadscreens.record_event_async", new=recorder),
         ):
-            await UploadScreensManager({"DEFAULT": {"img_host_1": "imgbox"}}).upload_screens(
-                meta, 1, 1, 0, 1, [], {}
-            )
+            await UploadScreensManager({"DEFAULT": {"img_host_1": "imgbox"}}).upload_screens(meta, 1, 1, 0, 1, [], {})
         assert recorder.await_args.kwargs["outcome"] == "error"
 
     asyncio.run(exercise())
@@ -306,3 +300,83 @@ def test_upload_screens_normalizes_image_upload_delay_before_limiter(
     delays, uploaded_count = asyncio.run(exercise())
     assert delays == [expected_delay]
     assert uploaded_count == 1
+
+
+def test_upload_screens_manager_reports_webui_progress_across_fallback(tmp_path: Path) -> None:
+    from src import webui_progress
+
+    events: list[dict[str, object]] = []
+
+    async def fake_upload(args: object) -> dict[str, str]:
+        assert isinstance(args, list)
+        filename = Path(str(args[0])).name
+        host = str(args[1])
+        if filename == "image-2.png" and host == "imgbox":
+            return {"status": "failed", "reason": "duplicate image"}
+        url = f"https://img.example/{filename}/{host}"
+        return {"status": "success", "img_url": url, "raw_url": url, "web_url": url}
+
+    async def exercise() -> None:
+        for filename in ("image-1.png", "image-2.png"):
+            (tmp_path / filename).write_bytes(b"image")
+        meta = Meta({"base_dir": str(tmp_path), "uuid": "test", "imghost": "imgbox"})
+        config = {
+            "DEFAULT": {"img_host_1": "imgbox", "img_host_2": "ptscreens", "image_upload_concurrency": 1, "image_upload_delay": 0},
+            "TRACKERS": {},
+        }
+        with (
+            patch("src.uploadscreens.screenshots_dir", return_value=tmp_path),
+            patch("src.uploadscreens.upload_image_task", new=fake_upload),
+            patch("src.uploadscreens.record_event_async", new=AsyncMock()),
+        ):
+            await UploadScreensManager(config).upload_screens(meta, 1, 1, 0, 2, [], {})
+
+    webui_progress.set_progress_callback(lambda event: events.append(dict(event)))
+    try:
+        asyncio.run(exercise())
+    finally:
+        webui_progress.clear_progress_callback()
+
+    assert len({event["id"] for event in events}) == 1
+    assert [(event["detail"], event["current"], event["total"], event["status"]) for event in events] == [
+        ("imgbox", 0, 2, "running"),
+        ("imgbox", 1, 2, "running"),
+        ("ptscreens", 1, 2, "running"),
+        ("ptscreens", 2, 2, "running"),
+        ("ptscreens", 2, 2, "completed"),
+    ]
+
+
+def test_upload_screens_manager_fails_progress_card_on_partial_upload(tmp_path: Path) -> None:
+    from src import webui_progress
+
+    events: list[dict[str, object]] = []
+
+    async def fake_upload(args: object) -> dict[str, str]:
+        assert isinstance(args, list)
+        filename = Path(str(args[0])).name
+        if filename == "image-2.png":
+            return {"status": "failed", "reason": "duplicate image"}
+        url = f"https://img.example/{filename}"
+        return {"status": "success", "img_url": url, "raw_url": url, "web_url": url}
+
+    async def exercise() -> None:
+        for filename in ("image-1.png", "image-2.png"):
+            (tmp_path / filename).write_bytes(b"image")
+        meta = Meta({"base_dir": str(tmp_path), "uuid": "test", "imghost": "imgbox"})
+        config = {"DEFAULT": {"img_host_1": "imgbox", "image_upload_concurrency": 1, "image_upload_delay": 0}, "TRACKERS": {}}
+        with (
+            patch("src.uploadscreens.screenshots_dir", return_value=tmp_path),
+            patch("src.uploadscreens.upload_image_task", new=fake_upload),
+            patch("src.uploadscreens.record_event_async", new=AsyncMock()),
+        ):
+            await UploadScreensManager(config).upload_screens(meta, 1, 1, 0, 2, [], {})
+
+    webui_progress.set_progress_callback(lambda event: events.append(dict(event)))
+    try:
+        asyncio.run(exercise())
+    finally:
+        webui_progress.clear_progress_callback()
+
+    final = events[-1]
+    assert (final["status"], final["current"], final["total"]) == ("failed", 1, 2)
