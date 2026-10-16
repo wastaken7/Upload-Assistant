@@ -634,6 +634,8 @@ class DiscParse:
                     main_set = vob_set
                     main_set_duration = vob_set_duration_float
 
+            if not main_set:
+                raise RuntimeError(f"MediaInfo reported no usable duration for any VOB set in {disc_path}")
             each["main_set"] = main_set
             set = main_set[0][:2]
             each["vob"] = vob = str(disc_path / f"VTS_{set}_1.VOB")
