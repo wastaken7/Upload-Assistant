@@ -2614,32 +2614,34 @@ function AudionutsUAGUI() {
     });
   };
 
-  const renderProgressPanel = (compact = false) => {
+  const renderProgressPanel = (compact = false, showHeader = true) => {
     if (!visibleProgressItems.length) return null;
 
     return (
       <div
         className={`rounded-lg border p-3 shadow-xl backdrop-blur-sm ${isDarkMode ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-white/95"}`}
       >
-        <div className="flex items-center justify-between gap-3 mb-3">
-          <div>
-            <h4
-              className={`font-semibold ${compact ? "text-sm" : "text-base"} ${isDarkMode ? "text-white" : "text-gray-900"}`}
+        {showHeader && (
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <div>
+              <h4
+                className={`font-semibold ${compact ? "text-sm" : "text-base"} ${isDarkMode ? "text-white" : "text-gray-900"}`}
+              >
+                Binary Progress
+              </h4>
+              <p
+                className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+              >
+                Live progress from external tools
+              </p>
+            </div>
+            <span
+              className={`text-xs font-medium ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
             >
-              Binary Progress
-            </h4>
-            <p
-              className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
-            >
-              Live progress from external tools
-            </p>
+              {visibleProgressItems.length} active
+            </span>
           </div>
-          <span
-            className={`text-xs font-medium ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
-          >
-            {visibleProgressItems.length} active
-          </span>
-        </div>
+        )}
         <div
           className={`${compact ? "space-y-2" : "space-y-3"} max-h-[40vh] overflow-y-auto pr-1`}
         >
@@ -2652,6 +2654,9 @@ function AudionutsUAGUI() {
               : 0;
             const isCompleted = item.status === "completed";
             const isFailed = item.status === "failed";
+            // Speed meters show a rate against a limit: green when under it, amber when over.
+            const isSpeedMeter = item.unit === "kbps";
+            const isOverLimit = isSpeedMeter && hasTotal && current > total;
             const statusTone = isCompleted
               ? isDarkMode
                 ? "text-emerald-300"
@@ -2660,16 +2665,30 @@ function AudionutsUAGUI() {
                 ? isDarkMode
                   ? "text-rose-300"
                   : "text-rose-700"
-                : "ua-accent-text";
+                : isSpeedMeter
+                  ? isOverLimit
+                    ? isDarkMode
+                      ? "text-amber-300"
+                      : "text-amber-700"
+                    : isDarkMode
+                      ? "text-emerald-300"
+                      : "text-emerald-700"
+                  : "ua-accent-text";
             const progressTone = isCompleted
               ? "bg-emerald-500"
               : isFailed
                 ? "bg-rose-500"
-                : "ua-accent-indicator";
+                : isSpeedMeter
+                  ? isOverLimit
+                    ? "bg-amber-500"
+                    : "bg-emerald-500"
+                  : "ua-accent-indicator";
             let summary = "";
             if (hasTotal) {
               if (item.unit === "percent")
                 summary = `${Math.round(clampedPercent)}%`;
+              else if (isSpeedMeter)
+                summary = `${Math.round(current)} / ${Math.round(total)} KB/s`;
               else summary = `${Math.round(current)}/${Math.round(total)}`;
             }
             return (
@@ -2735,12 +2754,21 @@ function AudionutsUAGUI() {
     return (
       <div className="flex flex-col h-full">
         <div className="ua-upload-panel-header p-3 border-b flex-shrink-0">
-          <h2
-            className={`text-base font-bold ${isDarkMode ? "text-white" : "text-gray-800"} flex items-center gap-2`}
-          >
-            <ProgressIcon />
-            Binary Progress
-          </h2>
+          <div className="flex items-center justify-between gap-3">
+            <h2
+              className={`text-base font-bold ${isDarkMode ? "text-white" : "text-gray-800"} flex items-center gap-2`}
+            >
+              <ProgressIcon />
+              Binary Progress
+            </h2>
+            {visibleProgressItems.length > 0 && (
+              <span
+                className={`text-xs font-medium ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+              >
+                {visibleProgressItems.length} active
+              </span>
+            )}
+          </div>
           <p
             className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
           >
@@ -2748,7 +2776,7 @@ function AudionutsUAGUI() {
           </p>
         </div>
         <div className="flex-1 overflow-y-auto p-3">
-          {renderProgressPanel() || (
+          {renderProgressPanel(false, false) || (
             <div
               className={`rounded-lg border p-5 text-center text-sm ${isDarkMode ? "border-gray-700 bg-gray-800 text-gray-400" : "border-gray-200 bg-gray-50 text-gray-500"}`}
             >
