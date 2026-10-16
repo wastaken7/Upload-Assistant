@@ -23,7 +23,7 @@ class VideoManager:
         source = str(guess_dict.get("Source", ""))
         other = str(guess_dict.get("Other", ""))
         uhd = ""
-        if (source == "Blu-ray" and other == "Ultra HD") or source == "Ultra HD Blu-ray" or "UHD" in path:
+        if (source == "Blu-ray" and other == "Ultra HD") or source == "Ultra HD Blu-ray" or re.search(r"(?:^|[\W_])UHD(?:$|[\W_])", path):
             uhd = "UHD"
         elif type in ("DISC", "REMUX", "ENCODE", "WEBRIP"):
             uhd = ""
