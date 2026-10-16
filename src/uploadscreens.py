@@ -104,13 +104,14 @@ class UploadScreensManager:
         finally:
             # Only calls that actually started uploading published a card.
             if "label" in progress:
-                if outcome == "error":
+                # A partial result (some images failed on every host) is still a failure.
+                if outcome == "error" or progress["current"] < progress["total"]:
                     publish_progress(
                         progress["id"],
                         progress["label"],
                         current=progress["current"],
                         total=progress["total"],
-                        detail=f"{progress['detail']}: upload failed",
+                        detail=f"{progress['detail']}: {progress['total'] - progress['current']:.0f} image(s) failed",
                         status="failed",
                         group="images",
                         unit="images",
@@ -1019,15 +1020,24 @@ async def _upload_screens(
     # Track running tasks for cancellation
     running_tasks: set[asyncio.Task[dict[str, Any]]] = set()
 
-    # A host fallback recurses with the same progress card, relabelled for the new host.
+    # A host fallback recurses with the same progress card, relabelled for the new host,
+    # keeping the images already uploaded and the original total. Custom lists are
+    # re-uploaded in full on the next host, so their count starts over.
     completed_uploads = 0
+    uploaded_before = int(progress.get("current", 0)) if progress is not None and not using_custom_img_list else 0
+    progress_total = int(progress.get("total", len(upload_tasks))) if progress is not None else len(upload_tasks)
 
     def report_upload_progress(note: str = "") -> None:
         if progress is None:
             return
         # Always send the host so a stale retry note is replaced on the next update.
-        progress.update(label="Uploading images", detail=f"{img_host}: {note}" if note else img_host, current=completed_uploads, total=len(upload_tasks))
-        publish_progress(progress["id"], progress["label"], current=completed_uploads, total=len(upload_tasks), detail=progress["detail"], group="images", unit="images")
+        progress.update(
+            label="Uploading images",
+            detail=f"{img_host}: {note}" if note else img_host,
+            current=uploaded_before + completed_uploads,
+            total=progress_total,
+        )
+        publish_progress(progress["id"], progress["label"], current=progress["current"], total=progress["total"], detail=progress["detail"], group="images", unit="images")
 
     report_upload_progress()
 
