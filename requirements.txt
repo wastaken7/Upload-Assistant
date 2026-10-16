@@ -72,7 +72,7 @@ mobi==0.4.1
 more-itertools==11.1.0
 msgpack==1.2.1
 msgspec==0.21.1
-multidict==6.7.1
+multidict==6.9.1
 mutagen==1.47.0
 narwhals==2.25.0
 nest-asyncio==1.6.0
@@ -126,7 +126,7 @@ typing-extensions==4.15.0
 unidecode==1.4.0
 urllib3==2.8.0
 waitress==3.0.2
-werkzeug==3.1.8
+werkzeug==3.1.9
 win32-setctime==1.2.0 ; sys_platform == 'win32'
 wrapt==2.3.0
 yarl==1.24.5
