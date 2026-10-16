@@ -34,6 +34,7 @@ from src.torrent_policy import hdbits_pieces_allowed as hdbits_pieces_allowed
 from src.webui_progress import complete_progress, has_progress_callback, publish_progress
 
 SUBTITLE_EXTENSIONS = (".srt", ".sub", ".vtt", ".ssa", ".ass", ".idx")
+DISC_EXCLUDE_GLOBS = ("._*", "*/._*", "*.lwi")
 
 
 def calculate_piece_size(
@@ -109,6 +110,14 @@ class TorrentCreator:
     _create_torrent_semaphore = asyncio.Semaphore(1)
     _create_torrent_inflight = 0
     _torf_start_time = time.time()
+
+    @classmethod
+    async def rehash_torrents(cls, meta: Meta) -> None:
+        TorrentManifest(meta.base_dir, meta.uuid).clear()
+        path = Path(str(meta.path))
+        await cls.create_torrent(meta, path, "BASE")
+        if meta.subtitle_files:
+            await cls.create_torrent(meta, path, "BASE_SUBS")
 
     @staticmethod
     def calculate_piece_size(
@@ -242,52 +251,33 @@ class TorrentCreator:
                 if meta.category not in ("MOVIE", "TV"):
                     if meta.isdir and len(meta.filelist) == 1 and not meta.keep_folder:
                         path = meta.filelist[0]
-                    include = []
-                    exclude = []
-                elif meta.keep_folder:
-                    logger.info("--keep-folder was specified. Using complete folder for torrent creation.")
+                elif not meta.is_disc:
+                    if meta.keep_folder:
+                        logger.info("--keep-folder was specified. Preserving the root folder for torrent creation.")
                     # specific nfo catch for certain trackers. BASE catch should prevent unintentional inclusion by default
                     if meta.keep_nfo and "BASE" not in output_filename:
                         logger.info("--keep-nfo was specified. Including NFO files in torrent.")
                         include = ["*.mkv", "*.mp4", "*.ts", "*.nfo"]
                         exclude = ["*.*", "*sample.mkv"]
                         meta.mkbrr = False
-                    elif not meta.tv_pack:
-                        folder_name = Path(str(path)).name
-                        include = [glob.escape(f"{folder_name}/{Path(f).name}") for f in creation_filelist]
+                    elif len(creation_filelist) == 1 and not (meta.keep_folder or meta.tv_pack or is_subs):
+                        path = creation_filelist[0]
+                    elif Path(path).is_dir():
+                        root = Path(path).absolute()
+                        for file in creation_filelist:
+                            try:
+                                relative_file = Path(file).absolute().relative_to(root)
+                            except ValueError:
+                                logger.warning(f"[yellow]Selected file is outside torrent root and will be skipped: {file}")
+                                continue
+                            # torf matches paths including the torrent's root name.
+                            include.append(glob.escape((Path(root.name) / relative_file).as_posix()))
                         exclude = ["*", "*/**"]
 
-                elif meta.isdir:
-                    if meta.keep_nfo and not meta.is_disc and "BASE" not in output_filename:
-                        logger.info("--keep-nfo was specified. Including NFO files in torrent.")
-                        include = ["*.mkv", "*.mp4", "*.ts", "*.nfo"]
-                        exclude = ["*.*", "*sample.mkv"]
-                        meta.mkbrr = False
-                    elif meta.is_disc:
-                        include = []
-                        exclude = []
-                    elif not meta.tv_pack:
-                        path_dir = os.fspath(path)
-                        path_dir_path = Path(path_dir)
-                        globs = [f.name for f in path_dir_path.glob("*.mkv")] + [f.name for f in path_dir_path.glob("*.mp4")] + [f.name for f in path_dir_path.glob("*.ts")]
-                        no_sample_globs = [
-                            str(Path(f"{path_dir}{os.sep}{file}").resolve()) for file in globs if not file.lower().endswith("sample.mkv") or "!sample" in file.lower()
-                        ]
-                        if len(no_sample_globs) == 1 and not is_subs:
-                            path = meta.filelist[0]
-                        exclude = ["*.*", "*sample.mkv", "!sample*.*"] if not meta.is_disc else []
-                        include = ["*.mkv", "*.mp4", "*.ts"] if not meta.is_disc else []
-                    else:
-                        folder_name = Path(str(path)).name
-                        include = [glob.escape(f"{folder_name}/{Path(f).name}") for f in creation_filelist]
-                        exclude = ["*", "*/**"]
-                elif is_subs:
-                    folder_name = Path(path).name
-                    include = [glob.escape(f"{folder_name}/{Path(file).name}") for file in creation_filelist]
-                    exclude = ["*", "*/**"]
-                else:
-                    exclude = ["*.*", "*sample.mkv", "!sample*.*"] if not meta.is_disc else []
-                    include = ["*.mkv", "*.mp4", "*.ts"] if not meta.is_disc else []
+                if meta.is_disc:
+                    exclude.extend(DISC_EXCLUDE_GLOBS)
+                    if output_filename == "BASE":
+                        exclude.extend(f"*{extension}" for extension in SUBTITLE_EXTENSIONS)
 
                 # Calculate initial size
                 def calculate_size() -> int:
@@ -355,6 +345,8 @@ class TorrentCreator:
                         if not meta.is_disc and meta.category in ("MOVIE", "TV"):
                             exclude_str = cls.build_mkbrr_exclude_string(str(path), creation_filelist, allow_subs=is_subs)
                             cmd.extend(["--exclude", exclude_str])
+                        elif meta.is_disc:
+                            cmd.extend(["--exclude", ",".join(exclude)])
 
                         cmd.extend(["-o", str(output_path)])
                         logger.debug(f"[cyan]mkbrr cmd: {cmd}")
@@ -467,30 +459,14 @@ class TorrentCreator:
                 piece_size = cls.calculate_piece_size(initial_size, 32768, 134217728, meta, piece_size=piece_size)
 
                 # Fallback to CustomTorrent if mkbrr is not used
-                custom_include = include or []
-                if is_subs and not meta.is_disc and meta.category in ("TV", "MOVIE"):
-                    # Preserve the existing video include rules and add only the
-                    # subtitle files selected for this upload, never every subtitle
-                    # matching an extension below the creation root.
-                    root = Path(path).resolve()
-                    root_name = Path(path).name
-                    selected_subtitles: list[str] = []
-                    for subtitle_file in meta.subtitle_files:
-                        try:
-                            relative_subtitle = Path(str(subtitle_file)).resolve().relative_to(root)
-                            # torf matches paths including the torrent's root name.
-                            selected_subtitles.append(glob.escape((Path(root_name) / relative_subtitle).as_posix()))
-                        except ValueError:
-                            logger.warning(f"[yellow]Selected subtitle is outside torrent root and will be skipped: {subtitle_file}")
-                    custom_include = list(dict.fromkeys([*custom_include, *selected_subtitles]))
                 torrent = CustomTorrent(
                     meta=meta,
                     path=path,
                     trackers=["https://fake.tracker"],
                     source="UA",
                     private=True,
-                    exclude_globs=exclude or [],
-                    include_globs=custom_include,
+                    exclude_globs=exclude,
+                    include_globs=include,
                     creation_date=datetime.now(UTC),
                     comment=f"{meta.ua_name} (fork)",
                     created_by=f"{meta.ua_name} (fork)",

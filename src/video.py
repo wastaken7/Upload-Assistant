@@ -134,7 +134,7 @@ class VideoManager:
         if Path(videoloc).is_dir():
             logger.debug("[blue]Scanning directory for video files...[/blue]")
             try:
-                entries = [p.name for p in Path(videoloc).iterdir() if p.is_file()]
+                entries = [p.name for p in Path(videoloc).iterdir() if p.is_file() and not p.name.startswith("._")]
             except Exception:
                 entries = []
 
@@ -148,7 +148,8 @@ class VideoManager:
                 if "sample" in fname_lower and "!sample" not in fname_lower:
                     continue
 
-                filelist.append(str(Path(Path(videoloc) / file).resolve()))
+                # Preserve the release layout when an episode is a symlink.
+                filelist.append(str(Path(videoloc) / file))
 
             filelist = sorted(filelist)
             if filelist:
