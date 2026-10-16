@@ -656,7 +656,7 @@ async def upload_image_task(args: Sequence[Any]) -> dict[str, Any]:
                 return {"status": "failed", "reason": f"Unexpected error: {e!s}"}
 
         elif img_host == "samaritano":
-            url = "https://img.samaritano.cc/api/v1/images"
+            url = "https://img.samaritano.cc/api/v1/sharex/upload"
             api_key = config.get("TRACKERS", {}).get("SAMARITANO", {}).get("image_host_api_key")
 
             if not isinstance(api_key, str) or not api_key.strip():
