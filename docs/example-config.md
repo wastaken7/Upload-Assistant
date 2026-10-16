@@ -282,6 +282,7 @@ Implementation notes:
 - `tracker_pass_checks` is used to determine how many trackers must pass early validation before continuing (see `upload.py`).
 - `tracker_description_mode` is the only configuration that controls imported tracker description text and screenshots. `--onlyID` temporarily forces `ids` for that execution.
 - `tracker_comment_only` does not disable explicit IDs supplied through `--tracker-id`.
+- See [Importing IDs and Descriptions from Other Trackers](tracker-metadata-import.md) for the full workflow, supported source trackers and troubleshooting.
 
 ### Sonarr / Radarr integration
 
