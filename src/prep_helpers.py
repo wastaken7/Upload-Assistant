@@ -1419,6 +1419,16 @@ async def finalize_metadata(
                 config=prep_instance.config,
             )
             meta.tvmaze_id = tvmaze_res if isinstance(tvmaze_res, int) else tvmaze_res[0]
+        if meta.tvdb_id == 0 and not both_ids_searched and (meta.imdb_id or meta.tmdb_id):
+            try:
+                series_id, series_name = await prep_instance.tvdb_handler.get_tvdb_by_external_id(imdb=meta.imdb_id, tmdb=meta.tmdb_id, tv_movie=meta.tv_movie)
+                if series_id:
+                    meta.tvdb_id = series_id
+                    if series_name:
+                        meta.tvdb_series_name = series_name
+                    logger.debug(f"[blue]Found TVDB series ID from external IDs: {series_id}[/blue]")
+            except Exception as e:
+                logger.error(f"[red]Error looking up TVDB by external ID: {e}[/red]")
         if meta.tvdb_id == 0:
             logger.debug("[yellow]No TVDB ID found, attempting to fetch...[/yellow]")
             try:
