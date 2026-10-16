@@ -49,15 +49,18 @@ def size_diff_ratio(first: ReleaseProfile, second: ReleaseProfile) -> float | No
 
 
 def _repack_traits(profile: ReleaseProfile) -> tuple[object, ...]:
-    return (profile.resolution, profile.kind, profile.codec, profile.hdr)
+    """Traits that identify a release; None means unknown. WEB releases are also identified by provider."""
+    if profile.kind is None:
+        provider: object = None
+    elif profile.kind in (WEBDL, WEBRIP):
+        provider = profile.provider
+    else:
+        provider = "not WEB"
+    return (profile.resolution, profile.kind, profile.codec, profile.hdr, provider)
 
 
 def _newer_from_same_group(upload: ReleaseProfile, existing: ReleaseProfile) -> bool:
-    if not (upload.group and upload.group == existing.group and upload.repack > existing.repack and upload.edition == existing.edition):
-        return False
-    # A group's WEB releases from different providers are different releases.
-    both_web = upload.kind in (WEBDL, WEBRIP) and existing.kind in (WEBDL, WEBRIP)
-    return not (both_web and upload.provider and existing.provider and upload.provider != existing.provider)
+    return bool(upload.group and upload.group == existing.group and upload.repack > existing.repack and upload.edition == existing.edition)
 
 
 def is_repack_of(upload: ReleaseProfile, existing: ReleaseProfile) -> bool:

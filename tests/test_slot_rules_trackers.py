@@ -384,3 +384,4 @@ def test_repack_from_another_provider_is_a_different_release() -> None:
     upload = prof(f"{T}.1080p.AMZN.WEB-DL.DDP5.1.H.264-NOGRPA")
     assert verdict(TorrentLeechSlotRules(), upload, prof(f"{T}.REPACK.1080p.NF.WEB-DL.DDP5.1.H.264-NOGRPA")) is ALLOW
     assert verdict(TorrentLeechSlotRules(), upload, prof(f"{T}.REPACK.1080p.AMZN.WEB-DL.DDP5.1.H.264-NOGRPA")) is BLOCK
+    assert verdict(TorrentLeechSlotRules(), upload, prof(f"{T}.REPACK.1080p.WEB-DL.DDP5.1.H.264-NOGRPA")) is REVIEW
