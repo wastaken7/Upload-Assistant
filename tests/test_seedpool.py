@@ -35,13 +35,13 @@ def test_seedpool_maps_music_book_and_game_types_to_current_site_ids():
 
 @pytest.mark.parametrize("single_file", [False, True])
 def test_seedpool_preserves_original_filename_spacing_and_punctuation(single_file):
-    release_name = "The Adam Project (2022) (2160p NF WEB-DL H265 SDR DDP Atmos 5.1 English - HONE)"
+    release_name = "Fictional Voyage (2022) (2160p NF WEB-DL H265 SDR DDP Atmos 5.1 English - NOGRP)"
     meta = Meta(
         category="MOVIE",
-        name="The Adam Project 2022 2160p NF WEB-DL DDP 5.1 Atmos H.265-HONE",
-        uuid="The Adam Project (2022)",
-        basename_no_ext="The Adam Project (2022)" if single_file else release_name,
-        filelist=[f"D:/Movies/The Adam Project (2022)/{release_name}.mkv"] if single_file else [],
+        name="Fictional Voyage 2022 2160p NF WEB-DL DDP 5.1 Atmos H.265-NOGRP",
+        uuid="Fictional Voyage (2022)",
+        basename_no_ext="Fictional Voyage (2022)" if single_file else release_name,
+        filelist=[f"D:/Movies/Fictional Voyage (2022)/{release_name}.mkv"] if single_file else [],
     )
 
     assert asyncio.run(_tracker().get_name(meta)) == {"name": release_name}
