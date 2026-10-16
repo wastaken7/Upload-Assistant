@@ -87,7 +87,7 @@ def test_samaritano_upload_posts_bearer_multipart_and_maps_urls(tmp_path: Path) 
     }
     assert requests == [
         (
-            ("https://img.samaritano.cc/api/v1/images",),
+            ("https://img.samaritano.cc/api/v1/sharex/upload",),
             {
                 "headers": {"Authorization": "Bearer fictional-image-token"},
                 "files": {"file": ("fictional-shot.png", b"fictional image")},
