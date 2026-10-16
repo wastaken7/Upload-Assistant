@@ -1,7 +1,9 @@
 # ruff: noqa: S101
 import ctypes
 import stat
+import subprocess
 import sys
+from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -32,6 +34,13 @@ def _set_mock_attributes(monkeypatch, attributes):
         return SimpleNamespace(**fields)
 
     monkeypatch.setattr(Path, "stat", entry_stat)
+    original_hidden = server._is_hidden_browse_entry
+
+    def hidden_entry(path):
+        # Inject attributes into both Path-based search and DirEntry-based listing.
+        return original_hidden(Path(path.path) if isinstance(path, server.os.DirEntry) else path)
+
+    monkeypatch.setattr(server, "_is_hidden_browse_entry", hidden_entry)
 
 
 @pytest.mark.parametrize("file_filter", ["video", "desc"])
@@ -87,6 +96,178 @@ def test_known_system_names_are_filtered_case_insensitively_without_reading_them
 
 def test_missing_entries_are_skipped():
     assert server._is_hidden_browse_entry(Path("nonexistent-fictional-entry"))
+
+
+def test_large_listing_reuses_metadata_and_root_resolution(browser, tmp_path, monkeypatch):
+    folder = tmp_path / "Fictional Folder"
+    folder.mkdir()
+    first = tmp_path / "Fictional 000.txt"
+    first.write_text("fictional", encoding="utf-8")
+    expected_stat = first.stat()
+    root_reads = []
+    child_stats = []
+    original_stat = Path.stat
+
+    def roots():
+        root_reads.append(True)
+        return [str(tmp_path)]
+
+    def tracked_stat(path, *args, **kwargs):
+        if path.parent == tmp_path:
+            child_stats.append(path.name)
+        return original_stat(path, *args, **kwargs)
+
+    monkeypatch.setattr(server, "_get_browse_roots", roots)
+    monkeypatch.setattr(Path, "stat", tracked_stat)
+    response = browser.get("/api/browse", query_string={"path": str(tmp_path)})
+    assert response.status_code == 200
+    small_root_reads = len(root_reads)
+    for index in range(1, 64):
+        (tmp_path / f"Fictional {index:03}.txt").touch()
+    root_reads.clear()
+    child_stats.clear()
+    response = browser.get("/api/browse", query_string={"path": str(tmp_path)})
+    assert response.status_code == 200
+    assert len(root_reads) == small_root_reads
+    assert child_stats == []
+    items = response.json["items"]
+    assert len(items) == 65
+    assert [item["name"] for item in items] == sorted(item["name"] for item in items)
+    assert items[0]["size"] == expected_stat.st_size
+    assert items[0]["mtime"] == expected_stat.st_mtime
+    assert items[0]["type"] == "file"
+    assert items[-1]["type"] == "folder"
+    assert items[-1]["size"] == 0
+
+
+def test_listing_detects_replacement_link_from_nofollow_metadata(browser, tmp_path, monkeypatch):
+    """A cached non-link type must not bypass validation of a replacement link."""
+    entry_path = tmp_path / "Fictional Replacement.txt"
+    entry_path.touch()
+    inspected = []
+    original_assert = server._assert_safe_resolved_path
+
+    class ReplacedEntry:
+        name = entry_path.name
+
+        def stat(self, *, follow_symlinks=True):
+            assert not follow_symlinks
+            return SimpleNamespace(st_mode=stat.S_IFLNK, st_file_attributes=0, st_size=17, st_mtime=123)
+
+        def is_symlink(self):
+            return False  # Type from enumeration predates the replacement.
+
+        def is_dir(self):
+            return False
+
+    @contextmanager
+    def scandir(path):
+        assert Path(path) == tmp_path
+        yield iter([ReplacedEntry()])
+
+    def validate(path):
+        if Path(path) == entry_path:
+            inspected.append(path)
+            raise ValueError("Path outside allowed roots")
+        return original_assert(path)
+
+    monkeypatch.setattr(server.os, "scandir", scandir)
+    monkeypatch.setattr(server, "_assert_safe_resolved_path", validate)
+    response = browser.get("/api/browse", query_string={"path": str(tmp_path)})
+    assert response.status_code == 200
+    assert inspected == [entry_path]
+    assert response.json["items"] == []
+
+
+@pytest.mark.parametrize("directory", [False, True])
+def test_listing_never_exposes_retargeted_link_metadata(browser, tmp_path, monkeypatch, directory):
+    """Model a known symlink retargeted after its path passes validation."""
+    entry_path = tmp_path / "Fictional Link.txt"
+    entry_path.touch()
+    original_assert = server._assert_safe_resolved_path
+    attributes = stat.FILE_ATTRIBUTE_REPARSE_POINT | (stat.FILE_ATTRIBUTE_DIRECTORY if directory else 0)
+    link_stat = SimpleNamespace(st_mode=stat.S_IFLNK, st_file_attributes=attributes, st_size=17, st_mtime=123)
+    retargeted = False
+    following_reads = []
+
+    class LinkEntry:
+        name = entry_path.name
+
+        def stat(self, *, follow_symlinks=True):
+            if not follow_symlinks:
+                return link_stat
+            following_reads.append(retargeted)
+            return SimpleNamespace(st_size=987654, st_mtime=999999)
+
+        def is_symlink(self):
+            return True
+
+        def is_dir(self):
+            # A known symlink's following is_dir also populates its stat cache.
+            self.stat()
+            return directory
+
+    @contextmanager
+    def scandir(path):
+        assert Path(path) == tmp_path
+        yield iter([LinkEntry()])
+
+    def validate(path):
+        nonlocal retargeted
+        if Path(path) == entry_path:
+            retargeted = True
+            return None
+        return original_assert(path)
+
+    monkeypatch.setattr(server.os, "scandir", scandir)
+    monkeypatch.setattr(server, "_assert_safe_resolved_path", validate)
+    response = browser.get("/api/browse", query_string={"path": str(tmp_path)})
+    assert response.status_code == 200
+    assert retargeted
+    assert True not in following_reads
+    assert response.json["items"] == [
+        {
+            "name": entry_path.name,
+            "path": str(entry_path),
+            "type": "folder" if directory else "file",
+            "children": [] if directory else None,
+            "mtime": link_stat.st_mtime,
+            "size": 0 if directory else link_stat.st_size,
+        }
+    ]
+
+
+def test_listing_still_validates_directory_link_targets(browser, tmp_path):
+    root = tmp_path / "media"
+    root.mkdir()
+    inside = root / "Fictional Inside"
+    inside.mkdir()
+    outside = tmp_path / "media-outside"
+    outside.mkdir()
+    links = [root / "Fictional Allowed Link", root / "Fictional Escaping Link"]
+    try:
+        for link, target in zip(links, [inside, outside], strict=True):
+            if sys.platform == "win32":
+                result = subprocess.run(  # noqa: S603 - only pytest-owned paths
+                    ["cmd", "/c", "mklink", "/J", str(link), str(target)],  # noqa: S607 - Windows built-in
+                    capture_output=True,
+                    check=False,
+                )
+                assert result.returncode == 0, result.stderr
+            else:
+                link.symlink_to(target, target_is_directory=True)
+        # The browser fixture normally allows tmp_path; narrow it for this request.
+        with pytest.MonkeyPatch.context() as patch:
+            patch.setattr(server, "_get_browse_roots", lambda: [str(root)])
+            response = browser.get("/api/browse", query_string={"path": str(root)})
+        assert response.status_code == 200
+        assert {item["name"] for item in response.json["items"]} == {inside.name, links[0].name}
+    finally:
+        for link in links:
+            if sys.platform == "win32" and link.exists():
+                link.rmdir()
+            elif link.is_symlink():
+                link.unlink()
 
 
 def test_search_does_not_inspect_attributes_of_nonmatching_files(browser, tmp_path, monkeypatch):

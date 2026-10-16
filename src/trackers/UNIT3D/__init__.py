@@ -4,7 +4,7 @@ import json
 import platform
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import aiofiles
 import httpx
@@ -15,11 +15,15 @@ from src.cogs.redaction import Redaction
 from src.console import logger
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
+from src.slot_rules.profile import DISC, kind_from_type_label
 from src.trackers.common import Common
 from src.trackers.naming import add_incomplete_pack_marker
 
 type QueryValue = str | int | float | bool | None
 type ParamsList = list[tuple[str, QueryValue]]
+
+# Upper bound on per-torrent detail requests made by one duplicate search.
+MAX_TORRENT_DETAIL_REQUESTS = 10
 
 
 class UNIT3D:
@@ -32,6 +36,10 @@ class UNIT3D:
     pending_url: str = ""
     search_url: str = ""
     upload_url: str = ""
+    # Search every release of the title for MOVIE/TV. The basic dupe check still
+    # gets only the upload's type and resolution; slot rules get the whole title
+    # through ``meta["<TRACKER>_title_releases"]``.
+    search_whole_title: bool = False
 
     def __init__(self, config: dict[str, Any], tracker_name: str):
         self.config = config
@@ -67,6 +75,8 @@ class UNIT3D:
         dupes: list[dict[str, Any]] = []
         params_list: ParamsList | None = None
         category = meta.category
+        # Slot rules must only see a title list produced by this search.
+        meta.pop(f"{self.tracker}_title_releases", None)
 
         # Ensure tracker_status keys exist before any potential writes
         meta.setdefault("tracker_status", {})
@@ -76,6 +86,8 @@ class UNIT3D:
             "accept": "application/json",
         }
 
+        local_resolution_ids: set[str] | None = None
+        local_type_id: str | None = None
         if category in ("MOVIE", "TV"):
             params_dict: dict[str, str] = {
                 "name": "",
@@ -92,7 +104,9 @@ class UNIT3D:
             if self.tracker not in ["OLDTOONSWORLD"]:
                 resolutions = await self.get_resolution_id(meta)
                 resolution_id = resolutions["resolution_id"]
-                if resolution_id in ["3", "4"]:
+                if self.search_whole_title:
+                    local_resolution_ids = {"3", "4"} if resolution_id in ["3", "4"] else {resolution_id}
+                elif resolution_id in ["3", "4"]:
                     # Convert params to list of tuples to support duplicate keys
                     params_list = list(params_dict.items())
                     params_list.append(("resolutions[]", "3"))
@@ -102,7 +116,9 @@ class UNIT3D:
 
             if self.tracker not in ["SEEDPOOL", "SKIPTHECOMMERCIALS"]:
                 type_id = (await self.get_type_id(meta))["type_id"]
-                if params_list is not None:
+                if self.search_whole_title:
+                    local_type_id = type_id
+                elif params_list is not None:
                     params_list.append(("types[]", type_id))
                 else:
                     params_dict["types[]"] = type_id
@@ -127,6 +143,9 @@ class UNIT3D:
 
         urls_to_check = await self.get_search_urls(meta, request_params)
 
+        missing_details: list[dict[str, Any]] = []
+        disc_type_ids: list[set[str]] = []
+        title_releases: list[dict[str, Any]] = []
         async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
             for url, params, check_pending in urls_to_check:
                 logger.debug(f"{self.tracker}: Searching URL: {url} with params: {params} (pending={check_pending})")
@@ -160,6 +179,8 @@ class UNIT3D:
                                 "type": attributes.get("type", None),
                                 "res": attributes.get("resolution", None),
                                 "internal": attributes.get("internal", False),
+                                # Used by slot rules (audio languages, HDR format, bitrate).
+                                "media_info": attributes.get("media_info", None),
                             }
                         else:
                             result = {
@@ -177,11 +198,98 @@ class UNIT3D:
                                 "bd_info": attributes.get("bd_info", ""),
                                 "description": attributes.get("description", ""),
                             }
-                        dupes.append(result)
+                        title_releases.append(result)
+                        if self._matches_local_filter(attributes, local_resolution_ids, local_type_id):
+                            dupes.append(result)
+                        # Newer UNIT3D versions omit these fields from search results (or send them empty).
+                        missing_key = "bd_info" if meta.is_disc else "media_info"
+                        type_label = attributes.get("type")
+                        if type_label:
+                            entry_is_disc = kind_from_type_label(type_label) == DISC
+                        else:
+                            if not disc_type_ids:
+                                disc_type_ids.append(await self._disc_type_ids(meta))
+                            entry_type_id = attributes.get("type_id")
+                            entry_is_disc = entry_type_id is not None and str(entry_type_id) in disc_type_ids[0]
+                        if not check_pending and torrent_id and not attributes.get(missing_key) and entry_is_disc == bool(meta.is_disc):
+                            missing_details.append(result)
                 else:
                     logger.info(f"{self.tracker}: [bold red]Failed to search torrents. HTTP Status: {response.status_code}")
 
+            if missing_details and self._wants_torrent_details(meta):
+                # Some trackers ignore the resolution filter; spend the capped requests on the upload's resolution first.
+                missing_details.sort(key=lambda entry: entry.get("res") != meta.resolution)
+                await self._fill_torrent_details(client, headers, missing_details)
+
+        if self.search_whole_title and category in ("MOVIE", "TV"):
+            meta[f"{self.tracker}_title_releases"] = title_releases
         return dupes
+
+    async def _disc_type_ids(self, meta: Meta) -> set[str]:
+        """The tracker's Full Disc type ids; empty when its type mapping can't say."""
+        ids: set[str] = set()
+        try:
+            mapping = await self.get_type_id(meta, mapping_only=True)
+            disc_id = mapping.get("DISC") if isinstance(mapping, dict) else None
+            if disc_id:
+                ids.add(str(disc_id))
+        except Exception:
+            logger.debug(f"{self.tracker}: type mapping unavailable for disc detection")
+        if meta.is_disc:
+            # Some trackers only map the upload's own type; for a disc upload that is the disc type.
+            try:
+                upload_type = (await self.get_type_id(meta)).get("type_id")
+                if upload_type and upload_type != "0":
+                    ids.add(str(upload_type))
+            except Exception:
+                logger.debug(f"{self.tracker}: could not resolve the upload's type id for disc detection")
+        return ids
+
+    @staticmethod
+    def _matches_local_filter(attributes: dict[str, Any], resolution_ids: set[str] | None, type_id: str | None) -> bool:
+        """Apply the type/resolution filter the API would have applied; unknown ids are kept."""
+        entry_resolution = attributes.get("resolution_id")
+        if resolution_ids is not None and entry_resolution is not None and str(entry_resolution) not in resolution_ids:
+            return False
+        entry_type = attributes.get("type_id")
+        return type_id is None or entry_type is None or str(entry_type) == type_id
+
+    def _wants_torrent_details(self, meta: Meta) -> bool:
+        """Discs need BDInfo for the comparator; other releases need MediaInfo only for slot rules."""
+        if meta.category not in ("MOVIE", "TV"):
+            return False
+        if meta.is_disc:
+            return True
+        from src.slot_rules.registry import has_slot_rules, slot_rules_apply
+
+        return has_slot_rules(self.tracker) and slot_rules_apply(meta, self.config)
+
+    async def _fill_torrent_details(self, client: httpx.AsyncClient, headers: dict[str, str], entries: list[dict[str, Any]]) -> None:
+        """Fetch MediaInfo/BDInfo per torrent when the search results leave them out."""
+        detail_base = self.search_url.rsplit("/filter", 1)[0]
+        if not self.search_url.endswith("/filter") or not detail_base:
+            return
+        if len(entries) > MAX_TORRENT_DETAIL_REQUESTS:
+            logger.debug(f"{self.tracker}: fetching details for the first {MAX_TORRENT_DETAIL_REQUESTS} of {len(entries)} results")
+        for index, entry in enumerate(entries[:MAX_TORRENT_DETAIL_REQUESTS]):
+            if index:
+                # Sequential and spaced out to stay well within API rate limits.
+                await asyncio.sleep(0.5)
+            try:
+                response = await client.get(f"{detail_base}/{entry['id']}", headers=headers)
+                response.raise_for_status()
+                data = response.json()
+            except (httpx.HTTPError, ValueError) as e:
+                logger.debug(f"{self.tracker}: could not fetch details for torrent {entry['id']}: {e}")
+                continue
+            if not isinstance(data, dict):
+                continue
+            payload = cast(dict[str, Any], data)
+            nested = cast(dict[str, Any], payload.get("data") or {})
+            attributes = cast(dict[str, Any], payload.get("attributes") or nested.get("attributes") or {})
+            for key in ("media_info", "bd_info", "description"):
+                if key in entry and key in attributes:
+                    entry[key] = attributes.get(key)
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
         return {"name": add_incomplete_pack_marker(meta.name, meta, self.tracker)}

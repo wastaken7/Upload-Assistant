@@ -21,7 +21,7 @@ from src.cleanup import cleanup_manager
 from src.clients import Clients
 from src.config_helpers import parse_bool
 from src.console import logger
-from src.edition import get_edition
+from src.edition import RELEASE_TOKEN_RE, get_edition
 from src.exceptions import NoAudioMediaError
 from src.exportmi import export_info, get_conformance_error, mi_resolution, validate_mediainfo
 from src.get_source import get_source
@@ -593,8 +593,9 @@ async def process_media_files(prep_instance: Any, meta: Meta, videoloc: str, bdi
                         continue
                     for file in files:
                         ext = Path(file).suffix.lower()
-                        if ext in subtitle_exts:
-                            meta.subtitle_files.append(str(Path(Path(root) / file).resolve()))
+                        if ext in subtitle_exts and not file.startswith("._"):
+                            # Torrent layouts use the link's path within the release.
+                            meta.subtitle_files.append(str((Path(root) / file).absolute()))
             else:
                 parent_dir = str(Path(meta_path).parent)
                 if parent_dir and Path(parent_dir).exists():
@@ -603,7 +604,7 @@ async def process_media_files(prep_instance: Any, meta: Meta, videoloc: str, bdi
                         if (Path(parent_dir) / file).is_file():
                             ext = Path(file).suffix.lower()
                             if ext in subtitle_exts and file.lower().startswith(base_name.lower()):
-                                meta.subtitle_files.append(str(Path(Path(parent_dir) / file).resolve()))
+                                meta.subtitle_files.append(str((Path(parent_dir) / file).absolute()))
             meta.subtitle_files = sorted(set(meta.subtitle_files))
 
         video, meta.scene, meta.imdb_id = await prep_instance.scene_manager.is_scene(videopath, meta, meta.imdb_id)
@@ -1659,11 +1660,7 @@ async def finalize_metadata(
         if meta.no_edition is False:
             manual_edition = meta.manual_edition or ""
             meta.edition, meta.repack, meta.webdv = await get_edition(meta.uuid, bdinfo, meta.filelist, manual_edition, meta)
-            if "REPACK" in meta.edition:
-                repack_match = re.search(r"REPACK[\d]?", meta.edition)
-                if repack_match:
-                    meta.repack = repack_match.group(0)
-                meta.edition = re.sub(r"REPACK[\d]?", "", meta.edition).strip().replace("  ", " ")
+            meta.edition = " ".join(RELEASE_TOKEN_RE.sub("", meta.edition).split())
         else:
             meta.edition = ""
 

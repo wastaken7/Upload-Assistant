@@ -20,6 +20,8 @@ from src.manualpackage import ManualPackageManager
 from src.meta import Meta
 from src.qbitwait import Wait
 from src.rehostimages import check_tracker_image_hosts, has_restricted_image_hosts, select_common_image_host
+from src.slot_rules.models import Verdict
+from src.slot_rules.registry import evaluate_slots
 from src.stats import record_event_async
 from src.torrent_provision import provision_tracker_torrents
 from src.trackers.GAZELLE.passthepopcorn import PassThePopcorn
@@ -193,6 +195,13 @@ async def process_trackers(
                         real_new_dupes = [d for d in new_dupes if not is_in_initial(d)]
 
                         if real_new_dupes:
+                            slot_decision = await evaluate_slots(new_dupes, meta, tracker_name, config)
+                            if slot_decision is not None and slot_decision.verdict is Verdict.ALLOW:
+                                logger.info(f"[green]{tracker_name}: new releases appeared during the wait, but slot rules still allow this upload.[/green]")
+                                return True
+                            if slot_decision is not None and slot_decision.verdict is Verdict.BLOCK:
+                                logger.info(f"[red]{tracker_name}: a release that fills this slot appeared during the wait. Automatically skipping upload.[/red]")
+                                return False
                             dupe_checker = DupeChecker(config)
                             real_new_dupes = cast(list[Any], await dupe_checker.filter_dupes(real_new_dupes, meta, tracker_name))
                             if real_new_dupes:

@@ -22,6 +22,7 @@ from src.config_helpers import format_terminal_link
 from src.console import logger, prompt_in_thread
 from src.meta import Meta
 from src.prompt_sound import play_prompt_sound
+from src.slot_rules.models import SlotDecision, Verdict
 from src.trackersetup import tracker_class_map
 
 _dupe_prompt_lock_held = contextvars.ContextVar("dupe_prompt_lock_held", default=False)
@@ -226,6 +227,21 @@ def parse_size_to_bytes(size_str: Any) -> int | None:
         return None
 
 
+def _describe_size(size: Any, upload_size: int | None) -> str:
+    """Size of a release on the site, compared with the upload ("9.4 GB · 65% smaller than yours")."""
+    size_bytes = parse_size_to_bytes(size)
+    if not size_bytes:
+        return ""
+    gib = size_bytes / 1024**3
+    text = f"{gib:.1f} GB" if gib >= 1 else f"{size_bytes / 1024**2:.0f} MB"
+    if not upload_size:
+        return text
+    percent = round((size_bytes - upload_size) / upload_size * 100)
+    if abs(percent) < 2:
+        return f"{text} · about the same size as yours"
+    return f"{text} · {abs(percent)}% {'smaller' if percent < 0 else 'larger'} than yours"
+
+
 def hsl_to_rgb(h: float, s: float, lx: float) -> tuple[int, int, int]:
     # h in [0, 360], s in [0, 1], l in [0, 1]
     c = (1.0 - abs(2.0 * lx - 1.0)) * s
@@ -271,16 +287,95 @@ class UploadHelper:
         async with self._prompt_lock:
             return await prompt_in_thread(cli_ui.ask_yes_no, question, default=default)
 
-    async def dupe_check(self, dupes: list[DupeEntry | str], meta: Meta, tracker_name: str) -> tuple[bool, Meta]:
+    async def dupe_check(self, dupes: list[DupeEntry | str], meta: Meta, tracker_name: str, slot_decision: SlotDecision | None = None) -> tuple[bool, Meta]:
         """Show duplicate results and their confirmation as one atomic console interaction."""
         async with self._prompt_lock:
             token = _dupe_prompt_lock_held.set(True)
             try:
-                return await self._dupe_check(dupes, meta, tracker_name)
+                return await self._dupe_check(dupes, meta, tracker_name, slot_decision)
             finally:
                 _dupe_prompt_lock_held.reset(token)
 
-    async def _dupe_check(self, dupes: list[DupeEntry | str], meta: Meta, tracker_name: str) -> tuple[bool, Meta]:
+    def _show_slot_decision(self, decision: SlotDecision, meta: Meta) -> None:
+        """Print a tracker's slot recommendation as a small, readable box."""
+        import textwrap
+        from datetime import datetime
+
+        from src.console import console
+
+        # Box-drawing characters need a UTF-8 console; older Windows consoles get ASCII.
+        unicode_ok = "utf" in (console.encoding or "").lower()
+        top, side, bottom, more, dot = ("╭─", "│", "╰─", "…", "·") if unicode_ok else ("+-", "|", "+-", "...", "-")
+        icon = ({Verdict.ALLOW: "✓", Verdict.BLOCK: "✗", Verdict.REVIEW: "!"} if unicode_ok else {Verdict.ALLOW: "OK", Verdict.BLOCK: "X", Verdict.REVIEW: "!"})[
+            decision.verdict
+        ]
+        color, title = {
+            Verdict.ALLOW: ("green", "Upload looks fine"),
+            Verdict.BLOCK: ("red", "Upload not recommended"),
+            Verdict.REVIEW: ("yellow", "Check before uploading"),
+        }[decision.verdict]
+        bar = f"[{color}]{side}[/{color}]"
+        # Wrap text ourselves so every line keeps the side bar.
+        width = max(40, min(console.width, 120) - 6)
+
+        def plain(text: str) -> str:
+            return text if unicode_ok else text.replace("·", dot).replace("…", more)
+
+        def line(markup: str = "") -> None:
+            logger.info(f"{bar} {markup}" if markup else bar, extra={"highlighter": None})
+
+        def paragraph(text: str, *, indent: str = "", style: str = "") -> None:
+            for chunk in textwrap.wrap(plain(text), width=width - len(indent)) or [""]:
+                body = escape(chunk)
+                line(f"{indent}[{style}]{body}[/{style}]" if style else f"{indent}{body}")
+
+        logger.info("")
+        logger.info(f"[{color}]{top}[/{color}] [bold]{decision.tracker}[/bold] [dim]{dot} slot check[/dim]", extra={"highlighter": None})
+        line(f"[bold {color}]{icon} {title}[/bold {color}]")
+        paragraph(decision.reason)
+        if decision.slot:
+            line()
+            paragraph(f"Slot: {decision.slot}")
+        if decision.why:
+            line()
+            line("[dim]Why[/dim]")
+            paragraph(decision.why, indent="  ")
+        if decision.conflicts:
+            line()
+            line("[dim]Already on the site[/dim]")
+            shown = decision.conflicts[:5]
+            for entry in shown:
+                name = plain(str(entry.get("name", "")))
+                link = entry.get("link")
+                label = format_terminal_link(name, link, self.default_config) if isinstance(link, str) and link else escape(name)
+                line(f"  [cyan]{label}[/cyan]")
+                size_text = _describe_size(entry.get("size"), meta.source_size)
+                if size_text:
+                    paragraph(size_text, indent="  ", style="dim")
+            if len(decision.conflicts) > len(shown):
+                paragraph(f"…and {len(decision.conflicts) - len(shown)} more", indent="  ", style="dim")
+        for note in decision.notes:
+            line()
+            paragraph(f"Note: {note}")
+        age_days = (datetime.now().astimezone().date() - decision.rules_date).days
+        age = "today" if age_days <= 0 else f"{age_days} day{'s' if age_days != 1 else ''} ago"
+        line()
+        paragraph(f"Rules as of {decision.rules_date.isoformat()} ({age}). This is only a recommendation; tracker rules change over time.", style="dim")
+        logger.info(f"[{color}]{bottom}[/{color}]", extra={"highlighter": None})
+        logger.info("")
+
+    def _show_slot_fallback(self, meta: Meta, tracker_name: str) -> None:
+        """Explain that the basic dupe check is used when slot rules don't apply."""
+        from src.slot_rules.registry import has_slot_rules, slot_rules_apply
+
+        if not slot_rules_apply(meta, self.config):
+            return
+        if has_slot_rules(tracker_name):
+            logger.info(f"[dim]{tracker_name}: slot rules don't cover this release; using the basic dupe check.[/dim]")
+        else:
+            logger.info(f"[dim]{tracker_name}: slot rules are not implemented for this tracker; using the basic dupe check.[/dim]")
+
+    async def _dupe_check(self, dupes: list[DupeEntry | str], meta: Meta, tracker_name: str, slot_decision: SlotDecision | None = None) -> tuple[bool, Meta]:
         def _format_dupe(entry: DupeEntry | str) -> str:
             if isinstance(entry, dict):
                 name = str(entry.get("name", ""))
@@ -320,7 +415,32 @@ class UploadHelper:
         dupes_list: list[DupeEntry | str] = dupes
         upload: bool = False
         meta.were_trumping = False
+        slot_verdict = slot_decision.verdict if slot_decision is not None else None
+        interactive = (not meta.unattended or (meta.unattended and meta.unattended_confirm)) and not meta.ask_dupe
         if not dupes_list:
+            needs_answer = slot_verdict is Verdict.BLOCK or (slot_verdict is Verdict.REVIEW and bool(slot_decision and slot_decision.conflicts))
+            if slot_decision is not None and needs_answer:
+                # The basic check found nothing, but the slot rules see a conflict.
+                self._show_slot_decision(slot_decision, meta)
+                if meta.dupe is not False:
+                    return False, meta
+                if not interactive:
+                    if slot_verdict is Verdict.REVIEW:
+                        # Unattended review keeps the basic result, which found no dupes.
+                        return False, meta
+                    logger.info(f"[bold red]{tracker_name}: skipping upload, slot rules recommend against it.[/bold red]")
+                    return True, meta
+                try:
+                    upload = await self.prompt_yes_no(f"Upload to {tracker_name} anyway?", default=False)
+                    meta.we_asked = True
+                except EOFError:
+                    logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")
+                    await cleanup_manager.cleanup()
+                    cleanup_manager.reset_terminal()
+                    sys.exit(1)
+                return (not upload), meta
+            if slot_decision is not None and slot_decision.conflicts:
+                self._show_slot_decision(slot_decision, meta)
             logger.debug(f"[green]No dupes found at[/green] [yellow]{tracker_name}[/yellow]")
             return False, meta
         tracker_class_factory = cast(Callable[..., Any], self.tracker_class_map[tracker_name])
@@ -377,7 +497,12 @@ class UploadHelper:
                 if user_tag and not tag_matched:
                     logger.info(f"[yellow]Note: No release found with matching tag '{meta.tag}'. Selected release may be from a different group.[/yellow]")
 
-        if (not meta.unattended or (meta.unattended and meta.unattended_confirm)) and not meta.ask_dupe:
+        if slot_decision is not None:
+            self._show_slot_decision(slot_decision, meta)
+        else:
+            self._show_slot_fallback(meta, tracker_name)
+
+        if interactive:
             dupe_text = _format_dupes_list(dupes_list)
 
             if trumpable_text and (meta.trumpable_id or (meta.season_pack_contains_episode and meta.get(f"{tracker_name}_matched_episode_ids", []))):
@@ -453,7 +578,7 @@ class UploadHelper:
                         try:
                             if meta.is_disc == "BDMV":
                                 await self.ask_bdinfo_comparison(meta, dupes_list, tracker_name)
-                            upload = await self.prompt_yes_no(f"Upload to {tracker_name} anyway?", default=False)
+                            upload = await self.prompt_yes_no(f"Upload to {tracker_name} anyway?", default=slot_verdict is Verdict.ALLOW)
                             meta.we_asked = True
                         except EOFError:
                             logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")
@@ -466,8 +591,16 @@ class UploadHelper:
                     # dupes list was emptied after filtering (e.g., season pack declined trump, no other dupes)
                     upload = True
 
+        elif meta.dupe is not False:
+            upload = True
+        elif slot_verdict is Verdict.ALLOW:
+            # Unattended: a tracker with slot rules decides; REVIEW keeps the basic result.
+            logger.info(f"[green]{tracker_name}: uploading, slot rules allow this release.[/green]")
+            upload = True
         else:
-            upload = meta.dupe is not False
+            if slot_verdict is Verdict.BLOCK:
+                logger.info(f"[bold red]{tracker_name}: skipping upload, slot rules recommend against it.[/bold red]")
+            upload = False
 
         display_name = display_name if display_name is not None else meta.name
         display_name = display_name

@@ -182,6 +182,7 @@ These can be [overridden per-tracker](#tracker-overridable-settings) by adding t
 
 - `custom_description_header` (str): BBCode header added at top of description section.
 - `screenshot_header` (str): BBCode header added above screenshots.
+- `hide_screenshot_header_if_only_section` (bool): Hide the generated image-section header when it is the only one rendered (default `True`). Applies to screenshots, disc menus, audio spectrograms and dynamic HDR plots. Logos, text and signatures do not count; tone-mapping notices are preserved. Set to `False` to always keep these headers.
 - `disc_menu_header` (str): BBCode header added above disc menu screenshots (discs only).
 - `audio_spectrogram_header` (str): BBCode header added above audio spectrograms.
 - `dynamic_hdr_plot_header` (str): BBCode header added above dynamic HDR metadata plots.
@@ -267,6 +268,8 @@ Implementation notes:
 ### UX / safety toggles
 
 - `sfx_on_prompt` (bool, default `True`): Play a bell before release confirmation. CLI runs use the terminal bell; WebUI runs play the sound in the browser after clicking Execute. Allow site audio and keep the tab unmuted. Fully unattended runs skip the sound along with confirmation.
+- `webui_keep_uploads_on_disconnect` (bool, default `True`): Keep a WebUI upload running after its browser tab closes, reloads, or loses the connection. Reopen the WebUI to see its tab again. Set to `False` to kill an upload as soon as its tab disconnects.
+- `webui_unattended_prompt_timeout` (number, default `60`): Minutes a WebUI upload may wait at an unanswered prompt while no browser is connected before it is killed. Set `0` to wait indefinitely.
 - `embed_links` (bool): Set true to embed terminal links using terminal hyperlinks (OSC 8). Set false to display the full raw URLs. `embed_dupe_links` remains supported temporarily as a deprecated alias.
 - `tracker_pass_checks` (str): Minimum number of trackers that must pass checks to continue upload.
 - `use_largest_playlist` (bool): Always use the largest Blu-ray playlist without prompting.

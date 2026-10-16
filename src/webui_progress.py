@@ -11,6 +11,8 @@ from typing import TypedDict
 
 class ProgressEvent(TypedDict, total=False):
     op: str
+    path: str
+    meta_uuid: str
     id: str
     label: str
     current: float
@@ -62,6 +64,14 @@ def _emit(event: ProgressEvent) -> None:
 
 def reset_progress() -> None:
     _emit({"op": "reset", "updated_at": time.time()})
+
+
+def publish_preview_target(path: str, meta_uuid: str | None = None) -> None:
+    """Send the current release target over the WebUI child's structured channel."""
+    event: ProgressEvent = {"op": "preview_target", "path": path}
+    if meta_uuid:
+        event["meta_uuid"] = meta_uuid
+    _emit(event)
 
 
 def publish_progress(

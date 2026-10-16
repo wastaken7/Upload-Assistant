@@ -35,6 +35,9 @@ class CapybaraBR(UNIT3D):
     requests_url = f"{base_url}/api/requests/filter"
     pending_url = f"{base_url}/api/torrents/pending"
     supported_categories = ("TV", "MOVIE", "BOOK", "GAME")
+    # Slot rules need every release of the title: a complete DUAL release trumps
+    # dub-only and subtitle-only releases of any type.
+    search_whole_title = True
     tracker_urls = ("capybarabr.com",)
 
     def __init__(self, config: dict[str, Any]):

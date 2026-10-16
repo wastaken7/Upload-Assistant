@@ -15,6 +15,7 @@ from src.dupe_checking import DupeChecker
 from src.imdb import imdb_manager
 from src.meta import Meta
 from src.metadata_searching import get_douban_id
+from src.slot_rules.registry import evaluate_slots
 from src.stats import record_event_async
 from src.trackers.AVISTAZ.routing import AvistaZNetworkRouter
 from src.trackers.GAZELLE.passthepopcorn import PassThePopcorn
@@ -286,10 +287,12 @@ class TrackerStatusManager:
                         meta.initial_dupes[tracker_name] = copy.deepcopy(dupes)
 
                     if ("skipping" not in local_meta or local_meta["skipping"] is None) and not local_tracker_status["skipped"]:
+                        # Slot rules need the unfiltered results; the basic filter drops releases they compare against.
+                        slot_decision = await evaluate_slots(dupes, local_meta, tracker_name, self.config)
                         dupes = cast(list[Any], await dupe_checker.filter_dupes(dupes, local_meta, tracker_name))
 
                         # Run dupe check first so it can modify local_meta (e.g., set cross-seed values)
-                        is_dupe, local_meta = await helper.dupe_check(dupes, local_meta, tracker_name)
+                        is_dupe, local_meta = await helper.dupe_check(dupes, local_meta, tracker_name, slot_decision)
                         if is_dupe:
                             local_tracker_status["dupe"] = True
 

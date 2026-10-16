@@ -3,6 +3,8 @@
 import asyncio
 from unittest.mock import AsyncMock, Mock, patch
 
+import pytest
+
 from src.meta import Meta
 from src.trackers.UNIT3D.darkpeers import DarkPeers
 
@@ -29,7 +31,8 @@ def test_darkpeers_music_name_uses_required_folder_style():
     assert _name(meta) == "Example Artist - Sample Album (2012) - WEB FLAC 16-44.1"
 
 
-def test_darkpeers_only_includes_audio_spectrograms_for_music():
+@pytest.mark.parametrize("hide_header", [None, True, False])
+def test_darkpeers_only_includes_audio_spectrograms_for_music(hide_header):
     config = {
         "DEFAULT": {"tmdb_api": "test-key"},
         "TRACKERS": {
@@ -39,6 +42,8 @@ def test_darkpeers_only_includes_audio_spectrograms_for_music():
             }
         },
     }
+    if hide_header is not None:
+        config["TRACKERS"]["DARKPEERS"]["hide_screenshot_header_if_only_section"] = hide_header
     adapter = DarkPeers(config)
     spectrogram = {"web_url": "https://example.com/page", "raw_url": "https://example.com/spectrogram.png"}
 
@@ -50,7 +55,7 @@ def test_darkpeers_only_includes_audio_spectrograms_for_music():
 
     music = Meta(category="MUSIC", audio_spectrogram=True, spectrograms_images=[spectrogram])
     music_description = asyncio.run(adapter.get_description(music))["description"]
-    assert "[h2]Audio Spectrogram[/h2]" in music_description
+    assert ("[h2]Audio Spectrogram[/h2]" in music_description) is (hide_header is False)
     assert "spectrogram.png" in music_description
 
 

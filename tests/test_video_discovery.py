@@ -39,6 +39,15 @@ def test_uppercase_avi_extension_and_explicit_sample_override(tmp_path):
     assert asyncio.run(VideoManager().get_video(str(tmp_path))) == (str(video.resolve()), [str(video.resolve())])
 
 
+@pytest.mark.parametrize("sort_by_size", [False, True])
+def test_video_discovery_ignores_macos_sidecars(tmp_path, sort_by_size):
+    video = tmp_path / "movie.2000.mkv"
+    video.write_bytes(b"video")
+    (tmp_path / "._movie.2000.mkv").write_bytes(b"macOS metadata" * 10)
+
+    assert asyncio.run(VideoManager().get_video(str(tmp_path), sort_by_size)) == (str(video), [str(video)])
+
+
 @pytest.mark.parametrize("sidecar", ["readme.txt", "extras.rar"])
 def test_avi_with_sidecars_is_not_classified_as_book_or_game(tmp_path, sidecar):
     (tmp_path / "episode.avi").write_bytes(b"video")
@@ -51,7 +60,10 @@ def test_avi_with_sidecars_is_not_classified_as_book_or_game(tmp_path, sidecar):
     assert meta.category not in ("BOOK", "GAME", "MUSIC")
 
 
-def test_empty_directory_stops_before_scene_or_mediainfo_processing(tmp_path, monkeypatch):
+@pytest.mark.parametrize("with_sidecar", [False, True])
+def test_empty_directory_stops_before_scene_or_mediainfo_processing(tmp_path, monkeypatch, with_sidecar):
+    if with_sidecar:
+        (tmp_path / "._movie.2000.mkv").write_bytes(b"macOS metadata")
     meta = Meta(path=str(tmp_path), category="TV", isdir=True)
     scene = AsyncMock()
     export = AsyncMock()

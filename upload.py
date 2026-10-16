@@ -183,6 +183,11 @@ def set_webui_session_id(session_id: str | None, run_token: str | None = None) -
 
 def _publish_webui_preview_target(path: str, meta_uuid: str | None = None) -> None:
     """Push the current queue item to the Web UI execution preview, when active."""
+    if path and os.environ.get("UA_WEBUI_PROGRESS_STDOUT") == "1":
+        from src.webui_progress import publish_preview_target
+
+        publish_preview_target(path, meta_uuid)
+        return
     if not _is_webui_mode or not _webui_session_id or not _webui_run_token or not path:
         return
     try:
@@ -1930,9 +1935,7 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
 
         # 2. Re-create base torrents if rehash is True
         if meta.rehash is True and meta.nohash is False:
-            await TORRENT_CREATOR.create_torrent(meta, Path(cast(str, meta.path)), "BASE", make_default=True)
-            if has_local_subs:
-                await TORRENT_CREATOR.create_torrent(meta, Path(cast(str, meta.path)), "BASE_SUBS", make_default=True)
+            await TORRENT_CREATOR.rehash_torrents(meta)
 
         # 3. Otherwise generate if missing
         else:
