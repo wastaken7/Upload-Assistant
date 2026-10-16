@@ -3884,6 +3884,8 @@ html[data-ua-shape="square"]
     [class~="rounded-full"],
     [class~="rounded-t"],
     [class~="rounded-b"],
+    .ua-processing-poster,
+    .ua-processing-genre,
     .ua-config-nav-button,
     .ua-config-nav-indicator,
     .ua-config-icon-button,

@@ -14,6 +14,7 @@
     "ptscreens",
     "seedpool_cdn",
     "sharex",
+    "thrimg",
     "utppm",
     "zipline",
   ]);
