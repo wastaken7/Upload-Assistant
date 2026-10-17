@@ -1,7 +1,10 @@
 import json
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
+from src import prep_helpers
 from src.exportmi import export_info
 from src.meta import Meta
 from src.region import get_mediainfo_service
@@ -113,3 +116,79 @@ async def test_near_misses_and_invalid_fields(track, key, value):
 @pytest.mark.parametrize('media', [None, [], {}, {'media': None}, {'media': {'track': None}}, {'media': {'track': [None, {}]}}])
 async def test_malformed_tracks(media):
     assert await get_mediainfo_service(metadata(mediainfo=media)) == ('', '')
+
+
+@pytest.fixture
+def prep(monkeypatch):
+    monkeypatch.setattr(prep_helpers, 'video_manager', SimpleNamespace(
+        get_container=AsyncMock(return_value='mkv'),
+        is_3d=AsyncMock(return_value=''),
+        get_uhd=AsyncMock(return_value=''),
+        get_hdr=AsyncMock(return_value=''),
+        get_video_encode=AsyncMock(return_value=('H.264', 'AVC', False, '8')),
+    ))
+    monkeypatch.setattr(prep_helpers, 'get_source', AsyncMock(return_value=('WEB', 'WEBDL')))
+    monkeypatch.setattr(prep_helpers, 'tag_override', AsyncMock(side_effect=lambda meta: meta))
+    return SimpleNamespace(
+        config={'DEFAULT': {}},
+        audio_manager=SimpleNamespace(get_audio_v2=AsyncMock(return_value=('DD+ 2.0', '2.0', False))),
+        stream_optimized=AsyncMock(return_value=False),
+        check_adult_media=lambda _meta: False,
+        parse_scene_nfo=AsyncMock(),
+    )
+
+
+@pytest.fixture
+def service_prompt(monkeypatch):
+    prompt = Mock(return_value=False)
+    monkeypatch.setattr(prep_helpers.cli_ui, 'ask_yes_no', prompt)
+    return prompt
+
+
+async def finalize_service(prep, meta):
+    video = meta.path or 'Example.Movie.2025.1080p.WEB-DL-GROUP.mkv'
+    meta.category = 'MOVIE'
+    meta.tag = '-GROUP'
+    meta.no_edition = True
+    await prep_helpers.finalize_metadata(prep, meta, video, {}, meta.mediainfo, video, video, video)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('unattended,confirm', [(False, False), (False, True), (True, True)])
+@pytest.mark.parametrize('response,expected', [(True, ('AMZN', 'Amazon')), (False, ('', '')), (EOFError(), ('', ''))], ids=['accept', 'decline', 'eof'])
+async def test_inferred_service_requires_confirmation(prep, service_prompt, unattended, confirm, response, expected):
+    service_prompt.side_effect = [response]
+    meta = metadata(unattended=unattended, unattended_confirm=confirm)
+
+    await finalize_service(prep, meta)
+
+    assert (meta.service, meta.service_longname) == expected
+    service_prompt.assert_called_once()
+    assert 'AMZN (Amazon)' in service_prompt.call_args.args[0]
+    assert service_prompt.call_args.kwargs['default'] is False
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('overrides', [dict(unattended=True), dict(resolution='720p')], ids=['unattended', 'no-signature'])
+async def test_no_confirmation_when_unattended_or_signature_missing(prep, service_prompt, overrides):
+    meta = metadata(**overrides)
+
+    await finalize_service(prep, meta)
+
+    assert (meta.service, meta.service_longname) == ('', '')
+    service_prompt.assert_not_called()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('overrides', [dict(service='NF'), dict(path='Example.Movie.2025.1080p.NF.WEB-DL-GROUP.mkv'), dict(scene=True)], ids=['explicit', 'filename', 'nfo'])
+async def test_known_service_does_not_require_confirmation(prep, service_prompt, overrides):
+    async def parse_scene_nfo(meta):
+        meta.service, meta.service_longname = 'NF', 'Netflix'
+
+    prep.parse_scene_nfo.side_effect = parse_scene_nfo
+    meta = metadata(**overrides)
+
+    await finalize_service(prep, meta)
+
+    assert (meta.service, meta.service_longname) == ('NF', 'Netflix')
+    service_prompt.assert_not_called()
