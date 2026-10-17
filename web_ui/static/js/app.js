@@ -3731,7 +3731,21 @@ function AudionutsUAGUI() {
 
   const copyMediaInfoReport = async (content) => {
     try {
-      await navigator.clipboard.writeText(content);
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(content);
+      } else {
+        // navigator.clipboard only exists in secure contexts; plain-HTTP LAN access needs the legacy path.
+        const area = document.createElement("textarea");
+        area.value = content;
+        area.setAttribute("readonly", "");
+        area.style.position = "fixed";
+        area.style.opacity = "0";
+        document.body.appendChild(area);
+        area.select();
+        const copied = document.execCommand("copy");
+        area.remove();
+        if (!copied) throw new Error("Copy failed");
+      }
       setMediaInfoCopied(true);
       window.setTimeout(() => setMediaInfoCopied(false), 1500);
     } catch (_error) {
