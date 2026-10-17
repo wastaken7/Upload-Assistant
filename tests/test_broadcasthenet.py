@@ -322,3 +322,47 @@ def test_btn_get_series_name_fetches_and_caches(monkeypatch) -> None:
     assert api_calls == 1  # noqa: S101
 
 
+def test_btn_get_series_name_falls_back_to_tvdb_episode_data_when_btn_empty(monkeypatch) -> None:
+    async def fake_api(_method: str, _params: dict[str, object]) -> dict[str, object]:
+        return {"result": {"torrents": {}}}
+
+    btn = tracker()
+    monkeypatch.setattr(btn, "_api", fake_api)
+    meta = Meta(
+        tvdb_id=73244,
+        tvdb_episode_data={"series_name": "The Office (US)"},
+        name="The Office 2005 S01E01 1080p WEB-DL DDP 5.1 x264-GRP",
+        title="The Office",
+        year=2005,
+        resolution="1080p",
+        tag="-GRP",
+    )
+
+    assert asyncio.run(btn.get_series_name(meta)) == "The Office (US)"  # noqa: S101
+    assert asyncio.run(btn.get_name(meta)) == "The.Office.US.S01E01.1080p.WEB-DL.DDP5.1.x264-GRP"  # noqa: S101
+
+
+def test_btn_get_series_name_falls_back_to_tvdb_client(monkeypatch) -> None:
+    async def fake_api(_method: str, _params: dict[str, object]) -> dict[str, object]:
+        return {"result": {"torrents": {}}}
+
+    class FakeTVDBClient:
+        async def get_series_extended(self, series_id: int) -> dict[str, object]:
+            assert series_id == 78804  # noqa: S101
+            return {"name": "Doctor Who (2005)"}
+
+    monkeypatch.setattr("src.tvdb._get_tvdb_or_warn", lambda _cfg: FakeTVDBClient())
+
+    btn = tracker()
+    monkeypatch.setattr(btn, "_api", fake_api)
+    meta = Meta(
+        tvdb_id=78804,
+        name="Doctor Who 2005 S01E01 1080p WEB-DL DDP 5.1 x264-GRP",
+        title="Doctor Who",
+        year=2005,
+        resolution="1080p",
+        tag="-GRP",
+    )
+
+    assert asyncio.run(btn.get_series_name(meta)) == "Doctor Who (2005)"  # noqa: S101
+    assert asyncio.run(btn.get_name(meta)) == "Doctor.Who.2005.S01E01.1080p.WEB-DL.DDP5.1.x264-GRP"  # noqa: S101

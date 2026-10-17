@@ -414,33 +414,55 @@ class BroadcasTheNet:
             return False
         return True
 
+    async def get_tvdb_series_name(self, meta: Meta) -> str | None:
+        episode_data = meta.get("tvdb_episode_data")
+        if isinstance(episode_data, dict) and episode_data.get("series_name"):
+            return str(episode_data["series_name"]).strip() or None
+
+        if meta.get("tvdb_series_name"):
+            return str(meta.tvdb_series_name).strip() or None
+
+        tvdb_id = int(meta.tvdb_id or 0)
+        if tvdb_id:
+            try:
+                from src.tvdb import _get_tvdb_or_warn
+
+                client = _get_tvdb_or_warn(self.config)
+                if client is not None:
+                    series_info = await client.get_series_extended(tvdb_id)
+                    if isinstance(series_info, dict) and series_info.get("name"):
+                        return str(series_info["name"]).strip() or None
+            except Exception as exc:
+                logger.debug(f"{self.tracker}: Could not fetch TVDB series name for ID {tvdb_id}: {exc}")
+
+        return None
+
     async def get_series_name(self, meta: Meta) -> str | None:
         cache_key = f"{meta.tvdb_id}_{meta.imdb_id}"
         if cache_key in self._series_cache:
             return self._series_cache[cache_key] or None
 
-        if not self.api_key:
-            return None
-
-        filters: dict[str, Any] = {}
-        if int(meta.tvdb_id or 0):
-            filters["tvdb"] = str(meta.tvdb_id)
-        elif int(meta.imdb_id or 0):
-            filters["imdb"] = str(meta.imdb_id)
-        if not filters:
-            return None
-
         series_name: str | None = None
-        try:
-            result = await self._api("getTorrents", {"search": filters, "results": 1, "offset": 0})
-            payload = result.get("result")
-            torrents = payload.get("torrents") if isinstance(payload, dict) else None
-            if isinstance(torrents, dict) and torrents:
-                first = next(iter(torrents.values()))
-                if isinstance(first, dict):
-                    series_name = str(first.get("Series") or "").strip() or None
-        except Exception as exc:
-            logger.debug(f"{self.tracker}: Could not fetch series name from BTN: {exc}")
+        if self.api_key:
+            filters: dict[str, Any] = {}
+            if int(meta.tvdb_id or 0):
+                filters["tvdb"] = str(meta.tvdb_id)
+            elif int(meta.imdb_id or 0):
+                filters["imdb"] = str(meta.imdb_id)
+            if filters:
+                try:
+                    result = await self._api("getTorrents", {"search": filters, "results": 1, "offset": 0})
+                    payload = result.get("result")
+                    torrents = payload.get("torrents") if isinstance(payload, dict) else None
+                    if isinstance(torrents, dict) and torrents:
+                        first = next(iter(torrents.values()))
+                        if isinstance(first, dict):
+                            series_name = str(first.get("Series") or "").strip() or None
+                except Exception as exc:
+                    logger.debug(f"{self.tracker}: Could not fetch series name from BTN: {exc}")
+
+        if not series_name:
+            series_name = await self.get_tvdb_series_name(meta)
 
         self._series_cache[cache_key] = series_name or ""
         return series_name
@@ -630,15 +652,17 @@ class BroadcasTheNet:
                 if not items:
                     continue
 
-                matched_group = [
-                    (t_id, item) for t_id, item in items
-                    if str(item.get("GroupID") or item.get("groupId") or item.get("GroupId") or "").strip() == group_id
-                ] if group_id else []
+                matched_group = (
+                    [(t_id, item) for t_id, item in items if str(item.get("GroupID") or item.get("groupId") or item.get("GroupId") or "").strip() == group_id]
+                    if group_id
+                    else []
+                )
 
                 candidates = matched_group if matched_group else items
 
                 exact_matches = [
-                    (t_id, item) for t_id, item in candidates
+                    (t_id, item)
+                    for t_id, item in candidates
                     if any(str(item.get(f) or "").strip().casefold() == expected_release for f in ("ReleaseName", "releaseName", "TorrentName", "Name", "Release"))
                 ]
                 if exact_matches:
