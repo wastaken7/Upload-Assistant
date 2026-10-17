@@ -320,3 +320,20 @@ def test_aither_falls_back_to_generic_name_for_unknown_type() -> None:
 
 def test_aither_appends_trump_marker() -> None:
     assert _name(_movie(trump_reason="exact_match")) == "Synthetic Feature 2024 1080p NF WEB-DL DD+ 5.1 H.264-TESTGROUP - TRUMP"
+
+
+@pytest.mark.parametrize(("is_disc", "checked"), [("BDMV", False), ("DVD", False), ("HDDVD", True), ("", True)])
+def test_aither_language_requirement_exempts_only_bdmv_and_dvd(monkeypatch: pytest.MonkeyPatch, is_disc: str, checked: bool) -> None:
+    tracker = Aither({"DEFAULT": {}, "TRACKERS": {"AITHER": {}}})
+    calls: list[str] = []
+
+    async def language_check(*_args: object, **_kwargs: object) -> bool:
+        calls.append(is_disc)
+        return False
+
+    monkeypatch.setattr(tracker.common, "check_language_requirements", language_check)
+
+    passed = asyncio.run(tracker.get_additional_checks(Meta(is_disc=is_disc, valid_mi=True)))
+
+    assert bool(calls) is checked
+    assert passed is not checked

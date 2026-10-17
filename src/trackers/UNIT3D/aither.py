@@ -77,7 +77,7 @@ class Aither(UNIT3D):
     async def get_additional_checks(self, meta: Meta):
         should_continue = True
 
-        if not meta.is_disc and not await self.common.check_language_requirements(
+        if meta.is_disc not in ["BDMV", "DVD"] and not await self.common.check_language_requirements(
             meta, self.tracker, languages_to_check=["english"], check_audio=True, check_subtitle=True, original_language=True, original_required=True
         ):
             return False
