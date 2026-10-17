@@ -792,13 +792,20 @@ class Common:
                 bbcode = BBCODE()
                 description, imagelist = bbcode.clean_unit3d_description(description, torrent_url)
                 if not skip_tracker_descriptions:
-                    logger.info(f"[green]Successfully grabbed description from {tracker}")
-                    logger.info(f"Extracted description: \n\n{description}\n\n", extra={"markup": False, "highlighter": None})
-
                     # A tracker ID only identifies the source of this metadata.  It
                     # must not suppress the interactive review of the description.
                     # Candidate collection sets ``unattended`` explicitly and is
                     # therefore still non-interactive.
+                    if not description:
+                        # Nothing useful remained after cleanup (only images,
+                        # signatures or empty BBCode), so there is nothing to review.
+                        logger.info(f"[yellow]Description from {tracker} has no text content after cleanup; ignoring it.[/yellow]")
+                        if not meta.unattended and not meta.keep_images:
+                            imagelist = []
+                        return tmdb, imdb, tvdb, mal, description, category, infohash, imagelist, file_name
+                    logger.info(f"[green]Successfully grabbed description from {tracker}")
+                    logger.info(f"Extracted description: \n\n{description}\n\n", extra={"markup": False, "highlighter": None})
+
                     if meta.unattended:
                         return tmdb, imdb, tvdb, mal, description, category, infohash, imagelist, file_name
                     logger.info("[cyan]Do you want to edit, discard or keep the description?[/cyan]")
