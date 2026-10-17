@@ -20,7 +20,7 @@ from src.book_prep import AUDIOBOOK_EXTENSIONS, BOOK_EXTENSIONS, BOOK_SERVICES
 from src.cleanup import cleanup_manager
 from src.clients import Clients
 from src.config_helpers import parse_bool
-from src.console import logger
+from src.console import logger, prompt_in_thread
 from src.edition import RELEASE_TOKEN_RE, get_edition
 from src.exceptions import NoAudioMediaError
 from src.exportmi import export_info, get_conformance_error, mi_resolution, validate_mediainfo
@@ -29,7 +29,7 @@ from src.imdb import imdb_manager, imdb_match_rejection
 from src.languages import languages_manager
 from src.media_extensions import VIDEO_EXTENSIONS
 from src.meta import Meta
-from src.region import get_distributor, get_region, get_service
+from src.region import get_distributor, get_mediainfo_service, get_region, get_service
 from src.sports import detect_sports
 from src.tags import get_tag, tag_override
 from src.tvmaze import tvmaze_manager
@@ -1716,6 +1716,19 @@ async def finalize_metadata(
         # Parse NFO for scene releases to get service
         if meta.scene and not meta.service and meta.category in ("TV", "MOVIE"):
             await prep_instance.parse_scene_nfo(meta)
+
+        # MediaInfo signatures are weaker evidence than explicit, filename or NFO services.
+        if not meta.service and (not meta.unattended or meta.unattended_confirm):
+            service, service_longname = await get_mediainfo_service(meta)
+            if service:
+                with contextlib.suppress(EOFError):
+                    if await prompt_in_thread(
+                        cli_ui.ask_yes_no,
+                        f"MediaInfo signature suggests {service} ({service_longname}). Set this as the service?",
+                        default=False,
+                    ):
+                        meta.service, meta.service_longname = service, service_longname
+                        logger.info(f"[green]Confirmed {service} ({service_longname}) from MediaInfo signature[/green]")
 
         # Combine genres from TMDB and IMDb
         tmdb_genres = meta.genres or []
