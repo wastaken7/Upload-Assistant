@@ -36,3 +36,39 @@ def test_homiehelpdesk_music_type_uses_analyzed_format():
     meta = Meta(category="MUSIC", music_release={"fields": {"format": {"value": "FLAC"}}})
 
     assert asyncio.run(_tracker().get_type_id(meta)) == {"type_id": "7"}
+
+
+def test_homiehelpdesk_audiobook_upload_sends_audiobook_fields():
+    meta = Meta(
+        category="BOOK",
+        audiobook=True,
+        asin="b0testasin",
+        audible_url="https://www.audible.co.uk/pd/B0TESTASIN",
+        title="The Glass Orchard",
+        author="Mira Vantell",
+        audible_authors=[{"name": "Mira Vantell", "asin": ""}, {"name": "Oren Lasko", "asin": ""}],
+        narrator="Tess Calloway",
+    )
+
+    assert asyncio.run(_tracker().get_additional_data(meta)) == {
+        "audiobook_asin": "B0TESTASIN",
+        "audiobook_region": "uk",
+        "audiobook_title": "The Glass Orchard",
+        "audiobook_authors": "Mira Vantell, Oren Lasko",
+        "audiobook_narrators": "Tess Calloway",
+    }
+
+
+def test_homiehelpdesk_audiobook_without_asin_still_sends_title_and_author():
+    meta = Meta(category="BOOK", audiobook=True, title="The Glass Orchard", author="Mira Vantell")
+
+    assert asyncio.run(_tracker().get_additional_data(meta)) == {
+        "audiobook_title": "The Glass Orchard",
+        "audiobook_authors": "Mira Vantell",
+    }
+
+
+def test_homiehelpdesk_ebook_upload_sends_isbn():
+    meta = Meta(category="BOOK", isbn="978-0-00-000000-2")
+
+    assert asyncio.run(_tracker().get_additional_data(meta)) == {"isbn": "9780000000002"}
