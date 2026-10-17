@@ -1,6 +1,7 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import re
-from typing import Any
+from typing import Any, ClassVar
+from urllib.parse import urlsplit
 
 from src.console import logger
 from src.meta import Meta
@@ -78,6 +79,19 @@ class HomieHelpDesk(UNIT3D):
     torrent_url = f"{base_url}/torrents/"
     supported_categories = ("TV", "MOVIE", "BOOK", "GAME", "MUSIC")
     tracker_urls = ("https://homiehelpdesk.net",)
+    # Audible marketplace host -> HHD "audiobook_region" form value
+    _AUDIBLE_REGIONS: ClassVar[dict[str, str]] = {
+        "audible.com.au": "au",
+        "audible.ca": "ca",
+        "audible.de": "de",
+        "audible.es": "es",
+        "audible.fr": "fr",
+        "audible.in": "in",
+        "audible.it": "it",
+        "audible.co.jp": "jp",
+        "audible.co.uk": "uk",
+        "audible.com": "us",
+    }
 
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name="HOMIEHELPDESK")
@@ -129,9 +143,50 @@ class HomieHelpDesk(UNIT3D):
 
         return {}
 
+    @staticmethod
+    def _audiobook_upload_data(meta: Meta) -> dict[str, str]:
+        """Build HomieHelpDesk's audiobook fields; title and authors are required when no ASIN is sent."""
+        data: dict[str, str] = {}
+
+        asin = str(meta.asin or meta.book_asin or "").strip().upper()
+        if re.fullmatch(r"[A-Z0-9]{10}", asin):
+            data["audiobook_asin"] = asin
+            host = (urlsplit(meta.audible_url).hostname or "").removeprefix("www.") if meta.audible_url else ""
+            region = HomieHelpDesk._AUDIBLE_REGIONS.get(host)
+            if region:
+                data["audiobook_region"] = region
+
+        title = str(meta.title or meta.book_title or "").strip()
+        if title:
+            data["audiobook_title"] = title
+
+        audible_names = [str(author.get("name") or "").strip() for author in meta.audible_authors if isinstance(author, dict)]
+        authors = ", ".join(name for name in audible_names if name) or str(meta.author or meta.book_author or "").strip()
+        if authors:
+            data["audiobook_authors"] = authors
+
+        narrators = str(meta.narrator or meta.book_narrator or "").strip()
+        if narrators:
+            data["audiobook_narrators"] = narrators
+
+        return data
+
+    @staticmethod
+    def _ebook_upload_data(meta: Meta) -> dict[str, str]:
+        """Send the ISBN so HHD can fetch the cover and book details."""
+        isbn = re.sub(r"[^0-9Xx]", "", str(meta.isbn or meta.book_isbn or "")).upper()
+        if len(isbn) in (10, 13):
+            return {"isbn": isbn}
+        return {}
+
     async def get_additional_data(self, meta: Meta) -> dict[str, str]:
         if meta.category == "MUSIC":
             return self._music_upload_data(meta)
+        if meta.category == "BOOK":
+            if meta.audiobook:
+                return self._audiobook_upload_data(meta)
+            if not (meta.comic or meta.manga or meta.magazine):
+                return self._ebook_upload_data(meta)
         return {}
 
     async def get_category_id(self, meta: Meta, category: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
