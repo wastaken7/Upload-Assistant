@@ -1992,9 +1992,15 @@ function AudionutsUAGUI() {
     getStoredExpandedFolders,
   );
   const [sessionId, setSessionId] = useState("");
-  const [uploadTabs, setUploadTabs] = useState([
-    { id: "tab-1", number: 1, title: "", status: "idle" },
-  ]);
+  const [uploadTabs, setUploadTabs] = useState(() =>
+    screenshotMode
+      ? screenshotMode.tabs.map((tab, index) => ({
+          ...tab,
+          id: `tab-${index + 1}`,
+          number: index + 1,
+        }))
+      : [{ id: "tab-1", number: 1, title: "", status: "idle" }],
+  );
   const [activeTabId, setActiveTabId] = useState("tab-1");
   const [pendingCloseTabId, setPendingCloseTabId] = useState("");
   const [maxRunningUploads, setMaxRunningUploads] = useState(
@@ -2052,18 +2058,29 @@ function AudionutsUAGUI() {
   const [showSubtitleTracks, setShowSubtitleTracks] = useState(
     () => storage.get(SHOW_SUBTITLE_TRACKS_KEY) === "true",
   );
-  const [executionScreenshots, setExecutionScreenshots] = useState([]);
-  const [executionDescription, setExecutionDescription] = useState(null);
-  const [descriptionDraft, setDescriptionDraft] = useState("");
+  const [executionScreenshots, setExecutionScreenshots] = useState(
+    () => screenshotMode?.screenshots || [],
+  );
+  const [executionDescription, setExecutionDescription] = useState(
+    () => screenshotMode?.description || null,
+  );
+  const [descriptionDraft, setDescriptionDraft] = useState(
+    () => screenshotMode?.description.content || "",
+  );
   const [descriptionView, setDescriptionView] = useState("edit");
-  const [descriptionVersion, setDescriptionVersion] = useState(0);
+  const [descriptionVersion, setDescriptionVersion] = useState(
+    () => screenshotMode?.description.version || 0,
+  );
   const [descriptionDirty, setDescriptionDirty] = useState(false);
   const descriptionDirtyRef = useRef(false);
-  const descriptionVersionRef = useRef(0);
+  const descriptionVersionRef = useRef(
+    screenshotMode?.description.version || 0,
+  );
   const descriptionEditorRef = useRef(null);
   const [descriptionAction, setDescriptionAction] = useState("");
-  const [canAddExecutionScreenshot, setCanAddExecutionScreenshot] =
-    useState(false);
+  const [canAddExecutionScreenshot, setCanAddExecutionScreenshot] = useState(
+    Boolean(screenshotMode),
+  );
   const [screenshotActionId, setScreenshotActionId] = useState("");
   const [coverAction, setCoverAction] = useState("");
   const coverRequestRef = useRef(0);
@@ -2085,9 +2102,15 @@ function AudionutsUAGUI() {
   const [isScreenshotReviewOpen, setIsScreenshotReviewOpen] = useState(false);
   const [isDescriptionReviewOpen, setIsDescriptionReviewOpen] = useState(false);
   const [isMediaInfoOpen, setIsMediaInfoOpen] = useState(false);
-  const [executionMediaInfo, setExecutionMediaInfo] = useState(null);
-  const [mediaInfoStatus, setMediaInfoStatus] = useState("idle");
-  const [selectedMediaInfoKey, setSelectedMediaInfoKey] = useState("");
+  const [executionMediaInfo, setExecutionMediaInfo] = useState(
+    () => screenshotMode?.mediainfo || null,
+  );
+  const [mediaInfoStatus, setMediaInfoStatus] = useState(
+    screenshotMode ? "ready" : "idle",
+  );
+  const [selectedMediaInfoKey, setSelectedMediaInfoKey] = useState(
+    () => screenshotMode?.mediainfo.reports[0]?.key || "",
+  );
   const [mediaInfoCopied, setMediaInfoCopied] = useState(false);
   const mediaInfoTargetRef = useRef("");
   // Desktop-only enlarged view of one review panel; the sidebar keeps showing
@@ -2523,6 +2546,18 @@ function AudionutsUAGUI() {
     const firstTab = createUploadTabRuntime();
     firstTab.run.isExecuting = Boolean(screenshotMode);
     tabRuntimeRef.current = new Map([["tab-1", firstTab]]);
+    // Demo background tabs only feed the tab bar; switching to them is disabled.
+    screenshotMode?.tabs.slice(1).forEach((tab, index) => {
+      const runtime = createUploadTabRuntime();
+      runtime.run.isExecuting = ["running", "input", "scheduled"].includes(
+        tab.status,
+      );
+      runtime.awaiting = tab.status === "input";
+      runtime.scheduled = tab.status === "scheduled";
+      if (!runtime.run.isExecuting) runtime.result = tab.status;
+      tabRuntimeRef.current.set(`tab-${index + 2}`, runtime);
+    });
+    uploadTabCounterRef.current = tabRuntimeRef.current.size;
   }
 
   const getTabRuntime = (tabId) => tabRuntimeRef.current.get(tabId);
@@ -2679,8 +2714,13 @@ function AudionutsUAGUI() {
             </span>
           </div>
         )}
+        {/* Only the floating panel caps its height; the sidebar already scrolls. */}
         <div
-          className={`${compact ? "space-y-2" : "space-y-3"} max-h-[40vh] overflow-y-auto pr-1`}
+          className={
+            compact
+              ? "space-y-2 max-h-[40vh] overflow-y-auto pr-1"
+              : "space-y-3"
+          }
         >
           {visibleProgressItems.map((item) => {
             const current = Number(item.current ?? 0);
@@ -5995,6 +6035,7 @@ function AudionutsUAGUI() {
 
   /** Show another tab: park the current view state and restore the target's. */
   const switchUploadTab = (nextId) => {
+    if (screenshotMode) return;
     const currentId = activeTabIdRef.current;
     const next = getTabRuntime(nextId);
     if (nextId === currentId || !next) return;
@@ -6090,6 +6131,7 @@ function AudionutsUAGUI() {
   };
 
   const requestCloseUploadTab = (tabId) => {
+    if (screenshotMode) return;
     if (getTabRuntime(tabId)?.run.isExecuting) {
       setPendingCloseTabId(tabId);
       return;
@@ -6168,7 +6210,6 @@ function AudionutsUAGUI() {
   };
 
   const renderUploadTabs = () => {
-    if (screenshotMode) return null;
     const canAddTab = uploadTabs.length < MAX_UPLOAD_TABS;
     return (
       <>

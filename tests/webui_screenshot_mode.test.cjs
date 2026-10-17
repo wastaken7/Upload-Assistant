@@ -71,15 +71,39 @@ test("demo metadata and progress remain stable across API actions", async () => 
   const demo = context.window.UAScreenshotMode;
   const before = JSON.stringify(demo.media);
   assert.equal(demo.media.title, "The Automation Menace");
-  assert.equal(demo.media.progress.length, 5);
+  assert.equal(demo.media.progress.length, 7);
+  // Bars are mid-run; the bandwidth meter shows a rate over its limit instead.
   assert.ok(
-    demo.media.progress.every(
-      (item) => item.current > 0 && item.current < item.total,
+    demo.media.progress.every((item) =>
+      item.unit === "kbps"
+        ? item.current > item.total
+        : item.current > 0 && item.current < item.total,
     ),
   );
   assert.ok(demo.output.includes(demo.media.path));
   await context.uaApiFetch("/api/kill", { method: "POST" });
   assert.equal(JSON.stringify(demo.media), before);
+});
+
+test("demo review panels and tabs are populated with local fictional data", () => {
+  const demo = fixture(true).window.UAScreenshotMode;
+  assert.ok(demo.screenshots.length > 0);
+  assert.ok(
+    demo.screenshots.every((shot) =>
+      shot.image_url.startsWith("data:image/svg+xml"),
+    ),
+  );
+  assert.equal(new Set(demo.screenshots.map((shot) => shot.id)).size, 6);
+  assert.ok(demo.description.content.includes("The Automation Menace"));
+  assert.ok(Number.isInteger(demo.description.version));
+  assert.equal(demo.mediainfo.kind, "mediainfo");
+  assert.ok(
+    demo.mediainfo.reports[0].content.includes(
+      demo.media.title.replaceAll(" ", "."),
+    ),
+  );
+  assert.equal(demo.tabs[0].status, "running");
+  assert.ok(demo.tabs.length > 1);
 });
 
 const appSource = read("app.js");
