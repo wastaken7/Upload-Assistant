@@ -366,3 +366,57 @@ def test_btn_get_series_name_falls_back_to_tvdb_client(monkeypatch) -> None:
 
     assert asyncio.run(btn.get_series_name(meta)) == "Doctor Who (2005)"  # noqa: S101
     assert asyncio.run(btn.get_name(meta)) == "Doctor.Who.2005.S01E01.1080p.WEB-DL.DDP5.1.x264-GRP"  # noqa: S101
+
+
+def test_btn_verify_autofill_success() -> None:
+    btn = tracker()
+    meta = Meta(season_int=1, episode_int=2, year=2005)
+    data = {"artist": "The Office (US)", "title": "S01E02", "year": "2005"}
+
+    assert btn._verify_autofill(data, meta, "The Office (US)", "Episode") == []  # noqa: S101
+
+
+def test_btn_verify_autofill_detects_mismatches() -> None:
+    btn = tracker()
+    meta = Meta(season_int=1, episode_int=2, year=2005)
+    data = {"artist": "The Office", "title": "S01E03", "year": "2001"}
+
+    errors = btn._verify_autofill(data, meta, "The Office (US)", "Episode")
+    assert any("artist" in e for e in errors)  # noqa: S101
+    assert any("title" in e for e in errors)  # noqa: S101
+    assert any("year" in e for e in errors)  # noqa: S101
+
+
+def test_btn_verify_autofill_season_pack_accepts_valid_formats() -> None:
+    btn = tracker()
+    meta = Meta(season_int=3, tv_pack=True, year=2010)
+
+    for valid_title in ("S03", "s03", "Season 3", "Season 03"):
+        data = {"artist": "Breaking Bad", "title": valid_title, "year": "2010"}
+        assert btn._verify_autofill(data, meta, "Breaking Bad", "Season") == []  # noqa: S101
+
+    invalid_data = {"artist": "Breaking Bad", "title": "S04", "year": "2010"}
+    assert len(btn._verify_autofill(invalid_data, meta, "Breaking Bad", "Season")) == 1  # noqa: S101
+
+
+def test_btn_verify_autofill_uses_season_year_over_series_year() -> None:
+    btn = tracker()
+    # Series began in 2005, but Season 3 aired in 2006
+    meta = Meta(
+        season_int=3,
+        episode_int=1,
+        year=2005,
+        tvdb_episode_data={
+            "episodes": [
+                {"seasonNumber": 1, "number": 1, "year": "2005"},
+                {"seasonNumber": 3, "number": 1, "year": "2006"},
+            ]
+        },
+    )
+
+    valid_data = {"artist": "The Office (US)", "title": "S03E01", "year": "2006"}
+    assert btn._verify_autofill(valid_data, meta, "The Office (US)", "Episode") == []  # noqa: S101
+
+    series_year_data = {"artist": "The Office (US)", "title": "S03E01", "year": "2005"}
+    errors = btn._verify_autofill(series_year_data, meta, "The Office (US)", "Episode")
+    assert errors == ["year '2005' != expected '2006'"]  # noqa: S101

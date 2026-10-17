@@ -8,6 +8,7 @@ replaces the locally-created torrent with BTN's registered torrent afterwards.
 """
 
 import asyncio
+import html
 import re
 import unicodedata
 from pathlib import Path
@@ -779,6 +780,72 @@ class BroadcasTheNet:
                 fields[name] = selected.group(1)
         return fields
 
+    def _get_season_year(self, meta: Meta) -> str:
+        season_int = int(meta.season_int or 0)
+
+        tvdb_data = meta.get("tvdb_episode_data")
+        if isinstance(tvdb_data, dict):
+            episodes = tvdb_data.get("episodes")
+            if isinstance(episodes, list):
+                for ep in episodes:
+                    if isinstance(ep, dict) and int(ep.get("seasonNumber") or 0) == season_int:
+                        if ep.get("year"):
+                            return str(ep["year"]).strip()
+                        aired = str(ep.get("aired") or "").strip()
+                        if len(aired) >= 4 and aired[:4].isdigit():
+                            return aired[:4]
+
+        if meta.get("tvdb_episode_year") and str(meta.tvdb_episode_year).strip().isdigit():
+            return str(meta.tvdb_episode_year).strip()
+
+        if meta.get("season_air_first_date") and len(str(meta.season_air_first_date)) >= 4:
+            year_part = str(meta.season_air_first_date)[:4]
+            if year_part.isdigit():
+                return year_part
+
+        if isinstance(meta.get("tmdb_season_data"), dict):
+            air_date = str(meta.tmdb_season_data.get("air_date") or "")
+            if len(air_date) >= 4 and air_date[:4].isdigit():
+                return air_date[:4]
+
+        if isinstance(meta.get("imdb_info"), dict):
+            seasons = meta.imdb_info.get("seasons_summary") or []
+            if isinstance(seasons, list):
+                for s in seasons:
+                    if isinstance(s, dict) and int(s.get("season") or 0) == season_int:
+                        year = str(s.get("year") or "").strip()
+                        if year.isdigit():
+                            return year
+
+        return str(meta.year or meta.get("search_year") or "").strip()
+
+    def _verify_autofill(self, data: dict[str, str], meta: Meta, expected_series: str, upload_type: str) -> list[str]:
+        autofilled_series = html.unescape(str(data.get("artist") or "")).strip()
+        autofilled_title = html.unescape(str(data.get("title") or "")).strip()
+        autofilled_year = str(data.get("year") or "").strip()
+
+        expected_series = expected_series.strip()
+        expected_year = self._get_season_year(meta)
+
+        errors: list[str] = []
+        if expected_series and autofilled_series != expected_series:
+            errors.append(f"artist '{autofilled_series}' != expected '{expected_series}'")
+
+        if upload_type == "Episode":
+            expected_title = f"S{int(meta.season_int or 0):02d}E{int(meta.episode_int or 0):02d}"
+            if autofilled_title.upper() != expected_title.upper():
+                errors.append(f"title '{autofilled_title}' != expected '{expected_title}'")
+        else:
+            s_num = int(meta.season_int or 0)
+            valid_season_titles = {f"S{s_num:02d}", f"S{s_num}", f"SEASON {s_num}", f"SEASON {s_num:02d}"}
+            if autofilled_title.upper() not in valid_season_titles:
+                errors.append(f"title '{autofilled_title}' != expected 'S{s_num:02d}'")
+
+        if expected_year and autofilled_year != expected_year:
+            errors.append(f"year '{autofilled_year}' != expected '{expected_year}'")
+
+        return errors
+
     async def upload(self, meta: Meta) -> bool:
         await self.common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
         torrent_path = Path(meta.base_dir) / "tmp" / meta.uuid / f"[{self.tracker}].torrent"
@@ -789,13 +856,14 @@ class BroadcasTheNet:
         cookie_file = self._cookie_file(meta)
         cookies = await self.common.parse_cookie_file(cookie_file)
         release_name = await self.get_name(meta)
+        series_name = (await self.get_series_name(meta)) or str(meta.title or "")
         upload_type = "Season" if int(meta.tv_pack or 0) else "Episode"
         if meta.title:
             autofill_data: dict[str, str] = {
                 "type": upload_type,
                 "tvdb": "Get Info",
                 "scene_yesno": "No",
-                "auto_series": (await self.get_series_name(meta)) or str(meta.title),
+                "auto_series": series_name,
             }
             if upload_type == "Episode":
                 autofill_data["auto_title"] = f"S{int(meta.season_int or 0):02d}E{int(meta.episode_int or 0):02d}"
@@ -813,6 +881,13 @@ class BroadcasTheNet:
                 autofill = await client.post(self.upload_url, data=autofill_data)
                 autofill.raise_for_status()
                 data = self._form_fields(autofill.text)
+                autofill_errors = self._verify_autofill(data, meta, series_name, upload_type)
+                if autofill_errors:
+                    failure_path = work_dir / f"[{self.tracker}]BTN_autofill_failure.html"
+                    async with aiofiles.open(failure_path, "w", encoding="utf-8") as f:
+                        await f.write(autofill.text)
+                    raise UploadError(f"BTN autofill mismatch: {'; '.join(autofill_errors)}. See {failure_path}", "red")
+
                 tag = str(meta.tag or "").lstrip("-")
                 is_no_group = not tag or bool(re.search(r"^(?:nogrp|nogroup|unknown|unk)$", tag, re.I))
                 origin = "Scene" if meta.scene else "None" if is_no_group else "P2P"
