@@ -420,3 +420,54 @@ def test_btn_verify_autofill_uses_season_year_over_series_year() -> None:
     series_year_data = {"artist": "The Office (US)", "title": "S03E01", "year": "2005"}
     errors = btn._verify_autofill(series_year_data, meta, "The Office (US)", "Episode")
     assert errors == ["year '2005' != expected '2006'"]  # noqa: S101
+
+
+def test_btn_uploaded_torrent_id_does_not_return_older_group_torrent_during_retries(monkeypatch) -> None:
+    async def fake_sleep(_s: float) -> None:
+        pass
+
+    monkeypatch.setattr(asyncio, "sleep", fake_sleep)
+
+    call_count = 0
+
+    async def fake_api(_method: str, params: dict[str, object]) -> dict[str, object]:
+        nonlocal call_count
+        call_count += 1
+        # Attempt 0: only older 720p torrent exists in group
+        if call_count == 1:
+            return {"result": {"torrents": {"100": {"GroupID": "123", "ReleaseName": "Show.S01E01.720p-OLD"}}}}
+        # Subsequent attempt: new 1080p release appears
+        return {
+            "result": {
+                "torrents": {
+                    "100": {"GroupID": "123", "ReleaseName": "Show.S01E01.720p-OLD"},
+                    "200": {"GroupID": "123", "ReleaseName": "Show.S01E01.1080p-GRP"},
+                }
+            }
+        }
+
+    btn = tracker()
+    monkeypatch.setattr(btn, "_api", fake_api)
+    meta = Meta(category="TV", tvdb_id=42)
+
+    result = asyncio.run(btn._uploaded_torrent_id("Show.S01E01.1080p-GRP", "123", meta))
+    assert result == "200"  # noqa: S101
+    assert call_count > 1  # noqa: S101
+
+
+def test_btn_uploaded_torrent_id_falls_back_to_newest_group_candidate_after_all_attempts(monkeypatch) -> None:
+    async def fake_sleep(_s: float) -> None:
+        pass
+
+    monkeypatch.setattr(asyncio, "sleep", fake_sleep)
+
+    async def fake_api(_method: str, _params: dict[str, object]) -> dict[str, object]:
+        return {"result": {"torrents": {"100": {"GroupID": "123", "ReleaseName": "Show.S01E01.720p-OTHER"}}}}
+
+    btn = tracker()
+    monkeypatch.setattr(btn, "_api", fake_api)
+    meta = Meta(category="TV", tvdb_id=42)
+
+    result = asyncio.run(btn._uploaded_torrent_id("Show.S01E01.1080p-GRP", "123", meta))
+    assert result == "100"  # noqa: S101
+    assert meta.tracker_status["BROADCASTHENET"]["group_id"] == "123"  # noqa: S101

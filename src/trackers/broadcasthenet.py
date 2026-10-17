@@ -507,8 +507,8 @@ class BroadcasTheNet:
         value = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode()
         value = value.replace("&", " and ").replace("'", "")
         value = re.sub(r"\s+", ".", value.strip())
-        value = re.sub(r"(?i)\.DDP\.(\d(?:\.\d+)?)\.Atmos", r".DDPA\1", value)
-        value = re.sub(r"(?i)\.TrueHD\.(\d(?:\.\d+)?)\.Atmos", r".TrueHDA\1", value)
+        value = re.sub(r"(?i)\.DDP\.?(\d(?:\.\d+)?)\.Atmos", r".DDPA\1", value)
+        value = re.sub(r"(?i)\.TrueHD\.?(\d(?:\.\d+)?)\.Atmos", r".TrueHDA\1", value)
         value = re.sub(r"(?i)\.(DDP|DD|AC3|DTS|AAC|FLAC|TrueHD|PCM|LPCM)\.(\d)", r".\1\2", value)
         value = re.sub(r"[^A-Za-z0-9.\-]+", ".", value)
         return re.sub(r"\.{2,}", ".", value).strip(".-")
@@ -639,6 +639,8 @@ class BroadcasTheNet:
             search_filter_list.append({"release": f"%{release_name}%", **tvdb_or_imdb})
         search_filter_list.append({"release": f"%{release_name}%"})
 
+        newest_group_candidate: tuple[str, dict[str, Any]] | None = None
+
         for attempt in range(4):
             if attempt:
                 await asyncio.sleep(2)
@@ -658,6 +660,13 @@ class BroadcasTheNet:
                     if group_id
                     else []
                 )
+
+                if matched_group:
+                    best_group = max(matched_group, key=lambda pair: int(pair[0]) if pair[0].isdigit() else -1)
+                    if newest_group_candidate is None or (int(best_group[0]) if best_group[0].isdigit() else -1) > (
+                        int(newest_group_candidate[0]) if newest_group_candidate[0].isdigit() else -1
+                    ):
+                        newest_group_candidate = best_group
 
                 candidates = matched_group if matched_group else items
 
@@ -683,11 +692,11 @@ class BroadcasTheNet:
                         meta.tracker_status.setdefault(self.tracker, {})["group_id"] = str(best_item.get("GroupID"))
                     return best_id
 
-                if matched_group:
-                    best_id, best_item = max(matched_group, key=lambda pair: int(pair[0]) if pair[0].isdigit() else -1)
-                    if best_item.get("GroupID"):
-                        meta.tracker_status.setdefault(self.tracker, {})["group_id"] = str(best_item.get("GroupID"))
-                    return best_id
+        if newest_group_candidate:
+            best_id, best_item = newest_group_candidate
+            if best_item.get("GroupID"):
+                meta.tracker_status.setdefault(self.tracker, {})["group_id"] = str(best_item.get("GroupID"))
+            return best_id
 
         raise UploadError("BTN did not return the uploaded torrent ID after four API checks", "red")
 
