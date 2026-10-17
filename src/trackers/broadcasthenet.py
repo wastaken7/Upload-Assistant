@@ -8,6 +8,7 @@ replaces the locally-created torrent with BTN's registered torrent afterwards.
 """
 
 import asyncio
+import html
 import re
 import unicodedata
 from pathlib import Path
@@ -402,6 +403,7 @@ class BroadcasTheNet:
         self.api_url = str(self.settings.get("api_url") or self.api_url).strip()
         self.base_url = str(self.settings.get("base_url") or self.base_url).rstrip("/")
         self.upload_url = f"{self.base_url}/upload.php"
+        self._series_cache: dict[str, str] = {}
 
     async def edit_desc(self, _meta: Meta) -> None:
         # BTN consumes MediaInfo in release_desc; it does not use UA's generic description.
@@ -412,6 +414,59 @@ class BroadcasTheNet:
             logger.info(f"{self.tracker}: [red]BTN requires a TVDB or IMDb ID.[/red]")
             return False
         return True
+
+    async def get_tvdb_series_name(self, meta: Meta) -> str | None:
+        episode_data = meta.get("tvdb_episode_data")
+        if isinstance(episode_data, dict) and episode_data.get("series_name"):
+            return str(episode_data["series_name"]).strip() or None
+
+        if meta.get("tvdb_series_name"):
+            return str(meta.tvdb_series_name).strip() or None
+
+        tvdb_id = int(meta.tvdb_id or 0)
+        if tvdb_id:
+            try:
+                from src.tvdb import _get_tvdb_or_warn
+
+                client = _get_tvdb_or_warn(self.config)
+                if client is not None:
+                    series_info = await client.get_series_extended(tvdb_id)
+                    if isinstance(series_info, dict) and series_info.get("name"):
+                        return str(series_info["name"]).strip() or None
+            except Exception as exc:
+                logger.debug(f"{self.tracker}: Could not fetch TVDB series name for ID {tvdb_id}: {exc}")
+
+        return None
+
+    async def get_series_name(self, meta: Meta) -> str | None:
+        cache_key = f"{meta.tvdb_id}_{meta.imdb_id}"
+        if cache_key in self._series_cache:
+            return self._series_cache[cache_key] or None
+
+        series_name: str | None = None
+        if self.api_key:
+            filters: dict[str, Any] = {}
+            if int(meta.tvdb_id or 0):
+                filters["tvdb"] = str(meta.tvdb_id)
+            elif int(meta.imdb_id or 0):
+                filters["imdb"] = str(meta.imdb_id)
+            if filters:
+                try:
+                    result = await self._api("getTorrents", {"search": filters, "results": 1, "offset": 0})
+                    payload = result.get("result")
+                    torrents = payload.get("torrents") if isinstance(payload, dict) else None
+                    if isinstance(torrents, dict) and torrents:
+                        first = next(iter(torrents.values()))
+                        if isinstance(first, dict):
+                            series_name = str(first.get("Series") or "").strip() or None
+                except Exception as exc:
+                    logger.debug(f"{self.tracker}: Could not fetch series name from BTN: {exc}")
+
+        if not series_name:
+            series_name = await self.get_tvdb_series_name(meta)
+
+        self._series_cache[cache_key] = series_name or ""
+        return series_name
 
     async def validate_credentials(self, meta: Meta) -> bool:
         cookie_file = self._cookie_file(meta)
@@ -452,8 +507,8 @@ class BroadcasTheNet:
         value = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode()
         value = value.replace("&", " and ").replace("'", "")
         value = re.sub(r"\s+", ".", value.strip())
-        value = re.sub(r"(?i)\.DDP\.(\d(?:\.\d+)?)\.Atmos", r".DDPA\1", value)
-        value = re.sub(r"(?i)\.TrueHD\.(\d(?:\.\d+)?)\.Atmos", r".TrueHDA\1", value)
+        value = re.sub(r"(?i)\.DDP\.?(\d(?:\.\d+)?)\.Atmos", r".DDPA\1", value)
+        value = re.sub(r"(?i)\.TrueHD\.?(\d(?:\.\d+)?)\.Atmos", r".TrueHDA\1", value)
         value = re.sub(r"(?i)\.(DDP|DD|AC3|DTS|AAC|FLAC|TrueHD|PCM|LPCM)\.(\d)", r".\1\2", value)
         value = re.sub(r"[^A-Za-z0-9.\-]+", ".", value)
         return re.sub(r"\.{2,}", ".", value).strip(".-")
@@ -463,6 +518,15 @@ class BroadcasTheNet:
         name = re.sub(r"(?i)\.(avi|mkv|mp4|ts|m4v|m2ts|wmv|mpeg|mpg|vob)$", "", name)
         name = self._clean_name(name)
         if not meta.scene_name:
+            series_name = await self.get_series_name(meta)
+            if series_name:
+                clean_series = self._clean_name(series_name)
+                title = self._clean_name(str(meta.title or ""))
+                year = str(meta.year or "").strip()
+                if title:
+                    pattern = rf"^{re.escape(title)}(?:\.{re.escape(year)})?(?=\.|$)"
+                    name = re.sub(pattern, clean_series, name, count=1, flags=re.I)
+
             aka = self._clean_name(str(meta.aka or ""))
             if aka:
                 name = re.sub(rf"(?i)(?:^|\.){re.escape(aka)}(?=\.|$)", ".", name, count=1)
@@ -557,32 +621,83 @@ class BroadcasTheNet:
     async def _uploaded_torrent_id(self, release_name: str, group_id: str, meta: Meta) -> str:
         if not self.api_key:
             raise UploadError("BTN needs an API key to identify the uploaded torrent on a group page", "red")
-        # BTN's getTorrents does not filter by group or release name, so search the
-        # series and match the uploaded release inside its group locally.
-        filters: dict[str, Any] = {}
-        if int(meta.tvdb_id or 0):
-            filters["tvdb"] = str(meta.tvdb_id)
-        elif int(meta.imdb_id or 0):
-            filters["imdb"] = str(meta.imdb_id)
+
         expected_release = release_name.strip().casefold()
+        cleaned_expected = self._clean_name(release_name).casefold()
+
+        search_filter_list: list[dict[str, Any]] = []
+        tvdb_or_imdb: dict[str, Any] = {}
+        if int(meta.tvdb_id or 0):
+            tvdb_or_imdb["tvdb"] = str(meta.tvdb_id)
+        elif int(meta.imdb_id or 0):
+            tvdb_or_imdb["imdb"] = str(meta.imdb_id)
+
+        if group_id:
+            search_filter_list.append({"group_id": str(group_id), **tvdb_or_imdb})
+
+        if tvdb_or_imdb:
+            search_filter_list.append({"release": f"%{release_name}%", **tvdb_or_imdb})
+        search_filter_list.append({"release": f"%{release_name}%"})
+
+        newest_group_candidate: tuple[str, dict[str, Any]] | None = None
+
         for attempt in range(4):
             if attempt:
                 await asyncio.sleep(2)
-            result = await self._api("getTorrents", {"search": filters, "results": 1000, "offset": 0})
-            payload = result.get("result")
-            torrents = payload.get("torrents") if isinstance(payload, dict) else None
-            if not isinstance(torrents, dict):
-                continue
-            matches = [
-                str(torrent_id)
-                for torrent_id, item in torrents.items()
-                if isinstance(item, dict)
-                and str(item.get("GroupID") or item.get("groupId") or item.get("GroupId") or "").strip() == group_id
-                and any(str(item.get(field) or "").strip().casefold() == expected_release for field in ("ReleaseName", "releaseName", "TorrentName", "Name", "Release"))
-            ]
-            if matches:
-                # Prefer the newest torrent when an older copy shares the release name.
-                return max(matches, key=lambda torrent_id: int(torrent_id) if torrent_id.isdigit() else -1)
+            for filters in search_filter_list:
+                result = await self._api("getTorrents", {"search": filters, "results": 1000, "offset": 0})
+                payload = result.get("result")
+                torrents = payload.get("torrents") if isinstance(payload, dict) else None
+                if not isinstance(torrents, dict) or not torrents:
+                    continue
+
+                items = [(str(t_id), item) for t_id, item in torrents.items() if isinstance(item, dict)]
+                if not items:
+                    continue
+
+                matched_group = (
+                    [(t_id, item) for t_id, item in items if str(item.get("GroupID") or item.get("groupId") or item.get("GroupId") or "").strip() == group_id]
+                    if group_id
+                    else []
+                )
+
+                if matched_group:
+                    best_group = max(matched_group, key=lambda pair: int(pair[0]) if pair[0].isdigit() else -1)
+                    if newest_group_candidate is None or (int(best_group[0]) if best_group[0].isdigit() else -1) > (
+                        int(newest_group_candidate[0]) if newest_group_candidate[0].isdigit() else -1
+                    ):
+                        newest_group_candidate = best_group
+
+                candidates = matched_group if matched_group else items
+
+                exact_matches = [
+                    (t_id, item)
+                    for t_id, item in candidates
+                    if any(str(item.get(f) or "").strip().casefold() == expected_release for f in ("ReleaseName", "releaseName", "TorrentName", "Name", "Release"))
+                ]
+                if exact_matches:
+                    best_id, best_item = max(exact_matches, key=lambda pair: int(pair[0]) if pair[0].isdigit() else -1)
+                    if best_item.get("GroupID"):
+                        meta.tracker_status.setdefault(self.tracker, {})["group_id"] = str(best_item.get("GroupID"))
+                    return best_id
+
+                cleaned_matches = [
+                    (t_id, item)
+                    for t_id, item in candidates
+                    if any(self._clean_name(str(item.get(f) or "")).casefold() == cleaned_expected for f in ("ReleaseName", "releaseName", "TorrentName", "Name", "Release"))
+                ]
+                if cleaned_matches:
+                    best_id, best_item = max(cleaned_matches, key=lambda pair: int(pair[0]) if pair[0].isdigit() else -1)
+                    if best_item.get("GroupID"):
+                        meta.tracker_status.setdefault(self.tracker, {})["group_id"] = str(best_item.get("GroupID"))
+                    return best_id
+
+        if newest_group_candidate:
+            best_id, best_item = newest_group_candidate
+            if best_item.get("GroupID"):
+                meta.tracker_status.setdefault(self.tracker, {})["group_id"] = str(best_item.get("GroupID"))
+            return best_id
+
         raise UploadError("BTN did not return the uploaded torrent ID after four API checks", "red")
 
     @staticmethod
@@ -674,6 +789,72 @@ class BroadcasTheNet:
                 fields[name] = selected.group(1)
         return fields
 
+    def _get_season_year(self, meta: Meta) -> str:
+        season_int = int(meta.season_int or 0)
+
+        tvdb_data = meta.get("tvdb_episode_data")
+        if isinstance(tvdb_data, dict):
+            episodes = tvdb_data.get("episodes")
+            if isinstance(episodes, list):
+                for ep in episodes:
+                    if isinstance(ep, dict) and int(ep.get("seasonNumber") or 0) == season_int:
+                        if ep.get("year"):
+                            return str(ep["year"]).strip()
+                        aired = str(ep.get("aired") or "").strip()
+                        if len(aired) >= 4 and aired[:4].isdigit():
+                            return aired[:4]
+
+        if meta.get("tvdb_episode_year") and str(meta.tvdb_episode_year).strip().isdigit():
+            return str(meta.tvdb_episode_year).strip()
+
+        if meta.get("season_air_first_date") and len(str(meta.season_air_first_date)) >= 4:
+            year_part = str(meta.season_air_first_date)[:4]
+            if year_part.isdigit():
+                return year_part
+
+        if isinstance(meta.get("tmdb_season_data"), dict):
+            air_date = str(meta.tmdb_season_data.get("air_date") or "")
+            if len(air_date) >= 4 and air_date[:4].isdigit():
+                return air_date[:4]
+
+        if isinstance(meta.get("imdb_info"), dict):
+            seasons = meta.imdb_info.get("seasons_summary") or []
+            if isinstance(seasons, list):
+                for s in seasons:
+                    if isinstance(s, dict) and int(s.get("season") or 0) == season_int:
+                        year = str(s.get("year") or "").strip()
+                        if year.isdigit():
+                            return year
+
+        return str(meta.year or meta.get("search_year") or "").strip()
+
+    def _verify_autofill(self, data: dict[str, str], meta: Meta, expected_series: str, upload_type: str) -> list[str]:
+        autofilled_series = html.unescape(str(data.get("artist") or "")).strip()
+        autofilled_title = html.unescape(str(data.get("title") or "")).strip()
+        autofilled_year = str(data.get("year") or "").strip()
+
+        expected_series = expected_series.strip()
+        expected_year = self._get_season_year(meta)
+
+        errors: list[str] = []
+        if expected_series and autofilled_series != expected_series:
+            errors.append(f"artist '{autofilled_series}' != expected '{expected_series}'")
+
+        if upload_type == "Episode":
+            expected_title = f"S{int(meta.season_int or 0):02d}E{int(meta.episode_int or 0):02d}"
+            if autofilled_title.upper() != expected_title.upper():
+                errors.append(f"title '{autofilled_title}' != expected '{expected_title}'")
+        else:
+            s_num = int(meta.season_int or 0)
+            valid_season_titles = {f"S{s_num:02d}", f"S{s_num}", f"SEASON {s_num}", f"SEASON {s_num:02d}"}
+            if autofilled_title.upper() not in valid_season_titles:
+                errors.append(f"title '{autofilled_title}' != expected 'S{s_num:02d}'")
+
+        if expected_year and autofilled_year != expected_year:
+            errors.append(f"year '{autofilled_year}' != expected '{expected_year}'")
+
+        return errors
+
     async def upload(self, meta: Meta) -> bool:
         await self.common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
         torrent_path = Path(meta.base_dir) / "tmp" / meta.uuid / f"[{self.tracker}].torrent"
@@ -684,13 +865,14 @@ class BroadcasTheNet:
         cookie_file = self._cookie_file(meta)
         cookies = await self.common.parse_cookie_file(cookie_file)
         release_name = await self.get_name(meta)
+        series_name = (await self.get_series_name(meta)) or str(meta.title or "")
         upload_type = "Season" if int(meta.tv_pack or 0) else "Episode"
         if meta.title:
             autofill_data: dict[str, str] = {
                 "type": upload_type,
                 "tvdb": "Get Info",
                 "scene_yesno": "No",
-                "auto_series": str(meta.title),
+                "auto_series": series_name,
             }
             if upload_type == "Episode":
                 autofill_data["auto_title"] = f"S{int(meta.season_int or 0):02d}E{int(meta.episode_int or 0):02d}"
@@ -708,6 +890,13 @@ class BroadcasTheNet:
                 autofill = await client.post(self.upload_url, data=autofill_data)
                 autofill.raise_for_status()
                 data = self._form_fields(autofill.text)
+                autofill_errors = self._verify_autofill(data, meta, series_name, upload_type)
+                if autofill_errors:
+                    failure_path = work_dir / f"[{self.tracker}]BTN_autofill_failure.html"
+                    async with aiofiles.open(failure_path, "w", encoding="utf-8") as f:
+                        await f.write(autofill.text)
+                    raise UploadError(f"BTN autofill mismatch: {'; '.join(autofill_errors)}. See {failure_path}", "red")
+
                 tag = str(meta.tag or "").lstrip("-")
                 is_no_group = not tag or bool(re.search(r"^(?:nogrp|nogroup|unknown|unk)$", tag, re.I))
                 origin = "Scene" if meta.scene else "None" if is_no_group else "P2P"
@@ -749,14 +938,22 @@ class BroadcasTheNet:
                 response = await client.post(self.upload_url, data=data, files={"file_input": ("upload.torrent", torrent, "application/x-bittorrent")})
                 response.raise_for_status()
                 group_id, torrent_id = self._upload_ids(str(response.url), response.text)
-                if not group_id:
+
+                if not torrent_id:
+                    try:
+                        torrent_id = await self._uploaded_torrent_id(release_name, group_id, meta)
+                        group_id = meta.tracker_status.get(self.tracker, {}).get("group_id") or group_id
+                    except UploadError:
+                        failure_path = work_dir / f"[{self.tracker}]BTN_upload_failure.html"
+                        async with aiofiles.open(failure_path, "w", encoding="utf-8") as f:
+                            await f.write(response.text)
+                        raise
+
+                if not group_id and not torrent_id:
                     failure_path = work_dir / f"[{self.tracker}]BTN_upload_failure.html"
                     async with aiofiles.open(failure_path, "w", encoding="utf-8") as f:
                         await f.write(response.text)
                     raise UploadError(f"BTN upload did not return a registered torrent ID. See {failure_path}", "red")
-
-                if not torrent_id:
-                    torrent_id = await self._uploaded_torrent_id(release_name, group_id, meta)
 
                 download = await client.get(f"{self.base_url}/torrents.php?action=download&id={torrent_id}")
                 download.raise_for_status()
