@@ -3621,6 +3621,7 @@ function AudionutsUAGUI() {
 
   useEffect(() => {
     if (!showScreenshotsButton) {
+      setExpandedScreenshot(null);
       setIsScreenshotReviewOpen(false);
       setExpandedReviewPanel((panel) => (panel === "screenshots" ? "" : panel));
       setActivePanel((panel) => (panel === "screenshots" ? "main" : panel));
