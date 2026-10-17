@@ -102,30 +102,30 @@ def test_nordicquality_sanitizes_upload_name():
 def test_nordicquality_removes_parentheses_around_release_year():
     meta = Meta(
         category="MOVIE",
-        filelist=["D:/Movies/Congo (1995) 1080p UHD BluRay OPUS 5.1 SDR AV1-WhiskeyJack.mkv"],
+        filelist=["D:/Movies/Distant Canopy (1995) 1080p UHD BluRay OPUS 5.1 SDR AV1-FAKEGRP.mkv"],
     )
     assert asyncio.run(_tracker().get_name(meta)) == {  # noqa: S101
-        "name": "Congo.1995.1080p.UHD.BluRay.OPUS.5.1.SDR.AV1-WhiskeyJack"
+        "name": "Distant.Canopy.1995.1080p.UHD.BluRay.OPUS.5.1.SDR.AV1-FAKEGRP"
     }
 
 
 def test_nordicquality_preserves_release_suffix_in_extensionless_uuid():
-    meta = Meta(category="MOVIE", uuid="Snatched.2017.UHD.BluRay.2160p.DTS-HD.MA.7.1.HEVC.REMUX-FraMeSToR")
+    meta = Meta(category="MOVIE", uuid="Quiet.Harbor.2017.UHD.BluRay.2160p.DTS-HD.MA.7.1.HEVC.REMUX-FAKEGRP")
 
     assert asyncio.run(_tracker().get_name(meta)) == {  # noqa: S101
-        "name": "Snatched.2017.UHD.BluRay.2160p.DTS-HD.MA.7.1.HEVC.REMUX-FraMeSToR"
+        "name": "Quiet.Harbor.2017.UHD.BluRay.2160p.DTS-HD.MA.7.1.HEVC.REMUX-FAKEGRP"
     }
 
 
 def test_nordicquality_prefers_single_media_filename_over_folder_uuid():
     meta = Meta(
         category="MOVIE",
-        uuid="Snatched.2017.UHD.BluRay.2160p.DTS-HD.MA.7.1.HEVC",
-        filelist=["D:/Movies/Snatched/Snatched.2017.UHD.BluRay.2160p.DTS-HD.MA.7.1.HEVC.REMUX-FraMeSToR.mkv"],
+        uuid="Quiet.Harbor.2017.UHD.BluRay.2160p.DTS-HD.MA.7.1.HEVC",
+        filelist=["D:/Movies/Quiet Harbor/Quiet.Harbor.2017.UHD.BluRay.2160p.DTS-HD.MA.7.1.HEVC.REMUX-FAKEGRP.mkv"],
     )
 
     assert asyncio.run(_tracker().get_name(meta)) == {  # noqa: S101
-        "name": "Snatched.2017.UHD.BluRay.2160p.DTS-HD.MA.7.1.HEVC.REMUX-FraMeSToR"
+        "name": "Quiet.Harbor.2017.UHD.BluRay.2160p.DTS-HD.MA.7.1.HEVC.REMUX-FAKEGRP"
     }
 
 

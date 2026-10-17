@@ -223,7 +223,7 @@ def test_dreadvault_formats_dvdrip_with_empty_audio(source, original_name):
 
 def test_dreadvault_names_a_dvd_sourced_encode_as_a_dvdrip():
     meta = Meta(
-        name="Ghost 1984 480p NTSC DD 2.0 x264-SaL",
+        name="Example Phantom 1984 480p NTSC DD 2.0 x264-GRP",
         type="ENCODE",
         source="NTSC",
         resolution="480p",
@@ -234,7 +234,7 @@ def test_dreadvault_names_a_dvd_sourced_encode_as_a_dvdrip():
 
     name = asyncio.run(_tracker().get_name(meta))["name"]
 
-    assert name == "Ghost 1984 480p DVDRip DD 2.0 x264-SaL"  # noqa: S101
+    assert name == "Example Phantom 1984 480p DVDRip DD 2.0 x264-GRP"  # noqa: S101
 
 
 @pytest.mark.parametrize(
@@ -434,7 +434,7 @@ def test_dreadvault_dub_token_respects_no_dual_and_no_dub(audio_languages, flag,
 @pytest.mark.parametrize(("audio_language", "marker"), [("No", "ZXX "), ("zxx", "ZXX "), ("No linguistic content", "ZXX "), ("Undetermined", ""), ("und", ""), ("", "")])
 def test_dreadvault_formats_non_linguistic_and_undetermined_audio(audio_language, marker):
     meta = Meta(
-        name="Ghost 1984 NTSC x264 DVDRip DD 2.0-SaL",
+        name="Example Phantom 1984 NTSC x264 DVDRip DD 2.0-GRP",
         type="DVDRIP",
         source="NTSC",
         resolution="480p",
@@ -446,7 +446,7 @@ def test_dreadvault_formats_non_linguistic_and_undetermined_audio(audio_language
 
     name = asyncio.run(_tracker().get_name(meta))["name"]
 
-    assert name == f"Ghost 1984 {marker}480p DVDRip DD 2.0 x264-SaL"  # noqa: S101
+    assert name == f"Example Phantom 1984 {marker}480p DVDRip DD 2.0 x264-GRP"  # noqa: S101
 
 
 @pytest.mark.parametrize(
@@ -486,7 +486,7 @@ def test_dreadvault_adds_foreign_audio_language_to_a_dvdrip():
     # The DVDRip template carries no resolution of its own, so a language pass that ran before the
     # DVDRip branch had nothing to anchor to and dropped the marker (kainoa 2026-09-09).
     meta = Meta(
-        name="Imaginary Dolls 1999 NTSC DVD x264 DVDRip DD 2.0-GVXXI",
+        name="Imaginary Dolls 1999 NTSC DVD x264 DVDRip DD 2.0-GRP",
         type="DVDRIP",
         source="NTSC DVD",
         resolution="480p",
@@ -498,7 +498,7 @@ def test_dreadvault_adds_foreign_audio_language_to_a_dvdrip():
 
     name = asyncio.run(_tracker().get_name(meta))["name"]
 
-    assert name == "Imaginary Dolls 1999 JAPANESE 480p DVDRip DD 2.0 x264-GVXXI"  # noqa: S101
+    assert name == "Imaginary Dolls 1999 JAPANESE 480p DVDRip DD 2.0 x264-GRP"  # noqa: S101
 
 
 def test_dreadvault_omits_foreign_audio_language_from_a_dvd_full_disc():
@@ -635,8 +635,8 @@ def test_dreadvault_moves_tv_aka_before_year_with_foreign_audio_language():
             {
                 "category": "MOVIE",
                 "type": "ENCODE",
-                "title": "Kuroko's Basketball",
-                "aka": "Kuroko no Basket",
+                "title": "Hikari's Court",
+                "aka": "Hikari no Kooto",
                 "year": 2017,
                 "resolution": "1080p",
                 "source": "BluRay",
@@ -644,16 +644,16 @@ def test_dreadvault_moves_tv_aka_before_year_with_foreign_audio_language():
                 "video": "x264",
                 "tracks": [{"lang": "Japanese"}],
                 "original_language": "ja",
-                "tag": "Kitsune",
+                "tag": "GRP",
             },
-            "Kuroko's Basketball AKA Kuroko no Basket 2017 JAPANESE 1080p BluRay DD+ 5.1 x264-Kitsune",
+            "Hikari's Court AKA Hikari no Kooto 2017 JAPANESE 1080p BluRay DD+ 5.1 x264-GRP",
             id="lang-basic",
         ),
         pytest.param(
             {
                 "category": "MOVIE",
                 "type": "ENCODE",
-                "title": "The Wailing",
+                "title": "The Hollow Cry",
                 "year": 2016,
                 "hybrid": True,
                 "repack": "REPACK",
@@ -665,17 +665,17 @@ def test_dreadvault_moves_tv_aka_before_year_with_foreign_audio_language():
                 "original_language": "ko",
                 "tag": "GRP",
             },
-            "The Wailing 2016 KOREAN Hybrid REPACK 1080p BluRay DD 5.1 x264-GRP",
+            "The Hollow Cry 2016 KOREAN Hybrid REPACK 1080p BluRay DD 5.1 x264-GRP",
             id="lang-before-hybrid-repack",
         ),
         pytest.param(
             {
                 "category": "TV",
                 "type": "WEBDL",
-                "title": "Kingdom",
+                "title": "Crown Lands",
                 "season": 1,
                 "episode": 1,
-                "episode_title": "The Hungry Dead",
+                "episode_title": "The Restless Night",
                 "resolution": "1080p",
                 "source": "WEB",
                 "service": "NF",
@@ -685,14 +685,14 @@ def test_dreadvault_moves_tv_aka_before_year_with_foreign_audio_language():
                 "original_language": "ko",
                 "tag": "GRP",
             },
-            "Kingdom S01E01 The Hungry Dead KOREAN 1080p NF WEB-DL DD+ 5.1 H.264-GRP",
+            "Crown Lands S01E01 The Restless Night KOREAN 1080p NF WEB-DL DD+ 5.1 H.264-GRP",
             id="lang-tv-episode-named",
         ),
         pytest.param(
             {
                 "category": "MOVIE",
                 "type": "ENCODE",
-                "title": "Ringu",
+                "title": "Shiroi Koe",
                 "year": 1998,
                 "resolution": "1080p",
                 "source": "BluRay",
@@ -702,14 +702,14 @@ def test_dreadvault_moves_tv_aka_before_year_with_foreign_audio_language():
                 "original_language": "ja",
                 "tag": "GRP",
             },
-            "Ringu 1998 JAPANESE 1080p BluRay Dual-Audio FLAC 2.0 x264-GRP",
+            "Shiroi Koe 1998 JAPANESE 1080p BluRay Dual-Audio FLAC 2.0 x264-GRP",
             id="dual-no-english",
         ),
         pytest.param(
             {
                 "category": "MOVIE",
                 "type": "ENCODE",
-                "title": "Inferno",
+                "title": "Fiammata",
                 "year": 1980,
                 "resolution": "1080p",
                 "source": "BluRay",
@@ -719,14 +719,14 @@ def test_dreadvault_moves_tv_aka_before_year_with_foreign_audio_language():
                 "original_language": "it",
                 "tag": "GRP",
             },
-            "Inferno 1980 1080p BluRay Multi-Audio DTS-HD MA 1.0 x264-GRP",
+            "Fiammata 1980 1080p BluRay Multi-Audio DTS-HD MA 1.0 x264-GRP",
             id="multi-with-english",
         ),
         pytest.param(
             {
                 "category": "MOVIE",
                 "type": "ENCODE",
-                "title": "Zombie Flesh Eaters",
+                "title": "Marsh Ghoul Feast",
                 "year": 1979,
                 "resolution": "1080p",
                 "source": "BluRay",
@@ -736,14 +736,14 @@ def test_dreadvault_moves_tv_aka_before_year_with_foreign_audio_language():
                 "original_language": "it",
                 "tag": "GRP",
             },
-            "Zombie Flesh Eaters 1979 1080p BluRay Dubbed DTS-HD MA 1.0 x264-GRP",
+            "Marsh Ghoul Feast 1979 1080p BluRay Dubbed DTS-HD MA 1.0 x264-GRP",
             id="dubbed",
         ),
         pytest.param(
             {
                 "category": "MOVIE",
                 "type": "ENCODE",
-                "title": "Nosferatu",
+                "title": "Silent Count",
                 "year": 1922,
                 "resolution": "1080p",
                 "source": "BluRay",
@@ -753,14 +753,14 @@ def test_dreadvault_moves_tv_aka_before_year_with_foreign_audio_language():
                 "original_language": "de",
                 "tag": "GRP",
             },
-            "Nosferatu 1922 ZXX 1080p BluRay FLAC 2.0 x264-GRP",
+            "Silent Count 1922 ZXX 1080p BluRay FLAC 2.0 x264-GRP",
             id="lang-zxx",
         ),
         pytest.param(
             {
                 "category": "MOVIE",
                 "type": "ENCODE",
-                "title": "Dead Snow",
+                "title": "Frozen Ridge",
                 "year": 2009,
                 "resolution": "1080p",
                 "source": "BluRay",
@@ -770,14 +770,14 @@ def test_dreadvault_moves_tv_aka_before_year_with_foreign_audio_language():
                 "original_language": "no",
                 "tag": "GRP",
             },
-            "Dead Snow 2009 NORWEGIAN 1080p BluRay DTS 5.1 x264-GRP",
+            "Frozen Ridge 2009 NORWEGIAN 1080p BluRay DTS 5.1 x264-GRP",
             id="zxx-music-track-before-dialogue",
         ),
         pytest.param(
             {
                 "category": "MOVIE",
                 "type": "REMUX",
-                "title": "Alien Abduction: Incident in Lake County",
+                "title": "Sky Visitors: Incident at Pine Hollow",
                 "year": 1998,
                 "resolution": "576i",
                 "source": "PAL DVD",
@@ -785,14 +785,14 @@ def test_dreadvault_moves_tv_aka_before_year_with_foreign_audio_language():
                 "video": "MPEG-2",
                 "tag": "DVL",
             },
-            "Alien Abduction: Incident in Lake County 1998 576i DVD REMUX DD 2.0-DVL",
+            "Sky Visitors: Incident at Pine Hollow 1998 576i DVD REMUX DD 2.0-DVL",
             id="dvd-remux-pal",
         ),
         pytest.param(
             {
                 "category": "MOVIE",
                 "type": "REMUX",
-                "title": "Kuroneko",
+                "title": "Kurokage",
                 "year": 1968,
                 "resolution": "480i",
                 "source": "NTSC DVD",
@@ -802,7 +802,7 @@ def test_dreadvault_moves_tv_aka_before_year_with_foreign_audio_language():
                 "original_language": "ja",
                 "tag": "GRP",
             },
-            "Kuroneko 1968 JAPANESE 480i DVD REMUX DD 1.0-GRP",
+            "Kurokage 1968 JAPANESE 480i DVD REMUX DD 1.0-GRP",
             id="dvd-remux-foreign",
         ),
         pytest.param(
@@ -810,7 +810,7 @@ def test_dreadvault_moves_tv_aka_before_year_with_foreign_audio_language():
                 "category": "MOVIE",
                 "type": "DISC",
                 "disc": "DVD",
-                "title": "Rabies",
+                "title": "Thornwood",
                 "year": 2010,
                 "resolution": "576i",
                 "source": "PAL DVD",
@@ -821,14 +821,14 @@ def test_dreadvault_moves_tv_aka_before_year_with_foreign_audio_language():
                 "original_language": "he",
                 "tag": "GRP",
             },
-            "Rabies 2010 PAL DVD9 DD 5.1-GRP",
+            "Thornwood 2010 PAL DVD9 DD 5.1-GRP",
             id="dvd-disc-foreign-no-marker",
         ),
         pytest.param(
             {
                 "category": "MOVIE",
                 "type": "ENCODE",
-                "title": "The Vampires of Coyoacan",
+                "title": "The Phantoms of Valle Verde",
                 "year": 1974,
                 "resolution": "480p",
                 "source": "NTSC DVD",
@@ -838,7 +838,7 @@ def test_dreadvault_moves_tv_aka_before_year_with_foreign_audio_language():
                 "original_language": "es",
                 "tag": "GRP",
             },
-            "The Vampires of Coyoacan 1974 SPANISH 480p DVDRip MP3 2.0 x264-GRP",
+            "The Phantoms of Valle Verde 1974 SPANISH 480p DVDRip MP3 2.0 x264-GRP",
             id="dvdrip-foreign",
         ),
         pytest.param(
@@ -846,7 +846,7 @@ def test_dreadvault_moves_tv_aka_before_year_with_foreign_audio_language():
                 "category": "MOVIE",
                 "type": "DISC",
                 "disc": "BDMV",
-                "title": "Kwaidan",
+                "title": "Yurei Tales",
                 "year": 1964,
                 "resolution": "1080p",
                 "source": "BluRay",
@@ -857,7 +857,7 @@ def test_dreadvault_moves_tv_aka_before_year_with_foreign_audio_language():
                 "original_language": "ja",
                 "tag": "GRP",
             },
-            "Kwaidan 1964 1080p JPN Blu-ray AVC LPCM 1.0-GRP",
+            "Yurei Tales 1964 1080p JPN Blu-ray AVC LPCM 1.0-GRP",
             id="bd-disc-foreign-no-marker",
         ),
         pytest.param(
@@ -865,7 +865,7 @@ def test_dreadvault_moves_tv_aka_before_year_with_foreign_audio_language():
                 "category": "MOVIE",
                 "type": "DISC",
                 "disc": "BDMV",
-                "title": "Night of the Living Dead",
+                "title": "Night of the Restless Fog",
                 "year": 1968,
                 "edition": "Criterion Director's Cut",
                 "resolution": "1080p",
@@ -875,7 +875,7 @@ def test_dreadvault_moves_tv_aka_before_year_with_foreign_audio_language():
                 "audio": {"codec": "LPCM", "channels": "1.0"},
                 "tag": "GRP",
             },
-            "Night of the Living Dead 1968 Director's Cut 1080p USA Blu-ray AVC LPCM 1.0-GRP",
+            "Night of the Restless Fog 1968 Director's Cut 1080p USA Blu-ray AVC LPCM 1.0-GRP",
             id="bd-disc-cut-kept-distributor-dropped",
         ),
     ],

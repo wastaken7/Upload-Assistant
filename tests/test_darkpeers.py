@@ -110,11 +110,11 @@ def test_darkpeers_replaces_generic_dual_audio_with_rule_matrix_label():
 
 
 def test_darkpeers_tv_name_omits_year_without_an_exact_title_match():
-    meta = Meta(category="TV", title="SHADOW LANTERN", year=2026, name="SHADOW LANTERN 2026 S01E05 1080p CR WEB-DL DD+ 2.0 H.264-AnoZu")
+    meta = Meta(category="TV", title="SHADOW LANTERN", year=2026, name="SHADOW LANTERN 2026 S01E05 1080p CR WEB-DL DD+ 2.0 H.264-FAKESUBS")
     adapter = DarkPeers({"DEFAULT": {"tmdb_api": "test-key"}, "TRACKERS": {"DARKPEERS": {}}})
     adapter._tv_title_needs_year = AsyncMock(return_value=False)
 
-    assert asyncio.run(adapter.get_name(meta))["name"] == "SHADOW LANTERN S01E05 1080p CR WEB-DL DD+ 2.0 H.264-AnoZu"
+    assert asyncio.run(adapter.get_name(meta))["name"] == "SHADOW LANTERN S01E05 1080p CR WEB-DL DD+ 2.0 H.264-FAKESUBS"
 
 
 def test_darkpeers_tv_name_keeps_year_for_an_exact_title_match():
@@ -152,7 +152,7 @@ def test_darkpeers_tv_year_rule_does_not_count_the_only_tmdb_result_as_a_duplica
     meta = Meta(category="TV", title="SHADOW LANTERN")
     adapter = DarkPeers({"DEFAULT": {"tmdb_api": "test-key"}, "TRACKERS": {"DARKPEERS": {}}})
     response = Mock()
-    response.json.return_value = {"results": [{"id": 279807, "name": "SHADOW LANTERN", "original_name": "SHADOW LANTERN"}]}
+    response.json.return_value = {"results": [{"id": 424242, "name": "SHADOW LANTERN", "original_name": "SHADOW LANTERN"}]}
 
     with patch("src.trackers.UNIT3D.darkpeers.httpx.AsyncClient.get", new=AsyncMock(return_value=response)):
         assert asyncio.run(adapter._tv_title_needs_year(meta)) is False

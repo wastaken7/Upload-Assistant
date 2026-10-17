@@ -271,36 +271,36 @@ def test_btn_get_name_uses_disambiguation_from_btn_series_name(monkeypatch) -> N
     btn = tracker()
 
     async def fake_get_series_name(_meta: Meta) -> str:
-        return "The Office (US)"
+        return "Paper Street Works (US)"
 
     monkeypatch.setattr(btn, "get_series_name", fake_get_series_name)
-    meta = Meta(name="The Office 2005 S01E01 1080p WEB-DL DDP 5.1 x264-GRP", title="The Office", year=2005, resolution="1080p", tag="-GRP")
+    meta = Meta(name="Paper Street Works 2005 S01E01 1080p WEB-DL DDP 5.1 x264-GRP", title="Paper Street Works", year=2005, resolution="1080p", tag="-GRP")
 
-    assert asyncio.run(btn.get_name(meta)) == "The.Office.US.S01E01.1080p.WEB-DL.DDP5.1.x264-GRP"  # noqa: S101
+    assert asyncio.run(btn.get_name(meta)) == "Paper.Street.Works.US.S01E01.1080p.WEB-DL.DDP5.1.x264-GRP"  # noqa: S101
 
 
 def test_btn_get_name_removes_year_when_btn_series_has_no_year(monkeypatch) -> None:
     btn = tracker()
 
     async def fake_get_series_name(_meta: Meta) -> str:
-        return "Breaking Bad"
+        return "Copper Valley"
 
     monkeypatch.setattr(btn, "get_series_name", fake_get_series_name)
-    meta = Meta(name="Breaking Bad 2008 S01E01 1080p WEB-DL DDP 5.1 x264-GRP", title="Breaking Bad", year=2008, resolution="1080p", tag="-GRP")
+    meta = Meta(name="Copper Valley 2008 S01E01 1080p WEB-DL DDP 5.1 x264-GRP", title="Copper Valley", year=2008, resolution="1080p", tag="-GRP")
 
-    assert asyncio.run(btn.get_name(meta)) == "Breaking.Bad.S01E01.1080p.WEB-DL.DDP5.1.x264-GRP"  # noqa: S101
+    assert asyncio.run(btn.get_name(meta)) == "Copper.Valley.S01E01.1080p.WEB-DL.DDP5.1.x264-GRP"  # noqa: S101
 
 
 def test_btn_get_name_preserves_year_when_btn_series_has_year(monkeypatch) -> None:
     btn = tracker()
 
     async def fake_get_series_name(_meta: Meta) -> str:
-        return "Doctor Who (2005)"
+        return "Starlight Wanderer (2005)"
 
     monkeypatch.setattr(btn, "get_series_name", fake_get_series_name)
-    meta = Meta(name="Doctor Who 2005 S01E01 1080p WEB-DL DDP 5.1 x264-GRP", title="Doctor Who", year=2005, resolution="1080p", tag="-GRP")
+    meta = Meta(name="Starlight Wanderer 2005 S01E01 1080p WEB-DL DDP 5.1 x264-GRP", title="Starlight Wanderer", year=2005, resolution="1080p", tag="-GRP")
 
-    assert asyncio.run(btn.get_name(meta)) == "Doctor.Who.2005.S01E01.1080p.WEB-DL.DDP5.1.x264-GRP"  # noqa: S101
+    assert asyncio.run(btn.get_name(meta)) == "Starlight.Wanderer.2005.S01E01.1080p.WEB-DL.DDP5.1.x264-GRP"  # noqa: S101
 
 
 def test_btn_get_series_name_fetches_and_caches(monkeypatch) -> None:
@@ -311,14 +311,14 @@ def test_btn_get_series_name_fetches_and_caches(monkeypatch) -> None:
         api_calls += 1
         assert method == "getTorrents"  # noqa: S101
         assert params["search"] == {"tvdb": "73244"}  # noqa: S101
-        return {"result": {"torrents": {"1": {"Series": "The Office (US)"}}}}
+        return {"result": {"torrents": {"1": {"Series": "Paper Street Works (US)"}}}}
 
     btn = tracker()
     monkeypatch.setattr(btn, "_api", fake_api)
     meta = Meta(tvdb_id=73244)
 
-    assert asyncio.run(btn.get_series_name(meta)) == "The Office (US)"  # noqa: S101
-    assert asyncio.run(btn.get_series_name(meta)) == "The Office (US)"  # noqa: S101
+    assert asyncio.run(btn.get_series_name(meta)) == "Paper Street Works (US)"  # noqa: S101
+    assert asyncio.run(btn.get_series_name(meta)) == "Paper Street Works (US)"  # noqa: S101
     assert api_calls == 1  # noqa: S101
 
 
@@ -330,16 +330,16 @@ def test_btn_get_series_name_falls_back_to_tvdb_episode_data_when_btn_empty(monk
     monkeypatch.setattr(btn, "_api", fake_api)
     meta = Meta(
         tvdb_id=73244,
-        tvdb_episode_data={"series_name": "The Office (US)"},
-        name="The Office 2005 S01E01 1080p WEB-DL DDP 5.1 x264-GRP",
-        title="The Office",
+        tvdb_episode_data={"series_name": "Paper Street Works (US)"},
+        name="Paper Street Works 2005 S01E01 1080p WEB-DL DDP 5.1 x264-GRP",
+        title="Paper Street Works",
         year=2005,
         resolution="1080p",
         tag="-GRP",
     )
 
-    assert asyncio.run(btn.get_series_name(meta)) == "The Office (US)"  # noqa: S101
-    assert asyncio.run(btn.get_name(meta)) == "The.Office.US.S01E01.1080p.WEB-DL.DDP5.1.x264-GRP"  # noqa: S101
+    assert asyncio.run(btn.get_series_name(meta)) == "Paper Street Works (US)"  # noqa: S101
+    assert asyncio.run(btn.get_name(meta)) == "Paper.Street.Works.US.S01E01.1080p.WEB-DL.DDP5.1.x264-GRP"  # noqa: S101
 
 
 def test_btn_get_series_name_falls_back_to_tvdb_client(monkeypatch) -> None:
@@ -349,7 +349,7 @@ def test_btn_get_series_name_falls_back_to_tvdb_client(monkeypatch) -> None:
     class FakeTVDBClient:
         async def get_series_extended(self, series_id: int) -> dict[str, object]:
             assert series_id == 78804  # noqa: S101
-            return {"name": "Doctor Who (2005)"}
+            return {"name": "Starlight Wanderer (2005)"}
 
     monkeypatch.setattr("src.tvdb._get_tvdb_or_warn", lambda _cfg: FakeTVDBClient())
 
@@ -357,31 +357,31 @@ def test_btn_get_series_name_falls_back_to_tvdb_client(monkeypatch) -> None:
     monkeypatch.setattr(btn, "_api", fake_api)
     meta = Meta(
         tvdb_id=78804,
-        name="Doctor Who 2005 S01E01 1080p WEB-DL DDP 5.1 x264-GRP",
-        title="Doctor Who",
+        name="Starlight Wanderer 2005 S01E01 1080p WEB-DL DDP 5.1 x264-GRP",
+        title="Starlight Wanderer",
         year=2005,
         resolution="1080p",
         tag="-GRP",
     )
 
-    assert asyncio.run(btn.get_series_name(meta)) == "Doctor Who (2005)"  # noqa: S101
-    assert asyncio.run(btn.get_name(meta)) == "Doctor.Who.2005.S01E01.1080p.WEB-DL.DDP5.1.x264-GRP"  # noqa: S101
+    assert asyncio.run(btn.get_series_name(meta)) == "Starlight Wanderer (2005)"  # noqa: S101
+    assert asyncio.run(btn.get_name(meta)) == "Starlight.Wanderer.2005.S01E01.1080p.WEB-DL.DDP5.1.x264-GRP"  # noqa: S101
 
 
 def test_btn_verify_autofill_success() -> None:
     btn = tracker()
     meta = Meta(season_int=1, episode_int=2, year=2005)
-    data = {"artist": "The Office (US)", "title": "S01E02", "year": "2005"}
+    data = {"artist": "Paper Street Works (US)", "title": "S01E02", "year": "2005"}
 
-    assert btn._verify_autofill(data, meta, "The Office (US)", "Episode") == []  # noqa: S101
+    assert btn._verify_autofill(data, meta, "Paper Street Works (US)", "Episode") == []  # noqa: S101
 
 
 def test_btn_verify_autofill_detects_mismatches() -> None:
     btn = tracker()
     meta = Meta(season_int=1, episode_int=2, year=2005)
-    data = {"artist": "The Office", "title": "S01E03", "year": "2001"}
+    data = {"artist": "Paper Street Works", "title": "S01E03", "year": "2001"}
 
-    errors = btn._verify_autofill(data, meta, "The Office (US)", "Episode")
+    errors = btn._verify_autofill(data, meta, "Paper Street Works (US)", "Episode")
     assert any("artist" in e for e in errors)  # noqa: S101
     assert any("title" in e for e in errors)  # noqa: S101
     assert any("year" in e for e in errors)  # noqa: S101
@@ -392,11 +392,11 @@ def test_btn_verify_autofill_season_pack_accepts_valid_formats() -> None:
     meta = Meta(season_int=3, tv_pack=True, year=2010)
 
     for valid_title in ("S03", "s03", "Season 3", "Season 03"):
-        data = {"artist": "Breaking Bad", "title": valid_title, "year": "2010"}
-        assert btn._verify_autofill(data, meta, "Breaking Bad", "Season") == []  # noqa: S101
+        data = {"artist": "Copper Valley", "title": valid_title, "year": "2010"}
+        assert btn._verify_autofill(data, meta, "Copper Valley", "Season") == []  # noqa: S101
 
-    invalid_data = {"artist": "Breaking Bad", "title": "S04", "year": "2010"}
-    assert len(btn._verify_autofill(invalid_data, meta, "Breaking Bad", "Season")) == 1  # noqa: S101
+    invalid_data = {"artist": "Copper Valley", "title": "S04", "year": "2010"}
+    assert len(btn._verify_autofill(invalid_data, meta, "Copper Valley", "Season")) == 1  # noqa: S101
 
 
 def test_btn_verify_autofill_uses_season_year_over_series_year() -> None:
@@ -414,11 +414,11 @@ def test_btn_verify_autofill_uses_season_year_over_series_year() -> None:
         },
     )
 
-    valid_data = {"artist": "The Office (US)", "title": "S03E01", "year": "2006"}
-    assert btn._verify_autofill(valid_data, meta, "The Office (US)", "Episode") == []  # noqa: S101
+    valid_data = {"artist": "Paper Street Works (US)", "title": "S03E01", "year": "2006"}
+    assert btn._verify_autofill(valid_data, meta, "Paper Street Works (US)", "Episode") == []  # noqa: S101
 
-    series_year_data = {"artist": "The Office (US)", "title": "S03E01", "year": "2005"}
-    errors = btn._verify_autofill(series_year_data, meta, "The Office (US)", "Episode")
+    series_year_data = {"artist": "Paper Street Works (US)", "title": "S03E01", "year": "2005"}
+    errors = btn._verify_autofill(series_year_data, meta, "Paper Street Works (US)", "Episode")
     assert errors == ["year '2005' != expected '2006'"]  # noqa: S101
 
 
