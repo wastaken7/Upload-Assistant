@@ -2672,6 +2672,18 @@ def _description_review_lock(temp_dir: Path) -> threading.Lock:
         return _description_review_locks.setdefault(key, threading.Lock())
 
 
+def _screenshot_capture_supported(meta_data: Mapping[str, object]) -> bool:
+    """Return whether review actions may capture new frames with FFmpeg.
+
+    GAME images come from IGDB, BOOK pages/covers and MUSIC artwork are not
+    video, so FFmpeg has nothing meaningful to capture for those categories.
+    """
+    if _stringify_preview_value(meta_data.get("category")).upper() in {"GAME", "BOOK", "MUSIC"}:
+        return False
+    is_disc = meta_data.get("is_disc")
+    return not is_disc or is_disc == "BDMV"
+
+
 def _screenshot_review_meta(temp_dir: Path, meta_data: Mapping[str, object]) -> Mapping[str, object]:
     """Include cached hosted images when a resumed run has not restored them into meta.json yet."""
     result = dict(meta_data)
@@ -5756,11 +5768,7 @@ def _apply_config_update(source: str, example_config: dict[str, Any], data: dict
 
     is_webui_prompt_timeout = path == ["DEFAULT", "webui_unattended_prompt_timeout"]
     if is_webui_prompt_timeout:
-        if (
-            isinstance(raw_value, bool)
-            or not isinstance(raw_value, (str, int, float))
-            or (isinstance(raw_value, str) and not raw_value.strip())
-        ):
+        if isinstance(raw_value, bool) or not isinstance(raw_value, (str, int, float)) or (isinstance(raw_value, str) and not raw_value.strip()):
             raise ValueError("Enter a timeout in minutes, or 0 to wait indefinitely")
         # The runtime accepts fractional minutes even though the example is 60.
         example_value = 60.0
@@ -6683,12 +6691,23 @@ def execution_screenshots():
     if resolved is None:
         return jsonify({"success": False, "error": "Screenshots are not available yet"}), 404
 
-    from src.screenshot_review import image_version, list_review_items
+    from src.screenshot_review import ReviewedScreenshot, image_version, list_review_items
 
     temp_dir, meta_data = resolved
     meta_data = _screenshot_review_meta(temp_dir, meta_data)
     items = list_review_items(temp_dir, meta_data)
-    can_capture = not meta_data.get("is_disc") or meta_data.get("is_disc") == "BDMV"
+    can_capture = _screenshot_capture_supported(meta_data)
+
+    def image_urls(item: ReviewedScreenshot) -> tuple[str, str]:
+        """Return (grid, full-size) URLs; remote hosts expose a lighter ``img_url`` thumbnail."""
+        if item.path:
+            local_url = f"/api/execution_screenshots/{item.id}/image?session_id={session_id}&v={image_version(temp_dir, item.id, item.path.stat().st_mtime_ns)}"
+            return local_url, local_url
+        remote = item.remote_image or {}
+        img_url = str(remote.get("img_url") or "")
+        raw_url = str(remote.get("raw_url") or "")
+        return img_url or raw_url, raw_url or img_url
+
     return jsonify(
         {
             "success": True,
@@ -6700,18 +6719,38 @@ def execution_screenshots():
                     "size": item.path.stat().st_size if item.path else None,
                     "source": item.source,
                     "group": item.group,
-                    "image_url": (
-                        f"/api/execution_screenshots/{item.id}/image?session_id={session_id}&v={image_version(temp_dir, item.id, item.path.stat().st_mtime_ns)}"
-                        if item.path
-                        else str((item.remote_image or {}).get("img_url") or (item.remote_image or {}).get("raw_url") or "")
-                    ),
+                    "image_url": urls[0],
+                    "full_image_url": urls[1],
                     "can_replace": can_capture and item.source != "addition",
                     "can_delete": item.source in {"local", "addition"},
                 }
                 for item in items
+                for urls in (image_urls(item),)
             ],
         }
     )
+
+
+@app.route("/api/execution_mediainfo")
+@limiter.limit("7200 per hour", key_func=_rate_limit_key_func, override_defaults=True)
+def execution_mediainfo():
+    """Return read-only MediaInfo/BDInfo reports for the active execution only."""
+    session_id = str(request.args.get("session_id", "")).strip()
+    if not session_id:
+        return jsonify({"success": False, "error": "Missing session_id"}), 400
+    resolved = _resolve_execution_screenshot_review(session_id)
+    if resolved is None:
+        return jsonify({"success": False, "error": "MediaInfo is not available yet"}), 404
+
+    from src.mediainfo_review import report_items
+
+    temp_dir, meta_data = resolved
+    kind, reports = report_items(meta_data, temp_dir)
+    if not reports:
+        return jsonify({"success": False, "kind": kind, "error": "MediaInfo is not available yet"}), 404
+    response = jsonify({"success": True, "kind": kind, "reports": reports})
+    response.headers["Cache-Control"] = "no-store, max-age=0"
+    return response
 
 
 @app.route("/api/execution_description")
@@ -6844,6 +6883,8 @@ def add_execution_screenshot():
         return jsonify({"success": False, "error": "Screenshots are not available yet"}), 404
     temp_dir, meta_data = resolved
     meta_data = _screenshot_review_meta(temp_dir, meta_data)
+    if not _screenshot_capture_supported(meta_data):
+        return jsonify({"success": False, "error": "Screenshot capture is not supported for this release"}), 400
 
     try:
         from src.screenshot_review import add_screenshot
@@ -6871,6 +6912,8 @@ def mutate_execution_screenshot(screenshot_id: str, action: str):
         return jsonify({"success": False, "error": "Screenshots are not available yet"}), 404
     temp_dir, meta_data = resolved
     meta_data = _screenshot_review_meta(temp_dir, meta_data)
+    if action == "replace" and not _screenshot_capture_supported(meta_data):
+        return jsonify({"success": False, "error": "Screenshot capture is not supported for this release"}), 400
 
     try:
         from src.screenshot_review import delete_screenshot, replace_screenshot, undo_remote_replacement
