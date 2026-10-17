@@ -557,32 +557,72 @@ class BroadcasTheNet:
     async def _uploaded_torrent_id(self, release_name: str, group_id: str, meta: Meta) -> str:
         if not self.api_key:
             raise UploadError("BTN needs an API key to identify the uploaded torrent on a group page", "red")
-        # BTN's getTorrents does not filter by group or release name, so search the
-        # series and match the uploaded release inside its group locally.
-        filters: dict[str, Any] = {}
-        if int(meta.tvdb_id or 0):
-            filters["tvdb"] = str(meta.tvdb_id)
-        elif int(meta.imdb_id or 0):
-            filters["imdb"] = str(meta.imdb_id)
+
         expected_release = release_name.strip().casefold()
+        cleaned_expected = self._clean_name(release_name).casefold()
+
+        search_filter_list: list[dict[str, Any]] = []
+        tvdb_or_imdb: dict[str, Any] = {}
+        if int(meta.tvdb_id or 0):
+            tvdb_or_imdb["tvdb"] = str(meta.tvdb_id)
+        elif int(meta.imdb_id or 0):
+            tvdb_or_imdb["imdb"] = str(meta.imdb_id)
+
+        if group_id:
+            search_filter_list.append({"group_id": str(group_id), **tvdb_or_imdb})
+
+        if tvdb_or_imdb:
+            search_filter_list.append({"release": f"%{release_name}%", **tvdb_or_imdb})
+        search_filter_list.append({"release": f"%{release_name}%"})
+
         for attempt in range(4):
             if attempt:
                 await asyncio.sleep(2)
-            result = await self._api("getTorrents", {"search": filters, "results": 1000, "offset": 0})
-            payload = result.get("result")
-            torrents = payload.get("torrents") if isinstance(payload, dict) else None
-            if not isinstance(torrents, dict):
-                continue
-            matches = [
-                str(torrent_id)
-                for torrent_id, item in torrents.items()
-                if isinstance(item, dict)
-                and str(item.get("GroupID") or item.get("groupId") or item.get("GroupId") or "").strip() == group_id
-                and any(str(item.get(field) or "").strip().casefold() == expected_release for field in ("ReleaseName", "releaseName", "TorrentName", "Name", "Release"))
-            ]
-            if matches:
-                # Prefer the newest torrent when an older copy shares the release name.
-                return max(matches, key=lambda torrent_id: int(torrent_id) if torrent_id.isdigit() else -1)
+            for filters in search_filter_list:
+                result = await self._api("getTorrents", {"search": filters, "results": 1000, "offset": 0})
+                payload = result.get("result")
+                torrents = payload.get("torrents") if isinstance(payload, dict) else None
+                if not isinstance(torrents, dict) or not torrents:
+                    continue
+
+                items = [(str(t_id), item) for t_id, item in torrents.items() if isinstance(item, dict)]
+                if not items:
+                    continue
+
+                matched_group = [
+                    (t_id, item) for t_id, item in items
+                    if str(item.get("GroupID") or item.get("groupId") or item.get("GroupId") or "").strip() == group_id
+                ] if group_id else []
+
+                candidates = matched_group if matched_group else items
+
+                exact_matches = [
+                    (t_id, item) for t_id, item in candidates
+                    if any(str(item.get(f) or "").strip().casefold() == expected_release for f in ("ReleaseName", "releaseName", "TorrentName", "Name", "Release"))
+                ]
+                if exact_matches:
+                    best_id, best_item = max(exact_matches, key=lambda pair: int(pair[0]) if pair[0].isdigit() else -1)
+                    if best_item.get("GroupID"):
+                        meta.tracker_status.setdefault(self.tracker, {})["group_id"] = str(best_item.get("GroupID"))
+                    return best_id
+
+                cleaned_matches = [
+                    (t_id, item)
+                    for t_id, item in candidates
+                    if any(self._clean_name(str(item.get(f) or "")).casefold() == cleaned_expected for f in ("ReleaseName", "releaseName", "TorrentName", "Name", "Release"))
+                ]
+                if cleaned_matches:
+                    best_id, best_item = max(cleaned_matches, key=lambda pair: int(pair[0]) if pair[0].isdigit() else -1)
+                    if best_item.get("GroupID"):
+                        meta.tracker_status.setdefault(self.tracker, {})["group_id"] = str(best_item.get("GroupID"))
+                    return best_id
+
+                if matched_group:
+                    best_id, best_item = max(matched_group, key=lambda pair: int(pair[0]) if pair[0].isdigit() else -1)
+                    if best_item.get("GroupID"):
+                        meta.tracker_status.setdefault(self.tracker, {})["group_id"] = str(best_item.get("GroupID"))
+                    return best_id
+
         raise UploadError("BTN did not return the uploaded torrent ID after four API checks", "red")
 
     @staticmethod
@@ -749,14 +789,16 @@ class BroadcasTheNet:
                 response = await client.post(self.upload_url, data=data, files={"file_input": ("upload.torrent", torrent, "application/x-bittorrent")})
                 response.raise_for_status()
                 group_id, torrent_id = self._upload_ids(str(response.url), response.text)
-                if not group_id:
+
+                if not torrent_id:
+                    torrent_id = await self._uploaded_torrent_id(release_name, group_id, meta)
+                    group_id = meta.tracker_status.get(self.tracker, {}).get("group_id") or group_id
+
+                if not group_id and not torrent_id:
                     failure_path = work_dir / f"[{self.tracker}]BTN_upload_failure.html"
                     async with aiofiles.open(failure_path, "w", encoding="utf-8") as f:
                         await f.write(response.text)
                     raise UploadError(f"BTN upload did not return a registered torrent ID. See {failure_path}", "red")
-
-                if not torrent_id:
-                    torrent_id = await self._uploaded_torrent_id(release_name, group_id, meta)
 
                 download = await client.get(f"{self.base_url}/torrents.php?action=download&id={torrent_id}")
                 download.raise_for_status()

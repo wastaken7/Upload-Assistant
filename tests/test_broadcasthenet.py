@@ -105,7 +105,7 @@ def test_btn_group_page_does_not_identify_an_older_torrent() -> None:
 def test_btn_finds_uploaded_release_in_its_group(monkeypatch) -> None:
     async def fake_api(method: str, params: dict[str, object]) -> dict[str, object]:
         assert method == "getTorrents"  # noqa: S101
-        assert params == {"search": {"tvdb": "42"}, "results": 1000, "offset": 0}  # noqa: S101
+        assert params == {"search": {"group_id": "123", "tvdb": "42"}, "results": 1000, "offset": 0}  # noqa: S101
         return {
             "result": {
                 "torrents": {
@@ -124,7 +124,7 @@ def test_btn_finds_uploaded_release_in_its_group(monkeypatch) -> None:
 
 def test_btn_uploaded_release_lookup_falls_back_to_imdb_and_prefers_newest(monkeypatch) -> None:
     async def fake_api(_method: str, params: dict[str, object]) -> dict[str, object]:
-        assert params["search"] == {"imdb": "77"}  # noqa: S101
+        assert params["search"] == {"group_id": "123", "imdb": "77"}  # noqa: S101
         return {
             "result": {
                 "torrents": {
@@ -138,6 +138,23 @@ def test_btn_uploaded_release_lookup_falls_back_to_imdb_and_prefers_newest(monke
     monkeypatch.setattr(btn, "_api", fake_api)
 
     assert asyncio.run(btn._uploaded_torrent_id("Show.S01E01.1080p-GRP", "123", Meta(category="TV", imdb_id=77))) == "200"  # noqa: S101
+
+
+def test_btn_uploaded_release_lookup_matches_cleaned_name_and_falls_back_to_group_newest(monkeypatch) -> None:
+    async def fake_api(_method: str, params: dict[str, object]) -> dict[str, object]:
+        assert params["search"] == {"group_id": "123"}  # noqa: S101
+        return {
+            "result": {
+                "torrents": {
+                    "300": {"GroupID": "123", "ReleaseName": "Show.S01E01.1080p.WEB-DL.DDP5.1.Atmos.x265-GRP"},
+                }
+            }
+        }
+
+    btn = tracker()
+    monkeypatch.setattr(btn, "_api", fake_api)
+
+    assert asyncio.run(btn._uploaded_torrent_id("Show S01E01 1080p WEB-DL DDP 5.1 Atmos x265-GRP", "123", Meta(category="TV"))) == "300"  # noqa: S101
 
 
 def test_btn_api_sends_named_search_parameters(monkeypatch) -> None:
