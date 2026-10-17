@@ -32,6 +32,20 @@ async def test_hdbits_preserves_custom_title_ellipsis(custom_name):
     assert name == custom_name  # noqa: S101
 
 
+@pytest.mark.parametrize("custom_name,expected_name", [
+    ("Example Title", "Original Title"),
+    ("Example Title 2015 1080p", "Original Title 2015 1080p"),
+    ("Example Titles 2015 1080p", "Example Titles 2015 1080p"),
+    ("Example Title... 2015 1080p", "Example Title... 2015 1080p"),
+])
+async def test_hdbits_requires_complete_title_prefix(custom_name, expected_name):
+    meta = make_meta(name=custom_name, manual_name=custom_name, imdb_info={"aka": "Original Title"})
+
+    name = await HDBits({}).get_name(meta)
+
+    assert name == expected_name  # noqa: S101
+
+
 @pytest.mark.parametrize("use_imdb_title", [False, True])
 async def test_hdbits_preserves_title_commas(use_imdb_title):
     expected_title = "Example Chronicles: Dawn, Noon, Dusk"

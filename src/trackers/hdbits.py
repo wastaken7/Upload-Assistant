@@ -211,7 +211,7 @@ class HDBits:
     async def get_name(self, meta: Meta) -> str:
         hdb_name = meta.name
         title = ""
-        if meta.title and hdb_name.startswith(meta.title):
+        if meta.title and (hdb_name == meta.title or hdb_name.startswith(f"{meta.title} ")):
             title = str(meta.imdb_info.get("aka") or meta.imdb_info.get("title") or meta.title)
             hdb_name = hdb_name[len(meta.title) :]
         audio = meta.audio
