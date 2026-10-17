@@ -2089,6 +2089,7 @@ function AudionutsUAGUI() {
   const [mediaInfoStatus, setMediaInfoStatus] = useState("idle");
   const [selectedMediaInfoKey, setSelectedMediaInfoKey] = useState("");
   const [mediaInfoCopied, setMediaInfoCopied] = useState(false);
+  const mediaInfoTargetRef = useRef("");
   // Desktop-only enlarged view of one review panel; the sidebar keeps showing
   // the media preview meanwhile so a panel is never mounted twice.
   const [expandedReviewPanel, setExpandedReviewPanel] = useState("");
@@ -3673,7 +3674,16 @@ function AudionutsUAGUI() {
       timeoutId = window.setTimeout(loadMediaInfo, 3000);
     };
 
-    setMediaInfoStatus((status) => (status === "ready" ? status : "loading"));
+    // Reopening the panel keeps the cached report; a different execution or
+    // file must not show (or copy) the previous release's report meanwhile.
+    const mediaInfoTarget = `${sessionId}\n${executionPreview?.path || ""}`;
+    if (mediaInfoTargetRef.current !== mediaInfoTarget) {
+      mediaInfoTargetRef.current = mediaInfoTarget;
+      setExecutionMediaInfo(null);
+      setMediaInfoStatus("loading");
+    } else {
+      setMediaInfoStatus((status) => (status === "ready" ? status : "loading"));
+    }
     loadMediaInfo();
 
     return () => {
