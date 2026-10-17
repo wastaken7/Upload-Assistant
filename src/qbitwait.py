@@ -10,6 +10,7 @@ import qbittorrentapi
 
 from src.console import console, logger
 from src.meta import Meta
+from src.webui_progress import complete_progress, has_progress_callback, publish_progress
 
 
 class Wait:
@@ -155,6 +156,9 @@ class Wait:
         check_interval = 5
         max_samples = max(1, wait_time // check_interval)
         speeds: deque[int] = deque(maxlen=max_samples)
+        web_progress = has_progress_callback()
+        progress_id = "qbit-bandwidth"
+        progress_label = "Waiting for bandwidth"
 
         try:
             # Bandwidth checks need a stable, authenticated qBittorrent API connection.
@@ -180,18 +184,42 @@ class Wait:
                 total_seconds = current_samples * check_interval
                 avg_speed_color = "green" if avg_speed <= threshold_bytes else "red"
                 if current_samples >= max_samples and avg_speed <= threshold_bytes:
+                    if web_progress:
+                        complete_progress(
+                            progress_id,
+                            progress_label,
+                            current=avg_speed_kbs,
+                            total=threshold_kb,
+                            detail=f"Average over last {total_seconds}s",
+                            group="bandwidth",
+                            unit="kbps",
+                        )
                     console.print(
                         f"[yellow]Average speed of [{avg_speed_color}]{avg_speed_kbs:.0f}/{threshold_kb:.0f}[/{avg_speed_color}] KB/s in the last {total_seconds} seconds. [/yellow]"
                     )
                     break
-                console.print(
-                    f"[yellow]Average speed of [{avg_speed_color}]{avg_speed_kbs:.0f}[/{avg_speed_color}]/[green]{threshold_kb:.0f}[/green] KB/s in the last {total_seconds} seconds. [/yellow]",
-                    end="\r",
-                )
+                if web_progress:
+                    # The Web UI console cannot redraw "\r" lines, so report a live meter instead.
+                    publish_progress(
+                        progress_id,
+                        progress_label,
+                        current=avg_speed_kbs,
+                        total=threshold_kb,
+                        detail=f"Average over last {total_seconds}/{max_samples * check_interval}s",
+                        group="bandwidth",
+                        unit="kbps",
+                    )
+                else:
+                    console.print(
+                        f"[yellow]Average speed of [{avg_speed_color}]{avg_speed_kbs:.0f}[/{avg_speed_color}]/[green]{threshold_kb:.0f}[/green] KB/s in the last {total_seconds} seconds. [/yellow]",
+                        end="\r",
+                    )
 
                 await asyncio.sleep(check_interval)
             return True
         except Exception as e:
+            if web_progress:
+                publish_progress(progress_id, progress_label, detail=str(e), status="failed", group="bandwidth", unit="kbps")
             logger.error(f"\n[red]Error checking bandwidth: {e}[/red]")
             return False
 

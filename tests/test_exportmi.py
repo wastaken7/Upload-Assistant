@@ -166,20 +166,20 @@ def test_mediainfo_timeout_becomes_runtime_error() -> None:
 
 def test_all_supported_mediainfo_downloads_have_pinned_hashes() -> None:
     assert {
-        "MediaInfo_CLI_26.05_Windows_x64.zip",
-        "MediaInfo_CLI_26.05_Windows_ARM64.zip",
-        "MediaInfo_CLI_26.05_Lambda_x86_64.zip",
-        "MediaInfo_CLI_26.05_Lambda_arm64.zip",
-        "MediaInfo_CLI_26.05_Mac.dmg",
+        "MediaInfo_CLI_26.10_Windows_x64.zip",
+        "MediaInfo_CLI_26.10_Windows_ARM64.zip",
+        "MediaInfo_CLI_26.10_Lambda_x86_64.zip",
+        "MediaInfo_CLI_26.10_Lambda_arm64.zip",
+        "MediaInfo_CLI_26.10_Mac.dmg",
     } <= SHA256_BY_ASSET.keys()
 
 
 @pytest.mark.parametrize(
     ("system", "machine", "expected"),
     [
-        ("Windows", "AMD64", ("windows", "MediaInfo_CLI_26.05_Windows_x64.zip", "MediaInfo.exe", "zip")),
-        ("Windows", "ARM64", ("windows/arm64", "MediaInfo_CLI_26.05_Windows_ARM64.zip", "MediaInfo.exe", "zip")),
-        ("Darwin", "arm64", ("macos", "MediaInfo_CLI_26.05_Mac.dmg", "mediainfo", "dmg")),
+        ("Windows", "AMD64", ("windows", "MediaInfo_CLI_26.10_Windows_x64.zip", "MediaInfo.exe", "zip")),
+        ("Windows", "ARM64", ("windows/arm64", "MediaInfo_CLI_26.10_Windows_ARM64.zip", "MediaInfo.exe", "zip")),
+        ("Darwin", "arm64", ("macos", "MediaInfo_CLI_26.10_Mac.dmg", "mediainfo", "dmg")),
     ],
 )
 def test_mediainfo_platform_info_uses_official_asset(system, machine, expected) -> None:
@@ -217,7 +217,7 @@ def test_macos_uses_downloaded_binary_before_path(tmp_path) -> None:
         patch.object(MediaInfoBinaryManager, "_is_android", return_value=False),
         patch.object(MediaInfoBinaryManager, "_is_macos", return_value=True),
         patch("bin.get_mediainfo.shutil.which", return_value="/opt/homebrew/bin/mediainfo"),
-        patch.object(MediaInfoBinaryManager, "_platform_info", return_value=("macos", "MediaInfo_CLI_26.05_Mac.dmg", "mediainfo", "dmg")),
+        patch.object(MediaInfoBinaryManager, "_platform_info", return_value=("macos", "MediaInfo_CLI_26.10_Mac.dmg", "mediainfo", "dmg")),
     ):
         binary = tmp_path / "bin" / "MI" / "macos" / "mediainfo"
         binary.parent.mkdir(parents=True)
@@ -232,7 +232,7 @@ def test_macos_falls_back_to_path_when_downloaded_binary_is_unavailable(tmp_path
     with (
         patch.object(MediaInfoBinaryManager, "_is_android", return_value=False),
         patch.object(MediaInfoBinaryManager, "_is_macos", return_value=True),
-        patch.object(MediaInfoBinaryManager, "_platform_info", return_value=("macos", "MediaInfo_CLI_26.05_Mac.dmg", "mediainfo", "dmg")),
+        patch.object(MediaInfoBinaryManager, "_platform_info", return_value=("macos", "MediaInfo_CLI_26.10_Mac.dmg", "mediainfo", "dmg")),
         patch("bin.get_mediainfo.shutil.which", return_value="/opt/homebrew/bin/mediainfo"),
     ):
         assert MediaInfoBinaryManager.find_existing_binary(tmp_path) == "/opt/homebrew/bin/mediainfo"
@@ -244,7 +244,7 @@ def test_linux_falls_back_to_path_when_downloaded_binary_is_unavailable(tmp_path
     with (
         patch.object(MediaInfoBinaryManager, "_is_android", return_value=False),
         patch.object(MediaInfoBinaryManager, "_is_macos", return_value=False),
-        patch.object(MediaInfoBinaryManager, "_platform_info", return_value=("linux", "MediaInfo_CLI_26.05_Lambda_x86_64.zip", "mediainfo", "zip")),
+        patch.object(MediaInfoBinaryManager, "_platform_info", return_value=("linux", "MediaInfo_CLI_26.10_Lambda_x86_64.zip", "mediainfo", "zip")),
         patch("bin.get_mediainfo.shutil.which", return_value="/usr/bin/mediainfo"),
     ):
         assert MediaInfoBinaryManager.find_existing_binary(tmp_path) == "/usr/bin/mediainfo"

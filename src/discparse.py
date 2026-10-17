@@ -18,7 +18,6 @@ from rich.progress import BarColumn, TaskProgressColumn, TextColumn
 from bin.get_playlist import MplsParser
 from src.binaries import configured_binary
 from src.console import console, logger, progress_display, prompt_in_thread
-from src.exportmi import find_dvd_mediainfo
 from src.mediainfo import MediaInfo
 from src.meta import Meta
 from src.resource_coordinator import holds_slot
@@ -31,7 +30,6 @@ PlaylistInfo = dict[str, Any]
 class DiscParse:
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
-        self.mediainfo_config: dict[str, Any] | None = None
 
     def _calculate_playlist_score(self, playlist: PlaylistInfo) -> float:
         """Calculate weighted score for playlist selection.
@@ -78,32 +76,6 @@ class DiscParse:
         score += file_concentration * 10.0
 
         return score
-
-    def setup_mediainfo_for_dvd(self, base_dir: str | None) -> tuple[str, dict[str, str]] | None:
-        """Setup MediaInfo binary for DVD processing using the complete setup from exportmi"""
-        if configured := configured_binary("dvd_mediainfo_path", self.config):
-            return configured, os.environ.copy()
-        if base_dir is not None and platform.system().lower() == "windows":
-            dvd_cli = Path(base_dir) / "bin" / "MI" / "windows" / "dvd" / "MediaInfo.exe"
-            if dvd_cli.is_file():
-                return str(dvd_cli), os.environ.copy()
-        if base_dir is not None and platform.system().lower() == "linux":
-            dvd_dir = Path(base_dir) / "bin" / "MI" / "linux" / "dvd"
-            dvd_cli = dvd_dir / "mediainfo"
-            dvd_lib = dvd_dir / "libmediainfo.so.0"
-            if dvd_cli.is_file() and dvd_lib.is_file():
-                current_ld_path = os.environ.get("LD_LIBRARY_PATH", "")
-                env = os.environ.copy()
-                env["LD_LIBRARY_PATH"] = f"{dvd_dir}{os.pathsep}{current_ld_path}" if current_ld_path else str(dvd_dir)
-                return str(dvd_cli), env
-        if self.mediainfo_config is None:
-            if base_dir is None:
-                return None
-            self.mediainfo_config = find_dvd_mediainfo(base_dir)
-
-        if self.mediainfo_config and self.mediainfo_config["cli"]:
-            return str(self.mediainfo_config["cli"]), os.environ.copy()
-        return None
 
     @holds_slot("bdinfo", "BDInfo disc scan")
     async def _run_bdinfo_with_progress(self, command: list[str], progress_id: str) -> int:
@@ -616,10 +588,7 @@ class DiscParse:
     Parse VIDEO_TS and get mediainfos
     """
 
-    async def get_dvdinfo(self, discs: list[dict[str, Any]], base_dir: str | None = None) -> list[dict[str, Any]]:
-        mediainfo_config = self.setup_mediainfo_for_dvd(base_dir)
-        mediainfo_binary, mediainfo_env = mediainfo_config if mediainfo_config else (None, None)
-
+    async def get_dvdinfo(self, discs: list[dict[str, Any]]) -> list[dict[str, Any]]:
         for each in discs:
             path = each.get("path")
             if not isinstance(path, str) or not path:
@@ -640,28 +609,7 @@ class DiscParse:
                 try:
                     ifo_file = f"VTS_{vob_set[0][:2]}_0.IFO"
 
-                    try:
-                        if mediainfo_binary:
-                            process = await asyncio.create_subprocess_exec(
-                                mediainfo_binary, "--Output=JSON", ifo_file, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, env=mediainfo_env, cwd=disc_path
-                            )
-                            stdout, stderr = await process.communicate()
-
-                            if process.returncode == 0 and stdout:
-                                vob_set_mi = stdout.decode()
-                            else:
-                                logger.info(f"[yellow]Specialized MediaInfo failed for {ifo_file}, falling back to standard[/yellow]")
-                                if stderr:
-                                    logger.info(f"[red]MediaInfo stderr: {stderr.decode()}[/red]")
-                                vob_set_mi = MediaInfo.parse(str(disc_path / ifo_file), output="JSON")
-                        else:
-                            vob_set_mi = MediaInfo.parse(str(disc_path / ifo_file), output="JSON")
-
-                    except Exception as e:
-                        logger.info(f"[yellow]Error with DVD MediaInfo binary for JSON: {e!s}")
-                        # Fall back to standard MediaInfo
-                        vob_set_mi = MediaInfo.parse(str(disc_path / ifo_file), output="JSON")
-
+                    vob_set_mi = MediaInfo.parse(str(disc_path / ifo_file), output="JSON")
                     vob_set_mi = json.loads(vob_set_mi)
                     tracks = vob_set_mi.get("media", {}).get("track", [])
 
@@ -686,74 +634,19 @@ class DiscParse:
                     main_set = vob_set
                     main_set_duration = vob_set_duration_float
 
+            if not main_set:
+                raise RuntimeError(f"MediaInfo reported no usable duration for any VOB set in {disc_path}")
             each["main_set"] = main_set
             set = main_set[0][:2]
             each["vob"] = vob = str(disc_path / f"VTS_{set}_1.VOB")
             each["ifo"] = ifo = str(disc_path / f"VTS_{set}_0.IFO")
 
-            # Use basenames for mediainfo processing to avoid full paths in output
-            vob_basename = Path(vob).name
-            ifo_basename = Path(ifo).name
-
-            try:
-                # Process VOB file
-                try:
-                    if mediainfo_binary:
-                        process = await asyncio.create_subprocess_exec(
-                            mediainfo_binary, vob_basename, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, env=mediainfo_env, cwd=disc_path
-                        )
-                        stdout, stderr = await process.communicate()
-
-                        if process.returncode == 0 and stdout:
-                            vob_mi_output = stdout.decode().replace("\r\n", "\n")
-                        else:
-                            logger.info("[yellow]Specialized MediaInfo failed for VOB, falling back[/yellow]")
-                            if stderr:
-                                logger.info(f"[red]MediaInfo stderr: {stderr.decode()}[/red]")
-                            vob_mi_output = MediaInfo.parse(vob, output="STRING", full=False).replace("\r\n", "\n")
-                    else:
-                        vob_mi_output = MediaInfo.parse(vob, output="STRING", full=False).replace("\r\n", "\n")
-                except Exception as e:
-                    logger.info(f"[yellow]Error with DVD MediaInfo binary for VOB: {e!s}")
-                    vob_mi_output = MediaInfo.parse(vob, output="STRING", full=False).replace("\r\n", "\n")
-
-                # Store VOB mediainfo (same output for both keys)
-                each["vob_mi"] = vob_mi_output
-                each["vob_mi_full"] = vob_mi_output
-
-                # Process IFO file
-                try:
-                    if mediainfo_binary:
-                        process = await asyncio.create_subprocess_exec(
-                            mediainfo_binary, ifo_basename, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, env=mediainfo_env, cwd=disc_path
-                        )
-                        stdout, stderr = await process.communicate()
-
-                        if process.returncode == 0 and stdout:
-                            ifo_mi_output = stdout.decode().replace("\r\n", "\n")
-                        else:
-                            logger.info("[yellow]Specialized MediaInfo failed for IFO, falling back[/yellow]")
-                            if stderr:
-                                logger.info(f"[red]MediaInfo stderr: {stderr.decode()}[/red]")
-                            ifo_mi_output = MediaInfo.parse(ifo, output="STRING", full=False).replace("\r\n", "\n")
-                    else:
-                        ifo_mi_output = MediaInfo.parse(ifo, output="STRING", full=False).replace("\r\n", "\n")
-                except Exception as e:
-                    logger.info(f"[yellow]Error with DVD MediaInfo binary for IFO: {e!s}")
-                    ifo_mi_output = MediaInfo.parse(ifo, output="STRING", full=False).replace("\r\n", "\n")
-
-                each["ifo_mi"] = ifo_mi_output
-                each["ifo_mi_full"] = ifo_mi_output
-
-            except Exception as e:
-                logger.info(f"[yellow]Error using DVD MediaInfo binary, falling back to standard: {e}")
-                # Fallback to standard MediaInfo using basenames
-                vob_mi_output = MediaInfo.parse(vob, output="STRING", full=False).replace("\r\n", "\n")
-                ifo_mi_output = MediaInfo.parse(ifo, output="STRING", full=False).replace("\r\n", "\n")
-                each["vob_mi"] = vob_mi_output
-                each["ifo_mi"] = ifo_mi_output
-                each["vob_mi_full"] = vob_mi_output
-                each["ifo_mi_full"] = ifo_mi_output
+            vob_mi_output = MediaInfo.parse(vob, output="STRING", full=False).replace("\r\n", "\n")
+            ifo_mi_output = MediaInfo.parse(ifo, output="STRING", full=False).replace("\r\n", "\n")
+            each["vob_mi"] = vob_mi_output
+            each["ifo_mi"] = ifo_mi_output
+            each["vob_mi_full"] = vob_mi_output
+            each["ifo_mi_full"] = ifo_mi_output
 
             for key in ("vob_mi", "ifo_mi", "vob_mi_full", "ifo_mi_full"):
                 each[key] = each[key].replace(str(disc_path) + os.sep, "")
