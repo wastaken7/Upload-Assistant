@@ -157,6 +157,28 @@ def test_btn_uploaded_release_lookup_matches_cleaned_name_and_falls_back_to_grou
     assert asyncio.run(btn._uploaded_torrent_id("Show S01E01 1080p WEB-DL DDP 5.1 Atmos x265-GRP", "123", Meta(category="TV"))) == "300"  # noqa: S101
 
 
+def test_btn_uploaded_release_lookup_falls_back_to_release_name_and_tvdb(monkeypatch) -> None:
+    calls: list[dict[str, object]] = []
+
+    async def fake_api(_method: str, params: dict[str, object]) -> dict[str, object]:
+        calls.append(params["search"])
+        if params["search"] == {"release": "%Show.S01E01.1080p-GRP%", "tvdb": "42"}:
+            return {
+                "result": {
+                    "torrents": {
+                        "500": {"GroupID": "999", "ReleaseName": "Show.S01E01.1080p-GRP"},
+                    }
+                }
+            }
+        return {"result": {"results": "0"}}
+
+    btn = tracker()
+    monkeypatch.setattr(btn, "_api", fake_api)
+
+    assert asyncio.run(btn._uploaded_torrent_id("Show.S01E01.1080p-GRP", "wrong_id", Meta(category="TV", tvdb_id=42))) == "500"  # noqa: S101
+    assert {"release": "%Show.S01E01.1080p-GRP%", "tvdb": "42"} in calls  # noqa: S101
+
+
 def test_btn_api_sends_named_search_parameters(monkeypatch) -> None:
     requests: list[dict[str, object]] = []
 
@@ -243,3 +265,60 @@ def test_btn_api_reports_ip_authorization_hint(monkeypatch) -> None:
 def test_btn_rejects_bencoded_error_instead_of_seeding_it() -> None:
     with pytest.raises(UploadError, match="invalid torrent"):
         tracker()._registered_torrent(b"d5:error14:login requirede")
+
+
+def test_btn_get_name_uses_disambiguation_from_btn_series_name(monkeypatch) -> None:
+    btn = tracker()
+
+    async def fake_get_series_name(_meta: Meta) -> str:
+        return "The Office (US)"
+
+    monkeypatch.setattr(btn, "get_series_name", fake_get_series_name)
+    meta = Meta(name="The Office 2005 S01E01 1080p WEB-DL DDP 5.1 x264-GRP", title="The Office", year=2005, resolution="1080p", tag="-GRP")
+
+    assert asyncio.run(btn.get_name(meta)) == "The.Office.US.S01E01.1080p.WEB-DL.DDP5.1.x264-GRP"  # noqa: S101
+
+
+def test_btn_get_name_removes_year_when_btn_series_has_no_year(monkeypatch) -> None:
+    btn = tracker()
+
+    async def fake_get_series_name(_meta: Meta) -> str:
+        return "Breaking Bad"
+
+    monkeypatch.setattr(btn, "get_series_name", fake_get_series_name)
+    meta = Meta(name="Breaking Bad 2008 S01E01 1080p WEB-DL DDP 5.1 x264-GRP", title="Breaking Bad", year=2008, resolution="1080p", tag="-GRP")
+
+    assert asyncio.run(btn.get_name(meta)) == "Breaking.Bad.S01E01.1080p.WEB-DL.DDP5.1.x264-GRP"  # noqa: S101
+
+
+def test_btn_get_name_preserves_year_when_btn_series_has_year(monkeypatch) -> None:
+    btn = tracker()
+
+    async def fake_get_series_name(_meta: Meta) -> str:
+        return "Doctor Who (2005)"
+
+    monkeypatch.setattr(btn, "get_series_name", fake_get_series_name)
+    meta = Meta(name="Doctor Who 2005 S01E01 1080p WEB-DL DDP 5.1 x264-GRP", title="Doctor Who", year=2005, resolution="1080p", tag="-GRP")
+
+    assert asyncio.run(btn.get_name(meta)) == "Doctor.Who.2005.S01E01.1080p.WEB-DL.DDP5.1.x264-GRP"  # noqa: S101
+
+
+def test_btn_get_series_name_fetches_and_caches(monkeypatch) -> None:
+    api_calls = 0
+
+    async def fake_api(method: str, params: dict[str, object]) -> dict[str, object]:
+        nonlocal api_calls
+        api_calls += 1
+        assert method == "getTorrents"  # noqa: S101
+        assert params["search"] == {"tvdb": "73244"}  # noqa: S101
+        return {"result": {"torrents": {"1": {"Series": "The Office (US)"}}}}
+
+    btn = tracker()
+    monkeypatch.setattr(btn, "_api", fake_api)
+    meta = Meta(tvdb_id=73244)
+
+    assert asyncio.run(btn.get_series_name(meta)) == "The Office (US)"  # noqa: S101
+    assert asyncio.run(btn.get_series_name(meta)) == "The Office (US)"  # noqa: S101
+    assert api_calls == 1  # noqa: S101
+
+

@@ -402,6 +402,7 @@ class BroadcasTheNet:
         self.api_url = str(self.settings.get("api_url") or self.api_url).strip()
         self.base_url = str(self.settings.get("base_url") or self.base_url).rstrip("/")
         self.upload_url = f"{self.base_url}/upload.php"
+        self._series_cache: dict[str, str] = {}
 
     async def edit_desc(self, _meta: Meta) -> None:
         # BTN consumes MediaInfo in release_desc; it does not use UA's generic description.
@@ -412,6 +413,37 @@ class BroadcasTheNet:
             logger.info(f"{self.tracker}: [red]BTN requires a TVDB or IMDb ID.[/red]")
             return False
         return True
+
+    async def get_series_name(self, meta: Meta) -> str | None:
+        cache_key = f"{meta.tvdb_id}_{meta.imdb_id}"
+        if cache_key in self._series_cache:
+            return self._series_cache[cache_key] or None
+
+        if not self.api_key:
+            return None
+
+        filters: dict[str, Any] = {}
+        if int(meta.tvdb_id or 0):
+            filters["tvdb"] = str(meta.tvdb_id)
+        elif int(meta.imdb_id or 0):
+            filters["imdb"] = str(meta.imdb_id)
+        if not filters:
+            return None
+
+        series_name: str | None = None
+        try:
+            result = await self._api("getTorrents", {"search": filters, "results": 1, "offset": 0})
+            payload = result.get("result")
+            torrents = payload.get("torrents") if isinstance(payload, dict) else None
+            if isinstance(torrents, dict) and torrents:
+                first = next(iter(torrents.values()))
+                if isinstance(first, dict):
+                    series_name = str(first.get("Series") or "").strip() or None
+        except Exception as exc:
+            logger.debug(f"{self.tracker}: Could not fetch series name from BTN: {exc}")
+
+        self._series_cache[cache_key] = series_name or ""
+        return series_name
 
     async def validate_credentials(self, meta: Meta) -> bool:
         cookie_file = self._cookie_file(meta)
@@ -463,6 +495,15 @@ class BroadcasTheNet:
         name = re.sub(r"(?i)\.(avi|mkv|mp4|ts|m4v|m2ts|wmv|mpeg|mpg|vob)$", "", name)
         name = self._clean_name(name)
         if not meta.scene_name:
+            series_name = await self.get_series_name(meta)
+            if series_name:
+                clean_series = self._clean_name(series_name)
+                title = self._clean_name(str(meta.title or ""))
+                year = str(meta.year or "").strip()
+                if title:
+                    pattern = rf"^{re.escape(title)}(?:\.{re.escape(year)})?(?=\.|$)"
+                    name = re.sub(pattern, clean_series, name, count=1, flags=re.I)
+
             aka = self._clean_name(str(meta.aka or ""))
             if aka:
                 name = re.sub(rf"(?i)(?:^|\.){re.escape(aka)}(?=\.|$)", ".", name, count=1)
@@ -730,7 +771,7 @@ class BroadcasTheNet:
                 "type": upload_type,
                 "tvdb": "Get Info",
                 "scene_yesno": "No",
-                "auto_series": str(meta.title),
+                "auto_series": (await self.get_series_name(meta)) or str(meta.title),
             }
             if upload_type == "Episode":
                 autofill_data["auto_title"] = f"S{int(meta.season_int or 0):02d}E{int(meta.episode_int or 0):02d}"
