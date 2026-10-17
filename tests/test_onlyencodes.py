@@ -41,7 +41,13 @@ def test_onlyencodes_keeps_tmdb_title_and_year(category: str, episode: str, aka:
         name=name,
         imdb_info={"title": "IMDb Moon", "aka": "Original Moon", "year": 2024},
         resolution="1080p",
-        tag="FictionalGroup",
+        source="WEB",
+        audio="DDP 5.1",
+        video_encode="H.264",
+        season="S01" if episode else "",
+        episode="E02" if episode else "",
+        search_year="2025",
+        tag="-FictionalGroup",
         audio_languages=["English"],
         language_checked=True,
     )
@@ -140,91 +146,88 @@ def test_onlyencodes_medium_screenshot_bbcode_links_to_full_image() -> None:
     )
 
 
-def test_onlyencodes_adds_resolution_before_ds4k() -> None:
-    meta = Meta(
-        category="MOVIE",
-        type="WEBRIP",
-        resolution="1080p",
-        basename_no_ext="Movie.Title.2025.1080p.DS4K.WEBRip.DDP5.1.x265-RlsGrp",
-        name="Movie Title 2025 1080p WEBRip DDP 5.1 x265-RlsGrp",
-        tag="RlsGrp",
-        audio_languages=["English"],
-        language_checked=True,
-    )
+def _movie(**overrides: object) -> Meta:
+    fields: dict[str, object] = {
+        "category": "MOVIE",
+        "type": "WEBRIP",
+        "title": "Movie Title",
+        "year": 2025,
+        "resolution": "1080p",
+        "source": "WEB",
+        "audio": "DDP 5.1",
+        "video_codec": "HEVC",
+        "video_encode": "x265",
+        "tag": "-RlsGrp",
+        "basename_no_ext": "Movie.Title.2025.1080p.WEBRip.DDP5.1.x265-RlsGrp",
+        "audio_languages": ["English"],
+        "original_language": "en",
+        "language_checked": True,
+    }
+    fields.update(overrides)
+    return Meta(**fields)
+
+
+def test_onlyencodes_adds_ds4k_after_resolution() -> None:
+    meta = _movie(basename_no_ext="Movie.Title.2025.1080p.DS4K.WEBRip.DDP5.1.x265-RlsGrp")
 
     assert _name(meta) == "Movie Title 2025 1080p DS4K WEBRip DDP 5.1 x265-RlsGrp"
 
 
-def test_onlyencodes_adds_resolution_before_rm4k() -> None:
-    meta = Meta(
-        category="MOVIE",
-        type="ENCODE",
-        resolution="1080p",
-        basename_no_ext="Movie.Title.2025.1080p.RM4K.BluRay.x264-RlsGrp",
-        name="Movie Title 2025 1080p BluRay x264-RlsGrp",
-        tag="RlsGrp",
-        audio_languages=["English"],
-        language_checked=True,
-    )
+def test_onlyencodes_adds_rm4k_after_resolution() -> None:
+    meta = _movie(type="ENCODE", source="BluRay", audio="", basename_no_ext="Movie.Title.2025.1080p.RM4K.BluRay.x264-RlsGrp", video_encode="x264")
 
     assert _name(meta) == "Movie Title 2025 1080p RM4K BluRay x264-RlsGrp"
 
 
-def test_onlyencodes_fixes_ds4k_without_resolution() -> None:
-    meta = Meta(
-        category="MOVIE",
-        type="WEBRIP",
-        resolution="1080p",
-        basename_no_ext="Movie.Title.2025.1080p.DS4K.WEBRip.DDP5.1.x265-RlsGrp",
-        name="Movie Title 2025 DS4K WEBRip DDP 5.1 x265-RlsGrp",
-        tag="RlsGrp",
-        audio_languages=["English"],
-        language_checked=True,
-    )
-
-    assert _name(meta) == "Movie Title 2025 1080p DS4K WEBRip DDP 5.1 x265-RlsGrp"
-
-
-def test_onlyencodes_does_not_duplicate_existing_resolution_ds4k() -> None:
-    meta = Meta(
-        category="MOVIE",
-        type="WEBRIP",
-        resolution="1080p",
-        basename_no_ext="Movie.Title.2025.1080p.DS4K.WEBRip.DDP5.1.x265-RlsGrp",
-        name="Movie Title 2025 1080p DS4K WEBRip DDP 5.1 x265-RlsGrp",
-        tag="RlsGrp",
-        audio_languages=["English"],
-        language_checked=True,
-    )
-
-    assert _name(meta) == "Movie Title 2025 1080p DS4K WEBRip DDP 5.1 x265-RlsGrp"
-
-
 def test_onlyencodes_normal_name_without_scale_tag() -> None:
-    meta = Meta(
-        category="MOVIE",
-        type="WEBRIP",
-        resolution="1080p",
-        basename_no_ext="Movie.Title.2025.1080p.WEBRip.DDP5.1.x265-RlsGrp",
-        name="Movie Title 2025 1080p WEBRip DDP 5.1 x265-RlsGrp",
-        tag="RlsGrp",
-        audio_languages=["English"],
-        language_checked=True,
-    )
-
-    assert _name(meta) == "Movie Title 2025 1080p WEBRip DDP 5.1 x265-RlsGrp"
+    assert _name(_movie()) == "Movie Title 2025 1080p WEBRip DDP 5.1 x265-RlsGrp"
 
 
 def test_onlyencodes_foreign_language_with_ds4k() -> None:
-    meta = Meta(
-        category="MOVIE",
-        type="WEBRIP",
-        resolution="1080p",
-        basename_no_ext="Movie.Title.2025.1080p.DS4K.WEBRip.DDP5.1.x265-RlsGrp",
-        name="Movie Title 2025 1080p WEBRip DDP 5.1 x265-RlsGrp",
-        tag="RlsGrp",
-        audio_languages=["French"],
-        language_checked=True,
-    )
+    meta = _movie(basename_no_ext="Movie.Title.2025.1080p.DS4K.WEBRip.DDP5.1.x265-RlsGrp", audio_languages=["French"], original_language="fr")
 
     assert _name(meta) == "Movie Title 2025 FRENCH 1080p DS4K WEBRip DDP 5.1 x265-RlsGrp"
+
+
+def test_onlyencodes_places_language_after_episode_and_before_cut() -> None:
+    meta = _movie(
+        category="TV",
+        title="Show Title",
+        season="S01",
+        episode="E02",
+        search_year="",
+        edition="Extended",
+        audio_languages=["Spanish"],
+        original_language="es",
+    )
+
+    assert _name(meta) == "Show Title S01E02 SPANISH Extended 1080p WEBRip DDP 5.1 x265-RlsGrp"
+
+
+@pytest.mark.parametrize("tag", ["", "-NOGROUP", "-Unknown"])
+def test_onlyencodes_uses_nogrp_without_a_release_group(tag: str) -> None:
+    assert _name(_movie(tag=tag)) == "Movie Title 2025 1080p WEBRip DDP 5.1 x265-NOGRP"
+
+
+def test_onlyencodes_formats_dvdrip_without_resolution() -> None:
+    meta = _movie(type="DVDRIP", source="NTSC", resolution="480p", audio="DD 2.0", video_encode="x264")
+
+    assert _name(meta) == "Movie Title 2025 DVDRip DD 2.0 x264-RlsGrp"
+
+
+def test_onlyencodes_omits_resolution_and_codec_for_dvd_remux() -> None:
+    meta = _movie(type="REMUX", source="NTSC DVD", resolution="480i", audio="DD 2.0", video_codec="MPEG-2")
+
+    assert _name(meta) == "Movie Title 2025 NTSC DVD REMUX DD 2.0-RlsGrp"
+
+
+def test_onlyencodes_moves_edition_out_of_title() -> None:
+    meta = _movie(type="ENCODE", source="BluRay", edition="Special Edition 4K Remaster")
+
+    assert _name(meta) == "Movie Title 2025 Special Edition 1080p BluRay DDP 5.1 x265-RlsGrp"
+
+
+def test_onlyencodes_keeps_dual_audio_only_with_english_dub() -> None:
+    meta = _movie(audio="MULTI DDP 5.1", original_language="ja", audio_languages=["Japanese", "English", "French"])
+
+    assert _name(meta) == "Movie Title 2025 1080p WEBRip Dual-Audio DDP 5.1 x265-RlsGrp"

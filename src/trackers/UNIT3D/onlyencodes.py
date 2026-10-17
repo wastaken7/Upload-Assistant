@@ -1,18 +1,20 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-import re
-from typing import Any, cast
+from dataclasses import replace
+from typing import Any
 
 from src.console import logger
 from src.get_desc import DescriptionBuilder
-from src.languages import languages_manager
+from src.get_name import build_name_components
 from src.meta import Meta
 from src.rehostimages import ImageHostPolicy, RehostImagesManager
 from src.tracker_images import get_tracker_image_collection
 from src.trackers.common import Common
-from src.trackers.naming import add_incomplete_pack_marker
+from src.trackers.naming import BLU_NAME_RULES, add_incomplete_pack_marker, build_video_name
 from src.trackers.UNIT3D import UNIT3D
 
 Config = dict[str, Any]
+# OnlyEncodes adds the audio language after the season/episode when no English audio exists.
+ONLYENCODES_NAME_RULES = replace(BLU_NAME_RULES, language_slot="before_cut")
 
 
 class OnlyEncodes(UNIT3D):
@@ -227,48 +229,17 @@ class OnlyEncodes(UNIT3D):
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
         # Keep the TMDB title and year from the generated name for OnlyEncodes.
-        oe_name = meta.name
-        resolution = meta.resolution
-        video_encode = meta.video_encode
-        name_type = str(meta.type)
-        source = str(meta.source)
-        audio = meta.audio
-        video_codec = meta.video_codec
+        components = build_name_components(meta)
+        scale_source = meta.basename_no_ext.upper()
+        scale = "DS4K" if "DS4K" in scale_source else "RM4K" if "RM4K" in scale_source else ""
+        if scale and components.type in ("ENCODE", "WEBDL", "WEBRIP") and components.resolution:
+            components = replace(components, resolution=f"{components.resolution} {scale}")
 
-        if name_type == "DVDRIP":
-            if meta.category == "MOVIE":
-                oe_name = oe_name.replace(f"{source}{video_encode}", f"{resolution}", 1)
-                oe_name = oe_name.replace((audio), f"{audio}{video_encode}", 1)
-            else:
-                oe_name = oe_name.replace(f"{source}", f"{resolution}", 1)
-                oe_name = oe_name.replace(f"{video_codec}", f"{audio} {video_codec}", 1)
+        tag_lower = components.tag.lower()
+        if not components.tag or any(invalid_tag in tag_lower for invalid_tag in ("nogrp", "nogroup", "unknown", "-unk-")):
+            components = replace(components, tag="-NOGRP")
 
-        if not meta.audio_languages:
-            await languages_manager.process_desc_language(meta, tracker=self.tracker)
-        elif meta.audio_languages:
-            audio_languages_value = meta.audio_languages
-            audio_languages = cast(list[str], audio_languages_value) if isinstance(audio_languages_value, list) else []
-            if audio_languages and not await languages_manager.has_english_language(audio_languages) and meta.is_disc != "BDMV":
-                foreign_lang = str(audio_languages[0]).upper()
-                oe_name = oe_name.replace(f"{resolution}", f"{foreign_lang} {resolution}", 1)
-
-        uuid_value = meta.basename_no_ext
-        scale = "DS4K" if "DS4K" in uuid_value.upper() else "RM4K" if "RM4K" in uuid_value.upper() else ""
-        if name_type in ["ENCODE", "WEBDL", "WEBRIP"] and scale != "":
-            if scale not in oe_name:
-                if resolution and resolution in oe_name:
-                    oe_name = oe_name.replace(f"{resolution}", f"{resolution} {scale}", 1)
-            elif resolution and f"{resolution} {scale}" not in oe_name:
-                oe_name = oe_name.replace(scale, f"{resolution} {scale}", 1)
-
-        tag_value = meta.tag or ""
-        tag_lower = tag_value.lower()
-        invalid_tags = ["nogrp", "nogroup", "unknown", "-unk-"]
-        if tag_value == "" or any(invalid_tag in tag_lower for invalid_tag in invalid_tags):
-            for invalid_tag in invalid_tags:
-                oe_name = re.sub(f"-{invalid_tag}", "", oe_name, flags=re.IGNORECASE)
-            oe_name = f"{oe_name}-NOGRP"
-
+        oe_name = await build_video_name(meta, ONLYENCODES_NAME_RULES, self.tracker, components) or meta.name
         return {"name": add_incomplete_pack_marker(oe_name, meta, self.tracker)}
 
     async def get_type_id(self, meta: Meta, type: str | None = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:

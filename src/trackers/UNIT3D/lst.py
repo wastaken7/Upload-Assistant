@@ -1,15 +1,18 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import re
+from dataclasses import replace
 from typing import Any
 
 from src.console import logger
 from src.meta import Meta
 from src.music.sources import DiscogsEnricher
 from src.trackers.common import Common
-from src.trackers.naming import add_incomplete_pack_marker
+from src.trackers.naming import BLU_NAME_RULES, add_incomplete_pack_marker, build_video_name
 from src.trackers.UNIT3D import UNIT3D
 
 Config = dict[str, Any]
+# The LST templates have no Edition slot, not even for full discs.
+LST_NAME_RULES = replace(BLU_NAME_RULES, keep_edition_on_discs=False)
 
 
 class LST(UNIT3D):
@@ -176,19 +179,7 @@ class LST(UNIT3D):
         if meta.category == "BOOK":
             return {"name": self._append_trump(self._book_name(meta), meta)}
 
-        lst_name = meta.name
-        resolution = meta.resolution
-        video_encode = meta.video_encode
-        name_type = meta.type
-
-        if name_type == "DVDRIP":
-            if meta.category == "MOVIE":
-                lst_name = lst_name.replace(f"{meta.source}{meta.video_encode}", f"{resolution}", 1)
-                lst_name = lst_name.replace(meta.audio, f"{meta.audio}{video_encode}", 1)
-            else:
-                lst_name = lst_name.replace(str(meta.source), f"{resolution}", 1)
-                lst_name = lst_name.replace(meta.video_codec, f"{meta.audio} {meta.video_codec}", 1)
-
+        lst_name = await build_video_name(meta, LST_NAME_RULES, self.tracker) or meta.name
         if meta.trump_reason == "exact_match":
             lst_name = lst_name + " - TRUMP"
 
