@@ -940,8 +940,14 @@ class BroadcasTheNet:
                 group_id, torrent_id = self._upload_ids(str(response.url), response.text)
 
                 if not torrent_id:
-                    torrent_id = await self._uploaded_torrent_id(release_name, group_id, meta)
-                    group_id = meta.tracker_status.get(self.tracker, {}).get("group_id") or group_id
+                    try:
+                        torrent_id = await self._uploaded_torrent_id(release_name, group_id, meta)
+                        group_id = meta.tracker_status.get(self.tracker, {}).get("group_id") or group_id
+                    except UploadError:
+                        failure_path = work_dir / f"[{self.tracker}]BTN_upload_failure.html"
+                        async with aiofiles.open(failure_path, "w", encoding="utf-8") as f:
+                            await f.write(response.text)
+                        raise
 
                 if not group_id and not torrent_id:
                     failure_path = work_dir / f"[{self.tracker}]BTN_upload_failure.html"

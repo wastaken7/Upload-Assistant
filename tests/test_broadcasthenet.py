@@ -471,3 +471,63 @@ def test_btn_uploaded_torrent_id_falls_back_to_newest_group_candidate_after_all_
     result = asyncio.run(btn._uploaded_torrent_id("Show.S01E01.1080p-GRP", "123", meta))
     assert result == "100"  # noqa: S101
     assert meta.tracker_status["BROADCASTHENET"]["group_id"] == "123"  # noqa: S101
+
+
+def test_btn_upload_saves_failure_html_when_torrent_id_lookup_fails(monkeypatch, tmp_path) -> None:
+    work_dir = tmp_path / "tmp" / "uuid-123"
+    work_dir.mkdir(parents=True)
+    torrent_file = work_dir / "[BROADCASTHENET].torrent"
+    torrent_file.write_bytes(b"d8:announce3:url4:infod4:name4:showee")
+    mediainfo_file = work_dir / "MEDIAINFO_CLEANPATH.txt"
+    mediainfo_file.write_text("MediaInfo text", encoding="utf-8")
+    cookie_file = tmp_path / "cookies.txt"
+    cookie_file.write_text("cookie data", encoding="utf-8")
+
+    btn = tracker()
+    monkeypatch.setattr(btn, "_cookie_file", lambda _meta: str(cookie_file))
+
+    async def fake_create(*_args, **_kwargs) -> None:
+        pass
+
+    async def fake_parse(_f) -> dict[str, str]:
+        return {}
+
+    async def fake_name(_meta) -> str:
+        return "Show.S01E01.1080p-GRP"
+
+    async def fake_series(_meta) -> str:
+        return "Show"
+
+    monkeypatch.setattr(btn.common, "create_torrent_for_upload", fake_create)
+    monkeypatch.setattr(btn.common, "parse_cookie_file", fake_parse)
+    monkeypatch.setattr(btn, "get_name", fake_name)
+    monkeypatch.setattr(btn, "get_series_name", fake_series)
+    monkeypatch.setattr(btn, "_verify_autofill", lambda *args, **kwargs: [])
+
+    def mock_post(request: httpx.Request) -> httpx.Response:
+        content = request.content.decode("latin1", errors="ignore")
+        if "submit=true" in content or "file_input" in content:
+            return httpx.Response(200, text="<html>Upload rejected</html>", request=request)
+        return httpx.Response(
+            200,
+            text="<input name='artist' value='Show'><input name='title' value='S01E01'><input name='year' value='2020'>",
+            request=request,
+        )
+
+    transport = httpx.MockTransport(mock_post)
+    original_client = httpx.AsyncClient
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: original_client(transport=transport, **kwargs))
+
+    async def fake_lookup(*_args, **_kwargs) -> str:
+        raise UploadError("BTN did not return torrent ID", "red")
+
+    monkeypatch.setattr(btn, "_uploaded_torrent_id", fake_lookup)
+
+    meta = Meta(base_dir=str(tmp_path), uuid="uuid-123", title="Show", season_int=1, episode_int=1, year=2020)
+    meta.tracker_status = {btn.tracker: {}}
+
+    success = asyncio.run(btn.upload(meta))
+    assert success is False  # noqa: S101
+    failure_file = work_dir / f"[{btn.tracker}]BTN_upload_failure.html"
+    assert failure_file.exists()  # noqa: S101
+    assert failure_file.read_text(encoding="utf-8") == "<html>Upload rejected</html>"  # noqa: S101
