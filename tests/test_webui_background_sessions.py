@@ -118,9 +118,21 @@ def start_session(tmp_path, monkeypatch):
         process.exit(0)
     # Session threads must finish before this test's patches are undone; a late
     # one would otherwise run against the next test's state.
+    _join_session_threads()
+
+
+def _join_session_threads() -> None:
     for thread in threading.enumerate():
         if thread.name.startswith("webui-session-"):
             thread.join(timeout=10)
+
+
+def _warm_up(start_session) -> None:
+    """Install the session fixture patches, then wait until the warm-up session has fully finished."""
+    start_session("warm-up")[0].exit(0)
+    # Its thread releases the session's queue file when it ends; finishing first keeps that
+    # call out of patches the test installs afterwards.
+    _join_session_threads()
 
 
 def test_closed_tab_keeps_upload_running_and_reattach_replays_missed_output(start_session) -> None:
@@ -319,7 +331,7 @@ def _post_execute(session_id: str, *, schedule: bool) -> list[dict[str, object]]
 
 
 def test_full_slots_schedule_the_upload_and_a_free_slot_starts_it(start_session, tmp_path, monkeypatch) -> None:
-    start_session("warm-up")[0].exit(0)  # installs the session fixture patches
+    _warm_up(start_session)
     busy = _occupy_all_slots(tmp_path)
     monkeypatch.setattr(server, "active_processes", dict(busy))
     process = FakeProcess()
@@ -356,7 +368,7 @@ def test_full_slots_schedule_the_upload_and_a_free_slot_starts_it(start_session,
 
 
 def test_upload_is_refused_instead_of_scheduled_when_not_requested_or_keep_running_is_off(start_session, tmp_path, monkeypatch) -> None:
-    start_session("warm-up")[0].exit(0)
+    _warm_up(start_session)
     monkeypatch.setattr(server, "active_processes", _occupy_all_slots(tmp_path))
 
     assert _post_execute("plain", schedule=False)[0]["code"] == "capacity"
@@ -367,7 +379,7 @@ def test_upload_is_refused_instead_of_scheduled_when_not_requested_or_keep_runni
 
 
 def test_killing_a_scheduled_upload_cancels_it(start_session, tmp_path, monkeypatch) -> None:
-    start_session("warm-up")[0].exit(0)
+    _warm_up(start_session)
     monkeypatch.setattr(server, "active_processes", _occupy_all_slots(tmp_path))
     monkeypatch.setattr(server, "_webui_session_settings", lambda: (True, 0.0))
     assert _post_execute("cancel-me", schedule=True) == [{"type": "scheduled"}]
@@ -378,7 +390,7 @@ def test_killing_a_scheduled_upload_cancels_it(start_session, tmp_path, monkeypa
 
 
 def test_scheduling_queue_has_its_own_limit(start_session, tmp_path, monkeypatch) -> None:
-    start_session("warm-up")[0].exit(0)
+    _warm_up(start_session)
     sessions = _occupy_all_slots(tmp_path)
     for index in range(server.MAX_SCHEDULED_SESSIONS):
         sessions[f"waiting-{index}"] = {"content_paths": frozenset({str(tmp_path / f"Fictional Wait {index}")}), "scheduled": True}
@@ -390,7 +402,7 @@ def test_scheduling_queue_has_its_own_limit(start_session, tmp_path, monkeypatch
 
 
 def test_replacing_a_scheduled_session_releases_it(start_session, tmp_path, monkeypatch) -> None:
-    start_session("warm-up")[0].exit(0)
+    _warm_up(start_session)
     monkeypatch.setattr(server, "active_processes", _occupy_all_slots(tmp_path))
     monkeypatch.setattr(server, "_webui_session_settings", lambda: (True, 0.0))
     assert _post_execute("reused-id", schedule=True) == [{"type": "scheduled"}]

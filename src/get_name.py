@@ -2,6 +2,7 @@
 import re
 import sys
 from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
 
@@ -29,6 +30,90 @@ TRACKER_DISC_REQUIREMENTS = {
 }
 
 
+@dataclass(frozen=True)
+class NameComponents:
+    """Release-name fields shared by the generic name and tracker-specific templates."""
+
+    type: str
+    title: str
+    alt_title: str
+    year: str
+    resolution: str
+    audio: str
+    hardcoded_subs: str
+    service: str
+    season: str
+    episode: str
+    part: str
+    repack: str
+    three_d: str
+    tag: str
+    source: str
+    uhd: str
+    hdr: str
+    hybrid: str
+    episode_title: str
+    edition: str
+
+
+def _name_text(value: object) -> str:
+    return "" if value is None or value is False else str(value)
+
+
+def build_name_components(meta: Meta) -> NameComponents:
+    year = str(meta.year) if meta.year is not None else ""
+    manual_year_value = meta.manual_year
+    if manual_year_value is not None and manual_year_value > 0:
+        year = str(manual_year_value)
+    resolution = meta.resolution
+    if resolution == "OTHER":
+        resolution = ""
+    season = _name_text(meta.season)
+    episode = meta.episode
+    if meta.manual_episode_title:
+        episode_title = meta.manual_episode_title
+    elif meta.daily_episode_title:
+        episode_title = meta.daily_episode_title
+    else:
+        episode_title = ""
+    # Hybrid has its own slot (get_edition sets webdv whenever the edition names it).
+    edition = " ".join(re.sub(r"\bhybrid\b", " ", meta.edition, flags=re.IGNORECASE).split())
+
+    if meta.category == "TV":
+        year = str(meta.year) if (meta.year is not None and meta.search_year != "") else ""
+        if meta.manual_date:
+            # Ignore season and year for --daily flagged shows, just use manual date stored in episode_name
+            season = ""
+            episode = ""
+    if meta.no_season is True:
+        season = ""
+    if meta.no_year is True:
+        year = ""
+
+    return NameComponents(
+        type=str(meta.type).upper(),
+        title=meta.title,
+        alt_title="" if meta.no_aka is True else meta.aka,
+        year=year,
+        resolution=resolution,
+        audio=meta.audio,
+        hardcoded_subs="HC" if meta.hardcoded_subs else "",
+        service=_name_text(meta.service),
+        season=season,
+        episode=episode,
+        part=meta.part,
+        repack=meta.repack,
+        three_d=meta.three_d,
+        tag=meta.tag or "",
+        source=_name_text(meta.source),
+        uhd=_name_text(meta.uhd),
+        hdr=meta.hdr,
+        hybrid="Hybrid" if meta.webdv else "",
+        episode_title=episode_title,
+        edition=edition,
+    )
+
+
 class NameManager:
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
@@ -45,35 +130,27 @@ class NameManager:
                 meta.distributor = distributor
             if region and "SKIPPED" not in region:
                 meta.region = region
-        type = str(meta.type).upper()
-        title = meta.title
-        alt_title = meta.aka
-        year = str(meta.year) if meta.year is not None else ""
-        manual_year_value = meta.manual_year
-        if manual_year_value is not None and manual_year_value > 0:
-            year = str(manual_year_value)
-        resolution = meta.resolution
-        if resolution == "OTHER":
-            resolution = ""
-        audio = meta.audio
-        hardcoded_subs = "HC" if meta.hardcoded_subs else ""
-        service = str(meta.service)
-        season = str(meta.season)
-        episode = meta.episode
-        part = meta.part
-        repack = meta.repack
-        three_d = meta.three_d
-        tag = meta.tag or ""
-        source = str(meta.source)
-        uhd = str(meta.uhd)
-        hdr = meta.hdr
-        hybrid = "Hybrid" if meta.webdv else ""
-        if meta.manual_episode_title:
-            episode_title = meta.manual_episode_title
-        elif meta.daily_episode_title:
-            episode_title = meta.daily_episode_title
-        else:
-            episode_title = ""
+        components = build_name_components(meta)
+        type = components.type
+        title = components.title
+        alt_title = components.alt_title
+        year = components.year
+        resolution = components.resolution
+        audio = components.audio
+        hardcoded_subs = components.hardcoded_subs
+        service = components.service
+        season = components.season
+        episode = components.episode
+        part = components.part
+        repack = components.repack
+        three_d = components.three_d
+        tag = components.tag
+        source = components.source
+        uhd = components.uhd
+        hdr = components.hdr
+        hybrid = components.hybrid
+        episode_title = components.episode_title
+        edition = components.edition
         video_codec = ""
         video_encode = ""
         region = ""
@@ -87,22 +164,7 @@ class NameManager:
         else:
             video_codec = meta.video_codec
             video_encode = meta.video_encode
-        edition = meta.edition
-        if "hybrid" in edition.upper():
-            edition = edition.replace("Hybrid", "").strip()
 
-        if meta.category == "TV":
-            year = str(meta.year) if (meta.year is not None and meta.search_year != "") else ""
-            if meta.manual_date:
-                # Ignore season and year for --daily flagged shows, just use manual date stored in episode_name
-                season = ""
-                episode = ""
-        if meta.no_season is True:
-            season = ""
-        if meta.no_year is True:
-            year = ""
-        if meta.no_aka is True:
-            alt_title = ""
         if meta.debug:
             logger.debug("[cyan]get_name cat/type")
             logger.debug(f"CATEGORY: {meta.category}")

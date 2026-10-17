@@ -1,16 +1,30 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import re
+from dataclasses import replace
 from typing import Any, cast
 
 import cli_ui
 
 from src.console import logger
+from src.get_name import build_name_components
 from src.meta import Meta
 from src.trackers.common import Common
-from src.trackers.naming import add_incomplete_pack_marker
+from src.trackers.naming import BLU_EDITION_TERMS, VideoNameRules, add_incomplete_pack_marker, build_video_name
 from src.trackers.UNIT3D import UNIT3D
 
 Config = dict[str, Any]
+# OldToons uses English names only, keeps resolution and codec on DVDs, and spells the dub "Dual Audio".
+OLDTOONS_NAME_RULES = VideoNameRules(
+    english_dub_only=True,
+    keep_multi=True,
+    dual_audio_label="Dual Audio",
+    edition_terms=BLU_EDITION_TERMS,
+    dvd_resolution=True,
+    dvd_video_codec=True,
+    aka=False,
+    # OldToons always titles TV with the year the series debuted.
+    tv_year_from_tvdb=False,
+)
 
 
 class OldToonsWorld(UNIT3D):
@@ -172,45 +186,29 @@ class OldToonsWorld(UNIT3D):
         return {"type_id": type_id.get(type_value, "0")}
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
-        otw_name = meta.name
-        source = str(meta.source)
-        resolution = meta.resolution
-        aka = meta.aka
-        type = str(meta.type)
-        video_codec = meta.video_codec
-        if aka:
-            otw_name = otw_name.replace(f"{aka} ", "")
-        is_disc = str(meta.is_disc)
-        audio = meta.audio
-        if is_disc == "DVD" or (type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD")):
-            otw_name = otw_name.replace(source, f"{resolution} {source}", 1)
-            otw_name = otw_name.replace(audio, f"{video_codec} {audio}", 1)
-        if str(meta.category) == "TV":
-            years: list[int] = []
+        components = build_name_components(meta)
+        # OldToons titles TV with the year the series debuted.
+        if meta.category == "TV" and not meta.no_year and not components.year:
+            components = replace(components, year=self._series_year(meta))
 
-            tmdb_year = str(meta.year) if meta.year is not None else ""
-            if tmdb_year and tmdb_year.isdigit():
-                year = tmdb_year
-            else:
-                if tmdb_year and tmdb_year.isdigit():
-                    years.append(int(tmdb_year))
-
-                imdb_info = cast(dict[str, Any], meta.imdb_info)
-                imdb_year = imdb_info.get("year")
-                if imdb_year and str(imdb_year).isdigit():
-                    years.append(int(imdb_year))
-
-                tvdb_episode_data = meta.tvdb_episode_data
-                series_year = tvdb_episode_data.get("series_year")
-                if series_year and str(series_year).isdigit():
-                    years.append(int(series_year))
-                # Use the oldest year if any found, else empty string
-                year = str(min(years)) if years else ""
-            if not meta.no_year and not meta.search_year:
-                title = meta.title
-                otw_name = otw_name.replace(title, f"{title} {year}", 1)
-
+        otw_name = await build_video_name(meta, OLDTOONS_NAME_RULES, self.tracker, components) or meta.name
         return {"name": add_incomplete_pack_marker(otw_name, meta, self.tracker)}
+
+    @staticmethod
+    def _series_year(meta: Meta) -> str:
+        tmdb_year = str(meta.year) if meta.year is not None else ""
+        if tmdb_year.isdigit():
+            return tmdb_year
+
+        years: list[int] = []
+        imdb_year = cast(dict[str, Any], meta.imdb_info).get("year")
+        if imdb_year and str(imdb_year).isdigit():
+            years.append(int(imdb_year))
+        series_year = meta.tvdb_episode_data.get("series_year")
+        if series_year and str(series_year).isdigit():
+            years.append(int(series_year))
+        # Use the oldest year if any found, else empty string
+        return str(min(years)) if years else ""
 
     async def get_additional_data(self, meta: Meta) -> dict[str, Any]:
         data: dict[str, Any] = {
