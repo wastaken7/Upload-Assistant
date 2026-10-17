@@ -424,6 +424,15 @@ const renderBbcodePreview = (content) => {
   );
 };
 
+// Pointer coordinates are fractional under browser zoom or OS display scaling.
+// Keeping panel widths on whole device pixels stops right-aligned mask icons
+// from being resampled at a different sub-pixel offset on every resize step,
+// which made them appear to grow and shrink while dragging.
+const snapToDevicePixels = (width) => {
+  const ratio = window.devicePixelRatio || 1;
+  return Math.round(width * ratio) / ratio;
+};
+
 const getStoredSidebarWidth = (
   key,
   defaultWidth,
@@ -436,7 +445,7 @@ const getStoredSidebarWidth = (
     storedWidth >= minWidth &&
     storedWidth <= maxWidth
   ) {
-    return storedWidth;
+    return snapToDevicePixels(storedWidth);
   }
   return defaultWidth;
 };
@@ -1312,6 +1321,10 @@ const DescriptionIcon = () => (
   <LucideIcon name="text-initial" className="w-5 h-5" />
 );
 
+const MediaInfoIcon = () => (
+  <LucideIcon name="file-search" className="w-5 h-5" />
+);
+
 const PaletteIcon = () => <WebUiIcon name="palette" />;
 
 const SettingsIcon = () => <WebUiIcon name="config" />;
@@ -1689,6 +1702,16 @@ const DiscIcon = () => <WebUiIcon name="music" />;
 
 const PepperIcon = () => <WebUiIcon name="pepper" />;
 
+// The review grid groups frames by disc/playlist; navigation follows that order.
+const orderScreenshotsByGroup = (screenshots) =>
+  Object.values(
+    screenshots.reduce((groups, screenshot) => {
+      const group = screenshot.group || "main";
+      (groups[group] ||= []).push(screenshot);
+      return groups;
+    }, {}),
+  ).flat();
+
 const mediaIconForCategory = (category) => {
   switch (String(category || "").toUpperCase()) {
     case "MOVIE":
@@ -2045,6 +2068,11 @@ function AudionutsUAGUI() {
   const [coverAction, setCoverAction] = useState("");
   const coverRequestRef = useRef(0);
   const [expandedScreenshot, setExpandedScreenshot] = useState(null);
+  const [isScreenshotZoomed, setIsScreenshotZoomed] = useState(false);
+  const [expandedScreenshotSize, setExpandedScreenshotSize] = useState(null);
+  const [screenshotError, setScreenshotError] = useState("");
+  const [pendingDeleteScreenshot, setPendingDeleteScreenshot] = useState("");
+  const expandedScreenshotIndexRef = useRef(0);
   const themePaletteRef = useRef(null);
   const screenshotModalRef = useModalFocus(
     () => setExpandedScreenshot(null),
@@ -2056,6 +2084,15 @@ function AudionutsUAGUI() {
   }, [descriptionDirty]);
   const [isScreenshotReviewOpen, setIsScreenshotReviewOpen] = useState(false);
   const [isDescriptionReviewOpen, setIsDescriptionReviewOpen] = useState(false);
+  const [isMediaInfoOpen, setIsMediaInfoOpen] = useState(false);
+  const [executionMediaInfo, setExecutionMediaInfo] = useState(null);
+  const [mediaInfoStatus, setMediaInfoStatus] = useState("idle");
+  const [selectedMediaInfoKey, setSelectedMediaInfoKey] = useState("");
+  const [mediaInfoCopied, setMediaInfoCopied] = useState(false);
+  const mediaInfoTargetRef = useRef("");
+  // Desktop-only enlarged view of one review panel; the sidebar keeps showing
+  // the media preview meanwhile so a panel is never mounted twice.
+  const [expandedReviewPanel, setExpandedReviewPanel] = useState("");
   const [progressItems, setProgressItems] = useState(
     screenshotMode?.media.progress || [],
   );
@@ -3452,10 +3489,18 @@ function AudionutsUAGUI() {
       setCanAddExecutionScreenshot(false);
       setCoverAction("");
       setExpandedScreenshot(null);
+      setScreenshotError("");
+      setPendingDeleteScreenshot("");
       setIsScreenshotReviewOpen(false);
       setIsDescriptionReviewOpen(false);
+      setIsMediaInfoOpen(false);
+      setExpandedReviewPanel("");
+      setExecutionMediaInfo(null);
+      setMediaInfoStatus("idle");
       setActivePanel((panel) =>
-        ["screenshots", "description"].includes(panel) ? "main" : panel,
+        ["screenshots", "description", "mediainfo"].includes(panel)
+          ? "main"
+          : panel,
       );
       return undefined;
     }
@@ -3561,6 +3606,164 @@ function AudionutsUAGUI() {
     setCoverAction("");
   }, [executionPreview?.media_id]);
 
+  const isMediaInfoVisible = isMediaInfoOpen || activePanel === "mediainfo";
+  const mediaInfoLabel =
+    executionMediaInfo?.kind === "bdinfo" ? "BDInfo" : "MediaInfo";
+  // Hide review panels a category never produces. While the category is still
+  // unknown every button stays visible so nothing that will exist is hidden.
+  const executionCategory = String(
+    executionPreview?.category || "",
+  ).toUpperCase();
+  const showScreenshotsButton = !(
+    executionCategory === "MUSIC" ||
+    (executionCategory === "BOOK" && executionPreview?.audiobook)
+  );
+  const showMediaInfoButton = executionCategory !== "GAME";
+
+  useEffect(() => {
+    if (!showScreenshotsButton) {
+      setExpandedScreenshot(null);
+      setIsScreenshotReviewOpen(false);
+      setExpandedReviewPanel((panel) => (panel === "screenshots" ? "" : panel));
+      setActivePanel((panel) => (panel === "screenshots" ? "main" : panel));
+    }
+  }, [showScreenshotsButton]);
+
+  useEffect(() => {
+    if (!showMediaInfoButton) {
+      setIsMediaInfoOpen(false);
+      setExpandedReviewPanel((panel) => (panel === "mediainfo" ? "" : panel));
+      setActivePanel((panel) => (panel === "mediainfo" ? "main" : panel));
+    }
+  }, [showMediaInfoButton]);
+
+  useEffect(() => {
+    // Reports are large and rarely change, so load them only while the panel
+    // is visible and retry until the run has generated them.
+    if (screenshotMode || !isExecuting || !sessionId || !isMediaInfoVisible) {
+      return undefined;
+    }
+    let cancelled = false;
+    let timeoutId;
+    const controller = new AbortController();
+
+    const loadMediaInfo = async () => {
+      try {
+        const response = await apiFetch(
+          `${API_BASE}/execution_mediainfo?session_id=${encodeURIComponent(sessionId)}`,
+          { cache: "no-store", signal: controller.signal },
+        );
+        const data = await response.json().catch(() => null);
+        if (cancelled) return;
+        if (response.ok && data?.success && Array.isArray(data.reports)) {
+          setExecutionMediaInfo(data);
+          setMediaInfoStatus("ready");
+          setSelectedMediaInfoKey((key) =>
+            data.reports.some((report) => report.key === key)
+              ? key
+              : data.reports[0]?.key || "",
+          );
+          return;
+        }
+        setExecutionMediaInfo(null);
+        setMediaInfoStatus(response.status === 404 ? "pending" : "error");
+      } catch (_error) {
+        if (cancelled) return;
+        setMediaInfoStatus("error");
+      }
+      timeoutId = window.setTimeout(loadMediaInfo, 3000);
+    };
+
+    // Reopening the panel keeps the cached report; a different execution or
+    // file must not show (or copy) the previous release's report meanwhile.
+    const mediaInfoTarget = `${sessionId}\n${executionPreview?.path || ""}`;
+    if (mediaInfoTargetRef.current !== mediaInfoTarget) {
+      mediaInfoTargetRef.current = mediaInfoTarget;
+      setExecutionMediaInfo(null);
+      setMediaInfoStatus("loading");
+    } else {
+      setMediaInfoStatus((status) => (status === "ready" ? status : "loading"));
+    }
+    loadMediaInfo();
+
+    return () => {
+      cancelled = true;
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
+      }
+      controller.abort();
+    };
+  }, [
+    API_BASE,
+    isExecuting,
+    sessionId,
+    isMediaInfoVisible,
+    executionPreview?.path,
+  ]);
+
+  const closeReviewModal = () => {
+    // The screenshot lightbox handles its own Escape key first.
+    if (expandedScreenshot) return;
+    if (expandedReviewPanel === "description" && descriptionDirty) {
+      saveExecutionDescription();
+    }
+    setExpandedReviewPanel("");
+  };
+  const reviewModalRef = useModalFocus(
+    closeReviewModal,
+    Boolean(expandedReviewPanel),
+  );
+
+  useEffect(() => {
+    if (isMobile) setExpandedReviewPanel("");
+  }, [isMobile]);
+
+  const renderReviewExpandButton = (panel) => {
+    if (isMobile) return null;
+    const isExpanded = expandedReviewPanel === panel;
+    const label = isExpanded ? "Return to sidebar" : "Open in a larger view";
+    return (
+      <button
+        type="button"
+        onClick={() =>
+          isExpanded ? closeReviewModal() : setExpandedReviewPanel(panel)
+        }
+        className={`flex-none rounded-md p-2 transition-colors ${isDarkMode ? "text-gray-300 hover:bg-gray-700" : "text-gray-600 hover:bg-gray-100"}`}
+        title={label}
+        aria-label={label}
+      >
+        <LucideIcon
+          name={isExpanded ? "minimize-2" : "maximize-2"}
+          className="w-4 h-4"
+        />
+      </button>
+    );
+  };
+
+  const copyMediaInfoReport = async (content) => {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(content);
+      } else {
+        // navigator.clipboard only exists in secure contexts; plain-HTTP LAN access needs the legacy path.
+        const area = document.createElement("textarea");
+        area.value = content;
+        area.setAttribute("readonly", "");
+        area.style.position = "fixed";
+        area.style.opacity = "0";
+        document.body.appendChild(area);
+        area.select();
+        const copied = document.execCommand("copy");
+        area.remove();
+        if (!copied) throw new Error("Copy failed");
+      }
+      setMediaInfoCopied(true);
+      window.setTimeout(() => setMediaInfoCopied(false), 1500);
+    } catch (_error) {
+      setMediaInfoCopied(false);
+    }
+  };
+
   const refreshExecutionScreenshots = async () => {
     const refreshed = await apiFetch(
       `${API_BASE}/execution_screenshots?session_id=${encodeURIComponent(sessionId)}`,
@@ -3577,6 +3780,7 @@ function AudionutsUAGUI() {
   const changeExecutionScreenshot = async (screenshotId, action) => {
     if (!sessionId || screenshotActionId) return;
     setScreenshotActionId(`${action}:${screenshotId}`);
+    setScreenshotError("");
     try {
       const response = await apiFetch(
         `${API_BASE}/execution_screenshots/${encodeURIComponent(screenshotId)}/${action}`,
@@ -3588,13 +3792,13 @@ function AudionutsUAGUI() {
       );
       const data = await response.json().catch(() => null);
       if (!response.ok || !data?.success) {
-        window.alert(data?.error || `Could not ${action} screenshot.`);
+        setScreenshotError(data?.error || `Could not ${action} screenshot.`);
         return;
       }
       await refreshExecutionScreenshots();
     } catch (error) {
       console.error(`Could not ${action} screenshot:`, error);
-      window.alert(`Could not ${action} screenshot. Please try again.`);
+      setScreenshotError(`Could not ${action} screenshot. Please try again.`);
     } finally {
       setScreenshotActionId("");
     }
@@ -3637,6 +3841,7 @@ function AudionutsUAGUI() {
   const addExecutionScreenshot = async (group = "main") => {
     if (!sessionId || screenshotActionId || !canAddExecutionScreenshot) return;
     setScreenshotActionId("add");
+    setScreenshotError("");
     try {
       const response = await apiFetch(`${API_BASE}/execution_screenshots/add`, {
         method: "POST",
@@ -3645,27 +3850,65 @@ function AudionutsUAGUI() {
       });
       const data = await response.json().catch(() => null);
       if (!response.ok || !data?.success) {
-        window.alert(data?.error || "Could not add screenshot.");
+        setScreenshotError(data?.error || "Could not add screenshot.");
         return;
       }
       await refreshExecutionScreenshots();
     } catch (error) {
       console.error("Could not add screenshot:", error);
-      window.alert("Could not add screenshot. Please try again.");
+      setScreenshotError("Could not add screenshot. Please try again.");
     } finally {
       setScreenshotActionId("");
     }
   };
 
   useEffect(() => {
-    if (
-      expandedScreenshot &&
-      !executionScreenshots.some(
-        (screenshot) => screenshot.id === expandedScreenshot,
-      )
-    ) {
-      setExpandedScreenshot(null);
+    if (!expandedScreenshot) return;
+    const ordered = orderScreenshotsByGroup(executionScreenshots);
+    const index = ordered.findIndex(
+      (screenshot) => screenshot.id === expandedScreenshot,
+    );
+    if (index >= 0) {
+      expandedScreenshotIndexRef.current = index;
+      return;
     }
+    // Deleting a frame removes its ID; stay on the neighbour that took its
+    // place instead of closing the review.
+    const fallback =
+      ordered[Math.min(expandedScreenshotIndexRef.current, ordered.length - 1)];
+    setExpandedScreenshot(fallback ? fallback.id : null);
+  }, [executionScreenshots, expandedScreenshot]);
+
+  useEffect(() => {
+    setIsScreenshotZoomed(false);
+    setExpandedScreenshotSize(null);
+  }, [expandedScreenshot]);
+
+  useEffect(() => {
+    if (!pendingDeleteScreenshot) return undefined;
+    const timeoutId = window.setTimeout(
+      () => setPendingDeleteScreenshot(""),
+      4000,
+    );
+    return () => window.clearTimeout(timeoutId);
+  }, [pendingDeleteScreenshot]);
+
+  useEffect(() => {
+    if (!expandedScreenshot) return undefined;
+    const handleKeyDown = (event) => {
+      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+      if (event.target.closest?.("input, textarea, select")) return;
+      const ordered = orderScreenshotsByGroup(executionScreenshots);
+      const index = ordered.findIndex(
+        (screenshot) => screenshot.id === expandedScreenshot,
+      );
+      const next = ordered[index + (event.key === "ArrowRight" ? 1 : -1)];
+      if (index < 0 || !next) return;
+      event.preventDefault();
+      setExpandedScreenshot(next.id);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [executionScreenshots, expandedScreenshot]);
 
   // Update descfile in args
@@ -6005,9 +6248,11 @@ function AudionutsUAGUI() {
   const resize = useCallback(
     (e) => {
       const requestedWidth = e.clientX - APPLICATION_RAIL_WIDTH;
-      const newWidth = Math.min(
-        LEFT_SIDEBAR_MAX_WIDTH,
-        Math.max(DEFAULT_LEFT_SIDEBAR_WIDTH, requestedWidth),
+      const newWidth = snapToDevicePixels(
+        Math.min(
+          LEFT_SIDEBAR_MAX_WIDTH,
+          Math.max(DEFAULT_LEFT_SIDEBAR_WIDTH, requestedWidth),
+        ),
       );
       setSidebarWidth(newWidth);
       storage.set(LEFT_SIDEBAR_WIDTH_KEY, String(newWidth));
@@ -6039,9 +6284,11 @@ function AudionutsUAGUI() {
     (e) => {
       // Calculate width from right edge
       const requestedWidth = window.innerWidth - e.clientX;
-      const newWidth = Math.min(
-        RIGHT_SIDEBAR_MAX_WIDTH,
-        Math.max(DEFAULT_RIGHT_SIDEBAR_WIDTH, requestedWidth),
+      const newWidth = snapToDevicePixels(
+        Math.min(
+          RIGHT_SIDEBAR_MAX_WIDTH,
+          Math.max(DEFAULT_RIGHT_SIDEBAR_WIDTH, requestedWidth),
+        ),
       );
       setRightSidebarWidth(newWidth);
       storage.set(RIGHT_SIDEBAR_WIDTH_KEY, String(newWidth));
@@ -6346,23 +6593,31 @@ function AudionutsUAGUI() {
   };
 
   const renderDescriptionPanel = () => {
+    const isSplitView = expandedReviewPanel === "description";
+    const showEditor = isSplitView || descriptionView === "edit";
+    const showPreview = isSplitView || descriptionView === "preview";
     const sources = Array.isArray(executionDescription?.sources)
       ? executionDescription.sources
       : [];
     return (
       <div className="flex h-full flex-col">
         <div className="ua-upload-panel-header border-b p-3">
-          <h2
-            className={`text-base font-bold ${isDarkMode ? "text-white" : "text-gray-800"}`}
-          >
-            Description review
-          </h2>
-          <p
-            className={`mt-1 text-xs ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}
-          >
-            Edit the base description before tracker-specific formatting is
-            applied.
-          </p>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2
+                className={`text-base font-bold ${isDarkMode ? "text-white" : "text-gray-800"}`}
+              >
+                Description review
+              </h2>
+              <p
+                className={`mt-1 text-xs ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}
+              >
+                Edit the base description before tracker-specific formatting is
+                applied.
+              </p>
+            </div>
+            {renderReviewExpandButton("description")}
+          </div>
         </div>
         <div className="flex flex-1 min-h-0 flex-col gap-3 overflow-hidden p-3">
           <section
@@ -6400,7 +6655,7 @@ function AudionutsUAGUI() {
           <section className="flex min-h-[24rem] flex-1 flex-col">
             <div className="mb-2 flex items-center justify-between gap-3">
               <div
-                className={`inline-flex rounded-md p-1 ${isDarkMode ? "bg-gray-800" : "bg-gray-100"}`}
+                className={`inline-flex rounded-md p-1 ${isSplitView ? "invisible" : ""} ${isDarkMode ? "bg-gray-800" : "bg-gray-100"}`}
               >
                 {["edit", "preview"].map((view) => (
                   <button
@@ -6413,7 +6668,7 @@ function AudionutsUAGUI() {
                   </button>
                 ))}
               </div>
-              {descriptionView === "preview" && (
+              {showPreview && (
                 <span
                   className={`text-right text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
                 >
@@ -6422,68 +6677,77 @@ function AudionutsUAGUI() {
                 </span>
               )}
             </div>
-            {descriptionView === "edit" ? (
-              <>
-                <div
-                  role="toolbar"
-                  aria-label="Description formatting"
-                  className={`mb-2 flex flex-wrap gap-1 rounded-lg border p-1.5 ${isDarkMode ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-gray-50"}`}
-                >
-                  {[
-                    ["Bold", "B", "[b]", "[/b]"],
-                    ["Italic", "I", "[i]", "[/i]"],
-                    ["Underline", "U", "[u]", "[/u]"],
-                    ["Strikethrough", "S", "[s]", "[/s]"],
-                    ["Code", "Code", "[code]", "[/code]"],
-                    ["Quote", "Quote", "[quote]", "[/quote]"],
-                    ["Spoiler", "Spoiler", "[spoiler]", "[/spoiler]"],
-                    ["Align left", "Left", "[left]", "[/left]"],
-                    ["Align center", "Center", "[center]", "[/center]"],
-                    ["Align right", "Right", "[right]", "[/right]"],
-                  ].map(([label, text, openingTag, closingTag]) => (
-                    <button
-                      key={label}
-                      type="button"
-                      title={label}
-                      aria-label={label}
-                      onMouseDown={(event) => event.preventDefault()}
-                      onClick={() =>
-                        applyDescriptionBbcode(openingTag, closingTag)
-                      }
-                      className={`ua-accent-hover rounded px-2 py-1 text-xs font-semibold ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}
-                    >
-                      {text}
-                    </button>
-                  ))}
+            <div
+              className={
+                isSplitView
+                  ? "grid min-h-0 flex-1 grid-cols-2 gap-3"
+                  : "flex min-h-0 flex-1 flex-col"
+              }
+            >
+              {showEditor && (
+                <div className="flex min-h-0 flex-1 flex-col">
+                  <div
+                    role="toolbar"
+                    aria-label="Description formatting"
+                    className={`mb-2 flex flex-wrap gap-1 rounded-lg border p-1.5 ${isDarkMode ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-gray-50"}`}
+                  >
+                    {[
+                      ["Bold", "B", "[b]", "[/b]"],
+                      ["Italic", "I", "[i]", "[/i]"],
+                      ["Underline", "U", "[u]", "[/u]"],
+                      ["Strikethrough", "S", "[s]", "[/s]"],
+                      ["Code", "Code", "[code]", "[/code]"],
+                      ["Quote", "Quote", "[quote]", "[/quote]"],
+                      ["Spoiler", "Spoiler", "[spoiler]", "[/spoiler]"],
+                      ["Align left", "Left", "[left]", "[/left]"],
+                      ["Align center", "Center", "[center]", "[/center]"],
+                      ["Align right", "Right", "[right]", "[/right]"],
+                    ].map(([label, text, openingTag, closingTag]) => (
+                      <button
+                        key={label}
+                        type="button"
+                        title={label}
+                        aria-label={label}
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() =>
+                          applyDescriptionBbcode(openingTag, closingTag)
+                        }
+                        className={`ua-accent-hover rounded px-2 py-1 text-xs font-semibold ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}
+                      >
+                        {text}
+                      </button>
+                    ))}
+                  </div>
+                  <textarea
+                    ref={descriptionEditorRef}
+                    value={descriptionDraft}
+                    onChange={(event) => {
+                      descriptionVersionRef.current = Math.max(
+                        descriptionVersionRef.current,
+                        descriptionVersion,
+                      );
+                      setDescriptionDraft(event.target.value);
+                      setDescriptionDirty(true);
+                    }}
+                    onBlur={() => {
+                      if (descriptionDirty) saveExecutionDescription();
+                    }}
+                    spellCheck={false}
+                    aria-label="Base description"
+                    className={`min-h-[20rem] flex-1 resize-y rounded-lg border p-3 font-mono text-xs leading-5 ${isDarkMode ? "border-gray-700 bg-gray-950 text-gray-100" : "border-gray-300 bg-white text-gray-800"}`}
+                    placeholder="The editable base description will appear here."
+                  />
                 </div>
-                <textarea
-                  ref={descriptionEditorRef}
-                  value={descriptionDraft}
-                  onChange={(event) => {
-                    descriptionVersionRef.current = Math.max(
-                      descriptionVersionRef.current,
-                      descriptionVersion,
-                    );
-                    setDescriptionDraft(event.target.value);
-                    setDescriptionDirty(true);
+              )}
+              {showPreview && (
+                <div
+                  className={`bbcode-preview min-h-[20rem] flex-1 overflow-auto whitespace-pre-wrap rounded-lg border p-3 text-sm leading-6 [&_a]:text-sky-400 [&_a]:underline [&_blockquote]:my-3 [&_blockquote]:border-l-4 [&_blockquote]:pl-3 [&_details]:my-3 [&_img]:my-3 [&_img]:max-w-full [&_img]:rounded [&_pre]:overflow-auto [&_pre]:font-mono [&_table]:my-3 [&_table]:border-collapse [&_td]:border [&_td]:p-2 [&_th]:border [&_th]:p-2 ${isDarkMode ? "border-gray-700 bg-gray-950 text-gray-100 [&_td]:border-gray-700 [&_th]:border-gray-700" : "border-gray-300 bg-white text-gray-800 [&_td]:border-gray-300 [&_th]:border-gray-300"}`}
+                  dangerouslySetInnerHTML={{
+                    __html: renderBbcodePreview(descriptionDraft),
                   }}
-                  onBlur={() => {
-                    if (descriptionDirty) saveExecutionDescription();
-                  }}
-                  spellCheck={false}
-                  aria-label="Base description"
-                  className={`min-h-[20rem] flex-1 resize-y rounded-lg border p-3 font-mono text-xs leading-5 ${isDarkMode ? "border-gray-700 bg-gray-950 text-gray-100" : "border-gray-300 bg-white text-gray-800"}`}
-                  placeholder="The editable base description will appear here."
                 />
-              </>
-            ) : (
-              <div
-                className={`bbcode-preview min-h-[20rem] flex-1 overflow-auto whitespace-pre-wrap rounded-lg border p-3 text-sm leading-6 [&_a]:text-sky-400 [&_a]:underline [&_blockquote]:my-3 [&_blockquote]:border-l-4 [&_blockquote]:pl-3 [&_details]:my-3 [&_img]:my-3 [&_img]:max-w-full [&_img]:rounded [&_pre]:overflow-auto [&_pre]:font-mono [&_table]:my-3 [&_table]:border-collapse [&_td]:border [&_td]:p-2 [&_th]:border [&_th]:p-2 ${isDarkMode ? "border-gray-700 bg-gray-950 text-gray-100 [&_td]:border-gray-700 [&_th]:border-gray-700" : "border-gray-300 bg-white text-gray-800 [&_td]:border-gray-300 [&_th]:border-gray-300"}`}
-                dangerouslySetInnerHTML={{
-                  __html: renderBbcodePreview(descriptionDraft),
-                }}
-              />
-            )}
+              )}
+            </div>
             <div className="mt-2 flex items-center justify-between gap-3">
               <span
                 className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
@@ -6505,6 +6769,87 @@ function AudionutsUAGUI() {
     );
   };
 
+  const renderMediaInfoPanel = () => {
+    const reports = Array.isArray(executionMediaInfo?.reports)
+      ? executionMediaInfo.reports
+      : [];
+    const selectedReport =
+      reports.find((report) => report.key === selectedMediaInfoKey) ||
+      reports[0];
+    const emptyMessage =
+      mediaInfoStatus === "error"
+        ? "Could not load the report. Retrying…"
+        : mediaInfoStatus === "pending"
+          ? "The report has not been generated yet."
+          : "Loading…";
+    return (
+      <div className="flex h-full flex-col">
+        <div className="ua-upload-panel-header border-b p-3">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2
+                className={`text-base font-bold ${isDarkMode ? "text-white" : "text-gray-800"}`}
+              >
+                {mediaInfoLabel}
+              </h2>
+              <p
+                className={`mt-1 text-xs ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}
+              >
+                Read-only report generated for the current release.
+              </p>
+            </div>
+            {renderReviewExpandButton("mediainfo")}
+          </div>
+        </div>
+        <div className="flex flex-1 min-h-0 flex-col gap-3 overflow-hidden p-3">
+          {reports.length > 1 && (
+            <div className="overflow-x-auto pb-1">
+              <div
+                className={`inline-flex w-max rounded-md p-1 ${isDarkMode ? "bg-gray-800" : "bg-gray-100"}`}
+              >
+                {reports.map((report) => (
+                  <button
+                    key={report.key}
+                    onClick={() => setSelectedMediaInfoKey(report.key)}
+                    aria-pressed={selectedReport?.key === report.key}
+                    className={`whitespace-nowrap rounded px-3 py-1 text-xs font-semibold ${selectedReport?.key === report.key ? "ua-accent-action" : isDarkMode ? "text-gray-300 hover:bg-gray-700" : "text-gray-600 hover:bg-white"}`}
+                  >
+                    {report.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {selectedReport ? (
+            <>
+              <pre
+                aria-label={`${selectedReport.label} report`}
+                className={`min-h-[20rem] flex-1 overflow-auto whitespace-pre rounded-lg border p-3 font-mono text-xs leading-5 ${isDarkMode ? "border-gray-700 bg-gray-950 text-gray-100" : "border-gray-300 bg-white text-gray-800"}`}
+              >
+                {selectedReport.content}
+              </pre>
+              <div className="flex items-center justify-between gap-3">
+                <span
+                  className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                >
+                  {selectedReport.content.length.toLocaleString()} characters
+                </span>
+                <button
+                  onClick={() => copyMediaInfoReport(selectedReport.content)}
+                  className="ua-accent-action rounded-md px-3 py-1.5 text-xs font-semibold"
+                >
+                  {mediaInfoCopied ? "Copied" : "Copy"}
+                </button>
+              </div>
+            </>
+          ) : (
+            <p className="text-xs text-gray-500">{emptyMessage}</p>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   const renderScreenshotsPanel = () => {
     const isWorking = Boolean(screenshotActionId);
     const expandedItem = executionScreenshots.find(
@@ -6518,6 +6863,95 @@ function AudionutsUAGUI() {
       },
       {},
     );
+    const orderedScreenshots = orderScreenshotsByGroup(executionScreenshots);
+    const expandedIndex = expandedItem
+      ? orderedScreenshots.findIndex(
+          (screenshot) => screenshot.id === expandedItem.id,
+        )
+      : -1;
+    const previousScreenshot =
+      expandedIndex > 0 ? orderedScreenshots[expandedIndex - 1] : null;
+    const nextScreenshot =
+      expandedIndex >= 0 ? orderedScreenshots[expandedIndex + 1] : null;
+    const isGeneratingFrame =
+      screenshotActionId === "add" || screenshotActionId.startsWith("replace:");
+    const screenshotStateLabel = {
+      remote: "Remote",
+      replacement: "Replacement",
+      addition: "Added",
+    };
+    const renderScreenshotActions = (screenshot, inLightbox = false) => {
+      const replacing = screenshotActionId === `replace:${screenshot.id}`;
+      const deleting = screenshotActionId === `delete:${screenshot.id}`;
+      const undoing = screenshotActionId === `undo:${screenshot.id}`;
+      const confirmingDelete = pendingDeleteScreenshot === screenshot.id;
+      const neutralButtonClass = inLightbox
+        ? "bg-white/10 text-gray-100 hover:bg-white/20"
+        : isDarkMode
+          ? "bg-gray-700 text-gray-100 hover:bg-gray-600"
+          : "bg-gray-100 text-gray-700 hover:bg-gray-200";
+      return (
+        <>
+          {screenshot.can_replace && (
+            <button
+              type="button"
+              onClick={() =>
+                changeExecutionScreenshot(screenshot.id, "replace")
+              }
+              disabled={isWorking}
+              className="ua-accent-action px-2 py-1 text-xs rounded-md disabled:opacity-50"
+            >
+              {replacing ? "Generating…" : "Replace"}
+            </button>
+          )}
+          {screenshot.source === "replacement" && (
+            <button
+              type="button"
+              onClick={() => changeExecutionScreenshot(screenshot.id, "undo")}
+              disabled={isWorking}
+              className={`px-2 py-1 text-xs rounded-md disabled:opacity-50 ${neutralButtonClass}`}
+              title="Restore the original remote screenshot"
+              aria-label="Restore the original remote screenshot"
+            >
+              {undoing ? "Restoring…" : "Undo"}
+            </button>
+          )}
+          {screenshot.can_delete && (
+            <button
+              type="button"
+              onClick={() => {
+                if (confirmingDelete) {
+                  setPendingDeleteScreenshot("");
+                  changeExecutionScreenshot(screenshot.id, "delete");
+                } else {
+                  setPendingDeleteScreenshot(screenshot.id);
+                }
+              }}
+              disabled={isWorking}
+              className={`rounded-md disabled:opacity-50 ${confirmingDelete ? "bg-rose-600 px-2 py-1 text-xs font-semibold text-white hover:bg-rose-700" : `p-1.5 text-rose-500 ${inLightbox ? "hover:bg-white/10" : "hover:bg-rose-50 dark:hover:bg-rose-950/40"}`}`}
+              title={
+                confirmingDelete
+                  ? "Click again to delete"
+                  : `Delete ${screenshot.filename}`
+              }
+              aria-label={
+                confirmingDelete
+                  ? `Confirm deleting ${screenshot.filename}`
+                  : `Delete ${screenshot.filename}`
+              }
+            >
+              {deleting ? (
+                <SpinnerIcon />
+              ) : confirmingDelete ? (
+                "Confirm delete"
+              ) : (
+                <TrashIcon />
+              )}
+            </button>
+          )}
+        </>
+      );
+    };
     const screenshotGroupLabel = (group) => {
       if (group === "main") return "Main";
       return group.startsWith("PLAYLIST_")
@@ -6544,6 +6978,15 @@ function AudionutsUAGUI() {
                   Review frames before image hosting. Replacements use a
                   different point in the video.
                 </p>
+                {isGeneratingFrame && (
+                  <p
+                    className={`mt-1 flex items-center gap-1.5 text-xs font-semibold ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}
+                    role="status"
+                  >
+                    <SpinnerIcon />
+                    Generating a new frame…
+                  </p>
+                )}
               </div>
               <button
                 onClick={() => addExecutionScreenshot("main")}
@@ -6554,9 +6997,25 @@ function AudionutsUAGUI() {
               >
                 {screenshotActionId === "add" ? <SpinnerIcon /> : <PlusIcon />}
               </button>
+              {renderReviewExpandButton("screenshots")}
             </div>
           </div>
           <div className="flex-1 overflow-y-auto p-3">
+            {screenshotError && (
+              <div
+                className="mb-3 flex items-start justify-between gap-3 rounded-lg bg-rose-600 px-3 py-2 text-xs text-white"
+                role="alert"
+              >
+                <span>{screenshotError}</span>
+                <button
+                  type="button"
+                  onClick={() => setScreenshotError("")}
+                  className="font-semibold underline"
+                >
+                  Dismiss
+                </button>
+              </div>
+            )}
             {executionScreenshots.length === 0 ? (
               <div
                 className={`rounded-lg border p-5 text-center text-sm ${isDarkMode ? "border-gray-700 bg-gray-800 text-gray-400" : "border-gray-200 bg-gray-50 text-gray-500"}`}
@@ -6590,18 +7049,8 @@ function AudionutsUAGUI() {
                         {screenshots.map((screenshot, index) => {
                           const replacing =
                             screenshotActionId === `replace:${screenshot.id}`;
-                          const deleting =
-                            screenshotActionId === `delete:${screenshot.id}`;
-                          const undoing =
-                            screenshotActionId === `undo:${screenshot.id}`;
                           const screenshotState =
-                            screenshot.source === "remote"
-                              ? "Remote"
-                              : screenshot.source === "replacement"
-                                ? "Pending upload"
-                                : screenshot.source === "addition"
-                                  ? "Pending upload"
-                                  : "Local";
+                            screenshotStateLabel[screenshot.source] || "Local";
                           const screenshotStateClass =
                             screenshot.source === "remote"
                               ? isDarkMode
@@ -6623,12 +7072,21 @@ function AudionutsUAGUI() {
                               key={screenshot.id}
                               className={`rounded-xl overflow-hidden border ${isDarkMode ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-white"}`}
                             >
-                              <img
-                                src={screenshot.image_url}
-                                alt={`Screenshot ${index + 1}`}
-                                className={`w-full aspect-video object-contain bg-black transition-all duration-300 ${replacing ? "opacity-35 brightness-50" : "opacity-100 brightness-100"}`}
-                                loading="lazy"
-                              />
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setExpandedScreenshot(screenshot.id)
+                                }
+                                className="block w-full cursor-zoom-in"
+                                aria-label={`Expand ${screenshot.filename}`}
+                              >
+                                <img
+                                  src={screenshot.image_url}
+                                  alt={`Screenshot ${index + 1}`}
+                                  className={`w-full aspect-video object-contain bg-black transition-all duration-300 ${replacing ? "opacity-35 brightness-50" : "opacity-100 brightness-100"}`}
+                                  loading="lazy"
+                                />
+                              </button>
                               <div className="p-2.5 flex items-center justify-between gap-2">
                                 <div className="min-w-0 flex-1">
                                   <span
@@ -6641,68 +7099,24 @@ function AudionutsUAGUI() {
                                     title={screenshot.filename}
                                   >
                                     {screenshot.filename}
+                                    {screenshot.size
+                                      ? ` · ${formatSize(screenshot.size)}`
+                                      : ""}
                                   </span>
                                 </div>
                                 <div className="flex gap-1.5 flex-shrink-0">
-                                  {screenshot.can_replace && (
-                                    <button
-                                      onClick={() =>
-                                        changeExecutionScreenshot(
-                                          screenshot.id,
-                                          "replace",
-                                        )
-                                      }
-                                      disabled={isWorking}
-                                      className="ua-accent-action px-2 py-1 text-xs rounded-md disabled:opacity-50"
-                                    >
-                                      {replacing ? "Generating…" : "Replace"}
-                                    </button>
-                                  )}
+                                  {renderScreenshotActions(screenshot)}
                                   <button
+                                    type="button"
                                     onClick={() =>
                                       setExpandedScreenshot(screenshot.id)
                                     }
-                                    disabled={isWorking}
-                                    className={`p-1.5 rounded-md disabled:opacity-50 ${isDarkMode ? "text-gray-200 hover:bg-gray-700" : "text-gray-600 hover:bg-gray-100"}`}
+                                    className={`p-1.5 rounded-md ${isDarkMode ? "text-gray-200 hover:bg-gray-700" : "text-gray-600 hover:bg-gray-100"}`}
                                     title={`Expand ${screenshot.filename}`}
                                     aria-label={`Expand ${screenshot.filename}`}
                                   >
                                     <ExpandIcon />
                                   </button>
-                                  {screenshot.can_delete && (
-                                    <button
-                                      onClick={() =>
-                                        changeExecutionScreenshot(
-                                          screenshot.id,
-                                          "delete",
-                                        )
-                                      }
-                                      disabled={isWorking}
-                                      className="p-1.5 rounded-md text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 disabled:opacity-50"
-                                      title={`Delete ${screenshot.filename}`}
-                                    >
-                                      {deleting ? (
-                                        <SpinnerIcon />
-                                      ) : (
-                                        <TrashIcon />
-                                      )}
-                                    </button>
-                                  )}
-                                  {screenshot.source === "replacement" && (
-                                    <button
-                                      onClick={() =>
-                                        changeExecutionScreenshot(
-                                          screenshot.id,
-                                          "undo",
-                                        )
-                                      }
-                                      disabled={isWorking}
-                                      className={`px-2 py-1 text-xs rounded-md disabled:opacity-50 ${isDarkMode ? "bg-gray-700 text-gray-100 hover:bg-gray-600" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
-                                      title="Restore the original remote screenshot"
-                                    >
-                                      {undoing ? "Restoring…" : "Undo"}
-                                    </button>
-                                  )}
                                 </div>
                               </div>
                             </article>
@@ -6719,29 +7133,111 @@ function AudionutsUAGUI() {
         {expandedItem && (
           <div
             ref={screenshotModalRef}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4"
+            className="fixed inset-0 z-50 flex flex-col bg-black/90"
             role="dialog"
             aria-modal="true"
             aria-label={`Expanded ${expandedItem.filename}`}
             tabIndex="-1"
-            onClick={() => setExpandedScreenshot(null)}
           >
-            <div
-              className="relative max-h-full max-w-full"
-              onClick={(event) => event.stopPropagation()}
-            >
-              <button
-                onClick={() => setExpandedScreenshot(null)}
-                className="absolute right-2 top-2 z-10 rounded-md bg-black/70 px-3 py-1.5 text-sm text-white hover:bg-black"
-                data-ua-modal-initial-focus
+            <div className="flex flex-none flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2 text-sm text-gray-100">
+              <span className="font-semibold tabular-nums">
+                {expandedIndex + 1} / {orderedScreenshots.length}
+              </span>
+              <span className="min-w-0 truncate font-mono text-xs text-gray-300">
+                {expandedItem.filename}
+              </span>
+              <span className="text-xs text-gray-400 tabular-nums">
+                {[
+                  expandedScreenshotSize
+                    ? `${expandedScreenshotSize.width}×${expandedScreenshotSize.height}`
+                    : "",
+                  expandedItem.size ? formatSize(expandedItem.size) : "",
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </span>
+              <div className="ml-auto flex flex-wrap items-center gap-1.5">
+                {renderScreenshotActions(expandedItem, true)}
+                <button
+                  type="button"
+                  onClick={() => setIsScreenshotZoomed((zoomed) => !zoomed)}
+                  aria-pressed={isScreenshotZoomed}
+                  className="rounded-md bg-white/10 px-2 py-1 text-xs text-gray-100 hover:bg-white/20"
+                  title={
+                    isScreenshotZoomed
+                      ? "Fit the image to the window"
+                      : "Show at full size"
+                  }
+                >
+                  {isScreenshotZoomed ? "Fit" : "100%"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setExpandedScreenshot(null)}
+                  className="rounded-md bg-white/10 px-3 py-1 text-xs text-gray-100 hover:bg-white/20"
+                  data-ua-modal-initial-focus
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+            {screenshotError && (
+              <div
+                className="mx-4 mb-2 flex-none rounded-md bg-rose-600 px-3 py-1.5 text-xs text-white"
+                role="alert"
               >
-                Close
-              </button>
-              <img
-                src={expandedItem.image_url}
-                alt={expandedItem.filename}
-                className="max-h-[90vh] max-w-[92vw] object-contain"
-              />
+                {screenshotError}
+              </div>
+            )}
+            <div className="relative flex min-h-0 flex-1">
+              <div
+                className={`h-full w-full ${isScreenshotZoomed ? "overflow-auto" : "flex items-center justify-center p-4"}`}
+                onClick={(event) => {
+                  if (event.target === event.currentTarget) {
+                    setExpandedScreenshot(null);
+                  }
+                }}
+              >
+                <img
+                  key={expandedItem.full_image_url || expandedItem.image_url}
+                  src={expandedItem.full_image_url || expandedItem.image_url}
+                  alt={expandedItem.filename}
+                  onLoad={(event) =>
+                    setExpandedScreenshotSize({
+                      width: event.currentTarget.naturalWidth,
+                      height: event.currentTarget.naturalHeight,
+                    })
+                  }
+                  onClick={() => setIsScreenshotZoomed((zoomed) => !zoomed)}
+                  className={
+                    isScreenshotZoomed
+                      ? "m-auto block max-w-none cursor-zoom-out"
+                      : "max-h-full max-w-full cursor-zoom-in object-contain"
+                  }
+                />
+              </div>
+              {previousScreenshot && (
+                <button
+                  type="button"
+                  onClick={() => setExpandedScreenshot(previousScreenshot.id)}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-black/60 p-2 text-white hover:bg-black"
+                  title="Previous screenshot (←)"
+                  aria-label="Previous screenshot"
+                >
+                  <LucideIcon name="chevron-left" className="h-6 w-6" />
+                </button>
+              )}
+              {nextScreenshot && (
+                <button
+                  type="button"
+                  onClick={() => setExpandedScreenshot(nextScreenshot.id)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-black/60 p-2 text-white hover:bg-black"
+                  title="Next screenshot (→)"
+                  aria-label="Next screenshot"
+                >
+                  <LucideIcon name="chevron-right" className="h-6 w-6" />
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -7953,6 +8449,7 @@ function AudionutsUAGUI() {
           {/* Screenshot Review Panel */}
           {activePanel === "screenshots" && renderScreenshotsPanel()}
           {activePanel === "description" && renderDescriptionPanel()}
+          {activePanel === "mediainfo" && renderMediaInfoPanel()}
         </div>
 
         {/* Bottom Nav */}
@@ -7979,6 +8476,7 @@ function AudionutsUAGUI() {
             isExecuting ? "Media" : "Arguments",
           )}
           {isExecuting &&
+            showScreenshotsButton &&
             navButton(
               "screenshots",
               <ScreenshotsIcon />,
@@ -7986,6 +8484,9 @@ function AudionutsUAGUI() {
             )}
           {isExecuting &&
             navButton("description", <DescriptionIcon />, "Description")}
+          {isExecuting &&
+            showMediaInfoButton &&
+            navButton("mediainfo", <MediaInfoIcon />, mediaInfoLabel)}
         </div>
       </div>
     );
@@ -8113,25 +8614,29 @@ function AudionutsUAGUI() {
             </div>
             {isExecuting && (
               <div className="flex shrink-0 items-center gap-2">
-                <button
-                  onClick={() => {
-                    setIsScreenshotReviewOpen((open) => !open);
-                    setIsDescriptionReviewOpen(false);
-                  }}
-                  aria-pressed={isScreenshotReviewOpen}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${isScreenshotReviewOpen ? "ua-accent-action" : isDarkMode ? "bg-gray-700 hover:bg-gray-600 text-gray-100" : "bg-gray-100 hover:bg-gray-200 text-gray-700"}`}
-                  title="Review generated screenshots"
-                >
-                  <ScreenshotsIcon />
-                  Screenshots
-                  {executionScreenshots.length
-                    ? ` (${executionScreenshots.length})`
-                    : ""}
-                </button>
+                {showScreenshotsButton && (
+                  <button
+                    onClick={() => {
+                      setIsScreenshotReviewOpen((open) => !open);
+                      setIsDescriptionReviewOpen(false);
+                      setIsMediaInfoOpen(false);
+                    }}
+                    aria-pressed={isScreenshotReviewOpen}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${isScreenshotReviewOpen ? "ua-accent-action" : isDarkMode ? "bg-gray-700 hover:bg-gray-600 text-gray-100" : "bg-gray-100 hover:bg-gray-200 text-gray-700"}`}
+                    title="Review generated screenshots"
+                  >
+                    <ScreenshotsIcon />
+                    Screenshots
+                    {executionScreenshots.length
+                      ? ` (${executionScreenshots.length})`
+                      : ""}
+                  </button>
+                )}
                 <button
                   onClick={() => {
                     setIsDescriptionReviewOpen((open) => !open);
                     setIsScreenshotReviewOpen(false);
+                    setIsMediaInfoOpen(false);
                   }}
                   aria-pressed={isDescriptionReviewOpen}
                   className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${isDescriptionReviewOpen ? "ua-accent-action" : isDarkMode ? "bg-gray-700 hover:bg-gray-600 text-gray-100" : "bg-gray-100 hover:bg-gray-200 text-gray-700"}`}
@@ -8140,6 +8645,21 @@ function AudionutsUAGUI() {
                   <DescriptionIcon />
                   Description
                 </button>
+                {showMediaInfoButton && (
+                  <button
+                    onClick={() => {
+                      setIsMediaInfoOpen((open) => !open);
+                      setIsScreenshotReviewOpen(false);
+                      setIsDescriptionReviewOpen(false);
+                    }}
+                    aria-pressed={isMediaInfoOpen}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${isMediaInfoOpen ? "ua-accent-action" : isDarkMode ? "bg-gray-700 hover:bg-gray-600 text-gray-100" : "bg-gray-100 hover:bg-gray-200 text-gray-700"}`}
+                    title={`View the ${mediaInfoLabel} report`}
+                  >
+                    <MediaInfoIcon />
+                    {mediaInfoLabel}
+                  </button>
+                )}
                 <button
                   onClick={clearTerminal}
                   aria-label={
@@ -8700,10 +9220,13 @@ function AudionutsUAGUI() {
         }}
       >
         {isExecuting ? (
-          isScreenshotReviewOpen ? (
+          isScreenshotReviewOpen && expandedReviewPanel !== "screenshots" ? (
             renderScreenshotsPanel()
-          ) : isDescriptionReviewOpen ? (
+          ) : isDescriptionReviewOpen &&
+            expandedReviewPanel !== "description" ? (
             renderDescriptionPanel()
+          ) : isMediaInfoOpen && expandedReviewPanel !== "mediainfo" ? (
+            renderMediaInfoPanel()
           ) : (
             renderExecutionPreviewPanel()
           )
@@ -8885,6 +9408,50 @@ function AudionutsUAGUI() {
           </>
         )}
       </div>
+      {isExecuting && !isMobile && expandedReviewPanel && (
+        <div
+          className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4 sm:p-6"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) closeReviewModal();
+          }}
+        >
+          <section
+            ref={reviewModalRef}
+            className={`flex h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-xl border shadow-2xl ${isDarkMode ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-white"}`}
+            role="dialog"
+            aria-modal="true"
+            aria-label={
+              expandedReviewPanel === "screenshots"
+                ? "Generated screenshots"
+                : expandedReviewPanel === "description"
+                  ? "Description review"
+                  : mediaInfoLabel
+            }
+            tabIndex="-1"
+          >
+            {isAwaitingTerminalInput && (
+              <div className="flex flex-none items-center justify-between gap-3 bg-amber-500 px-4 py-2 text-sm font-semibold text-gray-950">
+                <span>The upload is waiting for your input.</span>
+                <button
+                  type="button"
+                  onClick={closeReviewModal}
+                  className="rounded-md bg-gray-950/15 px-3 py-1 text-xs font-semibold hover:bg-gray-950/25"
+                >
+                  Go to terminal
+                </button>
+              </div>
+            )}
+            <div className="min-h-0 flex-1">
+              {expandedReviewPanel === "screenshots"
+                ? renderScreenshotsPanel()
+                : expandedReviewPanel === "description"
+                  ? renderDescriptionPanel()
+                  : renderMediaInfoPanel()}
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   );
 }
