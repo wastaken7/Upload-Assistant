@@ -72,7 +72,7 @@ def _tracker_name(tracker_class: type, meta: Meta) -> str:
                 episode="",
                 edition="Criterion",
             ),
-            "Synthetic Show S01 1080p Criterion USA Blu-ray AVC TrueHD 7.1 Atmos-TESTGROUP",
+            "Synthetic Show S01 1080p USA Blu-ray AVC TrueHD 7.1 Atmos-TESTGROUP",
         ),
         (
             _meta(type="REMUX", source="BluRay", uhd="UHD", resolution="2160p", hdr="DV HDR", video_codec="HEVC", audio="TrueHD 7.1 Atmos"),
@@ -140,10 +140,18 @@ def test_blu_rules_keep_cut_and_drop_edition_outside_discs() -> None:
     assert _build(meta) == "Synthetic Feature 2024 Director's Cut 1080p BluRay DD+ 5.1 x264-TESTGROUP"
 
 
-def test_blu_rules_place_disc_edition_after_resolution() -> None:
-    meta = _meta(type="DISC", is_disc="BDMV", source="Blu-ray", region="GBR", edition="Extended Criterion Collection", audio="DTS-HD MA 5.1")
+def test_blu_rules_keep_editions_out_of_full_disc_titles() -> None:
+    meta = _meta(type="DISC", is_disc="BDMV", source="Blu-ray", region="GBR", edition="Extended 25th Anniversary Remastered", audio="DTS-HD MA 5.1")
 
-    assert _build(meta) == "Synthetic Feature 2024 Extended 1080p Criterion Collection GBR Blu-ray AVC DTS-HD MA 5.1-TESTGROUP"
+    assert _build(meta) == "Synthetic Feature 2024 Extended 1080p GBR Blu-ray AVC DTS-HD MA 5.1-TESTGROUP"
+
+
+@pytest.mark.parametrize("system", ["NTSC", "PAL"])
+def test_dvd_sourced_encode_is_titled_dvdrip(system: str) -> None:
+    meta = _meta(type="ENCODE", source=system, resolution="480p", audio="DD 1.0", video_encode="x264")
+
+    assert _build(meta) == "Synthetic Feature 2024 DVDRip DD 1.0 x264-TESTGROUP"
+    assert _build(meta, VideoNameRules(dvd_resolution=True)) == "Synthetic Feature 2024 480p DVDRip DD 1.0 x264-TESTGROUP"
 
 
 def test_blu_rules_fold_multi_into_dual_audio_and_drop_non_english_dual() -> None:

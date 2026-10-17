@@ -33,9 +33,8 @@ class VideoNameRules:
     # Keep MULTI for three or more languages instead of folding it into Dual-Audio.
     keep_multi: bool = False
     dual_audio_label: str = "Dual-Audio"
-    # Edition words removed from the cut slot; with keep_edition_on_discs they move after the resolution on full discs.
+    # Edition words kept out of the title (they belong in the description); cuts stay.
     edition_terms: re.Pattern[str] | None = None
-    keep_edition_on_discs: bool = False
     # DVD-sourced releases: whether resolution and video codec appear (most guides omit both).
     dvd_resolution: bool = False
     dvd_video_codec: bool = False
@@ -49,9 +48,9 @@ class VideoNameRules:
     tv_year_from_tvdb: bool = True
 
 
-# Blutopia-derived guides (Blutopia, ULCX, OnlyEncodes, LST): Dual-Audio/Dubbed only, editions out of the title except
-# on full discs, 3D right before the source, and no resolution or video codec for DVD-sourced releases.
-BLU_NAME_RULES = VideoNameRules(english_dub_only=True, edition_terms=BLU_EDITION_TERMS, keep_edition_on_discs=True)
+# Blutopia-derived guides (Blutopia, ULCX, OnlyEncodes, LST): Dual-Audio/Dubbed only, editions out of the title,
+# 3D right before the source, and no resolution or video codec for DVD-sourced releases.
+BLU_NAME_RULES = VideoNameRules(english_dub_only=True, edition_terms=BLU_EDITION_TERMS)
 
 
 TVDB_TITLE_YEAR = re.compile(r"\((19\d{2}|20\d{2})\)\s*$")
@@ -95,6 +94,9 @@ async def build_video_name(meta: Meta, rules: VideoNameRules, tracker: str, comp
     parts = components or build_name_components(meta)
     name_type = parts.type
     source = parts.source
+    if name_type == "ENCODE" and source in ("NTSC", "PAL"):
+        # get_source reports a DVD-sourced encode as its bare broadcast system; the guides title it DVDRip.
+        name_type = "DVDRIP"
     is_disc = name_type == "DISC" and bool(meta.is_disc)
     dvd_sourced = (is_disc and meta.is_disc == "DVD") or (name_type == "REMUX" and source in DVD_SOURCES)
 
@@ -109,8 +111,7 @@ async def build_video_name(meta: Meta, rules: VideoNameRules, tracker: str, comp
 
     language = "" if is_disc or not rules.language_slot else await get_language_label(meta, tracker)
     audio = await _get_audio(meta, parts.audio, rules)
-    cut, edition = _split_edition(parts.edition, rules)
-    disc_edition = edition if is_disc and rules.keep_edition_on_discs else ""
+    cut = _cut_from_edition(parts.edition, rules)
     resolution = "" if dvd_sourced and not rules.dvd_resolution else parts.resolution
     hybrid = "" if name_type == "WEBDL" and not rules.hybrid_on_webdl else parts.hybrid
     three_d_near_source = rules.three_d_slot == "source" or (rules.three_d_slot == "source_on_discs" and is_disc)
@@ -126,11 +127,11 @@ async def build_video_name(meta: Meta, rules: VideoNameRules, tracker: str, comp
 
     details: list[str]
     if is_disc and meta.is_disc == "BDMV":
-        details = [hybrid, parts.repack, language_before_resolution, resolution, disc_edition, region, three_d_source, uhd, source, parts.hdr, video_codec, audio]
+        details = [hybrid, parts.repack, language_before_resolution, resolution, region, three_d_source, uhd, source, parts.hdr, video_codec, audio]
     elif is_disc and meta.is_disc == "DVD":
-        details = [parts.repack, language_before_resolution, resolution, disc_edition, region, source, meta.dvd_size, dvd_video_codec, audio]
+        details = [parts.repack, language_before_resolution, resolution, region, source, meta.dvd_size, dvd_video_codec, audio]
     elif is_disc and meta.is_disc == "HDDVD":
-        details = [parts.repack, language_before_resolution, resolution, disc_edition, region, source, video_codec, audio]
+        details = [parts.repack, language_before_resolution, resolution, region, source, video_codec, audio]
     elif name_type == "REMUX" and source in ("BluRay", "HDDVD"):
         details = [hybrid, parts.repack, language_before_resolution, resolution, three_d_source, uhd, source, "REMUX", parts.hdr, video_codec, audio]
     elif name_type == "REMUX" and source in DVD_SOURCES:
@@ -187,13 +188,12 @@ async def _get_audio(meta: Meta, audio: str, rules: VideoNameRules) -> str:
     return f"{rules.dual_audio_label} {codec}" if has_english_audio and not is_english_original else codec
 
 
-def _split_edition(edition: str, rules: VideoNameRules) -> tuple[str, str]:
-    """Split the detected edition into the cut kept in the title and the edition-only terms."""
+def _cut_from_edition(edition: str, rules: VideoNameRules) -> str:
+    """Keep the cut from the detected edition, dropping the edition-only terms."""
     edition = " ".join(edition.split())
     if not edition or rules.edition_terms is None:
-        return edition, ""
-    removed = " ".join(match.group(0) for match in rules.edition_terms.finditer(edition))
-    return " ".join(rules.edition_terms.sub(" ", edition).split()), removed
+        return edition
+    return " ".join(rules.edition_terms.sub(" ", edition).split())
 
 
 INCOMPLETE_PACK_TRACKERS = frozenset(

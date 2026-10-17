@@ -294,6 +294,12 @@ def test_aither_moves_edition_terms_out_of_title_and_keeps_cut() -> None:
     assert _name(meta) == "Special Feature 2024 Director's Cut 1080p NF WEB-DL DD+ 5.1 H.264-TESTGROUP"
 
 
+def test_aither_keeps_special_edition_as_a_cut() -> None:
+    meta = _movie(edition="Special Edition Remastered")
+
+    assert _name(meta) == "Synthetic Feature 2024 Special Edition 1080p NF WEB-DL DD+ 5.1 H.264-TESTGROUP"
+
+
 def test_aither_removes_edition_only_title_slot() -> None:
     meta = _movie(edition="25th Anniversary Remastered")
 

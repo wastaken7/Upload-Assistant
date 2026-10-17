@@ -5,12 +5,12 @@ from typing import Any
 from src.console import logger
 from src.meta import Meta
 from src.trackers.common import Common
-from src.trackers.naming import VideoNameRules, add_incomplete_pack_marker, build_video_name
+from src.trackers.naming import BLU_EDITION_TERMS, VideoNameRules, add_incomplete_pack_marker, build_video_name
 from src.trackers.UNIT3D import UNIT3D
 
 # Aither keeps editions (Criterion, Remastered, Anniversary...) in the description; cuts stay in the title.
 AITHER_EDITION_TERMS = re.compile(
-    r"\b(?:\d+(?:st|nd|rd|th)\s+)?anniversary\b|\b(?:remaster(?:ed)?|restored|criterion|collector'?s?|deluxe|special|limited|edition|multiple(?:\s+languages)?)\b",
+    rf"{BLU_EDITION_TERMS.pattern}|\brestored\b|\bmultiple(?:\s+languages)?\b",
     re.IGNORECASE,
 )
 AITHER_NAME_RULES = VideoNameRules(

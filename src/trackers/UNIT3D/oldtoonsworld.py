@@ -19,7 +19,6 @@ OLDTOONS_NAME_RULES = VideoNameRules(
     keep_multi=True,
     dual_audio_label="Dual Audio",
     edition_terms=BLU_EDITION_TERMS,
-    keep_edition_on_discs=True,
     dvd_resolution=True,
     dvd_video_codec=True,
     aka=False,
