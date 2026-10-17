@@ -23,6 +23,8 @@ OLDTOONS_NAME_RULES = VideoNameRules(
     dvd_resolution=True,
     dvd_video_codec=True,
     aka=False,
+    # OldToons always titles TV with the year the series debuted.
+    tv_year_from_tvdb=False,
 )
 
 

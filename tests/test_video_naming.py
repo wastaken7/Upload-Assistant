@@ -255,3 +255,63 @@ def test_lst_appends_trump_marker() -> None:
 )
 def test_oldtoons_follows_its_guide(meta: Meta, expected: str) -> None:
     assert _tracker_name(OldToonsWorld, meta) == expected
+
+
+@pytest.mark.parametrize("edition", ["Hybrid", "hybrid Extended", "Extended HYBRID"])
+def test_hybrid_in_edition_appears_once(edition: str) -> None:
+    meta = _meta(type="REMUX", source="BluRay", webdv=True, edition=edition, audio="TrueHD 7.1 Atmos")
+    cut = "Extended " if "Extended" in edition else ""
+
+    assert _build(meta) == f"Synthetic Feature 2024 {cut}Hybrid 1080p BluRay REMUX AVC TrueHD 7.1 Atmos-TESTGROUP"
+
+
+def test_missing_manual_year_keeps_component_year() -> None:
+    meta = _meta(manual_year=None)
+
+    assert _build(meta, VideoNameRules(honor_manual_year_on_tv=True)) == "Synthetic Feature 2024 1080p AMZN WEB-DL DD+ 5.1 H.264-TESTGROUP"
+
+
+def test_ulcx_omits_aka_for_anime_without_imdb_title() -> None:
+    meta = _meta(anime=True, aka="AKA Gensaku Taitoru")
+
+    assert _tracker_name(ULCX, meta) == "Synthetic Feature 2024 1080p AMZN WEB-DL DD+ 5.1 H.264-TESTGROUP"
+
+
+def _show(**overrides: object) -> Meta:
+    fields: dict[str, object] = {"category": "TV", "title": "Synthetic Show", "year": 2019, "season": "S01", "episode": "", "search_year": ""}
+    fields.update(overrides)
+    return _meta(**fields)
+
+
+@pytest.mark.parametrize(
+    ("episode_data", "search_year", "expected_year"),
+    [
+        # TVDB disambiguates with a year that can differ from the first-aired year.
+        ({"series_name": "Synthetic Show (2017)"}, "", "2017 "),
+        ({"series_name": "SYNTHETIC SHOW (2017)", "series_title": "Synthetic Show"}, "", "2017 "),
+        ({"series_name": "Synthetic Show", "series_title": "Synthetic Show (2017)"}, "", "2017 "),
+        # A TVDB name without a year drops a year taken from the filename.
+        ({"series_name": "Synthetic Show"}, "2019", ""),
+        # Without TVDB data the filename decides, as before.
+        ({}, "2019", "2019 "),
+        ({}, "", ""),
+    ],
+)
+def test_tv_year_follows_tvdb_title(episode_data: dict[str, str], search_year: str, expected_year: str) -> None:
+    meta = _show(tvdb_episode_data=episode_data, search_year=search_year)
+
+    assert _build(meta) == f"Synthetic Show {expected_year}S01 1080p AMZN WEB-DL DD+ 5.1 H.264-TESTGROUP"
+
+
+def test_tvdb_year_respects_no_year_and_manual_year() -> None:
+    no_year = _show(tvdb_episode_data={"series_name": "Synthetic Show (2017)"}, no_year=True)
+    manual = _show(tvdb_episode_data={"series_name": "Synthetic Show"}, manual_year=2015)
+
+    assert _build(no_year) == "Synthetic Show S01 1080p AMZN WEB-DL DD+ 5.1 H.264-TESTGROUP"
+    assert _build(manual, VideoNameRules(honor_manual_year_on_tv=True)) == "Synthetic Show 2015 S01 1080p AMZN WEB-DL DD+ 5.1 H.264-TESTGROUP"
+
+
+def test_oldtoons_keeps_debut_year_instead_of_tvdb_title_year() -> None:
+    meta = _show(title="Synthetic Toon", year=2005, tvdb_episode_data={"series_name": "Synthetic Toon"}, service="DSNP")
+
+    assert _tracker_name(OldToonsWorld, meta) == "Synthetic Toon 2005 S01 1080p DSNP WEB-DL DD+ 5.1 H.264-TESTGROUP"

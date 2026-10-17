@@ -76,9 +76,8 @@ def build_name_components(meta: Meta) -> NameComponents:
         episode_title = meta.daily_episode_title
     else:
         episode_title = ""
-    edition = meta.edition
-    if "hybrid" in edition.upper():
-        edition = edition.replace("Hybrid", "").strip()
+    # Hybrid has its own slot (get_edition sets webdv whenever the edition names it).
+    edition = " ".join(re.sub(r"\bhybrid\b", " ", meta.edition, flags=re.IGNORECASE).split())
 
     if meta.category == "TV":
         year = str(meta.year) if (meta.year is not None and meta.search_year != "") else ""

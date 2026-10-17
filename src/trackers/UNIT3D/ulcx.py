@@ -287,6 +287,8 @@ class ULCX(UNIT3D):
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
         # ULCX omits the AKA for anime and Hybrid for WEB-DLs.
-        components = with_imdb_title(meta, build_name_components(meta), allow_aka=not meta.anime)
+        components = with_imdb_title(meta, build_name_components(meta))
+        if meta.anime:
+            components = replace(components, alt_title="")
         ulcx_name = await build_video_name(meta, ULCX_NAME_RULES, self.tracker, components) or meta.name
         return {"name": add_incomplete_pack_marker(ulcx_name, meta, self.tracker)}

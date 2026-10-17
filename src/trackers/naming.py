@@ -45,6 +45,8 @@ class VideoNameRules:
     hybrid_on_webdl: bool = True
     # The generic name drops a manual year on TV unless the year came from the filename.
     honor_manual_year_on_tv: bool = False
+    # TV titles carry a year only when TVDB disambiguates the series with one, e.g. "Show (2021)".
+    tv_year_from_tvdb: bool = True
 
 
 # Blutopia-derived guides (Blutopia, ULCX, OnlyEncodes, LST): Dual-Audio/Dubbed only, editions out of the title except
@@ -52,7 +54,26 @@ class VideoNameRules:
 BLU_NAME_RULES = VideoNameRules(english_dub_only=True, edition_terms=BLU_EDITION_TERMS, keep_edition_on_discs=True)
 
 
-def with_imdb_title(meta: Meta, components: NameComponents, allow_aka: bool = True) -> NameComponents:
+TVDB_TITLE_YEAR = re.compile(r"\((19\d{2}|20\d{2})\)\s*$")
+
+
+def tvdb_title_year(meta: Meta) -> str | None:
+    """Year TVDB appends to the series name to tell same-named shows apart.
+
+    Returns None when no TVDB series name is known, "" when the name carries no year.
+    """
+    episode_data = meta.tvdb_episode_data if isinstance(meta.tvdb_episode_data, dict) else {}
+    names = [str(name).strip() for name in (episode_data.get("series_name"), episode_data.get("series_title")) if isinstance(name, str) and name.strip()]
+    if not names:
+        return None
+    for name in names:
+        match = TVDB_TITLE_YEAR.search(name)
+        if match:
+            return match.group(1)
+    return ""
+
+
+def with_imdb_title(meta: Meta, components: NameComponents) -> NameComponents:
     """Use the IMDb title, AKA and movie year, as the IMDb-based guides require."""
     imdb_name = str(meta.imdb_info.get("title") or "").strip()
     imdb_year = str(meta.imdb_info.get("year") or "").strip()
@@ -60,7 +81,7 @@ def with_imdb_title(meta: Meta, components: NameComponents, allow_aka: bool = Tr
     title, alt_title, year = components.title, components.alt_title, components.year
     if imdb_name:
         title = imdb_name
-        alt_title = f"AKA {imdb_aka}" if allow_aka and imdb_aka and imdb_aka != imdb_name and not meta.no_aka else ""
+        alt_title = f"AKA {imdb_aka}" if imdb_aka and imdb_aka != imdb_name and not meta.no_aka else ""
     if meta.category != "TV" and imdb_year and year and imdb_year != year:
         year = imdb_year
     return replace(components, title=title, alt_title=alt_title, year=year)
@@ -78,8 +99,13 @@ async def build_video_name(meta: Meta, rules: VideoNameRules, tracker: str, comp
     dvd_sourced = (is_disc and meta.is_disc == "DVD") or (name_type == "REMUX" and source in DVD_SOURCES)
 
     year = parts.year
-    if rules.honor_manual_year_on_tv and meta.manual_year > 0 and not meta.no_year:
-        year = str(meta.manual_year)
+    if meta.category == "TV" and rules.tv_year_from_tvdb and not meta.no_year:
+        tvdb_year = tvdb_title_year(meta)
+        if tvdb_year is not None:
+            year = tvdb_year
+    manual_year = meta.manual_year or 0
+    if rules.honor_manual_year_on_tv and manual_year > 0 and not meta.no_year:
+        year = str(manual_year)
 
     language = "" if is_disc or not rules.language_slot else await get_language_label(meta, tracker)
     audio = await _get_audio(meta, parts.audio, rules)
