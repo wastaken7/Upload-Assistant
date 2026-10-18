@@ -362,7 +362,7 @@ class DiscMenus:
         """
         Uploads disc menu images from a local directory.
         """
-        image_paths = [p for p in Path(self.path_to_menu_screenshots).iterdir() if p.name.lower().endswith((".png", ".jpg", ".jpeg", ".webp"))]
+        image_paths = sorted(p for p in Path(self.path_to_menu_screenshots).iterdir() if p.name.lower().endswith((".png", ".jpg", ".jpeg", ".webp")))
 
         if not image_paths:
             logger.info("[yellow]No local menu images found to upload.[/yellow]")
