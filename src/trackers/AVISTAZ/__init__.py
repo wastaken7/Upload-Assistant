@@ -955,7 +955,7 @@ class AZTrackerBase:
                 html_label = "DVD"
 
         elif source_type == "remux":
-            if "dvd" in source:
+            if source in ("dvd", "pal dvd", "ntsc dvd"):
                 html_label = "DVD Remux"
             elif source in ("bluray", "blu-ray"):
                 html_label = "BluRay REMUX"
