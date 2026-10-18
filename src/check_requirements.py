@@ -20,9 +20,14 @@ def _installed_versions() -> dict[str, str]:
     """
     versions: dict[str, str] = {}
     for dist in importlib.metadata.distributions():
-        metadata = dist.metadata
-        name = metadata["Name"]
-        version = metadata["Version"]
+        # Skip unrelated distributions with unreadable metadata instead of aborting the whole check.
+        try:
+            metadata = dist.metadata
+            name = metadata["Name"]
+            version = metadata["Version"]
+        except Exception as exc:
+            logger.debug(f"Failed to read distribution metadata: {exc}", exc_info=True)
+            continue
         if name and version:
             versions.setdefault(_normalize_name(name), version)
     return versions
