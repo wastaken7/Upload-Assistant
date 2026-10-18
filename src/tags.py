@@ -124,8 +124,9 @@ async def get_tag(video: str, meta: Meta, season_pack_check: bool = False) -> st
 
     # A generic season folder may omit the group present in every episode.
     # Infer ZR- only when all supplied episode filenames agree; extras such as
-    # NCOP/NCED/menus (no SxxEyy in the name) are ignored.
-    if not release_group and meta.tv_pack and meta.filelist:
+    # NCOP/NCED/menus (no SxxEyy in the name) are ignored. Per-file season pack
+    # checks must only see a file's own tag, so inference is skipped there.
+    if not release_group and meta.tv_pack and meta.filelist and not season_pack_check:
         episode_files = [
             p for p in meta.filelist
             if Path(p).suffix.lower() in {".mkv", ".mp4", ".avi", ".ts", ".m2ts"}

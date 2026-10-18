@@ -29,6 +29,7 @@ async def test_zr_generic_season_folder():
     assert await get_tag(files[0], meta) == "-ZR-"
     meta.filelist = [files[0], "Example Show S01E02 1080p BluRay -Other.mkv"]
     assert await get_tag(files[0], meta) == ""
+    assert await get_tag(meta.filelist[1], meta, season_pack_check=True) == "-Other"
 
 
 @pytest.mark.asyncio
@@ -37,6 +38,7 @@ async def test_zr_generic_season_folder_ignores_extras():
     meta = Meta(category="TV", anime=True, tv_pack=True, uuid="Another Show S01 Remux",
                 filelist=[*files, "NCED #02.mkv", "NCOP #02.mkv"])
     assert await get_tag(files[0], meta) == "-ZR-"
+    assert await get_tag("NCED #02.mkv", meta, season_pack_check=True) == ""
 
 
 @pytest.mark.parametrize(
