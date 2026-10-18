@@ -943,7 +943,7 @@ class AZTrackerBase:
         }
 
         source_type = (meta.type or "").strip().lower()
-        source = meta.source or "".strip().lower()
+        source = (meta.source or "").strip().lower()
         is_disc = (meta.is_disc or "").strip().lower()
 
         html_label = ""
