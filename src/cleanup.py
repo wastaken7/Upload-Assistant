@@ -22,7 +22,8 @@ else:
     termios = None
 
 # Detect Android environment
-IS_ANDROID = "android" in platform.platform().lower() or Path("/system/build.prop").exists() or "ANDROID_ROOT" in os.environ
+# platform.platform() is slow on Windows (WMI query), and Windows can never be Android.
+IS_ANDROID = os.name != "nt" and ("android" in platform.platform().lower() or Path("/system/build.prop").exists() or "ANDROID_ROOT" in os.environ)
 
 running_subprocesses: set[subprocess.Popen[Any]] = set()
 thread_executor: ThreadPoolExecutor | None = None
