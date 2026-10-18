@@ -1,10 +1,36 @@
 # Upload Assistant © 2026 Audionut & wastaken7 — Licensed under UAPL v1.0
 import importlib.metadata
 import logging
+import re
 import sys
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
+
+
+def _normalize_name(name: str) -> str:
+    return re.sub(r"[-_.]+", "-", name).lower()
+
+
+def _installed_versions() -> dict[str, str]:
+    """Map normalized distribution names to versions with a single scan of sys.path.
+
+    Calling importlib.metadata.version() per requirement rescans every path entry each time.
+    The first match on sys.path wins, matching importlib.metadata.version().
+    """
+    versions: dict[str, str] = {}
+    for dist in importlib.metadata.distributions():
+        # Skip unrelated distributions with unreadable metadata instead of aborting the whole check.
+        try:
+            metadata = dist.metadata
+            name = metadata["Name"]
+            version = metadata["Version"]
+        except Exception as exc:
+            logger.debug(f"Failed to read distribution metadata: {exc}", exc_info=True)
+            continue
+        if name and version:
+            versions.setdefault(_normalize_name(name), version)
+    return versions
 
 
 def check_dependencies() -> None:
@@ -41,6 +67,7 @@ def check_dependencies() -> None:
         missing_packages.append("  - packaging: not installed (required by Upload Assistant)")
 
     try:
+        installed_versions = _installed_versions()
         with Path(requirements_file).open(encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
@@ -59,12 +86,11 @@ def check_dependencies() -> None:
                     if norm_name == "packaging":
                         continue  # Already handled
 
-                    try:
-                        installed_version = importlib.metadata.version(req_name)
-                        if req_version and installed_version != req_version:
-                            mismatched_versions.append(f"  - {req_name}: installed {installed_version}, required {req_version}")
-                    except importlib.metadata.PackageNotFoundError:
+                    installed_version = installed_versions.get(_normalize_name(req_name))
+                    if installed_version is None:
                         missing_packages.append(f"  - {req_name}: not installed (required: {line})")
+                    elif req_version and installed_version != req_version:
+                        mismatched_versions.append(f"  - {req_name}: installed {installed_version}, required {req_version}")
                     continue
 
                 # If packaging is available, use it for parsing
@@ -73,12 +99,11 @@ def check_dependencies() -> None:
                         req = packaging.requirements.Requirement(line)
                         if req.marker is not None and not req.marker.evaluate():
                             continue
-                        try:
-                            installed_version = importlib.metadata.version(req.name)
-                            if not req.specifier.contains(installed_version, prereleases=True):
-                                mismatched_versions.append(f"  - {req.name}: installed {installed_version}, required {req.specifier}")
-                        except importlib.metadata.PackageNotFoundError:
+                        installed_version = installed_versions.get(_normalize_name(req.name))
+                        if installed_version is None:
                             missing_packages.append(f"  - {req.name}: not installed (required: {line})")
+                        elif not req.specifier.contains(installed_version, prereleases=True):
+                            mismatched_versions.append(f"  - {req.name}: installed {installed_version}, required {req.specifier}")
                 except Exception as exc:
                     # Ignore lines with parsing errors (e.g. custom URLs, local paths)
                     logger.debug(f"Failed to parse requirement line '{line}': {exc}", exc_info=True)

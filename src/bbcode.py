@@ -2,15 +2,26 @@
 import html
 import re
 import urllib.parse
+from functools import cache
 from pathlib import Path
 from typing import Any
-
-from matplotlib.colors import CSS4_COLORS
 
 from src.console import logger
 from src.meta import Meta
 
-CSS4_COLORS_BY_HEX = {color_hex.lower(): color_name for color_name, color_hex in CSS4_COLORS.items()}
+
+@cache
+def _css4_colors() -> dict[str, str]:
+    # Imported lazily: matplotlib is slow to import and only a few trackers need color conversion.
+    from matplotlib.colors import CSS4_COLORS
+
+    return dict(CSS4_COLORS)
+
+
+@cache
+def _css4_colors_by_hex() -> dict[str, str]:
+    return {color_hex.lower(): color_name for color_name, color_hex in _css4_colors().items()}
+
 
 # Bold - KEEP
 # Italic - KEEP
@@ -600,7 +611,7 @@ class BBCODE:
 
         def convert(match: re.Match[str]) -> str:
             color_name = match.group(1).strip().lower()
-            color_hex = CSS4_COLORS.get(color_name)
+            color_hex = _css4_colors().get(color_name)
             return f"[color={color_hex.lower()}]" if color_hex else match.group(0)
 
         return re.sub(r"\[color=([^\]]+)\]", convert, desc, flags=re.IGNORECASE)
@@ -612,7 +623,7 @@ class BBCODE:
             color_hex = match.group(1).lower()
             if len(color_hex) == 4:
                 color_hex = "#" + "".join(character * 2 for character in color_hex[1:])
-            color_name = CSS4_COLORS_BY_HEX.get(color_hex)
+            color_name = _css4_colors_by_hex().get(color_hex)
             return f"[color={color_name}]" if color_name else match.group(0)
 
         return re.sub(r"\[color=(#[0-9a-fA-F]{3}|#[0-9a-fA-F]{6})\]", convert, desc, flags=re.IGNORECASE)
