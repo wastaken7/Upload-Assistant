@@ -303,7 +303,7 @@ class NameManager:
         lang_display = "" if lang_display.lower() in ("english", "eng", "en") else lang_display.upper().replace("I", "i")
 
         # Source logic: RETAiL, SCAN, HYBRiD
-        source = meta.source or "".strip().upper()
+        source = (meta.source or "").strip().upper()
         manual_source = str(meta.manual_source or "").strip().upper()
         if manual_source in ("RETAIL", "SCAN", "HYBRID"):
             source = manual_source
@@ -367,8 +367,8 @@ class NameManager:
         edition = str(meta.manual_edition or meta.edition or "").strip()
         year = str(meta.manual_year or meta.year or "").strip()
         platform = str(meta.manual_platform or meta.platform or "").strip().upper()
-        game_version = meta.game_version or "".strip()
-        repack = meta.repack or "".strip().upper()
+        game_version = (meta.game_version or "").strip()
+        repack = (meta.repack or "").strip().upper()
         force_multi = bool(meta.manual_multi)
 
         #  language / MULTI tag
