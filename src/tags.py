@@ -76,6 +76,12 @@ async def get_tag(video: str, meta: Meta, season_pack_check: bool = False) -> st
         if ext.lower() in known_extensions:
             basename_stripped = name
 
+        # ZR- includes a terminal hyphen in the actual release-group name.
+        # Keep this explicit so technical suffixes and arbitrary trailing
+        # punctuation do not become release groups.
+        if re.search(r"-ZR-$", basename_stripped, re.IGNORECASE):
+            return "-ZR-"
+
         non_anime_match = re.search(
             r"(?<=-)((?!\s*(?:WEB-DL|Blu-ray|H-264|H-265))(?:\W|\b)(?!(?:\d{3,4}[ip]))(?!\d+\b)(?:\W|\b)([\w .]+?))(?:\[.+\])?(?:\))?(?:\s\[.+\])?$", basename_stripped
         )
@@ -115,6 +121,18 @@ async def get_tag(video: str, meta: Meta, season_pack_check: bool = False) -> st
             if release_group and "Z0N3" in release_group:
                 release_group = release_group.replace("Z0N3", "D-Z0N3")
             logger.debug(f"Non-anime regex match: {release_group}")
+
+    # A generic season folder may omit the group present in every episode.
+    # Infer ZR- only when all supplied episode filenames agree; extras such as
+    # NCOP/NCED/menus (no SxxEyy in the name) are ignored.
+    if not release_group and meta.tv_pack and meta.filelist:
+        episode_files = [
+            p for p in meta.filelist
+            if Path(p).suffix.lower() in {".mkv", ".mp4", ".avi", ".ts", ".m2ts"}
+            and re.search(r"S\d{1,2}E\d{1,4}", Path(p).stem, re.IGNORECASE)
+        ]
+        if episode_files and all(re.search(r"-ZR-$", Path(p).stem, re.IGNORECASE) for p in episode_files):
+            release_group = "ZR-"
 
     # If regex patterns didn't work, fall back to guessit
     if not release_group and meta.is_disc:
