@@ -819,7 +819,6 @@ class Orpheus:
             "media": media,
             "release_desc": self._release_description(release, meta),
             "releasetype": self.release_types.get(str(release.get("release_type", "Unknown")), 21),
-            "scene": int(bool(meta.scene)),
             "submit": 1,
             "tags": tags,
             "title": str(release.get("album")),
@@ -836,6 +835,10 @@ class Orpheus:
             payload["remaster_catalogue_number"] = edition.catalogue_number
         if other_bitrate:
             payload["other_bitrate"] = other_bitrate
+        # Gazelle reads these checkboxes with isset(): sending them at all,
+        # even as 0, marks the upload as scene/showcase.
+        if meta.scene:
+            payload["scene"] = 1
         if meta.music_showcase:
             payload["vanity_house"] = 1
         return {key: value for key, value in payload.items() if value not in ("", None, [])}

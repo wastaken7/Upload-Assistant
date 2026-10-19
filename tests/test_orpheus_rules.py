@@ -468,3 +468,10 @@ def test_group_id_must_share_an_artist():
     group["group"]["musicInfo"]["artists"][0]["name"] = "Fictional Band"
     with patch.object(Orpheus, "_api_get", new=AsyncMock(return_value=group)):
         assert asyncio.run(_adapter()._verify_group(Meta(music_group_id="4"), release)) == ("4", "")
+
+
+def test_scene_checkbox_is_only_sent_for_scene_uploads():
+    # Orpheus treats any submitted "scene" field as checked (isset).
+    release = _release()
+    assert "scene" not in _adapter().build_upload_payload(Meta(category="MUSIC", scene=False), release)
+    assert _adapter().build_upload_payload(Meta(category="MUSIC", scene=True), release)["scene"] == 1
