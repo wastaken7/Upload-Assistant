@@ -495,7 +495,9 @@ class Orpheus:
         return not values or "Any" in values or value in values
 
     @classmethod
-    def _request_compatibility(cls, record: dict[str, Any], planned: dict[str, Any], release: MusicRelease) -> tuple[bool, list[str]]:
+    def _request_compatibility(
+        cls, record: dict[str, Any], planned: dict[str, Any], release: MusicRelease, log_checks: list[dict[str, Any]] | None = None
+    ) -> tuple[bool, list[str]]:
         unmet: list[str] = []
         if not cls._accepts(record.get("formatList"), planned["format"]):
             unmet.append(f"format {planned['format']} not in {record.get('formatList')}")
@@ -507,9 +509,20 @@ class Orpheus:
             unmet.append("a rip log is required")
         if record.get("needCue") and not release.auxiliary.cues:
             unmet.append("a cue sheet is required")
-        # A minimum log score cannot be proven locally; it is shown in the
-        # requirements and can be confirmed with --music-check-log.
+        # A minimum log score cannot be proven locally; when --music-check-log
+        # scored the logs, the best score must reach the request's minimum.
+        scores = [float(entry["score"]) for entry in log_checks or [] if isinstance(entry.get("score"), int | float)]
+        minimum = float(record.get("minLogScore") or 0)
+        if minimum and scores and max(scores) < minimum:
+            unmet.append(f"log score {max(scores):g}% is below the minimum {minimum:g}%")
         return not unmet, unmet
+
+    @classmethod
+    def _artists_overlap(cls, release: MusicRelease, record: dict[str, Any]) -> bool:
+        """Return whether a request/group shares an artist with the release."""
+        theirs = {cls._normalise_request_text(name) for name in cls._request_artists(record)}
+        ours = {cls._normalise_request_text(name) for name in cls._artists(release)}
+        return not theirs or bool(theirs & ours)
 
     @staticmethod
     def _normalise_request_text(value: Any) -> str:
@@ -551,7 +564,7 @@ class Orpheus:
         match = re.search(r"[?&](?:id|requestid|groupid)=(\d+)", text)
         return match.group(1) if match else ""
 
-    async def _verify_request_fill(self, meta: Meta, release: MusicRelease) -> tuple[str, str]:
+    async def _verify_request_fill(self, meta: Meta, release: MusicRelease, log_checks: list[dict[str, Any]] | None = None) -> tuple[str, str]:
         """Return ``(request_id, error)`` for an explicitly requested fill."""
         request_id = self._parse_identifier(meta.music_request_id)
         if not str(meta.music_request_id or "").strip():
@@ -567,7 +580,9 @@ class Orpheus:
             return "", f"request {request_id} is not a Music request"
         if self._request_match_type(release, record) is None:
             return "", f"request {request_id} title '{record.get('title', '')}' does not match '{release.get('album', '')}'"
-        compatible, unmet = self._request_compatibility(record, self._planned_upload(release), release)
+        if not self._artists_overlap(release, record):
+            return "", f"request {request_id} artists {self._request_artists(record)} do not match {self._artists(release)}"
+        compatible, unmet = self._request_compatibility(record, self._planned_upload(release), release, log_checks)
         if not compatible:
             return "", f"request {request_id} requirements are not met: {'; '.join(unmet)}"
         return request_id, ""
@@ -585,6 +600,8 @@ class Orpheus:
             return "", f"group {group_id} could not be loaded"
         if self._normalise_request_text(group.get("name")) != self._normalise_request_text(release.get("album")):
             return "", f"group {group_id} is '{group.get('name', '')}', not '{release.get('album', '')}'"
+        if not self._artists_overlap(release, group):
+            return "", f"group {group_id} artists {self._request_artists(group)} do not match {self._artists(release)}"
         return group_id, ""
 
     async def _check_logs(self, meta: Meta, release: MusicRelease) -> list[dict[str, Any]]:
@@ -650,8 +667,8 @@ class Orpheus:
         if errors:
             status["status_message"] = "Validation failed: " + " | ".join(errors)
             return False
-        await self._check_logs(meta, release)
-        request_id, request_error = await self._verify_request_fill(meta, release) if self.api_key else ("", "")
+        log_checks = await self._check_logs(meta, release)
+        request_id, request_error = await self._verify_request_fill(meta, release, log_checks) if self.api_key else ("", "")
         group_id, group_error = await self._verify_group(meta, release) if self.api_key else ("", "")
         if request_error or group_error:
             status["status_message"] = "Upload blocked: " + " | ".join(error for error in (request_error, group_error) if error)

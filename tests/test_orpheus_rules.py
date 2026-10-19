@@ -424,3 +424,47 @@ def test_directory_technical_brackets_are_not_labels(tmp_path):
     release = MusicReleaseAnalyzer().analyze(folder)
     assert not release.get("release_label")
     assert not release.get("release_catalogue_number")
+
+
+def test_compact_sample_rate_brackets_are_technical(tmp_path):
+    from src.music.analyzer import MusicReleaseAnalyzer
+
+    folder = tmp_path / "Fictional Band - Paper Moons (2019) [WEB] [96kHz] [44.1kHz]"
+    folder.mkdir()
+    assert not MusicReleaseAnalyzer().analyze(folder).get("release_label")
+
+
+def test_missing_lineage_file_is_not_recorded(tmp_path):
+    from src.music.prep import _apply_music_cli_overrides
+
+    release = _release(media="Vinyl")
+    _apply_music_cli_overrides(Meta(music_lineage=str(tmp_path / "missing.txt")), release)
+    assert not release.get("lineage")
+    assert _codes(release)["missing_lineage"] == "warning"
+
+    lineage = tmp_path / "lineage.txt"
+    lineage.write_text("Turntable > ADC", encoding="utf-8")
+    _apply_music_cli_overrides(Meta(music_lineage=str(lineage)), release)
+    assert release.get("lineage") == str(lineage)
+
+
+def test_request_fill_rejects_low_log_score_and_other_artists():
+    release = _release(release_year="2019")
+    record = {"requestId": 9, "title": "Paper Moons", "artists": [[{"name": "Fictional Band"}]], "categoryName": "Music", "isFilled": False, "minLogScore": 100}
+    adapter = _adapter()
+
+    with patch.object(Orpheus, "_api_get", new=AsyncMock(return_value=record)):
+        assert "below the minimum 100%" in asyncio.run(adapter._verify_request_fill(Meta(music_request_id="9"), release, [{"score": 95}]))[1]
+        assert asyncio.run(adapter._verify_request_fill(Meta(music_request_id="9"), release, [{"score": 100}])) == ("9", "")
+    with patch.object(Orpheus, "_api_get", new=AsyncMock(return_value={**record, "artists": [[{"name": "Someone Else"}]]})):
+        assert "do not match" in asyncio.run(adapter._verify_request_fill(Meta(music_request_id="9"), release))[1]
+
+
+def test_group_id_must_share_an_artist():
+    release = _release()
+    group = {"group": {"id": 4, "name": "Paper Moons", "musicInfo": {"artists": [{"id": 1, "name": "Someone Else"}]}}}
+    with patch.object(Orpheus, "_api_get", new=AsyncMock(return_value=group)):
+        assert "do not match" in asyncio.run(_adapter()._verify_group(Meta(music_group_id="4"), release))[1]
+    group["group"]["musicInfo"]["artists"][0]["name"] = "Fictional Band"
+    with patch.object(Orpheus, "_api_get", new=AsyncMock(return_value=group)):
+        assert asyncio.run(_adapter()._verify_group(Meta(music_group_id="4"), release)) == ("4", "")

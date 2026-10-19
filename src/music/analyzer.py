@@ -23,7 +23,7 @@ LEADING_YEAR_RE = re.compile(r"^\s*[\[(]?\s*((?:19|20)\d{2})\b")
 EDITION_RE = re.compile(r"(?:\[|\()([^\]\)]*(?:deluxe|remaster|anniversary|reissue|expanded|edition)[^\]\)]*)(?:\]|\))", re.I)
 EDITION_WITH_YEAR_RE = re.compile(r"(?:\[|\()\s*((?:19|20)\d{2})[\s,.-]+([^\]\)]+)(?:\]|\))", re.I)
 BRACKET_RE = re.compile(r"\[([^\]]+)\]|\{([^\}]+)\}")
-TECHNICAL_BRACKET_RE = re.compile(r"\b\d{2}\s*-?\s*bits?\b|\bk?hz\b|\b(?:EAC|XLD|LOG|CUE|LOSSLESS|24-?\d{2,3})\b", re.I)
+TECHNICAL_BRACKET_RE = re.compile(r"\b\d{2}\s*-?\s*bits?\b|(?:\b|(?<=\d))k?hz\b|\b(?:EAC|XLD|LOG|CUE|LOSSLESS|24-?\d{2,3})\b", re.I)
 # Subsequent catalogue components must have an actual separator.  Allowing an
 # optional separator before another ``\d+`` creates many equivalent ways to
 # partition a long run of digits and can backtrack exponentially.
