@@ -30,7 +30,7 @@ class ConfigSyncError(RuntimeError):
     """Raised when a configuration cannot be synchronized or written safely."""
 
 
-class ConfigWriteConflict(ConfigSyncError):
+class ConfigWriteConflictError(ConfigSyncError):
     """Raised when an external edit invalidates a staged configuration write."""
 
 
@@ -301,10 +301,10 @@ def replace_config_source(config_path: Path, updated_source: str, original_bytes
         shutil.copymode(config_path, temp_path)
         _parse_config(temp_path.read_text(encoding="utf-8"), str(temp_path))
         if config_path.read_bytes() != original_bytes:
-            raise ConfigWriteConflict("Configuration changed while saving. Your pending changes are kept; review the latest configuration before retrying.")
+            raise ConfigWriteConflictError("Configuration changed while saving. Your pending changes are kept; review the latest configuration before retrying.")
         temp_path.replace(config_path)
         temp_path = None
-    except ConfigWriteConflict:
+    except ConfigWriteConflictError:
         raise
     except Exception as exc:
         raise ConfigSyncError(f"Could not replace the configuration safely: {exc}") from exc

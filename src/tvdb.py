@@ -249,10 +249,7 @@ def _get_tvdb_or_warn(config: dict[str, Any] | None = None) -> TVDB | None:
     if not isinstance(tvdb_api_key, str) or not tvdb_api_key.strip():
         if not _tvdb_error_reported:
             _tvdb_error_reported = True
-            logger.info(
-                "[yellow]TVDB API key is not configured. Direct TVDB lookups are unavailable; "
-                "TVDB IDs will be obtained from TMDb when available.[/yellow]"
-            )
+            logger.info("[yellow]TVDB API key is not configured. Direct TVDB lookups are unavailable; TVDB IDs will be obtained from TMDb when available.[/yellow]")
         return None
 
     try:
