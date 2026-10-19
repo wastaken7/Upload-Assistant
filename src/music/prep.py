@@ -182,6 +182,15 @@ def _apply_music_cli_overrides(meta: Meta, release: Any) -> None:
     if genres:
         set_user("genres", genres)
 
+    if meta.music_unknown_release:
+        set_user("unknown_release", True)
+    lineage_path = str(meta.music_lineage or "").strip()
+    if lineage_path:
+        if Path(lineage_path).expanduser().is_file():
+            set_user("lineage", lineage_path)
+        else:
+            logger.warning(f"[yellow]MUSIC: --music-lineage file not found: {lineage_path}[/yellow]")
+
     edition = meta.manual_edition
     if isinstance(edition, list):
         edition = " ".join(str(item).strip() for item in edition if str(item).strip())

@@ -511,6 +511,48 @@ class Args:
             "--music-release-year", nargs=1, required=False, help="MUSIC: concrete release/pressing year (not the original group year)", dest="music_release_year"
         )
         parser.add_argument("--music-edition-year", nargs=1, required=False, help="MUSIC: remaster/reissue/edition year", dest="music_edition_year")
+        parser.add_argument(
+            "--music-unknown-release",
+            action="store_true",
+            default=None,
+            help="MUSIC: mark the edition as Unknown Release when its year, label and catalogue cannot be established",
+            dest="music_unknown_release",
+        )
+        parser.add_argument(
+            "--music-artist-role",
+            nargs=1,
+            required=False,
+            metavar="NAME=ROLE",
+            help="MUSIC: extra artist credits as 'Name=role; Name=role' (main, guest, composer, conductor, dj, remixer, producer, arranger)",
+            dest="music_artist_roles",
+        )
+        parser.add_argument(
+            "--music-request-id", nargs=1, required=False, metavar="ID_OR_URL", help="MUSIC: Orpheus request to fill with this upload (checked first)", dest="music_request_id"
+        )
+        parser.add_argument(
+            "--music-group-id", nargs=1, required=False, metavar="ID_OR_URL", help="MUSIC: existing Orpheus torrent group to add this upload to", dest="music_group_id"
+        )
+        parser.add_argument(
+            "--music-watermark",
+            nargs=1,
+            required=False,
+            metavar="NOTE",
+            help="MUSIC: describe watermarks or voice-overs in the release (required disclosure)",
+            dest="music_watermark",
+        )
+        parser.add_argument(
+            "--music-lineage", nargs=1, required=False, metavar="PATH", help="MUSIC: text file with source lineage for the release description", dest="music_lineage"
+        )
+        parser.add_argument(
+            "--music-showcase", action="store_true", default=None, help="MUSIC: Orpheus Showcase release (your own work or on behalf of the artist)", dest="music_showcase"
+        )
+        parser.add_argument(
+            "--music-check-log",
+            action="store_true",
+            default=None,
+            help="MUSIC: score rip logs with the Orpheus logchecker before uploading",
+            dest="music_check_log",
+        )
         parser.add_argument("--music-label", nargs=1, required=False, help="MUSIC: label for this release", dest="music_label")
         parser.add_argument("--music-catalogue-number", nargs=1, required=False, help="MUSIC: catalogue number for this release", dest="music_catalogue_number")
         parser.add_argument("--music-genre", nargs=1, required=False, help="MUSIC: comma-separated genre override", dest="music_genres")
