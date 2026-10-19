@@ -326,6 +326,14 @@ class Meta:
     music_release_type: str = ""
     music_release_year: int = 0
     music_release: dict[str, Any] = field(default_factory=dict)
+    music_unknown_release: bool = False
+    music_artist_roles: str = ""
+    music_request_id: str = ""
+    music_group_id: str = ""
+    music_watermark: str = ""
+    music_lineage: str = ""
+    music_showcase: bool = False
+    music_check_log: bool = False
     name_notag: str = ""
     name: str = ""
     narrator: str = ""

@@ -182,6 +182,11 @@ def _apply_music_cli_overrides(meta: Meta, release: Any) -> None:
     if genres:
         set_user("genres", genres)
 
+    if meta.music_unknown_release:
+        set_user("unknown_release", True)
+    if str(meta.music_lineage or "").strip():
+        set_user("lineage", str(meta.music_lineage).strip())
+
     edition = meta.manual_edition
     if isinstance(edition, list):
         edition = " ".join(str(item).strip() for item in edition if str(item).strip())

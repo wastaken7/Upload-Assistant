@@ -3509,7 +3509,7 @@ def _validate_release_group_overrides(value: object) -> None:
                 try:
                     if isinstance(field_val, bool) or not isinstance(field_val, (str, int)) or int(field_val) < minimum:
                         raise ValueError
-                except (ValueError, TypeError):  # fmt: skip
+                except ValueError, TypeError:
                     raise ValueError(f"{field} for {name} must be an integer of at least {minimum}, or null.") from None
                 continue
             if not isinstance(field_val, str):

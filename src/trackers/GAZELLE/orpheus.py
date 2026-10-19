@@ -13,8 +13,9 @@ from rich.markup import escape
 from src.console import logger
 from src.meta import Meta
 from src.music.models import MusicRelease
-from src.music.validation import OrpheusMusicValidator, ValidationLevel
+from src.music.validation import OrpheusEdition, OrpheusMusicValidator, ValidationLevel, lame_preset, resolve_orpheus_edition
 from src.trackers.common import Common
+from src.trackers.GAZELLE.orpheus_tags import orpheus_tags
 
 
 class Orpheus:
@@ -26,6 +27,8 @@ class Orpheus:
     supported_categories = ("MUSIC",)
     source_flag = "OPS"
     base_url = "https://orpheus.network"
+    # Artwork hosts the upload form rejects; any other host is accepted.
+    banned_image_hosts = ("discogs.com", "fbcdn.net", "photobucket.com", "ptpimg.me")
     release_types: ClassVar[dict[str, int]] = {
         "Album": 1,
         "Soundtrack": 3,
@@ -46,6 +49,21 @@ class Orpheus:
         "Concert Recording": 18,
         "Unknown": 21,
     }
+    # Gazelle artist "importance" values from the upload form.
+    artist_roles: ClassVar[dict[str, int]] = {
+        "main": 1,
+        "guest": 2,
+        "remixer": 3,
+        "composer": 4,
+        "conductor": 5,
+        "dj": 6,
+        "compiler": 6,
+        "producer": 7,
+        "arranger": 8,
+    }
+    # Bitrates offered by the upload form for a CBR/ABR value.
+    form_bitrates = frozenset({320, 256, 192, 160, 128, 96, 64})
+    classical_tags = frozenset({"classical", "baroque.era", "classical.era", "romantic", "renaissance", "opera", "chamber.music", "modern.classical", "score"})
     banned_groups = ()
     blocked_music_artists: ClassVar[dict[str, str]] = {
         "vap0rwave": "Vap0rwave",
@@ -53,6 +71,7 @@ class Orpheus:
         "firmensprecher": "Firmensprecher",
         "stretches": "stretches",
         "phyllomedusa": "Phyllomedusa",
+        "drizzywap": "Drizzy Wap",
     }
     blocked_music_releases: ClassVar[tuple[tuple[str, str], ...]] = (
         ("Bruce Springsteen", "Odds and Sods"),
@@ -72,6 +91,8 @@ class Orpheus:
     )
     comment_hosts = ("orpheus.network", "home.opsfet.ch")
     tracker_urls = ("home.opsfet.ch",)
+    max_tag_length = 200
+    max_lineage_characters = 8000
 
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
@@ -93,6 +114,24 @@ class Orpheus:
         if not isinstance(meta.music_release, dict):
             raise ValueError("MUSIC analysis is missing; run preparation before using Orpheus.")
         return MusicRelease.from_dict(meta.music_release)
+
+    async def _api_get(self, meta: Meta, params: dict[str, str], timeout_seconds: float, purpose: str) -> dict[str, Any] | None:
+        """Run one read-only ``ajax.php`` GET and return its ``response`` object."""
+        try:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(timeout_seconds), headers=self._headers(meta)) as client:
+                response = await client.get(f"{self.base_url}/ajax.php", params=params)
+                response.raise_for_status()
+                raw_json = response.json()
+        except (httpx.HTTPError, ValueError) as error:
+            logger.warning(f"{self.tracker}: [yellow]read-only {purpose} failed: {error}[/yellow]")
+            return None
+        if not isinstance(raw_json, dict):
+            return None
+        payload = cast(dict[str, Any], raw_json)
+        response_data = payload.get("response")
+        if payload.get("status") != "success" or not isinstance(response_data, dict):
+            return None
+        return cast(dict[str, Any], response_data)
 
     @staticmethod
     def _normalise_artist_name(value: Any) -> str:
@@ -127,84 +166,235 @@ class Orpheus:
 
     @classmethod
     def _blocked_labels(cls, release: MusicRelease) -> list[str]:
-        labels = {cls._normalise_artist_name(value) for value in (release.get("release_label", ""), release.get("label", "")) if str(value or "").strip()}
+        labels = {
+            cls._normalise_artist_name(value)
+            for value in (release.get("release_label", ""), release.get("label", ""), release.get("edition_label", ""))
+            if str(value or "").strip()
+        }
         return [label for label in cls.blocked_music_labels if cls._normalise_artist_name(label) in labels]
 
     async def get_additional_checks(self, meta: Meta) -> bool:
-        """Prevent uploads of artists explicitly prohibited by Orpheus."""
+        """Prevent uploads of artists, releases and labels prohibited by Orpheus."""
         release = self._release(meta)
         blocked_artists = self._blocked_artists(release)
         blocked_releases = self._blocked_releases(release)
         blocked_labels = self._blocked_labels(release)
-        if not (blocked_artists or blocked_releases or blocked_labels):
+        not_in_folder = bool(meta.path) and Path(str(meta.path)).is_file()
+        if not (blocked_artists or blocked_releases or blocked_labels or not_in_folder):
             return True
         reasons = [
             *(f"artist {artist}" for artist in blocked_artists),
             *(f"blacklisted release {release_name}" for release_name in blocked_releases),
             *(f"blacklisted label {label}" for label in blocked_labels),
         ]
-        message = f"Upload blocked: Orpheus blacklist matched {', '.join(reasons)}."
+        messages = [f"Orpheus blacklist matched {', '.join(reasons)}"] if reasons else []
+        if not_in_folder:
+            reasons.append("not in a folder")
+            messages.append("music uploads must be inside a folder; select the release folder, not a single file")
+        message = f"Upload blocked: {'; '.join(messages)}."
         status = meta.tracker_status.setdefault(self.tracker, {})
         status["status_message"] = message
         status["blocked_reasons"] = reasons
         logger.error(f"{self.tracker}: [red]{message}[/red]")
         return False
 
+    # ------------------------------------------------------------------
+    # Duplicate review
+    # ------------------------------------------------------------------
+
     async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
-        """Perform one narrow, read-only Gazelle browse query for duplicate review."""
+        """Perform one narrow, read-only Gazelle browse query for duplicate review.
+
+        Matching groups are expanded per torrent and compared with the planned
+        upload's edition, medium, format and encoding so the dupe and trump
+        rules (2.2) can be reviewed before uploading.
+        """
         release = self._release(meta)
         artist, album = str(release.get("artist", "")), str(release.get("album", ""))
         if not artist or not album or not self.api_key:
             return []
-        params = {"action": "browse", "artistname": artist, "groupname": album}
-        payload: dict[str, Any] = {}
-        try:
-            async with httpx.AsyncClient(timeout=httpx.Timeout(8.0), headers=self._headers(meta)) as client:
-                response = await client.get(f"{self.base_url}/ajax.php", params=params)
-                response.raise_for_status()
-                raw_json = response.json()
-        except (httpx.HTTPError, ValueError) as error:
-            logger.warning(f"{self.tracker}: [yellow]read-only duplicate search failed: {error}[/yellow]")
+        response = await self._api_get(meta, {"action": "browse", "artistname": artist, "groupname": album}, 8.0, "duplicate search")
+        if response is None:
             return []
-        if not isinstance(raw_json, dict):
-            return []
-        payload = cast(dict[str, Any], raw_json)
-        if payload.get("status") != "success":
-            return []
-        response_data = payload.get("response")
-        if not isinstance(response_data, dict):
-            return []
-        response_data_dict = cast(dict[str, Any], response_data)
-        results = response_data_dict.get("results")
+        results = response.get("results")
         if not isinstance(results, list):
             return []
-        results_list = cast(list[Any], results)
+
+        planned = self._planned_upload(release)
+        title_key = self._normalise_request_text(album)
         dupes: list[dict[str, Any]] = []
-        for group_item in results_list:
+        assessment: list[dict[str, Any]] = []
+        for group_item in cast(list[Any], results):
             if not isinstance(group_item, dict):
                 continue
             group = cast(dict[str, Any], group_item)
             group_id = group.get("groupId")
-            editions = group.get("torrents")
-            if not isinstance(editions, list):
+            group_name = f"{group.get('artist', '')} - {group.get('groupName', '')}".strip(" -")
+            torrents = [cast(dict[str, Any], torrent) for torrent in cast(list[Any], group.get("torrents") or []) if isinstance(torrent, dict)]
+            if self._normalise_request_text(group.get("groupName")) != title_key:
+                dupes.append(
+                    {
+                        "name": group_name,
+                        "size": group.get("maxSize"),
+                        "id": group_id,
+                        "link": f"{self.base_url}/torrents.php?id={group_id}" if group_id else None,
+                        "flags": ["different release group"],
+                        "type": group.get("releaseType"),
+                    }
+                )
                 continue
-            editions_list = cast(list[Any], editions)
-            encodings = [
-                f"{cast(dict[str, Any], torrent).get('media', '')} {cast(dict[str, Any], torrent).get('format', '')} {cast(dict[str, Any], torrent).get('encoding', '')}".strip()
-                for torrent in editions_list
-                if isinstance(torrent, dict)
-            ]
-            dupes.append(
-                {
-                    "name": f"{group.get('artist', '')} - {group.get('groupName', '')}".strip(" -"),
-                    "size": group.get("maxSize"),
-                    "id": group_id,
-                    "link": f"{self.base_url}/torrents.php?id={group_id}" if group_id else None,
-                    "flags": encodings,
-                    "type": group.get("releaseType"),
-                }
-            )
+            for torrent in torrents:
+                verdict, trumpable = self._assess_existing_torrent(planned, torrent)
+                torrent_id = torrent.get("torrentId")
+                name = f"{group_name} [{group.get('groupYear', '')}] / {self._describe_torrent(torrent)}"
+                dupes.append(
+                    {
+                        "name": name,
+                        "size": torrent.get("size"),
+                        "id": torrent_id,
+                        "link": f"{self.base_url}/torrents.php?id={group_id}&torrentid={torrent_id}" if group_id and torrent_id else None,
+                        "flags": [verdict],
+                        "type": group.get("releaseType"),
+                        "trumpable": trumpable,
+                    }
+                )
+                assessment.append({"torrent": name, "verdict": verdict, "trumpable": trumpable})
+        if assessment:
+            meta.tracker_status.setdefault(self.tracker, {})["dupe_assessment"] = assessment
+            for item in assessment:
+                if item["verdict"].startswith(("DUPE", "LIKELY DUPE", "TRUMP")):
+                    logger.warning(f"{self.tracker}: [yellow]{escape(item['verdict'])}: {escape(item['torrent'])}[/yellow]")
         return dupes
+
+    def _planned_upload(self, release: MusicRelease) -> dict[str, Any]:
+        format_name = next(iter(release.formats)) if len(release.formats) == 1 else ""
+        encoding = ""
+        if format_name:
+            bitrate, other, vbr = self._encoding(release, format_name)
+            encoding = f"{other} (VBR)" if bitrate == "Other" and vbr else (other if bitrate == "Other" else bitrate)
+        edition = resolve_orpheus_edition(release)
+        return {
+            "edition": edition,
+            "media": str(release.get("media", "")),
+            "format": format_name,
+            "encoding": encoding,
+            "has_log": bool(release.auxiliary.logs),
+            # Folder catalogue numbers are not sent, but they are reliable
+            # enough to recognise an existing release of the same pressing.
+            "catalogue_number": edition.catalogue_number or dict(edition.folder_hints).get("catalogue number", ""),
+        }
+
+    @staticmethod
+    def _describe_torrent(torrent: dict[str, Any]) -> str:
+        edition_bits = [str(torrent.get(key) or "").strip() for key in ("remasterYear", "remasterRecordLabel", "remasterCatalogueNumber", "remasterTitle")]
+        edition = " ".join(bit for bit in edition_bits if bit and bit != "0") or "Unknown/Original release"
+        parts = [str(torrent.get(key) or "") for key in ("media", "format", "encoding")]
+        if torrent.get("hasLog"):
+            parts.append(f"Log ({torrent.get('logScore', 0)}%)")
+        if torrent.get("hasCue"):
+            parts.append("Cue")
+        if torrent.get("scene"):
+            parts.append("Scene")
+        return f"{edition} / {' '.join(part for part in parts if part)}"
+
+    @classmethod
+    def _catalogue_keys(cls, value: Any) -> set[str]:
+        """Normalise one or more catalogue numbers (``A & B``, ``A / B``)."""
+        return {key for part in re.split(r"\s*(?:&|/|,|;)\s*", str(value or "")) if (key := cls._normalise_request_text(part))}
+
+    @classmethod
+    def _edition_relation(cls, planned: dict[str, Any], torrent: dict[str, Any]) -> tuple[str, str]:
+        """Compare release information: ``(relation, note)``.
+
+        Editions are defined by the audio (rip log TOC and peaks), not by
+        catalogue data, so different releases of one edition are dupes (rule
+        2.2.11.2).  Relation is ``same`` (same catalogue or both unknown),
+        ``same_year`` (same edition year) or ``other``.
+        """
+        edition: OrpheusEdition = planned["edition"]
+        existing_year = str(torrent.get("remasterYear") or "").strip()
+        existing_unknown = existing_year in {"", "0"} and not any(torrent.get(key) for key in ("remasterRecordLabel", "remasterCatalogueNumber", "remasterTitle"))
+        if edition.unknown or existing_unknown:
+            return ("same", "") if edition.unknown and existing_unknown else ("other", "")
+        ours = cls._catalogue_keys(planned.get("catalogue_number"))
+        if ours and ours & cls._catalogue_keys(torrent.get("remasterCatalogueNumber")):
+            note = f"; the site lists this catalogue as {existing_year}, check your edition year" if edition.year and existing_year != edition.year else ""
+            return "same", note
+        if edition.year and existing_year == edition.year:
+            return "same_year", ""
+        return "other", ""
+
+    @classmethod
+    def _assess_existing_torrent(cls, planned: dict[str, Any], torrent: dict[str, Any]) -> tuple[str, bool]:
+        """Return a dupe/trump verdict for human review and whether we trump it."""
+        if str(torrent.get("format", "")) != planned["format"]:
+            return "different format", False
+        if str(torrent.get("media", "")).casefold() != str(planned["media"]).casefold():
+            return "different source medium (allowed, rule 2.2.11.1)", False
+        relation, note = cls._edition_relation(planned, torrent)
+        if relation == "other":
+            return "different edition year: allowed only if the audio differs (compare rip log TOC/peaks, rule 2.2.11.2)", False
+        scope = "same release" if relation == "same" else "same edition year (releases of one edition are dupes unless the audio differs, rule 2.2.11.2)"
+        dupe = "DUPE" if relation == "same" else "LIKELY DUPE"
+        ours, theirs = planned["encoding"], str(torrent.get("encoding", ""))
+        if planned["format"] == "FLAC":
+            if ours != theirs:
+                return "different bit depth (24-bit and 16-bit lossless coexist)", False
+            if str(planned["media"]).upper() == "CD" and planned["has_log"] and (not torrent.get("hasLog") or int(torrent.get("logScore") or 0) < 100):
+                return f"TRUMP possible only if your log scores 100% ({scope}; rules 2.2.10.2-2.2.10.4); report the old torrent after uploading{note}", True
+            return f"{dupe}: {scope}, same medium, format and encoding{note}", False
+        lossy = cls._lossy_relation(ours, theirs)
+        if lossy == "dupe":
+            return f"{dupe}: {scope}, same medium, format and bitrate{note}", False
+        if lossy == "trumps":
+            return f"TRUMP: your encode replaces this one ({scope}, rule 2.2.9); report the old torrent after uploading{note}", True
+        if lossy == "trumped":
+            return f"{dupe}: a preferred encode already exists ({scope}, rule 2.2.9){note}", False
+        return "coexists with your encode (rule 2.2.9)", False
+
+    @staticmethod
+    def _lossy_kind(encoding: str) -> tuple[str, int]:
+        value = encoding.strip()
+        if value in {"V0 (VBR)", "APX (VBR)"}:
+            return ("v0", 0)
+        if value in {"V2 (VBR)", "APS (VBR)"}:
+            return ("v2", 0)
+        if value == "V1 (VBR)":
+            return ("v1", 0)
+        number = re.match(r"(\d+)", value)
+        bitrate = int(number.group(1)) if number else 0
+        return ("vbr" if "VBR" in value else "cbr", bitrate)
+
+    @classmethod
+    def _lossy_relation(cls, ours: str, theirs: str) -> str:
+        """Approximate rule 2.2.9 between two lossy encodings."""
+        if ours == theirs:
+            return "dupe"
+        preset_rank = {"V0 (VBR)": 2, "APX (VBR)": 1, "V2 (VBR)": 2, "APS (VBR)": 1}
+        our_kind, our_rate = cls._lossy_kind(ours)
+        their_kind, their_rate = cls._lossy_kind(theirs)
+        if our_kind == their_kind and our_kind in {"v0", "v2"}:
+            return "trumps" if preset_rank.get(ours, 0) > preset_rank.get(theirs, 0) else "trumped"
+        # 320 CBR and V0 may always coexist (rule 2.2.9.3).
+        if {our_kind, their_kind} == {"v0", "cbr"} and 320 in {our_rate, their_rate}:
+            return "coexists"
+
+        def beats(kind: str, rate: int, other_kind: str, other_rate: int) -> bool:
+            if kind == "v0":
+                return other_kind in {"v1", "v2", "vbr"} or (other_kind == "cbr" and other_rate < 320)
+            if kind == "v2":
+                return (other_kind == "cbr" and other_rate < 256) or (other_kind == "vbr" and other_rate <= 210)
+            if kind == "cbr" and other_kind == "cbr":
+                return rate > other_rate
+            return False
+
+        if beats(our_kind, our_rate, their_kind, their_rate):
+            return "trumps"
+        if beats(their_kind, their_rate, our_kind, our_rate):
+            return "trumped"
+        if our_kind == their_kind == "vbr" and abs(our_rate - their_rate) < 32:
+            return "dupe"
+        return "coexists"
 
     async def get_torrent(self, torrent_id: int | str, meta: Meta) -> dict[str, Any] | None:
         """Return one Orpheus torrent's Gazelle metadata using a read-only API call.
@@ -215,30 +405,19 @@ class Orpheus:
         identifier = str(torrent_id).strip()
         if not identifier.isdigit() or not self.api_key:
             return None
-        payload: dict[str, Any] = {}
-        try:
-            async with httpx.AsyncClient(timeout=httpx.Timeout(15.0), headers=self._headers(meta)) as client:
-                response = await client.get(f"{self.base_url}/ajax.php", params={"action": "torrent", "id": identifier})
-                response.raise_for_status()
-                raw_json = response.json()
-        except (httpx.HTTPError, ValueError) as error:
-            logger.warning(f"{self.tracker}: [yellow]read-only torrent lookup failed for {identifier}: {error}[/yellow]")
-            return None
-        if not isinstance(raw_json, dict):
-            return None
-        payload = cast(dict[str, Any], raw_json)
-        response_data = payload.get("response")
-        if payload.get("status") == "success" and isinstance(response_data, dict):
-            return cast(dict[str, Any], response_data)
-        return None
+        return await self._api_get(meta, {"action": "torrent", "id": identifier}, 15.0, f"torrent lookup for {identifier}")
+
+    # ------------------------------------------------------------------
+    # Requests
+    # ------------------------------------------------------------------
 
     async def get_requests(self, meta: Meta) -> list[dict[str, Any]]:
         """Search open MUSIC requests with one bounded, read-only API call.
 
-        The API's requested format/media fields use legacy naming, so matching
-        is deliberately conservative: title, credited artists and initial year
-        determine the match level; source/format requirements are displayed for
-        human review and never cause an automatic request fill.
+        Title, credited artists and initial year determine the match level;
+        the request's format/bitrate/media/log/cue requirements are compared
+        with the planned upload and shown for review.  Requests are never
+        filled automatically; use ``--music-request-id`` for that.
         """
         if meta.category != "MUSIC" or not self.api_key:
             return []
@@ -246,37 +425,18 @@ class Orpheus:
         album = str(release.get("album", "")).strip()
         if not album:
             return []
-        params = {
-            "action": "requests",
-            "search": album,
-            "show_filled": "false",
-            "filter_cat[]": "1",
-        }
-        payload: dict[str, Any] = {}
-        try:
-            async with httpx.AsyncClient(timeout=httpx.Timeout(10.0), headers=self._headers(meta)) as client:
-                response = await client.get(f"{self.base_url}/ajax.php", params=params)
-                response.raise_for_status()
-                raw_json = response.json()
-        except (httpx.HTTPError, ValueError) as error:
-            logger.warning(f"{self.tracker}: [yellow]read-only request search failed: {error}[/yellow]")
+        # ``filter_cat[]`` is a zero-based category index (0 = Music), and
+        # ``show_filled`` is enabled by its mere presence, so it is omitted.
+        response = await self._api_get(meta, {"action": "requests", "search": album, "filter_cat[]": "0"}, 10.0, "request search")
+        if response is None:
             return []
-        if not isinstance(raw_json, dict):
-            return []
-        payload = cast(dict[str, Any], raw_json)
-        if payload.get("status") != "success":
-            return []
-        response_data = payload.get("response")
-        if not isinstance(response_data, dict):
-            return []
-        response_data_dict = cast(dict[str, Any], response_data)
-        records = response_data_dict.get("results")
+        records = response.get("results")
         if not isinstance(records, list):
             return []
-        records_list = cast(list[Any], records)
 
+        planned = self._planned_upload(release)
         matches: list[dict[str, Any]] = []
-        for record_item in records_list:
+        for record_item in cast(list[Any], records):
             if not isinstance(record_item, dict):
                 continue
             record = cast(dict[str, Any], record_item)
@@ -290,19 +450,25 @@ class Orpheus:
                 continue
             artists = self._request_artists(record)
             title = str(record.get("title", "")).strip()
+            compatible, unmet = self._request_compatibility(record, planned, release)
             matches.append(
                 {
                     "id": str(request_id),
                     "name": f"{' & '.join(artists)} - {title}".strip(" -"),
-                    "bounty": record.get("bounty", 0),
-                    "description": str(record.get("description", "")),
+                    "bounty": record.get("bounty", record.get("totalBounty", 0)),
+                    "description": str(record.get("bbDescription", record.get("description", ""))),
                     "match_type": match_type,
+                    "compatible": compatible,
+                    "unmet": unmet,
                     "requirements": {
-                        "release_type": record.get("releaseType", ""),
+                        "release_type": record.get("releaseTypeName", record.get("releaseType", "")),
                         "bitrate": record.get("bitrateList", ""),
                         "format": record.get("formatList", ""),
                         "media": record.get("mediaList", ""),
-                        "log_cue": record.get("logCue", ""),
+                        "need_log": record.get("needLog", False),
+                        "need_cue": record.get("needCue", False),
+                        "need_log_checksum": record.get("needLogChecksum", False),
+                        "min_log_score": record.get("minLogScore", 0),
                     },
                     "url": f"{self.base_url}/requests.php?action=view&id={request_id}",
                     "year": record.get("year", ""),
@@ -316,9 +482,34 @@ class Orpheus:
                     f"{self.tracker}: [bold green]{match['match_type'].title()} match:[/bold green] {escape(str(match['name']))} — bounty: {escape(str(match['bounty']))}"
                 )
                 logger.info(f"{self.tracker}: [cyan]{match['url']}[/cyan]")
-                logger.info(f"{self.tracker}: [yellow]Requested technical fields: {match['requirements']}[/yellow]")
+                if match["compatible"]:
+                    logger.info(f"{self.tracker}: [green]This upload meets the request's technical requirements. Fill it with --music-request-id {match['id']}.[/green]")
+                else:
+                    logger.info(f"{self.tracker}: [yellow]Not compatible: {escape('; '.join(match['unmet']))}[/yellow]")
         meta.tracker_status.setdefault(self.tracker, {})["request_matches"] = matches
         return matches
+
+    @staticmethod
+    def _accepts(allowed: Any, value: str) -> bool:
+        values = [str(item) for item in cast(list[Any], allowed)] if isinstance(allowed, list) else [item.strip() for item in str(allowed or "").split(",") if item.strip()]
+        return not values or "Any" in values or value in values
+
+    @classmethod
+    def _request_compatibility(cls, record: dict[str, Any], planned: dict[str, Any], release: MusicRelease) -> tuple[bool, list[str]]:
+        unmet: list[str] = []
+        if not cls._accepts(record.get("formatList"), planned["format"]):
+            unmet.append(f"format {planned['format']} not in {record.get('formatList')}")
+        if not cls._accepts(record.get("bitrateList"), planned["encoding"]):
+            unmet.append(f"bitrate {planned['encoding']} not in {record.get('bitrateList')}")
+        if not cls._accepts(record.get("mediaList"), planned["media"]):
+            unmet.append(f"media {planned['media']} not in {record.get('mediaList')}")
+        if record.get("needLog") and not release.auxiliary.logs:
+            unmet.append("a rip log is required")
+        if record.get("needCue") and not release.auxiliary.cues:
+            unmet.append("a cue sheet is required")
+        # A minimum log score cannot be proven locally; it is shown in the
+        # requirements and can be confirmed with --music-check-log.
+        return not unmet, unmet
 
     @staticmethod
     def _normalise_request_text(value: Any) -> str:
@@ -327,15 +518,14 @@ class Orpheus:
     @classmethod
     def _request_artists(cls, record: dict[str, Any]) -> list[str]:
         artists: list[str] = []
-        role_list = cast(list[Any], record.get("artists") or [])
-        for role in role_list:
+        roles: Any = record.get("artists") or record.get("musicInfo") or []
+        role_lists = list(cast(dict[str, Any], roles).values()) if isinstance(roles, dict) else cast(list[Any], roles)
+        for role in role_lists:
             if not isinstance(role, list):
                 continue
-            role_items = cast(list[Any], role)
-            for artist_item in role_items:
+            for artist_item in cast(list[Any], role):
                 if isinstance(artist_item, dict):
-                    artist = cast(dict[str, Any], artist_item)
-                    name = str(artist.get("name", "")).strip()
+                    name = str(cast(dict[str, Any], artist_item).get("name", "")).strip()
                     if name and name not in artists:
                         artists.append(name)
         return artists
@@ -352,6 +542,94 @@ class Orpheus:
         year_match = bool(request_year and release_year and request_year == release_year)
         return "exact" if artist_match and year_match else "partial"
 
+    @staticmethod
+    def _parse_identifier(value: Any) -> str:
+        """Accept a bare ID or an Orpheus URL containing ``id=``."""
+        text = str(value or "").strip()
+        if text.isdigit():
+            return text
+        match = re.search(r"[?&](?:id|requestid|groupid)=(\d+)", text)
+        return match.group(1) if match else ""
+
+    async def _verify_request_fill(self, meta: Meta, release: MusicRelease) -> tuple[str, str]:
+        """Return ``(request_id, error)`` for an explicitly requested fill."""
+        request_id = self._parse_identifier(meta.music_request_id)
+        if not str(meta.music_request_id or "").strip():
+            return "", ""
+        if not request_id:
+            return "", f"invalid request ID or URL: {meta.music_request_id}"
+        record = await self._api_get(meta, {"action": "request", "id": request_id}, 10.0, f"request lookup for {request_id}")
+        if record is None:
+            return "", f"request {request_id} could not be loaded"
+        if record.get("isFilled"):
+            return "", f"request {request_id} is already filled"
+        if str(record.get("categoryName", "Music")) != "Music":
+            return "", f"request {request_id} is not a Music request"
+        if self._request_match_type(release, record) is None:
+            return "", f"request {request_id} title '{record.get('title', '')}' does not match '{release.get('album', '')}'"
+        compatible, unmet = self._request_compatibility(record, self._planned_upload(release), release)
+        if not compatible:
+            return "", f"request {request_id} requirements are not met: {'; '.join(unmet)}"
+        return request_id, ""
+
+    async def _verify_group(self, meta: Meta, release: MusicRelease) -> tuple[str, str]:
+        """Return ``(group_id, error)`` for an explicit existing torrent group."""
+        if not str(meta.music_group_id or "").strip():
+            return "", ""
+        group_id = self._parse_identifier(meta.music_group_id)
+        if not group_id:
+            return "", f"invalid group ID or URL: {meta.music_group_id}"
+        response = await self._api_get(meta, {"action": "torrentgroup", "id": group_id}, 10.0, f"group lookup for {group_id}")
+        group = cast(dict[str, Any], response.get("group")) if response and isinstance(response.get("group"), dict) else None
+        if group is None:
+            return "", f"group {group_id} could not be loaded"
+        if self._normalise_request_text(group.get("name")) != self._normalise_request_text(release.get("album")):
+            return "", f"group {group_id} is '{group.get('name', '')}', not '{release.get('album', '')}'"
+        return group_id, ""
+
+    async def _check_logs(self, meta: Meta, release: MusicRelease) -> list[dict[str, Any]]:
+        """Score rip logs with Orpheus's logchecker when explicitly enabled.
+
+        The logchecker endpoint only parses the submitted log and returns its
+        score; it does not create or change anything on the site.
+        """
+        if not meta.music_check_log or not release.auxiliary.logs or not self.api_key:
+            return []
+        results: list[dict[str, Any]] = []
+        async with httpx.AsyncClient(timeout=httpx.Timeout(30.0), headers=self._headers(meta)) as client:
+            for log in release.auxiliary.logs:
+                log_path = release.path / log
+                if not log_path.is_file():
+                    continue
+                try:
+                    with log_path.open("rb") as handle:
+                        response = await client.post(f"{self.base_url}/ajax.php?action=logchecker", files={"log": (log_path.name, handle, "text/plain")})
+                    response.raise_for_status()
+                    payload = response.json()
+                except (httpx.HTTPError, ValueError, OSError) as error:
+                    logger.warning(f"{self.tracker}: [yellow]logchecker failed for {escape(log)}: {error}[/yellow]")
+                    continue
+                body = cast(dict[str, Any], payload) if isinstance(payload, dict) else {}
+                data: Any = body.get("response") if body.get("status") == "success" else None
+                if not isinstance(data, dict):
+                    continue
+                result = cast(dict[str, Any], data)
+                entry: dict[str, Any] = {
+                    "log": log,
+                    "score": result.get("score"),
+                    "checksum": result.get("checksum"),
+                    "ripper": result.get("ripper"),
+                    "issues": result.get("issues", []),
+                }
+                results.append(entry)
+                colour = "green" if entry["score"] == 100 else "yellow"
+                logger.info(f"{self.tracker}: [{colour}]log {escape(log)}: score {entry['score']}% ({escape(str(entry['ripper']))}, checksum {entry['checksum']})[/{colour}]")
+                for issue in cast(list[Any], entry["issues"] or []):
+                    logger.info(f"{self.tracker}: [yellow]  - {escape(str(issue))}[/yellow]")
+        if results:
+            meta.tracker_status.setdefault(self.tracker, {})["log_checks"] = results
+        return results
+
     async def get_name(self, meta: Meta) -> str:
         """For the terminal display only, not for upload."""
         release = self._release(meta)
@@ -361,10 +639,22 @@ class Orpheus:
         release = self._release(meta)
         if not await self.get_additional_checks(meta):
             return False
+        status = meta.tracker_status.setdefault(self.tracker, {})
         issues = OrpheusMusicValidator().validate(release)
         errors = [issue.message for issue in issues if issue.level == ValidationLevel.ERROR]
+        warnings = [issue.message for issue in issues if issue.level == ValidationLevel.WARNING]
+        if warnings:
+            status["validation_warnings"] = warnings
+            for warning in warnings:
+                logger.warning(f"{self.tracker}: [yellow]{escape(warning)}[/yellow]")
         if errors:
-            meta.tracker_status.setdefault(self.tracker, {})["status_message"] = "Validation failed: " + " | ".join(errors)
+            status["status_message"] = "Validation failed: " + " | ".join(errors)
+            return False
+        await self._check_logs(meta, release)
+        request_id, request_error = await self._verify_request_fill(meta, release) if self.api_key else ("", "")
+        group_id, group_error = await self._verify_group(meta, release) if self.api_key else ("", "")
+        if request_error or group_error:
+            status["status_message"] = "Upload blocked: " + " | ".join(error for error in (request_error, group_error) if error)
             return False
         # Keep debug semantics consistent with the other tracker adapters: do
         # not create a tracker torrent and never make a state-changing request.
@@ -372,12 +662,15 @@ class Orpheus:
         # normal tracker-status flow.
         if meta.debug:
             data = self.build_upload_payload(meta, release)
+            if request_id:
+                data["requestid"] = request_id
+            if group_id:
+                data["groupid"] = group_id
             debug_payload: dict[str, Any] = {
                 **data,
                 "file_input": "<not-created in debug mode>",
                 "logfiles[]": list(release.auxiliary.logs),
             }
-            status = meta.tracker_status.setdefault(self.tracker, {})
             status["status_message"] = "Debug mode: upload skipped; payload prepared locally. Artwork is optional on Orpheus."
             status["debug_payload_fields"] = sorted(data)
             status["debug_payload"] = debug_payload
@@ -385,14 +678,18 @@ class Orpheus:
             logger.info(json.dumps(debug_payload, ensure_ascii=False, indent=2), extra={"markup": False})
             return True
         if not self.api_key or not self.announce_url:
-            meta.tracker_status.setdefault(self.tracker, {})["status_message"] = "Missing Orpheus API key or announce URL."
+            status["status_message"] = "Missing Orpheus API key or announce URL."
             return False
         await self.common.create_torrent_for_upload(meta, self.tracker, self.source_flag, announce_url=self.announce_url)
         torrent_path = Path(meta.base_dir) / "tmp" / str(meta.uuid) / f"[{self.tracker}].torrent"
         if not torrent_path.is_file():
-            meta.tracker_status.setdefault(self.tracker, {})["status_message"] = "Tracker torrent was not created."
+            status["status_message"] = "Tracker torrent was not created."
             return False
         data = self.build_upload_payload(meta, release)
+        if request_id:
+            data["requestid"] = request_id
+        if group_id:
+            data["groupid"] = group_id
         try:
             async with httpx.AsyncClient(timeout=httpx.Timeout(60.0), headers=self._headers(meta)) as client:
                 with torrent_path.open("rb") as torrent_file:
@@ -416,7 +713,7 @@ class Orpheus:
                 response.raise_for_status()
                 payload = response.json()
         except (httpx.HTTPError, ValueError, OSError) as error:
-            meta.tracker_status.setdefault(self.tracker, {})["status_message"] = f"Upload request failed: {error}"
+            status["status_message"] = f"Upload request failed: {error}"
             return False
         return self._record_upload_response(meta, payload)
 
@@ -459,6 +756,13 @@ class Orpheus:
             if isinstance(response_warnings, list)
             else []
         )
+        fill = result_dict.get("fillRequest")
+        if isinstance(fill, dict):
+            status["fill_request"] = fill
+            if "requestId" not in fill:
+                warnings.append(f"Request fill failed: {cast(dict[str, Any], fill).get('error', fill)}")
+        if any(item.get("trumpable") for item in cast(list[dict[str, Any]], status.get("dupe_assessment", []))):
+            warnings.append("This upload trumps an existing torrent; report the old torrent with a link to the new one (rule 2.2.3).")
         if warnings:
             status["warnings"] = warnings
             status["status_message"] = f"Upload accepted by Orpheus. Warnings: {' | '.join(warnings)}"
@@ -466,6 +770,10 @@ class Orpheus:
         else:
             status["status_message"] = "Upload accepted by Orpheus."
         return True
+
+    # ------------------------------------------------------------------
+    # Upload form
+    # ------------------------------------------------------------------
 
     def build_upload_payload(self, meta: Meta, release: MusicRelease) -> dict[str, str | list[str] | list[int] | int]:
         media = str(release.get("media", ""))
@@ -476,56 +784,112 @@ class Orpheus:
             raise ValueError("Orpheus uploads must contain exactly one audio format.")
         format_name = next(iter(release.formats))
         bitrate, other_bitrate, vbr = self._encoding(release, format_name)
-        year = str(release.get("year", ""))
-        artists = self._artists(release)
-        release_label = str(release.get("release_label", release.get("label", "")))
-        release_catalogue = str(release.get("release_catalogue_number", release.get("catalogue_number", "")))
-        edition_label = str(release.get("edition_label", ""))
-        edition_catalogue = str(release.get("edition_catalogue_number", ""))
-        # Orpheus requires an edition year on every upload, including a first
-        # digital issue that is not a remaster.  Keep the generic model's
-        # release/edition distinction intact and only derive this tracker form
-        # value at the adapter boundary.
-        edition_year = self._edition_year_for_upload(release)
-        is_remaster = bool(release.get("edition") or release.get("edition_year") or edition_label or edition_catalogue)
+        credits = self._artist_credits(meta, release)
+        edition = resolve_orpheus_edition(release)
+        tags, unofficial, dropped = self._tags(release)
+        if unofficial or dropped:
+            meta.tracker_status.setdefault(self.tracker, {})["tag_review"] = {"unofficial": unofficial, "dropped": dropped}
+        # Orpheus stores release information only in the remaster_* fields
+        # (``record_label``/``catalogue_number``/``remaster`` are ignored by
+        # the upload handler).  An Unknown Release sends no edition fields.
         payload: dict[str, str | list[str] | list[int] | int] = {
             "album_desc": self._album_description(release),
-            "artists[]": artists,
+            "artists[]": [name for name, _ in credits],
             "bitrate": bitrate,
-            "catalogue_number": release_catalogue,
             "format": format_name,
             "image": image_url,
-            "importance[]": [1] * len(artists),
+            "importance[]": [role for _, role in credits],
             "media": media,
-            "record_label": release_label,
-            "release_desc": self._release_description(release),
+            "release_desc": self._release_description(release, meta),
             "releasetype": self.release_types.get(str(release.get("release_type", "Unknown")), 21),
-            "remaster_catalogue_number": edition_catalogue if is_remaster else "",
-            "remaster_record_label": edition_label if is_remaster else "",
-            "remaster_title": str(release.get("edition", "")),
-            "remaster_year": edition_year,
-            "remaster": int(bool(is_remaster)),
             "scene": int(bool(meta.scene)),
             "submit": 1,
-            "tags": ",".join(str(value).replace(" ", ".").lower() for value in release.get("genres", [])),
+            "tags": tags,
             "title": str(release.get("album")),
             "type": 0,
             "vbr": int(vbr),
-            "year": year,
+            "year": str(release.get("year", "")),
         }
+        if edition.unknown:
+            payload["unknown"] = 1
+        else:
+            payload["remaster_year"] = edition.year
+            payload["remaster_title"] = edition.title
+            payload["remaster_record_label"] = edition.label
+            payload["remaster_catalogue_number"] = edition.catalogue_number
         if other_bitrate:
             payload["other_bitrate"] = other_bitrate
+        if meta.music_showcase:
+            payload["vanity_house"] = 1
         return {key: value for key, value in payload.items() if value not in ("", None, [])}
 
-    @staticmethod
-    def _edition_year_for_upload(release: MusicRelease) -> str:
-        """Resolve Orpheus's mandatory edition year without mutating metadata."""
-        candidates = (release.get("edition_year", ""), release.get("release_year", ""), release.get("retail_date", ""), release.get("year", ""))
-        for candidate in candidates:
-            match = re.search(r"\b(\d{4})\b", str(candidate or ""))
+    def _tags(self, release: MusicRelease) -> tuple[str, list[str], list[str]]:
+        """Return comma-separated Orpheus tags within the server's 200 characters."""
+        tags, unofficial, dropped = orpheus_tags(cast(list[str], release.get("genres", []) or []))
+        selected: list[str] = []
+        for tag in tags:
+            if len(",".join([*selected, tag])) > self.max_tag_length:
+                break
+            selected.append(tag)
+        return ",".join(selected), unofficial, dropped
+
+    @classmethod
+    def _parse_role_overrides(cls, value: Any) -> list[tuple[str, int]]:
+        """Parse ``"Name=role; Other=guest"`` CLI credits."""
+        credits: list[tuple[str, int]] = []
+        for item in re.split(r"\s*;\s*", str(value or "")):
+            name, separator, role = item.rpartition("=")
+            role_id = cls.artist_roles.get(role.strip().casefold().replace(" ", ""))
+            if separator and name.strip() and role_id:
+                credits.append((name.strip(), role_id))
+            elif item.strip():
+                logger.warning(f"[yellow]ORPHEUS: ignoring artist role '{escape(item)}'; use Name=main|guest|composer|conductor|dj|remixer|producer|arranger.[/yellow]")
+        return credits
+
+    @classmethod
+    def _artist_credits(cls, meta: Meta, release: MusicRelease) -> list[tuple[str, int]]:
+        """Build ``(name, importance)`` credits for the multiple-artist form.
+
+        Main artists come from the release.  Guests come from "feat." credits
+        in track artists; composers and conductors are added only for
+        classical music and soundtracks, where Orpheus uses those roles.
+        """
+        main = cls._artists(release)
+        credits: list[tuple[str, int]] = [(name, 1) for name in main]
+        main_keys = {cls._normalise_artist_name(name) for name in main}
+        release_type = str(release.get("release_type", ""))
+        tags, _, _ = orpheus_tags(cast(list[str], release.get("genres", []) or []))
+        classical = release_type == "Soundtrack" or bool(cls.classical_tags.intersection(tags))
+
+        def add(name: str, role: int) -> None:
+            clean = name.strip()
+            if not clean or (role == 2 and cls._normalise_artist_name(clean) in main_keys):
+                return
+            if all(not (cls._normalise_artist_name(existing) == cls._normalise_artist_name(clean) and existing_role == role) for existing, existing_role in credits):
+                credits.append((clean, role))
+
+        for track in release.tracks:
+            match = re.search(r"\s(?:feat(?:uring)?\.?|ft\.)\s+(.+)$", track.artist, flags=re.I)
             if match:
-                return match.group(1)
-        return ""
+                for guest in re.split(r"\s*(?:,|&|\band\b)\s*", match.group(1)):
+                    add(guest, 2)
+            if classical:
+                for composer in track.tags.get("composer", []):
+                    add(composer, 4)
+                for conductor in track.tags.get("conductor", []):
+                    add(conductor, 5)
+            if release_type == "Remix":
+                for remixer in track.tags.get("remixer", []):
+                    add(remixer, 3)
+            if release_type == "DJ Mix":
+                for dj in track.tags.get("djmixer", []):
+                    add(dj, 6)
+        for name, role in cls._parse_role_overrides(meta.music_artist_roles):
+            credits = [(existing, existing_role) for existing, existing_role in credits if cls._normalise_artist_name(existing) != cls._normalise_artist_name(name)]
+            credits.append((name, role))
+        if not any(role == 1 for _, role in credits):
+            credits = [(name, 1) for name in main] + credits
+        return credits
 
     @staticmethod
     def _artists(release: MusicRelease) -> list[str]:
@@ -548,30 +912,35 @@ class Orpheus:
                 form.append((key, value))
         return form
 
-    @staticmethod
-    def _cover_url(meta: Meta) -> str:
+    @classmethod
+    def _cover_url(cls, meta: Meta) -> str:
         """Return an allowed optional Orpheus artwork URL, never a local path.
 
         The form accepts optional HTTP(S) artwork, but disallows Discogs,
-        Facebook CDN and Photobucket hosts.  Invalid or disallowed URLs are
-        omitted rather than being submitted as a local path.
+        Facebook CDN, Photobucket and ptpimg hosts.  Invalid or disallowed
+        URLs are omitted rather than being submitted as a local path.
         """
         value = str(meta.artwork_url or "").strip()
         parsed = urlparse(value)
         host = (parsed.hostname or "").casefold()
-        banned_hosts = ("discogs.com", "fbcdn.net", "photobucket.com")
-        if parsed.scheme in {"http", "https"} and host and not any(host == banned or host.endswith(f".{banned}") for banned in banned_hosts):
+        if len(value) > 255:
+            return ""
+        if parsed.scheme in {"http", "https"} and host and not any(host == banned or host.endswith(f".{banned}") for banned in cls.banned_image_hosts):
             return value
         return ""
 
-    @staticmethod
-    def _encoding(release: MusicRelease, format_name: str) -> tuple[str, str, bool]:
+    @classmethod
+    def _encoding(cls, release: MusicRelease, format_name: str) -> tuple[str, str, bool]:
         tracks = release.tracks
         if format_name == "FLAC":
             return ("24bit Lossless" if any((track.bit_depth or 0) > 16 for track in tracks) else "Lossless", "", False)
+        if format_name == "MP3":
+            presets = {lame_preset(track.encoder_settings) for track in tracks}
+            if len(presets) == 1 and None not in presets:
+                return cast(str, next(iter(presets))), "", False
         average = round(sum(track.bitrate or 0 for track in tracks) / max(len(tracks), 1) / 1000)
         mode = next((track.bitrate_mode for track in tracks if track.bitrate_mode), None)
-        if format_name == "MP3" and mode == "CBR" and average in {192, 256, 320}:
+        if mode in {"CBR", "ABR"} and average in cls.form_bitrates:
             return str(average), "", False
         return "Other", str(average or "VBR"), mode == "VBR"
 
@@ -596,9 +965,44 @@ class Orpheus:
         return f"{hours}:{minutes:02d}:{seconds:02d}" if hours else f"{minutes:02d}:{seconds:02d}"
 
     @staticmethod
-    def _release_description(release: MusicRelease) -> str:
-        variants = sorted({f"{track.bit_depth or '?'}-bit / {(track.sample_rate or 0) / 1000:g} kHz / {track.channels or '?'}ch" for track in release.tracks})
+    def _technical_label(track: Any) -> str:
+        return f"{track.bit_depth or '?'}-bit / {(track.sample_rate or 0) / 1000:g} kHz / {track.channels or '?'}ch"
+
+    @classmethod
+    def _lineage_text(cls, meta: Meta, release: MusicRelease) -> str:
+        """Read lineage from ``--music-lineage`` or a lineage text file."""
+        candidates: list[Path] = []
+        if str(meta.music_lineage or "").strip():
+            candidates.append(Path(str(meta.music_lineage)).expanduser())
+        candidates.extend(release.path / item for item in release.auxiliary.lineage if item.lower().endswith((".txt", ".md")))
+        for candidate in candidates:
+            try:
+                if candidate.is_file():
+                    text = candidate.read_text(encoding="utf-8", errors="replace").strip()
+                    if text:
+                        return text[: cls.max_lineage_characters]
+            except OSError as error:
+                logger.warning(f"[yellow]ORPHEUS: could not read lineage file {escape(str(candidate))}: {error}[/yellow]")
+        return ""
+
+    @classmethod
+    def _release_description(cls, release: MusicRelease, meta: Meta | None = None) -> str:
+        variants = sorted({cls._technical_label(track) for track in release.tracks})
         parts = [f"Technical audio: {', '.join(variants)}."] if variants else []
+        if len(variants) > 1:
+            # Rule 2.1.5.2: describe which tracks differ in a hybrid release.
+            for variant in variants:
+                numbers = [
+                    f"{track.disc_number}.{track.track_number}" if release.disc_count > 1 else str(track.track_number or Path(track.relative_path).stem)
+                    for track in release.tracks
+                    if cls._technical_label(track) == variant
+                ]
+                parts.append(f"{variant}: tracks {', '.join(numbers)}")
+        encoders = sorted(
+            {f"{track.encoder_info} {track.encoder_settings}".strip() for track in release.tracks if track.format == "MP3" and (track.encoder_info or track.encoder_settings)}
+        )
+        if encoders:
+            parts.append(f"Encoder: {', '.join(encoders)}.")
         if release.get("retail_date"):
             parts.append(f"Retail date: {release.get('retail_date')}.")
         if release.get("store_url"):
@@ -607,4 +1011,13 @@ class Orpheus:
             parts.append("Cue sheet included.")
         if release.auxiliary.logs:
             parts.append("Rip log included.")
+        if meta is not None:
+            # Rule 1.3.1: scene credit belongs in the release description only.
+            if meta.scene and str(meta.scene_name or "").strip():
+                parts.append(f"Scene release: {meta.scene_name}")
+            if str(meta.music_watermark or "").strip():
+                parts.append(f"[b]Watermark / voice-over:[/b] {meta.music_watermark}")
+            lineage = cls._lineage_text(meta, release)
+            if lineage:
+                parts.append(f"[b]Lineage[/b]\n[pre]{lineage}[/pre]")
         return "\n".join(parts)

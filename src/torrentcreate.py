@@ -249,7 +249,9 @@ class TorrentCreator:
                     path = Path(path).parent
 
                 if meta.category not in ("MOVIE", "TV"):
-                    if meta.isdir and len(meta.filelist) == 1 and not meta.keep_folder:
+                    # Music releases always keep their folder, including
+                    # one-track singles (e.g. Orpheus rejects folderless music).
+                    if meta.isdir and len(meta.filelist) == 1 and not meta.keep_folder and meta.category != "MUSIC":
                         path = meta.filelist[0]
                 elif not meta.is_disc:
                     if meta.keep_folder:

@@ -712,6 +712,35 @@ let argumentCategories = [
         placeholder: "YYYY",
       },
       {
+        label: "--music-unknown-release",
+      },
+      {
+        label: "--music-artist-role",
+        placeholder: "NAME=ROLE; NAME=ROLE",
+      },
+      {
+        label: "--music-request-id",
+        placeholder: "ID_OR_URL",
+      },
+      {
+        label: "--music-group-id",
+        placeholder: "ID_OR_URL",
+      },
+      {
+        label: "--music-watermark",
+        placeholder: "NOTE",
+      },
+      {
+        label: "--music-lineage",
+        placeholder: "PATH",
+      },
+      {
+        label: "--music-showcase",
+      },
+      {
+        label: "--music-check-log",
+      },
+      {
         label: "--music-label",
         placeholder: "LABEL",
       },

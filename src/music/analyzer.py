@@ -9,7 +9,7 @@ import re
 import unicodedata
 from collections import Counter
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import mutagen
 
@@ -23,6 +23,7 @@ LEADING_YEAR_RE = re.compile(r"^\s*[\[(]?\s*((?:19|20)\d{2})\b")
 EDITION_RE = re.compile(r"(?:\[|\()([^\]\)]*(?:deluxe|remaster|anniversary|reissue|expanded|edition)[^\]\)]*)(?:\]|\))", re.I)
 EDITION_WITH_YEAR_RE = re.compile(r"(?:\[|\()\s*((?:19|20)\d{2})[\s,.-]+([^\]\)]+)(?:\]|\))", re.I)
 BRACKET_RE = re.compile(r"\[([^\]]+)\]|\{([^\}]+)\}")
+TECHNICAL_BRACKET_RE = re.compile(r"\b\d{2}\s*-?\s*bits?\b|\bk?hz\b|\b(?:EAC|XLD|LOG|CUE|LOSSLESS|24-?\d{2,3})\b", re.I)
 # Subsequent catalogue components must have an actual separator.  Allowing an
 # optional separator before another ``\d+`` creates many equivalent ways to
 # partition a long run of digits and can backtrack exponentially.
@@ -110,6 +111,50 @@ def _bitrate_mode(info: Any) -> str | None:
     return None
 
 
+def _embedded_image_bytes(technical: Any) -> int:
+    """Return bytes used by embedded artwork plus metadata padding.
+
+    FLAC padding is reported directly; for ID3 the declared tag size already
+    covers frames and padding.  MP4 artwork is the sum of ``covr`` atoms.
+    """
+    if technical is None:
+        return 0
+    total = 0
+    try:
+        pictures = cast(list[Any], getattr(technical, "pictures", None) or [])
+        for picture in pictures:
+            total += len(getattr(picture, "data", b"") or b"")
+        blocks = cast(list[Any], getattr(technical, "metadata_blocks", None) or [])
+        for block in blocks:
+            if type(block).__name__ == "Padding":
+                total += int(getattr(block, "length", 0) or 0)
+        tags: Any = getattr(technical, "tags", None)
+        if tags is not None and type(tags).__name__ == "ID3":
+            total = max(total, int(getattr(tags, "size", 0) or 0))
+        elif tags is not None and hasattr(tags, "get"):
+            covers = cast(list[Any], tags.get("covr", None) or [])
+            for cover in covers:
+                total += len(bytes(cover))
+    except TypeError, ValueError, AttributeError:
+        return total
+    return total
+
+
+def _flac_has_id3(path: Path) -> bool:
+    """Detect an ID3v2 header or ID3v1 footer wrapped around a FLAC file."""
+    try:
+        with path.open("rb") as handle:
+            if handle.read(3) == b"ID3":
+                return True
+            size = path.stat().st_size
+            if size >= 128:
+                handle.seek(size - 128)
+                return handle.read(3) == b"TAG"
+    except OSError:
+        return False
+    return False
+
+
 class MusicReleaseAnalyzer:
     """Build a normalized release from tags, sidecars and file structure."""
 
@@ -179,6 +224,10 @@ class MusicReleaseAnalyzer:
             genre=tags.get("genre", []),
             isrc=_first(tags, "isrc"),
             tags=tags,
+            encoder_info=_clean(getattr(info, "encoder_info", "") or ""),
+            encoder_settings=_clean(getattr(info, "encoder_settings", "") or ""),
+            embedded_image_bytes=_embedded_image_bytes(technical),
+            has_id3_tags=format_name == "FLAC" and _flac_has_id3(path),
         )
 
     def _classify_auxiliary(self, release: MusicRelease, path: Path, root: Path) -> None:
@@ -461,6 +510,10 @@ class MusicReleaseAnalyzer:
                 edition_bracket_indexes.add(index)
         for index, detail in enumerate(brackets):
             if index in edition_bracket_indexes:
+                continue
+            # Technical blocks such as ``[16-bit 44100 Hz]`` or ``[EAC]`` are
+            # never imprint or catalogue information.
+            if TECHNICAL_BRACKET_RE.search(detail):
                 continue
             if CATALOGUE_RE.fullmatch(detail):
                 release.set_field("release_catalogue_number", detail, MetadataSource.DIRECTORY, 0.65)
