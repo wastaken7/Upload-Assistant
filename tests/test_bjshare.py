@@ -177,6 +177,19 @@ def test_search_existing_queries_only_media_identifiers():
 
     asyncio.run(tracker.search_existing(meta))
 
+    assert tracker.session.calls == [{"searchstr": "tt1234567"}]  # noqa: S101
+
+
+def test_search_existing_falls_back_to_tmdb_when_imdb_finds_no_group():
+    tracker = object.__new__(BJShare)
+    tracker.session = FakeSession(FakeSearchResponse())
+    tracker.cookie_validator = FakeCookieValidator()
+    tracker.base_url = "https://bj-share.info"
+    tracker.tracker = "BJSHARE"
+    meta = SimpleNamespace(category="TV", title="Example", imdb_tt="tt1234567", tmdb_id="76543")
+
+    asyncio.run(tracker.search_existing(meta))
+
     assert tracker.session.calls == [{"searchstr": "tt1234567"}, {"searchstr": "tv/76543"}]  # noqa: S101
 
 

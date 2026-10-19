@@ -43,7 +43,7 @@ from src.prompt_sound import PROMPT_SOUND_STDOUT_MARKER
 from src.app_paths import CODE_DIR, DATA_DIR, STATE_DIR
 from src.webui_paths import MAX_UPLOAD_PATHS, QUEUE_ENV, QUEUE_HASH_ENV, ROOTS_ENV, InspectedDirectories, validate_argument_paths, validate_content_path
 from src.args import cli_argument_catalog, tracker_cli_aliases
-from src.config_sync import ConfigSyncError, ConfigWriteConflict, config_write_lock, replace_config_source
+from src.config_sync import ConfigSyncError, ConfigWriteConflictError, config_write_lock, replace_config_source
 from src.external_tools import EXTERNAL_TOOL_KEYS, check_external_tools
 from src.meta import Meta
 from src.version import __version__
@@ -5627,7 +5627,7 @@ def _config_write_route(view: Callable[..., Any]) -> Callable[..., Any]:
         try:
             with config_write_lock(STATE_DIR / "data" / "config.py"):
                 return view(*args, **kwargs)
-        except ConfigWriteConflict as error:
+        except ConfigWriteConflictError as error:
             return jsonify({"success": False, "error": str(error)}), 409
         except (ValueError, SyntaxError, UnicodeError) as error:
             return jsonify({"success": False, "error": f"Configuration file could not be parsed: {error}"}), 400
