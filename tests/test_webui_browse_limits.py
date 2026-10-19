@@ -102,8 +102,14 @@ def test_browsing_still_requires_authentication(browser, route, query):
 def test_other_routes_keep_their_default_limits(browser):
     """Preserve the hourly default on endpoints without browsing overrides."""
     for _ in range(50):
+        assert browser.get("/api/2fa/status", headers=HEADERS).status_code == 200
+    assert browser.get("/api/2fa/status", headers=HEADERS).status_code == 429
+
+
+def test_page_load_routes_allow_more_than_default_limit(browser):
+    """Keep routes fetched on every Web UI load usable past the hourly default."""
+    for _ in range(51):
         assert browser.get("/api/csrf_token").status_code == 200
-    assert browser.get("/api/csrf_token").status_code == 429
 
 
 def test_invalid_basic_credentials_are_counted_before_html_redirect(browser, monkeypatch):
