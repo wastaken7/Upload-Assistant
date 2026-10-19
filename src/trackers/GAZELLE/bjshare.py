@@ -854,8 +854,10 @@ class BJShare:
             BJShare.secret_token = auth_match.group(1)
 
             fallback_response = candidate
-            if response is None and BeautifulSoup(candidate.text, "html.parser").find("div", class_="main_column"):
+            # The site resolves IMDb and TMDB IDs to the same group, so the next ID is only a fallback.
+            if BeautifulSoup(candidate.text, "html.parser").find("div", class_="main_column"):
                 response = candidate
+                break
 
         response = response or fallback_response
         if response is None:
