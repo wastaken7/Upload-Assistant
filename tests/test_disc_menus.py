@@ -1,12 +1,40 @@
 # ruff: noqa: S101
 
+import json
+from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
 
 from src import disc_menus
 from src.disc_menus import DiscMenus, discard_previous_menu_capture_files
 from src.meta import Meta
+
+
+@pytest.mark.asyncio
+async def test_local_menu_images_keep_filename_order_through_upload_and_save(monkeypatch, tmp_path) -> None:
+    menu_dir = tmp_path / "menus"
+    menu_dir.mkdir()
+    image_paths = [menu_dir / name for name in ("menu-02.png", "menu-01.png", "menu-03.png", "notes.txt")]
+    for path in image_paths:
+        path.write_bytes(b"image")
+
+    monkeypatch.setattr(Path, "iterdir", lambda _path: iter(image_paths))
+    expected_names = ["menu-01.png", "menu-02.png", "menu-03.png"]
+    uploaded_images = [{"raw_url": f"https://img.example/{name}"} for name in expected_names]
+    upload = AsyncMock(return_value=(uploaded_images, len(uploaded_images)))
+    meta = Meta(base_dir=str(tmp_path), uuid="menu-order", path_to_menu_screenshots=str(menu_dir))
+    manager = DiscMenus(meta, {})
+    monkeypatch.setattr(manager.uploadscreens_manager, "upload_screens", upload)
+
+    await manager.get_local_images(meta)
+
+    upload.assert_awaited_once()
+    assert [path.name for path in upload.await_args.kwargs["custom_img_list"]] == expected_names
+    assert meta.menu_images == uploaded_images
+    saved_images = json.loads((tmp_path / "tmp" / "menu-order" / "menu_images.json").read_text())
+    assert saved_images == {"menu_images": uploaded_images}
 
 
 def test_discard_previous_menu_capture_files_only_removes_the_current_vob_batch(tmp_path) -> None:
