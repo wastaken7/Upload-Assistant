@@ -2,9 +2,11 @@
 import hashlib
 import io
 import json
+import os
 import shlex
 import subprocess
 import sys
+import time
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
@@ -15,7 +17,7 @@ import src.webui_paths as policy
 import web_ui.server as server
 from src.meta import Meta
 from src.queuemanage import QueueManager
-from src.webui_paths import QUEUE_ENV, QUEUE_HASH_ENV, ROOTS_ENV, is_generated_queue_path, read_generated_queue, validate_content_path, validate_subprocess_queue
+from src.webui_paths import QUEUE_ENV, QUEUE_HASH_ENV, ROOTS_ENV, generated_queue_name, is_generated_queue_path, read_generated_queue, validate_content_path, validate_subprocess_queue
 
 
 @pytest.fixture
@@ -528,18 +530,117 @@ def test_directory_inspection_is_reused_only_within_a_validation_phase(workspace
     response = client.post("/api/save_queue", json={"items": items})
     assert response.status_code == 200
     assert walks == [str(menus)]
+    # The issued queue is unchanged since save_queue; the subprocess walks it again.
     server._validate_execution_path(response.json["path"])
-    assert walks == [str(menus)] * 2
+    assert walks == [str(menus)]
     monkeypatch.setenv(ROOTS_ENV, json.dumps([str(root)]))
-    validate_subprocess_queue([{"path": item["path"], "args": [item["path"], "--menus", str(menus)]} for item in items])
-    assert walks == [str(menus)] * 3
+    subprocess_queue = [{"path": item["path"], "args": [item["path"], "--menus", str(menus)]} for item in items]
+    validate_subprocess_queue(subprocess_queue)
+    assert walks == [str(menus)] * 2
     policy.validate_subprocess_path(str(menus))
-    assert walks == [str(menus)] * 4
+    assert walks == [str(menus)] * 3
     external = root.parent / "external-menu-folder"
     external.mkdir()
     _directory_link(menus / "escaping-link", external)
     with pytest.raises(ValueError, match="outside allowed roots"):
-        server._validate_execution_path(response.json["path"])
+        validate_subprocess_queue(subprocess_queue)
+
+
+@pytest.mark.parametrize("overlap", ["same", "equivalent", "child-after-folder", "folder-after-child"])
+def test_queue_rejects_repeated_or_overlapping_items(workspace, overlap):
+    client, root, state, first, second = workspace
+    folder = root / "Fictional Season"
+    folder.mkdir()
+    episode = folder / "Fictional Season E01.mkv"
+    episode.touch()
+    pairs = {
+        "same": (first, first),
+        "equivalent": (first, root / "." / first.name),
+        "child-after-folder": (folder, episode),
+        "folder-after-child": (episode, folder),
+    }
+    response = client.post("/api/save_queue", json={"items": [{"path": str(second)}, *({"path": str(path)} for path in pairs[overlap])]})
+    assert response.status_code == 400
+    assert response.json["item"] == 3
+    assert "overlaps item 2" in response.json["error"]
+    assert not (state / "tmp").exists()
+    sibling = root / "Fictional Season Extras"
+    sibling.mkdir()
+    response = client.post("/api/save_queue", json={"items": [{"path": str(folder)}, {"path": str(sibling)}]})
+    assert response.status_code == 200
+
+
+def _queue_logs(state, queue_path):
+    name = generated_queue_name(server._generated_queues[os.path.normcase(os.path.realpath(queue_path))])
+    return state / "tmp" / f"{name}_processed_files.log", state / "tmp" / f"{name}_queue.log"
+
+
+@pytest.mark.parametrize("finished", [True, False])
+def test_queue_logs_are_removed_when_finished_and_kept_to_resume(workspace, finished):
+    client, _, state, first, second = workspace
+    queue = client.post("/api/save_queue", json={"items": [{"path": str(first)}, {"path": str(second), "args": "--anon"}]}).json["path"]
+    processed_log, queue_log = _queue_logs(state, queue)
+    lines = Path(queue).read_text(encoding="utf-8").splitlines()
+    processed_log.write_text(json.dumps(lines if finished else lines[:1]), encoding="utf-8")
+    queue_log.write_text(json.dumps(lines), encoding="utf-8")
+    server._remove_session_queue_file(queue)
+    assert not Path(queue).exists()
+    assert not queue_log.exists()
+    assert processed_log.exists() is not finished
+
+
+@pytest.mark.asyncio
+async def test_resending_a_selection_resumes_its_queue(workspace, monkeypatch):
+    client, root, state, first, second = workspace
+    items = [{"path": str(first)}, {"path": str(second)}]
+    path = client.post("/api/save_queue", json={"items": items}).json["path"]
+    queue_hash = hashlib.sha256(Path(path).read_bytes()).hexdigest()
+    processed_log, _ = _queue_logs(state, path)
+    processed_log.write_text(json.dumps([Path(path).read_text(encoding="utf-8").splitlines()[0]]), encoding="utf-8")
+    server._remove_session_queue_file(path)
+    resent = client.post("/api/save_queue", json={"items": items}).json["path"]
+    assert resent != path
+    monkeypatch.setenv(ROOTS_ENV, json.dumps([str(root)]))
+    monkeypatch.setenv(QUEUE_ENV, resent)
+    monkeypatch.setenv(QUEUE_HASH_ENV, queue_hash)
+    meta = Meta()
+    queue, log_file = await QueueManager.handle_queue(resent, meta, [resent], str(state))
+    assert [item["path"] for item in queue] == [str(second)]
+    assert meta.queue == generated_queue_name(queue_hash)
+    assert Path(log_file) == processed_log
+
+
+def test_stale_queue_logs_are_pruned_when_a_queue_is_saved(workspace):
+    client, _, state, first, second = workspace
+    tmp_dir = state / "tmp"
+    tmp_dir.mkdir()
+    old = time.time() - server.WEBUI_QUEUE_LOG_RETENTION_SECONDS - 60
+    stale = [tmp_dir / "webui_0123456789abcdef_processed_files.log", tmp_dir / "webui_queue_1700000000000_0123abcd_queue.log"]
+    kept = [tmp_dir / "webui_fedcba9876543210_processed_files.log", tmp_dir / "other_processed_files.log", tmp_dir / "webui_notes.log"]
+    for path in [*stale, *kept]:
+        path.write_text("[]", encoding="utf-8")
+    for path in [*stale, *kept[1:]]:
+        os.utime(path, (old, old))
+    assert client.post("/api/save_queue", json={"items": [{"path": str(first)}, {"path": str(second)}]}).status_code == 200
+    assert not any(path.exists() for path in stale)
+    assert all(path.exists() for path in kept)
+
+
+def test_only_issued_queues_count_against_the_save_queue_quota(workspace, monkeypatch):
+    client, _, _, first, second = workspace
+    monkeypatch.setattr(server.limiter, "enabled", True)
+    server.limiter.reset()
+    try:
+        for _ in range(101):
+            assert client.post("/api/save_queue", json={"items": [{"path": str(first)}], "return_single_path": True}).status_code == 200
+        assert client.post("/api/save_queue", json={"items": [{"path": str(first) + ".missing"}]}).status_code == 400
+        for _ in range(100):
+            response = client.post("/api/save_queue", json={"items": [{"path": str(first)}, {"path": str(second)}]})
+            assert response.status_code == 200
+            server._remove_session_queue_file(response.json["path"])
+        assert client.post("/api/save_queue", json={"items": [{"path": str(first)}]}).status_code == 429
+    finally:
+        server.limiter.reset()
 
 
 @pytest.mark.asyncio
