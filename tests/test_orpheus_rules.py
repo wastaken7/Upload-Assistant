@@ -541,3 +541,83 @@ def test_artist_matching_is_strict_for_title_only_results():
     assert not Orpheus._shares_artist(single, "Various Artists", strict=True)
     compilation = _release(release_type="Compilation")
     assert Orpheus._shares_artist(compilation, "Various Artists", strict=True)
+
+
+def test_accepted_upload_writes_the_torrent_link_into_the_client_torrent(tmp_path):
+    from torf import Torrent
+
+    content = tmp_path / "Fictional Band - Paper Moons (2019)"
+    content.mkdir()
+    (content / "01 - Song 1.flac").write_bytes(b"fLaC" + b"\0" * 4096)
+    meta = Meta(category="MUSIC", base_dir=str(tmp_path), uuid="ops-comment")
+    torrent_path = tmp_path / "tmp" / "ops-comment" / "[ORPHEUS].torrent"
+    torrent_path.parent.mkdir(parents=True)
+    torrent = Torrent(path=content, private=True, trackers=["https://example.invalid/announce"])
+    torrent.metainfo["info"]["source"] = "OPS"
+    torrent.generate()
+    torrent.write(torrent_path)
+    info_hash = Torrent.read(torrent_path).infohash
+
+    adapter = Orpheus({"TRACKERS": {"ORPHEUS": {"api_key": "fictional-token", "announce_url": "https://example.invalid/announce"}}})
+    response = {"status": "success", "response": {"torrentId": 42, "groupId": 7, "warnings": []}}
+    assert adapter._record_upload_response(meta, response)
+    asyncio.run(adapter._write_torrent_comment(meta))
+
+    written = Torrent.read(torrent_path)
+    assert written.comment == "https://orpheus.network/torrents.php?id=7&torrentid=42"
+    assert written.infohash == info_hash
+
+
+def _client_torrent(tmp_path: Path) -> tuple[Meta, Path]:
+    from torf import Torrent
+
+    content = tmp_path / "Fictional Band - Paper Moons (2019)"
+    content.mkdir(exist_ok=True)
+    (content / "01 - Song 1.flac").write_bytes(b"fLaC" + b"\0" * 4096)
+    meta = Meta(category="MUSIC", base_dir=str(tmp_path), uuid="ops-download")
+    torrent_path = tmp_path / "tmp" / "ops-download" / "[ORPHEUS].torrent"
+    torrent_path.parent.mkdir(parents=True, exist_ok=True)
+    torrent = Torrent(path=content, private=True, trackers=["https://example.invalid/announce"])
+    torrent.generate()
+    torrent.write(torrent_path, overwrite=True)
+    meta.tracker_status["ORPHEUS"] = {"torrent_id": 42, "group_id": 7}
+    return meta, torrent_path
+
+
+def _fake_download(content: bytes | None):
+    """Stand-in for Common.download_tracker_torrent writing ``content``."""
+
+    async def download(_self: Any, meta: Meta, tracker: str, **kwargs: Any) -> str | None:
+        download.kwargs = kwargs  # type: ignore[attr-defined]
+        if content is None:
+            return None
+        path = Path(meta.base_dir) / "tmp" / str(meta.uuid) / f"[{tracker}].torrent"
+        path.write_bytes(content)
+        return str(path)
+
+    return download
+
+
+def test_accepted_upload_seeds_the_torrent_downloaded_from_orpheus(tmp_path):
+    import bencodepy
+
+    meta, torrent_path = _client_torrent(tmp_path)
+    site_file = bencodepy.encode({b"comment": b"https://orpheus.network/torrents.php?torrentid=42", b"info": {b"name": b"test"}})
+    download = _fake_download(site_file)
+    with patch("src.trackers.common.Common.download_tracker_torrent", new=download):
+        assert asyncio.run(_adapter()._download_site_torrent(meta))
+
+    assert download.kwargs["params"] == {"action": "download", "id": "42"}  # never "usetoken"
+    assert download.kwargs["downurl"] == "https://orpheus.network/ajax.php"
+    assert torrent_path.read_bytes() == site_file
+    assert meta.tracker_status["ORPHEUS"]["torrent_link"] == "https://orpheus.network/torrents.php?torrentid=42"
+
+
+def test_a_failed_download_keeps_the_local_torrent(tmp_path):
+    meta, torrent_path = _client_torrent(tmp_path)
+    original = torrent_path.read_bytes()
+    # The API reports errors as JSON with HTTP 200, so the downloader saves it.
+    for content in (b'{"status":"failure","error":"rate limit"}', None):
+        with patch("src.trackers.common.Common.download_tracker_torrent", new=_fake_download(content)):
+            assert not asyncio.run(_adapter()._download_site_torrent(meta))
+        assert torrent_path.read_bytes() == original
