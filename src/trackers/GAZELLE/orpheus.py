@@ -1025,11 +1025,20 @@ class Orpheus:
     def _artist_credits(cls, meta: Meta, release: MusicRelease) -> list[tuple[str, int]]:
         """Build ``(name, importance)`` credits for the multiple-artist form.
 
-        Main artists come from the release.  Guests come from "feat." credits
-        in track artists; composers and conductors are added only for
-        classical music and soundtracks, where Orpheus uses those roles.
+        Main artists come from the release; a "feat." part of that credit
+        ("A feat. B") becomes a guest instead of part of the main name.
+        Guests also come from "feat." credits in track artists, and a named
+        "(X Remix)" in the release or track titles makes X the remixer.
+        Composers and conductors are added only for classical music and
+        soundtracks, where Orpheus uses those roles.
         """
-        main = cls._artists(release)
+        main: list[str] = []
+        featured: list[str] = []
+        for credit in cls._artists(release):
+            name, guests = cls._split_featuring(credit)
+            if name and name not in main:
+                main.append(name)
+            featured.extend(guests)
         credits: list[tuple[str, int]] = [(name, 1) for name in main]
         main_keys = {cls._normalise_artist_name(name) for name in main}
         release_type = str(release.get("release_type", ""))
@@ -1043,10 +1052,17 @@ class Orpheus:
             if all(not (cls._normalise_artist_name(existing) == cls._normalise_artist_name(clean) and existing_role == role) for existing, existing_role in credits):
                 credits.append((clean, role))
 
+        remixers = [name for title in (release.get("album", ""), *(track.title for track in release.tracks)) for name in cls._title_remixers(title)]
+        remixer_keys = {cls._normalise_artist_name(name) for name in remixers}
+        for name in remixers:
+            if cls._normalise_artist_name(name) not in main_keys:
+                add(name, 3)
+        for guest in featured:
+            if cls._normalise_artist_name(guest) not in remixer_keys:
+                add(guest, 2)
         for track in release.tracks:
-            match = re.search(r"\s(?:feat(?:uring)?\.?|ft\.)\s+(.+)$", track.artist, flags=re.I)
-            if match:
-                for guest in re.split(r"\s*(?:,|&|\band\b)\s*", match.group(1)):
+            for guest in cls._split_featuring(track.artist)[1]:
+                if cls._normalise_artist_name(guest) not in remixer_keys:
                     add(guest, 2)
             if classical:
                 for composer in track.tags.get("composer", []):
@@ -1065,6 +1081,34 @@ class Orpheus:
         if not any(role == 1 for _, role in credits):
             credits = [(name, 1) for name in main] + credits
         return credits
+
+    _FEATURING = re.compile(r"\s+(?:feat(?:uring)?\.?|ft\.)\s+", re.I)
+    _REMIX_CREDIT = re.compile(r"[(\[]\s*([^()\[\]]+?)\s+(?:remix|rework)\s*[)\]]", re.I)
+    _GENERIC_MIX_WORDS = frozenset(
+        {"extended", "original", "club", "radio", "single", "album", "instrumental", "dub", "vip", "official", "acoustic", "short", "long", "edit", "the"}
+    )
+
+    @classmethod
+    def _split_featuring(cls, credit: str) -> tuple[str, list[str]]:
+        """Split ``"A feat. B & C"`` into ``("A", ["B", "C"])``."""
+        parts = cls._FEATURING.split(str(credit or "").strip(), maxsplit=1)
+        if len(parts) == 1:
+            return parts[0].strip(), []
+        guests = [guest.strip() for guest in re.split(r"\s*(?:,|&|\band\b)\s*", parts[1]) if guest.strip()]
+        return parts[0].strip(), guests
+
+    @classmethod
+    def _title_remixers(cls, title: str) -> list[str]:
+        """Return remixer names from titles such as ``"Song (Name Remix)"``."""
+        names: list[str] = []
+        for match in cls._REMIX_CREDIT.finditer(str(title or "")):
+            name = match.group(1).strip()
+            if not name or set(re.findall(r"[a-z0-9]+", name.casefold())) <= cls._GENERIC_MIX_WORDS:
+                continue
+            for part in re.split(r"\s*(?:,|&|\band\b)\s*", name):
+                if part.strip() and part.strip() not in names:
+                    names.append(part.strip())
+        return names
 
     @staticmethod
     def _artists(release: MusicRelease) -> list[str]:

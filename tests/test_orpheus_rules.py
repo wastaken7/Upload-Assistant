@@ -686,3 +686,22 @@ def test_classical_group_credits_compare_the_performers():
     assert Orpheus._shares_artist(duo, credit, strict=True)
     assert Orpheus._shares_artist(duo, "Imagined Composer performed by Fictional Violin and Pretend Piano under Some Conductor", strict=True)
     assert not Orpheus._shares_artist(duo, "Various Composers performed by Someone Else Entirely", strict=True)
+
+
+def test_featuring_in_the_main_credit_and_named_remixes_become_roles():
+    release = _release(
+        tracks=1,
+        artist="Neon Tide feat. Imaginary Singer",
+        artists=["Neon Tide feat. Imaginary Singer"],
+        album="Paper Boat (Imaginary Singer Remix)",
+        release_type="Single",
+    )
+    release.tracks[0] = _track(1, artist="Neon Tide feat. Imaginary Singer", title="Paper Boat (Imaginary Singer Remix)")
+    credits = Orpheus._artist_credits(Meta(category="MUSIC"), release)
+    # Main artist only; the featured remixer is credited once, as remixer.
+    assert credits == [("Neon Tide", 1), ("Imaginary Singer", 3)]
+
+    plain = _release(tracks=1, artist="Neon Tide feat. Guest Voice", artists=["Neon Tide feat. Guest Voice"], release_type="Single")
+    assert Orpheus._artist_credits(Meta(category="MUSIC"), plain) == [("Neon Tide", 1), ("Guest Voice", 2)]
+    assert Orpheus._title_remixers("Paper Boat (Extended Mix)") == []
+    assert Orpheus._title_remixers("Paper Boat (Original Remix)") == []
