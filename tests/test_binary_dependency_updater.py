@@ -14,6 +14,7 @@ from bin.get_bdinfo import BDInfoBinaryManager
 from bin.get_bdinfo_docker import BDINFO_VERSION
 from bin.get_mkbrr import MkbrrBinaryManager
 from bin.get_nyuu import NyuuBinaryManager
+from bin.get_pesto import PestoBinaryManager
 from scripts import update_binary_dependency as updater
 
 WORKFLOW_PATH = Path(__file__).parents[1] / ".github" / "workflows" / "update-binary-dependencies.yml"
@@ -105,6 +106,35 @@ async def test_runtime_download_urls_derive_asset_names_from_version(
     with pytest.raises(Exception, match="StopDownload"):
         await manager(tmp_path, version=version)  # type: ignore[operator]
     assert urls[0].endswith(f"/{version}/{expected_asset}")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("machine", ["aarch64", "arm64"])
+async def test_pesto_downloads_the_linux_arm64_asset(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, machine: str) -> None:
+    urls: list[str] = []
+
+    class StopDownloadError(Exception):
+        pass
+
+    class Client:
+        async def __aenter__(self):  # type: ignore[no-untyped-def]
+            return self
+
+        async def __aexit__(self, *_args):  # type: ignore[no-untyped-def]
+            return None
+
+        def stream(self, _method: str, url: str, **_kwargs):  # type: ignore[no-untyped-def]
+            urls.append(url)
+            raise StopDownloadError("StopDownload")
+
+    monkeypatch.setattr("bin.get_pesto.platform.system", lambda: "Linux")
+    monkeypatch.setattr("bin.get_pesto.platform.machine", lambda: machine)
+    monkeypatch.setattr("bin.get_pesto.httpx.AsyncClient", lambda **_kwargs: Client())
+
+    with pytest.raises(Exception, match="Failed to setup Pesto binary: StopDownload$"):
+        await PestoBinaryManager.ensure_pesto_binary(tmp_path)
+    assert urls[0].endswith(f"/{DEPENDENCY_VERSIONS['pesto']}/pesto-linux-aarch64")
+    assert "pesto-linux-aarch64" in updater.DEPENDENCY_SPECS["pesto"].assets(DEPENDENCY_VERSIONS["pesto"])
 
 
 def test_fetch_latest_accepts_a_complete_stable_release(monkeypatch: pytest.MonkeyPatch) -> None:
