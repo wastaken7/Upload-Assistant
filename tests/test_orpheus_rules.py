@@ -475,3 +475,69 @@ def test_scene_checkbox_is_only_sent_for_scene_uploads():
     release = _release()
     assert "scene" not in _adapter().build_upload_payload(Meta(category="MUSIC", scene=False), release)
     assert _adapter().build_upload_payload(Meta(category="MUSIC", scene=True), release)["scene"] == 1
+
+
+def test_dupe_search_finds_a_group_written_differently():
+    # Mirrors a real miss: different artist alias, punctuation and state name.
+    release = _release(
+        artist="Robbie Lane & Night Owls",
+        artists=["Robbie Lane & Night Owls"],
+        album="2023 12 31: Grand Hall Of Fictional Arts, Springfield, Florida",
+        year="2023",
+        release_year="2023",
+    )
+    meta = Meta(category="MUSIC", music_release=release.to_dict())
+    existing = {
+        "groupId": 77,
+        "groupName": "2023-12-31 Grand Hall of Fictional Arts, Springfield, FL",
+        "artist": "Rob Lane and Night Owls",
+        "groupYear": 2023,
+        "torrents": [{"torrentId": 5, "remasterYear": 2023, "media": "WEB", "format": "FLAC", "encoding": "Lossless"}],
+    }
+    calls: list[dict[str, str]] = []
+
+    async def fake_get(_self: Orpheus, _meta: Meta, params: dict[str, str], _timeout_seconds: float, _purpose: str) -> dict[str, Any]:
+        calls.append(params)
+        return {"results": [existing] if params.get("groupname") == "2023 12 31" else []}
+
+    with patch.object(Orpheus, "_api_get", new=fake_get), patch("asyncio.sleep", new=AsyncMock()):
+        dupes = asyncio.run(_adapter().search_existing(meta))
+
+    assert len(calls) == 3
+    assert dupes[0]["flags"][0].startswith("LIKELY DUPE")
+
+
+def test_group_matching_rejects_other_shows_and_artists():
+    release = _release(artist="Robbie Lane & Night Owls", artists=["Robbie Lane & Night Owls"])
+    assert not Orpheus._same_group_title("2023 12 31 Grand Hall", "2023-12-30 Grand Hall")
+    assert Orpheus._same_group_title("Paper Moons (Deluxe)", "Paper Moons Deluxe")
+    assert not Orpheus._same_group_title("Paper Moons", "Paper Moons Remixed And Extended")
+    assert not Orpheus._shares_artist(release, "Someone Else Entirely")
+    assert Orpheus._shares_artist(release, "Rob Lane and Night Owls")
+
+
+def test_dated_titles_are_concert_recordings(tmp_path):
+    from src.music.analyzer import MusicReleaseAnalyzer
+
+    release = MusicRelease(root=str(tmp_path))
+    release.set_field("album", "2023-12-31 Grand Hall, Springfield", MetadataSource.FILE_TAG, 1.0)
+    release.tracks.extend([_track(n) for n in range(1, 8)])
+    MusicReleaseAnalyzer._derive_release_type(release)
+    assert release.get("release_type") == "Concert recording"
+
+
+def test_same_date_at_another_venue_is_not_the_same_group():
+    assert not Orpheus._same_group_title("2023-06-01 Live at Wembley", "2023-06-01 Live at Madison Square Garden")
+    assert Orpheus._same_group_title("2023 12 31: Grand Hall Of Fictional Arts, Springfield, Florida", "2023-12-31 Grand Hall of Fictional Arts, Springfield, FL")
+
+
+def test_artist_matching_is_strict_for_title_only_results():
+    single = _release(artist="Robbie Lane", artists=["Robbie Lane"])
+    # Server-side artist filter (first query): a co-credit still matches.
+    assert Orpheus._shares_artist(single, "Robbie Lane & Marco Fictus")
+    # Title/date-only queries need most of the larger credit to match.
+    assert not Orpheus._shares_artist(single, "Robbie Lane & Marco Fictus & Third Person", strict=True)
+    assert not Orpheus._shares_artist(single, "", strict=True)
+    assert not Orpheus._shares_artist(single, "Various Artists", strict=True)
+    compilation = _release(release_type="Compilation")
+    assert Orpheus._shares_artist(compilation, "Various Artists", strict=True)

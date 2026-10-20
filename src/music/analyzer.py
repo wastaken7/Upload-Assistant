@@ -581,6 +581,10 @@ class MusicReleaseAnalyzer:
         # ``NOSTALGIA`` as a soundtrack or ``Olive`` as a live album.
         if "soundtrack" in album or re.search(r"(?:^|[^\w])ost(?:$|[^\w])", album):
             value = "Soundtrack"
+        elif re.match(r"\s*(?:19|20)\d{2}[\s._/-]+\d{1,2}[\s._/-]+\d{1,2}(?!\d)", album):
+            # Dated show titles (``2023-12-31 Venue, City``) are concert
+            # recordings on Orpheus, not studio albums.
+            value = "Concert recording"
         elif re.search(r"\blive\b", album):
             value = "Live album"
         elif explicit_compilation or has_explicit_various_artists or len(album_artist_credits) > 1 or inferred_from_tracks:
