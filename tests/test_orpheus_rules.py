@@ -654,3 +654,35 @@ def test_file_error_after_upload_keeps_the_accepted_result(tmp_path):
     fallback.assert_awaited_once_with(meta)
     assert meta.tracker_status["ORPHEUS"]["status_message"] == "Upload accepted by Orpheus."
     assert torrent_path.read_bytes() == original
+
+
+def test_title_fallback_query_drops_joining_words():
+    # A combined credit ("A and B") misses groups listing A and B separately,
+    # and the cleaned title must not turn "&" into a required word "and".
+    release = _release(artist="Fictional Violin and Pretend Piano", artists=["Fictional Violin and Pretend Piano"], album="Bowstring & Keys")
+    meta = Meta(category="MUSIC", music_release=release.to_dict())
+    existing = {
+        "groupId": 9,
+        "groupName": "Bowstring & Keys",
+        "artist": "Fictional Violin & Pretend Piano",
+        "torrents": [{"torrentId": 1, "remasterYear": 2019, "media": "WEB", "format": "FLAC", "encoding": "Lossless"}],
+    }
+    calls: list[dict[str, str]] = []
+
+    async def fake_get(_self: Orpheus, _meta: Meta, params: dict[str, str], _timeout_seconds: float, _purpose: str) -> dict[str, Any]:
+        calls.append(params)
+        return {"results": [existing] if params.get("groupname") == "bowstring keys" and "artistname" not in params else []}
+
+    with patch.object(Orpheus, "_api_get", new=fake_get), patch("asyncio.sleep", new=AsyncMock()):
+        dupes = asyncio.run(_adapter().search_existing(meta))
+
+    assert {"action": "browse", "groupname": "bowstring keys"} in calls
+    assert dupes and dupes[0]["flags"][0].startswith(("DUPE", "LIKELY DUPE"))
+
+
+def test_classical_group_credits_compare_the_performers():
+    duo = _release(artist="Fictional Violin and Pretend Piano", artists=["Fictional Violin and Pretend Piano"])
+    credit = "Various Composers performed by Pretend Piano and Fictional Violin"
+    assert Orpheus._shares_artist(duo, credit, strict=True)
+    assert Orpheus._shares_artist(duo, "Imagined Composer performed by Fictional Violin and Pretend Piano under Some Conductor", strict=True)
+    assert not Orpheus._shares_artist(duo, "Various Composers performed by Someone Else Entirely", strict=True)

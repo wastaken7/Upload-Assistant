@@ -221,7 +221,9 @@ class Orpheus:
         if not artist or not album or not self.api_key:
             return []
         queries: list[dict[str, str]] = [{"artistname": artist, "groupname": album}]
-        cleaned = " ".join(self._title_tokens(album))
+        # The site requires every search word, so drop joining words: "&" in
+        # "Patkop & Say" must not become a required "and".
+        cleaned = " ".join(token for token in self._title_tokens(album) if token not in self._IGNORED_TOKENS)
         if cleaned and cleaned.casefold() != album.casefold():
             queries.append({"groupname": cleaned})
         concert_date = self._concert_date(album)
@@ -339,13 +341,21 @@ class Orpheus:
         partial credit ("A" vs "A & B") is enough.  Title- or date-only
         queries are not, so they require most of the larger credit to match
         and accept "Various Artists" only for compilations.
+
+        Classical groups are credited as "<composers> performed by
+        <performers> [under <conductor>]"; only the performers are compared.
         """
-        theirs = cls._title_words(group_artist)
+        credit = str(group_artist or "")
+        if re.fullmatch(r"\s*various artists\s*", credit, flags=re.I):
+            ours_credit = {cls._normalise_request_text(name) for name in cls._artists(release)}
+            return "variousartists" in ours_credit or str(release.get("release_type", "")) == "Compilation"
+        performers = re.split(r"\bperformed by\b", credit, maxsplit=1, flags=re.I)
+        if len(performers) == 2:
+            credit = re.split(r"\bunder\b", performers[1], maxsplit=1, flags=re.I)[0]
+        theirs = cls._title_words(credit)
         ours = {token for name in cls._artists(release) for token in cls._title_words(name)}
         if not theirs or not ours:
             return False
-        if "various" in theirs:
-            return "various" in ours or str(release.get("release_type", "")) == "Compilation"
         overlap = len(ours & theirs)
         return overlap / (max(len(ours), len(theirs)) if strict else min(len(ours), len(theirs))) >= 0.5
 
