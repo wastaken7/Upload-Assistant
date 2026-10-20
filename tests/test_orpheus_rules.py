@@ -524,3 +524,20 @@ def test_dated_titles_are_concert_recordings(tmp_path):
     release.tracks.extend([_track(n) for n in range(1, 8)])
     MusicReleaseAnalyzer._derive_release_type(release)
     assert release.get("release_type") == "Concert recording"
+
+
+def test_same_date_at_another_venue_is_not_the_same_group():
+    assert not Orpheus._same_group_title("2023-06-01 Live at Wembley", "2023-06-01 Live at Madison Square Garden")
+    assert Orpheus._same_group_title("2023 12 31: Grand Hall Of Fictional Arts, Springfield, Florida", "2023-12-31 Grand Hall of Fictional Arts, Springfield, FL")
+
+
+def test_artist_matching_is_strict_for_title_only_results():
+    single = _release(artist="Robbie Lane", artists=["Robbie Lane"])
+    # Server-side artist filter (first query): a co-credit still matches.
+    assert Orpheus._shares_artist(single, "Robbie Lane & Marco Fictus")
+    # Title/date-only queries need most of the larger credit to match.
+    assert not Orpheus._shares_artist(single, "Robbie Lane & Marco Fictus & Third Person", strict=True)
+    assert not Orpheus._shares_artist(single, "", strict=True)
+    assert not Orpheus._shares_artist(single, "Various Artists", strict=True)
+    compilation = _release(release_type="Compilation")
+    assert Orpheus._shares_artist(compilation, "Various Artists", strict=True)

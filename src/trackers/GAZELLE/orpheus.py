@@ -239,7 +239,7 @@ class Orpheus:
                     continue
                 group = cast(dict[str, Any], group_item)
                 key = str(group.get("groupId", ""))
-                if self._same_group_title(album, group.get("groupName")) and self._shares_artist(release, group.get("artist")):
+                if self._same_group_title(album, group.get("groupName")) and self._shares_artist(release, group.get("artist"), strict=index > 0):
                     matched[key] = group
                 elif index == 0:
                     unmatched[key] = group
@@ -324,18 +324,29 @@ class Orpheus:
             if our_date != their_date:
                 return False
             a, b = cls._title_words(ours, drop_date=True), cls._title_words(theirs, drop_date=True)
-            return not a or not b or len(a & b) / min(len(a), len(b)) >= 0.6
+            # Measure against the longer title so another venue on the same
+            # date ("Live at X" vs "Live at Y Z") does not match.
+            return not a or not b or len(a & b) / max(len(a), len(b)) >= 0.6
         a, b = cls._title_words(ours), cls._title_words(theirs)
         return bool(a and b) and len(a & b) / len(a | b) >= 0.85
 
     @classmethod
-    def _shares_artist(cls, release: MusicRelease, group_artist: Any) -> bool:
-        """Return whether the group's artist credit overlaps the release artists."""
+    def _shares_artist(cls, release: MusicRelease, group_artist: Any, *, strict: bool = False) -> bool:
+        """Return whether the group's artist credit overlaps the release artists.
+
+        The first query is already filtered by artist on the server, so a
+        partial credit ("A" vs "A & B") is enough.  Title- or date-only
+        queries are not, so they require most of the larger credit to match
+        and accept "Various Artists" only for compilations.
+        """
         theirs = cls._title_words(group_artist)
-        if not theirs or "various" in theirs:
-            return True
         ours = {token for name in cls._artists(release) for token in cls._title_words(name)}
-        return bool(ours) and len(ours & theirs) / min(len(ours), len(theirs)) >= 0.5
+        if not theirs or not ours:
+            return False
+        if "various" in theirs:
+            return "various" in ours or str(release.get("release_type", "")) == "Compilation"
+        overlap = len(ours & theirs)
+        return overlap / (max(len(ours), len(theirs)) if strict else min(len(ours), len(theirs))) >= 0.5
 
     def _planned_upload(self, release: MusicRelease) -> dict[str, Any]:
         format_name = next(iter(release.formats)) if len(release.formats) == 1 else ""
