@@ -9,6 +9,7 @@ import pytest
 
 from src.meta import Meta
 from src.trackers import vultu as vultu_module
+from src.trackers.UNIT3D.capybarabr import CapybaraBR
 from src.trackers.vultu import Vultu
 from src.trackersetup import STATIC_AUTH_TYPES, TrackerSetup, tracker_class_map
 
@@ -138,6 +139,23 @@ def test_additional_checks(values: dict[str, Any], expected: bool) -> None:
     assert asyncio.run(Vultu(CONFIG).get_additional_checks(Meta(name="Fictional Film 2001 1080p WEB-DL-NOGRP", **values))) is expected
 
 
+def test_name_matches_capybarabr() -> None:
+    meta = Meta(
+        category="TV",
+        name="Fictional Show 2026 S01 1080p WEB-DL DD+ 5.1 H.264-FAKEGRP",
+        title="Fictional Show",
+        year=2026,
+        tag="-FAKEGRP",
+        audio_languages=["Portuguese", "English"],
+        dual_audio=True,
+    )
+
+    expected = asyncio.run(CapybaraBR({"TRACKERS": {}}).get_name(meta))["name"]
+
+    assert asyncio.run(Vultu(CONFIG).get_name(meta)) == expected.strip()
+    assert "2026" not in expected
+
+
 def test_upload_data_limits_screenshots_and_flags_anime(tmp_path: Path) -> None:
     (tmp_path / "tmp" / "abc").mkdir(parents=True)
     (tmp_path / "tmp" / "abc" / "MEDIAINFO_CLEANPATH.txt").write_text("General\nFormat : Matroska\n", encoding="utf-8")
@@ -160,7 +178,8 @@ def test_upload_posts_form_and_downloads_registered_torrent(tmp_path: Path, monk
         category="MOVIE",
         base_dir=str(tmp_path),
         uuid="abc",
-        name="Fictional Film 2001 1080p WEB-DL-NOGRP",
+        name="Fictional Film 2001 1080p WEB-DL-FAKEGRP",
+        tag="-FAKEGRP",
         tmdb=1,
         image_list=[{"raw_url": f"https://img.example/{index}.png"} for index in range(3)],
     )
@@ -185,7 +204,7 @@ def test_upload_posts_form_and_downloads_registered_torrent(tmp_path: Path, monk
         body = request.content
         assert b'name="work"\r\n\r\ntmdb:movie:1' in body
         assert body.count(b'name="screenshots"') == 3
-        assert b'name="torrent"; filename="Fictional Film 2001 1080p WEB-DL-NOGRP.torrent"' in body
+        assert b'name="torrent"; filename="Fictional Film 2001 1080p WEB-DL-FAKEGRP.torrent"' in body
         return httpx.Response(201, json={"id": 412, "url": "https://vultu.org/torrents/412", "downloadUrl": "https://vultu.org/api/v1/torrents/412/download", "pending": True})
 
     _mock_client(monkeypatch, handler)
