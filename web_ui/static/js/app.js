@@ -4371,14 +4371,17 @@ function AudionutsUAGUI() {
       if (isSelected) {
         next = selectedPaths.filter((p) => !range.includes(p.path));
       } else {
-        // Skip items inside a folder that is already queued; the server
-        // rejects a folder together with its contents.
-        const claimed = [...selectedPaths.map((p) => p.path), ...range];
+        // The server rejects a folder together with its contents, so skip a
+        // candidate that is inside, or contains, a path already in the queue.
         next = [...selectedPaths];
         range.forEach((candidate) => {
-          if (next.some((p) => p.path === candidate)) return;
-          if (claimed.some((other) => isInsidePath(candidate, other))) return;
-          next.push({ path: candidate, args: "" });
+          const overlaps = next.some(
+            (p) =>
+              p.path === candidate ||
+              isInsidePath(candidate, p.path) ||
+              isInsidePath(p.path, candidate),
+          );
+          if (!overlaps) next.push({ path: candidate, args: "" });
         });
       }
     } else {
