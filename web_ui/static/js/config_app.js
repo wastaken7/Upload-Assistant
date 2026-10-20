@@ -1440,6 +1440,7 @@ const trackerNameMap = {
   ULCX: "ULCX",
   SUIO: "Suio",
   UTOPIA: "UTOPIA",
+  VULTU: "vultu",
   XINGYUNGEPT: "XingyungePT",
   YUSCENE: "YUSCENE",
   ZENITH: "Zenith",
