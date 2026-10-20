@@ -11,7 +11,6 @@ import pytest
 from src.meta import Meta
 from src.trackers.common import Common
 
-
 TORRENT = bencodepy.encode({b"info": {b"name": b"test", b"length": 1, b"piece length": 16384, b"pieces": b"x" * 20}})
 
 
@@ -83,7 +82,7 @@ async def test_valid_download_replaces_file_and_preserves_return_contract(tmp_pa
     _serve(monkeypatch, httpx.Response(200, stream=TorrentStream()))
     result = await Common({}).download_tracker_torrent(meta, "TEST", downurl="https://example.invalid/download", cross=cross, hash_is_id=hash_is_id)
     info_hash = hashlib.sha1(bencodepy.encode(bencodepy.decode(TORRENT)[b"info"]), usedforsecurity=False).hexdigest()
-    assert result == (None if cross else info_hash if hash_is_id else str(path))
+    assert result == (None if cross else info_hash if hash_is_id else f"{tmp_path}/tmp/download/[TEST].torrent")
     assert path.read_bytes() == TORRENT
     assert list(path.parent.iterdir()) == [path]
 
