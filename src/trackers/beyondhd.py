@@ -28,17 +28,19 @@ class BEYONDHD:
     display_name = "BeyondHD"
     reject_english_original_bloat = True
     source_flag = "BHD"
+    # Conditional bans (EVO, iFT, LFi) are enforced in get_additional_checks.
     banned_groups = (
+        "126811",
         "4K4U",
         "AOC",
         "BiTOR",
         "C4K",
+        "CREATiVE24",
         "CRUCiBLE",
         "d3g",
         "EASports",
-        "FGT",
+        ["FGT", "Only allowed when no other encode is available"],
         "Flights",
-        "iFT",
         "iVy",
         "MeGusta",
         "MezRips",
@@ -55,7 +57,7 @@ class BEYONDHD:
         "Telly",
         "TGS",
         "tigole",
-        "TOMMY",
+        ["TOMMY", "No uploads after Nov 1, 2021"],
         "WKS",
         "x0r",
         "YIFY",
@@ -379,15 +381,8 @@ class BEYONDHD:
                 "-irobot",
                 "-beyondhd",
             )
-        ):
-            if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                logger.info(f"{self.tracker}: [bold red]This is an internal {self.tracker} release, skipping upload[/bold red]")
-                if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
-                    pass
-                else:
-                    return False
-            else:
-                return False
+        ) and not self._confirm_or_skip(meta, f"This is an internal {self.tracker} release"):
+            return False
 
         if not meta.valid_mi_settings:
             logger.info(f"{self.tracker}: [bold red]No encoding settings in mediainfo, skipping {self.tracker} upload.[/bold red]")
@@ -399,14 +394,50 @@ class BEYONDHD:
             )
             return False
 
-        if meta.type not in ["WEBDL"] and meta.tag and any(x in meta.tag for x in ["EVO"]):
-            if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                logger.info(f"{self.tracker}: [bold red]Group {escape(str(meta.tag))} is only allowed for raw type content at {self.tracker}[/bold red]")
-                if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
-                    pass
-                else:
-                    return False
-            else:
+        if meta.type == "REMUX" and meta.container != "mkv":
+            logger.info(f"{self.tracker}: [bold red]Remuxes must use the MKV container. Skipping upload.[/bold red]")
+            return False
+
+        if meta.type == "ENCODE" and meta.video_encode not in ("x264", "x265"):
+            logger.info(f"{self.tracker}: [bold red]Encodes must use x264 or x265, found '{escape(str(meta.video_encode))}'. Skipping upload.[/bold red]")
+            return False
+
+        disallowed_audio = set(str(meta.audio).upper().split()) & {"LPCM", "PCM", "VORBIS", "MP2", "MP3", "ALAC", "WMA"}
+        if meta.type in ["REMUX", "ENCODE", "WEBDL", "WEBRIP"] and disallowed_audio:
+            logger.info(
+                f"{self.tracker}: [bold red]Audio codec {escape(', '.join(sorted(disallowed_audio)))} is not allowed. "
+                "Allowed: AAC, AC-3, E-AC-3, DTS, DTS-ES, DTS-HD, TrueHD, Opus or FLAC. Skipping upload.[/bold red]"
+            )
+            return False
+
+        tag = str(meta.tag or "").lstrip("-").lower()
+        conditional_bans = (
+            ("evo", meta.type in ("ENCODE", "WEBRIP"), "EVO encodes and WEBRips are banned (WEB-DLs are okay)"),
+            ("ift", meta.type == "REMUX", "iFT remuxes are banned"),
+            ("lfi", meta.type == "WEBDL", "LFi WEB-DLs are banned"),
+        )
+        for group, applies, reason in conditional_bans:
+            if tag == group and applies and not self._confirm_or_skip(meta, f"{reason} at {self.tracker}"):
+                return False
+
+        lossless_main_audio = any(codec in str(meta.audio) for codec in ("TrueHD", "DTS-HD MA"))
+        rule_prompts = (
+            (
+                meta.type == "REMUX" and lossless_main_audio and str(meta.channels) in ("1.0", "2.0"),
+                "Lossless mono/stereo audio in remuxes must be encoded to FLAC",
+            ),
+            (
+                meta.type == "ENCODE" and meta.video_encode == "x265" and meta.uhd != "UHD" and not meta.hdr and not meta.anime,
+                "x265 encodes are only allowed from a UHD source (anime/cartoons at moderator discretion)",
+            ),
+            (
+                meta.type in ("WEBDL", "WEBRIP") and bool(meta.hdr) and meta.resolution != "2160p",
+                "HDR/DV WEB releases below 2160p are only allowed if those formats are not available at 2160p",
+            ),
+            (meta.sd == 1, "SD is only allowed if there is no retail HD/UHD source available"),
+        )
+        for violated, message in rule_prompts:
+            if violated and not self._confirm_or_skip(meta, message):
                 return False
 
         common = Common(config=self.config)
@@ -465,6 +496,12 @@ class BEYONDHD:
 
         return dupes
 
+    def _confirm_or_skip(self, meta: Meta, message: str) -> bool:
+        logger.info(f"{self.tracker}: [bold red]{escape(message)}[/bold red]")
+        if not meta.unattended or (meta.unattended and meta.unattended_confirm):
+            return bool(cli_ui.ask_yes_no("Do you want to upload anyway?", default=False))
+        return False
+
     def _is_true(self, value: Any) -> bool:
         """
         Converts a value to a boolean. Returns True for "true", "1", "yes" (case-insensitive), and False otherwise.
@@ -478,19 +515,31 @@ class BEYONDHD:
         return 0 if draft_bool or meta.draft else 1
 
     async def get_edition(self, meta: Meta, tags: list[str]) -> tuple[bool, str]:
-        custom = False
+        """Return (is_custom, edition). Hybrid and Open Matte are sent as tags, not editions."""
         edition = meta.edition
         if "Hybrid" in tags:
-            edition = edition.replace("Hybrid", "").strip()
-        editions = ["collector", "cirector", "extended", "limited", "special", "theatrical", "uncut", "unrated"]
-        for each in editions:
-            if each in meta.edition:
-                edition = each
-            elif edition == "":
-                edition = ""
-            else:
-                custom = True
-        return custom, edition
+            edition = re.sub(r"\bhybrid\b", "", edition, flags=re.IGNORECASE)
+        if "OpenMatte" in tags:
+            edition = re.sub(r"\bopen matte\b", "", edition, flags=re.IGNORECASE)
+        edition = " ".join(edition.split())
+        if not edition:
+            return False, ""
+
+        standard_editions = {
+            "collector": "Collector",
+            "director": "Director",
+            "extended": "Extended",
+            "limited": "Limited",
+            "special": "Special",
+            "theatrical": "Theatrical",
+            "uncut": "Uncut",
+            "unrated": "Unrated",
+        }
+        normalized = re.sub(r"'s\b|\b(?:cut|edition|version)\b", "", edition.lower())
+        normalized = " ".join(normalized.split())
+        if normalized in standard_editions:
+            return False, standard_editions[normalized]
+        return True, edition
 
     async def get_tags(self, meta: Meta) -> list[str]:
         tags: list[str] = []
@@ -527,8 +576,30 @@ class BEYONDHD:
 
     async def get_name(self, meta: Meta) -> str:
         name = meta.name or ""
+        # BHD wants "English Title AKA Original Title". When TMDB has no English translation its title is the
+        # original one and the AKA holds IMDb's English title, so the order comes out reversed.
+        title = str(meta.title or "").strip()
+        aka = str(meta.aka or "").strip()
+        aka_title = aka.removeprefix("AKA").strip()
+        if (
+            aka_title
+            and meta.original_language not in (None, "", "en")
+            and title.casefold() == str(meta.original_title or "").strip().casefold()
+            and name.startswith(f"{title} ")
+            and f" {aka} " in name
+        ):
+            name = aka_title + name[len(title) :].replace(f" {aka} ", f" AKA {title} ", 1)
         if meta.source in ("PAL DVD", "NTSC DVD", "DVD", "NTSC", "PAL"):
             audio = meta.audio
             audio = " ".join(audio.split())
             name = name.replace(audio, f"{meta.video_codec} {audio}")
-        return name.replace("DD+", "DDP")
+        name = name.replace("DD+", "DDP")
+        # BHD writes plain Dolby Digital without a space (DD5.1), every other codec with one (DDP 5.1).
+        name = re.sub(r"\bDD (\d\.\d)\b", r"DD\1", name)
+        # HEVC discs and remuxes are assumed HDR, so SDR must be stated.
+        if meta.type in ("DISC", "REMUX") and meta.video_codec == "HEVC" and not meta.hdr and not re.search(r"\bSDR\b", name):
+            name = re.sub(r"\bHEVC\b", "SDR HEVC", name, count=1)
+        # Non-disc releases without a group tag must end with -NOGROUP; discs stay tagless.
+        if not meta.is_disc and not str(meta.tag or "").strip("- ") and not re.search(r"-NOGROUP$", name, flags=re.IGNORECASE):
+            name = f"{name}-NOGROUP"
+        return name
