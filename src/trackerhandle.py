@@ -116,8 +116,9 @@ async def process_trackers(
 
                 message = f"{tracker_label} {' '.join(result_parts)}" if result_parts else None
             else:
-                if "status_message" in status and "data error" in str(status["status_message"]):
-                    logger.info(f"[red]{tracker_label} {escape(str(status['status_message']))}[/red]")
+                status_message = str(status.get("status_message", "")).strip()
+                if status_message:
+                    logger.info(f"[red]{tracker_label} {escape(Redaction.redact_private_info(status_message))}[/red]")
                     return
 
             if message is not None:
