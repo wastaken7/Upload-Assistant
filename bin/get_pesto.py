@@ -43,6 +43,8 @@ class PestoBinaryManager:
             "linux": {
                 "x86_64": {"file": "pesto-linux-x86_64", "folder": "linux/amd64"},
                 "amd64": {"file": "pesto-linux-x86_64", "folder": "linux/amd64"},
+                "aarch64": {"file": "pesto-linux-aarch64", "folder": "linux/arm64"},
+                "arm64": {"file": "pesto-linux-aarch64", "folder": "linux/arm64"},
             },
         }
 

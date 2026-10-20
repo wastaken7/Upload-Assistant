@@ -14,6 +14,7 @@ from bin.get_bdinfo import BDInfoBinaryManager
 from bin.get_bdinfo_docker import BDINFO_VERSION
 from bin.get_mkbrr import MkbrrBinaryManager
 from bin.get_nyuu import NyuuBinaryManager
+from bin.get_pesto import PestoBinaryManager
 from scripts import update_binary_dependency as updater
 
 WORKFLOW_PATH = Path(__file__).parents[1] / ".github" / "workflows" / "update-binary-dependencies.yml"
@@ -59,6 +60,7 @@ def test_asset_names_apply_upstream_version_formats() -> None:
 
 
 def test_runtime_and_docker_paths_share_version_pins() -> None:
+    assert inspect.signature(PestoBinaryManager.ensure_pesto_binary).parameters["version"].default == DEPENDENCY_VERSIONS["pesto"]
     assert inspect.signature(BDInfoBinaryManager.ensure_bdinfo_binary).parameters["version"].default == DEPENDENCY_VERSIONS["bdinfo"]
     assert BDINFO_VERSION == DEPENDENCY_VERSIONS["bdinfo"]
     assert inspect.signature(MkbrrBinaryManager.ensure_mkbrr_binary).parameters["version"].default == DEPENDENCY_VERSIONS["mkbrr"]
@@ -243,3 +245,32 @@ def test_main_writes_pull_request_metadata_to_github_output(tmp_path: Path, monk
         f"release_url=https://github.com/{DEPENDENCY_REPOSITORIES['ffmpeg']}/releases/tag/10.0%2Ftest\n"
         "asset_count=1\n"
     )
+
+
+def test_pesto_update_requires_arm64_and_refreshes_all_platform_checksums(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    assets = ("pesto-linux-aarch64", "pesto-linux-x86_64", "pesto-windows-x86_64.exe")
+    pin = tmp_path / "pesto.py"
+    pin.write_text("old pesto pin", encoding="utf-8")
+    monkeypatch.setitem(updater.PIN_PATHS, "pesto", pin)
+    monkeypatch.setitem(updater.DEPENDENCY_VERSIONS, "pesto", "pesto-v0.10.4")
+    release = _release("pesto-v0.10.5", assets, digest="sha256:" + "a" * 64)
+    monkeypatch.setattr(updater, "_request_json", lambda _url: release)
+
+    assert updater.update_dependency("pesto") == (True, "pesto-v0.10.5")
+    contents = pin.read_text(encoding="utf-8")
+    values = {node.targets[0].id: ast.literal_eval(node.value) for node in ast.parse(contents).body if isinstance(node, ast.Assign)}
+    assert values["VERSION"] == "pesto-v0.10.5"
+    assert values["SHA256_BY_ASSET"] == dict.fromkeys(assets, "a" * 64)
+
+
+def test_pesto_release_without_arm64_does_not_change_pins(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    pin = tmp_path / "pesto.py"
+    pin.write_text("unchanged", encoding="utf-8")
+    monkeypatch.setitem(updater.PIN_PATHS, "pesto", pin)
+    release = _release("pesto-v0.10.5", ("pesto-linux-x86_64", "pesto-windows-x86_64.exe"), digest="sha256:" + "a" * 64)
+    monkeypatch.setattr(updater, "_request_json", lambda _url: release)
+
+    with pytest.raises(RuntimeError, match="missing required assets: pesto-linux-aarch64"):
+        updater.update_dependency("pesto")
+
+    assert pin.read_text(encoding="utf-8") == "unchanged"

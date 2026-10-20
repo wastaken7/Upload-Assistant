@@ -79,6 +79,18 @@ config = {
 }
 ```
 
+### Managed Pesto binaries
+
+Automatic downloads use the version and SHA-256 checksums pinned in
+`bin/binary_dependency_pins/pesto.py`. Linux x86_64 and ARM64 (`aarch64` or
+`arm64`), and Windows x86_64 are supported. The Linux ARM64 binary requires
+glibc 2.36 or newer, as provided by the current Docker image.
+
+The weekly binary dependency workflow checks the latest stable release and
+opens a PR to update the pins. It requires the ARM64 artifact as well as the
+Linux and Windows x86_64 artifacts. To refresh the Pesto pin locally, run
+`python -m scripts.update_binary_dependency pesto` from the repository root.
+
 ### Pesto season uploads
 
 Set `"usenet_uploader": "pesto"` and `"pesto_season_upload": True` to use
