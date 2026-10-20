@@ -98,7 +98,7 @@ DEPENDENCY_SPECS = {
     "mkbrr": DependencySpec(_mkbrr_assets),
     "nyuu": DependencySpec(_nyuu_assets),
     "par2": DependencySpec(_par2_assets),
-    "pesto": DependencySpec(lambda _version: ("pesto-windows-x86_64.exe", "pesto-linux-x86_64")),
+    "pesto": DependencySpec(lambda _version: ("pesto-windows-x86_64.exe", "pesto-linux-x86_64", "pesto-linux-aarch64")),
 }
 
 
