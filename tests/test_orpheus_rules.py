@@ -9,6 +9,8 @@ from types import SimpleNamespace
 from typing import Any
 from unittest.mock import AsyncMock, patch
 
+import httpx
+
 from src.meta import Meta
 from src.music.analyzer import _embedded_image_bytes, _flac_has_id3
 from src.music.models import AudioTrack, MetadataSource, MusicRelease
@@ -541,3 +543,114 @@ def test_artist_matching_is_strict_for_title_only_results():
     assert not Orpheus._shares_artist(single, "Various Artists", strict=True)
     compilation = _release(release_type="Compilation")
     assert Orpheus._shares_artist(compilation, "Various Artists", strict=True)
+
+
+def test_accepted_upload_writes_the_torrent_link_into_the_client_torrent(tmp_path):
+    from torf import Torrent
+
+    content = tmp_path / "Fictional Band - Paper Moons (2019)"
+    content.mkdir()
+    (content / "01 - Song 1.flac").write_bytes(b"fLaC" + b"\0" * 4096)
+    meta = Meta(category="MUSIC", base_dir=str(tmp_path), uuid="ops-comment")
+    torrent_path = tmp_path / "tmp" / "ops-comment" / "[ORPHEUS].torrent"
+    torrent_path.parent.mkdir(parents=True)
+    torrent = Torrent(path=content, private=True, trackers=["https://example.invalid/announce"])
+    torrent.metainfo["info"]["source"] = "OPS"
+    torrent.generate()
+    torrent.write(torrent_path)
+    info_hash = Torrent.read(torrent_path).infohash
+
+    adapter = Orpheus({"TRACKERS": {"ORPHEUS": {"api_key": "fictional-token", "announce_url": "https://example.invalid/announce"}}})
+    response = {"status": "success", "response": {"torrentId": 42, "groupId": 7, "warnings": []}}
+    assert adapter._record_upload_response(meta, response)
+    asyncio.run(adapter._write_torrent_comment(meta))
+
+    written = Torrent.read(torrent_path)
+    assert written.comment == "https://orpheus.network/torrents.php?id=7&torrentid=42"
+    assert written.infohash == info_hash
+
+
+def _client_torrent(tmp_path: Path) -> tuple[Meta, Path]:
+    from torf import Torrent
+
+    content = tmp_path / "Fictional Band - Paper Moons (2019)"
+    content.mkdir(exist_ok=True)
+    (content / "01 - Song 1.flac").write_bytes(b"fLaC" + b"\0" * 4096)
+    meta = Meta(category="MUSIC", base_dir=str(tmp_path), uuid="ops-download")
+    torrent_path = tmp_path / "tmp" / "ops-download" / "[ORPHEUS].torrent"
+    torrent_path.parent.mkdir(parents=True, exist_ok=True)
+    torrent = Torrent(path=content, private=True, trackers=["https://example.invalid/announce"])
+    torrent.generate()
+    torrent.write(torrent_path, overwrite=True)
+    meta.tracker_status["ORPHEUS"] = {"torrent_id": 42, "group_id": 7}
+    return meta, torrent_path
+
+
+def _fake_download(content: bytes | None):
+    """Serve the site response through the real shared downloader."""
+    client = httpx.AsyncClient
+    requests: list[httpx.Request] = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(200 if content is not None else 503, content=content or b"")
+
+    def create_client(**kwargs: Any) -> httpx.AsyncClient:
+        return client(transport=httpx.MockTransport(handle), **kwargs)
+
+    return create_client, requests
+
+
+def test_accepted_upload_seeds_the_torrent_downloaded_from_orpheus(tmp_path):
+    import bencodepy
+
+    meta, torrent_path = _client_torrent(tmp_path)
+    site_torrent = bencodepy.decode(torrent_path.read_bytes())
+    site_torrent[b"comment"] = b"https://orpheus.network/torrents.php?torrentid=42"
+    site_file = bencodepy.encode(site_torrent)
+    client, requests = _fake_download(site_file)
+    with patch("src.trackers.common.httpx.AsyncClient", new=client):
+        assert asyncio.run(_adapter()._download_site_torrent(meta))
+
+    assert len(requests) == 1
+    assert dict(requests[0].url.params) == {"action": "download", "id": "42"}  # never "usetoken"
+    assert str(requests[0].url.copy_with(query=None)) == "https://orpheus.network/ajax.php"
+    assert torrent_path.read_bytes() == site_file
+    assert meta.tracker_status["ORPHEUS"]["torrent_link"] == "https://orpheus.network/torrents.php?torrentid=42"
+
+
+def test_a_failed_download_keeps_the_local_torrent(tmp_path):
+    meta, torrent_path = _client_torrent(tmp_path)
+    original = torrent_path.read_bytes()
+    # The API reports errors as JSON with HTTP 200; the helper must reject it.
+    for content in (b'{"status":"failure","error":"rate limit"}', None):
+        client, _ = _fake_download(content)
+        with patch("src.trackers.common.httpx.AsyncClient", new=client):
+            assert not asyncio.run(_adapter()._download_site_torrent(meta))
+        assert torrent_path.read_bytes() == original
+
+
+def test_file_error_after_upload_keeps_the_accepted_result(tmp_path):
+    meta, torrent_path = _client_torrent(tmp_path)
+    original = torrent_path.read_bytes()
+    meta.music_release = _release(release_year="2019").to_dict()
+    adapter = Orpheus({"TRACKERS": {"ORPHEUS": {"api_key": "fictional-token", "announce_url": "https://example.invalid/announce"}}})
+    response = httpx.Response(
+        200,
+        request=httpx.Request("POST", "https://orpheus.network/ajax.php?action=upload"),
+        json={"status": "success", "response": {"torrentId": 42, "groupId": 7}},
+    )
+    with (
+        patch.object(adapter, "get_additional_checks", new=AsyncMock(return_value=True)),
+        patch.object(adapter, "_check_logs", new=AsyncMock(return_value=[])),
+        patch.object(adapter, "_verify_request_fill", new=AsyncMock(return_value=("", ""))),
+        patch.object(adapter, "_verify_group", new=AsyncMock(return_value=("", ""))),
+        patch.object(adapter.common, "create_torrent_for_upload", new=AsyncMock()),
+        patch.object(httpx.AsyncClient, "post", new=AsyncMock(return_value=response)),
+        patch.object(adapter.common, "download_tracker_torrent", new=AsyncMock(side_effect=OSError("replacement failed"))),
+        patch.object(adapter, "_write_torrent_comment", new=AsyncMock()) as fallback,
+    ):
+        assert asyncio.run(adapter.upload(meta))
+    fallback.assert_awaited_once_with(meta)
+    assert meta.tracker_status["ORPHEUS"]["status_message"] == "Upload accepted by Orpheus."
+    assert torrent_path.read_bytes() == original

@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, ClassVar, cast
 from urllib.parse import urlparse
 
+import bencodepy
 import httpx
 from rich.markup import escape
 
@@ -814,7 +815,69 @@ class Orpheus:
         except (httpx.HTTPError, ValueError, OSError) as error:
             status["status_message"] = f"Upload request failed: {error}"
             return False
-        return self._record_upload_response(meta, payload)
+        accepted = self._record_upload_response(meta, payload)
+        if accepted and not await self._download_site_torrent(meta):
+            await self._write_torrent_comment(meta)
+        return accepted
+
+    async def _download_site_torrent(self, meta: Meta) -> bool:
+        """Replace the client torrent with the one served by Orpheus.
+
+        Seeding the site's own file keeps the client correct even if the site
+        changes the torrent after upload (for example its source flag).  The
+        file carries the user's announce URL and the torrent link as comment.
+        One API request is made; ``usetoken`` is never sent, so no freeleech
+        token is spent.
+
+        The API reports errors as JSON with HTTP 200. The shared downloader
+        validates the completed download before replacing the local torrent.
+        """
+        status = meta.tracker_status.setdefault(self.tracker, {})
+        torrent_id = status.get("torrent_id")
+        if torrent_id is None or not self.api_key:
+            return False
+        torrent_path = Path(meta.base_dir) / "tmp" / str(meta.uuid) / f"[{self.tracker}].torrent"
+        try:
+            downloaded = await self.common.download_tracker_torrent(
+                meta,
+                self.tracker,
+                headers=self._headers(meta),
+                params={"action": "download", "id": str(torrent_id)},
+                downurl=f"{self.base_url}/ajax.php",
+            )
+            if not downloaded:
+                return False
+            content = torrent_path.read_bytes()
+            decoded = cast(Any, bencodepy).decode(content) if content.startswith(b"d") else None
+        except (OSError, bencodepy.BencodeDecodeError) as error:
+            logger.warning(f"{self.tracker}: [yellow]could not use the site torrent; seeding the local torrent: {error}[/yellow]")
+            return False
+        if not isinstance(decoded, dict) or b"info" not in decoded:
+            logger.warning(f"{self.tracker}: [yellow]Orpheus did not return a torrent file; seeding the local torrent.[/yellow]")
+            return False
+        comment = decoded.get(b"comment", b"")
+        status["torrent_link"] = comment.decode("utf-8", "replace") if isinstance(comment, bytes) and comment else f"{self.torrent_url}{torrent_id}"
+        status["torrent_source"] = "site"
+        return True
+
+    async def _write_torrent_comment(self, meta: Meta) -> None:
+        """Put the new torrent's link in the comment of the torrent the client seeds.
+
+        The uploaded torrent is created locally with an empty comment.  The
+        site does not change its info dictionary, so writing the link keeps the
+        info hash and lets later runs recognise the Orpheus ID from the client.
+        """
+        status = meta.tracker_status.setdefault(self.tracker, {})
+        torrent_id, group_id = status.get("torrent_id"), status.get("group_id")
+        if torrent_id is None:
+            return
+        link = f"{self.base_url}/torrents.php?id={group_id}&torrentid={torrent_id}" if group_id is not None else f"{self.torrent_url}{torrent_id}"
+        try:
+            await self.common.create_torrent_ready_to_seed(meta, self.tracker, self.source_flag, self.announce_url, link)
+        except Exception as error:  # the upload already succeeded; never fail it here
+            logger.warning(f"{self.tracker}: [yellow]could not write the torrent link into the client torrent: {error}[/yellow]")
+            return
+        status["torrent_link"] = link
 
     def _record_upload_response(self, meta: Meta, payload: Any) -> bool:
         """Store the meaningful parts of an Orpheus upload response.

@@ -2,6 +2,7 @@
 
 import contextlib
 
+import bencodepy
 import pytest
 
 from src.get_desc import DescriptionBuilder
@@ -39,7 +40,7 @@ def _patch_client(monkeypatch, fail):
                 raise RuntimeError("404")
 
         async def aiter_bytes(self):
-            yield b"torrent-data"
+            yield bencodepy.encode({b"info": {b"name": b"test", b"length": 1, b"piece length": 16384, b"pieces": b"x" * 20}})
 
     monkeypatch.setattr("src.trackers.common.httpx.AsyncClient", Client)
 
@@ -58,4 +59,4 @@ async def test_download_tracker_torrent_returns_the_path_only_on_success(tmp_pat
 
     _patch_client(monkeypatch, fail=False)
     assert await common.download_tracker_torrent(meta, "TESTTRK", downurl="https://example.invalid/dl")
-    assert torrent_path.read_bytes() == b"torrent-data"
+    assert bencodepy.decode(torrent_path.read_bytes())[b"info"][b"name"] == b"test"
