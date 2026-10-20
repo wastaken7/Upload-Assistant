@@ -41,7 +41,7 @@ import web_ui.auth as auth_mod
 from src.webui_progress import PROGRESS_STDOUT_PREFIX
 from src.prompt_sound import PROMPT_SOUND_STDOUT_MARKER
 from src.app_paths import CODE_DIR, DATA_DIR, STATE_DIR
-from src.webui_paths import MAX_UPLOAD_PATHS, QUEUE_ENV, QUEUE_HASH_ENV, ROOTS_ENV, InspectedDirectories, validate_argument_paths, validate_content_path
+from src.webui_paths import MAX_UPLOAD_PATHS, QUEUE_ENV, QUEUE_HASH_ENV, ROOTS_ENV, InspectedDirectories, generated_queue_name, validate_argument_paths, validate_content_path
 from src.args import cli_argument_catalog, tracker_cli_aliases
 from src.config_sync import ConfigSyncError, ConfigWriteConflictError, config_write_lock, replace_config_source
 from src.external_tools import EXTERNAL_TOOL_KEYS, check_external_tools
@@ -96,6 +96,7 @@ class _ResponseLike(Protocol):
 
     def set_cookie(self, key: str, value: str, max_age: int | None = None, httponly: bool = False, secure: bool = False, samesite: str | None = None) -> None: ...
     def delete_cookie(self, key: str) -> None: ...
+    def get_json(self, silent: bool = False) -> object: ...
 
 
 class _ConsoleLike(Protocol):
@@ -143,6 +144,7 @@ class _LimiterLike(Protocol):
         key_func: Callable[[], str] | None = None,
         error_message: str | None = None,
         override_defaults: bool = True,
+        deduct_when: Callable[[_ResponseLike], bool] | None = None,
     ) -> Callable[[Callable[..., object]], Callable[..., object]]: ...
 
 
@@ -833,13 +835,14 @@ def _validate_execution_path(path: str, *, inspected_directories: InspectedDirec
         inspected_directories = set()
     resolved = os.path.realpath(path)
     if _is_generated_queue(resolved):
-        # Revalidate every content item, including folder descendants, at execution.
+        # The hash proves these are the lines save_queue fully validated. The
+        # upload subprocess validates every item and folder descendant again
+        # before processing the first one, so do not walk them a third time.
         for number, line in enumerate(Path(resolved).read_text(encoding="utf-8").splitlines(), 1):
             try:
-                values = shlex.split(line)
-                validate_content_path(values[0], _get_browse_roots(), inspected_directories=inspected_directories)
-                _validate_upload_assistant_args(values[1:], inspected_directories=inspected_directories)
-            except (ValueError, IndexError) as error:
+                if not shlex.split(line):
+                    raise ValueError("Empty queue line")
+            except ValueError as error:
                 raise ValueError(f"Invalid queue line {number}: {error}") from error
         return resolved
     resolved = _resolve_user_path(path, require_exists=True, require_dir=False)
@@ -855,6 +858,37 @@ def _remove_generated_queue_file(key: str) -> None:
         and os.path.normcase(os.path.realpath(path.parent)) == os.path.normcase(os.path.realpath(STATE_DIR / "tmp"))
     ):
         path.unlink(missing_ok=True)
+
+
+# Logs of interrupted WebUI queues are kept so resending the selection resumes it.
+WEBUI_QUEUE_LOG_RETENTION_SECONDS = 7 * 24 * 60 * 60
+_WEBUI_QUEUE_LOG_RE = re.compile(r"webui_(?:[0-9a-f]{16}|queue_\d+_[0-9a-f]{8})_(?:processed_files|queue)\.log")
+
+
+def _remove_generated_queue_logs(queue_hash: str, lines: Sequence[str]) -> None:
+    """Drop a finished queue's logs; keep the processed list while items remain."""
+    tmp_dir = STATE_DIR / "tmp"
+    name = generated_queue_name(queue_hash)
+    (tmp_dir / f"{name}_queue.log").unlink(missing_ok=True)
+    processed_log = tmp_dir / f"{name}_processed_files.log"
+    try:
+        processed = json.loads(processed_log.read_text(encoding="utf-8"))
+    except OSError, ValueError:
+        return
+    items = {line.strip() for line in lines if line.strip()}
+    if items and isinstance(processed, list) and items <= set(processed):
+        processed_log.unlink(missing_ok=True)
+
+
+def _prune_stale_queue_logs() -> None:
+    """Remove WebUI queue logs nobody resumed within the retention period."""
+    cutoff = time.time() - WEBUI_QUEUE_LOG_RETENTION_SECONDS
+    for path in (STATE_DIR / "tmp").glob("webui_*.log"):
+        try:
+            if _WEBUI_QUEUE_LOG_RE.fullmatch(path.name) and path.is_file() and path.stat().st_mtime < cutoff:
+                path.unlink(missing_ok=True)
+        except OSError as error:
+            console.print(f"Could not remove stale WebUI queue log: {error}", markup=False)
 
 
 # Runtime flags and stored totp
@@ -4078,6 +4112,7 @@ def index():
             app_version=APP_VERSION,
             csrf_token=_ensure_csrf_token(),
             cli_arguments=cli_argument_catalog(),
+            max_upload_paths=MAX_UPLOAD_PATHS,
             screenshot_mode=request.args.get("screenshot") == "1",
         )
     except Exception as e:
@@ -6943,8 +6978,14 @@ def mutate_execution_screenshot(screenshot_id: str, action: str):
     return jsonify({"success": True})
 
 
+def _save_queue_created_file(response: _ResponseLike) -> bool:
+    """Only issued queue files count against the quota, not path validation."""
+    data = response.get_json(silent=True)
+    return isinstance(data, dict) and data.get("queued") is True
+
+
 @app.route("/api/save_queue", methods=["POST"])
-@limiter.limit("100 per hour", key_func=_rate_limit_key_func)
+@limiter.limit("100 per hour", key_func=_rate_limit_key_func, deduct_when=_save_queue_created_file)
 def save_queue():
     """Save selected items to a temporary queue text file on the server"""
     # CSRF check
@@ -6980,6 +7021,9 @@ def save_queue():
 
         validated_items: list[tuple[str, list[str]]] = []
         inspected_directories: InspectedDirectories = set()
+        # Item number by normalized content path, and by each of its parent folders.
+        claimed_paths: dict[str, int] = {}
+        claimed_parents: dict[str, int] = {}
         for number, item in enumerate(items, 1):
             if not isinstance(item, dict):
                 return jsonify({"error": f"Invalid queue item {number}", "success": False, "item": number}), 400
@@ -6995,6 +7039,15 @@ def save_queue():
                 validated_args = _validate_upload_assistant_args(shlex.split(args) if args else [], inspected_directories=inspected_directories)
             except (ValueError, TypeError) as err:
                 return jsonify({"error": f"Invalid queue item {number}: {err}", "success": False, "item": number}), 400
+            content_key = os.path.normcase(validated_path)
+            parent_keys = [str(parent) for parent in Path(content_key).parents]
+            # The same content twice, or a folder plus something inside it, would upload twice.
+            overlapping = next((claimed_paths[key] for key in (content_key, *parent_keys) if key in claimed_paths), claimed_parents.get(content_key))
+            if overlapping is not None:
+                return jsonify({"error": f"Invalid queue item {number}: repeats or overlaps item {overlapping}", "success": False, "item": number}), 400
+            claimed_paths[content_key] = number
+            for parent_key in parent_keys:
+                claimed_parents.setdefault(parent_key, number)
             validated_items.append((validated_path, validated_args))
 
         if not validated_items:
@@ -7026,6 +7079,7 @@ def save_queue():
                 _remove_generated_queue_file(evicted_key)
             except OSError as error:
                 console.print(f"Could not remove expired WebUI queue: {error}", markup=False)
+        _prune_stale_queue_logs()
 
         return jsonify({"success": True, "path": str(file_path), "queued": True})
 
@@ -7362,7 +7416,9 @@ def _remove_session_queue_file(validated_path: str) -> None:
         with _generated_queues_lock:
             generated = _generated_queues.pop(key, None)
         if generated is not None:
+            lines = Path(key).read_text(encoding="utf-8").splitlines() if Path(key).is_file() else []
             _remove_generated_queue_file(key)
+            _remove_generated_queue_logs(generated, lines)
             console.print(f"Cleaned up queue file: {Path(validated_path).name}", markup=False)
     except Exception as cleanup_err:
         console.print(f"Failed to cleanup queue file: {cleanup_err}", markup=False)

@@ -15,6 +15,11 @@ const parseUploadPaths = (text) => {
   });
 };
 
+/** True when `path` lies below `folder` (either separator style). */
+const isInsidePath = (path, folder) =>
+  path !== folder &&
+  (path.startsWith(`${folder}/`) || path.startsWith(`${folder}\\`));
+
 const getPreviewLanguageFlag = window.getUAPreviewLanguageFlag;
 
 const { useState, useRef, useEffect, useLayoutEffect, useCallback } = React;
@@ -163,6 +168,10 @@ const shouldUseMobileLayout = () =>
 // Each running tab holds one SSE stream; the server enforces the same limit.
 // Idle tabs are cheap; only running uploads hold connections and server slots.
 const MAX_UPLOAD_TABS = 24;
+// Provided by the server; it enforces the limit even when this is missing.
+const MAX_UPLOAD_PATHS = Number.isInteger(window.UA_MAX_UPLOAD_PATHS)
+  ? window.UA_MAX_UPLOAD_PATHS
+  : null;
 const DEFAULT_MAX_RUNNING_UPLOADS = 4;
 const SCHEDULE_POLL_MS = 3000;
 // One /api/sessions request per interval serves every scheduled tab.
@@ -1996,6 +2005,11 @@ function AudionutsUAGUI() {
   const [selectedPath, setSelectedPath] = useState("");
   const [manualPathsText, setManualPathsText] = useState(null);
   const [pathInputError, setPathInputError] = useState("");
+  // Queue items whose per-line arguments are expanded for editing.
+  const [expandedQueueArgs, setExpandedQueueArgs] = useState(new Set());
+  // Last checkbox toggled in the file browser, the start of a Shift+click range.
+  const selectionAnchorRef = useRef("");
+  const queueListRef = useRef(null);
   const [, setSelectedName] = useState("");
   const [customArgs, setCustomArgs] = useState("");
   const [argumentPresets, setArgumentPresets] = useState([]);
@@ -4288,28 +4302,30 @@ function AudionutsUAGUI() {
     }
   }, [activePanel, isExecuting, isMobile]);
 
+  /** Paths in the order the file browser displays them. */
   const getVisiblePaths = () => {
     if (fileBrowserSearch) {
       if (!fileBrowserSearchResults || !fileBrowserSearchResults.items)
         return [];
-      return fileBrowserSearchResults.items.map((item) => item.path);
+      return sortItems(fileBrowserSearchResults.items).map((item) => item.path);
     }
 
-    const traverse = (nodes) => {
+    // Sort like renderFileTree so Shift+click ranges match what is on screen.
+    const traverse = (nodes, level) => {
       let paths = [];
-      for (const node of nodes) {
+      for (const node of sortItems(nodes, level)) {
         paths.push(node.path);
         if (
           node.type === "folder" &&
           expandedFolders.has(node.path) &&
           node.children
         ) {
-          paths = paths.concat(traverse(node.children));
+          paths = paths.concat(traverse(node.children, level + 1));
         }
       }
       return paths;
     };
-    return traverse(directories);
+    return traverse(directories, 0);
   };
 
   const handleToggleSelectAll = () => {
@@ -4333,13 +4349,46 @@ function AudionutsUAGUI() {
     setSelectedPath(next[0]?.path || "");
   };
 
-  const handleTogglePathSelect = (path) => {
+  const handleTogglePathSelect = (path, extendRange = false) => {
     setManualPathsText(null);
     setPathInputError("");
     const isSelected = selectedPaths.some((x) => x.path === path);
-    const next = isSelected
-      ? selectedPaths.filter((p) => p.path !== path)
-      : [...selectedPaths, { path, args: "" }];
+    const visible = extendRange ? getVisiblePaths() : [];
+    const anchorIndex = visible.indexOf(selectionAnchorRef.current);
+    const targetIndex = visible.indexOf(path);
+    selectionAnchorRef.current = path;
+    let next;
+    if (
+      anchorIndex !== -1 &&
+      targetIndex !== -1 &&
+      anchorIndex !== targetIndex
+    ) {
+      // Shift+click applies the clicked item's new state to the whole range.
+      const range = visible.slice(
+        Math.min(anchorIndex, targetIndex),
+        Math.max(anchorIndex, targetIndex) + 1,
+      );
+      if (isSelected) {
+        next = selectedPaths.filter((p) => !range.includes(p.path));
+      } else {
+        // The server rejects a folder together with its contents, so skip a
+        // candidate that is inside, or contains, a path already in the queue.
+        next = [...selectedPaths];
+        range.forEach((candidate) => {
+          const overlaps = next.some(
+            (p) =>
+              p.path === candidate ||
+              isInsidePath(candidate, p.path) ||
+              isInsidePath(p.path, candidate),
+          );
+          if (!overlaps) next.push({ path: candidate, args: "" });
+        });
+      }
+    } else {
+      next = isSelected
+        ? selectedPaths.filter((p) => p.path !== path)
+        : [...selectedPaths, { path, args: "" }];
+    }
     setSelectedPaths(next);
     setSelectedPath(next[0]?.path || "");
     if (next.length === 1) {
@@ -4364,6 +4413,37 @@ function AudionutsUAGUI() {
         item.path === path ? { ...item, args: newArgs } : item,
       ),
     );
+  };
+
+  const moveQueueItem = (index, delta) => {
+    const target = index + delta;
+    if (target < 0 || target >= selectedPaths.length) return;
+    const next = [...selectedPaths];
+    [next[index], next[target]] = [next[target], next[index]];
+    // The list now defines the order; regenerate the path text from it.
+    setManualPathsText(null);
+    setPathInputError("");
+    setSelectedPaths(next);
+    setSelectedPath(next[0].path);
+  };
+
+  const clearQueue = () => {
+    setManualPathsText(null);
+    setPathInputError("");
+    setSelectedPaths([]);
+    setSelectedPath("");
+    setSelectedName("");
+    setExpandedQueueArgs(new Set());
+    selectionAnchorRef.current = "";
+  };
+
+  const toggleQueueItemArgs = (path) => {
+    setExpandedQueueArgs((prev) => {
+      const next = new Set(prev);
+      if (next.has(path)) next.delete(path);
+      else next.add(path);
+      return next;
+    });
   };
 
   const formatMtime = (mtime) => {
@@ -4590,13 +4670,18 @@ function AudionutsUAGUI() {
   const handlePathInputChange = (text) => {
     setManualPathsText(text);
     setPathInputError("");
+    const parsed = parseUploadPaths(text);
+    const parsedPaths = new Set(parsed.map((item) => item.path));
     const previousArgs = new Map(
       selectedPaths.map((item) => [item.path, item.args]),
     );
-    const items = parseUploadPaths(text).map((item) => ({
-      ...item,
-      args: previousArgs.get(item.path) || "",
-    }));
+    const items = parsed.map((item, index) => {
+      // A path edited in place keeps the arguments of the line it replaced.
+      const replaced = selectedPaths[index];
+      const inherited =
+        replaced && !parsedPaths.has(replaced.path) ? replaced.args : "";
+      return { ...item, args: previousArgs.get(item.path) ?? inherited };
+    });
     setSelectedPaths(items);
     setSelectedPath(items[0]?.path || "");
     setSelectedName(items[0]?.path.split(/[/\\]/).pop() || "");
@@ -4609,6 +4694,11 @@ function AudionutsUAGUI() {
         : selectedPaths.length
           ? selectedPaths.map((item) => item.path).join("\n")
           : selectedPath;
+    const duplicateLines =
+      manualPathsText !== null
+        ? manualPathsText.split(/\r?\n/).filter((line) => line.trim()).length -
+          selectedPaths.length
+        : 0;
     const pathEditor = (
       <div
         className={`p-3 border rounded-lg ${isDarkMode ? "bg-gray-700 border-gray-600" : "bg-blue-50 border-blue-200"}`}
@@ -4640,8 +4730,20 @@ function AudionutsUAGUI() {
           className={`text-xs mt-1 ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}
         >
           Enter adds a line. Multiple paths create a queue. Only permitted
-          server folders are accepted (maximum 1000 paths).
+          server folders are accepted
+          {MAX_UPLOAD_PATHS ? ` (maximum ${MAX_UPLOAD_PATHS} paths)` : ""}.
+          {!isMobileView &&
+            " Shift+click checkboxes in the file browser to select a range."}
         </p>
+        {duplicateLines > 0 && (
+          <p
+            className={`text-xs mt-1 ${isDarkMode ? "text-yellow-300" : "text-yellow-700"}`}
+          >
+            {duplicateLines === 1
+              ? "1 repeated line is ignored."
+              : `${duplicateLines} repeated lines are ignored.`}
+          </p>
+        )}
         {pathInputError && (
           <p
             id="upload-paths-error"
@@ -4688,63 +4790,163 @@ function AudionutsUAGUI() {
                 </span>
                 Execution Queue ({selectedPaths.length} items)
               </h3>
+              <button
+                type="button"
+                onClick={clearQueue}
+                disabled={isExecuting}
+                className={`flex items-center gap-1 rounded px-2 py-1 text-xs font-semibold ${isDarkMode ? "text-gray-300 hover:bg-gray-700" : "text-gray-600 hover:bg-gray-100"}`}
+                title="Remove every item from the queue"
+              >
+                <LucideIcon name="trash-2" className="h-3.5 w-3.5" />
+                Clear
+              </button>
             </div>
-            <div className="max-h-60 overflow-y-auto space-y-3 pr-1 font-mono text-[11px]">
+            <ol
+              ref={queueListRef}
+              aria-label="Execution queue"
+              className="max-h-80 overflow-y-auto space-y-1 pr-1 text-xs"
+            >
               {selectedPaths.map((item, idx) => {
-                const name = item.path.split(/[/\\]/).pop() || item.path;
+                const separator = Math.max(
+                  item.path.lastIndexOf("/"),
+                  item.path.lastIndexOf("\\"),
+                );
+                const name = item.path.slice(separator + 1) || item.path;
+                const parent =
+                  separator > 0 ? item.path.slice(0, separator) : "";
+                // Queued items usually share a long root; show where they differ.
+                const parentParts = parent.split(/[/\\]/).filter(Boolean);
+                const shortParent =
+                  parentParts.length > 2
+                    ? `…${item.path[separator]}${parentParts.slice(-2).join(item.path[separator])}`
+                    : parent;
+                const invalid = !!pathInputError && item.invalid;
+                const argsOpen = expandedQueueArgs.has(item.path);
+                const argsId = `queue-args-${idx}`;
+                const iconButton = `flex h-6 w-6 shrink-0 items-center justify-center rounded disabled:opacity-30 ${isDarkMode ? "text-gray-400 hover:bg-gray-700 hover:text-white" : "text-gray-500 hover:bg-gray-200 hover:text-gray-900"}`;
 
                 return (
-                  <div
+                  <li
                     key={item.path}
-                    className={`flex flex-col gap-1.5 p-2 rounded border ${
-                      isDarkMode
-                        ? "bg-gray-900 border-gray-800"
-                        : "bg-gray-50 border-gray-200"
+                    data-queue-invalid={invalid ? "true" : undefined}
+                    className={`rounded border px-2 py-1 ${
+                      invalid
+                        ? "border-red-500 bg-red-500/10"
+                        : isDarkMode
+                          ? "bg-gray-900 border-gray-800"
+                          : "bg-gray-50 border-gray-200"
                     }`}
                   >
-                    <div className="flex items-center justify-between min-w-0">
+                    <div className="flex min-w-0 items-center gap-2">
                       <span
-                        className={`truncate font-semibold ${
-                          isDarkMode ? "text-gray-200" : "text-gray-800"
-                        }`}
+                        className={`w-7 shrink-0 text-right font-mono tabular-nums ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}
+                      >
+                        {idx + 1}.
+                      </span>
+                      <span
+                        className="flex min-w-0 flex-1 flex-col"
                         title={item.path}
                       >
-                        {idx + 1}. {name}
+                        <span
+                          className={`truncate font-semibold ${
+                            isDarkMode ? "text-gray-200" : "text-gray-800"
+                          }`}
+                        >
+                          {name}
+                        </span>
+                        {parent && (
+                          <span
+                            className={`truncate font-mono text-[10px] ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}
+                          >
+                            {shortParent}
+                          </span>
+                        )}
                       </span>
+                      {item.args && !argsOpen && (
+                        <button
+                          type="button"
+                          onClick={() => toggleQueueItemArgs(item.path)}
+                          disabled={isExecuting}
+                          className={`max-w-[40%] truncate rounded px-1.5 py-0.5 font-mono text-[10px] ${isDarkMode ? "bg-gray-700 text-gray-200" : "bg-gray-200 text-gray-700"}`}
+                          title={`Line arguments: ${item.args}`}
+                        >
+                          {item.args}
+                        </button>
+                      )}
                       <button
+                        type="button"
+                        onClick={() => toggleQueueItemArgs(item.path)}
+                        disabled={isExecuting}
+                        className={iconButton}
+                        aria-expanded={argsOpen}
+                        aria-controls={argsOpen ? argsId : undefined}
+                        title={
+                          argsOpen
+                            ? "Hide line arguments"
+                            : "Edit line arguments"
+                        }
+                      >
+                        <LucideIcon
+                          name="sliders-horizontal"
+                          className="h-3.5 w-3.5"
+                        />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => moveQueueItem(idx, -1)}
+                        disabled={isExecuting || idx === 0}
+                        className={iconButton}
+                        title="Move up"
+                      >
+                        <LucideIcon name="chevron-up" className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => moveQueueItem(idx, 1)}
+                        disabled={
+                          isExecuting || idx === selectedPaths.length - 1
+                        }
+                        className={iconButton}
+                        title="Move down"
+                      >
+                        <LucideIcon
+                          name="chevron-down"
+                          className="h-3.5 w-3.5"
+                        />
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => handleTogglePathSelect(item.path)}
-                        className="text-red-500 hover:text-red-400 font-bold ml-2 text-xs font-sans"
+                        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded text-red-500 hover:text-red-400 disabled:opacity-30 ${isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-200"}`}
                         title="Remove from queue"
                         disabled={isExecuting}
                       >
-                        <LucideIcon name="x" className="h-3 w-3" />
+                        <LucideIcon name="x" className="h-3.5 w-3.5" />
                       </button>
                     </div>
-                    <div className="flex flex-col gap-1">
-                      <label
-                        className={`text-[10px] ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
-                      >
-                        Line Arguments:
-                      </label>
+                    {argsOpen && (
                       <input
+                        id={argsId}
                         type="text"
                         value={item.args}
                         onChange={(e) =>
                           handleUpdateItemArgs(item.path, e.target.value)
                         }
+                        aria-label={`Line arguments for ${name}`}
+                        autoFocus
                         placeholder="e.g. --tmdb audiobook/12345 --anon"
-                        className={`w-full px-2 py-1 text-xs border rounded-lg ${
+                        className={`mt-1 mb-1 w-full px-2 py-1 font-mono text-xs border rounded-lg ${
                           isDarkMode
                             ? "bg-gray-800 border-gray-700 text-white placeholder-gray-500"
                             : "bg-white border-gray-300 text-gray-900 placeholder-gray-400"
                         }`}
                         disabled={isExecuting}
                       />
-                    </div>
-                  </div>
+                    )}
+                  </li>
                 );
               })}
-            </div>
+            </ol>
           </div>
         </>
       );
@@ -4973,7 +5175,10 @@ function AudionutsUAGUI() {
               onClick={(event) => event.stopPropagation()}
               onChange={(e) => {
                 e.stopPropagation();
-                handleTogglePathSelect(item.path);
+                handleTogglePathSelect(
+                  item.path,
+                  e.nativeEvent?.shiftKey === true,
+                );
               }}
               className={`ua-theme-checkbox w-4 h-4 rounded cursor-pointer ${
                 isDarkMode
@@ -5119,7 +5324,10 @@ function AudionutsUAGUI() {
               onClick={(event) => event.stopPropagation()}
               onChange={(e) => {
                 e.stopPropagation();
-                handleTogglePathSelect(item.path);
+                handleTogglePathSelect(
+                  item.path,
+                  e.nativeEvent?.shiftKey === true,
+                );
               }}
               className={`ua-theme-checkbox w-4 h-4 rounded cursor-pointer ${
                 isDarkMode
@@ -5943,14 +6151,36 @@ function AudionutsUAGUI() {
     customArgs,
   ]);
 
-  const reportTabPathError = (tabId, message) => {
+  /** Show a path error; `itemNumber` (1-based) marks the queue item it names. */
+  const reportTabPathError = (tabId, message, itemNumber = 0) => {
+    const markInvalid = (paths) =>
+      paths.map((item, index) => ({
+        ...item,
+        invalid: index === itemNumber - 1,
+      }));
+    // Nothing ran; return to the form where the error is shown.
     if (tabId === activeTabIdRef.current) {
       setPathInputError(message);
+      setSelectedPaths(markInvalid);
+      setIsTerminalView(false);
       return;
     }
     const runtime = getTabRuntime(tabId);
-    if (runtime) runtime.view.form.pathInputError = message;
+    if (runtime) {
+      runtime.view.isTerminalView = false;
+      runtime.view.form.pathInputError = message;
+      runtime.view.form.selectedPaths = markInvalid(
+        runtime.view.form.selectedPaths,
+      );
+    }
   };
+
+  useEffect(() => {
+    if (!pathInputError) return;
+    queueListRef.current
+      ?.querySelector('[data-queue-invalid="true"]')
+      ?.scrollIntoView({ block: "nearest" });
+  }, [pathInputError]);
 
   const executeCommand = async () => {
     if (screenshotMode) return;
@@ -5971,9 +6201,12 @@ function AudionutsUAGUI() {
           : selectedPath
             ? [{ path: selectedPath, args: "" }]
             : [];
-    if (!items.length || items.length > 1000) {
+    if (
+      !items.length ||
+      (MAX_UPLOAD_PATHS && items.length > MAX_UPLOAD_PATHS)
+    ) {
       const error = items.length
-        ? "Maximum 1000 paths per upload"
+        ? `Maximum ${MAX_UPLOAD_PATHS} paths per upload`
         : "Enter or select a file or folder first";
       setPathInputError(error);
       return;
@@ -5997,7 +6230,7 @@ function AudionutsUAGUI() {
       if (!response.ok || !data.success || !data.path) {
         const line = items[data.item - 1]?.line;
         const error = `${line ? `Line ${line}: ` : ""}${data.error || "Could not validate upload paths"}`;
-        reportTabPathError(tabId, error);
+        reportTabPathError(tabId, error, Number(data.item) || 0);
         return;
       }
       const runtime = getTabRuntime(tabId);
@@ -6187,7 +6420,8 @@ function AudionutsUAGUI() {
     : undefined;
   const getExecuteButtonLabel = () => {
     if (isExecuting) return activeTabScheduled ? "Scheduled" : "Executing...";
-    const noun = selectedPaths.length > 1 ? "Queue" : "Upload";
+    const noun =
+      selectedPaths.length > 1 ? `Queue (${selectedPaths.length})` : "Upload";
     if (!uploadSlotsFull) return `Execute ${noun}`;
     return schedulingEnabled ? `Schedule ${noun}` : "All upload slots busy";
   };

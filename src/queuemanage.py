@@ -14,7 +14,7 @@ import click
 
 from src.console import logger
 from src.meta import Meta
-from src.webui_paths import is_generated_queue_path, read_generated_queue, subprocess_roots
+from src.webui_paths import QUEUE_HASH_ENV, generated_queue_name, is_generated_queue_path, read_generated_queue, subprocess_roots
 
 type QueueItem = dict[str, Any]
 type QueueList = list[str] | list[QueueItem]
@@ -407,15 +407,17 @@ class QueueManager:
         if path.endswith(".txt") and not meta.unit3d:
             logger.info(f"[bold yellow]Detected a text file for queue input: {path}[/bold yellow]")
             if Path(path).exists():
-                queue_name = Path(path).stem
+                generated_queue = subprocess_roots() is not None and is_generated_queue_path(path)
+                lines = await asyncio.to_thread(read_generated_queue, path) if generated_queue else await _read_text_lines(path)
+                # Each WebUI queue file has a unique name; its contents identify the selection.
+                queue_name = generated_queue_name(os.environ.get(QUEUE_HASH_ENV, "")) if generated_queue else Path(path).stem
                 meta.queue = queue_name
                 meta.args_line_queue = True
 
                 log_file = await QueueManager.get_log_file(base_dir, queue_name)
                 processed_files = await QueueManager.load_processed_files(log_file)
 
-                generated_queue = subprocess_roots() is not None and is_generated_queue_path(path)
-                lines = await asyncio.to_thread(read_generated_queue, path) if generated_queue else await _read_text_lines(path)
+                skipped_processed = 0
                 queue = []
                 for line in lines:
                     line_stripped = line.strip()
@@ -439,6 +441,8 @@ class QueueManager:
 
                         if line_stripped not in processed_files and item_path not in processed_files:
                             queue.append(queue_item)
+                        else:
+                            skipped_processed += 1
                     except ValueError as e:
                         if generated_queue:
                             raise ValueError("Invalid WebUI queue contents") from e
@@ -449,6 +453,8 @@ class QueueManager:
                 if not queue:
                     logger.info(f"[bold yellow]All items in the {queue_name} queue have already been processed.[/bold yellow]")
                     exit(0)
+                if skipped_processed:
+                    logger.info(f"[yellow]Resuming the {queue_name} queue: skipping {skipped_processed} item(s) already processed.[/yellow]")
 
                 queue_log = Path(base_dir) / "tmp" / f"{queue_name}_queue.log"
                 try:

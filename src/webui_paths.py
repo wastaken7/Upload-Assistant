@@ -19,6 +19,11 @@ MAX_UPLOAD_PATHS = 1000
 type InspectedDirectories = set[tuple[str, tuple[str, ...]]]
 
 
+def generated_queue_name(queue_hash: str) -> str:
+    """Name a WebUI queue's logs after its contents so resending the same selection resumes it."""
+    return f"webui_{queue_hash[:16]}"
+
+
 def is_generated_queue_path(path: str) -> bool:
     queue_path = os.environ.get(QUEUE_ENV)
     if not queue_path:
