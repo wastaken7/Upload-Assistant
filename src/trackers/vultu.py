@@ -11,6 +11,7 @@ from src.cogs.redaction import Redaction
 from src.console import logger
 from src.meta import Meta
 from src.trackers.common import Common
+from src.trackers.UNIT3D.capybarabr import CapybaraBR
 
 Config = dict[str, Any]
 
@@ -101,8 +102,10 @@ class Vultu:
         return int(match.group(1)) if match else None
 
     async def get_name(self, meta: Meta) -> str:
-        # Vultu wants the release name as published by the group.
-        return str(meta.scene_name or meta.name).strip()
+        # Vultu follows the same naming as CapybaraBR.
+        cbr = CapybaraBR(self.config)
+        cbr.tracker = self.tracker
+        return (await cbr.get_name(meta))["name"].strip()
 
     def _screenshot_urls(self, meta: Meta) -> list[str]:
         urls: list[str] = []
