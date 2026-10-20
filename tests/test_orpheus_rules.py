@@ -9,6 +9,8 @@ from types import SimpleNamespace
 from typing import Any
 from unittest.mock import AsyncMock, patch
 
+import httpx
+
 from src.meta import Meta
 from src.music.analyzer import _embedded_image_bytes, _flac_has_id3
 from src.music.models import AudioTrack, MetadataSource, MusicRelease
@@ -585,30 +587,34 @@ def _client_torrent(tmp_path: Path) -> tuple[Meta, Path]:
 
 
 def _fake_download(content: bytes | None):
-    """Stand-in for Common.download_tracker_torrent writing ``content``."""
+    """Serve the site response through the real shared downloader."""
+    client = httpx.AsyncClient
+    requests: list[httpx.Request] = []
 
-    async def download(_self: Any, meta: Meta, tracker: str, **kwargs: Any) -> str | None:
-        download.kwargs = kwargs  # type: ignore[attr-defined]
-        if content is None:
-            return None
-        path = Path(meta.base_dir) / "tmp" / str(meta.uuid) / f"[{tracker}].torrent"
-        path.write_bytes(content)
-        return str(path)
+    def handle(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(200 if content is not None else 503, content=content or b"")
 
-    return download
+    def create_client(**kwargs: Any) -> httpx.AsyncClient:
+        return client(transport=httpx.MockTransport(handle), **kwargs)
+
+    return create_client, requests
 
 
 def test_accepted_upload_seeds_the_torrent_downloaded_from_orpheus(tmp_path):
     import bencodepy
 
     meta, torrent_path = _client_torrent(tmp_path)
-    site_file = bencodepy.encode({b"comment": b"https://orpheus.network/torrents.php?torrentid=42", b"info": {b"name": b"test"}})
-    download = _fake_download(site_file)
-    with patch("src.trackers.common.Common.download_tracker_torrent", new=download):
+    site_torrent = bencodepy.decode(torrent_path.read_bytes())
+    site_torrent[b"comment"] = b"https://orpheus.network/torrents.php?torrentid=42"
+    site_file = bencodepy.encode(site_torrent)
+    client, requests = _fake_download(site_file)
+    with patch("src.trackers.common.httpx.AsyncClient", new=client):
         assert asyncio.run(_adapter()._download_site_torrent(meta))
 
-    assert download.kwargs["params"] == {"action": "download", "id": "42"}  # never "usetoken"
-    assert download.kwargs["downurl"] == "https://orpheus.network/ajax.php"
+    assert len(requests) == 1
+    assert dict(requests[0].url.params) == {"action": "download", "id": "42"}  # never "usetoken"
+    assert str(requests[0].url.copy_with(query=None)) == "https://orpheus.network/ajax.php"
     assert torrent_path.read_bytes() == site_file
     assert meta.tracker_status["ORPHEUS"]["torrent_link"] == "https://orpheus.network/torrents.php?torrentid=42"
 
@@ -616,8 +622,35 @@ def test_accepted_upload_seeds_the_torrent_downloaded_from_orpheus(tmp_path):
 def test_a_failed_download_keeps_the_local_torrent(tmp_path):
     meta, torrent_path = _client_torrent(tmp_path)
     original = torrent_path.read_bytes()
-    # The API reports errors as JSON with HTTP 200, so the downloader saves it.
+    # The API reports errors as JSON with HTTP 200; the helper must reject it.
     for content in (b'{"status":"failure","error":"rate limit"}', None):
-        with patch("src.trackers.common.Common.download_tracker_torrent", new=_fake_download(content)):
+        client, _ = _fake_download(content)
+        with patch("src.trackers.common.httpx.AsyncClient", new=client):
             assert not asyncio.run(_adapter()._download_site_torrent(meta))
         assert torrent_path.read_bytes() == original
+
+
+def test_file_error_after_upload_keeps_the_accepted_result(tmp_path):
+    meta, torrent_path = _client_torrent(tmp_path)
+    original = torrent_path.read_bytes()
+    meta.music_release = _release(release_year="2019").to_dict()
+    adapter = Orpheus({"TRACKERS": {"ORPHEUS": {"api_key": "fictional-token", "announce_url": "https://example.invalid/announce"}}})
+    response = httpx.Response(
+        200,
+        request=httpx.Request("POST", "https://orpheus.network/ajax.php?action=upload"),
+        json={"status": "success", "response": {"torrentId": 42, "groupId": 7}},
+    )
+    with (
+        patch.object(adapter, "get_additional_checks", new=AsyncMock(return_value=True)),
+        patch.object(adapter, "_check_logs", new=AsyncMock(return_value=[])),
+        patch.object(adapter, "_verify_request_fill", new=AsyncMock(return_value=("", ""))),
+        patch.object(adapter, "_verify_group", new=AsyncMock(return_value=("", ""))),
+        patch.object(adapter.common, "create_torrent_for_upload", new=AsyncMock()),
+        patch.object(httpx.AsyncClient, "post", new=AsyncMock(return_value=response)),
+        patch.object(adapter.common, "download_tracker_torrent", new=AsyncMock(side_effect=OSError("replacement failed"))),
+        patch.object(adapter, "_write_torrent_comment", new=AsyncMock()) as fallback,
+    ):
+        assert asyncio.run(adapter.upload(meta))
+    fallback.assert_awaited_once_with(meta)
+    assert meta.tracker_status["ORPHEUS"]["status_message"] == "Upload accepted by Orpheus."
+    assert torrent_path.read_bytes() == original

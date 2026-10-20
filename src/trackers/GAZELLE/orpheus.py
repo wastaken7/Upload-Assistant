@@ -829,9 +829,8 @@ class Orpheus:
         One API request is made; ``usetoken`` is never sent, so no freeleech
         token is spent.
 
-        The API reports errors as JSON with HTTP 200, which the shared
-        downloader would save as the torrent.  The downloaded file is therefore
-        validated and the local torrent restored when it is not a torrent.
+        The API reports errors as JSON with HTTP 200. The shared downloader
+        validates the completed download before replacing the local torrent.
         """
         status = meta.tracker_status.setdefault(self.tracker, {})
         torrent_id = status.get("torrent_id")
@@ -839,28 +838,22 @@ class Orpheus:
             return False
         torrent_path = Path(meta.base_dir) / "tmp" / str(meta.uuid) / f"[{self.tracker}].torrent"
         try:
-            local_torrent = torrent_path.read_bytes()
-        except OSError:
-            local_torrent = None
-        downloaded = await self.common.download_tracker_torrent(
-            meta,
-            self.tracker,
-            headers=self._headers(meta),
-            params={"action": "download", "id": str(torrent_id)},
-            downurl=f"{self.base_url}/ajax.php",
-        )
-        decoded: Any = None
-        if downloaded:
-            try:
-                content = torrent_path.read_bytes()
-                decoded = cast(Any, bencodepy).decode(content) if content.startswith(b"d") else None
-            except OSError, bencodepy.BencodeDecodeError:
-                decoded = None
+            downloaded = await self.common.download_tracker_torrent(
+                meta,
+                self.tracker,
+                headers=self._headers(meta),
+                params={"action": "download", "id": str(torrent_id)},
+                downurl=f"{self.base_url}/ajax.php",
+            )
+            if not downloaded:
+                return False
+            content = torrent_path.read_bytes()
+            decoded = cast(Any, bencodepy).decode(content) if content.startswith(b"d") else None
+        except (OSError, bencodepy.BencodeDecodeError) as error:
+            logger.warning(f"{self.tracker}: [yellow]could not use the site torrent; seeding the local torrent: {error}[/yellow]")
+            return False
         if not isinstance(decoded, dict) or b"info" not in decoded:
-            if local_torrent is not None:
-                torrent_path.write_bytes(local_torrent)
-            if downloaded:
-                logger.warning(f"{self.tracker}: [yellow]Orpheus did not return a torrent file; seeding the local torrent.[/yellow]")
+            logger.warning(f"{self.tracker}: [yellow]Orpheus did not return a torrent file; seeding the local torrent.[/yellow]")
             return False
         comment = decoded.get(b"comment", b"")
         status["torrent_link"] = comment.decode("utf-8", "replace") if isinstance(comment, bytes) and comment else f"{self.torrent_url}{torrent_id}"
