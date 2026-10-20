@@ -987,7 +987,7 @@ except Exception:
 # Persistent cookie key helpers -------------------------------------------------
 def _get_persistent_cookie_key() -> bytes | None:
     """Return a bytes key used to HMAC-sign remember-me cookies.
-    Attempt to read from keyring; if missing and not in Docker, generate and store one.
+    Read the persisted key from the config dir; if missing, generate and store one.
     """
     with contextlib.suppress(Exception):
         raw = _cfg_read("session_key")
