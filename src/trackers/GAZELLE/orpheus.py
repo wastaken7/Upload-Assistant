@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import platform
 import re
+import unicodedata
 from pathlib import Path
 from typing import Any, ClassVar, cast
 from urllib.parse import urlparse
@@ -203,46 +205,56 @@ class Orpheus:
     # ------------------------------------------------------------------
 
     async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
-        """Perform one narrow, read-only Gazelle browse query for duplicate review.
+        """Find the release group with a few narrow, read-only browse queries.
 
-        Matching groups are expanded per torrent and compared with the planned
-        upload's edition, medium, format and encoding so the dupe and trump
-        rules (2.2) can be reviewed before uploading.
+        Group titles and artist credits are often written differently on the
+        site ("Bob" vs "Bobby", "&" vs "and", "FL" vs "Florida", "2023-12-31"
+        vs "2023 12 31").  Besides the exact query, at most two more search
+        by the cleaned title and, for dated concerts, by the date alone, so a
+        second group for the same release is also found.  Matching groups are expanded
+        per torrent and compared with the planned upload's edition, medium,
+        format and encoding so the dupe and trump rules (2.2) can be reviewed.
         """
         release = self._release(meta)
         artist, album = str(release.get("artist", "")), str(release.get("album", ""))
         if not artist or not album or not self.api_key:
             return []
-        response = await self._api_get(meta, {"action": "browse", "artistname": artist, "groupname": album}, 8.0, "duplicate search")
-        if response is None:
-            return []
-        results = response.get("results")
-        if not isinstance(results, list):
-            return []
+        queries: list[dict[str, str]] = [{"artistname": artist, "groupname": album}]
+        cleaned = " ".join(self._title_tokens(album))
+        if cleaned and cleaned.casefold() != album.casefold():
+            queries.append({"groupname": cleaned})
+        concert_date = self._concert_date(album)
+        if concert_date:
+            queries.append({"groupname": concert_date.replace("-", " ")})
+
+        matched: dict[str, dict[str, Any]] = {}
+        unmatched: dict[str, dict[str, Any]] = {}
+        for index, query in enumerate(queries):
+            if index:
+                await asyncio.sleep(1)
+            response = await self._api_get(meta, {"action": "browse", **query}, 8.0, "duplicate search")
+            results = response.get("results") if response else None
+            for group_item in cast(list[Any], results if isinstance(results, list) else []):
+                if not isinstance(group_item, dict):
+                    continue
+                group = cast(dict[str, Any], group_item)
+                key = str(group.get("groupId", ""))
+                if self._same_group_title(album, group.get("groupName")) and self._shares_artist(release, group.get("artist")):
+                    matched[key] = group
+                elif index == 0:
+                    unmatched[key] = group
 
         planned = self._planned_upload(release)
-        title_key = self._normalise_request_text(album)
         dupes: list[dict[str, Any]] = []
         assessment: list[dict[str, Any]] = []
-        for group_item in cast(list[Any], results):
-            if not isinstance(group_item, dict):
-                continue
-            group = cast(dict[str, Any], group_item)
+        for group in matched.values():
             group_id = group.get("groupId")
             group_name = f"{group.get('artist', '')} - {group.get('groupName', '')}".strip(" -")
-            torrents = [cast(dict[str, Any], torrent) for torrent in cast(list[Any], group.get("torrents") or []) if isinstance(torrent, dict)]
-            if self._normalise_request_text(group.get("groupName")) != title_key:
-                dupes.append(
-                    {
-                        "name": group_name,
-                        "size": group.get("maxSize"),
-                        "id": group_id,
-                        "link": f"{self.base_url}/torrents.php?id={group_id}" if group_id else None,
-                        "flags": ["different release group"],
-                        "type": group.get("releaseType"),
-                    }
+            if self._normalise_request_text(group.get("groupName")) != self._normalise_request_text(album):
+                logger.warning(
+                    f"{self.tracker}: [yellow]existing group found with a different title: {escape(group_name)} ({self.base_url}/torrents.php?id={group_id})[/yellow]"
                 )
-                continue
+            torrents = [cast(dict[str, Any], torrent) for torrent in cast(list[Any], group.get("torrents") or []) if isinstance(torrent, dict)]
             for torrent in torrents:
                 verdict, trumpable = self._assess_existing_torrent(planned, torrent)
                 torrent_id = torrent.get("torrentId")
@@ -258,13 +270,72 @@ class Orpheus:
                         "trumpable": trumpable,
                     }
                 )
-                assessment.append({"torrent": name, "verdict": verdict, "trumpable": trumpable})
+                assessment.append({"torrent": name, "verdict": verdict, "trumpable": trumpable, "group_id": group_id})
+        for key, group in unmatched.items():
+            if key in matched:
+                continue
+            group_id = group.get("groupId")
+            dupes.append(
+                {
+                    "name": f"{group.get('artist', '')} - {group.get('groupName', '')}".strip(" -"),
+                    "size": group.get("maxSize"),
+                    "id": group_id,
+                    "link": f"{self.base_url}/torrents.php?id={group_id}" if group_id else None,
+                    "flags": ["different release group"],
+                    "type": group.get("releaseType"),
+                }
+            )
         if assessment:
             meta.tracker_status.setdefault(self.tracker, {})["dupe_assessment"] = assessment
             for item in assessment:
                 if item["verdict"].startswith(("DUPE", "LIKELY DUPE", "TRUMP")):
                     logger.warning(f"{self.tracker}: [yellow]{escape(item['verdict'])}: {escape(item['torrent'])}[/yellow]")
         return dupes
+
+    _CONCERT_DATE = re.compile(r"(?<!\d)((?:19|20)\d{2})[\s._/-]+(\d{1,2})[\s._/-]+(\d{1,2})(?!\d)")
+    _IGNORED_TOKENS = frozenset({"and", "the", "feat", "featuring", "with", "presents"})
+
+    @staticmethod
+    def _title_tokens(value: Any) -> list[str]:
+        text = unicodedata.normalize("NFKD", str(value or "")).encode("ascii", "ignore").decode("ascii").casefold()
+        return re.findall(r"[a-z0-9]+", text.replace("&", " and "))
+
+    @classmethod
+    def _concert_date(cls, value: Any) -> str:
+        """Return ``YYYY-MM-DD`` for a dated concert title, else an empty string."""
+        match = cls._CONCERT_DATE.search(str(value or ""))
+        if not match:
+            return ""
+        year, month, day = match.group(1), int(match.group(2)), int(match.group(3))
+        return f"{year}-{month:02d}-{day:02d}" if 1 <= month <= 12 and 1 <= day <= 31 else ""
+
+    @classmethod
+    def _title_words(cls, value: Any, *, drop_date: bool = False) -> set[str]:
+        text = cls._CONCERT_DATE.sub(" ", str(value or "")) if drop_date else value
+        return set(cls._title_tokens(text)) - cls._IGNORED_TOKENS
+
+    @classmethod
+    def _same_group_title(cls, ours: Any, theirs: Any) -> bool:
+        """Tolerant title comparison; dated concerts must share the date."""
+        if cls._normalise_request_text(ours) == cls._normalise_request_text(theirs):
+            return True
+        our_date, their_date = cls._concert_date(ours), cls._concert_date(theirs)
+        if our_date or their_date:
+            if our_date != their_date:
+                return False
+            a, b = cls._title_words(ours, drop_date=True), cls._title_words(theirs, drop_date=True)
+            return not a or not b or len(a & b) / min(len(a), len(b)) >= 0.6
+        a, b = cls._title_words(ours), cls._title_words(theirs)
+        return bool(a and b) and len(a & b) / len(a | b) >= 0.85
+
+    @classmethod
+    def _shares_artist(cls, release: MusicRelease, group_artist: Any) -> bool:
+        """Return whether the group's artist credit overlaps the release artists."""
+        theirs = cls._title_words(group_artist)
+        if not theirs or "various" in theirs:
+            return True
+        ours = {token for name in cls._artists(release) for token in cls._title_words(name)}
+        return bool(ours) and len(ours & theirs) / min(len(ours), len(theirs)) >= 0.5
 
     def _planned_upload(self, release: MusicRelease) -> dict[str, Any]:
         format_name = next(iter(release.formats)) if len(release.formats) == 1 else ""
