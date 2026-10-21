@@ -579,6 +579,70 @@ async def test_dvd_retake_uses_only_valid_replacement(monkeypatch, tmp_path, ret
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("disc_num", [0, 1])
+@pytest.mark.parametrize("cached_count", [0, 1, 2, 3])
+@pytest.mark.parametrize("manifest_state", ["missing", "invalid", "old-group", "partial"])
+async def test_dvd_regenerates_unregistered_cache_and_uploads(monkeypatch, tmp_path, disc_num, cached_count, manifest_state):
+    directory = takescreens.screenshots_dir(tmp_path, "dvd-cache")
+    group = "main" if disc_num == 0 else "FILE_1"
+    image = Image.effect_noise((720, 480), 20)
+    cached = []
+    for index in range(cached_count):
+        path = directory / f"Example-{index}.png"
+        image.save(path)
+        cached.append(path)
+    if manifest_state == "invalid":
+        (directory.parent / "screenshot_manifest.json").write_text("incomplete json", encoding="utf-8")
+    elif manifest_state == "old-group":
+        takescreens.register_screenshots(tmp_path, "dvd-cache", cached, "Example")
+    elif manifest_state == "partial":
+        current = directory / "current.png"
+        image.save(current)
+        takescreens.register_screenshots(tmp_path, "dvd-cache", [current], group)
+
+    def parse(_path, output=None, **_kwargs):
+        if output == "JSON":
+            return json.dumps({"media": {"track": [{"Duration": 600, "Width": 720, "Height": 480}]}})
+        video = SimpleNamespace(track_type="Video", duration=600000, pixel_aspect_ratio=1, display_aspect_ratio=1.5, width=720, height=480, frame_rate=24)
+        return SimpleNamespace(tracks=[video])
+
+    async def capture(args):
+        image.save(args[2])
+        return args[0], args[2]
+
+    uploaded = []
+
+    async def host(args):
+        uploaded.append(Path(args[0]))
+        url = f"https://images.example/{Path(args[0]).name}"
+        return {"status": "success", "img_url": url, "raw_url": url, "web_url": url}
+
+    capture_mock = AsyncMock(side_effect=capture)
+    monkeypatch.setattr(takescreens.MediaInfo, "parse", parse)
+    monkeypatch.setattr(takescreens, "valid_ss_time", AsyncMock(return_value=["100", "200", "300"]))
+    monkeypatch.setattr(takescreens, "matching_dvd_title", AsyncMock(return_value=None))
+    monkeypatch.setattr(takescreens, "capture_dvd_screenshot", capture_mock)
+    monkeypatch.setattr(uploadscreens, "upload_image_task", host)
+    meta = Meta(
+        base_dir=str(tmp_path),
+        uuid="dvd-cache",
+        screens=2,
+        is_disc="DVD",
+        imghost="imgbox",
+        discs=[{"name": "Example", "path": str(tmp_path), "main_set": ["01_1.VOB"]} for _ in range(disc_num + 1)],
+    )
+
+    await takescreens.dvd_screenshots(meta, disc_num, cleanup_after_capture=False)
+    registered = takescreens.manifest_files(tmp_path, meta.uuid, group)
+    custom_images = [str(path) for path in registered] if disc_num else []
+    images, count = await uploadscreens._upload_screens({"DEFAULT": {"img_host_1": "imgbox", "image_upload_delay": 0}}, meta, 2, 1, 0, 2, custom_images, {})
+
+    assert capture_mock.await_count == (2 if manifest_state == "partial" else 3)
+    assert len(registered) == len(images) == count == 2
+    assert set(uploaded) == set(registered)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("disc_num", [0, 1])
 async def test_dvd_replaces_blank_registered_screenshot(monkeypatch, tmp_path, disc_num):
     disc_path = tmp_path / "VIDEO_TS"
     disc_path.mkdir()

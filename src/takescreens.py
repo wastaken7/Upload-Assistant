@@ -899,8 +899,8 @@ async def dvd_screenshots(
         logger.info(f"[yellow]Removing blank or unreadable registered DVD screenshot: {image}[/yellow]")
         Path(image).unlink(missing_ok=True)
         forget_screenshot_file(meta.base_dir, meta.uuid, Path(image))
-    if len(normal_screens) >= num_screens:
-        i = num_screens
+    num_screens = max(0, num_screens - len(normal_screens))
+    if num_screens == 0:
         logger.info("[bold green]Reusing screenshots")
         return
 
@@ -955,25 +955,6 @@ async def dvd_screenshots(
     if ifo_duration:
         voblength = ifo_duration
     ss_times = await valid_ss_time([], num_screens, voblength, frame_rate, meta, retake=retry_cap)
-    capture_tasks: list[Awaitable[tuple[int, str | None]]] = []
-    existing_images_count = 0
-    existing_image_paths: list[str] = []
-
-    for i in range(num_screens + 1):
-        image = str(screenshot_dir / f"{sanitized_disc_name}-{i}.png")
-        if Path(image).exists() and not meta.retake:
-            if not dvd_screenshot_has_content(image):
-                logger.info(f"[yellow]Removing blank or unreadable DVD screenshot: {image}[/yellow]")
-                Path(image).unlink(missing_ok=True)
-                continue
-            existing_images_count += 1
-            existing_image_paths.append(image)
-
-    if existing_images_count == num_screens and not meta.retake:
-        logger.debug("[yellow]The correct number of screenshots already exists. Skipping capture process.")
-        capture_results: list[str] = existing_image_paths
-        return
-    capture_tasks = []
     image_paths: list[str] = []
     input_files: list[str] = []
 
@@ -984,9 +965,7 @@ async def dvd_screenshots(
 
     if meta.frame_overlay and any(overlay_options(default_config)[key] for key in ("overlay_frame_number", "overlay_frame_type")):
         logger.debug("[yellow]Getting frame information for overlays...")
-        frame_info_tasks = [
-            get_frame_info(input_files[i], ss_times[i], meta, dvd_title=dvd_title) for i in range(num_screens + 1) if not Path(image_paths[i]).exists() or meta.retake
-        ]
+        frame_info_tasks = [get_frame_info(input_files[i], ss_times[i], meta, dvd_title=dvd_title) for i in range(num_screens + 1)]
 
         frame_info_results = await asyncio.gather(*frame_info_tasks)
         meta.frame_info_map = {}
@@ -1007,9 +986,7 @@ async def dvd_screenshots(
         async with semaphore:
             return await capture_dvd_screenshot(args)
 
-    for i in range(num_screens + 1):
-        if not Path(image_paths[i]).exists() or meta.retake:
-            capture_tasks.append(capture_dvd_with_semaphore((i, input_files[i], image_paths[i], ss_times[i], meta, width, height, w_sar, h_sar, dvd_title)))
+    capture_tasks = [capture_dvd_with_semaphore((i, input_files[i], image_paths[i], ss_times[i], meta, width, height, w_sar, h_sar, dvd_title)) for i in range(num_screens + 1)]
 
     capture_results: list[str] = []
     results = await asyncio.gather(*capture_tasks)
