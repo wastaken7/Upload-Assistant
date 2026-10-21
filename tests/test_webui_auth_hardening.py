@@ -161,3 +161,16 @@ def test_tracker_credential_files_are_owner_only(tmp_path):
     cookies.chmod(0o644)
     restrict_to_owner(cookies)
     assert stat.S_IMODE(cookies.stat().st_mode) == 0o600
+
+
+def test_private_files_are_not_rewritten_when_permissions_cannot_be_tightened(tmp_path, monkeypatch):
+    target = tmp_path / "webui_auth.json"
+    target.write_text("old", encoding="utf-8")
+
+    def deny_chmod(_path, _mode):
+        raise PermissionError("owned by another user")
+
+    monkeypatch.setattr(type(target), "chmod", deny_chmod)
+    with pytest.raises(PermissionError):
+        server.auth_mod.write_private_text(target, "new secret")
+    assert target.read_text(encoding="utf-8") == "old"

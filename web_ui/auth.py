@@ -16,7 +16,6 @@ import logging
 import math
 import os
 import string
-from contextlib import suppress
 from pathlib import Path
 
 from argon2 import PasswordHasher
@@ -105,11 +104,11 @@ def write_private_text(path: Path, text: str) -> None:
 
     New files are created with mode 0600 so they are never briefly readable by
     other accounts on shared hosts; existing files are tightened before the new
-    content is written.
+    content is written. If an existing file cannot be tightened, the error
+    propagates so new credentials are never written to a readable file.
     """
-    with suppress(Exception):
-        if Path(path).exists():
-            Path(path).chmod(0o600)
+    if Path(path).exists():
+        Path(path).chmod(0o600)
     fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     with os.fdopen(fd, "w", encoding="utf-8") as fobj:
         fobj.write(text)
