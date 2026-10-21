@@ -445,6 +445,8 @@ class BJShare:
 
         if has_pt_audio:
             if is_original_pt:
+                if languages_manager.has_explicit_european_portuguese_audio(meta):
+                    return "Outro"
                 return "Nacional"
             if len(audio_languages) > 1:
                 return "Dual Áudio"

@@ -23,6 +23,22 @@ class LanguagesManager:
         return any(re.search(r"(?:^|[.\s_\-\[\]()])HC(?:$|[.\s_\-\[\]()])", name, re.IGNORECASE) for name in names)
 
     @staticmethod
+    def has_explicit_european_portuguese_audio(meta: Meta) -> bool:
+        """Return True when non-disc MediaInfo declares pt-PT audio and no pt-BR audio."""
+        if meta.is_disc:
+            return False
+        mediainfo = cast(dict[str, Any], getattr(meta, "mediainfo", None) or {})
+        tracks = cast(list[Any], mediainfo.get("media", {}).get("track", []))
+        if not isinstance(tracks, list):
+            return False
+        audio_languages = {
+            str(track.get("Language") or "").strip().lower().replace("_", "-")
+            for track in cast(list[dict[str, Any]], [t for t in tracks if isinstance(t, dict)])
+            if track.get("@type") == "Audio"
+        }
+        return "pt-pt" in audio_languages and "pt-br" not in audio_languages
+
+    @staticmethod
     def _dedupe_preserve_order(values: list[str]) -> list[str]:
         seen: set[str] = set()
         deduped: list[str] = []

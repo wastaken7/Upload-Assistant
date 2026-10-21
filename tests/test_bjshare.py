@@ -82,6 +82,7 @@ def audio_search(category, upload_audio, header_html, *, season=1, tv_pack=True)
             "Nacional": ["Portuguese"],
         }[upload_audio],
         original_language="pt" if upload_audio == "Nacional" else "en",
+        is_disc="",
         season_int=season,
         tv_pack=tv_pack,
         episode_int=0 if tv_pack else 2,
@@ -288,3 +289,22 @@ def test_get_subtitle_no_portuguese():
 
     result = asyncio.run(tracker.get_subtitle(meta))
     assert result == "Nenhuma"  # noqa: S101
+
+
+@pytest.mark.parametrize(
+    "audio_tags, is_disc, expected",
+    [(["pt-PT"], "", "Outro"), (["pt-BR"], "", "Nacional"), (["pt"], "", "Nacional"), (["pt-PT", "pt-BR"], "", "Nacional"), (["pt-PT"], "BDMV", "Nacional")],
+)
+def test_get_audio_european_portuguese_is_outro(audio_tags, is_disc, expected):
+    tracker = object.__new__(BJShare)
+    tracks = [{"@type": "General"}, *({"@type": "Audio", "Language": tag} for tag in audio_tags)]
+    meta = Meta(
+        category="MOVIE",
+        language_checked=True,
+        audio_languages=["Portuguese"],
+        original_language="pt",
+        is_disc=is_disc,
+        mediainfo={"media": {"track": tracks}},
+    )
+
+    assert asyncio.run(tracker.get_audio(meta)) == expected  # noqa: S101
