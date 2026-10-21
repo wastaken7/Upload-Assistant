@@ -1,6 +1,7 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import http.cookiejar
 import json
+import os
 import re
 import stat
 import traceback
@@ -15,6 +16,29 @@ from bs4.element import AttributeValueList
 from src.console import logger
 from src.meta import Meta
 from src.trackers.common import Common
+
+
+def restrict_to_owner(path: str | Path) -> None:
+    """Limit an existing credential file to its owner before new secrets are written to it.
+
+    New files are created 0600 by their writers; this covers files saved by
+    older versions or exported with broader permissions.
+    """
+    try:
+        if Path(path).exists():
+            Path(path).chmod(stat.S_IRUSR | stat.S_IWUSR)
+    except OSError:
+        # Writing still proceeds (the file may be shared through a group); the
+        # WebUI startup warning lists credential files readable by others.
+        logger.info("[yellow]Could not restrict a tracker credential file to its owner; check its permissions.[/yellow]")
+
+
+def write_owner_only_text(path: str | Path, text: str) -> None:
+    """Write a credential file that other local users cannot read."""
+    restrict_to_owner(path)
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, stat.S_IRUSR | stat.S_IWUSR)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(text)
 
 
 def _attr_to_string(value: str | AttributeValueList | None) -> str:
@@ -278,6 +302,8 @@ class CookieValidator:
             return
 
         try:
+            if cookie_jar.filename:
+                restrict_to_owner(cookie_jar.filename)
             cookie_jar.save(ignore_discard=True, ignore_expires=True)
         except Exception as e:
             logger.info(f"{tracker}: Failed to update the cookie file: {e}")
@@ -386,14 +412,14 @@ class CookieValidator:
                                 cookie_jar.set_cookie(ck)
                                 break
 
+                    restrict_to_owner(cookie_file)
                     cookie_jar.save(ignore_discard=True, ignore_expires=True)
                     logger.info(f"{tracker}: [green]Cookies saved to {cookie_file}[/green]")
 
                     # Save auth key to a separate file if found
                     if auth_key:
                         auth_file = cookie_file.replace(".txt", "_auth.txt")
-                        async with aiofiles.open(auth_file, "w", encoding="utf-8") as f:
-                            await f.write(auth_key)
+                        write_owner_only_text(auth_file, auth_key)
                         logger.info(f"{tracker}: [green]Auth key saved to {auth_file}[/green]")
 
                     return True
@@ -530,11 +556,7 @@ class CookieValidator:
             for cookie in session_cookies:
                 cookie_dict[cookie.name] = {"value": cookie.value, "domain": cookie.domain, "path": cookie.path, "secure": cookie.secure, "expires": cookie.expires}
 
-            with Path(cookiefile).open("w", encoding="utf-8") as f:
-                json.dump(cookie_dict, f, indent=2)
-
-            # Set restrictive permissions (0o600) to protect cookie secrets
-            Path(cookiefile).chmod(stat.S_IRUSR | stat.S_IWUSR)
+            write_owner_only_text(cookiefile, json.dumps(cookie_dict, indent=2))
 
         except OSError as e:
             logger.error(f"[red]Error with cookie file operations: {e}[/red]")

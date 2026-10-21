@@ -32,7 +32,8 @@
       rel="shortcut icon"
       href="{{ url_for('static', filename='favicon.ico') }}"
     />
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tailwind Play CDN 3.4.17, self-hosted: its CDN omits CORS headers, so SRI cannot be used. -->
+    <script src="{{ url_for('static', filename='js/vendor/tailwindcss-3.4.17.js') }}"></script>
     {% include "_theme_bootstrap.html" %}
     <link
       rel="stylesheet"
@@ -62,12 +63,30 @@
         <div class="ua-auth-content">
           {% if setup_mode %}
           <div class="ua-auth-notice" role="status">
-            This is the first-run setup. Choose the username and password for
-            your Web UI account.
+            This is the first-run setup. Enter the setup code shown in the
+            Upload Assistant console output, then choose the username and
+            password for your Web UI account.
           </div>
           {% endif %}
 
           <form method="post" class="ua-auth-form">
+            {% if setup_mode %}
+            <div class="ua-auth-field">
+              <label class="ua-auth-label" for="setup_code">Setup code</label>
+              <input
+                class="ua-auth-input"
+                id="setup_code"
+                name="setup_code"
+                placeholder="XXXX-XXXX-XXXX"
+                type="text"
+                autocomplete="off"
+                autocapitalize="characters"
+                spellcheck="false"
+                required
+              />
+            </div>
+            {% endif %}
+
             <div class="ua-auth-field">
               <label class="ua-auth-label" for="username">
                 {{ 'Choose a username' if setup_mode else 'Username' }}

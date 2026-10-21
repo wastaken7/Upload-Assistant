@@ -1,5 +1,7 @@
 module.exports = {
   root: true,
+  // Third-party builds are vendored unchanged.
+  ignorePatterns: ["vendor/"],
   env: { browser: true, es2021: true },
   parserOptions: {
     ecmaVersion: 2022,

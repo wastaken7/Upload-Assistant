@@ -16,7 +16,6 @@ import logging
 import math
 import os
 import string
-from contextlib import suppress
 from pathlib import Path
 
 from argon2 import PasswordHasher
@@ -100,6 +99,21 @@ def get_config_dir() -> Path:
         return repo_dir
 
 
+def write_private_text(path: Path, text: str) -> None:
+    """Write text to a file that only the current user can read.
+
+    New files are created with mode 0600 so they are never briefly readable by
+    other accounts on shared hosts; existing files are tightened before the new
+    content is written. If an existing file cannot be tightened, the error
+    propagates so new credentials are never written to a readable file.
+    """
+    if Path(path).exists():
+        Path(path).chmod(0o600)
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as fobj:
+        fobj.write(text)
+
+
 _cached_session_secret: bytes | None = None
 
 
@@ -163,9 +177,7 @@ def _resolve_session_secret() -> bytes:
 
                 try:
                     b = token_bytes(64)
-                    p.write_text(b.hex(), encoding="utf-8")
-                    with suppress(Exception):
-                        Path(p).chmod(0o600)
+                    write_private_text(p, b.hex())
                     log.info("Auto-generated session secret at %s", p)
                     return b
                 except Exception as e:
@@ -216,11 +228,7 @@ def _resolve_session_secret() -> bytes:
     # Generate and persist
     try:
         b = token_bytes(64)
-        with Path(secret_file).open("w", encoding="utf-8") as fobj:
-            fobj.write(b.hex())
-        with suppress(Exception):
-            # Tighten permissions when possible
-            Path(secret_file).chmod(0o600)
+        write_private_text(secret_file, b.hex())
         return b
     except Exception as e:
         log.error("failed to persist session secret: %s", e)
@@ -354,8 +362,15 @@ def _unpack_field(extras: dict, field: str) -> str | None:
 def create_user(username: str, password: str) -> None:
     path = _get_user_file()
     # Prevent creating a new user if one already exists. Persisted user is authoritative.
+    # The file can already hold IP controls or failed sign-in records; keep those.
+    existing: dict = {}
     if path.exists():
-        raise ValueError("a user account already exists")
+        try:
+            existing = json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            raise OSError("failed to read existing user file; aborting to avoid overwriting it") from None
+        if not isinstance(existing, dict) or existing.get("password_hash"):
+            raise ValueError("a user account already exists")
 
     # Enforce minimum password entropy to ensure user-chosen secrets are strong.
     # Estimate entropy by character-class pool size heuristic: lowercase, uppercase,
@@ -386,10 +401,8 @@ def create_user(username: str, password: str) -> None:
     extras_enc = encrypt_text(key, json.dumps(extras, separators=(",", ":"), ensure_ascii=False))
     username_enc = encrypt_text(key, username)
 
-    data = {"username_enc": username_enc, "password_hash": hash_password(password), "extras_enc": extras_enc}
-    path.write_text(json.dumps(data), encoding="utf-8")
-    with suppress(Exception):
-        Path(path).chmod(0o600)
+    data = {**existing, "username_enc": username_enc, "password_hash": hash_password(password), "extras_enc": extras_enc}
+    write_private_text(path, json.dumps(data))
 
 
 def load_user() -> dict | None:
@@ -473,9 +486,7 @@ def set_totp_secret(secret: str | None) -> None:
 
     key = _get_master_key()
     raw["extras_enc"] = encrypt_text(key, json.dumps(extras, separators=(",", ":"), ensure_ascii=False))
-    path.write_text(json.dumps(raw), encoding="utf-8")
-    with suppress(Exception):
-        Path(path).chmod(0o600)
+    write_private_text(path, json.dumps(raw))
 
 
 def get_recovery_hashes() -> list[str]:
@@ -516,9 +527,7 @@ def set_recovery_hashes(hashes: list[str]) -> None:
 
     key = _get_master_key()
     raw["extras_enc"] = encrypt_text(key, json.dumps(extras, separators=(",", ":"), ensure_ascii=False))
-    path.write_text(json.dumps(raw), encoding="utf-8")
-    with suppress(Exception):
-        Path(path).chmod(0o600)
+    write_private_text(path, json.dumps(raw))
 
 
 def set_twofa_state(secret: str | None, recovery_hashes: list[str]) -> None:
@@ -545,9 +554,7 @@ def set_twofa_state(secret: str | None, recovery_hashes: list[str]) -> None:
 
     key = _get_master_key()
     raw["extras_enc"] = encrypt_text(key, json.dumps(extras, separators=(",", ":"), ensure_ascii=False))
-    path.write_text(json.dumps(raw), encoding="utf-8")
-    with suppress(Exception):
-        Path(path).chmod(0o600)
+    write_private_text(path, json.dumps(raw))
 
 
 def get_api_tokens() -> dict:
@@ -587,9 +594,7 @@ def set_api_tokens(store: dict) -> None:
 
     key = _get_master_key()
     raw["extras_enc"] = encrypt_text(key, json.dumps(extras, separators=(",", ":"), ensure_ascii=False))
-    path.write_text(json.dumps(raw), encoding="utf-8")
-    with suppress(Exception):
-        Path(path).chmod(0o600)
+    write_private_text(path, json.dumps(raw))
 
 
 def verify_user(username: str, password: str) -> bool:

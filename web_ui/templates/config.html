@@ -30,7 +30,8 @@
       rel="shortcut icon"
       href="{{ url_for('static', filename='favicon.ico') }}"
     />
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tailwind Play CDN 3.4.17, self-hosted: its CDN omits CORS headers, so SRI cannot be used. -->
+    <script src="{{ url_for('static', filename='js/vendor/tailwindcss-3.4.17.js') }}"></script>
     <link
       rel="stylesheet"
       href="{{ url_for('static', filename='css/theme.css') }}"
@@ -87,14 +88,20 @@
       window.UA_CSRF_TOKEN = {{ csrf_token | tojson }};
     </script>
     <script
-      crossorigin
-      src="https://unpkg.com/react@18/umd/react.production.min.js"
+      src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"
+      integrity="sha384-DGyLxAyjq0f9SPpVevD6IgztCFlnMF6oW/XQGmfe+IsZ8TqEiDrcHkMLKI6fiB/Z"
+      crossorigin="anonymous"
     ></script>
     <script
-      crossorigin
-      src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"
+      src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"
+      integrity="sha384-gTGxhz21lVGYNMcdJOyq01Edg0jhn/c22nsx0kyqP0TxaV5WVdsSH1fSDUf5YJj1"
+      crossorigin="anonymous"
     ></script>
-    <script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
+    <script
+      src="https://unpkg.com/@babel/standalone@7.29.10/babel.min.js"
+      integrity="sha384-DvKInD++yy7A2BLvCHTGeQpbzHFQ/fygXywfI/wco5cjKN4A+mE48ib8UE8FiW0o"
+      crossorigin="anonymous"
+    ></script>
     <script
       type="text/javascript"
       src="{{ url_for('static', filename='js/shared_utils.js') }}"

@@ -156,7 +156,7 @@ You can specify multiple browse roots by separating them with commas. In this ex
 ua "/path/to/media" --webui
 ```
 
-Open **<http://127.0.0.1:5000>** in a browser on the same computer. On your first visit, create a username and password for the WebUI's local account. This account is separate from your tracker accounts.
+Open **<http://127.0.0.1:5000>** in a browser on the same computer. On your first visit, enter the setup code printed in the terminal, then create a username and password for the WebUI's local account. This account is separate from your tracker accounts.
 
 **Check:** You should see the Upload workspace and be able to browse the folder you supplied.
 

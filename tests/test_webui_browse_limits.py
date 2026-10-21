@@ -31,11 +31,12 @@ def browser(tmp_path, monkeypatch):
     (movie / "movie.mkv").touch()
     monkeypatch.setenv("UA_BROWSE_ROOTS", str(media_root))
     server.limiter.reset()
+    server.auth_mod.create_user("fictional-user", "Fictional-Passphrase-2026!")
     client = server.app.test_client()
     with client.session_transaction() as session:
         session["enc"] = server.auth_mod.encrypt_text(
             server._derive_aes_key(),
-            json.dumps({"authenticated": True, "csrf_token": HEADERS["X-CSRF-Token"]}),
+            json.dumps({"authenticated": True, "account": server._account_fingerprint(), "csrf_token": HEADERS["X-CSRF-Token"]}),
         )
     yield client
     server.limiter.reset()

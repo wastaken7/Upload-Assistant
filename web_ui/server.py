@@ -291,7 +291,7 @@ def _cfg_read(name: str) -> str | None:
 def _cfg_write(name: str, value: str) -> None:
     p = _cfg_file_path(name)
     with contextlib.suppress(Exception):
-        p.write_text(value, encoding="utf-8")
+        auth_mod.write_private_text(p, value)
 
 
 def _cfg_delete(name: str) -> None:
@@ -406,7 +406,7 @@ app.secret_key = session_secret
 # Configure server-side filesystem sessions (persisted under config dir)
 cfg_dir = auth_mod.get_config_dir()
 sess_dir = cfg_dir / "sessions"
-sess_dir.mkdir(parents=True, exist_ok=True)
+sess_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
 app.config["SESSION_TYPE"] = "filesystem"
 app.config["SESSION_PERMANENT"] = False
 # Ensure permanent sessions (when set) expire after 30 days to match remember-me cookie
@@ -420,7 +420,7 @@ try:
     FileSystemCache = importlib.import_module("cachelib.file").FileSystemCache
 
     with contextlib.suppress(Exception):
-        _session_cache = FileSystemCache(str(sess_dir))
+        _session_cache = FileSystemCache(str(sess_dir), mode=0o600)
 except Exception:
     _session_cache = None
 
@@ -529,7 +529,11 @@ def _load_user_record() -> dict[str, Any] | None:
     load_user_fn = getattr(auth_mod, "load_user", None)
     if not callable(load_user_fn):
         return None
-    return _as_dict(load_user_fn())
+    record = _as_dict(load_user_fn())
+    # IP controls and access-log settings share the file before an account exists.
+    if record is None or not record.get("password_hash"):
+        return None
+    return record
 
 
 def _session_get(key: str, default: object = None) -> Any:
@@ -604,20 +608,6 @@ def _get_ip_whitelist() -> list[str]:
     return []
 
 
-def _set_ip_whitelist(ips: list[str]) -> None:
-    """Set the list of whitelisted IPs."""
-    with contextlib.suppress(Exception):
-        path = cfg_dir / "webui_auth.json"
-        data: dict[str, Any] = {}
-        if path.exists():
-            try:
-                data = _json_load_dict(path.read_text(encoding="utf-8"))
-            except Exception:
-                return
-        data["ip_whitelist"] = ips
-        path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-
-
 def _get_ip_blacklist() -> list[str]:
     """Get the list of blacklisted IPs."""
     with contextlib.suppress(Exception):
@@ -631,18 +621,33 @@ def _get_ip_blacklist() -> list[str]:
     return []
 
 
-def _set_ip_blacklist(ips: list[str]) -> None:
-    """Set the list of blacklisted IPs."""
-    with contextlib.suppress(Exception):
+def _set_ip_control(whitelist: list[str], blacklist: list[str]) -> bool:
+    """Save both IP lists in one write so a failure cannot apply only one of them."""
+    try:
         path = cfg_dir / "webui_auth.json"
         data: dict[str, Any] = {}
         if path.exists():
-            try:
-                data = _json_load_dict(path.read_text(encoding="utf-8"))
-            except Exception:
-                return
+            data = _json_load_dict(path.read_text(encoding="utf-8"))
+        data["ip_whitelist"] = whitelist
+        data["ip_blacklist"] = blacklist
+        auth_mod.write_private_text(path, json.dumps(data, ensure_ascii=False, indent=2))
+    except Exception:
+        return False
+    return True
+
+
+def _set_ip_blacklist(ips: list[str]) -> bool:
+    """Set the list of blacklisted IPs, returning whether it was saved."""
+    try:
+        path = cfg_dir / "webui_auth.json"
+        data: dict[str, Any] = {}
+        if path.exists():
+            data = _json_load_dict(path.read_text(encoding="utf-8"))
         data["ip_blacklist"] = ips
-        path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        auth_mod.write_private_text(path, json.dumps(data, ensure_ascii=False, indent=2))
+    except Exception:
+        return False
+    return True
 
 
 def _get_ip_failures() -> dict[str, list[int]]:
@@ -687,7 +692,7 @@ def _set_ip_failures(failures: dict[str, list[int]]) -> None:
             except Exception:
                 return
         data["ip_failures"] = failures
-        path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        auth_mod.write_private_text(path, json.dumps(data, ensure_ascii=False, indent=2))
 
 
 def _is_ip_allowed(ip: str) -> bool:
@@ -731,10 +736,84 @@ def _handle_failed_auth(ip: str) -> None:
             _set_ip_blacklist(blacklist)
 
 
+def _account_fingerprint() -> str | None:
+    """Identify the current account credentials without exposing the password hash.
+
+    Sessions and remember-me cookies carry this value, so recreating the account
+    (the documented password reset) or changing its password signs out every
+    existing browser.
+    """
+    record = _load_user_record()
+    password_hash = record.get("password_hash") if record else None
+    key = _derive_aes_key()
+    if not isinstance(password_hash, str) or not password_hash or not key:
+        return None
+    return hmac.new(key, b"webui-account:" + password_hash.encode("utf-8"), hashlib.sha256).hexdigest()
+
+
+def _account_fingerprint_matches(value: object) -> bool:
+    fingerprint = _account_fingerprint()
+    return fingerprint is not None and isinstance(value, str) and hmac.compare_digest(value, fingerprint)
+
+
 def _is_authenticated() -> bool:
     if getattr(g, "authenticated", False):
         return True
-    return bool(_session_get("authenticated", False))
+    session_data = _load_session_dict()
+    return bool(session_data.get("authenticated")) and _account_fingerprint_matches(session_data.get("account"))
+
+
+def _mark_session_authenticated(username: str) -> None:
+    """Replace the browser session with a fresh authenticated one."""
+    _commit_session_dict(
+        {
+            "authenticated": True,
+            "username": username,
+            "account": _account_fingerprint(),
+            "csrf_token": secrets.token_urlsafe(32),
+        }
+    )
+    # Issue a new session id so an id known before sign-in cannot be reused.
+    with contextlib.suppress(Exception):
+        app.session_interface.regenerate(session)
+
+
+_first_run_setup_code_value: str | None = None
+_first_run_setup_code_lock = threading.Lock()
+
+
+def _normalize_setup_code(code: str) -> str:
+    return re.sub(r"[\s-]+", "", code).upper()
+
+
+def _first_run_setup_code() -> str:
+    """Return the one-time code that authorizes creating the first account.
+
+    The code is printed to the server console when it is created, so only
+    someone who can see the Upload Assistant output can create the account.
+    """
+    global _first_run_setup_code_value
+    with _first_run_setup_code_lock:
+        if _first_run_setup_code_value is None:
+            alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+            raw = "".join(secrets.choice(alphabet) for _ in range(12))
+            _first_run_setup_code_value = "-".join(raw[i : i + 4] for i in range(0, len(raw), 4))
+            console.print(
+                f"WebUI first-run setup code: {_first_run_setup_code_value} (enter it on the sign-in page to create the WebUI account)",
+                markup=False,
+            )
+        return _first_run_setup_code_value
+
+
+def _first_run_setup_code_matches(code: str) -> bool:
+    expected = _normalize_setup_code(_first_run_setup_code())
+    return bool(code) and hmac.compare_digest(_normalize_setup_code(code), expected)
+
+
+def _clear_first_run_setup_code() -> None:
+    global _first_run_setup_code_value
+    with _first_run_setup_code_lock:
+        _first_run_setup_code_value = None
 
 
 def _cleanup_duplicate_sessions(username: str) -> None:
@@ -1089,7 +1168,8 @@ def _persist_existing_api_token(token: str, username: str, label: str = "") -> b
 
 
 def _verify_api_token(token: str) -> str | None:
-    if not token:
+    # Short legacy tokens are guessable; generated tokens are far longer.
+    if not token or len(token) < 32:
         return None
     store = _load_token_store()
     info = store.get(_hash_api_token(token))
@@ -1185,7 +1265,7 @@ def _create_remember_token(username: str, days: int = 30) -> str | None:
     if not key:
         return None
     expiry = int(datetime.now(UTC).timestamp()) + days * 86400
-    payload = json.dumps({"u": username, "e": expiry}, separators=(",", ":")).encode("utf-8")
+    payload = json.dumps({"u": username, "e": expiry, "a": _account_fingerprint()}, separators=(",", ":")).encode("utf-8")
     b64 = base64.urlsafe_b64encode(payload).decode("ascii")
     sig = hmac.new(key, b64.encode("ascii"), hashlib.sha256).hexdigest()
     return f"{b64}|{sig}"
@@ -1219,6 +1299,8 @@ def _verify_remember_token(token: str) -> str | None:
         else:
             return None
         if not username or expiry < int(datetime.now(UTC).timestamp()):
+            return None
+        if not _account_fingerprint_matches(data.get("a")):
             return None
         return str(username)
     except Exception:
@@ -1278,12 +1360,19 @@ def _parse_cors_origins() -> list[str]:
     origins: list[str] = []
     for part in raw.split(","):
         part = part.strip()
+        if part == "*":
+            # Credentialed CORS for every origin would let any website read the
+            # CSRF token and act as the signed-in user.
+            raise ValueError("UA_WEBUI_CORS_ORIGINS must list explicit origins; '*' is not allowed")
         if part:
             origins.append(part)
     return origins
 
 
 cors_origins = _parse_cors_origins()
+if not cors_origins:
+    # Cross-site callers are not configured, so keep browser sessions same-site.
+    app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 if cors_origins:
     # Allow the CSRF header and support credentials so browser-based
     # cross-origin requests can send cookies for authenticated sessions.
@@ -2887,6 +2976,9 @@ def _webui_auth_ok() -> bool:
         return False
     if not persisted:
         return False
+    # Basic auth carries no second factor, so it would bypass 2FA.
+    if _totp_enabled():
+        return False
     return auth_mod.verify_user(auth.username or "", auth.password or "")
 
 
@@ -2965,6 +3057,17 @@ def _require_auth_for_webui():  # pyright: ignore[reportUnusedFunction]
         return redirect(url_for("login_page"))
 
     return None
+
+
+@app.after_request
+def _set_security_headers(response: Any) -> Any:  # pyright: ignore[reportUnusedFunction]
+    """Apply browser hardening headers that do not affect embedding or proxies."""
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("Referrer-Policy", "same-origin")
+    if request.path.startswith("/api/"):
+        # API responses can contain configuration secrets and upload output.
+        response.headers.setdefault("Cache-Control", "no-store")
+    return response
 
 
 @app.after_request
@@ -4141,11 +4244,7 @@ def login_page():
                     _handle_failed_auth(get_remote_address())
                     return render_template("login.html", error="Credentials did not match", show_2fa=_totp_enabled(), setup_mode=False)
 
-                _session_set("authenticated", True)
-                with contextlib.suppress(Exception):
-                    _session_set("username", username)
-                with contextlib.suppress(Exception):
-                    _session_set("csrf_token", secrets.token_urlsafe(32))
+                _mark_session_authenticated(username)
                 if remember:
                     session.permanent = True
                 resp = redirect(url_for("index"))
@@ -4160,23 +4259,22 @@ def login_page():
             # Credentials don't match persisted user
             _handle_failed_auth(get_remote_address())
             return render_template("login.html", error="Credentials did not match", setup_mode=False)
-        # No persisted user: allow UI-driven creation (first-run setup)
+        # No persisted user: allow UI-driven creation (first-run setup). The
+        # setup code is only shown in the server console, so a visitor who
+        # reaches an exposed WebUI first cannot claim the account.
         if username and password:
-            if _totp_enabled() and not (totp_code and _verify_totp_code(totp_code)):
+            if not _first_run_setup_code_matches(_request_form_text("setup_code")):
                 _handle_failed_auth(get_remote_address())
-                return render_template("login.html", error="Credentials did not match", show_2fa=_totp_enabled(), setup_mode=True)
+                return render_template("login.html", error="Setup code did not match. Copy it from the Upload Assistant console output.", setup_mode=True)
             try:
                 auth_mod.create_user(username, password)
             except ValueError as exc:
-                return render_template("login.html", error=str(exc), show_2fa=_totp_enabled(), setup_mode=True)
+                return render_template("login.html", error=str(exc), setup_mode=True)
             except Exception:
-                return render_template("login.html", error="Unable to create account", show_2fa=_totp_enabled(), setup_mode=True)
+                return render_template("login.html", error="Unable to create account", setup_mode=True)
+            _clear_first_run_setup_code()
 
-            _session_set("authenticated", True)
-            with contextlib.suppress(Exception):
-                _session_set("username", username)
-            with contextlib.suppress(Exception):
-                _session_set("csrf_token", secrets.token_urlsafe(32))
+            _mark_session_authenticated(username)
             if remember:
                 session.permanent = True
                 with contextlib.suppress(Exception):
@@ -4197,7 +4295,10 @@ def login_page():
 
     # Show 2FA field if enabled
     show_2fa = _totp_enabled()
-    return render_template("login.html", show_2fa=show_2fa, setup_mode=_load_user_record() is None)
+    setup_mode = _load_user_record() is None
+    if setup_mode:
+        _first_run_setup_code()
+    return render_template("login.html", show_2fa=show_2fa, setup_mode=setup_mode)
 
 
 @app.errorhandler(429)
@@ -4259,11 +4360,7 @@ def login_recovery():
     # If a persisted user exists, require those credentials + recovery code
     if persisted:
         if username and password and recovery_code and _consume_recovery_code(recovery_code) and auth_mod.verify_user(username, password):
-            _session_set("authenticated", True)
-            with contextlib.suppress(Exception):
-                _session_set("username", username)
-            with contextlib.suppress(Exception):
-                _session_set("csrf_token", secrets.token_urlsafe(32))
+            _mark_session_authenticated(username)
             if remember:
                 session.permanent = True
                 with contextlib.suppress(Exception):
@@ -4276,35 +4373,6 @@ def login_recovery():
         # Failed recovery attempt -> record and show recovery page
         _handle_failed_auth(get_remote_address())
         return render_template("login_recovery.html", error="Recovery code invalid", show_2fa=_totp_enabled())
-
-    # No persisted user: allow first-run creation with recovery-code flow
-    if username and password and recovery_code and _consume_recovery_code(recovery_code):
-        try:
-            auth_mod.create_user(username, password)
-        except ValueError as exc:
-            return render_template("login_recovery.html", error=str(exc), show_2fa=_totp_enabled())
-        except Exception:
-            return render_template("login_recovery.html", error="Unable to create account", show_2fa=_totp_enabled())
-
-        _session_set("authenticated", True)
-        with contextlib.suppress(Exception):
-            _session_set("username", username)
-        with contextlib.suppress(Exception):
-            _session_set("csrf_token", secrets.token_urlsafe(32))
-        if remember:
-            session.permanent = True
-            with contextlib.suppress(Exception):
-                token = _create_remember_token(username)
-                if token:
-                    resp = redirect(url_for("config_page"))
-                    resp.set_cookie("ua_remember", token, max_age=30 * 86400, httponly=True, secure=True, samesite="Lax")
-                    with suppress(Exception):
-                        _cleanup_duplicate_sessions(username)
-                    return resp
-
-        with suppress(Exception):
-            _cleanup_duplicate_sessions(username)
-        return redirect(url_for("config_page"))
 
     _handle_failed_auth(get_remote_address())
     return render_template("login_recovery.html", error="Recovery code invalid", show_2fa=_totp_enabled())
@@ -4729,8 +4797,9 @@ def ip_control_api():
                 except ValueError:
                     return jsonify({"success": False, "error": f"Invalid IP address: {ip}"}), 400
 
-            _set_ip_whitelist(whitelist)
-            _set_ip_blacklist(blacklist)
+            # Report a policy that was not saved instead of claiming success.
+            if not _set_ip_control(whitelist, blacklist):
+                return jsonify({"success": False, "error": "Failed to update IP control settings"}), 500
             return jsonify({"success": True})
         except Exception as e:
             console.print(f"Error updating IP control: {e}", markup=False)
@@ -6291,6 +6360,9 @@ def api_tokens():
             token_value = str(data.get("token") or "")
             if not token_value:
                 return jsonify({"success": False, "error": "Token value required for store action"}), 400
+            # Stored tokens grant upload access, so refuse short guessable values.
+            if len(token_value) < 32:
+                return jsonify({"success": False, "error": "Token must be at least 32 characters"}), 400
             # Persist tokens to the config store
             ok = _persist_existing_api_token(token_value, username, label=str(label))
             if ok:
@@ -8068,6 +8140,38 @@ def internal_error(e: Exception):
     console.print(f"500 error: {e!s}", markup=False)
     console.print(traceback.format_exc(), markup=False)
     return jsonify({"error": "Internal server error", "success": False}), 500
+
+
+def _readable_secret_files() -> list[Path]:
+    """List credential files that other local accounts can read (POSIX only)."""
+    if os.name != "posix":
+        return []
+    data_dir = STATE_DIR / "data"
+    candidates = [data_dir / "config.py", cfg_dir / "webui_auth.json", cfg_dir / "session_secret", cfg_dir / "session_key"]
+    with contextlib.suppress(OSError):
+        candidates.extend(path for path in (data_dir / "cookies").iterdir() if path.is_file())
+    readable: list[Path] = []
+    for path in candidates:
+        with contextlib.suppress(OSError):
+            if path.stat().st_mode & (stat.S_IRGRP | stat.S_IROTH):
+                readable.append(path)
+    return readable
+
+
+# Startup notices: shared seedboxes expose group/world-readable credentials to
+# other accounts, and a first-run WebUI needs the console-only setup code.
+with contextlib.suppress(Exception):
+    _exposed_secret_files = _readable_secret_files()
+    if _exposed_secret_files:
+        console.print(
+            "Warning: these credential files are readable by other users on this system: "
+            + ", ".join(str(path) for path in _exposed_secret_files)
+            + ". Restrict them with 'chmod 600 <file>' (or 'chmod 700' on their directory).",
+            markup=False,
+        )
+with contextlib.suppress(Exception):
+    if _load_user_record() is None:
+        _first_run_setup_code()
 
 
 # Keep these helpers referenced so static analysis does not flag them as unused.

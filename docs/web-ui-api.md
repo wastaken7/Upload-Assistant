@@ -284,4 +284,5 @@ Notes & security model summary:
 
 - Web session authentication (login + encrypted session cookie) is required for any endpoints that modify server state (config, tokens, IP lists, enabling/disabling 2FA). Bearer tokens are intended for programmatic calls and are accepted only on a subset of read/execute endpoints; tokens are validated as valid/invalid (no per-token scope enforcement).
 - CSRF protection: state-changing endpoints invoked from the browser require a per-session CSRF token passed in a header (see `/api/csrf_token`). Token management endpoints explicitly disallow Basic/Bearer auth to ensure management is performed from the authenticated UI with CSRF protection.
+- HTTP Basic auth is rejected while 2FA is enabled, because it cannot carry a second factor. Use a Bearer API token for programmatic access.
 - Rate limits: defaults apply to routes without an override or exemption. Counters are separate per endpoint and client IP; most explicitly limited API routes also distinguish authenticated and unauthenticated requests. See [Request limits](web-ui.md#request-limits) for the full table and HTTP 429 behaviour.
