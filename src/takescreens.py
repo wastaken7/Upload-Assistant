@@ -497,7 +497,13 @@ async def disc_screenshots(
     capture_group: str | None = None,
 ) -> list[Path]:
     img_host = await get_image_host(meta)
+    capture_group = capture_group or "main"
     screens = meta.screens
+    if capture_group == "main":
+        from src.screenshot_review import target_count
+
+        screens = target_count(Path(base_dir) / "tmp" / folder_id, screens)
+        meta.screens = screens
     start_time = time.time() if meta.debug else 0.0
     if "image_list" not in meta:
         meta.image_list = []
@@ -548,7 +554,6 @@ async def disc_screenshots(
     keyframe = "nokey" if "VC-1" in bdinfo["video"][0]["codec"] or bdinfo["video"][0]["hdr_dv"] != "" else "none"
     logger.debug(f"File: {file_path}, Length: {length}, Frame Rate: {frame_rate}", extra={"markup": False})
     screenshot_dir = screenshots_dir(base_dir, folder_id)
-    capture_group = capture_group or "main"
     existing_screens = [p.name for p in manifest_files(base_dir, folder_id, capture_group)]
     total_existing = len(existing_screens) + len(existing_images)
     num_screens = max(0, screens - total_existing) if not force_screenshots else num_screens
