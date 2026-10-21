@@ -1599,7 +1599,8 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
             from src.screenshot_review import staged_remote_uploads
 
             reviewed_uploads = staged_remote_uploads(Path(meta.base_dir) / "tmp" / meta.uuid, cast(list[dict[str, Any]], meta.image_list or []))
-            if (len(meta.image_list) < cutoff or reviewed_uploads) and meta.skip_imghost_upload is False and meta.category not in ("GAME", "MUSIC"):
+            needs_shared_image_host = any(tracker not in {"HDBITS", "PTERCLUB"} or not tracker_class_map[tracker](config=config).rehost_images for tracker in meta.trackers)
+            if (len(meta.image_list) < cutoff or reviewed_uploads) and meta.skip_imghost_upload is False and meta.category not in ("GAME", "MUSIC") and needs_shared_image_host:
                 # Validate and (if needed) rehost images to tracker-approved hosts before uploading any new screenshots.
                 trackers_with_image_host_requirements = {
                     "BEYONDHD",
