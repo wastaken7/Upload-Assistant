@@ -81,7 +81,7 @@ def register(
 
 
 def files(base_dir: str | Path, release_id: str, group: str | None = None) -> list[Path]:
-    """Return active UUID screenshots, optionally limited to a capture group."""
+    """Return active screenshots in registration order, optionally by group."""
     directory = screenshots_dir(base_dir, release_id)
     entries = _load(base_dir, release_id).get("screenshots", {})
     if not isinstance(entries, dict):
@@ -93,7 +93,7 @@ def files(base_dir: str | Path, release_id: str, group: str | None = None) -> li
         path = directory / str(value.get("file", f"{screenshot_id}.png"))
         if path.is_file():
             result.append(path)
-    return sorted(result, key=lambda path: path.name)
+    return result
 
 
 def capture_timestamps(base_dir: str | Path, release_id: str, group: str, *, original_slots: bool = False) -> list[float]:
