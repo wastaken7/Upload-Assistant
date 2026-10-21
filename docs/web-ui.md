@@ -62,13 +62,13 @@ Docker deployments normally start the WebUI without positional paths, so `UA_BRO
 
 ### Relevant environment variables
 
-| Variable                       | Purpose                                                                                                                |
-| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
-| `UA_BROWSE_ROOTS`              | Comma-separated directories exposed by the File Browser.                                                               |
-| `UA_WEBUI_CORS_ORIGINS`        | Comma-separated origins allowed to call `/api/*` from a different origin. It is not needed for normal same-origin use. |
-| `UA_WEBUI_TRUSTED_PROXY_COUNT` | Number of trusted reverse-proxy hops. Leave unset or `0` for direct access; use `1` for one trusted proxy.             |
-| `SESSION_SECRET`               | Stable session/encryption secret of at least 32 bytes.                                                                 |
-| `SESSION_SECRET_FILE`          | Path to a readable file containing the stable session secret.                                                          |
+| Variable                       | Purpose                                                                                                                                 |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `UA_BROWSE_ROOTS`              | Comma-separated directories exposed by the File Browser.                                                                                |
+| `UA_WEBUI_CORS_ORIGINS`        | Comma-separated origins allowed to call `/api/*` from a different origin. It is not needed for normal same-origin use; `*` is rejected. |
+| `UA_WEBUI_TRUSTED_PROXY_COUNT` | Number of trusted reverse-proxy hops. Leave unset or `0` for direct access; use `1` for one trusted proxy.                              |
+| `SESSION_SECRET`               | Stable session/encryption secret of at least 32 bytes.                                                                                  |
+| `SESSION_SECRET_FILE`          | Path to a readable file containing the stable session secret.                                                                           |
 
 Provide either `SESSION_SECRET` or `SESSION_SECRET_FILE`, not both. If neither is set, the application creates and persists a secret in its configuration directory. Container deployments must persist that directory or secret across recreations.
 
@@ -78,9 +78,12 @@ The WebUI supports one local account.
 
 On the first visit:
 
-1. Enter a username and strong password.
-2. Choose **Create account**.
-3. Sign in with the new credentials if prompted.
+1. Copy the **setup code** that Upload Assistant prints in its console output (`docker logs` for containers), for example `WebUI first-run setup code: ABCD-EFGH-JKLM`.
+2. Enter the setup code, a username and a strong password.
+3. Choose **Create account**.
+4. Sign in with the new credentials if prompted.
+
+The setup code is shown only in the console, so a visitor who reaches an internet-exposed WebUI before you cannot claim the account. A new code is printed each time the WebUI starts without an account.
 
 The normal sign-in page provides:
 
@@ -324,7 +327,7 @@ Open **Configuration → Access Log** to manage:
 
 The blacklist takes precedence over the whitelist. Repeated failed API access attempts may add the source IP to the blacklist. Review IP changes carefully so that you do not lock out the device or reverse proxy used to administer the WebUI.
 
-The local account, encrypted credentials, token metadata, 2FA state, IP controls, and access-log level are stored in `webui_auth.json`. Access events are written to `access_log.log` in the same application configuration directory. The generated `session_secret` is also stored there unless `SESSION_SECRET` or `SESSION_SECRET_FILE` overrides it.
+The local account, encrypted credentials, token metadata, 2FA state, IP controls, and access-log level are stored in `webui_auth.json`. The WebUI creates its credential files readable only by the account that runs it. On POSIX systems it warns at startup when `config.py`, tracker cookie files, or its own credential files are readable by other users; restrict them with `chmod 600` on shared seedboxes. Access events are written to `access_log.log` in the same application configuration directory. The generated `session_secret` is also stored there unless `SESSION_SECRET` or `SESSION_SECRET_FILE` overrides it.
 
 ### Request limits
 
@@ -438,7 +441,7 @@ Perform a hard refresh or clear the site's cached files after updating Upload As
 
 Use a saved recovery code when possible. If the account cannot be recovered, stop the WebUI and remove `webui_auth.json` from the application configuration directory to return to first-run account setup.
 
-This reset removes the local account, API tokens, 2FA secret, and remaining recovery codes. Keep the persisted session secret intact unless you intentionally need to invalidate encrypted state.
+This reset removes the local account, API tokens, 2FA secret, and remaining recovery codes. Creating the new account also signs out every existing browser session and remember-me cookie. Keep the persisted session secret intact unless you intentionally need to invalidate encrypted state.
 
 Common authentication-state locations are:
 

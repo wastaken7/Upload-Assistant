@@ -1,6 +1,7 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import http.cookiejar
 import json
+import os
 import re
 import stat
 import traceback
@@ -392,7 +393,9 @@ class CookieValidator:
                     # Save auth key to a separate file if found
                     if auth_key:
                         auth_file = cookie_file.replace(".txt", "_auth.txt")
-                        async with aiofiles.open(auth_file, "w", encoding="utf-8") as f:
+                        # Create the auth key file owner-only, like the cookie jar.
+                        auth_fd = os.open(auth_file, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+                        async with aiofiles.open(auth_fd, "w", encoding="utf-8") as f:
                             await f.write(auth_key)
                         logger.info(f"{tracker}: [green]Auth key saved to {auth_file}[/green]")
 
@@ -530,10 +533,12 @@ class CookieValidator:
             for cookie in session_cookies:
                 cookie_dict[cookie.name] = {"value": cookie.value, "domain": cookie.domain, "path": cookie.path, "secure": cookie.secure, "expires": cookie.expires}
 
-            with Path(cookiefile).open("w", encoding="utf-8") as f:
+            # Create the file owner-only so cookie secrets are never briefly readable
+            fd = os.open(cookiefile, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, stat.S_IRUSR | stat.S_IWUSR)
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
                 json.dump(cookie_dict, f, indent=2)
 
-            # Set restrictive permissions (0o600) to protect cookie secrets
+            # Also tighten files that existed before with broader permissions
             Path(cookiefile).chmod(stat.S_IRUSR | stat.S_IWUSR)
 
         except OSError as e:
