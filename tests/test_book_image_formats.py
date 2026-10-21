@@ -10,6 +10,7 @@ from PIL import Image
 
 from src.meta import Meta
 from src.screenshot_manifest import files as manifest_files
+from src.screenshot_manifest import register
 from src.takescreens import generate_ebook_screenshots
 from src.uploadscreens import _upload_screens
 from upload import book_screens
@@ -37,6 +38,10 @@ def test_cbz_preserves_jpeg_pages_and_cover(tmp_path: Path) -> None:
     assert Path(meta.artwork_path).name == "POSTER.jpg"  # noqa: S101
     assert Path(meta.artwork_path).read_bytes() == pages["01.jpg"]  # noqa: S101
     assert Path(meta.artwork_banner_path).name == "POSTER_BANNER.png"  # noqa: S101
+    (Path(result[0]).parent / "stray.png").write_bytes(b"unregistered")
+    extra = Path(result[0]).parent / "extra.jpg"
+    extra.write_bytes(_image_bytes("JPEG"))
+    register(meta.base_dir, meta.uuid, [extra], "FILE_1")
     assert book_screens(meta, 4) == (3, 3)  # noqa: S101
 
     uploaded: list[Path] = []

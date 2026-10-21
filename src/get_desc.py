@@ -2069,13 +2069,7 @@ class DescriptionBuilder:
                                 desc_parts.append(f"[spoiler={Path(each['ifo']).name}][code]{each['ifo_mi']}[/code][/spoiler]\n\n")
                             desc_parts.append("[/center]\n\n")
                             # Check if new screenshots already exist before running prep.screenshots
-                            new_screens: list[str] = []
-                            if each["type"] == "BDMV":
-                                new_screens = [f.name for f in manifest_files(meta.base_dir, meta.uuid, f"FILE_{i}")]
-                            elif each["type"] == "DVD":
-                                new_screens = [
-                                    f.name for f in manifest_files(meta.base_dir, meta.uuid, await self.takescreens_manager.sanitize_filename(meta.discs[i]["name"]))
-                                ]
+                            new_screens = [f.name for f in manifest_files(meta.base_dir, meta.uuid, f"FILE_{i}")]
                             if not new_screens:
                                 logger.warning(f"[yellow]Missing prepared screenshots for {new_images_key}; skipping its images in the description.[/yellow]")
 

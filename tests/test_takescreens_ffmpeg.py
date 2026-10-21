@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 from random import Random
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import ffmpeg
 import pytest
@@ -14,6 +15,24 @@ from PIL import Image
 
 from src import takescreens, uploadscreens
 from src.meta import Meta
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("capture_group", [None, "FILE_1"])
+async def test_disc_reuses_registered_screenshots_when_title_changes(monkeypatch, tmp_path, capture_group):
+    screenshot = takescreens.screenshots_dir(tmp_path, "disc") / "Example-0.png"
+    screenshot.write_bytes(b"png")
+    takescreens.register_screenshots(tmp_path, "disc", [screenshot], capture_group or "main")
+    meta = Meta(base_dir=str(tmp_path), uuid="disc", screens=1)
+    bdinfo = {"files": [], "video": [{"codec": "AVC", "hdr_dv": ""}]}
+    sample_times = AsyncMock(side_effect=AssertionError("Registered screenshots should be reused"))
+    monkeypatch.setattr(takescreens, "get_image_host", AsyncMock(return_value="imgbb"))
+    monkeypatch.setattr(takescreens, "valid_ss_time", sample_times)
+
+    result = await takescreens.disc_screenshots(meta, "Changed, Title", bdinfo, meta.uuid, meta.base_dir, False, capture_group=capture_group)
+
+    assert result == []
+    sample_times.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -559,13 +578,15 @@ async def test_dvd_retake_uses_only_valid_replacement(monkeypatch, tmp_path, ret
 
 
 @pytest.mark.asyncio
-async def test_dvd_replaces_blank_registered_screenshot(monkeypatch, tmp_path):
+@pytest.mark.parametrize("disc_num", [0, 1])
+async def test_dvd_replaces_blank_registered_screenshot(monkeypatch, tmp_path, disc_num):
     disc_path = tmp_path / "VIDEO_TS"
     disc_path.mkdir()
     screenshot_dir = takescreens.screenshots_dir(tmp_path, "dvd-manifest")
     blank = screenshot_dir / "blank.png"
     Image.new("L", (720, 480), 0).save(blank, compress_level=0)
-    old_image = takescreens.register_screenshots(tmp_path, "dvd-manifest", [blank], "DVD")[0]
+    group = "main" if disc_num == 0 else "FILE_1"
+    old_image = takescreens.register_screenshots(tmp_path, "dvd-manifest", [blank], group)[0]
     captured = []
 
     def parse_stub(_path, output=None, **_kwargs):
@@ -593,7 +614,7 @@ async def test_dvd_replaces_blank_registered_screenshot(monkeypatch, tmp_path):
         base_dir=str(tmp_path),
         uuid="dvd-manifest",
         screens=1,
-        discs=[{"name": "DVD", "path": str(disc_path), "main_set": ["01_1.VOB"]}],
+        discs=[{"name": f"Example.Disc.{index}", "path": str(disc_path), "main_set": ["01_1.VOB"]} for index in range(disc_num + 1)],
         image_list=[],
         retake=False,
         frame_overlay=False,
@@ -601,9 +622,9 @@ async def test_dvd_replaces_blank_registered_screenshot(monkeypatch, tmp_path):
         debug=False,
         ffdebug=False,
     )
-    await takescreens.dvd_screenshots(meta, 0, cleanup_after_capture=False)
+    await takescreens.dvd_screenshots(meta, disc_num, cleanup_after_capture=False)
 
-    registered = takescreens.manifest_files(tmp_path, "dvd-manifest", "DVD")
+    registered = takescreens.manifest_files(tmp_path, "dvd-manifest", group)
     assert len(captured) == 2
     assert not old_image.exists()
     assert len(registered) == 1

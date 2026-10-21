@@ -548,7 +548,8 @@ async def disc_screenshots(
     keyframe = "nokey" if "VC-1" in bdinfo["video"][0]["codec"] or bdinfo["video"][0]["hdr_dv"] != "" else "none"
     logger.debug(f"File: {file_path}, Length: {length}, Frame Rate: {frame_rate}", extra={"markup": False})
     screenshot_dir = screenshots_dir(base_dir, folder_id)
-    existing_screens = [p.name for p in manifest_files(base_dir, folder_id, capture_group or sanitized_filename)]
+    capture_group = capture_group or "main"
+    existing_screens = [p.name for p in manifest_files(base_dir, folder_id, capture_group)]
     total_existing = len(existing_screens) + len(existing_images)
     num_screens = max(0, screens - total_existing) if not force_screenshots else num_screens
     is_hdr = any(marker in meta.hdr for marker in ("HDR", "DV", "HLG"))
@@ -777,7 +778,7 @@ async def disc_screenshots(
 
     # The temporary descriptive names above are only used while capture is in
     # progress.  Publish completed frames under opaque UUID filenames.
-    registered = register_screenshots(base_dir, folder_id, valid_results, capture_group or sanitized_filename) if valid_results else []
+    registered = register_screenshots(base_dir, folder_id, valid_results, capture_group) if valid_results else []
     await record_event_async("artifact", service="screenshot", operation="created", category="standard", count=len(registered))
 
     multi_screens = int(default_config.get("multiScreens", 2))
@@ -881,9 +882,10 @@ async def dvd_screenshots(
     if num_screens == 0 or (len(meta.image_list) >= screens and disc_num == 0):
         return
 
+    capture_group = "main" if disc_num == 0 else f"FILE_{disc_num}"
     sanitized_disc_name = await sanitize_filename(meta.discs[disc_num]["name"])
     screenshot_dir = screenshots_dir(meta.base_dir, meta.uuid)
-    existing_screens = [str(p) for p in manifest_files(meta.base_dir, meta.uuid, sanitized_disc_name)]
+    existing_screens = [str(p) for p in manifest_files(meta.base_dir, meta.uuid, capture_group)]
     normal_screens = []
     for image in existing_screens:
         if dvd_screenshot_has_content(image):
@@ -1070,7 +1072,7 @@ async def dvd_screenshots(
         logger.info(f"[red]The following images could not be retaken successfully: {remaining_retakes}[/red]")
 
     if valid_results:
-        registered = register_screenshots(meta.base_dir, meta.uuid, valid_results, sanitized_disc_name)
+        registered = register_screenshots(meta.base_dir, meta.uuid, valid_results, capture_group)
         await record_event_async("artifact", service="screenshot", operation="created", category="standard", count=len(registered))
 
     if not retry_cap and meta.debug:
