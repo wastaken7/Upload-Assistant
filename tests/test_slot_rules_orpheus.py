@@ -162,6 +162,14 @@ def test_unknown_releases():
     assert decision.conflicts
     assert verdict(torrent(has_log=True, log_score=100), torrent(edition=unknown, has_log=True, log_score=100)) is REVIEW
     assert verdict(torrent(media="WEB", edition=unknown), torrent(media="WEB", edition=unknown)) is BLOCK
+    # Release information doesn't let a less preferred encode replace an Unknown Release.
+    assert verdict(torrent(fmt="MP3", encoding="V2 (VBR)"), torrent(fmt="MP3", encoding="V0 (VBR)", edition=unknown)) is BLOCK
+    def web_24(rate: int | None, edition: MusicEdition = EDITION) -> MusicTorrent:
+        return torrent(media="WEB", encoding="24bit Lossless", sample_rate=rate, edition=edition)
+
+    assert verdict(web_24(48_000), web_24(96_000, unknown)) is BLOCK
+    assert verdict(web_24(96_000), web_24(96_000, unknown)) is ALLOW
+    assert verdict(web_24(48_000), web_24(None, unknown)) is REVIEW
 
 
 def test_unofficial_live_recordings_have_one_edition():

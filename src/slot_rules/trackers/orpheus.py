@@ -377,6 +377,15 @@ def _with_edition(relation: str, upload: MusicTorrent, existing: MusicTorrent, r
         return Outcome.REVIEW, ("The existing FLAC is an Unknown Release with a rip log. It is replaced only if staff can match its log to your edition (rule 2.2.11.5).")
     if outcome is Outcome.REVIEW:
         return result
+    if outcome is Outcome.DUPE and upload.encoding != existing.encoding:
+        # The existing encode is preferred (for example V0 over V2); release information doesn't change that.
+        return result
+    if outcome is Outcome.DUPE and upload.is_24bit:
+        ours, theirs = sample_rate_tier(upload.sample_rate), sample_rate_tier(existing.sample_rate)
+        if ours is None or theirs is None:
+            return Outcome.REVIEW, f"{reason} The existing torrent is an Unknown Release, but its sample rate is unknown, so it can't be confirmed as the same encode."
+        if ours != theirs:
+            return result
     return Outcome.TRUMPS, (
         "Your torrent has verified release information and replaces an Unknown Release from the same medium with the same tracklist "
         "and running order (rules 2.2.11.4, 2.2.11.6 and 2.2.11.8)."
