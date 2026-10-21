@@ -217,7 +217,7 @@ class Orpheus:
         format and encoding so the dupe and trump rules (2.2) can be reviewed.
         """
         release = self._release(meta)
-        artist, album = str(release.get("artist", "")), str(release.get("album", ""))
+        artist, album = str(release.get("artist", "")), self._strip_type_marker(release.get("album", ""))[0]
         if not artist or not album or not self.api_key:
             return []
         queries: list[dict[str, str]] = [{"artistname": artist, "groupname": album}]
@@ -317,9 +317,48 @@ class Orpheus:
         text = cls._CONCERT_DATE.sub(" ", str(value or "")) if drop_date else value
         return set(cls._title_tokens(text)) - cls._IGNORED_TOKENS
 
+    # A trailing release-type descriptor, e.g. "Title EP", "Title - EP",
+    # "Title (Single)" or "Title (Live)".  Bare "Live" is not matched because
+    # it is often part of a real title.
+    _TYPE_MARKER = re.compile(
+        r"(?:\s*[(\[]\s*(?P<bracketed>e\.?p\.?|single|live)\s*[)\]]|\s+-\s+(?P<dashed>e\.?p\.?|single)|\s+(?P<bare>e\.?p\.?))\s*$",
+        re.I,
+    )
+    _MARKER_TYPES: ClassVar[dict[str, set[str]]] = {
+        "ep": {"EP"},
+        "single": {"Single"},
+        "live": {"Live album", "Concert recording"},
+    }
+
+    @classmethod
+    def _strip_type_marker(cls, title: Any) -> tuple[str, str]:
+        """Return ``(title without marker, marker)``; the marker is "ep", "single" or "live"."""
+        text = str(title or "").strip()
+        match = cls._TYPE_MARKER.search(text)
+        # Keep titles such as "The EP", where only an article would remain.
+        if not match or not set(cls._title_tokens(text[: match.start()])) - {"the", "a", "an"}:
+            return text, ""
+        marker = next(group for group in match.groups() if group).replace(".", "").casefold()
+        return text[: match.start()].strip(" -"), marker
+
+    def _upload_title(self, meta: Meta, release: MusicRelease) -> str:
+        """Drop a trailing marker that only repeats the release type (rule 2.3.6)."""
+        album = str(release.get("album", ""))
+        stripped, marker = self._strip_type_marker(album)
+        if marker and str(release.get("release_type", "")) in self._MARKER_TYPES.get(marker, set()):
+            logger.info(f"{self.tracker}: [yellow]title sent as '{escape(stripped)}'; the release type already says {marker.upper()}.[/yellow]")
+            meta.tracker_status.setdefault(self.tracker, {})["title_note"] = f"'{album}' -> '{stripped}'"
+            return stripped
+        return album
+
     @classmethod
     def _same_group_title(cls, ours: Any, theirs: Any) -> bool:
-        """Tolerant title comparison; dated concerts must share the date."""
+        """Tolerant title comparison; dated concerts must share the date.
+
+        A trailing release-type marker ("EP", "(Live)") is ignored on both
+        sides, since the site keeps that in the release type, not the title.
+        """
+        ours, theirs = cls._strip_type_marker(ours)[0], cls._strip_type_marker(theirs)[0]
         if cls._normalise_request_text(ours) == cls._normalise_request_text(theirs):
             return True
         our_date, their_date = cls._concert_date(ours), cls._concert_date(theirs)
@@ -976,7 +1015,7 @@ class Orpheus:
             "releasetype": self.release_types.get(str(release.get("release_type", "Unknown")), 21),
             "submit": 1,
             "tags": tags,
-            "title": str(release.get("album")),
+            "title": self._upload_title(meta, release),
             "type": 0,
             "vbr": int(vbr),
             "year": str(release.get("year", "")),

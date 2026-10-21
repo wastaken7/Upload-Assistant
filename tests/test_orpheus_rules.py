@@ -705,3 +705,38 @@ def test_featuring_in_the_main_credit_and_named_remixes_become_roles():
     assert Orpheus._artist_credits(Meta(category="MUSIC"), plain) == [("Neon Tide", 1), ("Guest Voice", 2)]
     assert Orpheus._title_remixers("Paper Boat (Extended Mix)") == []
     assert Orpheus._title_remixers("Paper Boat (Original Remix)") == []
+
+
+def test_release_type_markers_do_not_split_groups():
+    assert Orpheus._strip_type_marker("Paper Boat EP") == ("Paper Boat", "ep")
+    assert Orpheus._strip_type_marker("Paper Boat - Single") == ("Paper Boat", "single")
+    assert Orpheus._strip_type_marker("Night Shift (Live)") == ("Night Shift", "live")
+    for title in ("The EP", "EP", "Stay Live", "Steep"):
+        assert Orpheus._strip_type_marker(title) == (title, "")
+    assert Orpheus._same_group_title("Paper Boat EP", "Paper Boat")
+    assert Orpheus._same_group_title("Night Shift (Live)", "Night Shift")
+
+
+def test_upload_title_drops_a_marker_that_repeats_the_release_type():
+    ep = _release(album="Paper Boat EP", release_type="EP")
+    assert _adapter().build_upload_payload(Meta(category="MUSIC"), ep)["title"] == "Paper Boat"
+    # A marker that does not match the release type is part of the title.
+    album = _release(album="Paper Boat EP", release_type="Album")
+    assert _adapter().build_upload_payload(Meta(category="MUSIC"), album)["title"] == "Paper Boat EP"
+
+
+def test_dupe_search_ignores_a_trailing_type_marker():
+    release = _release(album="Paper Boat EP", release_type="EP", release_year="2019")
+    meta = Meta(category="MUSIC", music_release=release.to_dict())
+    existing = {"groupId": 3, "groupName": "Paper Boat", "artist": "Fictional Band", "torrents": [{"torrentId": 8, "remasterYear": 2019, "media": "WEB", "format": "FLAC", "encoding": "Lossless"}]}
+    calls: list[dict[str, str]] = []
+
+    async def fake_get(_self: Orpheus, _meta: Meta, params: dict[str, str], _timeout_seconds: float, _purpose: str) -> dict[str, Any]:
+        calls.append(params)
+        return {"results": [existing] if params.get("groupname") == "Paper Boat" else []}
+
+    with patch.object(Orpheus, "_api_get", new=fake_get), patch("asyncio.sleep", new=AsyncMock()):
+        dupes = asyncio.run(_adapter().search_existing(meta))
+
+    assert calls[0] == {"action": "browse", "artistname": "Fictional Band", "groupname": "Paper Boat"}
+    assert dupes and dupes[0]["flags"][0].startswith(("DUPE", "LIKELY DUPE"))
