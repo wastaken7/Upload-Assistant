@@ -608,20 +608,6 @@ def _get_ip_whitelist() -> list[str]:
     return []
 
 
-def _set_ip_whitelist(ips: list[str]) -> bool:
-    """Set the list of whitelisted IPs, returning whether it was saved."""
-    try:
-        path = cfg_dir / "webui_auth.json"
-        data: dict[str, Any] = {}
-        if path.exists():
-            data = _json_load_dict(path.read_text(encoding="utf-8"))
-        data["ip_whitelist"] = ips
-        auth_mod.write_private_text(path, json.dumps(data, ensure_ascii=False, indent=2))
-    except Exception:
-        return False
-    return True
-
-
 def _get_ip_blacklist() -> list[str]:
     """Get the list of blacklisted IPs."""
     with contextlib.suppress(Exception):
@@ -633,6 +619,21 @@ def _get_ip_blacklist() -> list[str]:
             if items is not None:
                 return items
     return []
+
+
+def _set_ip_control(whitelist: list[str], blacklist: list[str]) -> bool:
+    """Save both IP lists in one write so a failure cannot apply only one of them."""
+    try:
+        path = cfg_dir / "webui_auth.json"
+        data: dict[str, Any] = {}
+        if path.exists():
+            data = _json_load_dict(path.read_text(encoding="utf-8"))
+        data["ip_whitelist"] = whitelist
+        data["ip_blacklist"] = blacklist
+        auth_mod.write_private_text(path, json.dumps(data, ensure_ascii=False, indent=2))
+    except Exception:
+        return False
+    return True
 
 
 def _set_ip_blacklist(ips: list[str]) -> bool:
@@ -4797,7 +4798,7 @@ def ip_control_api():
                     return jsonify({"success": False, "error": f"Invalid IP address: {ip}"}), 400
 
             # Report a policy that was not saved instead of claiming success.
-            if not _set_ip_whitelist(whitelist) or not _set_ip_blacklist(blacklist):
+            if not _set_ip_control(whitelist, blacklist):
                 return jsonify({"success": False, "error": "Failed to update IP control settings"}), 500
             return jsonify({"success": True})
         except Exception as e:

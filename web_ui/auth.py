@@ -104,13 +104,15 @@ def write_private_text(path: Path, text: str) -> None:
     """Write text to a file that only the current user can read.
 
     New files are created with mode 0600 so they are never briefly readable by
-    other accounts on shared hosts; existing files are tightened as well.
+    other accounts on shared hosts; existing files are tightened before the new
+    content is written.
     """
+    with suppress(Exception):
+        if Path(path).exists():
+            Path(path).chmod(0o600)
     fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     with os.fdopen(fd, "w", encoding="utf-8") as fobj:
         fobj.write(text)
-    with suppress(Exception):
-        Path(path).chmod(0o600)
 
 
 _cached_session_secret: bytes | None = None

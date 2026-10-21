@@ -19,19 +19,26 @@ from src.trackers.common import Common
 
 
 def restrict_to_owner(path: str | Path) -> None:
-    """Limit a credential file to its owner; new files are already 0600 but older ones may not be."""
+    """Limit an existing credential file to its owner before new secrets are written to it.
+
+    New files are created 0600 by their writers; this covers files saved by
+    older versions or exported with broader permissions.
+    """
     try:
-        Path(path).chmod(stat.S_IRUSR | stat.S_IWUSR)
-    except OSError as e:
-        logger.info(f"Could not restrict permissions on {path}: {e}")
+        if Path(path).exists():
+            Path(path).chmod(stat.S_IRUSR | stat.S_IWUSR)
+    except OSError:
+        # Writing still proceeds (the file may be shared through a group); the
+        # WebUI startup warning lists credential files readable by others.
+        logger.info("[yellow]Could not restrict a tracker credential file to its owner; check its permissions.[/yellow]")
 
 
 def write_owner_only_text(path: str | Path, text: str) -> None:
     """Write a credential file that other local users cannot read."""
+    restrict_to_owner(path)
     fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, stat.S_IRUSR | stat.S_IWUSR)
     with os.fdopen(fd, "w", encoding="utf-8") as f:
         f.write(text)
-    restrict_to_owner(path)
 
 
 def _attr_to_string(value: str | AttributeValueList | None) -> str:
@@ -295,9 +302,9 @@ class CookieValidator:
             return
 
         try:
-            cookie_jar.save(ignore_discard=True, ignore_expires=True)
             if cookie_jar.filename:
                 restrict_to_owner(cookie_jar.filename)
+            cookie_jar.save(ignore_discard=True, ignore_expires=True)
         except Exception as e:
             logger.info(f"{tracker}: Failed to update the cookie file: {e}")
 
@@ -405,8 +412,8 @@ class CookieValidator:
                                 cookie_jar.set_cookie(ck)
                                 break
 
-                    cookie_jar.save(ignore_discard=True, ignore_expires=True)
                     restrict_to_owner(cookie_file)
+                    cookie_jar.save(ignore_discard=True, ignore_expires=True)
                     logger.info(f"{tracker}: [green]Cookies saved to {cookie_file}[/green]")
 
                     # Save auth key to a separate file if found
@@ -549,13 +556,7 @@ class CookieValidator:
             for cookie in session_cookies:
                 cookie_dict[cookie.name] = {"value": cookie.value, "domain": cookie.domain, "path": cookie.path, "secure": cookie.secure, "expires": cookie.expires}
 
-            # Create the file owner-only so cookie secrets are never briefly readable
-            fd = os.open(cookiefile, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, stat.S_IRUSR | stat.S_IWUSR)
-            with os.fdopen(fd, "w", encoding="utf-8") as f:
-                json.dump(cookie_dict, f, indent=2)
-
-            # Also tighten files that existed before with broader permissions
-            Path(cookiefile).chmod(stat.S_IRUSR | stat.S_IWUSR)
+            write_owner_only_text(cookiefile, json.dumps(cookie_dict, indent=2))
 
         except OSError as e:
             logger.error(f"[red]Error with cookie file operations: {e}[/red]")
