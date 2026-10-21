@@ -20,6 +20,7 @@ from src.slot_rules.trackers.greatposterwall import GreatPosterWallSlotRules
 from src.slot_rules.trackers.hdtorrents import HDTorrentsSlotRules
 from src.slot_rules.trackers.lst import LstSlotRules
 from src.slot_rules.trackers.luminarr import LuminarrSlotRules
+from src.slot_rules.trackers.orpheus import SLOT_DECISION_KEY as ORPHEUS_SLOT_DECISION_KEY
 from src.slot_rules.trackers.simple import DreadVaultSlotRules, MTeamSlotRules, SeedpoolSlotRules, TorrentLeechSlotRules
 from src.slot_rules.trackers.ulcx import UlcxSlotRules
 from src.slot_rules.trackers.webproviders import HomieHelpDeskSlotRules, SkipTheCommercialsSlotRules
@@ -50,6 +51,8 @@ SLOT_RULES: dict[str, type[SlotRules]] = {
 }
 
 SLOT_CATEGORIES = frozenset({"MOVIE", "TV"})
+# Music trackers store their decision in meta under this key while searching.
+MUSIC_SLOT_RULES = {"ORPHEUS": ORPHEUS_SLOT_DECISION_KEY}
 
 
 def slot_rules_enabled(config: Mapping[str, Any]) -> bool:
@@ -89,6 +92,10 @@ async def evaluate_slots(dupes: Sequence[DupeInput], meta: Meta, tracker: str, c
     releases that matter for slots (other HDR layers, codecs and so on).
     """
     tracker = tracker.upper()
+    if tracker in MUSIC_SLOT_RULES:
+        # The music tracker evaluates its own release group during the search.
+        stored = meta.get(MUSIC_SLOT_RULES[tracker])
+        return stored if meta.category == "MUSIC" and slot_rules_enabled(config) and isinstance(stored, SlotDecision) else None
     rules_cls = SLOT_RULES.get(tracker)
     if rules_cls is None or not slot_rules_apply(meta, config):
         return None

@@ -15,6 +15,8 @@ from src.meta import Meta
 from src.music.analyzer import _embedded_image_bytes, _flac_has_id3
 from src.music.models import AudioTrack, MetadataSource, MusicRelease
 from src.music.validation import OrpheusMusicValidator, lame_preset, resolve_orpheus_edition
+from src.slot_rules.models import Verdict
+from src.slot_rules.trackers.orpheus import SLOT_DECISION_KEY
 from src.trackers.GAZELLE.orpheus import Orpheus
 from src.trackers.GAZELLE.orpheus_tags import orpheus_tags
 
@@ -233,16 +235,6 @@ def test_release_description_documents_hybrids_scene_watermark_and_lineage(tmp_p
     assert "Turntable > preamp > ADC" in description
 
 
-def test_lossy_trump_relations():
-    relation = Orpheus._lossy_relation
-    assert relation("V0 (VBR)", "V0 (VBR)") == "dupe"
-    assert relation("V0 (VBR)", "APX (VBR)") == "trumps"
-    assert relation("APS (VBR)", "V2 (VBR)") == "trumped"
-    assert relation("320", "V0 (VBR)") == "coexists"
-    assert relation("192", "V0 (VBR)") == "trumped"
-    assert relation("320", "256") == "trumps"
-
-
 def test_duplicate_search_assesses_each_torrent_in_the_matching_group():
     release = _release(release_label="Fictional Records", release_year="2019")
     # A folder catalogue number is not sent, but it identifies the release.
@@ -269,12 +261,15 @@ def test_duplicate_search_assesses_each_torrent_in_the_matching_group():
         dupes = asyncio.run(_adapter().search_existing(meta))
 
     flags = [dupe["flags"][0] for dupe in dupes]
-    assert flags[0].startswith("DUPE: same release")
-    assert "site lists this catalogue as 2018" in flags[0]
-    assert flags[1].startswith("LIKELY DUPE: same edition year")
-    assert flags[2].startswith("different edition year")
+    assert flags[0].startswith("DUPE: A 16-bit FLAC already exists")
+    assert flags[1].startswith("REVIEW: A release from the same year")
+    assert flags[2] == "coexists with your upload"
     assert flags[3] == "different release group"
     assert dupes[0]["link"].endswith("torrentid=7")
+    decision = meta[SLOT_DECISION_KEY]
+    assert decision.verdict is Verdict.BLOCK
+    assert [conflict["id"] for conflict in decision.conflicts] == [7]
+    assert any("catalogue FR-0042 / FR-0043 as 2018" in note for note in decision.notes)
 
 
 def test_request_search_uses_the_music_category_and_reports_compatibility():
@@ -505,8 +500,8 @@ def test_dupe_search_finds_a_group_written_differently():
     with patch.object(Orpheus, "_api_get", new=fake_get), patch("asyncio.sleep", new=AsyncMock()):
         dupes = asyncio.run(_adapter().search_existing(meta))
 
-    assert len(calls) == 3
-    assert dupes[0]["flags"][0].startswith("LIKELY DUPE")
+    assert [call["action"] for call in calls] == ["browse", "browse", "browse", "torrentgroup"]
+    assert dupes[0]["flags"][0].startswith("DUPE")
 
 
 def test_group_matching_rejects_other_shows_and_artists():
