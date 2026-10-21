@@ -122,3 +122,42 @@ def test_command_redaction_hides_attached_and_separate_passwords():
     rendered = _redact_pesto_command(["pesto", "--password=fictional-pass", "--proxy", "socks5://fictional"])
     assert "fictional-pass" not in rendered
     assert "socks5://fictional" not in rendered
+
+
+def test_ip_control_reports_policies_that_were_not_saved(auth_root, monkeypatch):
+    server.auth_mod.create_user("fictional-user", PASSWORD)
+    monkeypatch.setattr(server, "_verify_csrf_header", lambda: True)
+    monkeypatch.setattr(server, "_verify_same_origin", lambda: True)
+
+    def fail_write(_path, _text):
+        raise OSError("read-only filesystem")
+
+    monkeypatch.setattr(server.auth_mod, "write_private_text", fail_write)
+    client = _session_client(server._account_fingerprint())
+    response = client.post("/api/ip_control", json={"whitelist": ["192.0.2.10"], "blacklist": []})
+    assert response.status_code == 500
+    assert response.get_json()["success"] is False
+
+
+def test_short_legacy_api_tokens_are_rejected(auth_root):
+    server.auth_mod.create_user("fictional-user", PASSWORD)
+    with server.app.test_request_context("/"):
+        server._persist_token_store({server._hash_api_token("short"): {"token_id": "legacy", "user": "fictional-user"}})
+    assert server._verify_api_token("short") is None
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX permission bits")
+def test_tracker_credential_files_are_owner_only(tmp_path):
+    from src.cookie_auth import restrict_to_owner, write_owner_only_text
+
+    auth_key = tmp_path / "TRACKER_auth.txt"
+    auth_key.write_text("old", encoding="utf-8")
+    auth_key.chmod(0o644)
+    write_owner_only_text(auth_key, "fictional-auth-key")
+    assert stat.S_IMODE(auth_key.stat().st_mode) == 0o600
+
+    cookies = tmp_path / "TRACKER.txt"
+    cookies.write_text("# Netscape HTTP Cookie File\n", encoding="utf-8")
+    cookies.chmod(0o644)
+    restrict_to_owner(cookies)
+    assert stat.S_IMODE(cookies.stat().st_mode) == 0o600

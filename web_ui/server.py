@@ -608,18 +608,18 @@ def _get_ip_whitelist() -> list[str]:
     return []
 
 
-def _set_ip_whitelist(ips: list[str]) -> None:
-    """Set the list of whitelisted IPs."""
-    with contextlib.suppress(Exception):
+def _set_ip_whitelist(ips: list[str]) -> bool:
+    """Set the list of whitelisted IPs, returning whether it was saved."""
+    try:
         path = cfg_dir / "webui_auth.json"
         data: dict[str, Any] = {}
         if path.exists():
-            try:
-                data = _json_load_dict(path.read_text(encoding="utf-8"))
-            except Exception:
-                return
+            data = _json_load_dict(path.read_text(encoding="utf-8"))
         data["ip_whitelist"] = ips
         auth_mod.write_private_text(path, json.dumps(data, ensure_ascii=False, indent=2))
+    except Exception:
+        return False
+    return True
 
 
 def _get_ip_blacklist() -> list[str]:
@@ -635,18 +635,18 @@ def _get_ip_blacklist() -> list[str]:
     return []
 
 
-def _set_ip_blacklist(ips: list[str]) -> None:
-    """Set the list of blacklisted IPs."""
-    with contextlib.suppress(Exception):
+def _set_ip_blacklist(ips: list[str]) -> bool:
+    """Set the list of blacklisted IPs, returning whether it was saved."""
+    try:
         path = cfg_dir / "webui_auth.json"
         data: dict[str, Any] = {}
         if path.exists():
-            try:
-                data = _json_load_dict(path.read_text(encoding="utf-8"))
-            except Exception:
-                return
+            data = _json_load_dict(path.read_text(encoding="utf-8"))
         data["ip_blacklist"] = ips
         auth_mod.write_private_text(path, json.dumps(data, ensure_ascii=False, indent=2))
+    except Exception:
+        return False
+    return True
 
 
 def _get_ip_failures() -> dict[str, list[int]]:
@@ -1167,7 +1167,8 @@ def _persist_existing_api_token(token: str, username: str, label: str = "") -> b
 
 
 def _verify_api_token(token: str) -> str | None:
-    if not token:
+    # Short legacy tokens are guessable; generated tokens are far longer.
+    if not token or len(token) < 32:
         return None
     store = _load_token_store()
     info = store.get(_hash_api_token(token))
@@ -4795,8 +4796,9 @@ def ip_control_api():
                 except ValueError:
                     return jsonify({"success": False, "error": f"Invalid IP address: {ip}"}), 400
 
-            _set_ip_whitelist(whitelist)
-            _set_ip_blacklist(blacklist)
+            # Report a policy that was not saved instead of claiming success.
+            if not _set_ip_whitelist(whitelist) or not _set_ip_blacklist(blacklist):
+                return jsonify({"success": False, "error": "Failed to update IP control settings"}), 500
             return jsonify({"success": True})
         except Exception as e:
             console.print(f"Error updating IP control: {e}", markup=False)

@@ -18,6 +18,22 @@ from src.meta import Meta
 from src.trackers.common import Common
 
 
+def restrict_to_owner(path: str | Path) -> None:
+    """Limit a credential file to its owner; new files are already 0600 but older ones may not be."""
+    try:
+        Path(path).chmod(stat.S_IRUSR | stat.S_IWUSR)
+    except OSError as e:
+        logger.info(f"Could not restrict permissions on {path}: {e}")
+
+
+def write_owner_only_text(path: str | Path, text: str) -> None:
+    """Write a credential file that other local users cannot read."""
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, stat.S_IRUSR | stat.S_IWUSR)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(text)
+    restrict_to_owner(path)
+
+
 def _attr_to_string(value: str | AttributeValueList | None) -> str:
     """Convert BeautifulSoup attribute values to a plain string."""
     if isinstance(value, str):
@@ -280,6 +296,8 @@ class CookieValidator:
 
         try:
             cookie_jar.save(ignore_discard=True, ignore_expires=True)
+            if cookie_jar.filename:
+                restrict_to_owner(cookie_jar.filename)
         except Exception as e:
             logger.info(f"{tracker}: Failed to update the cookie file: {e}")
 
@@ -388,20 +406,13 @@ class CookieValidator:
                                 break
 
                     cookie_jar.save(ignore_discard=True, ignore_expires=True)
+                    restrict_to_owner(cookie_file)
                     logger.info(f"{tracker}: [green]Cookies saved to {cookie_file}[/green]")
 
                     # Save auth key to a separate file if found
                     if auth_key:
                         auth_file = cookie_file.replace(".txt", "_auth.txt")
-                        # Create the auth key file owner-only, like the cookie jar.
-                        auth_fd = os.open(auth_file, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-                        async with aiofiles.open(auth_fd, "w", encoding="utf-8") as f:
-                            await f.write(auth_key)
-                        # os.open only applies the mode to new files; tighten older ones too.
-                        try:
-                            Path(auth_file).chmod(stat.S_IRUSR | stat.S_IWUSR)
-                        except OSError as e:
-                            logger.info(f"{tracker}: Could not restrict auth key file permissions: {e}")
+                        write_owner_only_text(auth_file, auth_key)
                         logger.info(f"{tracker}: [green]Auth key saved to {auth_file}[/green]")
 
                     return True
