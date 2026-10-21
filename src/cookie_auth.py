@@ -397,6 +397,11 @@ class CookieValidator:
                         auth_fd = os.open(auth_file, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
                         async with aiofiles.open(auth_fd, "w", encoding="utf-8") as f:
                             await f.write(auth_key)
+                        # os.open only applies the mode to new files; tighten older ones too.
+                        try:
+                            Path(auth_file).chmod(stat.S_IRUSR | stat.S_IWUSR)
+                        except OSError as e:
+                            logger.info(f"{tracker}: Could not restrict auth key file permissions: {e}")
                         logger.info(f"{tracker}: [green]Auth key saved to {auth_file}[/green]")
 
                     return True

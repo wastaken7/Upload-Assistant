@@ -29,11 +29,8 @@
       rel="shortcut icon"
       href="{{ url_for('static', filename='favicon.ico') }}"
     />
-    <script
-      src="https://cdn.tailwindcss.com/3.4.17"
-      integrity="sha384-igm5BeiBt36UU4gqwWS7imYmelpTsZlQ45FZf+XBn9MuJbn4nQr7yx1yFydocC/K"
-      crossorigin="anonymous"
-    ></script>
+    <!-- Tailwind Play CDN 3.4.17, self-hosted: its CDN omits CORS headers, so SRI cannot be used. -->
+    <script src="{{ url_for('static', filename='js/vendor/tailwindcss-3.4.17.js') }}"></script>
     {% include "_theme_bootstrap.html" %}
     <link
       rel="stylesheet"

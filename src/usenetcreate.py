@@ -1749,7 +1749,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
         # so the password never protected anything and shouldn't be advertised.
         if archive_password and not skip_archive and await aiofiles.ospath.exists(nzb_file):
             if is_debug:
-                logger.info(f"[cyan][DEBUG SIMULATION] Injecting password '{archive_password}' into NZB file...[/cyan]")
+                logger.info("[cyan][DEBUG SIMULATION] Injecting password into NZB file...[/cyan]")
             else:
                 logger.info("[cyan]Injecting password into NZB metadata...[/cyan]")
             await inject_nzb_password(nzb_file, archive_password)
