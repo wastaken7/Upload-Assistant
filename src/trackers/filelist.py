@@ -417,9 +417,10 @@ class FileList:
                     async with aiofiles.open(screen, "rb") as image_file:
                         image_bytes = await image_file.read()
                     files.append(("images", (screen.name, image_bytes, "image/png")))
-                async with httpx.AsyncClient(timeout=30.0) as client:
-                    response = await client.post("https://up.img4k.net/api/description", data=data, files=files, auth=(self.fltools["user"], self.fltools["pass"]))
-                final_desc += response.text.replace("\r\n", "\n")
+                if meta.is_disc != "BDMV" or files:
+                    async with httpx.AsyncClient(timeout=30.0) as client:
+                        response = await client.post("https://up.img4k.net/api/description", data=data, files=files, auth=(self.fltools["user"], self.fltools["pass"]))
+                    final_desc += response.text.replace("\r\n", "\n")
             await descfile.write(final_desc)
 
             if self.signature is not None:
