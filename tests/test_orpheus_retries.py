@@ -103,7 +103,11 @@ def test_upload_retries_only_requests_orpheus_never_processed(tmp_path: Path, fi
     assert calls == 2
 
 
-@pytest.mark.parametrize("failure", [_raise(httpx.ReadTimeout), _status(502), _status(500)])
+def _not_json(request: httpx.Request) -> httpx.Response:
+    return httpx.Response(200, text="<html>stored, but not JSON</html>", request=request)
+
+
+@pytest.mark.parametrize("failure", [_raise(httpx.ReadTimeout), _status(502), _status(500), _not_json])
 def test_upload_is_not_repeated_when_it_may_have_succeeded(tmp_path: Path, failure: Handler) -> None:
     adapter = _adapter()
     meta = Meta(tracker_status={})

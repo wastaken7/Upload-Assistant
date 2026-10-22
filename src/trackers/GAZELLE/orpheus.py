@@ -913,7 +913,9 @@ class Orpheus:
                     await asyncio.sleep(self.retry_delay_seconds)
                     continue
                 message = f"Upload request failed: {self._error_text(error)}"
-                if not not_processed and isinstance(error, httpx.HTTPError):
+                # An unreadable response (ValueError from .json()) can also follow a
+                # stored upload; only a local file error (OSError) means nothing was sent.
+                if not not_processed and isinstance(error, (httpx.HTTPError, ValueError)):
                     message += ". The upload may still have reached Orpheus; check the site before uploading again."
                 status["status_message"] = message
                 return None
