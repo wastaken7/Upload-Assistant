@@ -36,6 +36,10 @@ Orpheus's `image` field is optional, but artwork improves the catalog. MUSIC fir
 
 Orpheus keeps release information (year, label, catalogue number, title) in its edition fields. The edition year comes from `--music-edition-year`, `--music-release-year`, the retail date, or the initial year when it cannot predate the source medium (CD 1982, DVD 1996, SACD/WEB 1999, BD 2006). It is never guessed: when no concrete year exists, the upload stops and asks for one. If the release cannot be identified, pass `--music-unknown-release` to submit it as an Unknown Release (rule 2.1.19).
 
+A label, catalogue number or edition title found only in the folder name is not sent on its own. Interactive runs ask about each one before the upload is confirmed, and a confirmed value is used as if it had been passed with `--music-label`, `--music-catalogue-number` or `--edition`. Unattended runs leave it out and show a warning.
+
+Orpheus API requests are retried after timeouts, connection failures and rate-limit or server errors, up to `max_retries` attempts (set under `TRACKERS["ORPHEUS"]` or `DEFAULT`). The upload itself is retried only when Orpheus certainly did not receive it: the connection failed, or the site answered 429 or 503. After a read timeout or another server error the upload may already exist, so it is reported instead of repeated; check the site before uploading again.
+
 ### Preflight
 
 The preflight enforces mechanical rules before a torrent is created:

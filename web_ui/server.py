@@ -38,7 +38,7 @@ from collections.abc import Mapping, Sequence
 import psutil
 
 import web_ui.auth as auth_mod
-from src.webui_events import GUI_EVENT_KINDS, GUI_EVENT_STDOUT_PREFIX, GUI_EVENTS_ENV, MAX_EVENT_BYTES
+from src.webui_events import GUI_EVENT_KINDS, GUI_EVENT_NONCE_ENV, GUI_EVENT_STDOUT_PREFIX, GUI_EVENTS_ENV, MAX_EVENT_BYTES, event_prefix
 from src.webui_progress import PROGRESS_STDOUT_PREFIX
 from src.prompt_sound import PROMPT_SOUND_STDOUT_MARKER
 from src.app_paths import CODE_DIR, DATA_DIR, STATE_DIR
@@ -2047,6 +2047,10 @@ def _resolve_execution_preview_meta(session_id: str) -> tuple[str, Path | None, 
 
 # Lines the child writes for the server rather than the terminal.
 STRUCTURED_STDOUT_PREFIXES = (PROGRESS_STDOUT_PREFIX, GUI_EVENT_STDOUT_PREFIX)
+# Secret part of the GUI event prefix, passed to every child. Text the child
+# prints (e.g. release names from a tracker) cannot know it, so it cannot
+# forge an event by printing the prefix itself.
+_GUI_EVENT_NONCE = secrets.token_hex(16)
 
 
 def _subprocess_prompt_type(buffer: str, previous_type: str | None = None) -> str | None:
@@ -2080,6 +2084,7 @@ def _webui_subprocess_env() -> dict[str, str]:
     env["UA_WEBUI_PROGRESS_STDOUT"] = "1"
     env["UA_WEBUI_PROMPT_SOUND_STDOUT"] = "1"
     env[GUI_EVENTS_ENV] = "1"
+    env[GUI_EVENT_NONCE_ENV] = _GUI_EVENT_NONCE
     env["UA_STATS_SOURCE"] = "webui"
     return env
 
@@ -2096,11 +2101,17 @@ def _subprocess_progress_event(chunk: str) -> dict[str, object] | None:
 
 
 def _subprocess_gui_event(chunk: str) -> dict[str, object] | None:
-    """Parse one GUI event line. Returns {} for a malformed or oversized one, which is dropped."""
+    """Parse one GUI event line.
+
+    Returns {} for a malformed, oversized or forged (wrong nonce) one, which is dropped.
+    """
     payload = chunk.strip()
     if not payload.startswith(GUI_EVENT_STDOUT_PREFIX):
         return None
-    body = payload.removeprefix(GUI_EVENT_STDOUT_PREFIX)
+    prefix = event_prefix(_GUI_EVENT_NONCE)
+    if not payload.startswith(prefix):
+        return {}
+    body = payload.removeprefix(prefix)
     if len(body) > MAX_EVENT_BYTES:
         return {}
     try:

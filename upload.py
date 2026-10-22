@@ -1020,11 +1020,52 @@ async def _prompt_music_meta(meta: Meta) -> None:
         return
 
     if changed:
-        await _write_music_snapshot(meta)
-        year = f" [{meta.year}]" if meta.year else ""
-        media = str(_music_field(meta, "media") or "")
-        meta.name_notag = f"{meta.artist} - {meta.title}{year} [{media} {meta.format}]".strip()
-        meta.name_notag, meta.name, meta.clean_name, meta.potential_missing = await name_manager.get_name(meta)
+        await _refresh_music_meta(meta)
+
+
+async def _refresh_music_meta(meta: Meta) -> None:
+    """Save prompted music fields and rebuild the release name from them."""
+    await _write_music_snapshot(meta)
+    year = f" [{meta.year}]" if meta.year else ""
+    media = str(_music_field(meta, "media") or "")
+    meta.name_notag = f"{meta.artist} - {meta.title}{year} [{media} {meta.format}]".strip()
+    meta.name_notag, meta.name, meta.clean_name, meta.potential_missing = await name_manager.get_name(meta)
+
+
+# Folder-name hints and the trusted field a confirmed value is stored in,
+# the same field the matching command-line option sets.
+_MUSIC_FOLDER_HINT_FIELDS = {"label": "release_label", "catalogue number": "release_catalogue_number", "edition title": "edition"}
+
+
+async def _confirm_music_folder_hints(meta: Meta) -> None:
+    """Ask before sending edition details that only come from the folder name.
+
+    Orpheus never sends folder-derived label, catalogue number or edition
+    title on its own (rule 2.1.19). Interactive runs ask about each one, so it
+    is not dropped silently; unattended runs keep the validation warning.
+    """
+    if meta.unattended or not isinstance(meta.music_release, dict):
+        return
+    if not any(str(tracker).upper() == "ORPHEUS" for tracker in meta.trackers or []):
+        return
+    from src.music.models import MusicRelease
+    from src.music.validation import resolve_orpheus_edition
+
+    hints = resolve_orpheus_edition(MusicRelease.from_dict(meta.music_release)).folder_hints
+    if not hints:
+        return
+    changed = False
+    try:
+        for name, value in hints:
+            field = _MUSIC_FOLDER_HINT_FIELDS.get(name)
+            if field and CLI_UI.ask_yes_no(f"Send {name} '{value}' from the folder name to Orpheus?", default=False):
+                _set_music_field(meta, field, value)
+                changed = True
+    except EOFError:
+        logger.info("[yellow]Input cancelled — folder-name edition details are not sent.[/yellow]")
+        return
+    if changed:
+        await _refresh_music_meta(meta)
 
 
 def book_screens(meta: Meta, min_successful_uploads: int) -> tuple[int, int]:
@@ -1145,6 +1186,7 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
 
     if meta.category == "MUSIC":
         await _prompt_music_meta(meta)
+        await _confirm_music_folder_hints(meta)
 
     meta = await gen_desc(meta, takescreens_manager, uploadscreens_manager)
     webui_events.stage("prep", "done")

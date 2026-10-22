@@ -3,12 +3,14 @@
 The Web UI starts ``upload.py`` as a child process and turns its terminal
 output into HTML. The GUI mode needs a few facts the terminal only shows as
 coloured text: run stages, prompts, dupes, missing disc details and tracker
-results. This module writes them as ``UA_GUI_EVENT_JSON:`` lines on stdout,
-which the server strips from the terminal stream and forwards as ``gui``
-session events.
+results. This module writes them as ``UA_GUI_EVENT_JSON:<nonce>:`` lines on
+stdout, which the server strips from the terminal stream and forwards as
+``gui`` session events. The nonce is a secret the server passes to each child,
+so text the run prints (a tracker's release names, for example) cannot forge
+an event by containing the prefix.
 
-Every helper is a no-op unless ``UA_WEBUI_GUI_EVENTS=1``, so the CLI output is
-unchanged.
+Every helper is a no-op unless ``UA_WEBUI_GUI_EVENTS=1`` and a nonce are set,
+so the CLI output is unchanged.
 """
 
 from __future__ import annotations
@@ -29,6 +31,7 @@ from typing import Any, Literal, cast
 
 GUI_EVENT_STDOUT_PREFIX = "UA_GUI_EVENT_JSON:"
 GUI_EVENTS_ENV = "UA_WEBUI_GUI_EVENTS"
+GUI_EVENT_NONCE_ENV = "UA_WEBUI_GUI_EVENT_NONCE"
 GUI_EVENT_KINDS = frozenset({"item", "stage", "notice", "notice_group", "prompt", "dupes", "slot", "tracker", "request"})
 STAGE_KEYS = ("prep", "confirm", "dupes", "screens", "torrent", "upload", "requests")
 STAGE_STATUSES = frozenset({"start", "done", "skip", "fail"})
@@ -55,7 +58,12 @@ _MARKUP_TAG = re.compile(r"\[/?[a-zA-Z#][^\[\]]*\]|\[/\]")
 
 
 def enabled() -> bool:
-    return os.environ.get(GUI_EVENTS_ENV) == "1"
+    return os.environ.get(GUI_EVENTS_ENV) == "1" and bool(os.environ.get(GUI_EVENT_NONCE_ENV))
+
+
+def event_prefix(nonce: str) -> str:
+    """Return the line prefix of events written with ``nonce``."""
+    return f"{GUI_EVENT_STDOUT_PREFIX}{nonce}:"
 
 
 def plain_text(value: Any, limit: int = MAX_TEXT_LENGTH, *, markup: bool = True) -> str:
@@ -96,7 +104,7 @@ def _emit(kind: str, payload: Mapping[str, Any]) -> None:
     if len(line) > MAX_EVENT_BYTES:
         return
     with _stdout_lock, contextlib.suppress(Exception):
-        sys.stdout.write(f"\n{GUI_EVENT_STDOUT_PREFIX}{line}\n")
+        sys.stdout.write(f"\n{event_prefix(os.environ.get(GUI_EVENT_NONCE_ENV, ''))}{line}\n")
         sys.stdout.flush()
 
 

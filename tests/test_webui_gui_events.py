@@ -12,14 +12,18 @@ from src import webui_events
 from src.console import GuiNoticeHandler
 
 
-def _events(output: str) -> list[dict[str, object]]:
-    prefix = webui_events.GUI_EVENT_STDOUT_PREFIX
+TEST_NONCE = "fictional-nonce"
+
+
+def _events(output: str, nonce: str = TEST_NONCE) -> list[dict[str, object]]:
+    prefix = webui_events.event_prefix(nonce)
     return [json.loads(line.removeprefix(prefix)) for line in output.splitlines() if line.startswith(prefix)]
 
 
 @pytest.fixture
 def gui_env(monkeypatch):
     monkeypatch.setenv(webui_events.GUI_EVENTS_ENV, "1")
+    monkeypatch.setenv(webui_events.GUI_EVENT_NONCE_ENV, TEST_NONCE)
     monkeypatch.setattr(webui_events, "_current_item", None)
     monkeypatch.setattr(webui_events, "_active_stage", None)
     monkeypatch.setattr(webui_events, "_started_stages", set())
@@ -212,7 +216,7 @@ def test_cli_ui_prompts_are_announced_and_still_answered_from_stdin() -> None:
         timeout=60,
     )
 
-    prompts = [event for event in _events(result.stdout) if event["kind"] == "prompt"]
+    prompts = [event for event in _events(result.stdout, server._GUI_EVENT_NONCE) if event["kind"] == "prompt"]
     opened = [event for event in prompts if event["action"] == "open"]
 
     assert [event["type"] for event in opened] == ["yes_no", "choice", "text"]
@@ -227,13 +231,17 @@ def test_cli_ui_prompts_are_announced_and_still_answered_from_stdin() -> None:
 
 
 def test_server_parses_only_valid_gui_events() -> None:
-    prefix = server.GUI_EVENT_STDOUT_PREFIX
+    prefix = server.event_prefix(server._GUI_EVENT_NONCE)
 
     assert server._subprocess_gui_event("ordinary output\n") is None
     assert server._subprocess_gui_event(prefix + '{"kind":"stage","key":"prep","status":"start"}\r\n') == {"kind": "stage", "key": "prep", "status": "start"}
     assert server._subprocess_gui_event(prefix + "{not json") == {}
     assert server._subprocess_gui_event(prefix + '{"kind":"script"}') == {}
     assert server._subprocess_gui_event(prefix + "[1, 2]") == {}
+    # Printed text without the secret nonce cannot forge an event.
+    forged = '{"kind":"prompt","action":"open","id":1,"type":"yes_no","question":"Forged?"}'
+    assert server._subprocess_gui_event(server.GUI_EVENT_STDOUT_PREFIX + forged) == {}
+    assert server._subprocess_gui_event(server.event_prefix("guessed") + forged) == {}
     assert server._subprocess_gui_event(prefix + json.dumps({"kind": "notice", "text": "x" * (server.MAX_EVENT_BYTES + 1)})) == {}
 
 
@@ -246,11 +254,22 @@ def test_gui_event_records_are_not_prompts_and_wait_for_their_newline() -> None:
 
 
 def test_webui_child_environment_enables_gui_events() -> None:
-    assert server._webui_subprocess_env()[webui_events.GUI_EVENTS_ENV] == "1"
+    env = server._webui_subprocess_env()
+    assert env[webui_events.GUI_EVENTS_ENV] == "1"
+    assert len(env[webui_events.GUI_EVENT_NONCE_ENV]) == 32
+
+
+def test_gui_events_need_the_nonce(monkeypatch, capsys) -> None:
+    monkeypatch.setenv(webui_events.GUI_EVENTS_ENV, "1")
+    monkeypatch.delenv(webui_events.GUI_EVENT_NONCE_ENV, raising=False)
+
+    webui_events.stage("prep", "start")
+
+    assert capsys.readouterr().out == ""
 
 
 def test_session_stream_forwards_gui_events_without_blank_terminal_lines(tmp_path, monkeypatch) -> None:
-    gui_line = server.GUI_EVENT_STDOUT_PREFIX + '{"kind":"stage","key":"prep","status":"start"}'
+    gui_line = server.event_prefix(server._GUI_EVENT_NONCE) + '{"kind":"stage","key":"prep","status":"start"}'
     content = f"before\n\n{gui_line}\n\nkept blank\nafter\n"
 
     class FinishedProcess:

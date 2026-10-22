@@ -2286,6 +2286,16 @@ function AudionutsUAGUI() {
     storage.set(RUN_GUI_RESULTS_COLLAPSED_KEY, String(runGuiResultsCollapsed));
   }, [runGuiResultsCollapsed]);
 
+  // A new question opens at the top of the GUI panel, so its Yes/No buttons
+  // are always in the same place even if the panel was scrolled down.
+  const runGuiPromptId = runGui.prompt?.id ?? null;
+  useEffect(() => {
+    if (runGuiPromptId === null) return;
+    document.querySelectorAll(".ua-run-gui").forEach((panel) => {
+      panel.scrollTop = 0;
+    });
+  }, [runGuiPromptId]);
+
   useEffect(() => {
     storage.set(
       COLLAPSED_ARGUMENT_SECTIONS_KEY,
@@ -8606,44 +8616,42 @@ function AudionutsUAGUI() {
         aria-live="polite"
         data-answered={Boolean(prompt?.answered)}
       >
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <LucideIcon
-            name={prompt?.answered ? "loader-circle" : "circle-help"}
-            className={`ua-run-gui-tone-icon h-4 w-4 ${prompt?.answered ? "animate-spin" : ""}`}
-          />
-          <p className="ua-run-gui-eyebrow text-xs font-semibold uppercase tracking-wide">
-            {prompt?.answered ? "Answer sent" : "Your input is needed"}
-          </p>
-          {context.tracker && (
-            <>
-              <span className="ua-run-gui-muted text-xs" aria-hidden="true">
-                ·
-              </span>
-              <span className="text-sm">
-                {renderRunGuiTracker(context.tracker)}
-              </span>
-            </>
-          )}
-          {context.debug === true && (
-            <span
-              className="ua-run-gui-chip ml-auto rounded-md px-2 py-0.5 text-xs"
-              data-tone="info"
-            >
-              Debug: nothing will be uploaded
-            </span>
-          )}
-        </div>
-        <p className="mt-1.5 break-words text-base font-semibold">{question}</p>
-
-        {details && (
-          <div className="ua-run-gui-prompt-context mt-3 space-y-3 rounded-md p-3">
-            {details}
+        {/* Yes/No sit at the top right so they stay put whatever the details below. */}
+        <div className="flex flex-wrap items-start gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <LucideIcon
+                name={prompt?.answered ? "loader-circle" : "circle-help"}
+                className={`ua-run-gui-tone-icon h-4 w-4 ${prompt?.answered ? "animate-spin" : ""}`}
+              />
+              <p className="ua-run-gui-eyebrow text-xs font-semibold uppercase tracking-wide">
+                {prompt?.answered ? "Answer sent" : "Your input is needed"}
+              </p>
+              {context.tracker && (
+                <>
+                  <span className="ua-run-gui-muted text-xs" aria-hidden="true">
+                    ·
+                  </span>
+                  <span className="text-sm">
+                    {renderRunGuiTracker(context.tracker)}
+                  </span>
+                </>
+              )}
+              {context.debug === true && (
+                <span
+                  className="ua-run-gui-chip ml-auto rounded-md px-2 py-0.5 text-xs"
+                  data-tone="info"
+                >
+                  Debug: nothing will be uploaded
+                </span>
+              )}
+            </div>
+            <p className="mt-1.5 break-words text-base font-semibold">
+              {question}
+            </p>
           </div>
-        )}
-
-        <div className="mt-3 flex flex-wrap gap-2">
           {type === "yes_no" && (
-            <>
+            <div className="flex shrink-0 gap-2">
               <button
                 type="button"
                 onClick={() => answer("yes")}
@@ -8668,65 +8676,76 @@ function AudionutsUAGUI() {
                 <LucideIcon name="x" className="h-4 w-4" />
                 No
               </button>
-            </>
-          )}
-          {type === "choice" && (
-            <div className="grid w-full gap-1.5">
-              {prompt.choices.map((choice, index) => (
-                <button
-                  key={`${index}-${choice}`}
-                  type="button"
-                  onClick={() => answer(String(index + 1))}
-                  disabled={disabled}
-                  className="ua-run-gui-choice flex min-w-0 items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm disabled:opacity-50"
-                >
-                  <span className="ua-run-gui-count shrink-0 rounded px-1.5 text-xs font-semibold">
-                    {index + 1}
-                  </span>
-                  <span className="min-w-0 break-words">{choice}</span>
-                </button>
-              ))}
-              <button
-                type="button"
-                onClick={() => answer("")}
-                disabled={disabled}
-                className="ua-run-gui-muted justify-self-start text-xs underline disabled:opacity-50"
-              >
-                Skip
-              </button>
             </div>
           )}
-          {type === "text" && (
-            <form
-              className="flex w-full min-w-0 gap-2"
-              onSubmit={(event) => {
-                event.preventDefault();
-                answer(userInput);
-              }}
-            >
-              <input
-                value={userInput}
-                onChange={(event) => setUserInput(event.target.value)}
-                disabled={disabled}
-                placeholder={
-                  prompt?.default && typeof prompt.default === "string"
-                    ? `Leave empty for "${prompt.default}"`
-                    : "Type your answer"
-                }
-                aria-label="Answer"
-                className="ua-run-gui-input min-w-0 flex-1 rounded-lg border px-3 py-2 text-sm"
-              />
-              <button
-                type="submit"
-                disabled={disabled}
-                className="ua-run-gui-answer rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50"
-                data-variant="send"
-              >
-                Send
-              </button>
-            </form>
-          )}
         </div>
+
+        {details && (
+          <div className="ua-run-gui-prompt-context mt-3 space-y-3 rounded-md p-3">
+            {details}
+          </div>
+        )}
+
+        {type !== "yes_no" && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {type === "choice" && (
+              <div className="grid w-full gap-1.5">
+                {prompt.choices.map((choice, index) => (
+                  <button
+                    key={`${index}-${choice}`}
+                    type="button"
+                    onClick={() => answer(String(index + 1))}
+                    disabled={disabled}
+                    className="ua-run-gui-choice flex min-w-0 items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm disabled:opacity-50"
+                  >
+                    <span className="ua-run-gui-count shrink-0 rounded px-1.5 text-xs font-semibold">
+                      {index + 1}
+                    </span>
+                    <span className="min-w-0 break-words">{choice}</span>
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => answer("")}
+                  disabled={disabled}
+                  className="ua-run-gui-muted justify-self-start text-xs underline disabled:opacity-50"
+                >
+                  Skip
+                </button>
+              </div>
+            )}
+            {type === "text" && (
+              <form
+                className="flex w-full min-w-0 gap-2"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  answer(userInput);
+                }}
+              >
+                <input
+                  value={userInput}
+                  onChange={(event) => setUserInput(event.target.value)}
+                  disabled={disabled}
+                  placeholder={
+                    prompt?.default && typeof prompt.default === "string"
+                      ? `Leave empty for "${prompt.default}"`
+                      : "Type your answer"
+                  }
+                  aria-label="Answer"
+                  className="ua-run-gui-input min-w-0 flex-1 rounded-lg border px-3 py-2 text-sm"
+                />
+                <button
+                  type="submit"
+                  disabled={disabled}
+                  className="ua-run-gui-answer rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50"
+                  data-variant="send"
+                >
+                  Send
+                </button>
+              </form>
+            )}
+          </div>
+        )}
       </section>
     );
   };
