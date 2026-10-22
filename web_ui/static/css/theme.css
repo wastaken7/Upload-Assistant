@@ -1334,6 +1334,11 @@ html.ua-upload-document #root {
   color: var(--ua-upload-text);
 }
 
+/* A step below the title: still readable, but clearly secondary. */
+.ua-processing-artist {
+  color: color-mix(in srgb, var(--ua-upload-text) 72%, var(--ua-upload-muted));
+}
+
 .ua-processing-muted,
 .ua-processing-year,
 .ua-processing-source {
@@ -4187,4 +4192,25 @@ html[data-ua-shape="square"]
   background: var(--ua-upload-surface-raised);
   border: 1px solid var(--ua-upload-border);
   color: var(--ua-upload-text);
+}
+
+/* Results: one card per queue item, its stripe showing the item's outcome. */
+.ua-run-gui-item {
+  background: color-mix(
+    in srgb,
+    var(--ua-upload-surface-raised) 55%,
+    transparent
+  );
+  border-color: var(--ua-upload-border);
+  border-left: 3px solid var(--ua-run-gui-tone);
+}
+
+.ua-run-gui-item-header {
+  border-bottom: 1px solid var(--ua-upload-border);
+  color: var(--ua-upload-text);
+}
+
+.ua-run-gui-item-index {
+  background: var(--ua-upload-hover);
+  color: var(--ua-upload-muted);
 }

@@ -7687,6 +7687,10 @@ function AudionutsUAGUI() {
         ? media?.episode_overview || media?.overview
         : media?.overview;
     const music = media?.music || {};
+    // Music shows its artist(s) above the album title, as on a record sleeve.
+    const titleArtist =
+      category === "MUSIC" ? String(music.artist || "").trim() : "";
+    const artistSize = compact ? "text-base" : "text-lg";
     const detailSections = Array.isArray(media?.detail_sections)
       ? media.detail_sections.filter(
           (section) =>
@@ -7913,6 +7917,13 @@ function AudionutsUAGUI() {
                   {mediaIconForCategory(category)}
                   <span>{category || "Media"}</span>
                 </div>
+                {titleArtist && (
+                  <p
+                    className={`ua-processing-artist ${artistSize} mb-0.5 font-semibold leading-snug`}
+                  >
+                    {titleArtist}
+                  </p>
+                )}
                 <h3
                   className={`ua-processing-title ${titleSize} font-bold leading-tight`}
                 >
@@ -8894,7 +8905,7 @@ function AudionutsUAGUI() {
       RUN_GUI_TRACKER_STATUS[entry.status] || RUN_GUI_TRACKER_STATUS.pending;
     const card = view.trackerDetails[`${entry.item}:${entry.tracker}`];
     return (
-      <li key={`${entry.item}-${entry.tracker}`} className="py-1.5">
+      <li key={`${entry.item}-${entry.tracker}`} className="py-1.5 text-sm">
         <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
           <span className="min-w-[8rem] flex-1">
             {renderRunGuiTracker(entry.tracker)}
@@ -8938,6 +8949,76 @@ function AudionutsUAGUI() {
   };
 
   const plural = (count, word) => `${count} ${word}${count === 1 ? "" : "s"}`;
+
+  /** Overall outcome of one queue item, shown on its card header and stripe. */
+  const runGuiItemOutcome = (group, view) => {
+    const statuses = group.rows.map((entry) => entry.status);
+    const has = (status) => statuses.includes(status);
+    if (!view.finished && group.index === view.currentItem?.index) {
+      return { tone: "info", icon: "loader-circle", label: "In progress" };
+    }
+    if (has("failed")) {
+      return has("success")
+        ? {
+            tone: "attention",
+            icon: "triangle-alert",
+            label: "Partly uploaded",
+          }
+        : { tone: "error", icon: "circle-x", label: "Failed" };
+    }
+    if (has("success")) {
+      return { tone: "success", icon: "circle-check", label: "Uploaded" };
+    }
+    if (has("pending")) {
+      return { tone: "info", icon: "clock", label: "Queued" };
+    }
+    if (has("dupe"))
+      return { tone: "muted", icon: "copy-check", label: "Dupe" };
+    if (has("banned")) return { tone: "muted", icon: "ban", label: "Banned" };
+    if (statuses.length) {
+      return { tone: "muted", icon: "circle-minus", label: "Skipped" };
+    }
+    return { tone: "muted", icon: "circle-minus", label: "No upload" };
+  };
+
+  /** One queue item as a card: the release is the heading, trackers below it. */
+  const renderRunGuiItemCard = (group, view) => {
+    const outcome = runGuiItemOutcome(group, view);
+    return (
+      <section
+        key={group.index}
+        className="ua-run-gui-item rounded-md border"
+        data-tone={outcome.tone}
+      >
+        <header className="ua-run-gui-item-header flex min-w-0 items-center gap-2 px-3 py-2">
+          <span className="ua-run-gui-item-index shrink-0 rounded px-1.5 text-xs font-semibold tabular-nums">
+            {group.index}
+          </span>
+          <h4
+            className="min-w-0 flex-1 truncate text-sm font-semibold"
+            title={group.name || undefined}
+          >
+            {group.name || `Item ${group.index}`}
+          </h4>
+          <span className="ua-run-gui-status inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-0.5 text-xs font-semibold">
+            <LucideIcon
+              name={outcome.icon}
+              className={`h-3.5 w-3.5 ${outcome.icon === "loader-circle" ? "animate-spin" : ""}`}
+            />
+            {outcome.label}
+          </span>
+        </header>
+        <div className="px-3 pb-2">
+          {group.rows.length > 0 && (
+            <ul className="ua-run-gui-divide divide-y">
+              {group.rows.map((entry) => renderRunGuiResultRow(entry, view))}
+            </ul>
+          )}
+          {renderRunGuiItemNotes(group.notes)}
+        </div>
+      </section>
+    );
+  };
 
   /** Notes, errors and warnings kept for an item the queue has moved past. */
   const renderRunGuiItemNotes = (notes) => {
@@ -9006,7 +9087,7 @@ function AudionutsUAGUI() {
     );
   };
 
-  const renderRunGuiPanel = (overlaidToggle = false) => {
+  const renderRunGuiPanel = (toggleInStrip = false) => {
     const view = RunGui.selectRunGuiView(runGui);
     const prompt = view.prompt;
     const waitingForUser =
@@ -9081,20 +9162,24 @@ function AudionutsUAGUI() {
 
     return (
       <div className="ua-run-gui flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
-        {/* Right padding leaves room for the overlaid Terminal | GUI switch. */}
-        <div
-          className={`ua-run-gui-strip rounded-lg border py-2 pl-3 ${overlaidToggle ? "pr-44" : "pr-3"}`}
-        >
-          {view.multipleItems && view.currentItem && (
-            <p className="ua-run-gui-muted mb-1.5 flex min-w-0 items-center gap-1.5 text-xs">
-              <LucideIcon name="file-stack" className="h-3.5 w-3.5 shrink-0" />
-              <span className="shrink-0 font-semibold">
-                Item {view.currentItem.index} of {view.currentItem.total}
-              </span>
-              <span className="truncate">{view.currentItem.name}</span>
-            </p>
-          )}
-          {renderRunGuiStages(view, waitingForUser)}
+        {/* The Terminal | GUI switch sits at the right of the stages bar. */}
+        <div className="ua-run-gui-strip flex items-start gap-3 rounded-lg border px-3 py-2">
+          <div className="min-w-0 flex-1">
+            {view.multipleItems && view.currentItem && (
+              <p className="ua-run-gui-muted mb-1.5 flex min-w-0 items-center gap-1.5 text-xs">
+                <LucideIcon
+                  name="file-stack"
+                  className="h-3.5 w-3.5 shrink-0"
+                />
+                <span className="shrink-0 font-semibold">
+                  Item {view.currentItem.index} of {view.currentItem.total}
+                </span>
+                <span className="truncate">{view.currentItem.name}</span>
+              </p>
+            )}
+            {renderRunGuiStages(view, waitingForUser)}
+          </div>
+          {toggleInStrip && renderOutputModeToggle(true)}
         </div>
 
         {renderRunGuiPrompt(view)}
@@ -9225,23 +9310,22 @@ function AudionutsUAGUI() {
             ) : null,
             children: (
               <div className="space-y-3">
-                {visibleGroups.map((group) => (
-                  <div key={group.index ?? "all"}>
-                    {group.index !== null && (
-                      <p className="ua-run-gui-muted mb-1 truncate text-xs font-semibold">
-                        {group.name || `Item ${group.index}`}
-                      </p>
-                    )}
-                    {group.rows.length > 0 && (
-                      <ul className="ua-run-gui-divide divide-y">
-                        {group.rows.map((entry) =>
-                          renderRunGuiResultRow(entry, view),
-                        )}
-                      </ul>
-                    )}
-                    {renderRunGuiItemNotes(group.notes)}
-                  </div>
-                ))}
+                {visibleGroups.map((group) =>
+                  group.index === null ? (
+                    <div key="all">
+                      {group.rows.length > 0 && (
+                        <ul className="ua-run-gui-divide divide-y">
+                          {group.rows.map((entry) =>
+                            renderRunGuiResultRow(entry, view),
+                          )}
+                        </ul>
+                      )}
+                      {renderRunGuiItemNotes(group.notes)}
+                    </div>
+                  ) : (
+                    renderRunGuiItemCard(group, view)
+                  ),
+                )}
                 {view.requests.length > 0 && (
                   <div>
                     <p className="mb-1 flex items-center gap-1.5 text-xs font-semibold">
@@ -10701,10 +10785,13 @@ function AudionutsUAGUI() {
                 <div
                   className={`relative min-h-0 flex-col ${isExecuting || isTerminalView ? "flex flex-1" : "hidden"}`}
                 >
-                  {/* The view switch floats over the output instead of taking a row. */}
-                  <div className="ua-run-gui-mode-overlay absolute right-2 top-2 z-10">
-                    {renderOutputModeToggle(true)}
-                  </div>
+                  {/* In Terminal view the switch floats over the output instead of
+                      taking a row; the GUI view shows it in its stages bar. */}
+                  {!isGuiOutput && (
+                    <div className="ua-run-gui-mode-overlay absolute right-2 top-2 z-10">
+                      {renderOutputModeToggle(true)}
+                    </div>
+                  )}
                   {/* Rich HTML output (rendered from Rich export_html fragments) */}
                   <div
                     ref={attachRichOutputHost}
