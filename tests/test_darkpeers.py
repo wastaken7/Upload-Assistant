@@ -267,7 +267,7 @@ def test_darkpeers_uploads_non_standard_resolutions_as_other(resolution: str):
     assert asyncio.run(adapter.get_resolution_id(meta)) == {"resolution_id": "10"}
 
 
-@pytest.mark.parametrize("resolution", ["360p", "1440p", ""])
+@pytest.mark.parametrize("resolution", ["360p", "1440p", "OTHER", ""])
 def test_darkpeers_rejects_360p_mislabelled_and_unknown_resolutions(resolution: str):
     meta = Meta(category="TV", resolution=resolution)
     adapter = DarkPeers({"DEFAULT": {"tmdb_api": "test-key"}, "TRACKERS": {"DARKPEERS": {}}})

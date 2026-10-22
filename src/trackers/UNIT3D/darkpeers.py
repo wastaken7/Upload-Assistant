@@ -266,7 +266,7 @@ class DarkPeers(TmdbTvNaming, UNIT3D):
         if resolution == "360p":
             return self._reject("only permits 360p when no official higher-resolution release exists.")
         # Odd resolutions like 540p go up as Other. 1440p maps to 1080p, so it's still rejected.
-        if resolution and (await self.get_resolution_id(meta))["resolution_id"] == "10":
+        if resolution and resolution.upper() != "OTHER" and (await self.get_resolution_id(meta))["resolution_id"] == "10":
             return True
         logger.info(f"{self.tracker}: [bold red]does not support {resolution or 'an unknown'} video resolution. Skipping upload.")
         return False
