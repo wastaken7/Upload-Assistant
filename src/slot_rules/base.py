@@ -1,9 +1,9 @@
 # Upload Assistant © 2026 Audionut & wastaken7 — Licensed under UAPL v1.0
 """Shared machinery for tracker slot rules."""
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from datetime import date
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Protocol
 
 from src.slot_rules.models import SlotDecision, Verdict
 from src.slot_rules.profile import DISC, DV, HDR10, HDR10P, HLG, PQ10, WEBDL, WEBRIP, ReleaseProfile
@@ -14,6 +14,13 @@ RULES_DATE_2026_10_15 = date(2026, 10, 15)
 type SlotKey = tuple[object, ...]
 # Returns a verdict and reason when the upload competes with an occupant of its slot.
 type TrumpTest = Callable[[ReleaseProfile, ReleaseProfile], tuple[Verdict, str]]
+
+
+class HasEntry(Protocol):
+    """Anything built from a search result, such as a ``ReleaseProfile``."""
+
+    @property
+    def entry(self) -> Mapping[str, Any]: ...
 
 
 class UnknownTraitError(Exception):
@@ -103,7 +110,7 @@ class SlotRules:
         self,
         verdict: Verdict,
         reason: str,
-        conflicts: Sequence[ReleaseProfile] = (),
+        conflicts: Sequence[HasEntry] = (),
         notes: Sequence[str] = (),
         *,
         slot: str = "",

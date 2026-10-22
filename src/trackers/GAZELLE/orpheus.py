@@ -17,6 +17,8 @@ from src.console import logger
 from src.meta import Meta
 from src.music.models import MusicRelease
 from src.music.validation import OrpheusEdition, OrpheusMusicValidator, ValidationLevel, lame_preset, resolve_orpheus_edition
+from src.slot_rules.models import Verdict
+from src.slot_rules.trackers.orpheus import SLOT_DECISION_KEY, MusicEdition, MusicTorrent, OrpheusSlotRules, Outcome, sample_rate_hint
 from src.trackers.common import Common
 from src.trackers.GAZELLE.orpheus_tags import orpheus_tags
 
@@ -247,10 +249,10 @@ class Orpheus:
                 elif index == 0:
                     unmatched[key] = group
 
-        planned = self._planned_upload(release)
+        upload = await self._upload_profile(meta, release)
         dupes: list[dict[str, Any]] = []
-        assessment: list[dict[str, Any]] = []
-        for group in matched.values():
+        existing: list[MusicTorrent] = []
+        for index, group in enumerate(matched.values()):
             group_id = group.get("groupId")
             group_name = f"{group.get('artist', '')} - {group.get('groupName', '')}".strip(" -")
             if self._normalise_request_text(group.get("groupName")) != self._normalise_request_text(album):
@@ -258,22 +260,33 @@ class Orpheus:
                     f"{self.tracker}: [yellow]existing group found with a different title: {escape(group_name)} ({self.base_url}/torrents.php?id={group_id})[/yellow]"
                 )
             torrents = [cast(dict[str, Any], torrent) for torrent in cast(list[Any], group.get("torrents") or []) if isinstance(torrent, dict)]
+            details = await self._group_details(meta, group_id, torrents, upload) if index < 3 else {}
             for torrent in torrents:
-                verdict, trumpable = self._assess_existing_torrent(planned, torrent)
                 torrent_id = torrent.get("torrentId")
-                name = f"{group_name} [{group.get('groupYear', '')}] / {self._describe_torrent(torrent)}"
-                dupes.append(
-                    {
-                        "name": name,
-                        "size": torrent.get("size"),
-                        "id": torrent_id,
-                        "link": f"{self.base_url}/torrents.php?id={group_id}&torrentid={torrent_id}" if group_id and torrent_id else None,
-                        "flags": [verdict],
-                        "type": group.get("releaseType"),
-                        "trumpable": trumpable,
-                    }
-                )
-                assessment.append({"torrent": name, "verdict": verdict, "trumpable": trumpable, "group_id": group_id})
+                entry: dict[str, Any] = {
+                    "name": f"{group_name} [{group.get('groupYear', '')}] / {self._describe_torrent(torrent)}",
+                    "size": torrent.get("size"),
+                    "id": torrent_id,
+                    "link": f"{self.base_url}/torrents.php?id={group_id}&torrentid={torrent_id}" if group_id and torrent_id else None,
+                    "flags": [],
+                    "type": group.get("releaseType"),
+                    "trumpable": False,
+                }
+                dupes.append(entry)
+                existing.append(self._existing_profile(torrent, details.get(str(torrent_id), {}), entry))
+
+        rules = OrpheusSlotRules(meta)
+        release_type = str(release.get("release_type", ""))
+        decision = rules.evaluate_music(upload, existing, release_type=release_type)
+        meta[SLOT_DECISION_KEY] = decision
+        # A trump is only reported when the upload is recommended at all.
+        trumping = decision.verdict is Verdict.ALLOW
+        assessment: list[dict[str, Any]] = []
+        for torrent, outcome, reason in rules.assess(upload, existing, release_type=release_type)[0]:
+            listed = cast(dict[str, Any], torrent.entry)
+            listed["flags"] = [f"{self._OUTCOME_LABELS[outcome]}: {reason}" if reason else self._OUTCOME_LABELS[outcome]]
+            listed["trumpable"] = trumping and outcome is Outcome.TRUMPS
+            assessment.append({"torrent": listed["name"], "verdict": listed["flags"][0], "trumpable": listed["trumpable"]})
         for key, group in unmatched.items():
             if key in matched:
                 continue
@@ -290,11 +303,14 @@ class Orpheus:
             )
         if assessment:
             meta.tracker_status.setdefault(self.tracker, {})["dupe_assessment"] = assessment
-            for item in assessment:
-                if item["verdict"].startswith(("DUPE", "LIKELY DUPE", "TRUMP")):
-                    logger.warning(f"{self.tracker}: [yellow]{escape(item['verdict'])}: {escape(item['torrent'])}[/yellow]")
         return dupes
 
+    _OUTCOME_LABELS: ClassVar[dict[Outcome, str]] = {
+        Outcome.DUPE: "DUPE",
+        Outcome.REVIEW: "REVIEW",
+        Outcome.TRUMPS: "TRUMP",
+        Outcome.COEXIST: "coexists with your upload",
+    }
     _CONCERT_DATE = re.compile(r"(?<!\d)((?:19|20)\d{2})[\s._/-]+(\d{1,2})[\s._/-]+(\d{1,2})(?!\d)")
     _IGNORED_TOKENS = frozenset({"and", "the", "feat", "featuring", "with", "presents"})
 
@@ -429,104 +445,71 @@ class Orpheus:
             parts.append("Scene")
         return f"{edition} / {' '.join(part for part in parts if part)}"
 
-    @classmethod
-    def _catalogue_keys(cls, value: Any) -> set[str]:
-        """Normalise one or more catalogue numbers (``A & B``, ``A / B``)."""
-        return {key for part in re.split(r"\s*(?:&|/|,|;)\s*", str(value or "")) if (key := cls._normalise_request_text(part))}
-
-    @classmethod
-    def _edition_relation(cls, planned: dict[str, Any], torrent: dict[str, Any]) -> tuple[str, str]:
-        """Compare release information: ``(relation, note)``.
-
-        Editions are defined by the audio (rip log TOC and peaks), not by
-        catalogue data, so different releases of one edition are dupes (rule
-        2.2.11.2).  Relation is ``same`` (same catalogue or both unknown),
-        ``same_year`` (same edition year) or ``other``.
-        """
+    async def _upload_profile(self, meta: Meta, release: MusicRelease) -> MusicTorrent:
+        planned = self._planned_upload(release)
         edition: OrpheusEdition = planned["edition"]
-        existing_year = str(torrent.get("remasterYear") or "").strip()
-        existing_unknown = existing_year in {"", "0"} and not any(torrent.get(key) for key in ("remasterRecordLabel", "remasterCatalogueNumber", "remasterTitle"))
-        if edition.unknown or existing_unknown:
-            return ("same", "") if edition.unknown and existing_unknown else ("other", "")
-        ours = cls._catalogue_keys(planned.get("catalogue_number"))
-        if ours and ours & cls._catalogue_keys(torrent.get("remasterCatalogueNumber")):
-            note = f"; the site lists this catalogue as {existing_year}, check your edition year" if edition.year and existing_year != edition.year else ""
-            return "same", note
-        if edition.year and existing_year == edition.year:
-            return "same_year", ""
-        return "other", ""
+        if planned["format"] == "FLAC" and str(planned["media"]).upper() == "CD":
+            # Log trumps depend on the score; this only runs with --music-check-log.
+            await self._check_logs(meta, release)
+        log_checks = cast(list[dict[str, Any]], meta.tracker_status.get(self.tracker, {}).get("log_checks") or [])
+        scores = [int(check["score"]) for check in log_checks if isinstance(check.get("score"), int)]
+        return MusicTorrent(
+            media=str(planned["media"]),
+            format=str(planned["format"]),
+            encoding=str(planned["encoding"]),
+            edition=MusicEdition(edition.unknown, edition.year, edition.label, str(planned["catalogue_number"]), edition.title),
+            sample_rate=max((track.sample_rate or 0 for track in release.tracks), default=0) or None,
+            has_log=bool(planned["has_log"]),
+            log_score=min(scores) if scores else None,
+            has_cue=bool(release.auxiliary.cues),
+        )
 
-    @classmethod
-    def _assess_existing_torrent(cls, planned: dict[str, Any], torrent: dict[str, Any]) -> tuple[str, bool]:
-        """Return a dupe/trump verdict for human review and whether we trump it."""
-        if str(torrent.get("format", "")) != planned["format"]:
-            return "different format", False
-        if str(torrent.get("media", "")).casefold() != str(planned["media"]).casefold():
-            return "different source medium (allowed, rule 2.2.11.1)", False
-        relation, note = cls._edition_relation(planned, torrent)
-        if relation == "other":
-            return "different edition year: allowed only if the audio differs (compare rip log TOC/peaks, rule 2.2.11.2)", False
-        scope = "same release" if relation == "same" else "same edition year (releases of one edition are dupes unless the audio differs, rule 2.2.11.2)"
-        dupe = "DUPE" if relation == "same" else "LIKELY DUPE"
-        ours, theirs = planned["encoding"], str(torrent.get("encoding", ""))
-        if planned["format"] == "FLAC":
-            if ours != theirs:
-                return "different bit depth (24-bit and 16-bit lossless coexist)", False
-            if str(planned["media"]).upper() == "CD" and planned["has_log"] and (not torrent.get("hasLog") or int(torrent.get("logScore") or 0) < 100):
-                return f"TRUMP possible only if your log scores 100% ({scope}; rules 2.2.10.2-2.2.10.4); report the old torrent after uploading{note}", True
-            return f"{dupe}: {scope}, same medium, format and encoding{note}", False
-        lossy = cls._lossy_relation(ours, theirs)
-        if lossy == "dupe":
-            return f"{dupe}: {scope}, same medium, format and bitrate{note}", False
-        if lossy == "trumps":
-            return f"TRUMP: your encode replaces this one ({scope}, rule 2.2.9); report the old torrent after uploading{note}", True
-        if lossy == "trumped":
-            return f"{dupe}: a preferred encode already exists ({scope}, rule 2.2.9){note}", False
-        return "coexists with your encode (rule 2.2.9)", False
+    async def _group_details(self, meta: Meta, group_id: Any, torrents: list[dict[str, Any]], upload: MusicTorrent) -> dict[str, dict[str, Any]]:
+        """Per-torrent details (trumpable flags, folder name) when a torrent may compete with the upload.
+
+        Search results lack the site's trumpable flags and anything that shows
+        a sample rate, so one read-only group lookup is made only when needed.
+        """
+        competing = any(str(torrent.get("format", "")) == upload.format and str(torrent.get("media", "")).casefold() == upload.media.casefold() for torrent in torrents)
+        if not competing or not str(group_id or "").isdigit():
+            return {}
+        await asyncio.sleep(1)
+        response = await self._api_get(meta, {"action": "torrentgroup", "id": str(group_id)}, 10.0, f"group details for {group_id}")
+        items = response.get("torrents") if response else None
+        return {str(item.get("id")): item for item in cast(list[dict[str, Any]], items if isinstance(items, list) else []) if isinstance(item, dict)}
 
     @staticmethod
-    def _lossy_kind(encoding: str) -> tuple[str, int]:
-        value = encoding.strip()
-        if value in {"V0 (VBR)", "APX (VBR)"}:
-            return ("v0", 0)
-        if value in {"V2 (VBR)", "APS (VBR)"}:
-            return ("v2", 0)
-        if value == "V1 (VBR)":
-            return ("v1", 0)
-        number = re.match(r"(\d+)", value)
-        bitrate = int(number.group(1)) if number else 0
-        return ("vbr" if "VBR" in value else "cbr", bitrate)
+    def _trumpable_reasons(details: dict[str, Any]) -> tuple[str, ...]:
+        if not details.get("trumpable"):
+            return ()
+        reasons: list[str] = []
+        for reason in cast(list[Any], details.get("trumpable_reasons") or []):
+            if isinstance(reason, dict):
+                values = cast(dict[str, Any], reason)
+                reason = values.get("reason") or values.get("name") or values.get("description") or ""
+            if str(reason).strip():
+                reasons.append(str(reason).strip())
+        return tuple(reasons) or ("marked trumpable",)
 
     @classmethod
-    def _lossy_relation(cls, ours: str, theirs: str) -> str:
-        """Approximate rule 2.2.9 between two lossy encodings."""
-        if ours == theirs:
-            return "dupe"
-        preset_rank = {"V0 (VBR)": 2, "APX (VBR)": 1, "V2 (VBR)": 2, "APS (VBR)": 1}
-        our_kind, our_rate = cls._lossy_kind(ours)
-        their_kind, their_rate = cls._lossy_kind(theirs)
-        if our_kind == their_kind and our_kind in {"v0", "v2"}:
-            return "trumps" if preset_rank.get(ours, 0) > preset_rank.get(theirs, 0) else "trumped"
-        # 320 CBR and V0 may always coexist (rule 2.2.9.3).
-        if {our_kind, their_kind} == {"v0", "cbr"} and 320 in {our_rate, their_rate}:
-            return "coexists"
-
-        def beats(kind: str, rate: int, other_kind: str, other_rate: int) -> bool:
-            if kind == "v0":
-                return other_kind in {"v1", "v2", "vbr"} or (other_kind == "cbr" and other_rate < 320)
-            if kind == "v2":
-                return (other_kind == "cbr" and other_rate < 256) or (other_kind == "vbr" and other_rate <= 210)
-            if kind == "cbr" and other_kind == "cbr":
-                return rate > other_rate
-            return False
-
-        if beats(our_kind, our_rate, their_kind, their_rate):
-            return "trumps"
-        if beats(their_kind, their_rate, our_kind, our_rate):
-            return "trumped"
-        if our_kind == their_kind == "vbr" and abs(our_rate - their_rate) < 32:
-            return "dupe"
-        return "coexists"
+    def _existing_profile(cls, torrent: dict[str, Any], details: dict[str, Any], entry: dict[str, Any]) -> MusicTorrent:
+        year = str(torrent.get("remasterYear") or "").strip()
+        label, catalogue, title = (str(torrent.get(key) or "").strip() for key in ("remasterRecordLabel", "remasterCatalogueNumber", "remasterTitle"))
+        unknown = year in {"", "0"} and not (label or catalogue or title)
+        log_score = details.get("logScore", torrent.get("logScore"))
+        return MusicTorrent(
+            media=str(torrent.get("media") or ""),
+            format=str(torrent.get("format") or ""),
+            encoding=str(torrent.get("encoding") or ""),
+            edition=MusicEdition(unknown, "" if year == "0" else year, label, catalogue, title),
+            sample_rate=sample_rate_hint(details.get("filePath"), details.get("description")),
+            has_log=bool(torrent.get("hasLog")),
+            log_score=int(log_score) if torrent.get("hasLog") and isinstance(log_score, int) else None,
+            has_cue=bool(torrent.get("hasCue")),
+            scene=bool(torrent.get("scene")),
+            trumpable_reasons=cls._trumpable_reasons(details),
+            entry=entry,
+        )
 
     async def get_torrent(self, torrent_id: int | str, meta: Meta) -> dict[str, Any] | None:
         """Return one Orpheus torrent's Gazelle metadata using a read-only API call.
@@ -799,7 +782,8 @@ class Orpheus:
         if errors:
             status["status_message"] = "Validation failed: " + " | ".join(errors)
             return False
-        log_checks = await self._check_logs(meta, release)
+        # The dupe check may already have scored the logs.
+        log_checks = cast(list[dict[str, Any]], status.get("log_checks") or []) or await self._check_logs(meta, release)
         request_id, request_error = await self._verify_request_fill(meta, release, log_checks) if self.api_key else ("", "")
         group_id, group_error = await self._verify_group(meta, release) if self.api_key else ("", "")
         if request_error or group_error:
