@@ -138,13 +138,26 @@ The custom order is stored in that browser and does not alter folders on disk.
 The Upload workspace offers several ways to build the upload command:
 
 - type flags directly into **Additional Arguments**;
-- choose an entry in the searchable **Arguments** sidebar;
+- fill in options in the **Arguments** sidebar;
 - choose trackers in **Select Trackers (`-tk`)**; or
 - load a saved argument preset.
 
 To save a preset, enter a name and choose **Save**. Saving an existing name updates it. **Delete** removes the selected preset. Presets are shared through the WebUI data directory, while the selected file-browser order is browser-local.
 
-Argument controls update the same command field, so advanced users can still edit the resulting string directly. The [CLI arguments reference](cli-args.md) explains each available flag.
+#### Arguments sidebar
+
+The category buttons at the top (**All**, **Movie**, **TV**, **Music**, **Book**, **Game**, **Other**) show the options that matter for that kind of upload, followed by the options that apply to every upload. Options shared by several categories appear in each of them. When the command contains `--category` (or `-c`), the matching category is selected automatically; you can still pick another one, and it stays selected until the category changes. Search looks through every option, whatever category is selected.
+
+Each option has its own control:
+
+- a checkbox for options without a value, such as `--debug`;
+- a list for options with fixed values, such as `--category`, `--type` or `--imghost`;
+- a text field for other values. Clearing the field keeps the bare option; choose **×** to remove it;
+- a folder button for options that take a server path, such as `--poster` or `--comparison`. It browses the same permitted roots as the File Browser.
+
+**In command** lists the options currently in the command, in order, so you can change or remove each one. Choose ☆ on any option to keep it under **Favorites**; favorites and the selected category are saved in this browser. Choose the expand icon in the sidebar header to open the panel in a larger view, with the command and its warnings below it.
+
+Every control edits only its own part of **Additional Arguments**, so the rest of what you typed is kept, and edits typed into the field show up in the controls. Values that need quoting are quoted the way the server reads them. Below the field, the WebUI warns about unknown options (with a suggestion), missing or invalid values, options set twice, options that cannot be combined (such as `--nohash` and `--rehash`), stray values and unclosed quotes. Warnings never block an upload; the server still validates the command. The [CLI arguments reference](cli-args.md) explains each available flag.
 
 Choose **Check status** to run a lightweight website-reachability check for the configured trackers. The dot beside each tracker shows available, issue detected, unavailable, or not checked. An affected selected tracker also gets a compact warning with its check age and expandable details; on the Upload page it can be deselected directly from that warning. Results are cached for 15 minutes and reused between the Upload and Configuration pages. These checks do not use tracker credentials and cannot confirm that an account or upload endpoint is working, so warnings never prevent an upload.
 

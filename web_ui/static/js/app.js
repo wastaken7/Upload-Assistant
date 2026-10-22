@@ -140,6 +140,8 @@ const THEME_KEY = "ua_config_theme";
 const LEFT_SIDEBAR_WIDTH_KEY = "ua_webui_left_sidebar_width_v2";
 const RIGHT_SIDEBAR_WIDTH_KEY = "ua_webui_right_sidebar_width";
 const COLLAPSED_ARGUMENT_SECTIONS_KEY = "ua_webui_collapsed_argument_sections";
+const ARGUMENT_VIEW_KEY = "ua_webui_argument_view";
+const FAVORITE_ARGUMENTS_KEY = "ua_webui_favorite_arguments";
 const FILE_BROWSER_CUSTOM_ORDER_KEY = "ua_webui_file_browser_custom_order";
 const FILE_BROWSER_EXPANDED_KEY = "ua_webui_file_browser_expanded";
 const FILE_BROWSER_SCROLL_KEY = "ua_webui_file_browser_scroll_top";
@@ -477,6 +479,17 @@ const getStoredCollapsedSections = () => {
   }
 };
 
+const getStoredFavoriteArguments = () => {
+  try {
+    const stored = JSON.parse(storage.get(FAVORITE_ARGUMENTS_KEY) || "[]");
+    return Array.isArray(stored)
+      ? stored.filter((id) => typeof id === "string")
+      : [];
+  } catch (error) {
+    return [];
+  }
+};
+
 const getStoredFileBrowserCustomOrder = () => {
   try {
     const storedOrder = JSON.parse(
@@ -619,629 +632,119 @@ const createUploadOutputFragment = (html) => {
   return wrapper;
 };
 
-// The CLI parser owns option names and help text. Keep only WebUI grouping and examples here.
-let argumentCategories = [
+// The CLI parser owns option names, help text and value shapes. Keep only WebUI
+// grouping, examples and pickers here. A row is a flag name, or an object that
+// adds an example placeholder, a path picker ("file" or "folder"), a prefixed
+// entry of a repeatable option, or a preset that inserts several options.
+const argumentSections = [
   {
-    title: "Modes / Workflows",
-    args: [
-      {
-        label: "--queue",
-        placeholder: "QUEUE_NAME",
-      },
-      {
-        label: "--limit-queue",
-        placeholder: "N",
-      },
-      { label: "--site-check" },
-      {
-        label: "--site-upload",
-        placeholder: "TRACKER",
-      },
-      {
-        label: "--search_requests",
-      },
-      {
-        label: "--unit3d",
-      },
-    ],
-  },
-  {
-    title: "Metadata / IDs",
+    id: "release",
+    title: "Release",
     subtitle: "Getting these correct is 90% of a successful upload!",
-    args: [
-      {
-        label: "--poster",
-        placeholder: "URL_OR_PATH",
-      },
-      {
-        label: "--banner",
-        placeholder: "URL_OR_PATH",
-      },
-      {
-        label: "--category",
-        placeholder: "MOVIE",
-      },
-      {
-        label: "--cast",
-        placeholder: "NAME1,NAME2",
-      },
-      {
-        label: "--genres",
-        placeholder: "GENRE1,GENRE2",
-      },
-      {
-        label: "--publisher",
-        placeholder: "NAME",
-      },
-      {
-        label: "--type",
-        placeholder: "REMUX",
-      },
-      {
-        label: "--source",
-        placeholder: "Blu-ray",
-      },
-      {
-        label: "--resolution",
-        placeholder: "2160p",
-      },
-      { label: "--tmdb", placeholder: "movie/123" },
-      { label: "--imdb", placeholder: "tt0111161" },
-      { label: "--mal", placeholder: "ID" },
-      { label: "--tvmaze", placeholder: "ID" },
-      { label: "--tvdb", placeholder: "ID" },
-      { label: "--douban", placeholder: "ID" },
-      { label: "--igdb", placeholder: "ID" },
-      {
-        label: "--steam",
-        placeholder: "APP_ID_OR_URL",
-      },
+    entries: [
+      { flag: "--category", placeholder: "MOVIE" },
+      { flag: "--type", placeholder: "REMUX" },
+      { flag: "--source", placeholder: "Blu-ray" },
+      { flag: "--resolution", placeholder: "2160p" },
+      { flag: "--tag", placeholder: "GROUP" },
+      { flag: "--service", placeholder: "SERVICE" },
+      { flag: "--edition", placeholder: "TEXT" },
+      { flag: "--region", placeholder: "REGION" },
+      { flag: "--distributor", placeholder: "NAME" },
     ],
   },
   {
-    title: "Music Metadata",
-    args: [
-      {
-        label: "--music-artist",
-        placeholder: "ARTIST",
-      },
-      {
-        label: "--music-album",
-        placeholder: "TITLE",
-      },
-      {
-        label: "--music-media",
-        placeholder: "MEDIUM",
-      },
-      {
-        label: "--music-release-type",
-        placeholder: "ALBUM / EP / SINGLE",
-      },
-      {
-        label: "--music-release-year",
-        placeholder: "YYYY",
-      },
-      {
-        label: "--music-edition-year",
-        placeholder: "YYYY",
-      },
-      {
-        label: "--music-unknown-release",
-      },
-      {
-        label: "--music-artist-role",
-        placeholder: "NAME=ROLE; NAME=ROLE",
-      },
-      {
-        label: "--music-request-id",
-        placeholder: "ID_OR_URL",
-      },
-      {
-        label: "--music-group-id",
-        placeholder: "ID_OR_URL",
-      },
-      {
-        label: "--music-watermark",
-        placeholder: "NOTE",
-      },
-      {
-        label: "--music-lineage",
-        placeholder: "PATH",
-      },
-      {
-        label: "--music-showcase",
-      },
-      {
-        label: "--music-check-log",
-      },
-      {
-        label: "--music-label",
-        placeholder: "LABEL",
-      },
-      {
-        label: "--music-catalogue-number",
-        placeholder: "CATALOGUE",
-      },
-      {
-        label: "--music-genre",
-        placeholder: "GENRE1,GENRE2",
-      },
-      {
-        label: "--music-discogs-id",
-        placeholder: "ID_OR_URL",
-      },
-      {
-        label: "--music-discogs-release-id",
-        placeholder: "ID_OR_URL",
-      },
-      {
-        label: "--music-discogs-master-id",
-        placeholder: "ID_OR_URL",
-      },
-      {
-        label: "--no-music-discogs",
-      },
-      {
-        label: "--music-enrich",
-      },
-      {
-        label: "--no-music-enrich",
-      },
+    id: "video-ids",
+    title: "Metadata IDs",
+    entries: [
+      { flag: "--tmdb", placeholder: "movie/123" },
+      { flag: "--imdb", placeholder: "tt0111161" },
+      "--no-imdb",
+      { flag: "--tvdb", placeholder: "ID" },
+      { flag: "--tvmaze", placeholder: "ID" },
+      { flag: "--mal", placeholder: "ID" },
+      { flag: "--douban", placeholder: "ID" },
+      "--no-metadata-cache",
     ],
   },
   {
-    title: "Screenshots / Images",
-    args: [
-      {
-        label: "--screens",
-        placeholder: "N",
-      },
-      {
-        label: "--manual_frames",
-        placeholder: '"1,250,500"',
-      },
-      {
-        label: "--comparison",
-        placeholder: "PATH",
-      },
-      {
-        label: "--comparison_index",
-        placeholder: "N",
-      },
-      {
-        label: "--imghost",
-        placeholder: "HOST",
-      },
-      {
-        label: "--skip-imagehost-upload",
-      },
+    id: "tv",
+    title: "TV Episode",
+    entries: [
+      { flag: "--season", placeholder: "S01" },
+      { flag: "--episode", placeholder: "E01" },
+      { flag: "--daily", placeholder: "YYYY-MM-DD" },
+      { flag: "--manual-episode-title", placeholder: "TITLE" },
+      "--no-season",
+      "--not-anime",
     ],
   },
   {
-    title: "TV Fields",
-    args: [
-      { label: "--season", placeholder: "S01" },
-      { label: "--episode", placeholder: "E01" },
-      {
-        label: "--manual-episode-title",
-        placeholder: "TITLE",
-      },
-      {
-        label: "--daily",
-        placeholder: "YYYY-MM-DD",
-      },
-    ],
-  },
-  {
+    id: "title",
     title: "Title Shaping",
-    args: [
-      { label: "--year", placeholder: "YYYY" },
-      {
-        label: "--name",
-        placeholder: "RELEASE_NAME",
-      },
-      { label: "--no-season" },
-      { label: "--no-year" },
-      { label: "--no-aka" },
-      { label: "--no-dub" },
-      { label: "--no-dual" },
-      { label: "--no-tag" },
-      { label: "--no-edition" },
-      { label: "--dual-audio" },
-      { label: "--tag", placeholder: "GROUP" },
-      {
-        label: "--service",
-        placeholder: "SERVICE",
-      },
-      { label: "--region", placeholder: "REGION" },
-      {
-        label: "--edition",
-        placeholder: "TEXT",
-      },
-      { label: "--repack", placeholder: "TEXT" },
+    entries: [
+      { flag: "--name", placeholder: "RELEASE_NAME" },
+      { flag: "--year", placeholder: "YYYY" },
+      "--no-year",
+      "--no-aka",
+      "--no-dub",
+      "--no-dual",
+      "--dual-audio",
+      "--no-tag",
+      "--no-edition",
     ],
   },
   {
-    title: "Description / NFO",
-    args: [
-      {
-        label: "--overview",
-        placeholder: "SYNOPSIS",
-      },
-      {
-        label: "--desclink",
-        placeholder: "URL",
-      },
-      {
-        label: "--descfile",
-        placeholder: "PATH",
-      },
-      { label: "--nfo" },
-      {
-        label: "--keywords",
-        placeholder: "keyword1,keyword2",
-      },
+    id: "details",
+    title: "Metadata Overrides",
+    entries: [
+      { flag: "--overview", placeholder: "SYNOPSIS" },
+      { flag: "--genres", placeholder: "GENRE1,GENRE2" },
+      { flag: "--cast", placeholder: "NAME1,NAME2" },
+      { flag: "--keywords", placeholder: "keyword1,keyword2" },
+      { flag: "--original-language", placeholder: "en" },
+      { flag: "--only-if-languages", placeholder: "en,fr" },
+      { flag: "--poster", placeholder: "URL_OR_PATH", path: "file" },
+      { flag: "--banner", placeholder: "URL_OR_PATH", path: "file" },
     ],
   },
   {
-    title: "Language",
-    args: [
-      {
-        label: "--original-language",
-        placeholder: "en",
-      },
-      {
-        label: "--only-if-languages",
-        placeholder: "en,fr",
-      },
+    id: "disc",
+    title: "Disc / Content Flags",
+    entries: [
+      { flag: "--disctype", placeholder: "BD50" },
+      { flag: "--manual_dvds", placeholder: "2xDVD9+DVD5" },
+      { flag: "--menus", placeholder: "FOLDER or auto", path: "folder" },
+      "--untouched",
+      "--extras",
+      "--commentary",
+      "--sfx-subtitles",
+      "--hardcoded-subs",
+      { flag: "--hardcoded-subs-language", placeholder: "LANG" },
+      "--webdv",
+      "--sorted-filelist",
+      "--keep-folder",
     ],
   },
   {
-    title: "Misc Metadata Flags",
-    args: [
-      { label: "--commentary" },
-      { label: "--sfx-subtitles" },
-      { label: "--extras" },
-      {
-        label: "--distributor",
-        placeholder: "NAME",
-      },
-      {
-        label: "--disctype",
-        placeholder: "BD50",
-      },
-      { label: "--untouched" },
-      { label: "--menus" },
-      {
-        label: "--manual_dvds",
-        placeholder: "2xDVD9+DVD5",
-      },
-      {
-        label: "--sorted-filelist",
-      },
-      {
-        label: "--keep-folder",
-      },
-      {
-        label: "--keep-nfo",
-      },
+    id: "screens",
+    title: "Screenshots / Images",
+    entries: [
+      { flag: "--screens", placeholder: "N" },
+      { flag: "--manual_frames", placeholder: "1,250,500" },
+      { flag: "--comparison", placeholder: "FOLDER", path: "folder" },
+      { flag: "--comparison_index", placeholder: "N" },
+      "--imghost",
+      "--skip-imagehost-upload",
+      "--vapoursynth",
     ],
   },
   {
-    title: "Books / Reading",
-    args: [
-      {
-        label: "--author",
-        placeholder: "AUTHOR",
-      },
-      {
-        label: "--book-title",
-        placeholder: "TITLE",
-      },
-      {
-        label: "--book-narrator",
-        placeholder: "NAME",
-      },
-      { label: "--comic" },
-      { label: "--manga" },
-      { label: "--magazine" },
-      { label: "--newspaper" },
-      {
-        label: "--book-translator",
-        placeholder: "NAME",
-      },
-      {
-        label: "--book-language",
-        placeholder: "LANG",
-      },
-      { label: "--isbn", placeholder: "ISBN" },
-      { label: "--asin", placeholder: "ASIN" },
-      {
-        label: "--openlibrary",
-        placeholder: "ID",
-      },
-    ],
-  },
-  {
-    title: "Games",
-    args: [
-      {
-        label: "--game-title",
-        placeholder: "TITLE",
-      },
-      {
-        label: "--developer",
-        placeholder: "NAME",
-      },
-      {
-        label: "--platform",
-        placeholder: "PC",
-      },
-      {
-        label: "--platforms",
-        placeholder: "PC,PS5",
-      },
-      {
-        label: "--game-version",
-        placeholder: "v1.0",
-      },
-      {
-        label: "--game-subcategory",
-        placeholder: "dlc",
-      },
-      { label: "--multi" },
-    ],
-  },
-  {
-    title: "Tracker References",
+    id: "analysis",
+    title: "Audio Spectrograms / HDR",
     subtitle:
-      "Pull metadata ids, descriptions, and screenshots from these trackers",
-    args: [
-      {
-        label: "--onlyID",
-      },
-      {
-        label: "--tracker-id",
-        placeholder: "TRACKER=ID or URL",
-      },
-      {
-        label: "PTP reference",
-        insert: "--tracker-id PTP=",
-        description: "PTP torrent ID",
-      },
-      {
-        label: "BLU reference",
-        insert: "--tracker-id BLU=",
-        description: "BLU torrent ID",
-      },
-      {
-        label: "Aither reference",
-        insert: "--tracker-id AITHER=",
-        description: "Aither torrent ID",
-      },
-      {
-        label: "LST reference",
-        insert: "--tracker-id LST=",
-        description: "LST torrent ID",
-      },
-      {
-        label: "OE reference",
-        insert: "--tracker-id OE=",
-        description: "OE torrent ID",
-      },
-      {
-        label: "HDB reference",
-        insert: "--tracker-id HDB=",
-        description: "HDB torrent ID",
-      },
-      {
-        label: "BTN reference",
-        insert: "--tracker-id BTN=",
-        description: "BTN torrent ID",
-      },
-      {
-        label: "BHD reference",
-        insert: "--tracker-id BHD=",
-        description: "BHD torrent ID",
-      },
-      {
-        label: "Orpheus reference",
-        insert: "--tracker-id ORPHEUS=",
-        description: "Orpheus torrent ID for music metadata enrichment",
-      },
-      {
-        label: "HUNO reference",
-        insert: "--tracker-id HUNO=",
-        description: "HUNO torrent ID",
-      },
-      {
-        label: "ULCX reference",
-        insert: "--tracker-id ULCX=",
-        description: "ULCX torrent ID",
-      },
-      {
-        label: "--torrenthash",
-        placeholder: "HASH",
-      },
-    ],
-  },
-  {
-    title: "Upload Selection / Dupe",
-    args: [
-      {
-        label: "--trackers",
-        placeholder: "aither,blutopia,lst,etc",
-      },
-      {
-        label: "--trackers-remove",
-        placeholder: "blutopia,xyz,etc",
-      },
-      {
-        label: "--trackers-pass",
-        placeholder: "N",
-      },
-      {
-        label: "--skip_auto_torrent",
-      },
-      { label: "--skip-dupe-check" },
-      {
-        label: "--skip-dupe-asking",
-      },
-      {
-        label: "--double-dupe-check",
-      },
-      {
-        label: "--dupe-size-difference-tolerance",
-        placeholder: "PERCENTAGE",
-      },
-      {
-        label: "--draft",
-      },
-      {
-        label: "--modq",
-      },
-      {
-        label: "--freeleech",
-        placeholder: "25%",
-      },
-    ],
-  },
-  {
-    title: "Anonymity / Seeding / Streaming",
-    args: [
-      {
-        label: "--anon",
-      },
-      { label: "--no-seed" },
-      { label: "--stream" },
-      { label: "--webdv" },
-      {
-        label: "--hardcoded-subs",
-      },
-      { label: "--personalrelease" },
-    ],
-  },
-  {
-    title: "Tracker / Site Specific",
-    args: [
-      { label: "--foreign" },
-      { label: "--opera" },
-      { label: "--asian" },
-      {
-        label: "--exclusive",
-        placeholder: "1",
-      },
-      { label: "--featured" },
-      {
-        label: "--double-upload",
-      },
-      {
-        label: "--double-upload-until",
-        placeholder: "N",
-      },
-      {
-        label: "--freeleech-until",
-        placeholder: "N",
-      },
-      {
-        label: "--refundable",
-      },
-      {
-        label: "--sticky",
-      },
-    ],
-  },
-  {
-    title: "Torrent Creation / Hashing",
-    args: [
-      {
-        label: "--max-piece-size",
-        placeholder: "N",
-      },
-      {
-        label: "--nohash",
-      },
-      {
-        label: "--rehash",
-      },
-      {
-        label: "--mkbrr",
-      },
-      {
-        label: "--vapoursynth",
-      },
-      { label: "--entropy", placeholder: "N" },
-      { label: "--randomized", placeholder: "N" },
-      {
-        label: "--infohash",
-        placeholder: "HASH",
-      },
-      {
-        label: "--force-recheck",
-      },
-    ],
-  },
-  {
-    title: "Torrent Client Integration",
-    args: [
-      {
-        label: "--client",
-        placeholder: "NAME",
-      },
-      {
-        label: "--qbit-tag",
-        placeholder: "TAG",
-      },
-      {
-        label: "--qbit-cat",
-        placeholder: "CATEGORY",
-      },
-      {
-        label: "--qbit-bw-control",
-      },
-      {
-        label: "--qbit-bw-threshold",
-        placeholder: "KiB/s",
-      },
-      {
-        label: "--qbit-bw-time",
-        placeholder: "SECONDS",
-      },
-      {
-        label: "--rtorrent-label",
-        placeholder: "LABEL",
-      },
-    ],
-  },
-  {
-    title: "Cleanup / Temp",
-    args: [
-      {
-        label: "--delete-meta",
-      },
-      {
-        label: "--delete-tmp",
-      },
-      { label: "--cleanup" },
-    ],
-  },
-  {
-    title: "Debug / Output",
-    args: [
-      { label: "--debug" },
-      { label: "--ffdebug" },
-      {
-        label: "--upload-order",
-        placeholder: "tracker1,tracker2",
-      },
-      { label: "--upload-timer" },
-    ],
-  },
-  {
-    title: "Audio Spectrograms",
-    subtitle:
-      "The stream positions are zero-based. Choose a preset, then edit the command if you want a different list.",
-    args: [
+      "Stream positions are zero-based. Plots for dynamic HDR are made only when the release has Dolby Vision or HDR10+ metadata.",
+    entries: [
       {
         label: "First audio stream",
         insert: "--audio-spectrogram --audio-spectrogram-tracks 0",
@@ -1253,92 +756,429 @@ let argumentCategories = [
         insert: "--audio-spectrogram --audio-spectrogram-tracks all",
         description: "Generate one spectrogram per available stream.",
       },
+      "--audio-spectrogram",
+      { flag: "--audio-spectrogram-tracks", placeholder: "0,1 or all" },
+      "--dynamic-hdr-plot",
+    ],
+  },
+  {
+    id: "description",
+    title: "Description / NFO",
+    entries: [
+      { flag: "--description", placeholder: "TEXT" },
+      { flag: "--descfile", placeholder: "PATH" },
+      { flag: "--desclink", placeholder: "URL" },
+      "--nfo",
+      "--keep-nfo",
+    ],
+  },
+  {
+    id: "music-release",
+    title: "Music Release",
+    entries: [
+      { flag: "--music-artist", placeholder: "ARTIST" },
+      { flag: "--music-album", placeholder: "TITLE" },
+      "--music-release-type",
+      "--music-media",
+      { flag: "--music-release-year", placeholder: "YYYY" },
+      { flag: "--music-edition-year", placeholder: "YYYY" },
+      "--music-unknown-release",
+      { flag: "--music-artist-role", placeholder: "NAME=ROLE; NAME=ROLE" },
+    ],
+  },
+  {
+    id: "music-edition",
+    title: "Music Edition / Catalogue",
+    entries: [
+      { flag: "--music-label", placeholder: "LABEL" },
+      { flag: "--music-catalogue-number", placeholder: "CATALOGUE" },
+      { flag: "--music-genre", placeholder: "GENRE1,GENRE2" },
+      { flag: "--music-watermark", placeholder: "NOTE" },
+      { flag: "--music-lineage", placeholder: "PATH", path: "file" },
+      "--music-showcase",
+    ],
+  },
+  {
+    id: "music-lookup",
+    title: "Discogs / MusicBrainz",
+    entries: [
+      { flag: "--music-discogs-id", placeholder: "ID_OR_URL" },
+      { flag: "--music-discogs-release-id", placeholder: "ID_OR_URL" },
+      { flag: "--music-discogs-master-id", placeholder: "ID_OR_URL" },
+      "--no-music-discogs",
+      "--music-enrich",
+      "--no-music-enrich",
+    ],
+  },
+  {
+    id: "music-orpheus",
+    title: "Orpheus",
+    entries: [
+      { flag: "--music-request-id", placeholder: "ID_OR_URL" },
+      { flag: "--music-group-id", placeholder: "ID_OR_URL" },
+      "--music-check-log",
       {
-        label: "--audio-spectrogram",
-      },
-      {
-        label: "--audio-spectrogram-tracks",
-        placeholder: "0,1 or all",
-        insert: "--audio-spectrogram --audio-spectrogram-tracks all",
+        label: "Orpheus reference",
+        flag: "--tracker-id",
+        prefix: "ORPHEUS=",
+        placeholder: "TORRENT_ID",
+        description: "Orpheus torrent ID for music metadata enrichment",
       },
     ],
   },
   {
-    title: "Dynamic HDR Metadata",
+    id: "book",
+    title: "Book / Audiobook",
+    entries: [
+      { flag: "--author", placeholder: "AUTHOR" },
+      { flag: "--book-title", placeholder: "TITLE" },
+      { flag: "--book-narrator", placeholder: "NAME" },
+      { flag: "--book-translator", placeholder: "NAME" },
+      { flag: "--book-language", placeholder: "LANG" },
+      { flag: "--publisher", placeholder: "NAME" },
+      { flag: "--isbn", placeholder: "ISBN" },
+      { flag: "--asin", placeholder: "ASIN" },
+      { flag: "--audible-url", placeholder: "URL" },
+      { flag: "--openlibrary", placeholder: "ID" },
+      "--comic",
+      "--manga",
+      "--magazine",
+      "--newspaper",
+      { flag: "--overview", placeholder: "SYNOPSIS" },
+      { flag: "--genres", placeholder: "GENRE1,GENRE2" },
+    ],
+  },
+  {
+    id: "game",
+    title: "Game",
+    entries: [
+      { flag: "--game-title", placeholder: "TITLE" },
+      { flag: "--developer", placeholder: "NAME" },
+      { flag: "--publisher", placeholder: "NAME" },
+      "--platforms",
+      { flag: "--game-version", placeholder: "v1.0" },
+      "--game-subcategory",
+      "--multi",
+      { flag: "--igdb", placeholder: "ID" },
+      { flag: "--steam", placeholder: "APP_ID_OR_URL" },
+      { flag: "--overview", placeholder: "SYNOPSIS" },
+      { flag: "--genres", placeholder: "GENRE1,GENRE2" },
+    ],
+  },
+  {
+    id: "tracker-refs",
+    title: "Tracker References",
     subtitle:
-      "Generates separate metadata plots only when the release contains Dolby Vision and/or HDR10+ dynamic metadata.",
-    args: [
-      {
-        label: "--dynamic-hdr-plot",
-      },
+      "Pull metadata ids, descriptions, and screenshots from these trackers",
+    entries: [
+      "--onlyID",
+      { flag: "--tracker-id", placeholder: "TRACKER=ID or URL" },
+      ...[
+        ["PTP", "PTP"],
+        ["BLU", "BLU"],
+        ["Aither", "AITHER"],
+        ["LST", "LST"],
+        ["OE", "OE"],
+        ["HDB", "HDB"],
+        ["BTN", "BTN"],
+        ["BHD", "BHD"],
+        ["HUNO", "HUNO"],
+        ["ULCX", "ULCX"],
+      ].map(([name, tracker]) => ({
+        label: `${name} reference`,
+        flag: "--tracker-id",
+        prefix: `${tracker}=`,
+        placeholder: "TORRENT_ID",
+        description: `${name} torrent ID`,
+      })),
+      { flag: "--torrenthash", placeholder: "HASH" },
     ],
   },
   {
-    title: "Misc Options",
-    args: [
+    id: "upload-selection",
+    title: "Trackers / Dupe Check",
+    entries: [
+      { flag: "--trackers", placeholder: "aither,blutopia,lst,etc" },
+      { flag: "--trackers-remove", placeholder: "blutopia,xyz,etc" },
+      { flag: "--trackers-pass", placeholder: "N" },
+      "--skip-dupe-check",
+      "--skip-dupe-asking",
+      "--double-dupe-check",
+      { flag: "--dupe-size-difference-tolerance", placeholder: "PERCENTAGE" },
+      "--search_requests",
+    ],
+  },
+  {
+    id: "upload-flags",
+    title: "Upload Flags / Site Specific",
+    entries: [
+      "--anon",
+      "--personalrelease",
+      "--stream",
+      "--draft",
+      "--modq",
+      { flag: "--freeleech", placeholder: "25%" },
+      { flag: "--freeleech-until", placeholder: "N" },
+      { flag: "--exclusive", placeholder: "1" },
+      "--featured",
+      "--double-upload",
+      { flag: "--double-upload-until", placeholder: "N" },
+      "--sticky",
+      "--refundable",
+      "--foreign",
+      "--opera",
+      "--asian",
+      { flag: "--channel", placeholder: "ID_OR_TAG" },
+    ],
+  },
+  {
+    id: "torrent",
+    title: "Torrent Creation / Hashing",
+    entries: [
+      "--max-piece-size",
+      "--nohash",
+      "--rehash",
+      "--mkbrr",
+      { flag: "--entropy", placeholder: "N" },
+      { flag: "--randomized", placeholder: "N" },
+      { flag: "--infohash", placeholder: "HASH" },
+      "--skip_auto_torrent",
+      "--force-recheck",
+    ],
+  },
+  {
+    id: "client",
+    title: "Torrent Client",
+    entries: [
+      "--no-seed",
+      { flag: "--client", placeholder: "NAME" },
+      { flag: "--qbit-tag", placeholder: "TAG" },
+      { flag: "--qbit-cat", placeholder: "CATEGORY" },
+      "--qbit-bw-control",
+      "--qbit-bw-control-after-usenet",
+      { flag: "--qbit-bw-threshold", placeholder: "KiB/s" },
+      { flag: "--qbit-bw-time", placeholder: "SECONDS" },
+      { flag: "--rtorrent-label", placeholder: "LABEL" },
+    ],
+  },
+  {
+    id: "usenet",
+    title: "Usenet",
+    entries: [
+      "--usenet",
+      { flag: "--usenet-subject", placeholder: "TEXT" },
+      { flag: "--archive-password", placeholder: "PASSWORD or random" },
+      { flag: "--usenet-episodes-only", placeholder: "CURUPIRA,NZBNEST" },
+      "--upload-order",
+    ],
+  },
+  {
+    id: "workflow",
+    title: "Modes / Workflows",
+    entries: [
+      { flag: "--queue", placeholder: "QUEUE_NAME" },
+      { flag: "--limit-queue", placeholder: "N" },
+      "--site-check",
+      { flag: "--site-upload", placeholder: "TRACKER" },
+      "--unit3d",
       {
-        label: "--not-anime",
-      },
-      {
-        label: "--channel",
-        placeholder: "ID_OR_TAG",
-      },
-      { label: "--usenet" },
-      {
-        label: "--usenet-subject",
-        placeholder: "TEXT",
-      },
-      {
-        label: "--archive-password",
-        placeholder: "PASSWORD or random",
-      },
-      {
-        label: "--usenet-episodes-only",
-        placeholder: "CURUPIRA,NZBNEST",
-      },
-      {
-        label: "--unattended",
+        flag: "--unattended",
         description: "Unattended (no prompts (AT ALL))",
       },
       {
-        label: "--unattended_confirm",
+        flag: "--unattended_confirm",
         description:
           "Unattended confirm (use with --unattended, some prompting)",
       },
     ],
   },
+  {
+    id: "debug",
+    title: "Debug / Cleanup",
+    entries: [
+      "--debug",
+      "--ffdebug",
+      "--upload-timer",
+      "--delete-meta",
+      "--delete-tmp",
+      "--cleanup",
+    ],
+  },
 ];
 
+// Every view ends with the options that apply to any upload.
+const COMMON_ARGUMENT_SECTIONS = [
+  "upload-selection",
+  "upload-flags",
+  "torrent",
+  "client",
+  "usenet",
+  "workflow",
+  "debug",
+];
+const VIDEO_ARGUMENT_SECTIONS = [
+  "release",
+  "video-ids",
+  "title",
+  "details",
+  "description",
+  "screens",
+  "disc",
+  "analysis",
+  "tracker-refs",
+];
+const argumentViews = [
+  { id: "all", label: "All", icon: "list" },
+  {
+    id: "movie",
+    label: "Movie",
+    icon: "clapperboard",
+    sections: [...VIDEO_ARGUMENT_SECTIONS, ...COMMON_ARGUMENT_SECTIONS],
+  },
+  {
+    id: "tv",
+    label: "TV",
+    icon: "tv",
+    sections: [
+      "release",
+      "video-ids",
+      "tv",
+      ...VIDEO_ARGUMENT_SECTIONS.slice(2),
+      ...COMMON_ARGUMENT_SECTIONS,
+    ],
+  },
+  {
+    id: "music",
+    label: "Music",
+    icon: "music-2",
+    sections: [
+      "music-release",
+      "music-edition",
+      "music-lookup",
+      "music-orpheus",
+      "description",
+      ...COMMON_ARGUMENT_SECTIONS,
+    ],
+  },
+  {
+    id: "book",
+    label: "Book",
+    icon: "book-open",
+    sections: ["book", "description", ...COMMON_ARGUMENT_SECTIONS],
+  },
+  {
+    id: "game",
+    label: "Game",
+    icon: "gamepad-2",
+    sections: ["game", "description", "screens", ...COMMON_ARGUMENT_SECTIONS],
+  },
+  {
+    id: "other",
+    label: "Other",
+    icon: "shapes",
+    description: "Sports, fan resyncs and adult releases",
+    sections: [
+      ...VIDEO_ARGUMENT_SECTIONS.filter((id) => id !== "analysis"),
+      ...COMMON_ARGUMENT_SECTIONS,
+    ],
+  },
+];
+// --category values pick the matching view automatically.
+const ARGUMENT_VIEW_FOR_CATEGORY = {
+  movie: "movie",
+  tv: "tv",
+  music: "music",
+  book: "book",
+  game: "game",
+  sports: "other",
+  fanres: "other",
+  xxx: "other",
+};
+
+const argumentBuilder = window.UAArgumentBuilder;
 const cliArguments = Array.isArray(window.UA_CLI_ARGUMENTS)
   ? window.UA_CLI_ARGUMENTS
   : [];
-if (cliArguments.length > 0) {
-  const cliByLabel = new Map(cliArguments.map((arg) => [arg.label, arg]));
-  const listedFlags = new Set();
-  argumentCategories = argumentCategories.map((category) => ({
-    ...category,
-    args: category.args
-      .filter(
-        (item) => !item.label.startsWith("--") || cliByLabel.has(item.label),
-      )
-      .map((item) => {
-        const cli = cliByLabel.get(item.label);
-        if (!cli) return item; // WebUI command presets have their own instructions.
-        listedFlags.add(item.label);
-        return {
-          ...item,
-          description: cli.description || item.description,
-          placeholder: item.placeholder || cli.placeholder,
-        };
-      }),
-  }));
-  const remaining = cliArguments.filter(
-    (arg) => !listedFlags.has(arg.label) && arg.description,
+const cliArgumentsByLabel = new Map(
+  cliArguments.map((arg) => [arg.label, arg]),
+);
+const argumentIndex = argumentBuilder.createArgumentIndex(cliArguments);
+
+const toArgumentRow = (entry) => {
+  const spec = typeof entry === "string" ? { flag: entry } : entry;
+  if (spec.insert) {
+    return {
+      id: `insert:${spec.label}`,
+      type: "insert",
+      label: spec.label,
+      insert: spec.insert,
+      description: spec.description || "",
+    };
+  }
+  // Options the running CLI no longer has are left out.
+  const key = argumentBuilder.keyForOption(argumentIndex, spec.flag);
+  if (!key) return null;
+  const item = argumentIndex.items.get(key);
+  const cli = cliArgumentsByLabel.get(spec.flag) || item;
+  return {
+    id: spec.prefix ? `${spec.flag}#${spec.prefix}` : spec.flag,
+    type: spec.prefix ? "value" : item.kind || "value",
+    key,
+    flag: spec.flag,
+    label: spec.label || spec.flag,
+    prefix: spec.prefix || "",
+    placeholder: spec.placeholder || cli.placeholder || "",
+    description: spec.description || cli.description || "",
+    choices: spec.prefix ? [] : item.choices || [],
+    path: spec.path || "",
+  };
+};
+
+const argumentSectionList = argumentSections.map((section) => ({
+  id: section.id,
+  title: section.title,
+  subtitle: section.subtitle,
+  rows: section.entries.map(toArgumentRow).filter(Boolean),
+}));
+{
+  // New CLI options appear here until they are given a section.
+  const groupedKeys = new Set(
+    argumentSectionList.flatMap((section) =>
+      section.rows.map((row) => row.key).filter(Boolean),
+    ),
   );
+  const remaining = [...argumentIndex.items.entries()]
+    .filter(([key, item]) => !groupedKeys.has(key) && item.description)
+    .map(([, item]) => toArgumentRow(item.label));
   if (remaining.length > 0) {
-    argumentCategories.push({ title: "Other CLI options", args: remaining });
+    argumentSectionList.push({
+      id: "other-cli",
+      title: "Other CLI options",
+      rows: remaining,
+    });
   }
 }
+const argumentSectionsById = new Map(
+  argumentSectionList.map((section) => [section.id, section]),
+);
+// Favorites and the "In command" list look rows up by id or option.
+const argumentRowsById = new Map();
+const argumentRowsByKey = new Map();
+argumentSectionList.forEach((section) =>
+  section.rows.forEach((row) => {
+    if (!argumentRowsById.has(row.id)) argumentRowsById.set(row.id, row);
+    if (row.key && !row.prefix && !argumentRowsByKey.has(row.key)) {
+      argumentRowsByKey.set(row.key, row);
+    }
+  }),
+);
+const getArgumentViewSections = (viewId) => {
+  const view = argumentViews.find((item) => item.id === viewId);
+  if (!view?.sections) return argumentSectionList;
+  return view.sections
+    .map((id) => argumentSectionsById.get(id))
+    .filter(Boolean);
+};
 
 // Icon components
 const LucideIcon = window.UALucideIcon;
@@ -1949,6 +1789,144 @@ const renderMetadataProviderIcon = (key, isDarkMode) => {
   }
 };
 
+// Inline browser for argument values that take a server path. It lists the
+// same browse roots as the File Browser, so only permitted paths are offered.
+function ArgumentPathBrowser({ mode, apiBase, isDarkMode, onPick }) {
+  const [nodes, setNodes] = useState([]);
+  const [expanded, setExpanded] = useState(() => new Set());
+  const [loading, setLoading] = useState(() => new Set());
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const response = await apiFetch(`${apiBase}/browse_roots`);
+        const data = await response.json();
+        if (cancelled) return;
+        if (data.success && data.items) setNodes(data.items);
+        else setError("Could not load the browse roots.");
+      } catch (_error) {
+        if (!cancelled) setError("Could not load the browse roots.");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [apiBase]);
+
+  const toggleFolder = async (path) => {
+    if (expanded.has(path)) {
+      setExpanded((prev) => {
+        const next = new Set(prev);
+        next.delete(path);
+        return next;
+      });
+      return;
+    }
+    setExpanded((prev) => new Set(prev).add(path));
+    setLoading((prev) => new Set(prev).add(path));
+    try {
+      const response = await apiFetch(
+        `${apiBase}/browse?path=${encodeURIComponent(path)}&filter=video`,
+      );
+      const data = await response.json();
+      if (data.success && data.items) {
+        const attach = (items) =>
+          items.map((node) =>
+            node.path === path
+              ? { ...node, children: data.items }
+              : node.children
+                ? { ...node, children: attach(node.children) }
+                : node,
+          );
+        setNodes((prev) => attach(prev));
+      } else {
+        setError("Could not open that folder.");
+      }
+    } catch (_error) {
+      setError("Could not open that folder.");
+    } finally {
+      setLoading((prev) => {
+        const next = new Set(prev);
+        next.delete(path);
+        return next;
+      });
+    }
+  };
+
+  const renderNodes = (items, level = 0) =>
+    items
+      .filter((item) => mode === "file" || item.type === "folder")
+      .map((item) => {
+        const isFolder = item.type === "folder";
+        const isOpen = expanded.has(item.path);
+        return (
+          <div key={item.path}>
+            <div
+              className={`flex items-center gap-1 rounded ${isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"}`}
+              style={{ paddingLeft: `${level * 14 + 4}px` }}
+            >
+              <button
+                type="button"
+                onClick={() =>
+                  isFolder ? toggleFolder(item.path) : onPick(item.path)
+                }
+                className="flex min-w-0 flex-1 items-center gap-1.5 py-1 text-left text-xs"
+                aria-label={
+                  isFolder
+                    ? `${isOpen ? "Collapse" : "Expand"} folder ${item.name}`
+                    : `Use file ${item.name}`
+                }
+                aria-expanded={isFolder ? isOpen : undefined}
+              >
+                <span className="flex-none text-yellow-600">
+                  {isFolder ? (
+                    loading.has(item.path) ? (
+                      <SpinnerIcon />
+                    ) : isOpen ? (
+                      <FolderOpenIcon />
+                    ) : (
+                      <FolderIcon />
+                    )
+                  ) : (
+                    <FileIcon />
+                  )}
+                </span>
+                <span className="truncate">{item.name}</span>
+              </button>
+              {isFolder && mode === "folder" && (
+                <button
+                  type="button"
+                  onClick={() => onPick(item.path)}
+                  className="ua-accent-link flex-none px-1.5 text-xs font-medium"
+                  aria-label={`Use folder ${item.name}`}
+                >
+                  Use
+                </button>
+              )}
+            </div>
+            {isFolder && isOpen && item.children && (
+              <div>{renderNodes(item.children, level + 1)}</div>
+            )}
+          </div>
+        );
+      });
+
+  return (
+    <div
+      className={`mt-2 max-h-64 overflow-y-auto rounded-md border p-1 ${isDarkMode ? "border-gray-600 bg-gray-900/40 text-gray-200" : "border-gray-200 bg-gray-50 text-gray-800"}`}
+    >
+      {error && <p className="px-1 py-1 text-xs text-red-500">{error}</p>}
+      {nodes.length === 0 && !error ? (
+        <p className="px-1 py-1 text-xs opacity-70">Loading…</p>
+      ) : (
+        renderNodes(nodes)
+      )}
+    </div>
+  );
+}
+
 function AudionutsUAGUI() {
   const API_BASE = window.location.origin + "/api";
   // Derive an application base path from the API base so links work under subpath deployments
@@ -2092,6 +2070,15 @@ function AudionutsUAGUI() {
   const [collapsedSections, setCollapsedSections] = useState(
     () => new Set(getStoredCollapsedSections()),
   );
+  const [argumentView, setArgumentView] = useState(() => {
+    const stored = storage.get(ARGUMENT_VIEW_KEY);
+    return argumentViews.some((view) => view.id === stored) ? stored : "all";
+  });
+  const [favoriteArguments, setFavoriteArguments] = useState(
+    getStoredFavoriteArguments,
+  );
+  // The row whose inline path browser is open, if any.
+  const [argumentPathRowId, setArgumentPathRowId] = useState("");
   const [executionPreview, setExecutionPreview] = useState(() => {
     if (!screenshotMode) return null;
     return {
@@ -2294,6 +2281,14 @@ function AudionutsUAGUI() {
       JSON.stringify(Array.from(collapsedSections)),
     );
   }, [collapsedSections]);
+
+  useEffect(() => {
+    storage.set(ARGUMENT_VIEW_KEY, argumentView);
+  }, [argumentView]);
+
+  useEffect(() => {
+    storage.set(FAVORITE_ARGUMENTS_KEY, JSON.stringify(favoriteArguments));
+  }, [favoriteArguments]);
 
   useEffect(() => {
     storage.set(
@@ -3057,63 +3052,6 @@ function AudionutsUAGUI() {
     return "";
   };
 
-  // Update argument value in string
-  // Supports both space-separated (--arg "value") and equals-separated (--arg="value") formats
-  const updateArgValue = (args, argName, value) => {
-    // Check if argument exists
-    if (!args.includes(argName)) {
-      return args;
-    }
-
-    // Check which format is being used
-    const hasEqualsFormat = new RegExp(`${argName}=`, "i").test(args);
-    const hasSpaceValue = new RegExp(
-      `${argName}\\s+(?:"[^"]*"|'[^']*'|(?!--)[^\\s]+)`,
-      "i",
-    ).test(args);
-
-    // If value is empty, remove the value but keep the flag
-    if (!value) {
-      if (hasEqualsFormat) {
-        // Remove equals-format value: --arg="value" or --arg='value' or --arg=value
-        return args.replace(
-          new RegExp(`(${argName})=(?:"[^"]*"|'[^']*'|[^\\s]*)`, "i"),
-          "$1",
-        );
-      } else if (hasSpaceValue) {
-        // Remove space-format value
-        return args.replace(
-          new RegExp(`(${argName})\\s+(?:"[^"]*"|'[^']*'|(?!--)[^\\s]+)`, "i"),
-          "$1",
-        );
-      }
-      return args;
-    }
-
-    // Quote the value if it contains spaces
-    const quotedValue = value.includes(" ") ? `"${value}"` : `"${value}"`;
-
-    if (hasEqualsFormat) {
-      // Replace equals-format value: --arg="value" or --arg='value' or --arg=value
-      return args.replace(
-        new RegExp(`(${argName})=(?:"[^"]*"|'[^']*'|[^\\s]*)`, "i"),
-        `$1=${quotedValue}`,
-      );
-    } else if (hasSpaceValue) {
-      // Replace space-format value
-      return args.replace(
-        new RegExp(`(${argName})\\s+(?:"[^"]*"|'[^']*'|(?!--)[^\\s]+)`, "i"),
-        `$1 ${quotedValue}`,
-      );
-    } else {
-      // Add value after the flag (no existing value)
-      return args.replace(
-        new RegExp(`(${argName})(\\s|$)`, "i"),
-        `$1 ${quotedValue}$2`,
-      );
-    }
-  };
-
   const parseTrackersFromArgs = (
     argsString,
     defaultTrackersSet,
@@ -3567,8 +3505,14 @@ function AudionutsUAGUI() {
   }, [customArgs, defaultTrackers, trackerAliases]);
 
   // Get current values from args
-  const descFilePath = extractArgValue(customArgs, "--descfile");
-  const descLinkUrl = extractArgValue(customArgs, "--desclink");
+  const descFilePath = argumentBuilder.getArgumentState(
+    argumentBuilder.parseArguments(customArgs, argumentIndex),
+    argumentBuilder.keyForOption(argumentIndex, "--descfile"),
+  ).value;
+  const descLinkUrl = argumentBuilder.getArgumentState(
+    argumentBuilder.parseArguments(customArgs, argumentIndex),
+    argumentBuilder.keyForOption(argumentIndex, "--desclink"),
+  ).value;
 
   // Validate desclink URL when it changes
   useEffect(() => {
@@ -3868,6 +3812,16 @@ function AudionutsUAGUI() {
     if (isMobile || isExecuting) setIsFileBrowserExpanded(false);
   }, [isMobile, isExecuting]);
 
+  // The Arguments panel opens in the same kind of modal.
+  const [isArgumentsExpanded, setIsArgumentsExpanded] = useState(false);
+  const argumentsModalRef = useModalFocus(
+    () => setIsArgumentsExpanded(false),
+    isArgumentsExpanded,
+  );
+  useEffect(() => {
+    if (isMobile || isExecuting) setIsArgumentsExpanded(false);
+  }, [isMobile, isExecuting]);
+
   const renderReviewExpandButton = (panel) => {
     if (isMobile) return null;
     const isExpanded = expandedReviewPanel === panel;
@@ -4063,12 +4017,26 @@ function AudionutsUAGUI() {
 
   // Update descfile in args
   const updateDescFile = (path) => {
-    setCustomArgs((prev) => updateArgValue(prev, "--descfile", path));
+    setCustomArgs((prev) =>
+      argumentBuilder.setArgumentValue(
+        prev || "",
+        argumentIndex,
+        argumentBuilder.keyForOption(argumentIndex, "--descfile"),
+        path,
+      ),
+    );
   };
 
   // Update desclink in args
   const updateDescLink = (url) => {
-    setCustomArgs((prev) => updateArgValue(prev, "--desclink", url));
+    setCustomArgs((prev) =>
+      argumentBuilder.setArgumentValue(
+        prev || "",
+        argumentIndex,
+        argumentBuilder.keyForOption(argumentIndex, "--desclink"),
+        url,
+      ),
+    );
   };
 
   const appendHtmlFragment = (rawHtml, tabId = activeTabIdRef.current) => {
@@ -6704,8 +6672,6 @@ function AudionutsUAGUI() {
     }
   }, [isResizingRight, resizeRight, stopResizingRight]);
 
-  // argumentCategories moved to module scope
-
   // Append only the plain argument flag to the input (no example values)
   const addArgument = (arg) => {
     setCustomArgs((prev) => (prev && prev.length ? `${prev} ${arg}` : arg));
@@ -6828,57 +6794,593 @@ function AudionutsUAGUI() {
   );
 
   // Toggle section collapse
-  const toggleSectionCollapse = (title) => {
+  const toggleSectionCollapse = (id) => {
     setCollapsedSections((prev) => {
       const newSet = new Set(prev);
-      if (newSet.has(title)) {
-        newSet.delete(title);
+      if (newSet.has(id)) {
+        newSet.delete(id);
       } else {
-        newSet.add(title);
+        newSet.add(id);
       }
       return newSet;
     });
   };
 
-  // Collapse all sections
-  const collapseAllSections = () => {
-    setCollapsedSections(new Set(argumentCategories.map((cat) => cat.title)));
+  // The Arguments panel reads and edits customArgs in place, so the text
+  // field, presets and queue lines stay the single source of the command.
+  const parsedArguments = argumentBuilder.parseArguments(
+    customArgs,
+    argumentIndex,
+  );
+  const argumentIssues = argumentBuilder.findArgumentIssues(
+    customArgs,
+    argumentIndex,
+  );
+  const categoryKey = argumentBuilder.keyForOption(argumentIndex, "--category");
+  const commandCategoryView = categoryKey
+    ? ARGUMENT_VIEW_FOR_CATEGORY[
+        argumentBuilder
+          .getArgumentState(parsedArguments, categoryKey)
+          .value.toLowerCase()
+      ] || ""
+    : "";
+  // A --category in the command picks its view; a manual choice holds
+  // until the category changes.
+  useEffect(() => {
+    if (commandCategoryView) setArgumentView(commandCategoryView);
+  }, [commandCategoryView]);
+
+  const occurrencesOf = (text, key) =>
+    argumentBuilder
+      .parseArguments(text, argumentIndex)
+      .occurrences.filter((occurrence) => occurrence.key === key);
+
+  // nth targets one occurrence in the "In command" list; rows otherwise
+  // edit the first occurrence of their option (and prefix).
+  const setArgumentRowValue = (row, value, nth = null) => {
+    setCustomArgs((prev) => {
+      const text = prev || "";
+      const occurrence =
+        nth === null ? null : occurrencesOf(text, row.key)[nth];
+      if (nth !== null && !occurrence) return text;
+      return argumentBuilder.setArgumentValue(
+        text,
+        argumentIndex,
+        row.key,
+        value,
+        { prefix: row.prefix, occurrence, option: row.flag },
+      );
+    });
   };
 
-  // Expand all sections
-  const expandAllSections = () => {
-    setCollapsedSections(new Set());
+  const setArgumentRowFlag = (row, enabled) => {
+    setCustomArgs((prev) =>
+      argumentBuilder.setArgumentFlag(
+        prev || "",
+        argumentIndex,
+        row.key,
+        enabled,
+        row.flag,
+      ),
+    );
   };
 
-  // Filter argument categories based on search
-  const getFilteredCategories = () => {
-    if (!argSearchFilter.trim()) {
-      return argumentCategories;
-    }
-    const searchLower = argSearchFilter.toLowerCase();
-    return argumentCategories
-      .map((cat) => {
-        const filteredArgs = cat.args.filter(
-          (a) =>
-            a.label.toLowerCase().includes(searchLower) ||
-            (a.description &&
-              a.description.toLowerCase().includes(searchLower)) ||
-            (a.placeholder &&
-              a.placeholder.toLowerCase().includes(searchLower)),
+  const removeArgumentRow = (row, nth = null) => {
+    setCustomArgs((prev) => {
+      const text = prev || "";
+      if (nth === null) {
+        return argumentBuilder.removeArgument(
+          text,
+          argumentIndex,
+          row.key,
+          row.prefix,
         );
-        if (filteredArgs.length > 0) {
-          return { ...cat, args: filteredArgs };
-        }
-        // Also include category if title matches
-        if (cat.title.toLowerCase().includes(searchLower)) {
-          return cat;
-        }
-        return null;
+      }
+      const occurrence = occurrencesOf(text, row.key)[nth];
+      return occurrence
+        ? argumentBuilder.removeOccurrence(text, occurrence)
+        : text;
+    });
+  };
+
+  const toggleFavoriteArgument = (id) => {
+    setFavoriteArguments((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
+    );
+  };
+
+  const renderArgumentRow = (row, nth = null, sectionId = "") => {
+    const rowKey = `${sectionId}:${row.id}:${nth ?? ""}`;
+    const isFavorite = favoriteArguments.includes(row.id);
+    const favoriteButton = (
+      <button
+        type="button"
+        onClick={() => toggleFavoriteArgument(row.id)}
+        className={`flex-none text-base leading-none ${isFavorite ? "ua-accent-text" : isDarkMode ? "text-gray-500 hover:text-gray-300" : "text-gray-400 hover:text-gray-600"}`}
+        title={isFavorite ? "Remove from favorites" : "Add to favorites"}
+        aria-label={`${isFavorite ? "Remove" : "Add"} ${row.label} ${isFavorite ? "from" : "to"} favorites`}
+        aria-pressed={isFavorite}
+      >
+        {isFavorite ? "★" : "☆"}
+      </button>
+    );
+    const description = row.description && (
+      <div
+        className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+      >
+        {row.description}
+      </div>
+    );
+    const cardClass = (active) =>
+      `w-full rounded-lg border p-2 ${active ? "ua-accent-chip" : isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-100"}`;
+    const fieldClass = `min-w-0 flex-1 rounded-md border px-2 py-1 text-sm font-mono ${
+      isDarkMode
+        ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+        : "bg-white border-gray-300 text-gray-900 placeholder-gray-400"
+    }`;
+
+    if (row.type === "insert") {
+      return (
+        <div key={rowKey} className={cardClass(false)}>
+          <div className="flex items-start gap-2">
+            {favoriteButton}
+            <div className="min-w-0 flex-1">
+              <div
+                className={`text-sm font-medium ${isDarkMode ? "text-gray-100" : "text-gray-800"}`}
+              >
+                {row.label}
+              </div>
+              <code
+                className={`block break-all text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+              >
+                {row.insert}
+              </code>
+            </div>
+            <button
+              type="button"
+              onClick={() => addArgument(row.insert)}
+              disabled={isExecuting}
+              className={`ua-accent-hover flex-none rounded-md border px-2 py-1 text-xs font-medium ${isDarkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-200 text-gray-800"}`}
+            >
+              Add
+            </button>
+          </div>
+          {description}
+        </div>
+      );
+    }
+
+    const occurrence =
+      nth === null
+        ? null
+        : parsedArguments.occurrences.filter((item) => item.key === row.key)[
+            nth
+          ];
+    const state = occurrence
+      ? { present: true, value: occurrence.value }
+      : argumentBuilder.getArgumentState(parsedArguments, row.key, row.prefix);
+    const flagLabel = (
+      <span
+        className={`min-w-0 break-all text-sm font-mono ${isDarkMode ? "text-gray-100" : "text-gray-800"}`}
+      >
+        {nth !== null && occurrence ? occurrence.option : row.label}
+      </span>
+    );
+
+    if (row.type === "flag") {
+      return (
+        <div key={rowKey} className={cardClass(state.present)}>
+          <div className="flex items-center gap-2">
+            {favoriteButton}
+            <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2">
+              <input
+                type="checkbox"
+                checked={state.present}
+                onChange={(event) =>
+                  setArgumentRowFlag(row, event.target.checked)
+                }
+                disabled={isExecuting}
+                className="h-4 w-4 flex-none"
+              />
+              {flagLabel}
+            </label>
+          </div>
+          {description}
+        </div>
+      );
+    }
+
+    const removeButton = state.present && (
+      <button
+        type="button"
+        onClick={() => removeArgumentRow(row, nth)}
+        disabled={isExecuting}
+        className={`flex-none rounded p-0.5 ${isDarkMode ? "text-gray-400 hover:bg-gray-700 hover:text-gray-100" : "text-gray-500 hover:bg-gray-100 hover:text-gray-800"}`}
+        title="Remove from the command"
+        aria-label={`Remove ${row.label} from the command`}
+      >
+        <LucideIcon name="x" className="h-4 w-4" />
+      </button>
+    );
+    const choices =
+      state.present && state.value && !row.choices.includes(state.value)
+        ? [...row.choices, state.value]
+        : row.choices;
+    const isPathOpen = argumentPathRowId === rowKey;
+
+    return (
+      <div key={rowKey} className={cardClass(state.present)}>
+        <div className="flex items-center gap-2">
+          {favoriteButton}
+          {flagLabel}
+          <span className="flex-1" />
+          {removeButton}
+        </div>
+        <div className="mt-1.5 flex items-center gap-1.5">
+          {row.type === "choice" ? (
+            <select
+              value={state.value}
+              onChange={(event) =>
+                setArgumentRowValue(row, event.target.value, nth)
+              }
+              disabled={isExecuting}
+              aria-label={`${row.label} value`}
+              className={fieldClass}
+            >
+              <option value="">Not set</option>
+              {choices.map((choice) => (
+                <option key={choice} value={choice}>
+                  {choice}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input
+              type="text"
+              value={state.value}
+              onChange={(event) =>
+                setArgumentRowValue(row, event.target.value, nth)
+              }
+              disabled={isExecuting}
+              placeholder={row.placeholder}
+              aria-label={`${row.label} value`}
+              spellCheck={false}
+              className={fieldClass}
+            />
+          )}
+          {row.path && (
+            <button
+              type="button"
+              onClick={() => setArgumentPathRowId(isPathOpen ? "" : rowKey)}
+              data-ua-arg-browse={rowKey}
+              disabled={isExecuting}
+              className={`flex-none rounded-md border p-1.5 ${isDarkMode ? "border-gray-600 text-gray-300 hover:bg-gray-700" : "border-gray-300 text-gray-600 hover:bg-gray-100"}`}
+              title={row.path === "folder" ? "Browse folders" : "Browse files"}
+              aria-label={`Browse for ${row.label}`}
+              aria-expanded={isPathOpen}
+            >
+              <LucideIcon name="folder-open" className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+        {isPathOpen && (
+          <ArgumentPathBrowser
+            mode={row.path}
+            apiBase={API_BASE}
+            isDarkMode={isDarkMode}
+            onPick={(path) => {
+              setArgumentRowValue(row, path, nth);
+              setArgumentPathRowId("");
+              // The picked entry unmounts; keep focus in the panel (and modal).
+              window.requestAnimationFrame(() =>
+                document
+                  .querySelector(`[data-ua-arg-browse="${CSS.escape(rowKey)}"]`)
+                  ?.focus(),
+              );
+            }}
+          />
+        )}
+        {description}
+      </div>
+    );
+  };
+
+  const renderArgumentSection = (section, rows, { count, note } = {}) => {
+    const isCollapsed = collapsedSections.has(section.id);
+    return (
+      <div
+        key={section.id}
+        className={`rounded-lg border ${isDarkMode ? "border-gray-700" : "border-gray-200"}`}
+      >
+        <button
+          type="button"
+          onClick={() => toggleSectionCollapse(section.id)}
+          aria-expanded={!isCollapsed}
+          className={`w-full flex items-center justify-between p-3 text-left transition-colors rounded-t-lg ${
+            isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-50"
+          } ${isCollapsed ? "rounded-b-lg" : ""}`}
+        >
+          <div className="flex-1">
+            <div
+              className={`text-sm font-bold ${isDarkMode ? "text-gray-100" : "text-gray-900"} flex items-center gap-2`}
+            >
+              <span className={isDarkMode ? "text-gray-400" : "text-gray-500"}>
+                {isCollapsed ? <ChevronRightIcon /> : <ChevronDownIcon />}
+              </span>
+              {section.title}
+              <span
+                className={`text-xs font-normal px-1.5 py-0.5 rounded ${isDarkMode ? "bg-gray-700 text-gray-400" : "bg-gray-200 text-gray-500"}`}
+              >
+                {count ?? rows.length}
+              </span>
+            </div>
+            {section.subtitle && !isCollapsed && (
+              <div
+                className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+              >
+                {section.subtitle}
+              </div>
+            )}
+          </div>
+        </button>
+        {!isCollapsed && (
+          <div
+            className={`px-3 pb-3 pt-2 ${isDarkMode ? "border-t border-gray-700" : "border-t border-gray-200"}`}
+          >
+            {note}
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(250px,1fr))] gap-2">
+              {rows}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Searching looks through every section, listing each option once.
+  const getSearchedArgumentSections = () => {
+    const searchLower = argSearchFilter.trim().toLowerCase();
+    const seen = new Set();
+    return argumentSectionList
+      .map((section) => {
+        const titleMatches = section.title.toLowerCase().includes(searchLower);
+        const rows = section.rows.filter((row) => {
+          if (seen.has(row.id)) return false;
+          const matches =
+            titleMatches ||
+            [row.label, row.flag, row.insert, row.description, row.placeholder]
+              .filter(Boolean)
+              .some((text) => text.toLowerCase().includes(searchLower));
+          if (matches) seen.add(row.id);
+          return matches;
+        });
+        return rows.length ? { ...section, rows } : null;
       })
       .filter(Boolean);
   };
 
-  const filteredCategories = getFilteredCategories();
+  const renderArgumentIssues = () =>
+    argumentIssues.length > 0 && (
+      <ul
+        className="space-y-1 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs"
+        aria-label="Argument warnings"
+      >
+        {argumentIssues.map((issue, index) => (
+          <li
+            key={`${issue.type}-${index}`}
+            className={`flex items-start gap-2 ${isDarkMode ? "text-amber-200" : "text-amber-800"}`}
+          >
+            <LucideIcon
+              name="triangle-alert"
+              className="mt-0.5 h-3.5 w-3.5 flex-none"
+            />
+            <span>{issue.message}</span>
+          </li>
+        ))}
+      </ul>
+    );
+
+  const renderArgumentsPanel = ({ inModal = false } = {}) => {
+    const searching = argSearchFilter.trim() !== "";
+    const sections = searching
+      ? getSearchedArgumentSections()
+      : getArgumentViewSections(argumentView);
+    const favoriteRows = favoriteArguments
+      .map((id) => argumentRowsById.get(id))
+      .filter(Boolean);
+    const commandRows = parsedArguments.occurrences.map((occurrence) => {
+      const nth = parsedArguments.occurrences
+        .filter((item) => item.key === occurrence.key)
+        .indexOf(occurrence);
+      const row =
+        argumentRowsByKey.get(occurrence.key) ||
+        toArgumentRow(argumentIndex.items.get(occurrence.key).label);
+      return renderArgumentRow(row, nth, "command");
+    });
+    const visibleSectionIds = [
+      "command",
+      "favorites",
+      ...sections.map((section) => section.id),
+    ];
+    const toolbarButtonClass = `flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-xs font-medium rounded-md border transition-colors ${
+      isDarkMode
+        ? "bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600"
+        : "bg-gray-100 border-gray-300 text-gray-600 hover:bg-gray-200"
+    }`;
+    const activeView = argumentViews.find((view) => view.id === argumentView);
+
+    return (
+      <div className="flex min-h-0 flex-1 flex-col">
+        {/* In the sidebar, match the h-20 context header so the borders form one line. */}
+        <div
+          className={`ua-upload-panel-header flex flex-shrink-0 items-center justify-between gap-2 border-b ${isMobile ? "p-3" : inModal ? "p-4" : "h-20 px-4"}`}
+        >
+          <h2
+            className={`${isMobile ? "text-base" : "text-lg"} font-bold ${isDarkMode ? "text-white" : "text-gray-800"} flex min-w-0 items-center gap-2 whitespace-nowrap`}
+          >
+            <TerminalIcon />
+            Arguments
+            {parsedArguments.occurrences.length > 0 && (
+              <span
+                className={`rounded px-1.5 text-xs font-normal leading-5 ${isDarkMode ? "bg-gray-700 text-gray-300" : "bg-gray-200 text-gray-600"}`}
+              >
+                {parsedArguments.occurrences.length} in command
+              </span>
+            )}
+          </h2>
+          {!isMobile && (
+            <button
+              type="button"
+              onClick={() => setIsArgumentsExpanded(!inModal)}
+              className={`flex-none rounded p-1 transition-colors ${isDarkMode ? "text-gray-400 hover:bg-gray-700 hover:text-gray-200" : "text-gray-500 hover:bg-gray-200 hover:text-gray-700"}`}
+              title={inModal ? "Return to sidebar" : "Open in a larger view"}
+              aria-label={
+                inModal ? "Return to sidebar" : "Open in a larger view"
+              }
+            >
+              <LucideIcon
+                name={inModal ? "minimize-2" : "maximize-2"}
+                className="w-4 h-4"
+              />
+            </button>
+          )}
+        </div>
+
+        <div
+          className={`flex-shrink-0 space-y-2 border-b p-3 ${isDarkMode ? "border-gray-700" : "border-gray-200"}`}
+        >
+          <div
+            className="flex flex-wrap gap-1.5"
+            role="group"
+            aria-label="Argument categories"
+          >
+            {argumentViews.map((view) => {
+              const selected = view.id === argumentView && !searching;
+              return (
+                <button
+                  key={view.id}
+                  type="button"
+                  onClick={() => {
+                    setArgumentView(view.id);
+                    setArgSearchFilter("");
+                  }}
+                  aria-pressed={selected}
+                  title={view.description || view.label}
+                  className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
+                    selected
+                      ? "ua-accent-chip"
+                      : isDarkMode
+                        ? "border-gray-600 text-gray-300 hover:bg-gray-700"
+                        : "border-gray-300 text-gray-600 hover:bg-gray-100"
+                  }`}
+                >
+                  <LucideIcon name={view.icon} className="h-3.5 w-3.5" />
+                  {view.label}
+                </button>
+              );
+            })}
+          </div>
+          {commandCategoryView && commandCategoryView === argumentView && (
+            <p
+              className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+            >
+              Showing {activeView?.label} options from --category.
+            </p>
+          )}
+          <div className="relative">
+            <div
+              className={`absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+            >
+              <SearchIcon />
+            </div>
+            <input
+              type="text"
+              aria-label="Search arguments"
+              value={argSearchFilter}
+              onChange={(e) => setArgSearchFilter(e.target.value)}
+              placeholder="Search all arguments..."
+              className={`w-full pl-10 pr-3 py-2 text-sm border rounded-lg ${
+                isDarkMode
+                  ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                  : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"
+              }`}
+            />
+            {argSearchFilter && (
+              <button
+                type="button"
+                aria-label="Clear argument search"
+                onClick={() => setArgSearchFilter("")}
+                className={`absolute inset-y-0 right-0 pr-3 flex items-center ${isDarkMode ? "text-gray-400 hover:text-gray-200" : "text-gray-500 hover:text-gray-700"}`}
+              >
+                <LucideIcon name="x" className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setCollapsedSections(new Set(visibleSectionIds))}
+              className={toolbarButtonClass}
+            >
+              <CollapseAllIcon />
+              Collapse All
+            </button>
+            <button
+              type="button"
+              onClick={() => setCollapsedSections(new Set())}
+              className={toolbarButtonClass}
+            >
+              <ExpandAllIcon />
+              Expand All
+            </button>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-3 space-y-2">
+          {!searching &&
+            commandRows.length > 0 &&
+            renderArgumentSection(
+              { id: "command", title: "In command" },
+              commandRows,
+            )}
+          {!searching &&
+            renderArgumentSection(
+              { id: "favorites", title: "★ Favorites" },
+              favoriteRows.map((row) =>
+                renderArgumentRow(row, null, "favorites"),
+              ),
+              {
+                note: favoriteRows.length === 0 && (
+                  <p
+                    className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                  >
+                    Choose ☆ on any argument to keep it here.
+                  </p>
+                ),
+              },
+            )}
+          {sections.length === 0 ? (
+            <div
+              className={`text-center py-8 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+            >
+              <p className="text-sm">
+                No arguments found matching &quot;{argSearchFilter}&quot;
+              </p>
+            </div>
+          ) : (
+            sections.map((section) =>
+              renderArgumentSection(
+                section,
+                section.rows.map((row) =>
+                  renderArgumentRow(row, null, section.id),
+                ),
+              ),
+            )
+          )}
+        </div>
+      </div>
+    );
+  };
 
   const saveExecutionDescription = async (content = descriptionDraft) => {
     if (!sessionId || descriptionAction) return;
@@ -10080,6 +10582,7 @@ function AudionutsUAGUI() {
                   }`}
                   disabled={isExecuting}
                 />
+                {renderArgumentIssues()}
                 {renderArgumentPresetControls(true)}
 
                 {/* Desc Link Input */}
@@ -10279,176 +10782,7 @@ function AudionutsUAGUI() {
               renderExecutionPreviewPanel(true)
             ) : (
               <div className="flex flex-col h-full">
-                <div className="ua-upload-panel-header p-3 border-b flex-shrink-0">
-                  <h2
-                    className={`text-base font-bold ${isDarkMode ? "text-white" : "text-gray-800"} flex items-center gap-2`}
-                  >
-                    <TerminalIcon />
-                    Arguments
-                  </h2>
-                </div>
-
-                {/* Search and Collapse Controls */}
-                <div
-                  className={`p-3 border-b flex-shrink-0 ${isDarkMode ? "border-gray-700" : "border-gray-200"} space-y-2`}
-                >
-                  <div className="relative">
-                    <div
-                      className={`absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
-                    >
-                      <SearchIcon />
-                    </div>
-                    <input
-                      type="text"
-                      aria-label="Search arguments"
-                      value={argSearchFilter}
-                      onChange={(e) => setArgSearchFilter(e.target.value)}
-                      placeholder="Search arguments..."
-                      className={`w-full pl-10 pr-3 py-2 text-sm border rounded-lg ${
-                        isDarkMode
-                          ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
-                          : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"
-                      }`}
-                    />
-                    {argSearchFilter && (
-                      <button
-                        type="button"
-                        aria-label="Clear argument search"
-                        onClick={() => setArgSearchFilter("")}
-                        className={`absolute inset-y-0 right-0 pr-3 flex items-center ${isDarkMode ? "text-gray-400 hover:text-gray-200" : "text-gray-500 hover:text-gray-700"}`}
-                      >
-                        <LucideIcon name="x" className="h-4 w-4" />
-                      </button>
-                    )}
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={collapseAllSections}
-                      className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-xs font-medium rounded-md border transition-colors ${
-                        isDarkMode
-                          ? "bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600"
-                          : "bg-gray-100 border-gray-300 text-gray-600 hover:bg-gray-200"
-                      }`}
-                    >
-                      <CollapseAllIcon />
-                      Collapse All
-                    </button>
-                    <button
-                      onClick={expandAllSections}
-                      className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-xs font-medium rounded-md border transition-colors ${
-                        isDarkMode
-                          ? "bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600"
-                          : "bg-gray-100 border-gray-300 text-gray-600 hover:bg-gray-200"
-                      }`}
-                    >
-                      <ExpandAllIcon />
-                      Expand All
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex-1 overflow-y-auto p-3 space-y-2">
-                  {filteredCategories.length === 0 ? (
-                    <div
-                      className={`text-center py-8 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
-                    >
-                      <p className="text-sm">
-                        No arguments found matching &quot;{argSearchFilter}
-                        &quot;
-                      </p>
-                    </div>
-                  ) : (
-                    filteredCategories.map((cat) => (
-                      <div
-                        key={cat.title}
-                        className={`rounded-lg border ${isDarkMode ? "border-gray-700" : "border-gray-200"}`}
-                      >
-                        <button
-                          onClick={() => toggleSectionCollapse(cat.title)}
-                          className={`w-full flex items-center justify-between p-3 text-left transition-colors rounded-t-lg ${
-                            isDarkMode
-                              ? "hover:bg-gray-700"
-                              : "hover:bg-gray-50"
-                          } ${collapsedSections.has(cat.title) ? "rounded-b-lg" : ""}`}
-                        >
-                          <div className="flex-1">
-                            <div
-                              className={`text-sm font-bold ${isDarkMode ? "text-gray-100" : "text-gray-900"} flex items-center gap-2`}
-                            >
-                              <span
-                                className={
-                                  isDarkMode ? "text-gray-400" : "text-gray-500"
-                                }
-                              >
-                                {collapsedSections.has(cat.title) ? (
-                                  <ChevronRightIcon />
-                                ) : (
-                                  <ChevronDownIcon />
-                                )}
-                              </span>
-                              {cat.title}
-                              <span
-                                className={`text-xs font-normal px-1.5 py-0.5 rounded ${isDarkMode ? "bg-gray-700 text-gray-400" : "bg-gray-200 text-gray-500"}`}
-                              >
-                                {cat.args.length}
-                              </span>
-                            </div>
-                            {cat.subtitle &&
-                              !collapsedSections.has(cat.title) && (
-                                <div
-                                  className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
-                                >
-                                  {cat.subtitle}
-                                </div>
-                              )}
-                          </div>
-                        </button>
-                        {!collapsedSections.has(cat.title) && (
-                          <div
-                            className={`px-3 pb-3 pt-2 ${isDarkMode ? "border-t border-gray-700" : "border-t border-gray-200"}`}
-                          >
-                            <div className="grid grid-cols-1 gap-2">
-                              {cat.args.map((a) => (
-                                <div
-                                  key={a.label}
-                                  className={`w-full p-2 rounded-lg border ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-100"}`}
-                                >
-                                  <div className="flex items-start justify-between gap-3">
-                                    <button
-                                      onClick={() =>
-                                        addArgument(a.insert || a.label)
-                                      }
-                                      disabled={isExecuting}
-                                      className={`ua-accent-hover px-3 py-1.5 text-sm font-mono rounded-md border ${isDarkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-200 text-gray-800"} transition-colors`}
-                                    >
-                                      {a.label}
-                                    </button>
-                                    <div className="flex-1 text-right">
-                                      {a.placeholder && (
-                                        <div
-                                          className={`text-xs ${isDarkMode ? "text-gray-300" : "text-gray-500"} font-mono`}
-                                        >
-                                          {a.placeholder}
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                  {a.description && (
-                                    <div
-                                      className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
-                                    >
-                                      {a.description}
-                                    </div>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ))
-                  )}
-                </div>
+                {renderArgumentsPanel()}
               </div>
             ))}
 
@@ -10889,6 +11223,7 @@ function AudionutsUAGUI() {
                         }`}
                         disabled={isExecuting}
                       />
+                      {renderArgumentIssues()}
                       {renderArgumentPresetControls()}
                     </div>
 
@@ -11168,184 +11503,76 @@ function AudionutsUAGUI() {
           ) : (
             renderExecutionPreviewPanel()
           )
-        ) : (
-          <>
-            <div className="ua-upload-panel-header p-4 border-b">
-              <h2
-                className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-gray-800"} flex items-center gap-2`}
-              >
-                <TerminalIcon />
-                Arguments
-              </h2>
-            </div>
-
-            {/* Search and Collapse Controls */}
-            <div
-              className={`p-3 border-b ${isDarkMode ? "border-gray-700" : "border-gray-200"} space-y-2`}
+        ) : isArgumentsExpanded ? (
+          <div
+            className={`flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center text-sm ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+          >
+            <LucideIcon name="maximize-2" className="h-5 w-5" />
+            <p>The arguments are open in a larger view.</p>
+            <button
+              type="button"
+              onClick={() => setIsArgumentsExpanded(false)}
+              className={`rounded-md px-3 py-1.5 text-sm font-medium ${isDarkMode ? "bg-gray-700 text-gray-100 hover:bg-gray-600" : "bg-gray-100 text-gray-800 hover:bg-gray-200"}`}
             >
-              {/* Search Input */}
-              <div className="relative">
-                <div
-                  className={`absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
-                >
-                  <SearchIcon />
-                </div>
-                <input
-                  type="text"
-                  aria-label="Search arguments"
-                  value={argSearchFilter}
-                  onChange={(e) => setArgSearchFilter(e.target.value)}
-                  placeholder="Search arguments..."
-                  className={`w-full pl-10 pr-3 py-2 text-sm border rounded-lg ${
-                    isDarkMode
-                      ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
-                      : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"
-                  }`}
-                />
-                {argSearchFilter && (
-                  <button
-                    type="button"
-                    aria-label="Clear argument search"
-                    onClick={() => setArgSearchFilter("")}
-                    className={`absolute inset-y-0 right-0 pr-3 flex items-center ${isDarkMode ? "text-gray-400 hover:text-gray-200" : "text-gray-500 hover:text-gray-700"}`}
-                  >
-                    <LucideIcon name="x" className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
-
-              {/* Collapse/Expand All Buttons */}
-              <div className="flex gap-2">
-                <button
-                  onClick={collapseAllSections}
-                  className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-xs font-medium rounded-md border transition-colors ${
-                    isDarkMode
-                      ? "bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600"
-                      : "bg-gray-100 border-gray-300 text-gray-600 hover:bg-gray-200"
-                  }`}
-                >
-                  <CollapseAllIcon />
-                  Collapse All
-                </button>
-                <button
-                  onClick={expandAllSections}
-                  className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-xs font-medium rounded-md border transition-colors ${
-                    isDarkMode
-                      ? "bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600"
-                      : "bg-gray-100 border-gray-300 text-gray-600 hover:bg-gray-200"
-                  }`}
-                >
-                  <ExpandAllIcon />
-                  Expand All
-                </button>
-              </div>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-3 space-y-2">
-              {filteredCategories.length === 0 ? (
-                <div
-                  className={`text-center py-8 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
-                >
-                  <p className="text-sm">
-                    No arguments found matching &quot;{argSearchFilter}
-                    &quot;
-                  </p>
-                </div>
-              ) : (
-                filteredCategories.map((cat) => (
-                  <div
-                    key={cat.title}
-                    className={`rounded-lg border ${isDarkMode ? "border-gray-700" : "border-gray-200"}`}
-                  >
-                    {/* Collapsible Section Header */}
-                    <button
-                      onClick={() => toggleSectionCollapse(cat.title)}
-                      className={`w-full flex items-center justify-between p-3 text-left transition-colors rounded-t-lg ${
-                        isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-50"
-                      } ${collapsedSections.has(cat.title) ? "rounded-b-lg" : ""}`}
-                    >
-                      <div className="flex-1">
-                        <div
-                          className={`text-sm font-bold ${isDarkMode ? "text-gray-100" : "text-gray-900"} flex items-center gap-2`}
-                        >
-                          <span
-                            className={
-                              isDarkMode ? "text-gray-400" : "text-gray-500"
-                            }
-                          >
-                            {collapsedSections.has(cat.title) ? (
-                              <ChevronRightIcon />
-                            ) : (
-                              <ChevronDownIcon />
-                            )}
-                          </span>
-                          {cat.title}
-                          <span
-                            className={`text-xs font-normal px-1.5 py-0.5 rounded ${isDarkMode ? "bg-gray-700 text-gray-400" : "bg-gray-200 text-gray-500"}`}
-                          >
-                            {cat.args.length}
-                          </span>
-                        </div>
-                        {cat.subtitle && !collapsedSections.has(cat.title) && (
-                          <div
-                            className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
-                          >
-                            {cat.subtitle}
-                          </div>
-                        )}
-                      </div>
-                    </button>
-
-                    {/* Collapsible Section Content */}
-                    {!collapsedSections.has(cat.title) && (
-                      <div
-                        className={`px-3 pb-3 pt-2 ${isDarkMode ? "border-t border-gray-700" : "border-t border-gray-200"}`}
-                      >
-                        <div className="grid grid-cols-[repeat(auto-fit,minmax(250px,1fr))] gap-2">
-                          {cat.args.map((a) => (
-                            <div
-                              key={a.label}
-                              className={`w-full p-2 rounded-lg border ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-100"}`}
-                            >
-                              <div className="flex items-start justify-between gap-3">
-                                <button
-                                  onClick={() =>
-                                    addArgument(a.insert || a.label)
-                                  }
-                                  disabled={isExecuting}
-                                  className={`ua-accent-hover px-3 py-1 text-sm font-mono rounded-md border ${isDarkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-200 text-gray-800"} transition-colors`}
-                                >
-                                  {a.label}
-                                </button>
-                                <div className="flex-1 text-right">
-                                  {a.placeholder && (
-                                    <div
-                                      className={`text-xs ${isDarkMode ? "text-gray-300" : "text-gray-500"} font-mono`}
-                                    >
-                                      {a.placeholder}
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                              {a.description && (
-                                <div
-                                  className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
-                                >
-                                  {a.description}
-                                </div>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))
-              )}
-            </div>
-          </>
+              Return to sidebar
+            </button>
+          </div>
+        ) : (
+          renderArgumentsPanel()
         )}
       </div>
+      {!isExecuting && !isMobile && isArgumentsExpanded && (
+        <div
+          className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4 sm:p-6"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setIsArgumentsExpanded(false);
+            }
+          }}
+        >
+          <section
+            ref={argumentsModalRef}
+            className={`ua-upload-panel flex h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-xl border shadow-2xl ${isDarkMode ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-white"}`}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Arguments"
+            tabIndex="-1"
+          >
+            {renderArgumentsPanel({ inModal: true })}
+            <footer
+              className={`flex-none space-y-2 border-t px-4 py-3 ${isDarkMode ? "border-gray-700" : "border-gray-200"}`}
+            >
+              <label
+                className={`block text-sm font-semibold ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}
+              >
+                Additional Arguments:
+                <input
+                  type="text"
+                  value={customArgs}
+                  onChange={(e) => setCustomArgs(e.target.value)}
+                  spellCheck={false}
+                  className={`mt-1 w-full rounded-lg border px-3 py-2 font-mono text-sm font-normal ${
+                    isDarkMode
+                      ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                      : "bg-white border-gray-300 text-gray-900"
+                  }`}
+                />
+              </label>
+              {renderArgumentIssues()}
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setIsArgumentsExpanded(false)}
+                  className="rounded-md bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-500"
+                >
+                  Done
+                </button>
+              </div>
+            </footer>
+          </section>
+        </div>
+      )}
       {!isExecuting && !isMobile && isFileBrowserExpanded && (
         <div
           className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4 sm:p-6"
