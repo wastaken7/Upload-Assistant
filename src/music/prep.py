@@ -12,6 +12,7 @@ import aiofiles
 import cli_ui
 import mutagen
 
+from src import webui_events
 from src.cogs.redaction import PathAwareEncoder
 from src.console import logger
 from src.meta import Meta
@@ -252,12 +253,15 @@ async def _find_discogs_release(meta: Meta, release: Any, token: str) -> str:
         logger.info("[yellow]MUSIC: multiple exact Discogs release matches in unattended mode; skipping Discogs.[/yellow]")
         return ""
     logger.info("[bold yellow]Multiple exact Discogs releases found; select one or 0 to skip:[/bold yellow]")
+    labels: list[str] = []
     for index, candidate in enumerate(matches, 1):
         details = " / ".join(str(candidate.get(key, "")).strip() for key in ("year", "country", "catno") if str(candidate.get(key, "")).strip())
         logger.info(f"[cyan]{index}.[/cyan] {candidate.get('title', '')} {f'({details})' if details else ''} [dim]ID: {candidate.get('id', '')}[/dim]")
+        labels.append(f"{candidate.get('title', '')} {f'({details})' if details else ''} · ID {candidate.get('id', '')}")
     while True:
         try:
-            choice = (cli_ui.ask_string(f"Discogs release (1-{len(matches)}, 0 to skip): ") or "").strip()
+            with webui_events.numbered_options(labels, actions=[("0", "Skip")]):
+                choice = (cli_ui.ask_string(f"Discogs release (1-{len(matches)}, 0 to skip): ") or "").strip()
         except EOFError, KeyboardInterrupt:
             logger.info("[yellow]MUSIC: Discogs selection cancelled; skipping Discogs.[/yellow]")
             return ""

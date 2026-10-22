@@ -37,10 +37,12 @@ STAGE_KEYS = ("prep", "confirm", "dupes", "screens", "torrent", "upload", "reque
 STAGE_STATUSES = frozenset({"start", "done", "skip", "fail"})
 NOTICE_LEVELS = frozenset({"error", "warning", "attention"})
 TRACKER_STATUSES = frozenset({"pending", "success", "failed", "skipped", "dupe", "banned"})
-# Keep events small: the session log replays them and the browser renders text.
+# Bound events: the session log replays them and the browser renders text.
+# Lists are large enough that the GUI shows every dupe or option the terminal
+# does; an event over the byte limit is dropped whole, so it stays generous.
 MAX_TEXT_LENGTH = 1000
-MAX_LIST_ITEMS = 50
-MAX_EVENT_BYTES = 16384
+MAX_LIST_ITEMS = 500
+MAX_EVENT_BYTES = 262144
 
 type StageStatus = Literal["start", "done", "skip", "fail"]
 type NoticeLevel = Literal["error", "warning", "attention"]
@@ -198,6 +200,19 @@ def prompt_context(**context: Any) -> Generator[None]:
         _prompt_context.reset(token)
 
 
+@contextlib.contextmanager
+def numbered_options(options: Iterable[Any], *, actions: Iterable[tuple[str, str]] = ()) -> Generator[None]:
+    """Show the numbered list printed before a free-text prompt as answer buttons.
+
+    The terminal prints the list and asks for its number; the GUI only gets
+    the question, so the list is attached here. Option N is answered with
+    "N"; ``actions`` are other accepted answers as ``(answer, label)``, for
+    example ``("0", "Skip")``.
+    """
+    with prompt_context(kind="options", options=list(options), actions=list(actions)):
+        yield
+
+
 def _context_payload() -> dict[str, Any] | None:
     context = _prompt_context.get()
     if not context:
@@ -207,6 +222,10 @@ def _context_payload() -> dict[str, Any] | None:
         if isinstance(value, Mapping):
             entries = list(cast(Mapping[Any, Any], value).items())[:MAX_LIST_ITEMS]
             payload[name] = {plain_text(k, 64): plain_text(v, 300) for k, v in entries}
+        elif isinstance(value, list):
+            # Lists keep their order; (answer, label) pairs become two-item lists.
+            items = cast(list[Any], value)[:MAX_LIST_ITEMS]
+            payload[name] = [[plain_text(part, 300) for part in item] if isinstance(item, tuple) else plain_text(item, 300) for item in items]
         elif isinstance(value, bool):
             payload[name] = value
         elif value is not None:

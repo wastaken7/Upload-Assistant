@@ -3,6 +3,7 @@ from typing import Any, cast
 
 import cli_ui
 
+from src import webui_events
 from src.console import logger
 from src.languages import languages_manager
 from src.meta import Meta
@@ -48,7 +49,8 @@ class Torrenteros(UNIT3D):
             logger.info(f"{self.tracker}: 1 = Castellano")
             logger.info(f"{self.tracker}: 2 = Latino")
             logger.info(f"{self.tracker}: 3 = Castellano Latino")
-            return str(cli_ui.ask_string("Enter choice (1-3): "))
+            with webui_events.numbered_options(["Castellano", "Latino", "Castellano Latino"]):
+                return str(cli_ui.ask_string("Enter choice (1-3): "))
 
         def get_spanish_type(lang_code: str) -> str | None:
             if not lang_code:

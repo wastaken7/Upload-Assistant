@@ -8314,10 +8314,10 @@ function AudionutsUAGUI() {
     </p>
   );
 
-  /** Releases on a site, coloured like the terminal: red means nearly your size. */
-  const renderRunGuiReleaseList = (entries, limit = 6) => (
+  /** Every release on a site, coloured like the terminal: red means nearly your size. */
+  const renderRunGuiReleaseList = (entries) => (
     <ul className="mt-1 space-y-1">
-      {entries.slice(0, limit).map((entry, index) => (
+      {entries.map((entry, index) => (
         <li
           key={`${entry.link || entry.name}-${index}`}
           className="flex min-w-0 items-center gap-2 text-sm"
@@ -8348,11 +8348,6 @@ function AudionutsUAGUI() {
           ) : null}
         </li>
       ))}
-      {entries.length > limit && (
-        <li className="ua-run-gui-muted text-xs">
-          …and {entries.length - limit} more in the terminal
-        </li>
-      )}
     </ul>
   );
 
@@ -8386,7 +8381,7 @@ function AudionutsUAGUI() {
       {slot.conflicts.length > 0 && (
         <div>
           {renderRunGuiSectionLabel("Already on the site")}
-          {renderRunGuiReleaseList(slot.conflicts, 5)}
+          {renderRunGuiReleaseList(slot.conflicts)}
         </div>
       )}
       {slot.notes.map((note, index) => (
@@ -8464,6 +8459,43 @@ function AudionutsUAGUI() {
       if (line) return line.split("\n").pop().trim();
     }
     return "";
+  };
+
+  /**
+   * The last lines printed before the current question. A free-text prompt
+   * often refers to a list printed just before it, which the GUI would
+   * otherwise not show.
+   */
+  const getRecentTerminalLines = (question, limit = 15) => {
+    const output = getTabRuntime(activeTabIdRef.current)?.output;
+    const nodes = output ? Array.from(output.childNodes || []) : [];
+    const lines = [];
+    for (
+      let index = nodes.length - 1;
+      index >= 0 && lines.length < limit;
+      index -= 1
+    ) {
+      const nodeLines = String(nodes[index].textContent || "").split("\n");
+      for (
+        let line = nodeLines.length - 1;
+        line >= 0 && lines.length < limit;
+        line -= 1
+      ) {
+        const text = nodeLines[line].trimEnd();
+        if (text.trim()) lines.unshift(text);
+      }
+    }
+    // Drop the question itself and the input marker, which the card shows.
+    const asked = String(question || "").trim();
+    while (lines.length) {
+      const last = lines[lines.length - 1].trim();
+      if (last === ">" || last.startsWith("> ") || (asked && last === asked)) {
+        lines.pop();
+      } else {
+        break;
+      }
+    }
+    return lines;
   };
 
   const splitTrackers = (value) =>
@@ -8595,6 +8627,17 @@ function AudionutsUAGUI() {
               notice.group === "confirm" && notice.item === prompt.item,
           )
         : [];
+    // A numbered list printed before a free-text question, sent as options.
+    const options =
+      context.kind === "options" && Array.isArray(context.options)
+        ? context.options
+        : [];
+    const actions =
+      context.kind === "options" && Array.isArray(context.actions)
+        ? context.actions.filter(
+            (action) => Array.isArray(action) && action.length === 2,
+          )
+        : [];
     let details = null;
     if (context.kind === "confirm") {
       details = renderRunGuiConfirmContext(context, missing);
@@ -8609,6 +8652,57 @@ function AudionutsUAGUI() {
       );
     }
     const answer = (value) => sendInput(sessionId, value);
+    if (!details && (options.length || actions.length)) {
+      details = (
+        <div className="grid gap-1.5">
+          {options.map((option, index) => (
+            <button
+              key={`${index}-${option}`}
+              type="button"
+              onClick={() => answer(String(index + 1))}
+              disabled={disabled}
+              className="ua-run-gui-choice flex min-w-0 items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm disabled:opacity-50"
+            >
+              <span className="ua-run-gui-count shrink-0 rounded px-1.5 text-xs font-semibold">
+                {index + 1}
+              </span>
+              <span className="min-w-0 break-words">{option}</span>
+            </button>
+          ))}
+          {actions.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {actions.map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => answer(value)}
+                  disabled={disabled}
+                  className="ua-run-gui-choice rounded-lg border px-3 py-1.5 text-sm disabled:opacity-50"
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    } else if (!details && type === "text") {
+      // Unknown free-text questions show the output before them, so a list
+      // they refer to is never hidden.
+      const recent = getRecentTerminalLines(question);
+      if (recent.length) {
+        details = (
+          <details open className="ua-run-gui-details">
+            <summary className="ua-run-gui-muted cursor-pointer text-xs font-semibold">
+              Output before this question
+            </summary>
+            <pre className="ua-run-gui-recent mt-2 max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-md p-2 font-mono text-xs">
+              {recent.join("\n")}
+            </pre>
+          </details>
+        );
+      }
+    }
 
     return (
       <section
@@ -8729,7 +8823,9 @@ function AudionutsUAGUI() {
                   placeholder={
                     prompt?.default && typeof prompt.default === "string"
                       ? `Leave empty for "${prompt.default}"`
-                      : "Type your answer"
+                      : options.length || actions.length
+                        ? "Or type your answer"
+                        : "Type your answer"
                   }
                   aria-label="Answer"
                   className="ua-run-gui-input min-w-0 flex-1 rounded-lg border px-3 py-2 text-sm"

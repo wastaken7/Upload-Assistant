@@ -14,6 +14,7 @@ from bs4 import BeautifulSoup
 from bs4.element import AttributeValueList
 from rich.console import Console
 
+from src import webui_events
 from src.console import logger
 from src.meta import Meta
 
@@ -516,7 +517,9 @@ async def get_bluray_releases(meta: Meta) -> list[Release]:
 
             while True:
                 try:
-                    selection_raw = cli_ui.ask_string(f"Selection (1-{len(matching_releases)}/a/n): ")
+                    labels = [f"{release['title']} · {release['country']} · {release['publisher']} · {release['price']}" for release in matching_releases]
+                    with webui_events.numbered_options(labels, actions=[("a", "Use all releases"), ("n", "Skip Blu-ray.com")]):
+                        selection_raw = cli_ui.ask_string(f"Selection (1-{len(matching_releases)}/a/n): ")
                     selection = (selection_raw or "").strip().lower()
                     if selection == "a":
                         cli_ui.info("All releases selected")
@@ -1567,9 +1570,13 @@ async def process_all_releases(releases: Sequence[Release], meta: Meta) -> list[
                         score = next(score for score, r in scored_releases if r == release)
                         logger.info(f"{idx}. [blue]{release['title']} ({release['country']})[/blue] - Score: {score:.1f}/100")
 
+                    close_labels = [
+                        f"{release['title']} ({release['country']}) · score {next(score for score, r in scored_releases if r == release):.1f}/100" for release in close_matches
+                    ]
                     while True:
                         logger.info("Enter the number of the release to use, 'p' to print logs for a release, or 'n' to skip:")
-                        user_input_raw = cli_ui.ask_string("Selection: ")
+                        with webui_events.numbered_options(close_labels, actions=[("p", "Print logs for a release"), ("n", "Skip")]):
+                            user_input_raw = cli_ui.ask_string("Selection: ")
                         user_input = (user_input_raw or "").strip().lower()
                         if user_input == "n":
                             cli_ui.warning("No release selected.")
@@ -1577,7 +1584,8 @@ async def process_all_releases(releases: Sequence[Release], meta: Meta) -> list[
                             break
                         if user_input == "p":
                             try:
-                                release_idx_raw = cli_ui.ask_string(f"Enter the release number (1-{len(close_matches)}) to print logs: ")
+                                with webui_events.numbered_options(close_labels):
+                                    release_idx_raw = cli_ui.ask_string(f"Enter the release number (1-{len(close_matches)}) to print logs: ")
                                 release_idx = int((release_idx_raw or "").strip())
                                 if 1 <= release_idx <= len(close_matches):
                                     selected_release = close_matches[release_idx - 1]

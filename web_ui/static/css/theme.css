@@ -4182,3 +4182,9 @@ html[data-ua-shape="square"]
 .ua-run-gui-tone-text {
   color: color-mix(in srgb, var(--ua-run-gui-tone) 75%, var(--ua-upload-text));
 }
+
+.ua-run-gui-recent {
+  background: var(--ua-upload-surface-raised);
+  border: 1px solid var(--ua-upload-border);
+  color: var(--ua-upload-text);
+}

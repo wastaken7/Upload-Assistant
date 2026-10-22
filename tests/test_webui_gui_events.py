@@ -371,3 +371,25 @@ def test_trackers_that_passed_the_dupe_check_say_so(gui_env, capsys) -> None:
     assert fake["status"] == "pending"
     assert fake["message"] == "No potential dupes found"
     assert "message" not in other
+
+
+def test_numbered_options_reach_the_prompt_in_order(gui_env, capsys) -> None:
+    with webui_events.numbered_options(["Fictional Album (2020)", "Fictional Album (2021)"], actions=[("0", "Skip")]):
+        webui_events.prompt_open("text", "Release (1-2, 0 to skip):")
+
+    (opened,) = _events(capsys.readouterr().out)
+
+    assert opened["context"] == {
+        "kind": "options",
+        "options": ["Fictional Album (2020)", "Fictional Album (2021)"],
+        "actions": [["0", "Skip"]],
+    }
+
+
+def test_long_dupe_lists_are_sent_whole(gui_env, capsys) -> None:
+    entries = [{"name": f"Fictional.Album.{index}.FLAC-GROUP" * 4, "link": f"https://tracker.invalid/t/{index}", "size": "1 GiB"} for index in range(120)]
+
+    webui_events.dupes("FAKE", entries, source_size=2**30)
+
+    (event,) = _events(capsys.readouterr().out)
+    assert len(event["entries"]) == 120
