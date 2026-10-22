@@ -1130,6 +1130,7 @@ const toArgumentRow = (entry) => {
     placeholder: spec.placeholder || cli.placeholder || "",
     description: spec.description || cli.description || "",
     choices: spec.prefix ? [] : item.choices || [],
+    caseInsensitive: !spec.prefix && Boolean(item.case_insensitive),
     path: spec.path || "",
   };
 };
@@ -7002,9 +7003,16 @@ function AudionutsUAGUI() {
         <LucideIcon name="x" className="h-4 w-4" />
       </button>
     );
+    // "PC" selects "pc" when the parser lower-cases the value; other
+    // unknown values stay listed so the select shows what is typed.
+    const selectedChoice =
+      argumentBuilder.matchChoice(
+        { choices: row.choices, case_insensitive: row.caseInsensitive },
+        state.value,
+      ) || state.value;
     const choices =
-      state.present && state.value && !row.choices.includes(state.value)
-        ? [...row.choices, state.value]
+      state.present && selectedChoice && !row.choices.includes(selectedChoice)
+        ? [...row.choices, selectedChoice]
         : row.choices;
     const isPathOpen = argumentPathRowId === rowKey;
 
@@ -7019,7 +7027,7 @@ function AudionutsUAGUI() {
         <div className="mt-1.5 flex items-center gap-1.5">
           {row.type === "choice" ? (
             <select
-              value={state.value}
+              value={selectedChoice}
               onChange={(event) =>
                 setArgumentRowValue(row, event.target.value, nth)
               }

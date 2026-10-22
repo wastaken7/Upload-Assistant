@@ -270,6 +270,9 @@ def cli_argument_catalog() -> tuple[dict[str, Any], ...]:
                 item["placeholder"] = str(action.metavar or action.dest).upper()
             if action.choices:
                 item["choices"] = [str(choice) for choice in action.choices]
+                # argparse converts with `type` before checking choices, so "PC" is valid here.
+                if action.type in (str.lower, str.casefold):
+                    item["case_insensitive"] = True
             aliases = [other for other in action.option_strings if other != option]
             if aliases:
                 item["aliases"] = aliases

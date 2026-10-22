@@ -66,3 +66,12 @@ def test_webui_template_receives_cli_catalog() -> None:
     assert "window.UA_CLI_ARGUMENTS = [{" in html
     assert '"label": "--developer"' in html
     assert '"label": "--tracker-id"' in html
+
+
+def test_webui_catalog_marks_lowercased_choices() -> None:
+    catalog = {item["label"]: item for item in cli_argument_catalog()}
+
+    for option in ("--platform", "--game-subcategory", "--music-media", "--music-release-type"):
+        assert catalog[option]["case_insensitive"] is True
+    assert "case_insensitive" not in catalog["--imghost"]
+    assert "case_insensitive" not in catalog["--category"]

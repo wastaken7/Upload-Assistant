@@ -298,6 +298,14 @@
     ["--no-music-discogs", "--music-discogs-master-id"],
   ];
 
+  // The parser lower-cases some values before it checks their choices.
+  const matchChoice = (item, value) => {
+    const choices = Array.isArray(item.choices) ? item.choices : [];
+    if (!item.case_insensitive) return choices.includes(value) ? value : "";
+    const lowered = value.toLowerCase();
+    return choices.find((choice) => choice.toLowerCase() === lowered) || "";
+  };
+
   // Advisory problems with the string. The server still validates the run.
   const findArgumentIssues = (text, index) => {
     const parsed = parseArguments(text, index);
@@ -344,7 +352,7 @@
         kind === "choice" &&
         occurrence.hasValue &&
         Array.isArray(item.choices) &&
-        !item.choices.includes(occurrence.value)
+        !matchChoice(item, occurrence.value)
       ) {
         issues.push({
           type: "choice",
@@ -397,5 +405,6 @@
     removeArgument,
     removeOccurrence,
     findArgumentIssues,
+    matchChoice,
   };
 })();

@@ -167,3 +167,25 @@ test("findArgumentIssues reports advisory problems", () => {
   same(types("stray --debug"), ["stray"]);
   same(types("--descfile 'open"), ["unclosed"]);
 });
+
+test("choices compare case-insensitively when the parser lower-cases them", () => {
+  const caseIndex = builder.createArgumentIndex([
+    {
+      label: "--platform",
+      kind: "choice",
+      choices: ["pc", "ps5"],
+      case_insensitive: true,
+    },
+    { label: "--imghost", kind: "choice", choices: ["imgbox"] },
+  ]);
+  const types = (text) =>
+    builder.findArgumentIssues(text, caseIndex).map((issue) => issue.type);
+  same(types("--platform PC"), []);
+  same(types("--platform xbox"), ["choice"]);
+  same(types("--imghost IMGBOX"), ["choice"]);
+  assert.equal(
+    builder.matchChoice({ choices: ["pc"], case_insensitive: true }, "PC"),
+    "pc",
+  );
+  assert.equal(builder.matchChoice({ choices: ["pc"] }, "PC"), "");
+});
