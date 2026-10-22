@@ -99,6 +99,14 @@ class Orpheus:
     max_tag_length = 200
     max_lineage_characters = 8000
 
+    # Responses worth another try: rate limiting and gateway/server failures.
+    retry_status_codes: ClassVar[frozenset[int]] = frozenset({429, 500, 502, 503, 504, 520, 521, 522, 524})
+    # The upload POST is retried only when Orpheus certainly did not process it.
+    # A 500/502/504 or a read timeout can follow a completed upload, and a
+    # second POST would then create a duplicate.
+    upload_retry_status_codes: ClassVar[frozenset[int]] = frozenset({429, 503})
+    retry_delay_seconds = 5.0
+
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
         settings = config.get("TRACKERS", {}).get(self.tracker, {})
@@ -107,6 +115,19 @@ class Orpheus:
         self.requests_url = f"{self.base_url}/requests.php"
         self.torrent_url = f"{self.base_url}/torrents.php?torrentid="
         self.common = Common(config)
+
+    def _max_attempts(self) -> int:
+        """Attempts per request: ``max_retries`` from the tracker, else DEFAULT, as for UNIT3D."""
+        default = self.config.get("DEFAULT", {}).get("max_retries", 2)
+        try:
+            return max(1, int(self.config.get("TRACKERS", {}).get(self.tracker, {}).get("max_retries", default)))
+        except TypeError, ValueError:
+            return 2
+
+    @staticmethod
+    def _error_text(error: BaseException) -> str:
+        # Timeouts and some transport errors have no message; name the error instead.
+        return str(error) or type(error).__name__
 
     def _headers(self, meta: Meta) -> dict[str, str]:
         product = str(meta.ua_name or "Upload Assistant").strip() or "Upload Assistant"
@@ -121,15 +142,32 @@ class Orpheus:
         return MusicRelease.from_dict(meta.music_release)
 
     async def _api_get(self, meta: Meta, params: dict[str, str], timeout_seconds: float, purpose: str) -> dict[str, Any] | None:
-        """Run one read-only ``ajax.php`` GET and return its ``response`` object."""
-        try:
-            async with httpx.AsyncClient(timeout=httpx.Timeout(timeout_seconds), headers=self._headers(meta)) as client:
-                response = await client.get(f"{self.base_url}/ajax.php", params=params)
-                response.raise_for_status()
-                raw_json = response.json()
-        except (httpx.HTTPError, ValueError) as error:
-            logger.warning(f"{self.tracker}: [yellow]read-only {purpose} failed: {error}[/yellow]")
-            return None
+        """Run one read-only ``ajax.php`` GET and return its ``response`` object.
+
+        Timeouts, connection failures and rate-limit or server errors are
+        retried; a GET changes nothing, so repeating it is safe.
+        """
+        attempts = self._max_attempts()
+        timeout = timeout_seconds
+        raw_json: Any = None
+        for attempt in range(1, attempts + 1):
+            try:
+                async with httpx.AsyncClient(timeout=httpx.Timeout(timeout), headers=self._headers(meta)) as client:
+                    response = await client.get(f"{self.base_url}/ajax.php", params=params)
+                    response.raise_for_status()
+                    raw_json = response.json()
+                break
+            except (httpx.HTTPError, ValueError) as error:
+                retryable = isinstance(error, httpx.TransportError) or (isinstance(error, httpx.HTTPStatusError) and error.response.status_code in self.retry_status_codes)
+                if not retryable or attempt >= attempts:
+                    logger.warning(f"{self.tracker}: [yellow]read-only {purpose} failed: {self._error_text(error)}[/yellow]")
+                    return None
+                if isinstance(error, httpx.TimeoutException):
+                    timeout *= 1.5
+                logger.info(
+                    f"{self.tracker}: [yellow]{purpose} failed ({self._error_text(error)}), retrying in {self.retry_delay_seconds:g} seconds... (attempt {attempt}/{attempts})[/yellow]"
+                )
+                await asyncio.sleep(self.retry_delay_seconds)
         if not isinstance(raw_json, dict):
             return None
         payload = cast(dict[str, Any], raw_json)
@@ -823,35 +861,65 @@ class Orpheus:
             data["requestid"] = request_id
         if group_id:
             data["groupid"] = group_id
-        try:
-            async with httpx.AsyncClient(timeout=httpx.Timeout(60.0), headers=self._headers(meta)) as client:
-                with torrent_path.open("rb") as torrent_file:
-                    files: list[tuple[str, tuple[str, Any, str]]] = [("file_input", (torrent_path.name, torrent_file, "application/x-bittorrent"))]
-                    for log in release.auxiliary.logs:
-                        log_path = release.path / log
-                        if log_path.is_file():
-                            files.append(("logfiles[]", (log_path.name, log_path.open("rb"), "text/plain")))
-                    try:
-                        # httpx AsyncClient requires a mapping here. Passing
-                        # the legacy list of repeated tuples makes httpx treat
-                        # it as a synchronous raw stream before it can build
-                        # its async-compatible multipart encoder.
-                        # MultipartStream expands list values into repeated
-                        # fields, so artists[] and importance[] keep their
-                        # required Gazelle form representation.
-                        response = await client.post(f"{self.base_url}/ajax.php?action=upload", data=data, files=files)
-                    finally:
-                        for _, (_, handle, _) in files[1:]:
-                            handle.close()
-                response.raise_for_status()
-                payload = response.json()
-        except (httpx.HTTPError, ValueError, OSError) as error:
-            status["status_message"] = f"Upload request failed: {error}"
+        payload = await self._post_upload(meta, data, torrent_path, release)
+        if payload is None:
             return False
         accepted = self._record_upload_response(meta, payload)
         if accepted and not await self._download_site_torrent(meta):
             await self._write_torrent_comment(meta)
         return accepted
+
+    async def _post_upload(self, meta: Meta, data: dict[str, Any], torrent_path: Path, release: MusicRelease) -> Any:
+        """POST the upload and return the decoded JSON, or None after recording why it failed.
+
+        Only failures that prove the upload was not processed are retried: the
+        connection was never made, or Orpheus answered 429/503. Any other
+        failure may follow a completed upload, so it is reported instead.
+        """
+        status = meta.tracker_status.setdefault(self.tracker, {})
+        attempts = self._max_attempts()
+        for attempt in range(1, attempts + 1):
+            try:
+                async with httpx.AsyncClient(timeout=httpx.Timeout(60.0), headers=self._headers(meta)) as client:
+                    # Files are reopened for every attempt; a failed POST may have read them.
+                    with torrent_path.open("rb") as torrent_file:
+                        files: list[tuple[str, tuple[str, Any, str]]] = [("file_input", (torrent_path.name, torrent_file, "application/x-bittorrent"))]
+                        for log in release.auxiliary.logs:
+                            log_path = release.path / log
+                            if log_path.is_file():
+                                files.append(("logfiles[]", (log_path.name, log_path.open("rb"), "text/plain")))
+                        try:
+                            # httpx AsyncClient requires a mapping here. Passing
+                            # the legacy list of repeated tuples makes httpx treat
+                            # it as a synchronous raw stream before it can build
+                            # its async-compatible multipart encoder.
+                            # MultipartStream expands list values into repeated
+                            # fields, so artists[] and importance[] keep their
+                            # required Gazelle form representation.
+                            response = await client.post(f"{self.base_url}/ajax.php?action=upload", data=data, files=files)
+                        finally:
+                            for _, (_, handle, _) in files[1:]:
+                                handle.close()
+                    response.raise_for_status()
+                    return response.json()
+            except (httpx.HTTPError, ValueError, OSError) as error:
+                not_processed = isinstance(error, (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout)) or (
+                    isinstance(error, httpx.HTTPStatusError) and error.response.status_code in self.upload_retry_status_codes
+                )
+                if not_processed and attempt < attempts:
+                    logger.info(
+                        f"{self.tracker}: [yellow]Upload request failed ({self._error_text(error)}), retrying in {self.retry_delay_seconds:g} seconds... (attempt {attempt}/{attempts})[/yellow]"
+                    )
+                    await asyncio.sleep(self.retry_delay_seconds)
+                    continue
+                message = f"Upload request failed: {self._error_text(error)}"
+                # An unreadable response (ValueError from .json()) can also follow a
+                # stored upload; only a local file error (OSError) means nothing was sent.
+                if not not_processed and isinstance(error, (httpx.HTTPError, ValueError)):
+                    message += ". The upload may still have reached Orpheus; check the site before uploading again."
+                status["status_message"] = message
+                return None
+        return None
 
     async def _download_site_torrent(self, meta: Meta) -> bool:
         """Replace the client torrent with the one served by Orpheus.

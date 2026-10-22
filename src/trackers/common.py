@@ -23,6 +23,7 @@ from langcodes import tag_parser
 from torf import Torrent
 from unidecode import unidecode
 
+from src import webui_events
 from src.api_key_expiry import observe_tracker_response
 from src.bbcode import BBCODE
 from src.console import console, logger, prompt_in_thread
@@ -588,7 +589,8 @@ class Common:
 
         if not meta.unattended:
             try:
-                selection = (await prompt_in_thread(cli_ui.ask_string, f"Do you want to use these IDs from {tracker_name}? (Y/n): ", default="") or "").strip().lower()
+                with webui_events.answer_buttons([("y", "Yes"), ("n", "No")]):
+                    selection = (await prompt_in_thread(cli_ui.ask_string, f"Do you want to use these IDs from {tracker_name}? (Y/n): ", default="") or "").strip().lower()
                 return selection == "" or selection == "y" or selection == "yes"
             except KeyboardInterrupt, EOFError:
                 sys.exit(1)
@@ -598,7 +600,8 @@ class Common:
     async def prompt_user_for_confirmation(self, message: str, meta: Meta | None = None) -> bool:
         if meta and meta.unattended and not meta.unattended_confirm:
             return False
-        response = (await prompt_in_thread(cli_ui.ask_string, f"{message} (Y/n): ", default="") or "").strip().lower()
+        with webui_events.answer_buttons([("y", "Yes"), ("n", "No")]):
+            response = (await prompt_in_thread(cli_ui.ask_string, f"{message} (Y/n): ", default="") or "").strip().lower()
         return response == "" or response == "y"
 
     async def _apply_region_distributor(self, meta: Meta, attributes: dict[str, Any], tracker: str = "") -> None:
@@ -820,9 +823,11 @@ class Common:
                     if meta.unattended:
                         return tmdb, imdb, tvdb, mal, description, category, infohash, imagelist, file_name
                     logger.info("[cyan]Do you want to edit, discard or keep the description?[/cyan]")
-                    edit_choice = cli_ui.ask_string("Enter 'e' to edit, 'd' to discard, or press Enter to keep it as is:")
+                    question, buttons = webui_events.letter_prompt([("e", "edit"), ("d", "discard")], "keep it as is")
+                    with webui_events.answer_buttons(buttons):
+                        edit_choice = cli_ui.ask_string(question)
 
-                    if (edit_choice or "").lower() == "e":
+                    if (edit_choice or "").lower() == "e" and webui_events.editor_available():
                         edited_description = cast(str | None, click.edit(cast(Any, description)))
                         if edited_description:
                             description = edited_description.strip()

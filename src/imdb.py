@@ -14,6 +14,7 @@ import cli_ui
 import guessit
 import httpx
 
+from src import webui_events
 from src.cleanup import cleanup_manager
 from src.console import logger, prompt_in_thread
 from src.metadata_cache import cache_for, is_cache_miss
@@ -597,6 +598,9 @@ class ImdbManager:
                                             plainText
                                             }}
                                         }}
+                                        primaryImage {{
+                                            url
+                                        }}
                                     }}
                                 }}
                             }}
@@ -829,6 +833,9 @@ class ImdbManager:
             # Show sorted results to user
             logger.info("[bold yellow]Multiple IMDb results found. Please select the correct entry:[/bold yellow]")
 
+            labels: list[str] = []
+            posters: list[str] = []
+            details: list[dict[str, str]] = []
             for idx, candidate in enumerate(sorted_results):
                 node = self.safe_get(candidate, ["node"], {})
                 title = self.safe_get(node, ["title"], {})
@@ -845,12 +852,26 @@ class ImdbManager:
                 if plot:
                     logger.info(f"[green]Plot:[/green] {plot[:200]}{'...' if len(plot) > 200 else ''}")
                 logger.info("")
+                # The GUI's answer buttons: the plot tells similar titles apart.
+                labels.append(f"{title_text} ({year})" if year else str(title_text))
+                details.append(
+                    {
+                        "meta": " · ".join(str(part) for part in (imdb_id, title_type, f"similarity {similarity_score:.2f}") if part),
+                        "text": plot,
+                        "link": f"https://www.imdb.com/title/{imdb_id}/" if imdb_id else "",
+                        "link_label": "IMDb",
+                    }
+                )
+                poster = str(self.safe_get(title, ["primaryImage", "url"], "") or "")
+                # IMDb serves the full image; this suffix asks its CDN for a small one.
+                posters.append(poster.replace("._V1_.jpg", "._V1_UX120_.jpg") if poster.endswith("._V1_.jpg") else poster)
 
             if sorted_results:
                 selection = None
                 while True:
                     try:
-                        selection = await prompt_in_thread(cli_ui.ask_string, "Enter the number of the correct entry, 0 for none, or manual IMDb ID (tt1234567): ") or ""
+                        with webui_events.numbered_options(labels, actions=[("0", "None of these")], images=posters, details=details):
+                            selection = await prompt_in_thread(cli_ui.ask_string, "Enter the number of the correct entry, 0 for none, or manual IMDb ID (tt1234567): ") or ""
                     except EOFError, KeyboardInterrupt:
                         logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")
                         await cleanup_manager.cleanup()
@@ -894,7 +915,8 @@ class ImdbManager:
         else:
             if not unattended:
                 try:
-                    selection = await prompt_in_thread(cli_ui.ask_string, "No results found. Please enter a manual IMDb ID (tt1234567) or 0 to skip: ") or ""
+                    with webui_events.answer_buttons([("0", "Skip")]):
+                        selection = await prompt_in_thread(cli_ui.ask_string, "No results found. Please enter a manual IMDb ID (tt1234567) or 0 to skip: ") or ""
                 except EOFError, KeyboardInterrupt:
                     logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")
                     await cleanup_manager.cleanup()

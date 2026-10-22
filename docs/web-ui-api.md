@@ -38,6 +38,21 @@ Statistics contain no per-release events, names, paths, release-group names or t
   - JSON values must use double quotes. When sending Windows paths from shells that perform quoting/escaping (PowerShell, cmd.exe), backslashes need special handling (escape them or use forward slashes). To avoid brittle quoting, prefer one of the approaches in the examples below.
   - The server attempts tolerant parsing: it accepts JSON, form-encoded bodies, or will attempt conservative normalization of raw bodies to extract `path` and `session_id` if standard JSON parsing fails. However, relying on correct JSON or a file payload is recommended for reliability.
 - Response: SSE stream on success. On immediate validation or parse errors the API returns JSON like {"error":"...","success":false} (HTTP 4xx/5xx as appropriate).
+- Structured run events: besides `html` terminal output, the stream carries `{"type":"gui","data":{...}}` events, which the WebUI's GUI output mode uses. `data.kind` is one of:
+
+  | `kind`         | Fields                                                                                                                                              |
+  | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | `item`         | `index`, `total`, `name` — a queue item started                                                                                                     |
+  | `stage`        | `key` (`prep`, `confirm`, `dupes`, `screens`, `torrent`, `upload`, `requests`), `status` (`start`, `done`, `skip`, `fail`)                          |
+  | `notice`       | `level` (`error`, `warning`, `attention`), `text`, optional `tracker`, `key`                                                                        |
+  | `notice_group` | `group`, `notices` — replaces the earlier notices of that group                                                                                     |
+  | `prompt`       | `action` (`open`, `close`), `id`; on open: `type` (`yes_no`, `choice`, `text`), `question`, optional `choices`, `default`, `context`                |
+  | `dupes`        | `tracker`, `entries` (`name`, optional `link`, `size`, `diff_pct`, `color`: hex size-difference colour), `note`, `trumpable`                        |
+  | `slot`         | `tracker`, `verdict` (`allow`, `review`, `block`), `title`, `reason`; optional `slot`, `why`, `conflicts` (entries as in `dupes`), `notes`, `rules` |
+  | `tracker`      | `tracker`, `status` (`pending`, `success`, `failed`, `skipped`, `dupe`, `banned`), optional `link`, `torrent_id`, `message`, `duration`             |
+  | `request`      | `tracker`, `name`, `exact`, optional `link`, `reward`, `status`                                                                                     |
+
+  Every event has `ts` and, inside a queue, `item`. Text is plain (no markup) and redacted. Answers to prompts still go through `/api/input`.
 
 Examples
 

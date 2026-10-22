@@ -5,6 +5,7 @@ from typing import Any, cast
 import cli_ui
 import httpx
 
+from src import webui_events
 from src.console import logger
 from src.meta import Meta
 from src.metadata_cache import cache_for, is_cache_miss
@@ -110,7 +111,17 @@ class TvmazeManager:
 
             while True:
                 try:
-                    choice_raw = cli_ui.ask_string(f"Enter the number of the correct show (1-{len(unique_results)}) or 0 to skip: ")
+                    labels = [f"{show.get('name', 'Unknown')} ({str(show.get('premiered') or '')[:4] or '?'})" for show in unique_results]
+                    details = [
+                        {
+                            "meta": f"TVmaze {show['id']} · premiered {show.get('premiered', 'Unknown')}",
+                            "link": f"https://www.tvmaze.com/shows/{show['id']}",
+                            "link_label": "TVmaze",
+                        }
+                        for show in unique_results
+                    ]
+                    with webui_events.numbered_options(labels, actions=[("0", "Skip")], details=details):
+                        choice_raw = cli_ui.ask_string(f"Enter the number of the correct show (1-{len(unique_results)}) or 0 to skip: ")
                     choice = int((choice_raw or "").strip())
                     if choice == 0:
                         logger.info("Skipping selection.")

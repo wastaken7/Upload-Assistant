@@ -38,6 +38,7 @@ from collections.abc import Mapping, Sequence
 import psutil
 
 import web_ui.auth as auth_mod
+from src.webui_events import GUI_EVENT_KINDS, GUI_EVENT_NONCE_ENV, GUI_EVENT_STDOUT_PREFIX, GUI_EVENTS_ENV, MAX_EVENT_BYTES, event_prefix
 from src.webui_progress import PROGRESS_STDOUT_PREFIX
 from src.prompt_sound import PROMPT_SOUND_STDOUT_MARKER
 from src.app_paths import CODE_DIR, DATA_DIR, STATE_DIR
@@ -2044,12 +2045,20 @@ def _resolve_execution_preview_meta(session_id: str) -> tuple[str, Path | None, 
     return execution_path, None, None
 
 
+# Lines the child writes for the server rather than the terminal.
+STRUCTURED_STDOUT_PREFIXES = (PROGRESS_STDOUT_PREFIX, GUI_EVENT_STDOUT_PREFIX)
+# Secret part of the GUI event prefix, passed to every child. Text the child
+# prints (e.g. release names from a tracker) cannot know it, so it cannot
+# forge an event by printing the prefix itself.
+_GUI_EVENT_NONCE = secrets.token_hex(16)
+
+
 def _subprocess_prompt_type(buffer: str, previous_type: str | None = None) -> str | None:
     last_line = buffer.splitlines()[-1] if buffer else ""
     stripped = re.sub(r"\x1b\[[0-?]*[ -/]*[@-~]", "", last_line).strip()
     if not stripped:
         return None
-    if stripped.startswith(PROGRESS_STDOUT_PREFIX):
+    if stripped.startswith(STRUCTURED_STDOUT_PREFIXES):
         return None
     if stripped == ">":
         return previous_type or "text"
@@ -2074,6 +2083,11 @@ def _webui_subprocess_env() -> dict[str, str]:
     env["UA_WEBUI_FORCE_COLOR"] = "1"
     env["UA_WEBUI_PROGRESS_STDOUT"] = "1"
     env["UA_WEBUI_PROMPT_SOUND_STDOUT"] = "1"
+    env[GUI_EVENTS_ENV] = "1"
+    # Lets the child skip terminal-only steps, e.g. opening a text editor;
+    # descriptions are reviewed in the Web UI instead.
+    env["UA_WEBUI_ACTIVE"] = "1"
+    env[GUI_EVENT_NONCE_ENV] = _GUI_EVENT_NONCE
     env["UA_STATS_SOURCE"] = "webui"
     return env
 
@@ -2089,8 +2103,35 @@ def _subprocess_progress_event(chunk: str) -> dict[str, object] | None:
     return event if isinstance(event, dict) else None
 
 
+def _subprocess_gui_event(chunk: str) -> dict[str, object] | None:
+    """Parse one GUI event line.
+
+    Returns {} for a malformed, oversized or forged (wrong nonce) one, which is dropped.
+    """
+    payload = chunk.strip()
+    if not payload.startswith(GUI_EVENT_STDOUT_PREFIX):
+        return None
+    prefix = event_prefix(_GUI_EVENT_NONCE)
+    if not payload.startswith(prefix):
+        return {}
+    body = payload.removeprefix(prefix)
+    if len(body) > MAX_EVENT_BYTES:
+        return {}
+    try:
+        event = json.loads(body)
+    except json.JSONDecodeError:
+        return {}
+    if not isinstance(event, dict) or event.get("kind") not in GUI_EVENT_KINDS:
+        return {}
+    return cast(dict[str, object], event)
+
+
+def _is_blank_output(chunk: str) -> bool:
+    return not ANSI_ESCAPE.sub("", chunk).strip()
+
+
 def _should_flush_subprocess_output(buffer: str, char: str, *, idle: bool = False) -> bool:
-    if char == "\n" or (len(buffer) > 512 and not buffer.lstrip().startswith(PROGRESS_STDOUT_PREFIX)):
+    if char == "\n" or (len(buffer) > 512 and not buffer.lstrip().startswith(STRUCTURED_STDOUT_PREFIXES)):
         return True
     # Wait for a pause in output before flushing unterminated prompts. Checking
     # each character would split ordinary lines at their first colon/question mark.
@@ -7575,6 +7616,7 @@ def _pump_session(session_id: str, process_state: dict[str, object], process: _W
 
         buffers: dict[str, str] = {"stdout": "", "stderr": ""}
         last_prompt_state: tuple[bool, object] = (False, None)
+        held_blank: tuple[str, str] | None = None
         prompt_timed_out = False
         orphaned = False
 
@@ -7614,12 +7656,29 @@ def _pump_session(session_id: str, process_state: dict[str, object], process: _W
                 output_type = pending_type
                 prompt_type = _subprocess_prompt_type(buffers[output_type], previous_prompt_type)
 
-            if buffers[output_type].strip() == PROMPT_SOUND_STDOUT_MARKER:
-                buffers[output_type] = ""
-                _publish_session_event(process_state, {"type": "prompt_sound"})
-                continue
             chunk = buffers[output_type]
             buffers[output_type] = ""
+            stripped_chunk = chunk.strip()
+            structured = stripped_chunk == PROMPT_SOUND_STDOUT_MARKER or stripped_chunk.startswith(STRUCTURED_STDOUT_PREFIXES)
+            if held_blank is not None:
+                # Structured lines start with a newline so they never join a
+                # terminal line; drop the blank line that newline produced.
+                if not structured:
+                    _publish_session_event(process_state, {"type": "html", "data": _subprocess_html_fragment(held_blank[1]), "origin": held_blank[0]})
+                held_blank = None
+            if not structured and not prompt_type and chunk.endswith("\n") and _is_blank_output(chunk):
+                held_blank = (output_type, chunk)
+                continue
+
+            if stripped_chunk == PROMPT_SOUND_STDOUT_MARKER:
+                _publish_session_event(process_state, {"type": "prompt_sound"})
+                continue
+
+            gui_event = _subprocess_gui_event(chunk)
+            if gui_event is not None:
+                if gui_event:
+                    _publish_session_event(process_state, {"type": "gui", "data": gui_event})
+                continue
 
             progress_event = _subprocess_progress_event(chunk)
             if progress_event is not None:
@@ -7652,6 +7711,8 @@ def _pump_session(session_id: str, process_state: dict[str, object], process: _W
             _publish_session_event(process_state, {"type": "html", "data": _subprocess_html_fragment(chunk), "origin": output_type})
 
         # Flush remaining buffers as HTML
+        if held_blank is not None:
+            _publish_session_event(process_state, {"type": "html", "data": _subprocess_html_fragment(held_blank[1]), "origin": held_blank[0]})
         for output_type, remaining in list(buffers.items()):
             if remaining:
                 _publish_session_event(process_state, {"type": "html", "data": _subprocess_html_fragment(remaining), "origin": output_type})

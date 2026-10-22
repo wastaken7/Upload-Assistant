@@ -32,7 +32,7 @@ Open <http://127.0.0.1:5000> in a browser. The address defaults to `127.0.0.1:50
 
 To capture the current interface for documentation, sign in normally and open the Upload page with `?screenshot=1`, for example `http://127.0.0.1:5000/?screenshot=1`.
 
-This browser-only demo shows the fictional **The Automation Menace (1968)** release with frozen FFmpeg, mkbrr, Usenet, spectrogram, and HDR progress. It does not start an upload, run external tools, load your files or tracker configuration, or send API actions. Existing uploads in other tabs continue normally. Authentication is still required.
+This browser-only demo shows the fictional **The Automation Menace (1968)** release with frozen FFmpeg, mkbrr, Usenet, spectrogram, and HDR progress. The **GUI** output view shows the run paused at a fictional dupe prompt, with a slot recommendation, a warning and tracker results. It does not start an upload, run external tools, load your files or tracker configuration, or send API actions. Existing uploads in other tabs continue normally. Authentication is still required.
 
 Use **Choose poster** and **Choose backdrop** to select your fictional artwork (PNG, JPEG, or WebP, up to 4 MiB per image). The backdrop appears behind the poster. Both images stay in your browser and are remembered there independently when storage is available. The demo includes ten subtitle languages with different flags. Choose the theme and resize the panels normally, then click **Hide controls (H)** before taking the screenshot. Press **H** outside a text field to bring the controls back. **Exit demo**, or removing the query parameter, returns to the normal app.
 
@@ -190,6 +190,20 @@ While an upload is active, the workspace changes from setup controls to live run
 - **Binary Progress** reports progress from external tools when available.
 - **Now Processing** uses a poster-first live summary with provider identifiers, technical release details, overview, and category-specific metadata for movies, TV, books, music, games, and adult releases.
 - **Kill** terminates the active run.
+
+### Terminal and GUI output
+
+The **Terminal | GUI** switch above the output chooses how the run is shown. The choice is remembered in this browser, and you can switch at any time, including during a run; both views receive the same session.
+
+- **Terminal** shows the full Upload Assistant console, with the input bar for prompts.
+- **GUI** shows the run as a few panels and leaves out what the **Now Processing** preview already shows:
+  - **Stages:** metadata, confirmation, dupe check, screenshots, torrent, upload and requests, each marked as running, done, skipped or stopped. In a queue it also shows the current item.
+  - **Your input is needed:** the current prompt, with Yes/No buttons, a list of choices or a text field. Dupe prompts show the slot recommendation and the possible dupes with their size difference. The confirmation prompt shows the per-tracker release names and any missing fields.
+  - **Needs attention:** slot recommendations, possible dupes, missing region, distributor or IDs, and trackers skipped for missing disc details.
+  - **Errors:** errors, repeated ones counted once, and warnings in a collapsible list. **View in terminal** opens the full output, including tracebacks.
+  - **Results:** one row per tracker: uploaded (with duration and torrent link), failed, queued, dupe, banned or skipped, with the tracker's message. Requests found after the upload are listed with their reward.
+
+The GUI shows the same run as the terminal; answering a prompt in one view answers it in the other.
 
 ### Generated screenshots
 

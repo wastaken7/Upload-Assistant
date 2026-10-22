@@ -209,11 +209,18 @@ class CustomArgumentParser(argparse.ArgumentParser):
 
 
 @lru_cache(maxsize=1)
-def cli_argument_catalog() -> tuple[dict[str, str], ...]:
-    """Expose the parser's actual long options and help text to the WebUI."""
+def _reference_parser() -> argparse.ArgumentParser:
+    """Build the real parser once, to read its options without parsing a run."""
     from src.meta import Meta
 
     _, parser, _ = Args({"DEFAULT": {"screens": 1}}).parse(["--webui"], Meta())
+    return parser
+
+
+@lru_cache(maxsize=1)
+def cli_argument_catalog() -> tuple[dict[str, str], ...]:
+    """Expose the parser's actual long options and help text to the WebUI."""
+    parser = _reference_parser()
     catalog = []
     for action in parser._actions:
         for option in action.option_strings:
@@ -224,6 +231,18 @@ def cli_argument_catalog() -> tuple[dict[str, str], ...]:
                 item["placeholder"] = str(action.metavar or action.dest).upper()
             catalog.append(item)
     return tuple(catalog)
+
+
+@lru_cache(maxsize=1)
+def cli_option_choices() -> dict[str, tuple[str, ...]]:
+    """Return the accepted values of each long option that has a fixed list."""
+    return {
+        option: tuple(str(choice) for choice in action.choices)
+        for action in _reference_parser()._actions
+        if action.choices
+        for option in action.option_strings
+        if option.startswith("--")
+    }
 
 
 def tracker_cli_aliases(config: Mapping[str, Any]) -> dict[str, str]:

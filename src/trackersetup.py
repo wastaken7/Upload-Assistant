@@ -14,6 +14,7 @@ import cli_ui
 import httpx
 
 from data.example_config import config as example_config
+from src import webui_events
 from src.api_key_expiry import observe_tracker_response, warn_api_key_expiry
 from src.cleanup import cleanup_manager
 from src.console import logger
@@ -152,6 +153,7 @@ STATIC_AUTH_TYPES = {
     "TORRENTLEECH": "other_api",
     "TOTHEGLORY": "cookies",
     "TVCHAOSUK": "other_api",
+    "TORRENTHAVEN": "unit3d_api",
     "ULCX": "unit3d_api",
     "UTOPIA": "unit3d_api",
     "VULTU": "other_api",
@@ -843,6 +845,16 @@ class TrackerSetup:
             elif tracker_name.upper() in ("BJSHARE", "FUNFILE", "HDSPACE", "AVISTAZ", "CINEMAZ", "PRIVATEHD", "MTEAM", "ORPHEUS"):
                 # These trackers have custom request handling
                 requests = cast(list[JsonDict], await tracker_instance.get_requests(meta))
+                for request in requests or []:
+                    # Orpheus returns lowercase keys; the other handlers use capitalised ones.
+                    if isinstance(request, dict) and (request.get("Name") or request.get("name")):
+                        webui_events.request_match(
+                            tracker_name,
+                            request.get("Name") or request.get("name"),
+                            link=request.get("Link") or request.get("url"),
+                            reward=request.get("Reward") or request.get("bounty"),
+                            exact=request.get("match_type") == "exact",
+                        )
                 return bool(requests) if tracker_name.upper() == "ORPHEUS" else False
             else:
                 if not url:
@@ -932,6 +944,7 @@ class TrackerSetup:
                             logger.info(
                                 f"[bold blue]Found exact request match on [bold yellow]{tracker_name}[/bold yellow] with bounty [bold yellow]{api_bounty}[/bold yellow] and with status [bold yellow]{api_status}[/bold yellow][/bold blue]"
                             )
+                            webui_events.request_match(tracker_name, api_name, link=new_url, reward=api_bounty, status=api_status, exact=True)
                             logger.info(f"[bold blue]Claimed status:[/bold blue] [bold yellow]{api_claimed}[/bold yellow]")
                             logger.info(f"[bold green]{api_name}:[/bold green] {new_url}")
                             logger.info("")
@@ -956,6 +969,7 @@ class TrackerSetup:
                             logger.info(
                                 f"[bold blue]Found exact request match on [bold yellow]{tracker_name}[/bold yellow] with bounty [bold yellow]{api_bounty}[/bold yellow] and with status [bold yellow]{api_status}[/bold yellow][/bold blue]"
                             )
+                            webui_events.request_match(tracker_name, api_name, link=new_url, reward=api_bounty, status=api_status, exact=True)
                             logger.info(f"[bold blue]Claimed status:[/bold blue] [bold yellow]{api_claimed}[/bold yellow]")
                             logger.info(f"[bold yellow]{api_name}[/bold yellow] - [bold yellow]S{api_season:02d} E{api_episode:02d}:[/bold yellow] {new_url}")
                             logger.info("")
@@ -980,6 +994,7 @@ class TrackerSetup:
                             logger.info(
                                 f"[bold blue]Found request on [bold yellow]{tracker_name}[/bold yellow] with bounty [bold yellow]{api_bounty}[/bold yellow] and with status [bold yellow]{api_status}[/bold yellow][/bold blue]"
                             )
+                            webui_events.request_match(tracker_name, api_name, link=new_url, reward=api_bounty, status=api_status, exact=False)
                             logger.info(f"[bold blue]Claimed status:[/bold blue] [bold yellow]{api_claimed}[/bold yellow]")
                             if meta.category == "MOVIE":
                                 logger.info(f"[bold yellow]{api_name}:[/bold yellow] {new_url}")
@@ -1045,6 +1060,7 @@ class TrackerSetup:
                         logger.info(
                             f"[bold blue]Found exact request match on [bold yellow]{tracker_name}[/bold yellow] with bounty [bold yellow]{api_bounty}[/bold yellow] and with status [bold yellow]{claimed_status}[/bold yellow][/bold blue]"
                         )
+                        webui_events.request_match(tracker_name, api_name, link=each.get("url"), reward=api_bounty, status=claimed_status, exact=True)
                         logger.info(f"[bold green]{api_name}:[/bold green] {each.get('url')}")
                         logger.info("")
 
@@ -1052,10 +1068,11 @@ class TrackerSetup:
                             request_entry = {"uuid": uuid_str, "path": meta.path, "url": each.get("url", ""), "name": api_name, "bounty": api_bounty, "claimed": claimed_status}
                             request_data.append(request_entry)
                             existing_uuids.add(uuid_str)
-                    if meta.category == "MOVIE" and type_name and resolution and unclaimed and not internal and not dv and not hdr and "uhd" in api_resolution_lower:
+                    elif meta.category == "MOVIE" and type_name and resolution and unclaimed and not internal and not dv and not hdr and "uhd" in api_resolution_lower:
                         logger.info(
                             f"[bold blue]Found request match on [bold yellow]{tracker_name}[/bold yellow] with bounty [bold yellow]{api_bounty}[/bold yellow] with mismatched HDR or DV[/bold blue]"
                         )
+                        webui_events.request_match(tracker_name, api_name, link=each.get("url"), reward=api_bounty, status=None, exact=False)
                         logger.info(f"[bold green]{api_name}:[/bold green] {each.get('url')}")
                         logger.info("")
 
@@ -1063,10 +1080,11 @@ class TrackerSetup:
                             request_entry = {"uuid": uuid_str, "path": meta.path, "url": each.get("url", ""), "name": api_name, "bounty": api_bounty, "claimed": claimed_status}
                             request_data.append(request_entry)
                             existing_uuids.add(uuid_str)
-                    if meta.category == "TV" and season and type_name and resolution and unclaimed and not internal and dv and hdr:
+                    elif meta.category == "TV" and season and type_name and resolution and unclaimed and not internal and dv and hdr:
                         logger.info(
                             f"[bold blue]Found exact request match on [bold yellow]{tracker_name}[/bold yellow] with bounty [bold yellow]{api_bounty}[/bold yellow] and with status [bold yellow]{claimed_status}[/bold yellow][/bold blue]"
                         )
+                        webui_events.request_match(tracker_name, api_name, link=each.get("url"), reward=api_bounty, status=claimed_status, exact=True)
                         logger.info(f"[bold yellow]{api_name}[/bold yellow] - [bold yellow]{meta.season}:[/bold yellow] {each.get('url')}")
                         logger.info("")
 
@@ -1074,10 +1092,11 @@ class TrackerSetup:
                             request_entry = {"uuid": uuid_str, "path": meta.path, "url": each.get("url", ""), "name": api_name, "bounty": api_bounty, "claimed": claimed_status}
                             request_data.append(request_entry)
                             existing_uuids.add(uuid_str)
-                    if meta.category == "TV" and season and type_name and resolution and unclaimed and not internal and not dv and not hdr:
+                    elif meta.category == "TV" and season and type_name and resolution and unclaimed and not internal and not dv and not hdr:
                         logger.info(
                             f"[bold blue]Found request match on [bold yellow]{tracker_name}[/bold yellow] with bounty [bold yellow]{api_bounty}[/bold yellow] with mismatched HDR or DV[/bold blue]"
                         )
+                        webui_events.request_match(tracker_name, api_name, link=each.get("url"), reward=api_bounty, status=None, exact=False)
                         logger.info(f"[bold yellow]{api_name}[/bold yellow] - [bold yellow]{meta.season}:[/bold yellow] {each.get('url')}")
                         logger.info("")
 
@@ -1089,6 +1108,7 @@ class TrackerSetup:
                         logger.info(
                             f"[bold blue]Found request on [bold yellow]{tracker_name}[/bold yellow] with bounty [bold yellow]{api_bounty}[/bold yellow] and with status [bold yellow]{claimed_status}[/bold yellow][/bold blue]"
                         )
+                        webui_events.request_match(tracker_name, api_name, link=each.get("url"), reward=api_bounty, status=claimed_status, exact=False)
                         if internal:
                             logger.info("[bold red]Request is internal only[/bold red]")
                         logger.info(f"[bold yellow]{api_name}[/bold yellow] - {each.get('url')}")
@@ -1171,7 +1191,8 @@ class TrackerSetup:
         if not meta.tv_pack:
             logger.info(f"[yellow]{tracker} requires comparisons to be provided for trump reports.\nAre the comparison images in the description or are you adding links?")
             try:
-                where_compare = cli_ui.ask_string("Enter 'd' if in description, 'L' if you want to paste links, or press Enter to skip trumping:", default="")
+                with webui_events.answer_buttons([("d", "In the description"), ("L", "Paste links"), ("", "Skip trumping")]):
+                    where_compare = cli_ui.ask_string("Enter 'd' if in description, 'L' if you want to paste links, or press Enter to skip trumping:", default="")
             except EOFError, KeyboardInterrupt:
                 logger.info("[yellow]Prompt cancelled; skipping trump report creation.[/yellow]")
                 return False
@@ -1501,6 +1522,7 @@ tracker_class_map: Any = LazyTrackerDict(
         "THELEACHZONE": ("src.trackers.UNIT3D.tlzdigital", "TheLeachZone"),
         "THEOLDSCHOOL": ("src.trackers.UNIT3D.theoldschool", "TheOldSchool"),
         "TORRENTEROS": ("src.trackers.UNIT3D.torrenteros", "Torrenteros"),
+        "TORRENTHAVEN": ("src.trackers.UNIT3D.torrenthaven", "TorrentHaven"),
         "TORRENTHR": ("src.trackers.UNIT3D.torrenthr", "TorrentHR"),
         "TORRENTLEECH": ("src.trackers.torrentleech", "TorrentLeech"),
         "TOTHEGLORY": ("src.trackers.totheglory", "ToTheGlory"),

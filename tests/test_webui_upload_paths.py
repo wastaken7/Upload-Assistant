@@ -17,7 +17,16 @@ import src.webui_paths as policy
 import web_ui.server as server
 from src.meta import Meta
 from src.queuemanage import QueueManager
-from src.webui_paths import QUEUE_ENV, QUEUE_HASH_ENV, ROOTS_ENV, generated_queue_name, is_generated_queue_path, read_generated_queue, validate_content_path, validate_subprocess_queue
+from src.webui_paths import (
+    QUEUE_ENV,
+    QUEUE_HASH_ENV,
+    ROOTS_ENV,
+    generated_queue_name,
+    is_generated_queue_path,
+    read_generated_queue,
+    validate_content_path,
+    validate_subprocess_queue,
+)
 
 
 @pytest.fixture
@@ -680,3 +689,69 @@ async def test_invalid_interactive_path_reprompts_without_mutating_metadata(work
     assert prep.gather_prep.await_count == 1
     assert meta.path == str(first)
     assert meta.anon is False
+
+
+def _confirmation_loop(workspace, monkeypatch, parse):
+    """process_meta stubbed up to the "Input args that need correction" loop."""
+    import upload
+
+    _, root, state, first, _ = workspace
+    monkeypatch.setenv(ROOTS_ENV, json.dumps([str(root)]))
+    meta = Meta(path=str(first), base_dir=str(state), imghost="fictional", category="MOVIE", item_args=[str(first)])
+    prep = SimpleNamespace(gather_prep=AsyncMock(return_value=meta))
+    monkeypatch.setattr(upload, "Prep", lambda **_kwargs: prep)
+    monkeypatch.setattr(upload, "name_manager", SimpleNamespace(get_name=AsyncMock(return_value=("Fictional", "Fictional", "Fictional", []))), raising=False)
+    monkeypatch.setattr(upload, "TrackerSetup", lambda **_kwargs: SimpleNamespace(filter_unsupported_trackers=lambda _meta: None))
+    monkeypatch.setattr(upload, "UploadHelper", lambda _config: SimpleNamespace(get_confirmation=AsyncMock(return_value=False)))
+    monkeypatch.setattr(upload, "write_meta_file", AsyncMock())
+    monkeypatch.setattr(upload, "gen_desc", AsyncMock(return_value=meta))
+    monkeypatch.setattr(upload, "_publish_webui_preview_target", Mock())
+    monkeypatch.setattr(upload, "Args", lambda _config: SimpleNamespace(parse=parse))
+    monkeypatch.setattr(upload, "config", {"DEFAULT": {"auto_mode": False}})
+    return upload, meta, prep, state
+
+
+@pytest.mark.asyncio
+async def test_skip_at_the_correction_prompt_leaves_the_release_out(workspace, monkeypatch):
+    upload, meta, prep, state = _confirmation_loop(workspace, monkeypatch, parse=Mock())
+    prompt = Mock(return_value="skip")
+    monkeypatch.setattr(upload, "CLI_UI", SimpleNamespace(ask_string=prompt))
+
+    assert await upload.process_meta(meta, str(state)) is False
+    assert meta.skipped_by_user is True
+    assert prompt.call_count == 1
+    assert prep.gather_prep.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_corrections_and_skip_reach_the_callers_metadata(workspace, monkeypatch):
+    def parse(_args, candidate):
+        candidate.anon = True
+        return candidate, None, None
+
+    upload, meta, prep, state = _confirmation_loop(workspace, monkeypatch, parse=parse)
+    prep.gather_prep = AsyncMock(side_effect=lambda meta, **_kwargs: meta)
+    prompt = Mock(side_effect=["--anon", "skip"])
+    monkeypatch.setattr(upload, "CLI_UI", SimpleNamespace(ask_string=prompt))
+
+    assert await upload.process_meta(meta, str(state)) is False
+    assert meta.anon is True
+    assert meta.skipped_by_user is True
+    assert prompt.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_invalid_correction_arguments_reprompt_instead_of_exiting(workspace, monkeypatch):
+    def parse(_args, _candidate):
+        raise SystemExit(2)
+
+    upload, meta, _prep, state = _confirmation_loop(workspace, monkeypatch, parse=parse)
+
+    class RepromptedError(Exception):
+        pass
+
+    prompt = Mock(side_effect=["--source Web", RepromptedError()])
+    monkeypatch.setattr(upload, "CLI_UI", SimpleNamespace(ask_string=prompt))
+    with pytest.raises(RepromptedError):
+        await upload.process_meta(meta, str(state))
+    assert prompt.call_count == 2

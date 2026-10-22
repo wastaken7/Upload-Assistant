@@ -12,6 +12,7 @@ _TRACKER_ID_ALIASES = {
     "BLU": "BLUTOPIA",
     "BTN": "BROADCASTHENET",
     "DVL": "DREADVAULT",
+    "THN": "TORRENTHAVEN",
     "BROADCASTHENET": "BROADCASTHENET",
     "HDB": "HDBITS",
     "HUNO": "HAWKEUNO",
@@ -482,6 +483,8 @@ class Meta:
     skip_upload_trackers: list[Any] = field(default_factory=list)
     skip_uploading: int | bool = False
     skipit: bool = False
+    # The user chose to skip this release at the confirmation prompt.
+    skipped_by_user: bool = False
     skipping: str | None = None
     sorted_filelist: bool = False
     source_size: int = 0

@@ -185,6 +185,9 @@ class Prep:
             await self._gather_music_prep(meta)
             prep_helpers.calculate_source_size(self, meta, str(meta.path or ""))
             await prep_helpers.process_trackers_and_torrent(self, meta, client, hash_ids, tracker_ids, "", "")
+            # Hash or reuse the base torrent while external lookups and the
+            # music metadata prompts run, as the video path does.
+            await restart_early_artifact_tasks(meta, client, self.config)
             await _enrich_music_from_orpheus_fn(meta, self.config)
             await _enrich_music_from_discogs_fn(meta, self.config)
             await prepare_artwork(meta)

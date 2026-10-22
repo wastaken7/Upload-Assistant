@@ -19,6 +19,7 @@ import langcodes
 import pycountry
 from bs4 import BeautifulSoup
 
+from src import webui_events
 from src.binaries import configured_binary
 from src.cogs.redaction import Redaction
 from src.config_helpers import format_terminal_link
@@ -1612,7 +1613,8 @@ class MakingOff:
         for k, (fid, name) in forum_options.items():
             logger.info(f"{self.tracker}:   {k}) {name} (ID: {fid})")
 
-        raw_choice = await prompt_in_thread(cli_ui.ask_string, "Escolha: ")
+        with webui_events.numbered_options([f"{name} (ID: {fid})" for fid, name in forum_options.values()]):
+            raw_choice = await prompt_in_thread(cli_ui.ask_string, "Escolha: ")
         choice = (raw_choice or "").strip()
         if choice in forum_options:
             return forum_options[choice][0]
@@ -1799,7 +1801,8 @@ class MakingOff:
         logger.info(f"{self.tracker}: [yellow]Any subtitles?[/yellow]")
         for k, v in options.items():
             logger.info(f"{self.tracker}:   {k}) {v}")
-        raw_selection = await prompt_in_thread(cli_ui.ask_string, "Choose: ")
+        with webui_events.numbered_options(list(options.values())):
+            raw_selection = await prompt_in_thread(cli_ui.ask_string, "Choose: ")
         selection = (raw_selection or "").strip()
         return options.get(selection, "Sem Legenda")
 

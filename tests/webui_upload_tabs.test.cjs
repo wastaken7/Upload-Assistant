@@ -51,7 +51,19 @@ const STATE = {
   uploadTabs: [],
   activeTabId: "",
   pendingCloseTabId: "",
+  runGui: null,
 };
+const RunGui = (() => {
+  const runGuiContext = { window: {} };
+  vm.runInNewContext(
+    fs.readFileSync(
+      path.join(__dirname, "../web_ui/static/js/run_gui_state.js"),
+      "utf8",
+    ),
+    runGuiContext,
+  );
+  return runGuiContext.window.UARunGui;
+})();
 
 function setup() {
   const context = vm.createContext({
@@ -70,6 +82,7 @@ function setup() {
       return { ok: true };
     },
     console,
+    RunGui,
   });
   for (const [name, initial] of Object.entries(STATE)) {
     context[name] = structuredClone(initial);
@@ -90,6 +103,7 @@ function setup() {
     "updateTabRun",
     "scrollTabOutput",
     "applyProgressEvent",
+    "applyRunGuiEvent",
     "appendSystemMessage",
     "appendWelcomeMessage",
     "switchUploadTab",
@@ -155,6 +169,30 @@ test("background tab output, progress and run state never touch the visible tab"
   assert.equal(context.customArgs, "--unattended");
   assert.equal(context.progressItems[0].id, "mkbrr-hash");
   assert.equal(context.isExecuting, false);
+});
+
+test("GUI run events for a background tab stay in its runtime until shown", () => {
+  const context = setup();
+  context.updateTabRun("tab-1", { isExecuting: true, sessionId: "first" });
+  context.addUploadTab();
+  context.runGui = null;
+
+  context.applyRunGuiEvent(
+    {
+      type: "gui",
+      data: { kind: "tracker", tracker: "FAKE", status: "success", item: 1 },
+    },
+    "tab-1",
+  );
+
+  assert.equal(context.runGui, null);
+  assert.equal(
+    context.getTabRuntime("tab-1").gui.trackers["1:FAKE"].status,
+    "success",
+  );
+
+  context.switchUploadTab("tab-1");
+  assert.equal(context.runGui.trackers["1:FAKE"].status, "success");
 });
 
 test("tab status reports shared-resource waits and pending prompts", () => {

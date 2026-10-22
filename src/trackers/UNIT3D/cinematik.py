@@ -12,6 +12,7 @@ import click
 import httpx
 from rich.markup import escape
 
+from src import webui_events
 from src.console import logger
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
@@ -388,8 +389,9 @@ class Cinematik(UNIT3D):
         # Convert the list to a single string for the description
         description = "".join(desc_text)
 
-        # Ask user if they want to edit or keep the description
-        if not meta.unattended or (meta.unattended and meta.unattended_confirm):
+        # Ask user if they want to edit or keep the description. Editing is the
+        # only alternative, so there is nothing to ask where no editor exists.
+        if (not meta.unattended or (meta.unattended and meta.unattended_confirm)) and webui_events.editor_available():
             logger.info(f"{self.tracker}: Current description: {description}", extra={"markup": False})
             logger.info(f"{self.tracker}: [cyan]Do you want to edit or keep the description?[/cyan]")
             edit_choice = cli_ui.ask_string("Enter 'e' to edit, or press Enter to keep it as is: ")
@@ -401,6 +403,10 @@ class Cinematik(UNIT3D):
                 logger.info(f"{self.tracker}: Final description after editing: {description}", extra={"markup": False})
             else:
                 logger.info(f"{self.tracker}: [green]Keeping the original description.[/green]")
+        elif not webui_events.editor_available():
+            # The Web UI's description review edits the base description, not this
+            # template, so its placeholders (extras, ripping program) stay as generated.
+            logger.warning(f"{self.tracker}: the generated description template still has placeholders to fill in; complete it on the site after uploading.")
         else:
             logger.info(f"{self.tracker}: [green]Unattended mode: Keeping the original description.[/green]")
 

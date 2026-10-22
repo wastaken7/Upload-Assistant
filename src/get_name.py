@@ -10,6 +10,7 @@ import anitopy
 import cli_ui
 import guessit
 
+from src import webui_events
 from src.cleanup import cleanup_manager
 from src.console import logger
 from src.meta import Meta
@@ -739,7 +740,8 @@ class NameManager:
                 region_id = await self.common.unit3d_region_ids(tracker_region, tracker=tracker)
                 if requirements.get("region") == "mandatory":
                     while not region_id and tracker_region and tracker_region != "SKIPPED":
-                        logger.warning(f"Region '{tracker_region}' is not recognized by {tracker}.")
+                        logger.warning(f"Region '{tracker_region}' is not recognized by {tracker}.", extra={"ua_gui": False})
+                        webui_events.notice("attention", f"Region '{tracker_region}' is not recognized.", tracker=tracker, key=f"region:{tracker}")
                         if meta.unattended and not meta.unattended_confirm:
                             break
                         replacement = await self._prompt_for_field(meta, f"Region code for {tracker} (press Enter to skip this tracker)", True)
@@ -752,7 +754,8 @@ class NameManager:
                 distributor_id = await self.common.unit3d_distributor_ids(distributor_name, tracker=tracker)
                 if requirements.get("distributor") == "mandatory":
                     while not distributor_id and distributor_name and distributor_name != "SKIPPED":
-                        logger.warning(f"Distributor '{distributor_name}' is not recognized by {tracker}.")
+                        logger.warning(f"Distributor '{distributor_name}' is not recognized by {tracker}.", extra={"ua_gui": False})
+                        webui_events.notice("attention", f"Distributor '{distributor_name}' is not recognized.", tracker=tracker, key=f"distributor:{tracker}")
                         if meta.unattended and not meta.unattended_confirm:
                             break
                         replacement = await self._prompt_for_field(meta, f"Distributor for {tracker} (press Enter to skip this tracker)", True)
@@ -767,7 +770,8 @@ class NameManager:
                         reason = f"unsupported region '{tracker_region}'" if tracker_region and tracker_region != "SKIPPED" else "missing region information"
                     else:
                         reason = f"unsupported distributor '{distributor_name}'" if distributor_name and distributor_name != "SKIPPED" else "missing distributor information"
-                    logger.warning(f"Skipping upload to {tracker}: {reason}.")
+                    logger.warning(f"Skipping upload to {tracker}: {reason}.", extra={"ua_gui": False})
+                    webui_events.notice("attention", f"Not uploading: {reason}.", tracker=tracker, key=f"disc-info:{tracker}")
                     trackers_to_remove.append(tracker)
 
         return region_name, distributor_name, trackers_to_remove
@@ -779,7 +783,8 @@ class NameManager:
         suffix = " (MANDATORY): " if is_mandatory else " (optional, press Enter to skip): "
         prompt = f"{field_name} not found for disc. Please enter it manually{suffix}"
         try:
-            value = cli_ui.ask_string(prompt)
+            with webui_events.answer_buttons([("", "Skip this tracker" if is_mandatory else "Skip")]):
+                value = cli_ui.ask_string(prompt)
             return value.upper() if value else "SKIPPED"
         except EOFError:
             logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")
