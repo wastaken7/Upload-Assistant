@@ -128,7 +128,8 @@ class Orpheus:
                 response.raise_for_status()
                 raw_json = response.json()
         except (httpx.HTTPError, ValueError) as error:
-            logger.warning(f"{self.tracker}: [yellow]read-only {purpose} failed: {error}[/yellow]")
+            # Timeouts and some transport errors have no message; name the error instead.
+            logger.warning(f"{self.tracker}: [yellow]read-only {purpose} failed: {str(error) or type(error).__name__}[/yellow]")
             return None
         if not isinstance(raw_json, dict):
             return None

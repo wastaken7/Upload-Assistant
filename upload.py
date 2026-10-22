@@ -86,6 +86,7 @@ from rich.markup import escape
 
 from bin.get_ffmpeg import FfmpegBinaryManager
 from bin.get_mkbrr import MkbrrBinaryManager
+from src import webui_events
 from src.add_comparison import ComparisonManager
 from src.app_paths import CODE_DIR, STATE_DIR
 from src.args import Args, read_paths_from_stdin
@@ -97,7 +98,7 @@ from src.cleanup import cleanup_manager
 from src.clients import Clients
 from src.cogs.redaction import PathAwareEncoder, Redaction
 from src.config_helpers import format_terminal_link, parse_bool
-from src.console import current_release_log_path, logger  # pyright: ignore[reportUnknownVariableType]
+from src.console import current_release_log_path, install_gui_prompt_events, logger  # pyright: ignore[reportUnknownVariableType]
 from src.console import rich_handler as _rich_handler
 from src.disc_menus import process_disc_menus
 from src.dupe_checking import DupeChecker
@@ -396,7 +397,7 @@ async def print_progress(message: str, interval: int = 10) -> None:
     try:
         while True:
             await asyncio.sleep(interval)
-            logger.info(message)
+            logger.info(message, extra={"ua_gui": False})
     except asyncio.CancelledError:
         pass
 
@@ -1075,6 +1076,7 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
             meta.unattended = True
             logger.info("[yellow]Running in Auto Mode")
     prep = Prep(screens=meta.screens, img_host=meta.imghost, config=config, publish_preview=_publish_webui_preview_target)
+    webui_events.stage("prep", "start")
     try:
         meta = await prep.gather_prep(meta=meta, mode="cli")
     except Exception as e:
@@ -1145,9 +1147,11 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
         await _prompt_music_meta(meta)
 
     meta = await gen_desc(meta, takescreens_manager, uploadscreens_manager)
+    webui_events.stage("prep", "done")
 
     editargs_tracking: tuple[str, ...] = ()
     previous_trackers = meta.trackers
+    webui_events.stage("confirm", "start")
     try:
         confirm = await helper.get_confirmation(meta)
     except EOFError:
@@ -1223,6 +1227,8 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
             cleanup_manager.reset_terminal()
             sys.exit(1)
 
+    webui_events.stage("confirm", "done")
+
     if meta.remove_trackers:
         removed: list[str] = []
         remove_trackers_list = [t for t in meta.remove_trackers if t] if isinstance(meta.remove_trackers, list) else [str(meta.remove_trackers)]
@@ -1239,6 +1245,7 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
             logger.info(f"[yellow]Removing trackers already in your client: {', '.join(removed)}[/yellow]")
     if not meta.trackers:
         logger.info("[red]No trackers remain after removal.[/red]")
+        webui_events.stage("dupes", "skip")
         successful_trackers = 0
         meta.skip_uploading = 10
 
@@ -1297,7 +1304,9 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
         except Exception as e:
             logger.warning(f"[yellow]Warning: Tracker validation encountered an error: {e}[/yellow]")
 
+        webui_events.stage("dupes", "start")
         successful_trackers = await TrackerStatusManager(config=config).process_all_trackers(meta)
+        webui_events.stage("dupes", "done")
 
         if meta.trackers_pass is not None:
             try:
@@ -1401,6 +1410,7 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
             await common.get_bdmv_mediainfo(meta)
             bdmv_mi_created = True
 
+    webui_events.stage("screens", "start")
     progress_task = asyncio.create_task(print_progress("[yellow]Still processing, please wait...", interval=10))
     try:
         if not meta.manual_frames:
@@ -1903,7 +1913,9 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
         progress_task.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await progress_task
+    webui_events.stage("screens", "done")
 
+    webui_events.stage("torrent", "start")
     has_local_subs = bool(meta.subtitle_files)
     torrent_manifest = TorrentManifest(meta.base_dir, meta.uuid)
 
@@ -1973,6 +1985,7 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
 
     if meta.randomized >= 1 and not meta.mkbrr and not is_usenet_only:
         TORRENT_CREATOR.create_random_torrents(meta.base_dir, meta.uuid, meta.randomized, cast(str, meta.path))
+    webui_events.stage("torrent", "done")
 
     await write_meta_file(meta)
     _publish_webui_preview_target(cast(str, meta.path or ""), meta.uuid or None)
@@ -2186,6 +2199,7 @@ def load_heavy_globals() -> None:
     CLI_UI = cli_ui
     TORF_Torrent = Torrent
     CLI_UI.setup(color="always", title="Upload Assistant")
+    install_gui_prompt_events()
 
 
 async def do_the_thing(base_dir: str) -> None:
@@ -2476,7 +2490,7 @@ async def do_the_thing(base_dir: str) -> None:
         skipped_files_count = 0
         base_meta = meta.copy()
 
-        for queue_item in queue_list:
+        for item_number, queue_item in enumerate(queue_list, start=1):
             total_files = len(queue_list)
             current_item_path: str = ""
             tmp_path = ""
@@ -2540,6 +2554,7 @@ async def do_the_thing(base_dir: str) -> None:
                 set_stats_context(debug=bool(meta.debug), category="")
                 await record_event_async("item", operation="started", outcome="success")
                 _publish_webui_preview_target(path)
+                webui_events.begin_item(path, item_number, total_files)
 
                 if not path:
                     raise ValueError("The 'path' variable is not defined or is empty.")
@@ -2581,9 +2596,13 @@ async def do_the_thing(base_dir: str) -> None:
 
             try:
                 meta_success = await process_meta(meta, base_dir)
+            except BaseException:
+                webui_events.fail_active_stage()
+                raise
             finally:
                 await cancel_and_drain_early_artifact_tasks(meta.uuid)
             if not meta_success:
+                webui_events.fail_active_stage()
                 set_stats_context(debug=bool(meta.debug), category=str(meta.category or ""))
                 await record_event_async("item", operation="completed", outcome="error")
                 await record_release_profile_async(meta, "error")
@@ -2681,7 +2700,9 @@ async def do_the_thing(base_dir: str) -> None:
 
                 if successful_trackers < skip_uploading_int and not meta.debug:
                     logger.info(f"[red]Not enough successful trackers ({successful_trackers}/{skip_uploading_int}). No uploads being processed.[/red]")
+                    webui_events.stage("upload", "skip")
                 else:
+                    webui_events.stage("upload", "start")
                     trackers_upper = [(t).upper() for t in meta.trackers]
                     # Partition trackers into torrent trackers and Usenet indexers
                     torrent_trackers: list[str] = []
@@ -2962,6 +2983,7 @@ async def do_the_thing(base_dir: str) -> None:
                         has_usenet_upload=need_usenet_post,
                         has_torrent_trackers=bool(torrent_trackers),
                     )
+                    webui_events.stage("upload", "done")
                     if config["DEFAULT"].get("cross_seeding", True):
                         await process_cross_seeds(meta)
 
@@ -3001,8 +3023,11 @@ async def do_the_thing(base_dir: str) -> None:
                 else:
                     trackers = [t for t in cast(list[Any], meta.trackers) if isinstance(t, str)]
                     logger.debug(f"[cyan]Using trackers for request search: {trackers}[/cyan]")
+                webui_events.stage("requests", "start")
                 await tracker_setup.tracker_request(meta, trackers)
+                webui_events.stage("requests", "done")
 
+            webui_events.publish_tracker_statuses(meta.tracker_status, final=True)
             # Persist and expose the completed item before user-managed hooks run.
             # Hooks may inspect the final tracker status and files have not yet been cleaned.
             await record_completed_item_stats_async(meta, tracker_class_map)
@@ -3044,6 +3069,7 @@ async def do_the_thing(base_dir: str) -> None:
         current_release_log_path.set(None)
 
     except Exception as e:
+        webui_events.fail_active_stage()
         logger.info(f"[bold red]An unexpected error occurred: {escape(str(e))}[/bold red]")
         if sanitize_meta:
             meta = await Redaction.clean_meta_for_export(meta)

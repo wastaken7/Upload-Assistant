@@ -14,6 +14,7 @@ import cli_ui
 import httpx
 
 from data.example_config import config as example_config
+from src import webui_events
 from src.api_key_expiry import observe_tracker_response, warn_api_key_expiry
 from src.cleanup import cleanup_manager
 from src.console import logger
@@ -843,6 +844,9 @@ class TrackerSetup:
             elif tracker_name.upper() in ("BJSHARE", "FUNFILE", "HDSPACE", "AVISTAZ", "CINEMAZ", "PRIVATEHD", "MTEAM", "ORPHEUS"):
                 # These trackers have custom request handling
                 requests = cast(list[JsonDict], await tracker_instance.get_requests(meta))
+                for request in requests or []:
+                    if isinstance(request, dict) and request.get("Name"):
+                        webui_events.request_match(tracker_name, request.get("Name"), link=request.get("Link"), reward=request.get("Reward"))
                 return bool(requests) if tracker_name.upper() == "ORPHEUS" else False
             else:
                 if not url:
@@ -932,6 +936,7 @@ class TrackerSetup:
                             logger.info(
                                 f"[bold blue]Found exact request match on [bold yellow]{tracker_name}[/bold yellow] with bounty [bold yellow]{api_bounty}[/bold yellow] and with status [bold yellow]{api_status}[/bold yellow][/bold blue]"
                             )
+                            webui_events.request_match(tracker_name, api_name, link=new_url, reward=api_bounty, status=api_status, exact=True)
                             logger.info(f"[bold blue]Claimed status:[/bold blue] [bold yellow]{api_claimed}[/bold yellow]")
                             logger.info(f"[bold green]{api_name}:[/bold green] {new_url}")
                             logger.info("")
@@ -956,6 +961,7 @@ class TrackerSetup:
                             logger.info(
                                 f"[bold blue]Found exact request match on [bold yellow]{tracker_name}[/bold yellow] with bounty [bold yellow]{api_bounty}[/bold yellow] and with status [bold yellow]{api_status}[/bold yellow][/bold blue]"
                             )
+                            webui_events.request_match(tracker_name, api_name, link=new_url, reward=api_bounty, status=api_status, exact=True)
                             logger.info(f"[bold blue]Claimed status:[/bold blue] [bold yellow]{api_claimed}[/bold yellow]")
                             logger.info(f"[bold yellow]{api_name}[/bold yellow] - [bold yellow]S{api_season:02d} E{api_episode:02d}:[/bold yellow] {new_url}")
                             logger.info("")
@@ -980,6 +986,7 @@ class TrackerSetup:
                             logger.info(
                                 f"[bold blue]Found request on [bold yellow]{tracker_name}[/bold yellow] with bounty [bold yellow]{api_bounty}[/bold yellow] and with status [bold yellow]{api_status}[/bold yellow][/bold blue]"
                             )
+                            webui_events.request_match(tracker_name, api_name, link=new_url, reward=api_bounty, status=api_status, exact=False)
                             logger.info(f"[bold blue]Claimed status:[/bold blue] [bold yellow]{api_claimed}[/bold yellow]")
                             if meta.category == "MOVIE":
                                 logger.info(f"[bold yellow]{api_name}:[/bold yellow] {new_url}")
@@ -1045,6 +1052,7 @@ class TrackerSetup:
                         logger.info(
                             f"[bold blue]Found exact request match on [bold yellow]{tracker_name}[/bold yellow] with bounty [bold yellow]{api_bounty}[/bold yellow] and with status [bold yellow]{claimed_status}[/bold yellow][/bold blue]"
                         )
+                        webui_events.request_match(tracker_name, api_name, link=each.get("url"), reward=api_bounty, status=claimed_status, exact=True)
                         logger.info(f"[bold green]{api_name}:[/bold green] {each.get('url')}")
                         logger.info("")
 
@@ -1056,6 +1064,7 @@ class TrackerSetup:
                         logger.info(
                             f"[bold blue]Found request match on [bold yellow]{tracker_name}[/bold yellow] with bounty [bold yellow]{api_bounty}[/bold yellow] with mismatched HDR or DV[/bold blue]"
                         )
+                        webui_events.request_match(tracker_name, api_name, link=each.get("url"), reward=api_bounty, status=None, exact=False)
                         logger.info(f"[bold green]{api_name}:[/bold green] {each.get('url')}")
                         logger.info("")
 
@@ -1067,6 +1076,7 @@ class TrackerSetup:
                         logger.info(
                             f"[bold blue]Found exact request match on [bold yellow]{tracker_name}[/bold yellow] with bounty [bold yellow]{api_bounty}[/bold yellow] and with status [bold yellow]{claimed_status}[/bold yellow][/bold blue]"
                         )
+                        webui_events.request_match(tracker_name, api_name, link=each.get("url"), reward=api_bounty, status=claimed_status, exact=True)
                         logger.info(f"[bold yellow]{api_name}[/bold yellow] - [bold yellow]{meta.season}:[/bold yellow] {each.get('url')}")
                         logger.info("")
 
@@ -1078,6 +1088,7 @@ class TrackerSetup:
                         logger.info(
                             f"[bold blue]Found request match on [bold yellow]{tracker_name}[/bold yellow] with bounty [bold yellow]{api_bounty}[/bold yellow] with mismatched HDR or DV[/bold blue]"
                         )
+                        webui_events.request_match(tracker_name, api_name, link=each.get("url"), reward=api_bounty, status=None, exact=False)
                         logger.info(f"[bold yellow]{api_name}[/bold yellow] - [bold yellow]{meta.season}:[/bold yellow] {each.get('url')}")
                         logger.info("")
 
@@ -1089,6 +1100,7 @@ class TrackerSetup:
                         logger.info(
                             f"[bold blue]Found request on [bold yellow]{tracker_name}[/bold yellow] with bounty [bold yellow]{api_bounty}[/bold yellow] and with status [bold yellow]{claimed_status}[/bold yellow][/bold blue]"
                         )
+                        webui_events.request_match(tracker_name, api_name, link=each.get("url"), reward=api_bounty, status=claimed_status, exact=False)
                         if internal:
                             logger.info("[bold red]Request is internal only[/bold red]")
                         logger.info(f"[bold yellow]{api_name}[/bold yellow] - {each.get('url')}")

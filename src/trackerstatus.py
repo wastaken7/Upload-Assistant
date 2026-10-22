@@ -9,6 +9,7 @@ from typing import Any, cast
 
 import cli_ui
 
+from src import webui_events
 from src.cleanup import cleanup_manager
 from src.console import logger, prompt_in_thread
 from src.dupe_checking import DupeChecker
@@ -363,9 +364,9 @@ class TrackerStatusManager:
                 passed_trackers.append((tracker_name, display_name, tracker_class))
 
         if skipped_trackers:
-            logger.info(f"[red]Skipped due to specific tracker conditions: [bold yellow]{', '.join(skipped_trackers)}[/bold yellow].")
+            logger.info(f"[red]Skipped due to specific tracker conditions: [bold yellow]{', '.join(skipped_trackers)}[/bold yellow].", extra={"ua_gui": False})
         if dupe_trackers:
-            logger.info(f"[red]Found potential dupes on: [bold yellow]{', '.join(dupe_trackers)}[/bold yellow].\n")
+            logger.info(f"[red]Found potential dupes on: [bold yellow]{', '.join(dupe_trackers)}[/bold yellow].\n", extra={"ua_gui": False})
 
         # Now handle the confirmation/upload decisions
         if meta.unattended:
@@ -390,7 +391,13 @@ class TrackerStatusManager:
                     prompt_msg = "Upload to all?"
 
                 try:
-                    upload_all = await helper.prompt_yes_no(prompt_msg, default=False)
+                    with webui_events.prompt_context(
+                        kind="dupe_clear",
+                        clear_trackers=",".join(prompt_trackers),
+                        dupe_trackers=",".join(dupe_trackers),
+                        skipped_trackers=",".join(skipped_trackers),
+                    ):
+                        upload_all = await helper.prompt_yes_no(prompt_msg, default=False)
                 except EOFError:
                     logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")
                     await cleanup_manager.cleanup()
@@ -429,6 +436,7 @@ class TrackerStatusManager:
             logger.debug("[bold red]DEBUG MODE does not upload to sites")
 
         meta.tracker_status = merge_tracker_status(tracker_status, status_map)
+        webui_events.publish_tracker_statuses(meta.tracker_status)
         return successful_trackers
 
 

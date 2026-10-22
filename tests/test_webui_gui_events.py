@@ -1,0 +1,310 @@
+import io
+import json
+import logging
+import subprocess
+import sys
+import time
+
+import pytest
+
+import web_ui.server as server
+from src import webui_events
+from src.console import GuiNoticeHandler
+
+
+def _events(output: str) -> list[dict[str, object]]:
+    prefix = webui_events.GUI_EVENT_STDOUT_PREFIX
+    return [json.loads(line.removeprefix(prefix)) for line in output.splitlines() if line.startswith(prefix)]
+
+
+@pytest.fixture
+def gui_env(monkeypatch):
+    monkeypatch.setenv(webui_events.GUI_EVENTS_ENV, "1")
+    monkeypatch.setattr(webui_events, "_current_item", None)
+    monkeypatch.setattr(webui_events, "_active_stage", None)
+
+
+def test_events_are_silent_outside_the_web_ui(monkeypatch, capsys) -> None:
+    monkeypatch.delenv(webui_events.GUI_EVENTS_ENV, raising=False)
+
+    webui_events.stage("prep", "start")
+    webui_events.notice("error", "Something failed")
+    webui_events.tracker_result("FAKE", "success")
+
+    assert capsys.readouterr().out == ""
+
+
+def test_events_carry_the_item_and_plain_redacted_text(gui_env, capsys) -> None:
+    webui_events.begin_item("/media/Fictional.Movie.2020.mkv", 2, 3)
+    webui_events.notice("error", "[bold red]Upload failed for https://tracker.invalid/upload?passkey=abc123[/bold red]", tracker="FAKE")
+
+    item, notice = _events(capsys.readouterr().out)
+
+    assert item == {"kind": "item", "ts": item["ts"], "index": 2, "total": 3, "name": "Fictional.Movie.2020.mkv"}
+    assert notice["item"] == 2
+    assert notice["text"] == "Upload failed for https://tracker.invalid/upload?passkey=[REDACTED]"
+    assert notice["tracker"] == "FAKE"
+
+
+def test_tracker_results_drop_non_http_links_and_unknown_statuses(gui_env, capsys) -> None:
+    webui_events.tracker_result("FAKE", "success", link="javascript:alert(1)", torrent_id=7, duration=1.234)
+    webui_events.tracker_result("FAKE", "exploded")  # type: ignore[arg-type]
+
+    (event,) = _events(capsys.readouterr().out)
+
+    assert "link" not in event
+    assert event["torrent_id"] == "7"
+    assert event["duration"] == 1.23
+
+
+def test_oversized_events_are_not_written(gui_env, capsys, monkeypatch) -> None:
+    monkeypatch.setattr(webui_events, "MAX_EVENT_BYTES", 200)
+
+    webui_events.notice("error", "x" * 500)
+
+    assert capsys.readouterr().out == ""
+
+
+def test_stages_remember_which_one_to_fail(gui_env, capsys) -> None:
+    webui_events.stage("screens", "start")
+    webui_events.fail_active_stage()
+    webui_events.fail_active_stage()
+
+    events = _events(capsys.readouterr().out)
+
+    assert [(event["key"], event["status"]) for event in events] == [("screens", "start"), ("screens", "fail")]
+
+
+@pytest.mark.parametrize(
+    ("status", "final", "expected"),
+    [
+        ({"banned": True, "upload": False}, False, "banned"),
+        ({"upload": True, "upload_success": True}, True, "success"),
+        ({"upload": True, "upload_success": False, "status_message": "data error: rejected"}, True, "failed"),
+        ({"dupe": True, "upload": False}, False, "dupe"),
+        ({"skipped": True, "upload": False}, False, "skipped"),
+        ({"upload": True}, False, "pending"),
+        ({"upload": True}, True, "failed"),
+        ({"upload": False}, False, "skipped"),
+    ],
+)
+def test_tracker_status_classification(status, final, expected) -> None:
+    assert webui_events.tracker_status_from_meta(status, final=final) == expected
+
+
+def test_prompt_context_is_attached_to_prompts(gui_env, capsys) -> None:
+    with webui_events.prompt_context(kind="dupes", tracker="FAKE"):
+        prompt_id = webui_events.prompt_open("yes_no", "Upload to FAKE anyway?", default=False)
+    webui_events.prompt_close(prompt_id)
+
+    opened, closed = _events(capsys.readouterr().out)
+
+    assert opened["context"] == {"kind": "dupes", "tracker": "FAKE"}
+    assert opened["default"] is False
+    assert closed == {"kind": "prompt", "ts": closed["ts"], "action": "close", "id": prompt_id}
+
+
+def _record(level: int, message: str, **extra: object) -> logging.LogRecord:
+    record = logging.LogRecord("UploadAssistant", level, __file__, 1, message, None, None)
+    for key, value in extra.items():
+        setattr(record, key, value)
+    return record
+
+
+@pytest.mark.parametrize(
+    ("level", "message", "extra", "expected"),
+    [
+        (logging.INFO, "[red]Upload failed: timeout[/red]", {}, ("error", "Upload failed: timeout")),
+        (logging.INFO, "[bold red]Something broke[/bold red]", {}, ("error", "Something broke")),
+        (logging.ERROR, "plain error", {}, ("error", "plain error")),
+        (logging.WARNING, "[yellow]Careful[/yellow]", {}, ("warning", "Careful")),
+        (logging.INFO, "[yellow]Searching for existing torrents...", {}, None),
+        (logging.INFO, "[red]│[/red]", {}, None),
+        (logging.INFO, "[red]Shown as a result row[/red]", {"ua_gui": False}, None),
+        (logging.DEBUG, "[red]debug only[/red]", {}, None),
+        (logging.INFO, "[red]a [literal] bracket[/red]", {"markup": False}, ("error", "[red]a [literal] bracket[/red]")),
+    ],
+)
+def test_notice_handler_classifies_records(monkeypatch, level, message, extra, expected) -> None:
+    sent: list[tuple[str, str]] = []
+    monkeypatch.setattr(webui_events, "notice", lambda notice_level, text, **_kwargs: sent.append((notice_level, text)))
+    handler = GuiNoticeHandler()
+
+    if level >= handler.level:
+        handler.handle(_record(level, message, **extra))
+
+    assert sent == ([expected] if expected else [])
+
+
+def test_notice_handler_stops_after_its_limit(monkeypatch) -> None:
+    sent: list[str] = []
+    monkeypatch.setattr(webui_events, "notice", lambda _level, text, **_kwargs: sent.append(text))
+    monkeypatch.setattr("src.console._MAX_GUI_NOTICES", 2)
+    handler = GuiNoticeHandler()
+
+    for index in range(5):
+        handler.handle(_record(logging.ERROR, f"error number {index}"))
+
+    assert sent == ["error number 0", "error number 1"]
+
+
+def test_cli_ui_prompts_are_announced_and_still_answered_from_stdin() -> None:
+    code = (
+        "import src.console\n"
+        "src.console.install_gui_prompt_events()\n"
+        "import cli_ui\n"
+        "print('YES=' + str(cli_ui.ask_yes_no('Continue?', default=False)), flush=True)\n"
+        "print('PICK=' + str(cli_ui.ask_choice('Pick one', choices=['zeta', 'alpha'])), flush=True)\n"
+        "print('TEXT=' + str(cli_ui.ask_string('Title?', default='Fallback')), flush=True)\n"
+    )
+    result = subprocess.run(  # noqa: S603 - fixed Python prompt fixture
+        [sys.executable, "-u", "-c", code],
+        input="y\n1\n\n",
+        text=True,
+        encoding="utf-8",
+        capture_output=True,
+        env=server._webui_subprocess_env(),
+        check=True,
+        timeout=60,
+    )
+
+    prompts = [event for event in _events(result.stdout) if event["kind"] == "prompt"]
+    opened = [event for event in prompts if event["action"] == "open"]
+
+    assert [event["type"] for event in opened] == ["yes_no", "choice", "text"]
+    assert opened[0]["question"] == "Continue?"
+    # Choices are announced in the order cli_ui numbers them.
+    assert opened[1]["choices"] == ["alpha", "zeta"]
+    assert opened[2]["default"] == "Fallback"
+    assert sum(event["action"] == "close" for event in prompts) == 3
+    assert "YES=True" in result.stdout
+    assert "PICK=alpha" in result.stdout
+    assert "TEXT=Fallback" in result.stdout
+
+
+def test_server_parses_only_valid_gui_events() -> None:
+    prefix = server.GUI_EVENT_STDOUT_PREFIX
+
+    assert server._subprocess_gui_event("ordinary output\n") is None
+    assert server._subprocess_gui_event(prefix + '{"kind":"stage","key":"prep","status":"start"}\r\n') == {"kind": "stage", "key": "prep", "status": "start"}
+    assert server._subprocess_gui_event(prefix + "{not json") == {}
+    assert server._subprocess_gui_event(prefix + '{"kind":"script"}') == {}
+    assert server._subprocess_gui_event(prefix + "[1, 2]") == {}
+    assert server._subprocess_gui_event(prefix + json.dumps({"kind": "notice", "text": "x" * (server.MAX_EVENT_BYTES + 1)})) == {}
+
+
+def test_gui_event_records_are_not_prompts_and_wait_for_their_newline() -> None:
+    record = server.GUI_EVENT_STDOUT_PREFIX + json.dumps({"kind": "notice", "text": "Enter a title:" + "x" * 600})
+
+    assert server._subprocess_prompt_type(record) is None
+    assert not server._should_flush_subprocess_output(record, record[-1])
+    assert not server._should_flush_subprocess_output(record, "", idle=True)
+
+
+def test_webui_child_environment_enables_gui_events() -> None:
+    assert server._webui_subprocess_env()[webui_events.GUI_EVENTS_ENV] == "1"
+
+
+def test_session_stream_forwards_gui_events_without_blank_terminal_lines(tmp_path, monkeypatch) -> None:
+    gui_line = server.GUI_EVENT_STDOUT_PREFIX + '{"kind":"stage","key":"prep","status":"start"}'
+    content = f"before\n\n{gui_line}\n\nkept blank\nafter\n"
+
+    class FinishedProcess:
+        stdin = io.StringIO()
+        stdout = io.StringIO(content)
+        stderr = io.StringIO()
+        drained_at: float | None = None
+
+        def poll(self):
+            # Report the exit only once the reader has had time to queue everything.
+            if self.stdout.tell() < len(content):
+                return None
+            self.drained_at = self.drained_at or time.monotonic()
+            return 0 if time.monotonic() - self.drained_at > 0.5 else None
+
+        def wait(self, timeout=None):
+            return 0
+
+    process = FinishedProcess()
+    session_id = "gui-event-stream-test"
+    monkeypatch.setattr(server, "_is_authenticated", lambda: True)
+    monkeypatch.setattr(server, "_verify_csrf_header", lambda: True)
+    monkeypatch.setattr(server, "_verify_same_origin", lambda: True)
+    monkeypatch.setattr(server, "_validate_execution_path", lambda *_args, **_kwargs: str(tmp_path))
+    monkeypatch.setattr(server, "_assert_safe_resolved_path", lambda _: None)
+    monkeypatch.setattr(server, "_validate_upload_assistant_args", lambda args: args)
+    monkeypatch.setattr(server, "_spawn_webui_upload_process", lambda *_args: (process, "subprocess"))
+    monkeypatch.setattr(server, "_terminate_process_tree", lambda _process: True)
+    response = server.app.test_client().post("/api/execute", json={"path": str(tmp_path), "session_id": session_id}, buffered=False)
+    try:
+        assert response.status_code == 200
+        received: list[dict[str, object]] = []
+        deadline = time.monotonic() + 10
+        for chunk in response.response:
+            assert time.monotonic() < deadline, "Session never finished"
+            event = json.loads(chunk.decode().removeprefix("data: "))
+            if event["type"] in {"html", "gui"}:
+                received.append(event)
+            if event["type"] in {"exit", "finished"}:
+                break
+    finally:
+        response.close()
+        server.active_processes.pop(session_id, None)
+
+    kinds = [event["type"] for event in received]
+    html = [str(event["data"]) for event in received if event["type"] == "html"]
+    assert kinds.count("gui") == 1
+    assert received[kinds.index("gui")]["data"] == {"kind": "stage", "key": "prep", "status": "start"}
+    assert "UA_GUI_EVENT_JSON" not in "".join(html)
+    # The newline written before the record is dropped; a real blank line is kept.
+    assert len(html) == 4
+    assert "before" in html[0] and "kept blank" in html[2] and "after" in html[3]
+
+
+def test_slot_events_carry_the_terminal_details(gui_env, capsys) -> None:
+    from datetime import date
+
+    webui_events.slot(
+        "FAKE",
+        "review",
+        "Check before uploading",
+        "A release in the same slot exists.",
+        slot_name="1080p WEB",
+        why="One release per group and resolution.",
+        conflicts=[{"name": "Fictional.Movie.2020-OTHERGRP", "link": "https://tracker.invalid/t/1", "size": "4 GiB"}],
+        notes=["Check the audio tracks."],
+        rules_date=date(2020, 1, 1),
+        source_size=4 * 1024**3,
+    )
+
+    (event,) = _events(capsys.readouterr().out)
+
+    assert event["slot"] == "1080p WEB"
+    assert event["why"] == "One release per group and resolution."
+    assert event["notes"] == ["Check the audio tracks."]
+    assert event["rules"].startswith("Rules as of 2020-01-01 (")
+    (conflict,) = event["conflicts"]
+    assert conflict["diff_pct"] == 0
+    # Same size as the upload: the terminal's red end of the scale.
+    assert conflict["color"] == "#f43d3d"
+
+
+def test_dupe_colours_follow_the_size_difference(gui_env, capsys) -> None:
+    webui_events.dupes("FAKE", [{"name": "Close", "size": "4 GiB"}, {"name": "Far", "size": "2 GiB"}, {"name": "No size"}], source_size=4 * 1024**3)
+
+    (event,) = _events(capsys.readouterr().out)
+
+    close, far, unknown = event["entries"]
+    assert close["color"] == "#f43d3d"
+    assert far["color"] == "#3df43d"
+    assert "color" not in unknown
+
+
+def test_trackers_that_passed_the_dupe_check_say_so(gui_env, capsys) -> None:
+    webui_events.publish_tracker_statuses({"FAKE": {"upload": True, "dupe": False}, "OTHER": {"upload": True}})
+
+    fake, other = _events(capsys.readouterr().out)
+
+    assert fake["status"] == "pending"
+    assert fake["message"] == "No potential dupes found"
+    assert "message" not in other

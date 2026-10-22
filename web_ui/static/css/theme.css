@@ -3904,3 +3904,281 @@ html[data-ua-shape="square"]
   mask: var(--ua-lucide-icon) center / contain no-repeat;
   -webkit-mask: var(--ua-lucide-icon) center / contain no-repeat;
 }
+
+/* Upload page GUI output mode */
+.ua-run-gui-mode-toggle {
+  background: var(--ua-upload-surface);
+  border-color: var(--ua-upload-border);
+}
+
+.ua-run-gui-mode-option {
+  color: var(--ua-upload-muted);
+  transition:
+    background-color 150ms ease,
+    color 150ms ease;
+}
+
+.ua-run-gui-mode-option:hover {
+  background: var(--ua-upload-hover);
+  color: var(--ua-upload-text);
+}
+
+.ua-run-gui-mode-option[data-active="true"] {
+  background: var(--ua-copper);
+  color: #ffffff;
+}
+
+.ua-run-gui {
+  --ua-run-gui-tone: var(--ua-upload-muted);
+  color: var(--ua-upload-text);
+  overscroll-behavior: contain;
+}
+
+.ua-run-gui [data-tone="success"] {
+  --ua-run-gui-tone: #22c55e;
+}
+
+.ua-run-gui [data-tone="error"] {
+  --ua-run-gui-tone: #ef4444;
+}
+
+.ua-run-gui [data-tone="attention"] {
+  --ua-run-gui-tone: #f59e0b;
+}
+
+.ua-run-gui [data-tone="info"] {
+  --ua-run-gui-tone: #38bdf8;
+}
+
+.ua-run-gui [data-tone="muted"] {
+  --ua-run-gui-tone: var(--ua-upload-muted);
+}
+
+.ua-run-gui-strip,
+.ua-run-gui-block,
+.ua-run-gui-empty {
+  background: var(--ua-upload-surface);
+  border-color: var(--ua-upload-border);
+}
+
+.ua-run-gui-block {
+  border-left: 3px solid var(--ua-run-gui-tone);
+  flex-shrink: 0;
+}
+
+/* Stages stay in view while scrolling, under the overlaid Terminal | GUI switch. */
+.ua-run-gui-strip {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  flex-shrink: 0;
+  backdrop-filter: blur(10px);
+}
+
+.ua-run-gui-block-header,
+.ua-run-gui-divide > * + * {
+  border-color: var(--ua-upload-border);
+}
+
+.ua-run-gui-tone-icon {
+  color: var(--ua-run-gui-tone);
+}
+
+.ua-run-gui-count {
+  background: color-mix(in srgb, var(--ua-run-gui-tone) 18%, transparent);
+  color: color-mix(in srgb, var(--ua-run-gui-tone) 60%, var(--ua-upload-text));
+}
+
+.ua-run-gui-muted,
+.ua-run-gui-empty {
+  color: var(--ua-upload-muted);
+}
+
+.ua-run-gui-link {
+  color: color-mix(in srgb, #38bdf8 70%, var(--ua-upload-text));
+}
+
+.ua-run-gui-link:hover {
+  text-decoration: underline;
+}
+
+.ua-run-gui-tracker-fallback {
+  background: var(--ua-upload-hover);
+  color: var(--ua-upload-text);
+}
+
+.ua-run-gui-stage {
+  border-color: var(--ua-upload-border);
+  color: var(--ua-upload-muted);
+}
+
+.ua-run-gui-stage[data-status="idle"] {
+  opacity: 0.55;
+}
+
+.ua-run-gui-stage[data-status="start"] {
+  border-color: var(--ua-copper);
+  color: var(--ua-upload-text);
+}
+
+.ua-run-gui-stage[data-status="done"] {
+  color: color-mix(in srgb, #22c55e 65%, var(--ua-upload-text));
+}
+
+.ua-run-gui-stage[data-status="fail"] {
+  border-color: color-mix(in srgb, #ef4444 50%, transparent);
+  color: color-mix(in srgb, #ef4444 70%, var(--ua-upload-text));
+}
+
+.ua-run-gui-stage[data-status="skip"] {
+  text-decoration: line-through;
+}
+
+.ua-run-gui-status {
+  background: color-mix(in srgb, var(--ua-run-gui-tone) 16%, transparent);
+  color: color-mix(in srgb, var(--ua-run-gui-tone) 65%, var(--ua-upload-text));
+}
+
+.ua-run-gui-slot {
+  background: color-mix(in srgb, #f59e0b 12%, transparent);
+}
+
+.ua-run-gui-slot[data-verdict="block"] {
+  background: color-mix(in srgb, #ef4444 12%, transparent);
+}
+
+.ua-run-gui-slot[data-verdict="allow"] {
+  background: color-mix(in srgb, #22c55e 12%, transparent);
+}
+
+.ua-run-gui-attention-text {
+  color: color-mix(in srgb, #f59e0b 70%, var(--ua-upload-text));
+}
+
+.ua-run-gui-prompt {
+  --ua-run-gui-tone: #f59e0b;
+  background: var(--ua-upload-surface-raised);
+  border-color: color-mix(in srgb, #f59e0b 65%, transparent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, #f59e0b 12%, transparent);
+  flex-shrink: 0;
+}
+
+.ua-run-gui-prompt[data-answered="true"] {
+  --ua-run-gui-tone: var(--ua-upload-muted);
+  border-color: var(--ua-upload-border);
+  box-shadow: none;
+}
+
+.ua-run-gui-eyebrow {
+  color: var(--ua-run-gui-tone);
+}
+
+.ua-run-gui-prompt-context {
+  background: var(--ua-upload-surface);
+}
+
+.ua-run-gui-answer {
+  background: var(--ua-upload-hover);
+  color: var(--ua-upload-text);
+}
+
+.ua-run-gui-answer[data-variant="yes"],
+.ua-run-gui-answer[data-variant="send"] {
+  background: #16a34a;
+  color: #ffffff;
+}
+
+.ua-run-gui-answer[data-variant="no"] {
+  background: #dc2626;
+  color: #ffffff;
+}
+
+.ua-run-gui-answer[data-default="true"] {
+  box-shadow:
+    0 0 0 2px var(--ua-upload-surface-raised),
+    0 0 0 4px color-mix(in srgb, var(--ua-upload-text) 45%, transparent);
+}
+
+.ua-run-gui-choice,
+.ua-run-gui-input {
+  background: var(--ua-upload-surface);
+  border-color: var(--ua-upload-border);
+  color: var(--ua-upload-text);
+}
+
+.ua-run-gui-choice:hover:not(:disabled) {
+  background: var(--ua-upload-hover);
+}
+
+.ua-run-gui-mode-overlay {
+  border-radius: 0.6rem;
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.28);
+  opacity: 0.92;
+  transition: opacity 150ms ease;
+}
+
+.ua-run-gui-mode-overlay:hover,
+.ua-run-gui-mode-overlay:focus-within {
+  opacity: 1;
+}
+
+.ua-run-gui-stage[data-status="waiting"] {
+  border-color: color-mix(in srgb, #f59e0b 60%, transparent);
+  color: color-mix(in srgb, #f59e0b 75%, var(--ua-upload-text));
+}
+
+.ua-run-gui-section-label {
+  color: var(--ua-upload-muted);
+}
+
+.ua-run-gui-chip {
+  background: color-mix(in srgb, var(--ua-run-gui-tone) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ua-run-gui-tone) 30%, transparent);
+}
+
+.ua-run-gui-release-name {
+  background: var(--ua-upload-surface-raised);
+  border: 1px solid var(--ua-upload-border);
+}
+
+.ua-run-gui-size-diff {
+  --ua-run-gui-diff: var(--ua-upload-muted);
+  background: color-mix(in srgb, var(--ua-run-gui-diff) 18%, transparent);
+  color: color-mix(in srgb, var(--ua-run-gui-diff) 55%, var(--ua-upload-text));
+}
+
+.ua-run-gui-slot-icon {
+  color: #f59e0b;
+}
+
+.ua-run-gui-slot[data-verdict="block"] .ua-run-gui-slot-icon {
+  color: #ef4444;
+}
+
+.ua-run-gui-slot[data-verdict="allow"] .ua-run-gui-slot-icon {
+  color: #22c55e;
+}
+
+.ua-run-gui-details > summary {
+  list-style-position: inside;
+}
+
+.ua-run-gui-details[open] > summary {
+  color: var(--ua-upload-text);
+}
+
+.ua-run-gui-collapse {
+  color: var(--ua-upload-muted);
+  transition:
+    background-color 150ms ease,
+    color 150ms ease;
+}
+
+.ua-run-gui-collapse:hover {
+  background: var(--ua-upload-hover);
+  color: var(--ua-upload-text);
+}
+
+.ua-run-gui-tone-text {
+  color: color-mix(in srgb, var(--ua-run-gui-tone) 75%, var(--ua-upload-text));
+}

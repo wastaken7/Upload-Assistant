@@ -1,0 +1,381 @@
+"""Structured run events for the Web UI's GUI output mode.
+
+The Web UI starts ``upload.py`` as a child process and turns its terminal
+output into HTML. The GUI mode needs a few facts the terminal only shows as
+coloured text: run stages, prompts, dupes, missing disc details and tracker
+results. This module writes them as ``UA_GUI_EVENT_JSON:`` lines on stdout,
+which the server strips from the terminal stream and forwards as ``gui``
+session events.
+
+Every helper is a no-op unless ``UA_WEBUI_GUI_EVENTS=1``, so the CLI output is
+unchanged.
+"""
+
+from __future__ import annotations
+
+import contextlib
+import contextvars
+import itertools
+import json
+import os
+import re
+import sys
+import time
+from collections.abc import Generator, Iterable, Mapping
+from datetime import date, datetime
+from pathlib import Path
+from threading import Lock
+from typing import Any, Literal, cast
+
+GUI_EVENT_STDOUT_PREFIX = "UA_GUI_EVENT_JSON:"
+GUI_EVENTS_ENV = "UA_WEBUI_GUI_EVENTS"
+GUI_EVENT_KINDS = frozenset({"item", "stage", "notice", "notice_group", "prompt", "dupes", "slot", "tracker", "request"})
+STAGE_KEYS = ("prep", "confirm", "dupes", "screens", "torrent", "upload", "requests")
+STAGE_STATUSES = frozenset({"start", "done", "skip", "fail"})
+NOTICE_LEVELS = frozenset({"error", "warning", "attention"})
+TRACKER_STATUSES = frozenset({"pending", "success", "failed", "skipped", "dupe", "banned"})
+# Keep events small: the session log replays them and the browser renders text.
+MAX_TEXT_LENGTH = 1000
+MAX_LIST_ITEMS = 50
+MAX_EVENT_BYTES = 16384
+
+type StageStatus = Literal["start", "done", "skip", "fail"]
+type NoticeLevel = Literal["error", "warning", "attention"]
+type TrackerStatus = Literal["pending", "success", "failed", "skipped", "dupe", "banned"]
+
+_stdout_lock = Lock()
+_prompt_ids = itertools.count(1)
+_current_item: dict[str, Any] | None = None
+_active_stage: str | None = None
+_prompt_context: contextvars.ContextVar[dict[str, Any] | None] = contextvars.ContextVar("ua_gui_prompt_context", default=None)
+_ANSI_ESCAPE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
+_MARKUP_TAG = re.compile(r"\[/?[a-zA-Z#][^\[\]]*\]|\[/\]")
+
+
+def enabled() -> bool:
+    return os.environ.get(GUI_EVENTS_ENV) == "1"
+
+
+def plain_text(value: Any, limit: int = MAX_TEXT_LENGTH, *, markup: bool = True) -> str:
+    """Return redacted, markup-free text that is safe to show as plain text."""
+    text = _ANSI_ESCAPE.sub("", str(value if value is not None else ""))
+    if markup:
+        try:
+            from rich.text import Text
+
+            text = Text.from_markup(text).plain
+        except Exception:
+            text = _MARKUP_TAG.sub("", text)
+    try:
+        from src.cogs.redaction import Redaction
+
+        text = str(Redaction.redact_value(text))
+    except Exception:
+        return ""
+    text = text.strip()
+    return text if len(text) <= limit else f"{text[: limit - 1]}…"
+
+
+def _http_link(value: Any) -> str:
+    link = plain_text(value, 2000)
+    return link if link.lower().startswith(("http://", "https://")) else ""
+
+
+def _emit(kind: str, payload: Mapping[str, Any]) -> None:
+    if not enabled():
+        return
+    event: dict[str, Any] = {"kind": kind, "ts": round(time.time(), 3), **payload}
+    if _current_item is not None and kind != "item":
+        event["item"] = _current_item["index"]
+    try:
+        line = json.dumps(event, separators=(",", ":"), default=str)
+    except TypeError, ValueError:
+        return
+    if len(line) > MAX_EVENT_BYTES:
+        return
+    with _stdout_lock, contextlib.suppress(Exception):
+        sys.stdout.write(f"\n{GUI_EVENT_STDOUT_PREFIX}{line}\n")
+        sys.stdout.flush()
+
+
+def begin_item(path: str, index: int, total: int) -> None:
+    """Start a queue item; later events are tagged with its index."""
+    global _current_item, _active_stage
+    _current_item = {"index": int(index), "total": int(total)}
+    _active_stage = None
+    _emit("item", {"index": int(index), "total": int(total), "name": plain_text(Path(str(path)).name or path, 300)})
+
+
+def stage(key: str, status: StageStatus) -> None:
+    global _active_stage
+    if key not in STAGE_KEYS or status not in STAGE_STATUSES:
+        return
+    if status == "start":
+        _active_stage = key
+    elif _active_stage == key:
+        _active_stage = None
+    _emit("stage", {"key": key, "status": status})
+
+
+def fail_active_stage() -> None:
+    """Mark the stage that was running when an item stopped early as failed."""
+    if _active_stage is not None:
+        stage(_active_stage, "fail")
+
+
+@contextlib.contextmanager
+def stage_scope(key: str) -> Generator[None]:
+    """Mark a stage as started, then done or failed when the block exits."""
+    stage(key, "start")
+    try:
+        yield
+    except BaseException:
+        stage(key, "fail")
+        raise
+    stage(key, "done")
+
+
+def notice(level: NoticeLevel, text: Any, *, tracker: str | None = None, key: str | None = None) -> None:
+    if level not in NOTICE_LEVELS:
+        return
+    message = plain_text(text)
+    if not message:
+        return
+    payload: dict[str, Any] = {"level": level, "text": message}
+    if tracker:
+        payload["tracker"] = plain_text(tracker, 64)
+    if key:
+        payload["key"] = plain_text(key, 200)
+    _emit("notice", payload)
+
+
+def notice_group(group: str, notices: Iterable[Mapping[str, Any]]) -> None:
+    """Replace every notice previously sent for ``group`` with ``notices``."""
+    items: list[dict[str, Any]] = []
+    for entry in notices:
+        level = entry.get("level")
+        message = plain_text(entry.get("text"))
+        if level not in NOTICE_LEVELS or not message:
+            continue
+        item: dict[str, Any] = {"level": level, "text": message}
+        if entry.get("tracker"):
+            item["tracker"] = plain_text(entry["tracker"], 64)
+        items.append(item)
+        if len(items) >= MAX_LIST_ITEMS:
+            break
+    _emit("notice_group", {"group": plain_text(group, 64), "notices": items})
+
+
+@contextlib.contextmanager
+def prompt_context(**context: Any) -> Generator[None]:
+    """Attach context (for example the tracker being asked about) to prompts in this block."""
+    current = _prompt_context.get() or {}
+    token = _prompt_context.set({**current, **context})
+    try:
+        yield
+    finally:
+        _prompt_context.reset(token)
+
+
+def _context_payload() -> dict[str, Any] | None:
+    context = _prompt_context.get()
+    if not context:
+        return None
+    payload: dict[str, Any] = {}
+    for name, value in context.items():
+        if isinstance(value, Mapping):
+            entries = list(cast(Mapping[Any, Any], value).items())[:MAX_LIST_ITEMS]
+            payload[name] = {plain_text(k, 64): plain_text(v, 300) for k, v in entries}
+        elif isinstance(value, bool):
+            payload[name] = value
+        elif value is not None:
+            payload[name] = plain_text(value, 300)
+    return payload
+
+
+def prompt_open(prompt_type: Literal["yes_no", "text", "choice"], question: Any, *, choices: Iterable[Any] = (), default: Any = None) -> int | None:
+    """Announce an interactive prompt and return its id for ``prompt_close``."""
+    if not enabled():
+        return None
+    prompt_id = next(_prompt_ids)
+    payload: dict[str, Any] = {"action": "open", "id": prompt_id, "type": prompt_type, "question": plain_text(question)}
+    choice_labels = [plain_text(choice, 300) for choice in itertools.islice(choices, MAX_LIST_ITEMS)]
+    if choice_labels:
+        payload["choices"] = choice_labels
+    if isinstance(default, bool):
+        payload["default"] = default
+    elif default is not None:
+        payload["default"] = plain_text(default, 300)
+    context = _context_payload()
+    if context:
+        payload["context"] = context
+    _emit("prompt", payload)
+    return prompt_id
+
+
+def prompt_close(prompt_id: int | None) -> None:
+    if prompt_id is not None:
+        _emit("prompt", {"action": "close", "id": prompt_id})
+
+
+def _release_entries(entries: Iterable[Mapping[str, Any] | str], source_size: int | None) -> list[dict[str, Any]]:
+    """Name, link and size of releases on a site, with the terminal's size-difference colour."""
+    from src.uphelper import get_color_for_diff, parse_size_to_bytes
+
+    items: list[dict[str, Any]] = []
+    seen_links: set[str] = set()
+    for entry in entries:
+        if isinstance(entry, Mapping):
+            link = _http_link(entry.get("link"))
+            if link and link in seen_links:
+                continue
+            if link:
+                seen_links.add(link)
+            item: dict[str, Any] = {"name": plain_text(entry.get("name"), 300)}
+            if link:
+                item["link"] = link
+            size = parse_size_to_bytes(entry.get("size")) if entry.get("size") else None
+            if size:
+                item["size"] = size
+                if source_size:
+                    diff = (size - source_size) / source_size
+                    item["diff_pct"] = round(diff * 100)
+                    # Red means nearly the same size as the upload, green very different.
+                    item["color"] = f"#{get_color_for_diff(abs(diff))}"
+        else:
+            item = {"name": plain_text(entry, 300)}
+        if item["name"]:
+            items.append(item)
+        if len(items) >= MAX_LIST_ITEMS:
+            break
+    return items
+
+
+def dupes(tracker: str, entries: Iterable[Mapping[str, Any] | str], *, source_size: int | None = None, note: str = "", trumpable: bool = False) -> None:
+    """Report the possible duplicates shown before an "upload anyway?" prompt."""
+    payload: dict[str, Any] = {"tracker": plain_text(tracker, 64), "entries": _release_entries(entries, source_size), "trumpable": bool(trumpable)}
+    if note:
+        payload["note"] = plain_text(note)
+    _emit("dupes", payload)
+
+
+def slot(
+    tracker: str,
+    verdict: str,
+    title: str,
+    reason: str,
+    *,
+    slot_name: str = "",
+    why: str = "",
+    conflicts: Iterable[Mapping[str, Any]] = (),
+    notes: Iterable[str] = (),
+    rules_date: date | None = None,
+    source_size: int | None = None,
+) -> None:
+    """Report a tracker's slot recommendation with the same detail as the terminal box."""
+    payload: dict[str, Any] = {
+        "tracker": plain_text(tracker, 64),
+        "verdict": plain_text(verdict, 16).lower(),
+        "title": plain_text(title, 200),
+        "reason": plain_text(reason),
+    }
+    if slot_name:
+        payload["slot"] = plain_text(slot_name, 200)
+    if why:
+        payload["why"] = plain_text(why)
+    conflict_items = _release_entries(conflicts, source_size)
+    if conflict_items:
+        payload["conflicts"] = conflict_items
+    note_items = [plain_text(note) for note in itertools.islice(notes, MAX_LIST_ITEMS) if note]
+    if note_items:
+        payload["notes"] = note_items
+    if rules_date is not None:
+        age_days = (datetime.now().astimezone().date() - rules_date).days
+        age = "today" if age_days <= 0 else f"{age_days} day{'s' if age_days != 1 else ''} ago"
+        payload["rules"] = f"Rules as of {rules_date.isoformat()} ({age}). This is only a recommendation; tracker rules change over time."
+    _emit("slot", payload)
+
+
+def tracker_result(
+    tracker: str,
+    status: TrackerStatus,
+    *,
+    link: Any = None,
+    torrent_id: Any = None,
+    message: Any = None,
+    duration: float | None = None,
+) -> None:
+    if status not in TRACKER_STATUSES:
+        return
+    payload: dict[str, Any] = {"tracker": plain_text(tracker, 64), "status": status}
+    url = _http_link(link)
+    if url:
+        payload["link"] = url
+    if torrent_id not in (None, ""):
+        payload["torrent_id"] = plain_text(torrent_id, 64)
+    text = plain_text(message) if message else ""
+    if text:
+        payload["message"] = text
+    if isinstance(duration, (int, float)) and duration > 0:
+        payload["duration"] = round(float(duration), 2)
+    _emit("tracker", payload)
+
+
+def request_match(tracker: str, name: Any, *, link: Any = None, reward: Any = None, status: Any = None, exact: bool = False) -> None:
+    payload: dict[str, Any] = {"tracker": plain_text(tracker, 64), "name": plain_text(name, 300), "exact": bool(exact)}
+    url = _http_link(link)
+    if url:
+        payload["link"] = url
+    if reward not in (None, ""):
+        payload["reward"] = plain_text(reward, 100)
+    if status not in (None, ""):
+        payload["status"] = plain_text(status, 100)
+    if payload["name"]:
+        _emit("request", payload)
+
+
+def tracker_status_from_meta(status: Mapping[str, Any], *, final: bool) -> TrackerStatus:
+    """Classify a ``meta.tracker_status`` entry for the results panel."""
+    message = str(status.get("status_message") or "").lower()
+    if status.get("banned"):
+        return "banned"
+    if status.get("upload_success") is True:
+        return "success"
+    if status.get("upload_success") is False:
+        return "failed"
+    if status.get("dupe") or "dupe" in message or "duplicate" in message:
+        return "dupe"
+    if status.get("skipped"):
+        return "skipped"
+    if status.get("upload") is True:
+        # An approved upload with no result by the end of the item errored out.
+        return "failed" if final else "pending"
+    return "skipped"
+
+
+_DEFAULT_STATUS_MESSAGES: dict[str, str] = {
+    "banned": "Release group is banned on this tracker",
+    "dupe": "Possible dupe on this tracker",
+    "skipped": "Not uploaded",
+    "failed": "Upload did not complete",
+}
+
+
+def publish_tracker_statuses(tracker_status: Mapping[str, Any], *, final: bool = False) -> None:
+    """Send every tracker's current state, e.g. after dupe checks or at the end of an item."""
+    if not enabled():
+        return
+    for tracker, raw_status in tracker_status.items():
+        if not isinstance(raw_status, Mapping) or str(tracker).upper() in {"MANUAL", "USENET"}:
+            continue
+        status = cast(Mapping[str, Any], raw_status)
+        resolved = tracker_status_from_meta(status, final=final)
+        if resolved == "success":
+            tracker_result(str(tracker), resolved, link=status.get("torrent_link"), torrent_id=status.get("torrent_id"))
+            continue
+        if resolved == "pending":
+            # Passed the dupe check and approved; the upload result comes later.
+            tracker_result(str(tracker), resolved, message="No potential dupes found" if status.get("dupe") is False else None)
+            continue
+        message = status.get("status_message") or _DEFAULT_STATUS_MESSAGES.get(resolved)
+        tracker_result(str(tracker), resolved, message=message)

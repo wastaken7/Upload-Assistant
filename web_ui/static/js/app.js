@@ -146,6 +146,8 @@ const FILE_BROWSER_SCROLL_KEY = "ua_webui_file_browser_scroll_top";
 const FILE_BROWSER_SORT_KEY = "ua_webui_file_browser_sort";
 const SHOW_AUDIO_TRACKS_KEY = "ua_webui_show_audio_tracks";
 const SHOW_SUBTITLE_TRACKS_KEY = "ua_webui_show_subtitle_tracks";
+const OUTPUT_MODE_KEY = "ua_webui_output_mode";
+const RUN_GUI_RESULTS_COLLAPSED_KEY = "ua_webui_run_gui_results_collapsed";
 const DEFAULT_LEFT_SIDEBAR_WIDTH = 256;
 const DEFAULT_RIGHT_SIDEBAR_WIDTH = 320;
 const APPLICATION_RAIL_WIDTH = 80;
@@ -202,6 +204,15 @@ const createUploadTabForm = () => ({
   userInput: "",
 });
 
+const RunGui = window.UARunGui;
+
+/** GUI state for a new view; the screenshot demo starts with its frozen events. */
+const initialRunGuiState = () =>
+  (screenshotMode?.guiEvents || []).reduce(
+    RunGui.reduceRunGuiEvent,
+    RunGui.createRunGuiState(),
+  );
+
 /** Per-tab state that must survive while the tab is not displayed. */
 const createUploadTabRuntime = () => ({
   output: document.createElement("div"),
@@ -224,6 +235,8 @@ const createUploadTabRuntime = () => ({
   awaiting: false,
   waiting: new Set(),
   result: "",
+  // Structured run state for the GUI output mode; kept even while hidden.
+  gui: RunGui.createRunGuiState(),
 });
 
 const getUploadTabStatus = (runtime) => {
@@ -2101,6 +2114,14 @@ function AudionutsUAGUI() {
   const [showSubtitleTracks, setShowSubtitleTracks] = useState(
     () => storage.get(SHOW_SUBTITLE_TRACKS_KEY) === "true",
   );
+  const [outputMode, setOutputMode] = useState(() =>
+    storage.get(OUTPUT_MODE_KEY) === "gui" ? "gui" : "terminal",
+  );
+  const [runGuiResultsCollapsed, setRunGuiResultsCollapsed] = useState(
+    () => storage.get(RUN_GUI_RESULTS_COLLAPSED_KEY) === "true",
+  );
+  // Mirrors the active tab's runtime.gui; background tabs update only their runtime.
+  const [runGui, setRunGui] = useState(initialRunGuiState);
   const [executionScreenshots, setExecutionScreenshots] = useState(
     () => screenshotMode?.screenshots || [],
   );
@@ -2251,6 +2272,14 @@ function AudionutsUAGUI() {
       showSubtitleTracks ? "true" : "false",
     );
   }, [showSubtitleTracks]);
+
+  useEffect(() => {
+    storage.set(OUTPUT_MODE_KEY, outputMode);
+  }, [outputMode]);
+
+  useEffect(() => {
+    storage.set(RUN_GUI_RESULTS_COLLAPSED_KEY, String(runGuiResultsCollapsed));
+  }, [runGuiResultsCollapsed]);
 
   useEffect(() => {
     storage.set(
@@ -2588,6 +2617,7 @@ function AudionutsUAGUI() {
   if (tabRuntimeRef.current === null) {
     const firstTab = createUploadTabRuntime();
     firstTab.run.isExecuting = Boolean(screenshotMode);
+    firstTab.gui = initialRunGuiState();
     tabRuntimeRef.current = new Map([["tab-1", firstTab]]);
     // Demo background tabs only feed the tab bar; switching to them is disabled.
     screenshotMode?.tabs.slice(1).forEach((tab, index) => {
@@ -2700,6 +2730,23 @@ function AudionutsUAGUI() {
       }
     });
     return sortProgressItems([...itemsById.values()]);
+  };
+
+  /** Fold one session event into a tab's GUI state; only the active tab re-renders. */
+  const applyRunGuiEvent = (event, tabId = activeTabIdRef.current) => {
+    const runtime = getTabRuntime(tabId);
+    if (!runtime) return;
+    const next = RunGui.reduceRunGuiEvent(runtime.gui, event);
+    if (next === runtime.gui) return;
+    runtime.gui = next;
+    if (tabId === activeTabIdRef.current) setRunGui(next);
+  };
+
+  const resetRunGui = (tabId = activeTabIdRef.current) => {
+    const runtime = getTabRuntime(tabId);
+    if (!runtime) return;
+    runtime.gui = RunGui.createRunGuiState();
+    if (tabId === activeTabIdRef.current) setRunGui(runtime.gui);
   };
 
   const applyProgressEvent = (event, tabId = activeTabIdRef.current) => {
@@ -4048,6 +4095,8 @@ function AudionutsUAGUI() {
     const runtime = getTabRuntime(tabId);
     if (runtime) {
       runtime.awaiting = false;
+      runtime.gui = RunGui.markRunGuiPromptAnswered(runtime.gui);
+      setRunGui(runtime.gui);
       refreshUploadTabStatus(tabId);
     }
     // Optimistically echo the user's input locally so it appears before
@@ -5641,10 +5690,13 @@ function AudionutsUAGUI() {
         }
       } else if (data.type === "progress") {
         applyProgressEvent(data.data || {}, tabId);
+      } else if (data.type === "gui") {
+        applyRunGuiEvent(data, tabId);
       } else if (data.type === "prompt_sound") {
         if (live) window.uaPromptSound?.play();
       } else if (data.type === "prompt_state") {
         runtime.awaiting = Boolean(data.awaiting);
+        applyRunGuiEvent(data, tabId);
         refreshUploadTabStatus(tabId);
       } else if (data.type === "replay_done") {
         live = true;
@@ -5661,6 +5713,7 @@ function AudionutsUAGUI() {
         outcome.error = true;
         appendSystemMessage(`Error: ${data.data}`, "error", tabId);
       } else if (data.type === "exit") {
+        applyRunGuiEvent(data, tabId);
         appendSystemMessage("", "info", tabId);
         appendSystemMessage(
           `Success: Process exited with code ${data.code}`,
@@ -5673,6 +5726,7 @@ function AudionutsUAGUI() {
       } else if (data.type === "started") {
         appendSystemMessage("Scheduled upload started.", "info", tabId);
       } else if (data.type === "finished") {
+        applyRunGuiEvent(data, tabId);
         outcome.finished = true;
         if (outcome.exitCode === null && Number.isInteger(data.exit_code)) {
           outcome.exitCode = data.exit_code;
@@ -6236,6 +6290,7 @@ function AudionutsUAGUI() {
       const runtime = getTabRuntime(tabId);
       if (!runtime) return;
       runtime.output.replaceChildren();
+      resetRunGui(tabId);
       await executeSinglePath(
         data.path,
         `session_${tabId}_${Date.now()}`,
@@ -6291,6 +6346,7 @@ function AudionutsUAGUI() {
 
     // Clear this tab's output
     runtime.output.replaceChildren();
+    resetRunGui(tabId);
     updateTabRun(tabId, { progressItems: [] });
     appendWelcomeMessage(tabId);
   };
@@ -6323,6 +6379,7 @@ function AudionutsUAGUI() {
     setIsExecuting(next.run.isExecuting);
     setIsTerminalView(next.view.isTerminalView);
     setProgressItems(next.view.progressItems);
+    setRunGui(next.gui);
     setSelectedPath(form.selectedPath);
     setSelectedPaths(form.selectedPaths);
     setManualPathsText(form.manualPathsText);
@@ -8067,6 +8124,1051 @@ function AudionutsUAGUI() {
     isAwaitingTerminalInput && executionPreview?.input_type === "yes_no",
   );
 
+  const isGuiOutput = outputMode === "gui";
+
+  const renderOutputModeToggle = (compact = false) => (
+    <div
+      role="radiogroup"
+      aria-label="Output view"
+      className="ua-run-gui-mode-toggle inline-flex shrink-0 rounded-lg border p-0.5"
+    >
+      {[
+        { mode: "terminal", icon: "square-terminal", label: "Terminal" },
+        { mode: "gui", icon: "layout-dashboard", label: "GUI" },
+      ].map((option) => (
+        <button
+          key={option.mode}
+          type="button"
+          role="radio"
+          aria-checked={outputMode === option.mode}
+          onClick={() => setOutputMode(option.mode)}
+          title={
+            option.mode === "gui"
+              ? "Show errors, prompts and results as panels"
+              : "Show the raw terminal output"
+          }
+          className={`ua-run-gui-mode-option flex items-center gap-1.5 rounded-md ${compact ? "px-2 py-1 text-xs" : "px-2.5 py-1 text-sm"} font-medium`}
+          data-active={outputMode === option.mode}
+        >
+          <LucideIcon name={option.icon} className="h-4 w-4" />
+          {option.label}
+        </button>
+      ))}
+    </div>
+  );
+
+  const RUN_GUI_TRACKER_STATUS = {
+    success: { icon: "circle-check", label: "Uploaded", tone: "success" },
+    failed: { icon: "circle-x", label: "Failed", tone: "error" },
+    pending: { icon: "clock", label: "Queued", tone: "info" },
+    dupe: { icon: "copy-check", label: "Dupe", tone: "attention" },
+    banned: { icon: "ban", label: "Banned", tone: "error" },
+    skipped: { icon: "circle-minus", label: "Skipped", tone: "muted" },
+  };
+
+  const RUN_GUI_SLOT_ICONS = {
+    allow: "circle-check",
+    block: "circle-x",
+    review: "triangle-alert",
+  };
+
+  const renderRunGuiTrackerIcon = (name) => {
+    const tracker = trackers.find((entry) => entry.name === name);
+    if (tracker?.favicon && !failedFavicons.has(name)) {
+      return (
+        <img
+          src={tracker.favicon}
+          alt=""
+          onError={() => setFailedFavicons((prev) => new Set(prev).add(name))}
+          className="h-4 w-4 shrink-0 rounded-sm object-contain"
+        />
+      );
+    }
+    return (
+      <span
+        aria-hidden="true"
+        className="ua-run-gui-tracker-fallback flex h-4 w-4 shrink-0 items-center justify-center rounded-sm text-[9px] font-bold uppercase"
+      >
+        {String(name || "?").slice(0, 1)}
+      </span>
+    );
+  };
+
+  const runGuiTrackerName = (name) =>
+    trackers.find((entry) => entry.name === name)?.display_name || name;
+
+  const renderRunGuiTracker = (name) =>
+    name ? (
+      <span className="inline-flex min-w-0 items-center gap-1.5 font-semibold">
+        {renderRunGuiTrackerIcon(name)}
+        <span className="truncate">{runGuiTrackerName(name)}</span>
+      </span>
+    ) : null;
+
+  const renderRunGuiTrackerChips = (names, tone = "muted") => (
+    <div className="flex flex-wrap gap-1.5">
+      {names.map((name) => (
+        <span
+          key={name}
+          className="ua-run-gui-chip inline-flex items-center rounded-md px-2 py-0.5 text-xs"
+          data-tone={tone}
+        >
+          {renderRunGuiTracker(name)}
+        </span>
+      ))}
+    </div>
+  );
+
+  const renderRunGuiLink = (href, label, className = "") =>
+    /^https?:\/\//i.test(href || "") ? (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={`ua-run-gui-link inline-flex min-w-0 items-center gap-1 ${className}`}
+      >
+        <span className="truncate">{label}</span>
+        <LucideIcon name="external-link" className="h-3.5 w-3.5 shrink-0" />
+      </a>
+    ) : (
+      <span className={`min-w-0 truncate ${className}`}>{label}</span>
+    );
+
+  /** A titled panel; pass onToggle to let the user collapse it to its header. */
+  const renderRunGuiBlock = ({
+    tone,
+    icon,
+    title,
+    count,
+    aside,
+    children,
+    collapsed = false,
+    onToggle = null,
+  }) => (
+    <section className="ua-run-gui-block rounded-lg border" data-tone={tone}>
+      <header
+        className={`ua-run-gui-block-header flex items-center gap-2 px-3 py-2 ${collapsed ? "" : "border-b"}`}
+      >
+        <LucideIcon name={icon} className="ua-run-gui-tone-icon h-4 w-4" />
+        <h3 className="text-sm font-semibold">{title}</h3>
+        {count > 0 && (
+          <span className="ua-run-gui-count rounded-full px-2 text-xs font-semibold">
+            {count}
+          </span>
+        )}
+        {aside && <div className="ml-auto min-w-0">{aside}</div>}
+        {onToggle && (
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-expanded={!collapsed}
+            aria-label={`${collapsed ? "Expand" : "Collapse"} ${title}`}
+            title={collapsed ? "Expand" : "Collapse"}
+            className={`ua-run-gui-collapse flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${aside ? "" : "ml-auto"}`}
+          >
+            <LucideIcon
+              name={collapsed ? "chevron-down" : "chevron-up"}
+              className="h-4 w-4"
+            />
+          </button>
+        )}
+      </header>
+      {!collapsed && <div className="px-3 py-2">{children}</div>}
+    </section>
+  );
+
+  const renderRunGuiSectionLabel = (label) => (
+    <p className="ua-run-gui-section-label text-[0.68rem] font-semibold uppercase tracking-wider">
+      {label}
+    </p>
+  );
+
+  /** Releases on a site, coloured like the terminal: red means nearly your size. */
+  const renderRunGuiReleaseList = (entries, limit = 6) => (
+    <ul className="mt-1 space-y-1">
+      {entries.slice(0, limit).map((entry, index) => (
+        <li
+          key={`${entry.link || entry.name}-${index}`}
+          className="flex min-w-0 items-center gap-2 text-sm"
+        >
+          {renderRunGuiLink(entry.link, entry.name, "flex-1")}
+          {entry.size ? (
+            <span className="shrink-0 text-xs tabular-nums">
+              <span className="ua-run-gui-muted">{formatSize(entry.size)}</span>
+              {entry.diffPct !== null && (
+                <span
+                  className="ua-run-gui-size-diff ml-1.5 rounded px-1.5 py-0.5 font-semibold"
+                  style={
+                    entry.color
+                      ? { "--ua-run-gui-diff": entry.color }
+                      : undefined
+                  }
+                  title={
+                    Math.abs(entry.diffPct) < 2
+                      ? "About the same size as yours"
+                      : `${Math.abs(entry.diffPct)}% ${entry.diffPct < 0 ? "smaller" : "larger"} than yours`
+                  }
+                >
+                  {entry.diffPct > 0 ? "+" : ""}
+                  {entry.diffPct}%
+                </span>
+              )}
+            </span>
+          ) : null}
+        </li>
+      ))}
+      {entries.length > limit && (
+        <li className="ua-run-gui-muted text-xs">
+          …and {entries.length - limit} more in the terminal
+        </li>
+      )}
+    </ul>
+  );
+
+  const renderRunGuiSlot = (slot) => (
+    <div
+      className="ua-run-gui-slot space-y-2 rounded-md px-3 py-2.5"
+      data-verdict={slot.verdict}
+    >
+      <div className="flex items-start gap-2">
+        <LucideIcon
+          name={RUN_GUI_SLOT_ICONS[slot.verdict] || "circle-help"}
+          className="ua-run-gui-slot-icon mt-0.5 h-4 w-4 shrink-0"
+        />
+        <div className="min-w-0">
+          <p className="text-sm font-semibold">{slot.title}</p>
+          {slot.reason && <p className="text-sm">{slot.reason}</p>}
+        </div>
+      </div>
+      {slot.slot && (
+        <p className="text-sm">
+          <span className="ua-run-gui-muted">Slot: </span>
+          {slot.slot}
+        </p>
+      )}
+      {slot.why && (
+        <div>
+          {renderRunGuiSectionLabel("Why")}
+          <p className="text-sm">{slot.why}</p>
+        </div>
+      )}
+      {slot.conflicts.length > 0 && (
+        <div>
+          {renderRunGuiSectionLabel("Already on the site")}
+          {renderRunGuiReleaseList(slot.conflicts, 5)}
+        </div>
+      )}
+      {slot.notes.map((note, index) => (
+        <p key={index} className="text-sm">
+          <span className="font-semibold">Note: </span>
+          {note}
+        </p>
+      ))}
+      {slot.rules && <p className="ua-run-gui-muted text-xs">{slot.rules}</p>}
+    </div>
+  );
+
+  const renderRunGuiDupe = (dupe) => (
+    <div>
+      {renderRunGuiSectionLabel(
+        dupe.trumpable
+          ? "Trumpable releases on the site"
+          : "Possible dupes on the site",
+      )}
+      {dupe.note && <p className="ua-run-gui-muted text-xs">{dupe.note}</p>}
+      {renderRunGuiReleaseList(dupe.entries)}
+    </div>
+  );
+
+  const renderRunGuiNotice = (notice) => (
+    <li key={notice.id} className="flex min-w-0 items-start gap-2 py-1 text-sm">
+      {notice.tracker ? (
+        <span className="shrink-0">{renderRunGuiTracker(notice.tracker)}</span>
+      ) : null}
+      <span className="min-w-0 flex-1 whitespace-pre-wrap break-words">
+        {notice.text}
+      </span>
+      {notice.count > 1 && (
+        <span className="ua-run-gui-count shrink-0 rounded-full px-1.5 text-xs font-semibold">
+          ×{notice.count}
+        </span>
+      )}
+    </li>
+  );
+
+  /** Slot check, dupes and notices kept for one tracker. */
+  const renderRunGuiTrackerCard = (card, { showTracker = true } = {}) => (
+    <div key={card.key} className="space-y-2">
+      {showTracker && renderRunGuiTracker(card.tracker)}
+      {card.slot && renderRunGuiSlot(card.slot)}
+      {card.dupe && renderRunGuiDupe(card.dupe)}
+      {card.notices.length > 0 && (
+        <ul>
+          {card.notices.map((notice) =>
+            renderRunGuiNotice({ ...notice, tracker: "" }),
+          )}
+        </ul>
+      )}
+    </div>
+  );
+
+  const runGuiCardSummary = (card) =>
+    [
+      card.slot && (card.slot.title || "Slot check"),
+      card.dupe &&
+        (card.dupe.trumpable
+          ? "trumpable release"
+          : `${card.dupe.entries.length} possible dupe${card.dupe.entries.length === 1 ? "" : "s"}`),
+      card.notices.length &&
+        `${card.notices.length} note${card.notices.length === 1 ? "" : "s"}`,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+
+  const getLastTerminalLine = () => {
+    const output = getTabRuntime(activeTabIdRef.current)?.output;
+    const nodes = output ? Array.from(output.childNodes || []) : [];
+    for (let index = nodes.length - 1; index >= 0; index -= 1) {
+      const line = String(nodes[index].textContent || "").trim();
+      if (line) return line.split("\n").pop().trim();
+    }
+    return "";
+  };
+
+  const splitTrackers = (value) =>
+    String(value || "")
+      .split(",")
+      .map((name) => name.trim())
+      .filter(Boolean);
+
+  const renderRunGuiConfirmContext = (context, missing) => {
+    const baseName = context.base_name || "";
+    const names = Object.entries(context.release_names || {});
+    const sameName = names
+      .filter(([, name]) => name === baseName)
+      .map(([tracker]) => tracker);
+    const otherNames = names.filter(([, name]) => name !== baseName);
+    return (
+      <>
+        {baseName && (
+          <div>
+            {renderRunGuiSectionLabel("Release name")}
+            <p className="ua-run-gui-release-name mt-1 break-all rounded-md px-2.5 py-1.5 font-mono text-sm">
+              {baseName}
+            </p>
+            {sameName.length > 0 && (
+              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                <span className="ua-run-gui-muted text-xs">Used on</span>
+                {renderRunGuiTrackerChips(sameName)}
+              </div>
+            )}
+          </div>
+        )}
+        {otherNames.length > 0 && (
+          <div>
+            {renderRunGuiSectionLabel(
+              baseName ? "Different name on" : "Release names",
+            )}
+            <dl className="mt-1 space-y-1.5">
+              {otherNames.map(([tracker, name]) => (
+                <div
+                  key={tracker}
+                  className="grid min-w-0 gap-x-3 gap-y-0.5 sm:grid-cols-[9rem_minmax(0,1fr)]"
+                >
+                  <dt className="min-w-0 text-sm">
+                    {renderRunGuiTracker(tracker)}
+                  </dt>
+                  <dd className="ua-run-gui-release-name min-w-0 break-all rounded-md px-2 py-1 font-mono text-xs">
+                    {name}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        )}
+        {missing.length > 0 && (
+          <div>
+            {renderRunGuiSectionLabel("Missing")}
+            <ul className="mt-1 space-y-1">
+              {missing.map((notice) => (
+                <li
+                  key={notice.id}
+                  className="ua-run-gui-attention-text flex gap-1.5 text-sm"
+                >
+                  <LucideIcon
+                    name="triangle-alert"
+                    className="mt-0.5 h-3.5 w-3.5 shrink-0"
+                  />
+                  {notice.text}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </>
+    );
+  };
+
+  const renderRunGuiDupeClearContext = (context) => {
+    const groups = [
+      [
+        "No potential dupes found",
+        splitTrackers(context.clear_trackers),
+        "success",
+      ],
+      [
+        "Possible dupes found",
+        splitTrackers(context.dupe_trackers),
+        "attention",
+      ],
+      [
+        "Skipped by tracker rules",
+        splitTrackers(context.skipped_trackers),
+        "muted",
+      ],
+    ].filter(([, names]) => names.length);
+    return groups.map(([label, names, tone]) => (
+      <div key={label}>
+        {renderRunGuiSectionLabel(label)}
+        <div className="mt-1">{renderRunGuiTrackerChips(names, tone)}</div>
+      </div>
+    ));
+  };
+
+  const renderRunGuiPrompt = (view) => {
+    const prompt = view.prompt;
+    // Every cli_ui prompt is announced. Without an announcement, rely on the
+    // text heuristic only once the 2-second preview poll agrees, so ordinary
+    // lines ending in ":" do not flash a prompt card.
+    const awaiting = view.awaiting && isAwaitingTerminalInput;
+    if (!isExecuting || (!prompt && !awaiting)) return null;
+    const type =
+      prompt?.type || (view.inputType === "yes_no" ? "yes_no" : "text");
+    const question =
+      prompt?.question ||
+      getLastTerminalLine() ||
+      "The upload is waiting for your answer.";
+    const context = prompt?.context || {};
+    // The demo has no session; its buttons look live but sendInput ignores them.
+    const disabled =
+      (!sessionId && !screenshotMode) ||
+      isSendingInput ||
+      Boolean(prompt?.answered);
+    const trackerKey = `${prompt?.item}:${context.tracker}`;
+    const slot = context.kind === "dupes" ? view.slots[trackerKey] : null;
+    const dupe = context.kind === "dupes" ? view.dupes[trackerKey] : null;
+    const missing =
+      context.kind === "confirm"
+        ? view.attention.filter(
+            (notice) =>
+              notice.group === "confirm" && notice.item === prompt.item,
+          )
+        : [];
+    let details = null;
+    if (context.kind === "confirm") {
+      details = renderRunGuiConfirmContext(context, missing);
+    } else if (context.kind === "dupe_clear") {
+      details = renderRunGuiDupeClearContext(context);
+    } else if (slot || dupe) {
+      details = (
+        <>
+          {slot && renderRunGuiSlot(slot)}
+          {dupe && renderRunGuiDupe(dupe)}
+        </>
+      );
+    }
+    const answer = (value) => sendInput(sessionId, value);
+
+    return (
+      <section
+        className="ua-run-gui-prompt rounded-lg border-2 p-3"
+        aria-live="polite"
+        data-answered={Boolean(prompt?.answered)}
+      >
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <LucideIcon
+            name={prompt?.answered ? "loader-circle" : "circle-help"}
+            className={`ua-run-gui-tone-icon h-4 w-4 ${prompt?.answered ? "animate-spin" : ""}`}
+          />
+          <p className="ua-run-gui-eyebrow text-xs font-semibold uppercase tracking-wide">
+            {prompt?.answered ? "Answer sent" : "Your input is needed"}
+          </p>
+          {context.tracker && (
+            <>
+              <span className="ua-run-gui-muted text-xs" aria-hidden="true">
+                ·
+              </span>
+              <span className="text-sm">
+                {renderRunGuiTracker(context.tracker)}
+              </span>
+            </>
+          )}
+          {context.debug === true && (
+            <span
+              className="ua-run-gui-chip ml-auto rounded-md px-2 py-0.5 text-xs"
+              data-tone="info"
+            >
+              Debug: nothing will be uploaded
+            </span>
+          )}
+        </div>
+        <p className="mt-1.5 break-words text-base font-semibold">{question}</p>
+
+        {details && (
+          <div className="ua-run-gui-prompt-context mt-3 space-y-3 rounded-md p-3">
+            {details}
+          </div>
+        )}
+
+        <div className="mt-3 flex flex-wrap gap-2">
+          {type === "yes_no" && (
+            <>
+              <button
+                type="button"
+                onClick={() => answer("yes")}
+                disabled={disabled}
+                className="ua-run-gui-answer flex items-center gap-1.5 rounded-lg px-4 py-2 font-medium disabled:opacity-50"
+                data-variant="yes"
+                data-default={prompt?.default === true}
+                title={prompt?.default === true ? "Default answer" : undefined}
+              >
+                <LucideIcon name="check" className="h-4 w-4" />
+                Yes
+              </button>
+              <button
+                type="button"
+                onClick={() => answer("no")}
+                disabled={disabled}
+                className="ua-run-gui-answer flex items-center gap-1.5 rounded-lg px-4 py-2 font-medium disabled:opacity-50"
+                data-variant="no"
+                data-default={prompt?.default === false}
+                title={prompt?.default === false ? "Default answer" : undefined}
+              >
+                <LucideIcon name="x" className="h-4 w-4" />
+                No
+              </button>
+            </>
+          )}
+          {type === "choice" && (
+            <div className="grid w-full gap-1.5">
+              {prompt.choices.map((choice, index) => (
+                <button
+                  key={`${index}-${choice}`}
+                  type="button"
+                  onClick={() => answer(String(index + 1))}
+                  disabled={disabled}
+                  className="ua-run-gui-choice flex min-w-0 items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm disabled:opacity-50"
+                >
+                  <span className="ua-run-gui-count shrink-0 rounded px-1.5 text-xs font-semibold">
+                    {index + 1}
+                  </span>
+                  <span className="min-w-0 break-words">{choice}</span>
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => answer("")}
+                disabled={disabled}
+                className="ua-run-gui-muted justify-self-start text-xs underline disabled:opacity-50"
+              >
+                Skip
+              </button>
+            </div>
+          )}
+          {type === "text" && (
+            <form
+              className="flex w-full min-w-0 gap-2"
+              onSubmit={(event) => {
+                event.preventDefault();
+                answer(userInput);
+              }}
+            >
+              <input
+                value={userInput}
+                onChange={(event) => setUserInput(event.target.value)}
+                disabled={disabled}
+                placeholder={
+                  prompt?.default && typeof prompt.default === "string"
+                    ? `Leave empty for "${prompt.default}"`
+                    : "Type your answer"
+                }
+                aria-label="Answer"
+                className="ua-run-gui-input min-w-0 flex-1 rounded-lg border px-3 py-2 text-sm"
+              />
+              <button
+                type="submit"
+                disabled={disabled}
+                className="ua-run-gui-answer rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50"
+                data-variant="send"
+              >
+                Send
+              </button>
+            </form>
+          )}
+        </div>
+      </section>
+    );
+  };
+
+  const RUN_GUI_STAGE_STATUS_TEXT = {
+    start: "running",
+    waiting: "waiting for your answer",
+    done: "done",
+    fail: "stopped",
+    skip: "skipped",
+  };
+
+  const renderRunGuiStages = (view, waitingForUser) => (
+    <ol
+      className="ua-run-gui-stages flex flex-wrap items-center gap-1.5"
+      aria-label="Upload stages"
+    >
+      {view.stages.map((stage) => {
+        // The running stage is paused while a prompt waits for the user.
+        const status =
+          stage.status === "start" && waitingForUser ? "waiting" : stage.status;
+        const icon =
+          {
+            start: "loader-circle",
+            waiting: "hourglass",
+            done: "circle-check",
+            fail: "circle-x",
+            skip: "circle-minus",
+          }[status] || stage.icon;
+        return (
+          <li
+            key={stage.key}
+            className="ua-run-gui-stage flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium"
+            data-status={status || "idle"}
+            title={`${stage.label}: ${RUN_GUI_STAGE_STATUS_TEXT[status] || "not reached"}`}
+          >
+            <LucideIcon
+              name={icon}
+              className={`h-3.5 w-3.5 ${status === "start" ? "animate-spin" : ""}`}
+            />
+            {stage.label}
+          </li>
+        );
+      })}
+    </ol>
+  );
+
+  const renderRunGuiResultRow = (entry, view) => {
+    const status =
+      RUN_GUI_TRACKER_STATUS[entry.status] || RUN_GUI_TRACKER_STATUS.pending;
+    const card = view.trackerDetails[`${entry.item}:${entry.tracker}`];
+    return (
+      <li key={`${entry.item}-${entry.tracker}`} className="py-1.5">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+          <span className="min-w-[8rem] flex-1">
+            {renderRunGuiTracker(entry.tracker)}
+          </span>
+          <span
+            className="ua-run-gui-status inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-semibold"
+            data-tone={status.tone}
+          >
+            <LucideIcon name={status.icon} className="h-3.5 w-3.5" />
+            {status.label}
+          </span>
+          {entry.duration ? (
+            <span className="ua-run-gui-muted text-xs tabular-nums">
+              {entry.duration.toFixed(1)}s
+            </span>
+          ) : null}
+          {entry.link &&
+            renderRunGuiLink(
+              entry.link,
+              entry.torrentId ? `#${entry.torrentId}` : "Open",
+              "text-xs",
+            )}
+        </div>
+        {entry.message && (
+          <p className="ua-run-gui-muted mt-0.5 break-words text-xs">
+            {entry.message}
+          </p>
+        )}
+        {card && (
+          <details className="ua-run-gui-details mt-1">
+            <summary className="ua-run-gui-muted cursor-pointer text-xs font-semibold">
+              {runGuiCardSummary(card)}
+            </summary>
+            <div className="mt-2">
+              {renderRunGuiTrackerCard(card, { showTracker: false })}
+            </div>
+          </details>
+        )}
+      </li>
+    );
+  };
+
+  const plural = (count, word) => `${count} ${word}${count === 1 ? "" : "s"}`;
+
+  /** Notes, errors and warnings kept for an item the queue has moved past. */
+  const renderRunGuiItemNotes = (notes) => {
+    const problems = notes.problems || [];
+    const errors = problems.filter((notice) => notice.level === "error");
+    const warnings = problems.filter((notice) => notice.level === "warning");
+    const noteCount = notes.cards.length + notes.notices.length;
+    if (!noteCount && !problems.length) return null;
+    const tone = errors.length ? "error" : warnings.length ? "attention" : "";
+    const summary = [
+      errors.length && plural(errors.length, "error"),
+      warnings.length && plural(warnings.length, "warning"),
+      noteCount && plural(noteCount, "note"),
+    ]
+      .filter(Boolean)
+      .join(" · ");
+    return (
+      <details className="ua-run-gui-details mt-1.5" data-tone={tone}>
+        <summary className="ua-run-gui-muted cursor-pointer text-xs font-semibold">
+          {tone && (
+            <LucideIcon
+              name={errors.length ? "circle-x" : "triangle-alert"}
+              className="ua-run-gui-tone-icon mr-1 inline-block h-3.5 w-3.5 align-[-2px]"
+            />
+          )}
+          {summary} from this item
+        </summary>
+        <div className="mt-2 space-y-3">
+          {problems.length > 0 && (
+            <ul>
+              {[...errors, ...warnings].map((notice) => (
+                <li
+                  key={notice.id}
+                  className="flex min-w-0 items-start gap-2 py-1 text-sm"
+                  data-tone={notice.level === "error" ? "error" : "attention"}
+                >
+                  <LucideIcon
+                    name={
+                      notice.level === "error" ? "circle-x" : "triangle-alert"
+                    }
+                    className="ua-run-gui-tone-icon mt-0.5 h-3.5 w-3.5 shrink-0"
+                  />
+                  {notice.tracker ? (
+                    <span className="shrink-0">
+                      {renderRunGuiTracker(notice.tracker)}
+                    </span>
+                  ) : null}
+                  <span className="min-w-0 flex-1 whitespace-pre-wrap break-words">
+                    {notice.text}
+                  </span>
+                  {notice.count > 1 && (
+                    <span className="ua-run-gui-count shrink-0 rounded-full px-1.5 text-xs font-semibold">
+                      ×{notice.count}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          {notes.cards.map((card) => renderRunGuiTrackerCard(card))}
+          {notes.notices.length > 0 && (
+            <ul>{notes.notices.map(renderRunGuiNotice)}</ul>
+          )}
+        </div>
+      </details>
+    );
+  };
+
+  const renderRunGuiPanel = (overlaidToggle = false) => {
+    const view = RunGui.selectRunGuiView(runGui);
+    const prompt = view.prompt;
+    const waitingForUser =
+      isExecuting &&
+      ((prompt && !prompt.answered) ||
+        (view.awaiting && isAwaitingTerminalInput));
+    const promptTracker =
+      prompt?.context?.kind === "dupes" ? prompt.context.tracker : "";
+    // The open prompt already shows its tracker's slot check and dupes.
+    const attentionCards = view.attentionCards.filter(
+      (card) => !(promptTracker && card.tracker === promptTracker),
+    );
+    const attentionNotices = view.attentionNotices.filter(
+      (notice) =>
+        !(prompt?.context?.kind === "confirm" && notice.group === "confirm"),
+    );
+    const attentionCount = attentionCards.length + attentionNotices.length;
+    const emptyNotes = { cards: [], notices: [], problems: [] };
+    const resultGroups = view.multipleItems
+      ? view.items.map((item) => ({
+          index: item.index,
+          name: item.name,
+          rows: view.trackers.filter((entry) => entry.item === item.index),
+          notes: view.itemNotes[item.index] || emptyNotes,
+        }))
+      : [
+          {
+            index: null,
+            rows: view.trackers,
+            notes: Object.values(view.itemNotes).reduce(
+              (all, notes) => ({
+                cards: [...all.cards, ...notes.cards],
+                notices: [...all.notices, ...notes.notices],
+                problems: [...all.problems, ...notes.problems],
+              }),
+              emptyNotes,
+            ),
+          },
+        ];
+    const visibleGroups = resultGroups.filter(
+      (group) =>
+        group.rows.length ||
+        group.notes.cards.length ||
+        group.notes.notices.length ||
+        group.notes.problems.length,
+    );
+    const hasAnything =
+      view.hasStages ||
+      view.trackers.length ||
+      view.errors.length ||
+      view.warnings.length ||
+      attentionCount ||
+      visibleGroups.length;
+    const { counts } = view;
+    const summary = [
+      counts.success && { text: `${counts.success} uploaded` },
+      counts.failed && { text: `${counts.failed} failed`, tone: "error" },
+      counts.dupe && { text: plural(counts.dupe, "dupe") },
+      counts.banned && { text: `${counts.banned} banned` },
+      counts.skipped && { text: `${counts.skipped} skipped` },
+      counts.pending && { text: `${counts.pending} queued` },
+    ].filter(Boolean);
+    // One failure in a mostly successful queue is a partial result, not a red
+    // panel; the failed count itself stays red in the summary.
+    const resultsTone = counts.failed
+      ? counts.success
+        ? "attention"
+        : "error"
+      : counts.success
+        ? "success"
+        : "info";
+
+    return (
+      <div className="ua-run-gui flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
+        {/* Right padding leaves room for the overlaid Terminal | GUI switch. */}
+        <div
+          className={`ua-run-gui-strip rounded-lg border py-2 pl-3 ${overlaidToggle ? "pr-44" : "pr-3"}`}
+        >
+          {view.multipleItems && view.currentItem && (
+            <p className="ua-run-gui-muted mb-1.5 flex min-w-0 items-center gap-1.5 text-xs">
+              <LucideIcon name="file-stack" className="h-3.5 w-3.5 shrink-0" />
+              <span className="shrink-0 font-semibold">
+                Item {view.currentItem.index} of {view.currentItem.total}
+              </span>
+              <span className="truncate">{view.currentItem.name}</span>
+            </p>
+          )}
+          {renderRunGuiStages(view, waitingForUser)}
+        </div>
+
+        {renderRunGuiPrompt(view)}
+
+        {!hasAnything && !prompt && (
+          <div className="ua-run-gui-empty flex flex-col items-center justify-center gap-2 rounded-lg border p-8 text-center text-sm">
+            {isExecuting ? (
+              <>
+                <SpinnerIcon />
+                <p>Waiting for the upload to report its first step…</p>
+              </>
+            ) : (
+              <>
+                <LucideIcon name="layout-dashboard" className="h-6 w-6" />
+                <p>
+                  Start an upload to see its prompts, problems and results here.
+                </p>
+              </>
+            )}
+          </div>
+        )}
+
+        {attentionCount > 0 &&
+          renderRunGuiBlock({
+            tone: "attention",
+            icon: "triangle-alert",
+            title: "Needs attention",
+            count: attentionCount,
+            aside:
+              view.multipleItems && view.currentItem ? (
+                <span className="ua-run-gui-muted block truncate text-xs">
+                  {view.currentItem.name}
+                </span>
+              ) : null,
+            children: (
+              <div className="space-y-3">
+                {/* Decided trackers stay compact; the prompt shows the full detail. */}
+                {attentionCards.map((card) => (
+                  <div key={card.key}>
+                    {renderRunGuiTracker(card.tracker)}
+                    {card.slot || card.dupe ? (
+                      <details className="ua-run-gui-details mt-1">
+                        <summary className="ua-run-gui-muted cursor-pointer text-xs font-semibold">
+                          {runGuiCardSummary(card)}
+                        </summary>
+                        <div className="mt-2">
+                          {renderRunGuiTrackerCard(card, {
+                            showTracker: false,
+                          })}
+                        </div>
+                      </details>
+                    ) : (
+                      renderRunGuiTrackerCard(card, { showTracker: false })
+                    )}
+                  </div>
+                ))}
+                {attentionNotices.length > 0 && (
+                  <ul>{attentionNotices.map(renderRunGuiNotice)}</ul>
+                )}
+              </div>
+            ),
+          })}
+
+        {(view.errors.length > 0 || view.warnings.length > 0) &&
+          renderRunGuiBlock({
+            tone: view.errors.length ? "error" : "attention",
+            icon: view.errors.length ? "circle-x" : "triangle-alert",
+            title: view.errors.length ? "Errors" : "Warnings",
+            count: view.errors.length || view.warnings.length,
+            aside: (
+              <button
+                type="button"
+                onClick={() => setOutputMode("terminal")}
+                className="ua-run-gui-link inline-flex items-center gap-1 text-xs"
+                title="Open the terminal for full details and tracebacks"
+              >
+                <LucideIcon name="square-terminal" className="h-3.5 w-3.5" />
+                View in terminal
+              </button>
+            ),
+            children: (
+              <>
+                {view.errors.length > 0 && (
+                  <ul className="ua-run-gui-divide divide-y">
+                    {view.errors.map(renderRunGuiNotice)}
+                  </ul>
+                )}
+                {view.warnings.length > 0 &&
+                  (view.errors.length > 0 ? (
+                    <details className="mt-2">
+                      <summary className="ua-run-gui-muted cursor-pointer text-xs font-semibold">
+                        Warnings ({view.warnings.length})
+                      </summary>
+                      <ul className="mt-1">
+                        {view.warnings.map(renderRunGuiNotice)}
+                      </ul>
+                    </details>
+                  ) : (
+                    <ul>{view.warnings.map(renderRunGuiNotice)}</ul>
+                  ))}
+              </>
+            ),
+          })}
+
+        {(visibleGroups.length > 0 || view.requests.length > 0) &&
+          renderRunGuiBlock({
+            tone: resultsTone,
+            icon: "cloud-upload",
+            title: "Results",
+            collapsed: runGuiResultsCollapsed,
+            onToggle: () => setRunGuiResultsCollapsed((value) => !value),
+            aside: summary.length ? (
+              <span className="ua-run-gui-muted block truncate text-xs">
+                {summary.map((part, index) => (
+                  <React.Fragment key={part.text}>
+                    {index > 0 && " · "}
+                    <span
+                      className={
+                        part.tone ? "ua-run-gui-tone-text font-semibold" : ""
+                      }
+                      data-tone={part.tone}
+                    >
+                      {part.text}
+                    </span>
+                  </React.Fragment>
+                ))}
+              </span>
+            ) : null,
+            children: (
+              <div className="space-y-3">
+                {visibleGroups.map((group) => (
+                  <div key={group.index ?? "all"}>
+                    {group.index !== null && (
+                      <p className="ua-run-gui-muted mb-1 truncate text-xs font-semibold">
+                        {group.name || `Item ${group.index}`}
+                      </p>
+                    )}
+                    {group.rows.length > 0 && (
+                      <ul className="ua-run-gui-divide divide-y">
+                        {group.rows.map((entry) =>
+                          renderRunGuiResultRow(entry, view),
+                        )}
+                      </ul>
+                    )}
+                    {renderRunGuiItemNotes(group.notes)}
+                  </div>
+                ))}
+                {view.requests.length > 0 && (
+                  <div>
+                    <p className="mb-1 flex items-center gap-1.5 text-xs font-semibold">
+                      <LucideIcon name="hand-coins" className="h-3.5 w-3.5" />
+                      Requests you can fill
+                    </p>
+                    <ul className="ua-run-gui-divide divide-y">
+                      {view.requests.map((request) => (
+                        <li
+                          key={request.key}
+                          className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 py-1.5 text-sm"
+                        >
+                          <span className="shrink-0">
+                            {renderRunGuiTracker(request.tracker)}
+                          </span>
+                          {renderRunGuiLink(
+                            request.link,
+                            request.name,
+                            "min-w-0 flex-1",
+                          )}
+                          {request.reward && (
+                            <span
+                              className="ua-run-gui-status rounded-md px-2 py-0.5 text-xs font-semibold"
+                              data-tone="success"
+                            >
+                              {request.reward}
+                            </span>
+                          )}
+                          <span className="ua-run-gui-muted text-xs">
+                            {[
+                              request.exact ? "exact match" : "partial match",
+                              request.status,
+                            ]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            ),
+          })}
+
+        {view.finished && (
+          <p
+            className="ua-run-gui-muted flex items-center gap-1.5 text-xs"
+            role="status"
+          >
+            <LucideIcon
+              name={view.exitCode ? "circle-x" : "circle-check"}
+              className="h-3.5 w-3.5"
+            />
+            {view.exitCode
+              ? `Upload process exited with code ${view.exitCode}.`
+              : "Upload process finished."}
+          </p>
+        )}
+      </div>
+    );
+  };
+
   // Mobile Layout
   if (isMobile) {
     const navButton = (panel, icon, label) => (
@@ -8484,6 +9586,8 @@ function AudionutsUAGUI() {
                 >
                   Output
                 </h3>
+                {(isExecuting || isTerminalView) &&
+                  renderOutputModeToggle(true)}
                 {isExecuting && (
                   <span className="ml-auto inline-flex items-center gap-1 text-xs text-green-400 animate-pulse">
                     <LucideIcon name="circle" className="h-2.5 w-2.5" />
@@ -8506,7 +9610,7 @@ function AudionutsUAGUI() {
                     onClick={() => setIsTerminalView((expanded) => !expanded)}
                     aria-expanded={isTerminalView}
                     title={
-                      isTerminalView ? "Back to preparation" : "View terminal"
+                      isTerminalView ? "Back to preparation" : "View output"
                     }
                     className={`ml-auto flex items-center gap-1 rounded px-2 py-1 text-xs ${isDarkMode ? "text-gray-300 hover:bg-gray-700" : "text-gray-600 hover:bg-gray-200"}`}
                   >
@@ -8515,16 +9619,19 @@ function AudionutsUAGUI() {
                     ) : (
                       <TerminalIcon />
                     )}
-                    {isTerminalView ? "Back to preparation" : "View terminal"}
+                    {isTerminalView ? "Back to preparation" : "View output"}
                   </button>
                 )}
               </div>
               <div
                 ref={attachRichOutputHost}
                 id="rich-output"
-                className={`min-h-0 rounded-lg overflow-auto p-2 border text-sm bg-black border-gray-700 text-white ${isExecuting || isTerminalView ? "flex-1" : "hidden"}`}
+                className={`min-h-0 rounded-lg overflow-auto p-2 border text-sm bg-black border-gray-700 text-white ${(isExecuting || isTerminalView) && !isGuiOutput ? "flex-1" : "hidden"}`}
               ></div>
-              {isExecuting && (
+              {(isExecuting || isTerminalView) &&
+                isGuiOutput &&
+                renderRunGuiPanel()}
+              {isExecuting && !isGuiOutput && (
                 <div
                   className={`mt-2 flex shrink-0 gap-2 ${isAwaitingTerminalInput ? "animate-pulse" : ""}`}
                 >
@@ -9437,26 +10544,40 @@ function AudionutsUAGUI() {
                       onClick={() => setIsTerminalView((expanded) => !expanded)}
                       aria-expanded={isTerminalView}
                       title={
-                        isTerminalView ? "Back to preparation" : "View terminal"
+                        isTerminalView ? "Back to preparation" : "View output"
                       }
                       className={`ml-auto flex items-center gap-1.5 rounded px-3 py-1.5 text-sm ${isDarkMode ? "text-gray-300 hover:bg-gray-800" : "text-gray-600 hover:bg-gray-200"}`}
                     >
                       {isTerminalView ? (
                         <LucideIcon name="arrow-left" className="h-4 w-4" />
+                      ) : isGuiOutput ? (
+                        <LucideIcon
+                          name="layout-dashboard"
+                          className="h-4 w-4"
+                        />
                       ) : (
                         <TerminalIcon />
                       )}
-                      {isTerminalView ? "Back to preparation" : "View terminal"}
+                      {isTerminalView ? "Back to preparation" : "View output"}
                     </button>
                   </div>
                 )}
-                {/* Rich HTML output (rendered from Rich export_html fragments) */}
                 <div
-                  ref={attachRichOutputHost}
-                  id="rich-output"
-                  className={`min-h-0 rounded-lg overflow-auto p-3 border bg-black border-gray-700 text-white ${isExecuting || isTerminalView ? "flex-1" : "hidden"}`}
-                ></div>
-                {isExecuting && (
+                  className={`relative min-h-0 flex-col ${isExecuting || isTerminalView ? "flex flex-1" : "hidden"}`}
+                >
+                  {/* The view switch floats over the output instead of taking a row. */}
+                  <div className="ua-run-gui-mode-overlay absolute right-2 top-2 z-10">
+                    {renderOutputModeToggle(true)}
+                  </div>
+                  {/* Rich HTML output (rendered from Rich export_html fragments) */}
+                  <div
+                    ref={attachRichOutputHost}
+                    id="rich-output"
+                    className={`min-h-0 rounded-lg overflow-auto p-3 border bg-black border-gray-700 text-white ${!isGuiOutput ? "flex-1" : "hidden"}`}
+                  ></div>
+                  {isGuiOutput && renderRunGuiPanel(true)}
+                </div>
+                {isExecuting && !isGuiOutput && (
                   <div
                     className={`mt-2 flex shrink-0 gap-2 ${isAwaitingTerminalInput ? "animate-pulse" : ""}`}
                   >
