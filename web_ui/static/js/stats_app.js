@@ -1780,6 +1780,31 @@ function ReleaseProfiles({ releaseProfiles }) {
   );
 }
 
+const DONUT_CENTER = 21;
+const DONUT_RADIUS = 15.9155;
+
+// Explicit arcs instead of stroke-dasharray: browsers approximate the circle
+// length differently per zoom level, which made dash patterns wrap and leak.
+function donutArcPath(startPercentage, percentage) {
+  const pointAt = (value) => {
+    const angle = (value / 100) * 2 * Math.PI;
+    return [
+      DONUT_CENTER + DONUT_RADIUS * Math.sin(angle),
+      DONUT_CENTER - DONUT_RADIUS * Math.cos(angle),
+    ];
+  };
+  const radius = `${DONUT_RADIUS} ${DONUT_RADIUS}`;
+  if (percentage >= 99.999) {
+    const top = DONUT_CENTER - DONUT_RADIUS;
+    const bottom = DONUT_CENTER + DONUT_RADIUS;
+    return `M ${DONUT_CENTER} ${top} A ${radius} 0 1 1 ${DONUT_CENTER} ${bottom} A ${radius} 0 1 1 ${DONUT_CENTER} ${top}`;
+  }
+  const [startX, startY] = pointAt(startPercentage);
+  const [endX, endY] = pointAt(startPercentage + percentage);
+  const largeArc = percentage > 50 ? 1 : 0;
+  return `M ${startX} ${startY} A ${radius} 0 ${largeArc} 1 ${endX} ${endY}`;
+}
+
 function DonutChart({
   rows,
   ariaLabel,
@@ -1834,18 +1859,13 @@ function DonutChart({
             opacity="0.1"
           />
           {segments.map((segment) => (
-            <circle
+            <path
               key={segment.label}
-              cx="21"
-              cy="21"
-              r="15.9155"
+              d={donutArcPath(segment.offset, segment.percentage)}
               fill="none"
               stroke={segment.color}
               strokeWidth="6"
-              strokeDasharray={`${segment.percentage} ${100 - segment.percentage}`}
-              strokeDashoffset={-segment.offset}
               strokeLinecap="butt"
-              transform="rotate(-90 21 21)"
               className={onSelect && segment.id ? "cursor-pointer" : ""}
               opacity={activeLabel && activeLabel !== segment.id ? "0.3" : "1"}
               onClick={() => segment.id && onSelect?.(segment.id)}
