@@ -1435,6 +1435,7 @@ const trackerNameMap = {
   TOTHEGLORY: "ToTheGlory",
   TORRENTHR: "TorrentHR",
   TORRENTEROS: "Torrenteros",
+  TORRENTHAVEN: "TorrentHaven",
   TORRENTLEECH: "TorrentLeech",
   TVCHAOSUK: "TV Chaos UK",
   ULCX: "ULCX",
