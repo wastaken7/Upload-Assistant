@@ -16,6 +16,7 @@ import click
 import httpx
 from rich.markup import escape
 
+from src import webui_events
 from src.bbcode import BBCODE
 from src.cogs.redaction import PathAwareEncoder, Redaction
 from src.console import logger, prompt_in_thread
@@ -299,9 +300,11 @@ class PassThePopcorn:
             if not meta.skipit and not meta.unattended:
                 # Allow user to edit or discard the description
                 logger.info(f"{self.tracker}: [cyan]Do you want to edit, discard or keep the description?[/cyan]")
-                edit_choice = await prompt_in_thread(cli_ui.ask_string, "Enter 'e' to edit, 'd' to discard, or press Enter to keep it as is: ")
+                question, buttons = webui_events.letter_prompt([("e", "edit"), ("d", "discard")], "keep it as is")
+                with webui_events.answer_buttons(buttons):
+                    edit_choice = await prompt_in_thread(cli_ui.ask_string, question)
 
-                if (edit_choice or "").lower() == "e":
+                if (edit_choice or "").lower() == "e" and webui_events.editor_available():
                     edited_description = cast(str | None, click.edit(cast(Any, desc)))
                     if edited_description:
                         desc = edited_description.strip()

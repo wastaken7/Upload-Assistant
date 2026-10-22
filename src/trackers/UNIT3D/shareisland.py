@@ -315,7 +315,8 @@ class ShareIsland(UNIT3D):
             distributor_name = meta.distributor
             distributor_id = None
             if not distributor_name and not meta.unattended:
-                distributor_name = cli_ui.ask_string("ShareIsland: Distributor (optional, Enter to skip): ")
+                with webui_events.answer_buttons([("", "Skip")]):
+                    distributor_name = cli_ui.ask_string("ShareIsland: Distributor (optional, Enter to skip): ")
                 distributor_name = distributor_name.strip().upper() if distributor_name else None
 
             if distributor_name:

@@ -201,16 +201,45 @@ def prompt_context(**context: Any) -> Generator[None]:
 
 
 @contextlib.contextmanager
-def numbered_options(options: Iterable[Any], *, actions: Iterable[tuple[str, str]] = ()) -> Generator[None]:
+def numbered_options(options: Iterable[Any], *, actions: Iterable[tuple[str, str]] = (), start: int = 1) -> Generator[None]:
     """Show the numbered list printed before a free-text prompt as answer buttons.
 
     The terminal prints the list and asks for its number; the GUI only gets
     the question, so the list is attached here. Option N is answered with
-    "N"; ``actions`` are other accepted answers as ``(answer, label)``, for
-    example ``("0", "Skip")``.
+    its number counted from ``start``; ``actions`` are other accepted
+    answers as ``(answer, label)``, for example ``("0", "Skip")`` or
+    ``("", "Keep it")`` for pressing Enter.
     """
-    with prompt_context(kind="options", options=list(options), actions=list(actions)):
+    with prompt_context(kind="options", options=list(options), actions=list(actions), start=str(int(start))):
         yield
+
+
+def answer_buttons(actions: Iterable[tuple[str, str]]) -> contextlib.AbstractContextManager[None]:
+    """Show the answers a free-text prompt accepts (``(answer, label)``) as buttons."""
+    return numbered_options((), actions=actions)
+
+
+def editor_available() -> bool:
+    """Whether an "edit" answer may open a text editor.
+
+    A Web UI run has no terminal on the server, so the editor would open
+    where nobody sees it. Descriptions are edited in the Web UI's own
+    description review instead.
+    """
+    return os.environ.get("UA_WEBUI_ACTIVE") != "1"
+
+
+def letter_prompt(choices: Iterable[tuple[str, str]], enter: str) -> tuple[str, list[tuple[str, str]]]:
+    """Build an "Enter 'x' to ..., or press Enter to ..." question and its answer buttons.
+
+    ``choices`` are ``(letter, action)`` pairs. An ``e`` (edit) choice is left
+    out when no editor is available, so the question never offers it.
+    """
+    available = [(letter, action) for letter, action in choices if letter != "e" or editor_available()]
+    offered = ", ".join(f"'{letter}' to {action}" for letter, action in available)
+    question = f"Enter {offered}, or press Enter to {enter}: " if offered else f"Press Enter to {enter}: "
+    buttons = [("", enter[:1].upper() + enter[1:])] + [(letter, action[:1].upper() + action[1:]) for letter, action in available]
+    return question, buttons
 
 
 def _context_payload() -> dict[str, Any] | None:

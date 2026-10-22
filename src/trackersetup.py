@@ -1190,7 +1190,8 @@ class TrackerSetup:
         if not meta.tv_pack:
             logger.info(f"[yellow]{tracker} requires comparisons to be provided for trump reports.\nAre the comparison images in the description or are you adding links?")
             try:
-                where_compare = cli_ui.ask_string("Enter 'd' if in description, 'L' if you want to paste links, or press Enter to skip trumping:", default="")
+                with webui_events.answer_buttons([("d", "In the description"), ("L", "Paste links"), ("", "Skip trumping")]):
+                    where_compare = cli_ui.ask_string("Enter 'd' if in description, 'L' if you want to paste links, or press Enter to skip trumping:", default="")
             except EOFError, KeyboardInterrupt:
                 logger.info("[yellow]Prompt cancelled; skipping trump report creation.[/yellow]")
                 return False

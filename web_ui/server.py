@@ -2084,6 +2084,9 @@ def _webui_subprocess_env() -> dict[str, str]:
     env["UA_WEBUI_PROGRESS_STDOUT"] = "1"
     env["UA_WEBUI_PROMPT_SOUND_STDOUT"] = "1"
     env[GUI_EVENTS_ENV] = "1"
+    # Lets the child skip terminal-only steps, e.g. opening a text editor;
+    # descriptions are reviewed in the Web UI instead.
+    env["UA_WEBUI_ACTIVE"] = "1"
     env[GUI_EVENT_NONCE_ENV] = _GUI_EVENT_NONCE
     env["UA_STATS_SOURCE"] = "webui"
     return env

@@ -783,7 +783,7 @@ class NameManager:
         suffix = " (MANDATORY): " if is_mandatory else " (optional, press Enter to skip): "
         prompt = f"{field_name} not found for disc. Please enter it manually{suffix}"
         try:
-            with webui_events.prompt_context(kind="disc_info", mandatory=is_mandatory):
+            with webui_events.answer_buttons([("", "Skip this tracker" if is_mandatory else "Skip")]):
                 value = cli_ui.ask_string(prompt)
             return value.upper() if value else "SKIPPED"
         except EOFError:

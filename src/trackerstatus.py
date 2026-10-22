@@ -83,9 +83,10 @@ class TrackerStatusManager:
             if needs_imdb:
                 while True:
                     try:
-                        imdb_id = await prompt_in_thread(
-                            cli_ui.ask_string, "Unable to find IMDB id, please enter e.g.(tt1234567) or press Enter to skip uploading to trackers requiring it:"
-                        )
+                        with webui_events.answer_buttons([("", "Skip trackers that need it")]):
+                            imdb_id = await prompt_in_thread(
+                                cli_ui.ask_string, "Unable to find IMDB id, please enter e.g.(tt1234567) or press Enter to skip uploading to trackers requiring it:"
+                            )
                     except EOFError:
                         logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")
                         await cleanup_manager.cleanup()

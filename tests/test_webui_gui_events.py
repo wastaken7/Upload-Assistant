@@ -383,6 +383,7 @@ def test_numbered_options_reach_the_prompt_in_order(gui_env, capsys) -> None:
         "kind": "options",
         "options": ["Fictional Album (2020)", "Fictional Album (2021)"],
         "actions": [["0", "Skip"]],
+        "start": "1",
     }
 
 
@@ -393,3 +394,48 @@ def test_long_dupe_lists_are_sent_whole(gui_env, capsys) -> None:
 
     (event,) = _events(capsys.readouterr().out)
     assert len(event["entries"]) == 120
+
+
+@pytest.mark.parametrize(
+    ("webui", "question", "answers"),
+    [
+        (
+            False,
+            "Enter 'e' to edit, 'd' to discard, or press Enter to keep it as is: ",
+            [["", "Keep it as is"], ["e", "Edit"], ["d", "Discard"]],
+        ),
+        # A Web UI run has no editor on the server, so editing is never offered.
+        (
+            True,
+            "Enter 'd' to discard, or press Enter to keep it as is: ",
+            [["", "Keep it as is"], ["d", "Discard"]],
+        ),
+    ],
+)
+def test_letter_prompts_offer_edit_only_where_an_editor_exists(gui_env, capsys, monkeypatch, webui, question, answers) -> None:
+    if webui:
+        monkeypatch.setenv("UA_WEBUI_ACTIVE", "1")
+    else:
+        monkeypatch.delenv("UA_WEBUI_ACTIVE", raising=False)
+
+    asked, buttons = webui_events.letter_prompt([("e", "edit"), ("d", "discard")], "keep it as is")
+    with webui_events.answer_buttons(buttons):
+        webui_events.prompt_open("text", asked)
+
+    (opened,) = _events(capsys.readouterr().out)
+    assert asked == question
+    assert webui_events.editor_available() is not webui
+    assert opened["context"]["actions"] == answers
+    assert opened["context"]["options"] == []
+
+
+def test_numbered_options_can_count_from_zero(gui_env, capsys) -> None:
+    with webui_events.numbered_options(["00800.mpls", "00801.mpls"], start=0):
+        webui_events.prompt_open("text", "Select playlists: ")
+
+    (opened,) = _events(capsys.readouterr().out)
+    assert opened["context"]["start"] == "0"
+
+
+def test_webui_child_runs_without_a_terminal_editor() -> None:
+    assert server._webui_subprocess_env()["UA_WEBUI_ACTIVE"] == "1"

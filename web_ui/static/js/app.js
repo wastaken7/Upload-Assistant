@@ -8477,7 +8477,7 @@ function AudionutsUAGUI() {
    * often refers to a list printed just before it, which the GUI would
    * otherwise not show.
    */
-  const getRecentTerminalLines = (question, limit = 15) => {
+  const getRecentTerminalLines = (question, limit = 40) => {
     const output = getTabRuntime(activeTabIdRef.current)?.output;
     const nodes = output ? Array.from(output.childNodes || []) : [];
     const lines = [];
@@ -8663,19 +8663,21 @@ function AudionutsUAGUI() {
       );
     }
     const answer = (value) => sendInput(sessionId, value);
-    if (!details && (options.length || actions.length)) {
-      details = (
+    // Numbered options count from ``start`` (BDMV playlists start at 0).
+    const optionStart = Number.parseInt(context.start ?? "1", 10) || 0;
+    const optionButtons =
+      !details && (options.length || actions.length) ? (
         <div className="grid gap-1.5">
           {options.map((option, index) => (
             <button
               key={`${index}-${option}`}
               type="button"
-              onClick={() => answer(String(index + 1))}
+              onClick={() => answer(String(optionStart + index))}
               disabled={disabled}
               className="ua-run-gui-choice flex min-w-0 items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm disabled:opacity-50"
             >
               <span className="ua-run-gui-count shrink-0 rounded px-1.5 text-xs font-semibold">
-                {index + 1}
+                {optionStart + index}
               </span>
               <span className="min-w-0 break-words">{option}</span>
             </button>
@@ -8684,7 +8686,7 @@ function AudionutsUAGUI() {
             <div className="flex flex-wrap gap-2">
               {actions.map(([value, label]) => (
                 <button
-                  key={value}
+                  key={value || "enter"}
                   type="button"
                   onClick={() => answer(value)}
                   disabled={disabled}
@@ -8696,23 +8698,30 @@ function AudionutsUAGUI() {
             </div>
           )}
         </div>
+      ) : null;
+    // A free-text question without its own list shows the output before it:
+    // the list it refers to, or the text (e.g. a description) being decided on.
+    const recent =
+      !details && type === "text" && !options.length
+        ? getRecentTerminalLines(question)
+        : [];
+    const recentOutput = recent.length ? (
+      <details open className="ua-run-gui-details">
+        <summary className="ua-run-gui-muted cursor-pointer text-xs font-semibold">
+          Output before this question
+        </summary>
+        <pre className="ua-run-gui-recent mt-2 max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-md p-2 font-mono text-xs">
+          {recent.join("\n")}
+        </pre>
+      </details>
+    ) : null;
+    if (optionButtons || recentOutput) {
+      details = (
+        <>
+          {optionButtons}
+          {recentOutput}
+        </>
       );
-    } else if (!details && type === "text") {
-      // Unknown free-text questions show the output before them, so a list
-      // they refer to is never hidden.
-      const recent = getRecentTerminalLines(question);
-      if (recent.length) {
-        details = (
-          <details open className="ua-run-gui-details">
-            <summary className="ua-run-gui-muted cursor-pointer text-xs font-semibold">
-              Output before this question
-            </summary>
-            <pre className="ua-run-gui-recent mt-2 max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-md p-2 font-mono text-xs">
-              {recent.join("\n")}
-            </pre>
-          </details>
-        );
-      }
     }
 
     return (

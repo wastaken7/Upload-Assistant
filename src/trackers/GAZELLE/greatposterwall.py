@@ -11,6 +11,7 @@ import httpx
 from bs4 import BeautifulSoup
 from rich.markup import escape
 
+from src import webui_events
 from src.cogs.redaction import Redaction
 from src.console import logger, prompt_in_thread
 from src.get_desc import DescriptionBuilder
@@ -847,7 +848,8 @@ class GreatPosterWall:
                 if not english_name:
                     logger.info(f"{self.tracker}: [red]Director English name cannot be empty.[/red]")
 
-            chinese_name_raw = await prompt_in_thread(cli_ui.ask_string, "Enter Director Chinese name (optional, press Enter to skip): ")
+            with webui_events.answer_buttons([("", "Skip")]):
+                chinese_name_raw = await prompt_in_thread(cli_ui.ask_string, "Enter Director Chinese name (optional, press Enter to skip): ")
             chinese_name = (chinese_name_raw or "").strip()
 
         artists: list[str] = [english_name]
