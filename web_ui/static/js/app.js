@@ -301,7 +301,8 @@ const interfaceStyles = window.UAInterfaceStyles || [];
 const getStoredInterfaceStyle = window.getUAStoredInterfaceStyle;
 const setInterfaceStyle = window.setUAInterfaceStyle;
 const useModalFocus = window.useUAModalFocus;
-let bbcodePreviewConfigured = false;
+const unit3dBbcode = window.UAUnit3dBbcode;
+const YOUTUBE_EMBED_PREFIX = "https://www.youtube-nocookie.com/embed/";
 
 const escapePreviewHtml = (value) =>
   String(value || "")
@@ -311,23 +312,14 @@ const escapePreviewHtml = (value) =>
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
 
+// Only absolute web URLs: tracker-relative links have no target in a preview.
 const isSafePreviewUrl = (value) => {
   try {
-    const url = new URL(value, window.location.origin);
+    const url = new URL(value);
     return url.protocol === "http:" || url.protocol === "https:";
   } catch (_error) {
     return false;
   }
-};
-
-const getSafeBbcodeColor = (params) => {
-  const color = String(params || "")
-    .replace(/^=/, "")
-    .trim()
-    .toLowerCase();
-  if (/^#[0-9a-f]{6}$/i.test(color)) return color;
-  if (/^[a-z]{3,20}$/i.test(color)) return color;
-  return "";
 };
 
 const sanitizeBbcodePreview = (html) => {
@@ -335,61 +327,69 @@ const sanitizeBbcodePreview = (html) => {
     return `<div>${escapePreviewHtml(html).replace(/\n/g, "<br>")}</div>`;
   }
 
+  // The parser escapes the source first, so inline styles only carry the
+  // values its tag patterns accept (sizes, colors, fonts and alignment).
   const sanitized = window.DOMPurify.sanitize(html, {
     ALLOWED_TAGS: [
       "a",
       "b",
       "blockquote",
       "br",
+      "button",
+      "cite",
       "code",
       "details",
       "div",
-      "em",
+      "figcaption",
+      "figure",
+      "h1",
+      "h2",
+      "h3",
+      "h4",
+      "h5",
+      "h6",
       "hr",
       "i",
+      "iframe",
       "img",
       "li",
       "ol",
       "p",
       "pre",
+      "s",
+      "small",
       "span",
-      "strong",
+      "sub",
       "summary",
+      "sup",
       "table",
-      "tbody",
       "td",
       "th",
-      "thead",
       "tr",
       "u",
       "ul",
     ],
     ALLOWED_ATTR: [
-      "alt",
+      "allow",
+      "allowfullscreen",
       "class",
-      "colspan",
-      "data-bbcode-color",
+      "height",
       "href",
+      "loading",
       "src",
+      "style",
       "title",
+      "type",
+      "width",
     ],
   });
   const preview = new DOMParser().parseFromString(sanitized, "text/html");
 
-  preview.querySelectorAll("[data-bbcode-color]").forEach((element) => {
-    const color = getSafeBbcodeColor(element.getAttribute("data-bbcode-color"));
-    element.removeAttribute("data-bbcode-color");
-    if (color) element.style.color = color;
-  });
-  preview.querySelectorAll("[class*='xbbcode-size-']").forEach((element) => {
-    const size = Number(
-      element.className.match(/(?:^|\s)xbbcode-size-(\d+)(?:\s|$)/)?.[1],
-    );
-    if (Number.isInteger(size) && size >= 4 && size <= 40) {
-      element.style.fontSize = `${size}px`;
+  preview.querySelectorAll("iframe").forEach((frame) => {
+    if (!frame.getAttribute("src")?.startsWith(YOUTUBE_EMBED_PREFIX)) {
+      frame.remove();
     }
   });
-
   preview.querySelectorAll("a[href]").forEach((link) => {
     if (!isSafePreviewUrl(link.getAttribute("href"))) {
       link.removeAttribute("href");
@@ -409,40 +409,32 @@ const sanitizeBbcodePreview = (html) => {
   return preview.body.innerHTML;
 };
 
-const configureBbcodePreview = () => {
-  if (!window.XBBCODE?.addTags || bbcodePreviewConfigured) return;
-
-  window.XBBCODE.addTags({
-    color: {
-      openTag: (params) => {
-        const color = getSafeBbcodeColor(params);
-        return color ? `<span data-bbcode-color="${color}">` : "<span>";
-      },
-      closeTag: () => "</span>",
-    },
-    spoiler: {
-      openTag: () =>
-        '<details class="xbbcode-spoiler"><summary>Spoiler</summary>',
-      closeTag: () => "</details>",
-    },
-  });
-  bbcodePreviewConfigured = true;
-};
-
 const renderBbcodePreview = (content) => {
   const text = String(content || "");
-  if (!window.XBBCODE?.process) {
+  if (!unit3dBbcode) {
     return `<div>${escapePreviewHtml(text).replace(/\n/g, "<br>")}</div>`;
   }
+  return sanitizeBbcodePreview(unit3dBbcode.parseUnit3dBbcode(text));
+};
 
-  configureBbcodePreview();
-  return sanitizeBbcodePreview(
-    window.XBBCODE.process({
-      text,
-      addInLineBreaks: true,
-      removeMisalignedTags: false,
-      escapeHtml: true,
-    }).html,
+// Copy buttons on rendered [code] blocks, as on UNIT3D sites.
+const handleBbcodePreviewClick = (event) => {
+  const button = event.target.closest?.(".bbcode-rendered__clipboard-button");
+  if (!button) return;
+  const code = button
+    .closest(".bbcode-rendered__clipboard")
+    ?.querySelector("pre")?.textContent;
+  if (code == null || !navigator.clipboard?.writeText) return;
+  navigator.clipboard.writeText(code).then(
+    () => {
+      button.classList.add("bbcode-rendered__clipboard-button--copied");
+      window.setTimeout(
+        () =>
+          button.classList.remove("bbcode-rendered__clipboard-button--copied"),
+        1500,
+      );
+    },
+    (error) => console.error("Could not copy the code block:", error),
   );
 };
 
@@ -6978,12 +6970,17 @@ function AudionutsUAGUI() {
     const editor = descriptionEditorRef.current;
     if (!editor) return;
 
-    const start = editor.selectionStart;
-    const end = editor.selectionEnd;
-    const selectedText = descriptionDraft.slice(start, end);
-    const nextDraft = `${descriptionDraft.slice(0, start)}${openingTag}${selectedText}${closingTag}${descriptionDraft.slice(end)}`;
-    const selectionStart = start + openingTag.length;
-    const selectionEnd = selectionStart + selectedText.length;
+    const {
+      value: nextDraft,
+      selectionStart,
+      selectionEnd,
+    } = unit3dBbcode.insertBbcodeTags(
+      descriptionDraft,
+      editor.selectionStart,
+      editor.selectionEnd,
+      openingTag,
+      closingTag,
+    );
 
     descriptionVersionRef.current = Math.max(
       descriptionVersionRef.current,
@@ -7069,7 +7066,7 @@ function AudionutsUAGUI() {
                     aria-pressed={descriptionView === view}
                     className={`rounded px-3 py-1 text-xs font-semibold capitalize ${descriptionView === view ? "ua-accent-action" : isDarkMode ? "text-gray-300 hover:bg-gray-700" : "text-gray-600 hover:bg-white"}`}
                   >
-                    {view}
+                    {view === "edit" ? "Write" : view}
                   </button>
                 ))}
               </div>
@@ -7094,33 +7091,36 @@ function AudionutsUAGUI() {
                   <div
                     role="toolbar"
                     aria-label="Description formatting"
-                    className={`mb-2 flex flex-wrap gap-1 rounded-lg border p-1.5 ${isDarkMode ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-gray-50"}`}
+                    className={`mb-2 flex flex-wrap items-center gap-0.5 rounded-lg border p-1.5 ${isDarkMode ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-gray-50"}`}
                   >
-                    {[
-                      ["Bold", "B", "[b]", "[/b]"],
-                      ["Italic", "I", "[i]", "[/i]"],
-                      ["Underline", "U", "[u]", "[/u]"],
-                      ["Strikethrough", "S", "[s]", "[/s]"],
-                      ["Code", "Code", "[code]", "[/code]"],
-                      ["Quote", "Quote", "[quote]", "[/quote]"],
-                      ["Spoiler", "Spoiler", "[spoiler]", "[/spoiler]"],
-                      ["Align left", "Left", "[left]", "[/left]"],
-                      ["Align center", "Center", "[center]", "[/center]"],
-                      ["Align right", "Right", "[right]", "[/right]"],
-                    ].map(([label, text, openingTag, closingTag]) => (
-                      <button
-                        key={label}
-                        type="button"
-                        title={label}
-                        aria-label={label}
-                        onMouseDown={(event) => event.preventDefault()}
-                        onClick={() =>
-                          applyDescriptionBbcode(openingTag, closingTag)
-                        }
-                        className={`ua-accent-hover rounded px-2 py-1 text-xs font-semibold ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}
-                      >
-                        {text}
-                      </button>
+                    {unit3dBbcode.UNIT3D_BBCODE_TOOLBAR.map((group, index) => (
+                      <React.Fragment key={group[0].title}>
+                        {index > 0 && (
+                          <span
+                            aria-hidden="true"
+                            className={`mx-1 h-5 w-px ${isDarkMode ? "bg-gray-600" : "bg-gray-300"}`}
+                          />
+                        )}
+                        {group.map((tool) => (
+                          <button
+                            key={tool.title}
+                            type="button"
+                            title={
+                              tool.key
+                                ? `${tool.title} (Ctrl+${tool.key.toUpperCase()})`
+                                : tool.title
+                            }
+                            aria-label={tool.title}
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={() =>
+                              applyDescriptionBbcode(tool.open, tool.close)
+                            }
+                            className={`ua-accent-hover rounded p-1.5 ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}
+                          >
+                            <LucideIcon name={tool.icon} className="h-4 w-4" />
+                          </button>
+                        ))}
+                      </React.Fragment>
                     ))}
                   </div>
                   <textarea
@@ -7137,6 +7137,18 @@ function AudionutsUAGUI() {
                     onBlur={() => {
                       if (descriptionDirty) saveExecutionDescription();
                     }}
+                    onKeyDown={(event) => {
+                      if (!event.ctrlKey || event.altKey || event.shiftKey) {
+                        return;
+                      }
+                      const tool =
+                        unit3dBbcode.UNIT3D_BBCODE_TOOLBAR.flat().find(
+                          ({ key }) => key === event.key.toLowerCase(),
+                        );
+                      if (!tool) return;
+                      event.preventDefault();
+                      applyDescriptionBbcode(tool.open, tool.close);
+                    }}
                     spellCheck={false}
                     aria-label="Base description"
                     className={`min-h-[20rem] flex-1 resize-y rounded-lg border p-3 font-mono text-xs leading-5 ${isDarkMode ? "border-gray-700 bg-gray-950 text-gray-100" : "border-gray-300 bg-white text-gray-800"}`}
@@ -7146,7 +7158,9 @@ function AudionutsUAGUI() {
               )}
               {showPreview && (
                 <div
-                  className={`bbcode-preview min-h-[20rem] flex-1 overflow-auto whitespace-pre-wrap rounded-lg border p-3 text-sm leading-6 [&_a]:text-sky-400 [&_a]:underline [&_blockquote]:my-3 [&_blockquote]:border-l-4 [&_blockquote]:pl-3 [&_details]:my-3 [&_img]:my-3 [&_img]:max-w-full [&_img]:rounded [&_pre]:overflow-auto [&_pre]:font-mono [&_table]:my-3 [&_table]:border-collapse [&_td]:border [&_td]:p-2 [&_th]:border [&_th]:p-2 ${isDarkMode ? "border-gray-700 bg-gray-950 text-gray-100 [&_td]:border-gray-700 [&_th]:border-gray-700" : "border-gray-300 bg-white text-gray-800 [&_td]:border-gray-300 [&_th]:border-gray-300"}`}
+                  data-mode={isDarkMode ? "dark" : "light"}
+                  onClick={handleBbcodePreviewClick}
+                  className={`bbcode-rendered min-h-[20rem] flex-1 overflow-auto rounded-lg border p-3 ${isDarkMode ? "border-gray-700 bg-gray-950" : "border-gray-300 bg-white"}`}
                   dangerouslySetInnerHTML={{
                     __html: renderBbcodePreview(descriptionDraft),
                   }}
