@@ -927,19 +927,23 @@ def test_music_prep_runs_shared_client_path_lookup_before_returning():
     client = object()
     hash_ids = ["infohash", "torrent_hash", "skip_auto_torrent"]
     tracker_ids = ["orpheus"]
+    calls: list[str] = []
 
     with (
         patch("src.prep.prep_helpers.init_meta", return_value=(False, False, client, False, hash_ids, tracker_ids)),
         patch("src.prep.prep_helpers.detect_disc_and_category", new=AsyncMock(return_value=("", {}))),
         patch.object(Prep, "_gather_music_prep", new=AsyncMock()),
-        patch("src.prep.prep_helpers.process_trackers_and_torrent", new=AsyncMock()) as process_trackers,
-        patch("src.prep._enrich_music_from_orpheus_fn", new=AsyncMock()) as enrich_orpheus,
+        patch("src.prep.prep_helpers.process_trackers_and_torrent", new=AsyncMock(side_effect=lambda *_: calls.append("trackers"))) as process_trackers,
+        patch("src.prep.restart_early_artifact_tasks", new=AsyncMock(side_effect=lambda *_: calls.append("early"))) as restart_early,
+        patch("src.prep._enrich_music_from_orpheus_fn", new=AsyncMock(side_effect=lambda *_: calls.append("orpheus"))) as enrich_orpheus,
         patch("src.prep._enrich_music_from_discogs_fn", new=AsyncMock()) as enrich_discogs,
     ):
         result = asyncio.run(prep.gather_prep(meta, "cli"))
 
     assert result is meta
     process_trackers.assert_awaited_once_with(prep, meta, client, hash_ids, tracker_ids, "", "")
+    restart_early.assert_awaited_once_with(meta, client, prep.config)
+    assert calls == ["trackers", "early", "orpheus"]
     enrich_orpheus.assert_awaited_once_with(meta, prep.config)
     enrich_discogs.assert_awaited_once_with(meta, prep.config)
 
