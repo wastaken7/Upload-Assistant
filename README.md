@@ -391,6 +391,7 @@ uv tool install --force git+https://github.com/wastaken7/Upload-Assistant.git
 | <img src="web_ui/static/img/trackers/theleachzone.png" width="16" height="16" />              | The Leach Zone         | THELEACHZONE           | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/theoldschool.png" alt="" width="16" height="16" />       | The Old School         | THEOLDSCHOOL           | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/torrenteros.png" width="16" height="16" />               | Torrenteros            | TORRENTEROS            | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/torrenthaven.png" width="16" height="16" />              | TorrentHaven           | TORRENTHAVEN           | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/torrenthr.png" width="16" height="16" />                 | TorrentHR              | TORRENTHR              | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/torrentleech.png" width="16" height="16" />              | TorrentLeech           | TORRENTLEECH           | MOVIE, TV, BOOK, GAME, MUSIC |
 | <img src="web_ui/static/img/trackers/totheglory.png" width="16" height="16" />                | ToTheGlory             | TOTHEGLORY             | MOVIE, TV                    |
