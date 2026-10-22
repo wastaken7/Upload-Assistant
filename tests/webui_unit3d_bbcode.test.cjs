@@ -167,6 +167,17 @@ test("unwraps a selection that is already wrapped", () => {
   );
 });
 
+test("inserts at a caret between two tag pairs instead of unwrapping", () => {
+  assert.deepEqual(
+    { ...insertBbcodeTags("[b]a[/b][b]b[/b]", 8, 8, "[b]", "[/b]") },
+    {
+      value: "[b]a[/b][b][/b][b]b[/b]",
+      selectionStart: 11,
+      selectionEnd: 11,
+    },
+  );
+});
+
 test("puts the caret on the parameter of tags ending in =", () => {
   assert.deepEqual(
     { ...insertBbcodeTags("red", 0, 3, "[color=]", "[/color]") },

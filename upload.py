@@ -1354,7 +1354,9 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
             except ValueError as error:
                 logger.info("%s", error, extra={"markup": False})
                 continue
-        meta = edited_meta
+        if edited_meta is not meta:
+            # Apply the validated copy in place: the caller keeps using this object for the upload.
+            meta.update(edited_meta)
         editargs_tracking = next_editargs
         if not meta.trackers:
             meta.trackers = previous_trackers

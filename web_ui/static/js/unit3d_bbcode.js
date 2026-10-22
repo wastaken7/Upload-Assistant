@@ -471,7 +471,10 @@
   // already exactly wrapped by it. Tags ending in "=" leave the caret on the
   // parameter, as UNIT3D does.
   const insertBbcodeTags = (value, start, end, openTag, closeTag) => {
+    // The selection must hold both tags; a caret between "[/b]" and "[b]"
+    // would otherwise match and corrupt the text.
     const alreadyNested =
+      end - start >= openTag.length + closeTag.length &&
       value.substring(start, start + openTag.length) === openTag &&
       value.substring(end - closeTag.length, end) === closeTag;
     const nextValue = alreadyNested

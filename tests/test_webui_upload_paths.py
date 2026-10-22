@@ -17,7 +17,16 @@ import src.webui_paths as policy
 import web_ui.server as server
 from src.meta import Meta
 from src.queuemanage import QueueManager
-from src.webui_paths import QUEUE_ENV, QUEUE_HASH_ENV, ROOTS_ENV, generated_queue_name, is_generated_queue_path, read_generated_queue, validate_content_path, validate_subprocess_queue
+from src.webui_paths import (
+    QUEUE_ENV,
+    QUEUE_HASH_ENV,
+    ROOTS_ENV,
+    generated_queue_name,
+    is_generated_queue_path,
+    read_generated_queue,
+    validate_content_path,
+    validate_subprocess_queue,
+)
 
 
 @pytest.fixture
@@ -712,6 +721,23 @@ async def test_skip_at_the_correction_prompt_leaves_the_release_out(workspace, m
     assert meta.skipped_by_user is True
     assert prompt.call_count == 1
     assert prep.gather_prep.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_corrections_and_skip_reach_the_callers_metadata(workspace, monkeypatch):
+    def parse(_args, candidate):
+        candidate.anon = True
+        return candidate, None, None
+
+    upload, meta, prep, state = _confirmation_loop(workspace, monkeypatch, parse=parse)
+    prep.gather_prep = AsyncMock(side_effect=lambda meta, **_kwargs: meta)
+    prompt = Mock(side_effect=["--anon", "skip"])
+    monkeypatch.setattr(upload, "CLI_UI", SimpleNamespace(ask_string=prompt))
+
+    assert await upload.process_meta(meta, str(state)) is False
+    assert meta.anon is True
+    assert meta.skipped_by_user is True
+    assert prompt.call_count == 2
 
 
 @pytest.mark.asyncio
