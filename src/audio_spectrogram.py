@@ -53,7 +53,7 @@ def get_audio_streams(file_path: str | Path) -> list[dict[str, Any]]:
         str(file_path),
     ]
     try:
-        result = subprocess.run(command, capture_output=True, text=True, check=False, timeout=60)  # noqa: S603
+        result = subprocess.run(command, capture_output=True, text=True, encoding="utf-8", errors="replace", check=False, timeout=60)  # noqa: S603
     except (OSError, subprocess.TimeoutExpired) as error:
         raise RuntimeError(f"Could not run ffprobe: {error}") from error
 

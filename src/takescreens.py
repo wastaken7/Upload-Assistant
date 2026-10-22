@@ -831,7 +831,7 @@ async def capture_disc_task(index: int, file: str, ss_time: str, image_path: str
 
         if returncode == 0:
             return (index, image_path)
-        logger.info(f"[red]FFmpeg error capturing screenshot: {stderr.decode()}")
+        logger.info(f"[red]FFmpeg error capturing screenshot: {stderr.decode(errors='replace')}")
         return None  # Ensure tuple format
     except Exception as e:
         logger.error(f"[red]Error capturing screenshot: {e}")
@@ -1144,7 +1144,7 @@ async def capture_dvd_screenshot(
             returncode, _stdout, stderr = await run_ffmpeg(fallback_command)
 
         if returncode != 0:
-            logger.error(f"[red]Error capturing screenshot for {input_file} at {seek_time}s:[/red]\n{stderr.decode()}")
+            logger.error(f"[red]Error capturing screenshot for {input_file} at {seek_time}s:[/red]\n{stderr.decode(errors='replace')}")
             return (index, None)
 
         if Path(image).exists():
