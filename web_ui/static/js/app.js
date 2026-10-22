@@ -2275,6 +2275,11 @@ function AudionutsUAGUI() {
 
   useEffect(() => {
     storage.set(OUTPUT_MODE_KEY, outputMode);
+    // Hidden output cannot scroll; show the latest lines when it reappears.
+    if (outputMode === "terminal") {
+      const host = richOutputRef.current;
+      if (host) host.scrollTop = host.scrollHeight;
+    }
   }, [outputMode]);
 
   useEffect(() => {
@@ -4093,25 +4098,41 @@ function AudionutsUAGUI() {
     setIsSendingInput(true);
     const tabId = activeTabIdRef.current;
     const runtime = getTabRuntime(tabId);
+    const promptId = runtime?.gui.prompt?.id ?? null;
     if (runtime) {
       runtime.awaiting = false;
       runtime.gui = RunGui.markRunGuiPromptAnswered(runtime.gui);
       setRunGui(runtime.gui);
       refreshUploadTabStatus(tabId);
     }
+    // Reopen the GUI prompt so the answer can be sent again.
+    const restorePrompt = () => {
+      const current = getTabRuntime(tabId);
+      if (!current || promptId === null) return;
+      current.gui = RunGui.markRunGuiPromptAnswered(
+        current.gui,
+        false,
+        promptId,
+      );
+      current.awaiting = true;
+      if (tabId === activeTabIdRef.current) setRunGui(current.gui);
+      refreshUploadTabStatus(tabId);
+    };
     // Optimistically echo the user's input locally so it appears before
     // any subsequent server-generated prompt / output.
     appendSystemMessage("> " + input, "user-input");
     setUserInput("");
     try {
-      await apiFetch(`${API_BASE}/input`, {
+      const response = await apiFetch(`${API_BASE}/input`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ session_id, input }),
       });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
     } catch (err) {
       console.error("Failed to send input:", err);
-      appendSystemMessage("Failed to send input", "error");
+      appendSystemMessage("Failed to send input", "error", tabId);
+      restorePrompt();
     } finally {
       isSendingInputRef.current = false;
       setIsSendingInput(false);

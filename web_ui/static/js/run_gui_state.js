@@ -160,7 +160,8 @@
         const entries = releaseEntries(data.entries);
         const key = trackerKey(item, tracker);
         const previous = state.dupes[key];
-        // A trumpable list and the regular list can both arrive; keep both flags.
+        // The latest list decides the label: after a declined trump prompt the
+        // regular dupe list follows and is no longer "trumpable".
         return {
           ...state,
           dupes: {
@@ -170,8 +171,7 @@
               item,
               entries: entries.length ? entries : previous?.entries || [],
               note: text(data.note) || previous?.note || "",
-              trumpable:
-                Boolean(data.trumpable) || Boolean(previous?.trumpable),
+              trumpable: Boolean(data.trumpable),
             },
           },
         };
@@ -288,10 +288,14 @@
     return state;
   };
 
-  /** Mark the open prompt as answered so its buttons stop accepting input. */
-  const markRunGuiPromptAnswered = (state) =>
-    state.prompt
-      ? { ...state, prompt: { ...state.prompt, answered: true } }
+  /**
+   * Mark the open prompt as answered so its buttons stop accepting input, or
+   * reopen it (answered = false) when sending the answer failed. ``promptId``
+   * limits the change to that prompt, in case another one has opened since.
+   */
+  const markRunGuiPromptAnswered = (state, answered = true, promptId = null) =>
+    state.prompt && (promptId === null || state.prompt.id === promptId)
+      ? { ...state, prompt: { ...state.prompt, answered } }
       : state;
 
   const TRACKER_STATUS_ORDER = {

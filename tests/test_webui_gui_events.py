@@ -22,6 +22,7 @@ def gui_env(monkeypatch):
     monkeypatch.setenv(webui_events.GUI_EVENTS_ENV, "1")
     monkeypatch.setattr(webui_events, "_current_item", None)
     monkeypatch.setattr(webui_events, "_active_stage", None)
+    monkeypatch.setattr(webui_events, "_started_stages", set())
 
 
 def test_events_are_silent_outside_the_web_ui(monkeypatch, capsys) -> None:
@@ -32,6 +33,23 @@ def test_events_are_silent_outside_the_web_ui(monkeypatch, capsys) -> None:
     webui_events.tracker_result("FAKE", "success")
 
     assert capsys.readouterr().out == ""
+
+
+def test_payload_helpers_do_no_work_outside_the_web_ui(monkeypatch) -> None:
+    monkeypatch.delenv(webui_events.GUI_EVENTS_ENV, raising=False)
+
+    def fail(*_args, **_kwargs):
+        raise AssertionError("payload built outside the Web UI")
+
+    monkeypatch.setattr(webui_events, "plain_text", fail)
+    monkeypatch.setattr(webui_events, "_release_entries", fail)
+
+    webui_events.notice("error", "x")
+    webui_events.notice_group("confirm", [{"level": "error", "text": "x"}])
+    webui_events.dupes("FAKE", [{"name": "x"}])
+    webui_events.slot("FAKE", "review", "t", "r", conflicts=[{"name": "x"}])
+    webui_events.tracker_result("FAKE", "success")
+    webui_events.request_match("FAKE", "x")
 
 
 def test_events_carry_the_item_and_plain_redacted_text(gui_env, capsys) -> None:
@@ -92,6 +110,18 @@ def test_tracker_status_classification(status, final, expected) -> None:
     assert webui_events.tracker_status_from_meta(status, final=final) == expected
 
 
+def test_approved_trackers_are_skipped_when_the_upload_stage_never_ran(gui_env, capsys) -> None:
+    webui_events.begin_item("/media/Fictional.Movie.2020.mkv", 1, 1)
+    webui_events.stage("dupes", "start")
+    webui_events.publish_tracker_statuses({"FAKE": {"upload": True}}, final=True)
+    webui_events.stage("upload", "start")
+    webui_events.publish_tracker_statuses({"FAKE": {"upload": True}}, final=True)
+
+    statuses = [event["status"] for event in _events(capsys.readouterr().out) if event["kind"] == "tracker"]
+
+    assert statuses == ["skipped", "failed"]
+
+
 def test_prompt_context_is_attached_to_prompts(gui_env, capsys) -> None:
     with webui_events.prompt_context(kind="dupes", tracker="FAKE"):
         prompt_id = webui_events.prompt_open("yes_no", "Upload to FAKE anyway?", default=False)
@@ -146,6 +176,20 @@ def test_notice_handler_stops_after_its_limit(monkeypatch) -> None:
         handler.handle(_record(logging.ERROR, f"error number {index}"))
 
     assert sent == ["error number 0", "error number 1"]
+
+
+def test_notice_handler_limit_restarts_for_each_queue_item(monkeypatch) -> None:
+    sent: list[str] = []
+    monkeypatch.setattr(webui_events, "notice", lambda _level, text, **_kwargs: sent.append(text))
+    monkeypatch.setattr("src.console._MAX_GUI_NOTICES", 1)
+    handler = GuiNoticeHandler()
+
+    for item in (1, 2):
+        monkeypatch.setattr(webui_events, "_current_item", {"index": item, "total": 2})
+        for index in range(3):
+            handler.handle(_record(logging.ERROR, f"item {item} error {index}"))
+
+    assert sent == ["item 1 error 0", "item 2 error 0"]
 
 
 def test_cli_ui_prompts_are_announced_and_still_answered_from_stdin() -> None:

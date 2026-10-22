@@ -445,3 +445,45 @@ test("errors and warnings of earlier queue items move under their results", () =
   );
   assert.equal(finished.warnings.length, 2);
 });
+
+test("a regular dupe list after a declined trump is no longer trumpable", () => {
+  const state = run(
+    gui({
+      kind: "dupes",
+      tracker: "FAKE",
+      item: 1,
+      trumpable: true,
+      entries: [{ name: "Fictional.Movie.2020.1080p-OLD" }],
+    }),
+    gui({
+      kind: "dupes",
+      tracker: "FAKE",
+      item: 1,
+      entries: [{ name: "Fictional.Movie.2020.1080p-OTHER" }],
+    }),
+  );
+
+  assert.equal(selectRunGuiView(state).dupes["1:FAKE"].trumpable, false);
+});
+
+test("a failed answer reopens only the prompt it was sent for", () => {
+  const opened = run(
+    gui({
+      kind: "prompt",
+      action: "open",
+      id: 4,
+      type: "yes_no",
+      question: "Upload anyway?",
+    }),
+  );
+  const answered = markRunGuiPromptAnswered(opened);
+
+  assert.equal(
+    markRunGuiPromptAnswered(answered, false, 4).prompt.answered,
+    false,
+  );
+  assert.equal(
+    markRunGuiPromptAnswered(answered, false, 5).prompt.answered,
+    true,
+  );
+});

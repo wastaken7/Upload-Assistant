@@ -47,6 +47,8 @@ _stdout_lock = Lock()
 _prompt_ids = itertools.count(1)
 _current_item: dict[str, Any] | None = None
 _active_stage: str | None = None
+# Stages started for the current item, so the final tracker summary knows whether uploading ran.
+_started_stages: set[str] = set()
 _prompt_context: contextvars.ContextVar[dict[str, Any] | None] = contextvars.ContextVar("ua_gui_prompt_context", default=None)
 _ANSI_ESCAPE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 _MARKUP_TAG = re.compile(r"\[/?[a-zA-Z#][^\[\]]*\]|\[/\]")
@@ -103,6 +105,7 @@ def begin_item(path: str, index: int, total: int) -> None:
     global _current_item, _active_stage
     _current_item = {"index": int(index), "total": int(total)}
     _active_stage = None
+    _started_stages.clear()
     _emit("item", {"index": int(index), "total": int(total), "name": plain_text(Path(str(path)).name or path, 300)})
 
 
@@ -112,9 +115,15 @@ def stage(key: str, status: StageStatus) -> None:
         return
     if status == "start":
         _active_stage = key
+        _started_stages.add(key)
     elif _active_stage == key:
         _active_stage = None
     _emit("stage", {"key": key, "status": status})
+
+
+def current_item_index() -> int | None:
+    """Index of the queue item being processed, or None before the first one."""
+    return _current_item["index"] if _current_item is not None else None
 
 
 def fail_active_stage() -> None:
@@ -136,6 +145,8 @@ def stage_scope(key: str) -> Generator[None]:
 
 
 def notice(level: NoticeLevel, text: Any, *, tracker: str | None = None, key: str | None = None) -> None:
+    if not enabled():
+        return
     if level not in NOTICE_LEVELS:
         return
     message = plain_text(text)
@@ -151,6 +162,8 @@ def notice(level: NoticeLevel, text: Any, *, tracker: str | None = None, key: st
 
 def notice_group(group: str, notices: Iterable[Mapping[str, Any]]) -> None:
     """Replace every notice previously sent for ``group`` with ``notices``."""
+    if not enabled():
+        return
     items: list[dict[str, Any]] = []
     for entry in notices:
         level = entry.get("level")
@@ -253,6 +266,8 @@ def _release_entries(entries: Iterable[Mapping[str, Any] | str], source_size: in
 
 def dupes(tracker: str, entries: Iterable[Mapping[str, Any] | str], *, source_size: int | None = None, note: str = "", trumpable: bool = False) -> None:
     """Report the possible duplicates shown before an "upload anyway?" prompt."""
+    if not enabled():
+        return
     payload: dict[str, Any] = {"tracker": plain_text(tracker, 64), "entries": _release_entries(entries, source_size), "trumpable": bool(trumpable)}
     if note:
         payload["note"] = plain_text(note)
@@ -273,6 +288,8 @@ def slot(
     source_size: int | None = None,
 ) -> None:
     """Report a tracker's slot recommendation with the same detail as the terminal box."""
+    if not enabled():
+        return
     payload: dict[str, Any] = {
         "tracker": plain_text(tracker, 64),
         "verdict": plain_text(verdict, 16).lower(),
@@ -305,7 +322,7 @@ def tracker_result(
     message: Any = None,
     duration: float | None = None,
 ) -> None:
-    if status not in TRACKER_STATUSES:
+    if not enabled() or status not in TRACKER_STATUSES:
         return
     payload: dict[str, Any] = {"tracker": plain_text(tracker, 64), "status": status}
     url = _http_link(link)
@@ -322,6 +339,8 @@ def tracker_result(
 
 
 def request_match(tracker: str, name: Any, *, link: Any = None, reward: Any = None, status: Any = None, exact: bool = False) -> None:
+    if not enabled():
+        return
     payload: dict[str, Any] = {"tracker": plain_text(tracker, 64), "name": plain_text(name, 300), "exact": bool(exact)}
     url = _http_link(link)
     if url:
@@ -334,8 +353,12 @@ def request_match(tracker: str, name: Any, *, link: Any = None, reward: Any = No
         _emit("request", payload)
 
 
-def tracker_status_from_meta(status: Mapping[str, Any], *, final: bool) -> TrackerStatus:
-    """Classify a ``meta.tracker_status`` entry for the results panel."""
+def tracker_status_from_meta(status: Mapping[str, Any], *, final: bool, upload_started: bool = True) -> TrackerStatus:
+    """Classify a ``meta.tracker_status`` entry for the results panel.
+
+    ``upload_started`` is False when the item ended before its upload stage,
+    e.g. too few trackers passed; approved trackers were then never tried.
+    """
     message = str(status.get("status_message") or "").lower()
     if status.get("banned"):
         return "banned"
@@ -348,8 +371,10 @@ def tracker_status_from_meta(status: Mapping[str, Any], *, final: bool) -> Track
     if status.get("skipped"):
         return "skipped"
     if status.get("upload") is True:
+        if not final:
+            return "pending"
         # An approved upload with no result by the end of the item errored out.
-        return "failed" if final else "pending"
+        return "failed" if upload_started else "skipped"
     return "skipped"
 
 
@@ -369,7 +394,7 @@ def publish_tracker_statuses(tracker_status: Mapping[str, Any], *, final: bool =
         if not isinstance(raw_status, Mapping) or str(tracker).upper() in {"MANUAL", "USENET"}:
             continue
         status = cast(Mapping[str, Any], raw_status)
-        resolved = tracker_status_from_meta(status, final=final)
+        resolved = tracker_status_from_meta(status, final=final, upload_started="upload" in _started_stages)
         if resolved == "success":
             tracker_result(str(tracker), resolved, link=status.get("torrent_link"), torrent_id=status.get("torrent_id"))
             continue

@@ -372,9 +372,19 @@ class GuiNoticeHandler(logging.Handler):
     def __init__(self) -> None:
         super().__init__(level=logging.INFO)
         self.sent = 0
+        self.item: int | None = None
 
     def emit(self, record: logging.LogRecord) -> None:
-        if getattr(record, "ua_gui", True) is False or self.sent >= _MAX_GUI_NOTICES:
+        if getattr(record, "ua_gui", True) is False:
+            return
+        from src import webui_events
+
+        # The limit applies per queue item, so a noisy item cannot hide later ones.
+        item = webui_events.current_item_index()
+        if item != self.item:
+            self.item = item
+            self.sent = 0
+        if self.sent >= _MAX_GUI_NOTICES:
             return
         try:
             message = record.getMessage()
@@ -385,8 +395,6 @@ class GuiNoticeHandler(logging.Handler):
                 level = "warning"
             else:
                 return
-            from src import webui_events
-
             text = webui_events.plain_text(message, markup=getattr(record, "markup", True) is not False)
             # Skip box drawing, separators and other lines without words.
             if sum(char.isalnum() for char in text) < 3:

@@ -845,8 +845,15 @@ class TrackerSetup:
                 # These trackers have custom request handling
                 requests = cast(list[JsonDict], await tracker_instance.get_requests(meta))
                 for request in requests or []:
-                    if isinstance(request, dict) and request.get("Name"):
-                        webui_events.request_match(tracker_name, request.get("Name"), link=request.get("Link"), reward=request.get("Reward"))
+                    # Orpheus returns lowercase keys; the other handlers use capitalised ones.
+                    if isinstance(request, dict) and (request.get("Name") or request.get("name")):
+                        webui_events.request_match(
+                            tracker_name,
+                            request.get("Name") or request.get("name"),
+                            link=request.get("Link") or request.get("url"),
+                            reward=request.get("Reward") or request.get("bounty"),
+                            exact=request.get("match_type") == "exact",
+                        )
                 return bool(requests) if tracker_name.upper() == "ORPHEUS" else False
             else:
                 if not url:
@@ -1060,7 +1067,7 @@ class TrackerSetup:
                             request_entry = {"uuid": uuid_str, "path": meta.path, "url": each.get("url", ""), "name": api_name, "bounty": api_bounty, "claimed": claimed_status}
                             request_data.append(request_entry)
                             existing_uuids.add(uuid_str)
-                    if meta.category == "MOVIE" and type_name and resolution and unclaimed and not internal and not dv and not hdr and "uhd" in api_resolution_lower:
+                    elif meta.category == "MOVIE" and type_name and resolution and unclaimed and not internal and not dv and not hdr and "uhd" in api_resolution_lower:
                         logger.info(
                             f"[bold blue]Found request match on [bold yellow]{tracker_name}[/bold yellow] with bounty [bold yellow]{api_bounty}[/bold yellow] with mismatched HDR or DV[/bold blue]"
                         )
@@ -1072,7 +1079,7 @@ class TrackerSetup:
                             request_entry = {"uuid": uuid_str, "path": meta.path, "url": each.get("url", ""), "name": api_name, "bounty": api_bounty, "claimed": claimed_status}
                             request_data.append(request_entry)
                             existing_uuids.add(uuid_str)
-                    if meta.category == "TV" and season and type_name and resolution and unclaimed and not internal and dv and hdr:
+                    elif meta.category == "TV" and season and type_name and resolution and unclaimed and not internal and dv and hdr:
                         logger.info(
                             f"[bold blue]Found exact request match on [bold yellow]{tracker_name}[/bold yellow] with bounty [bold yellow]{api_bounty}[/bold yellow] and with status [bold yellow]{claimed_status}[/bold yellow][/bold blue]"
                         )
@@ -1084,7 +1091,7 @@ class TrackerSetup:
                             request_entry = {"uuid": uuid_str, "path": meta.path, "url": each.get("url", ""), "name": api_name, "bounty": api_bounty, "claimed": claimed_status}
                             request_data.append(request_entry)
                             existing_uuids.add(uuid_str)
-                    if meta.category == "TV" and season and type_name and resolution and unclaimed and not internal and not dv and not hdr:
+                    elif meta.category == "TV" and season and type_name and resolution and unclaimed and not internal and not dv and not hdr:
                         logger.info(
                             f"[bold blue]Found request match on [bold yellow]{tracker_name}[/bold yellow] with bounty [bold yellow]{api_bounty}[/bold yellow] with mismatched HDR or DV[/bold blue]"
                         )

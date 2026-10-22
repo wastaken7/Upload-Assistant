@@ -914,9 +914,17 @@ class UploadHelper:
         # The GUI already shows the metadata in its preview; it only needs what is missing.
         missing_notices: list[dict[str, str]] = []
         for item in lines:
-            if isinstance(item, tuple) and missing_warning in item[1]:
-                hint = webui_events.plain_text(item[1]).replace("⚠️ Missing", "", 1).strip()
-                missing_notices.append({"level": "attention", "text": f"{item[0]} is missing. {hint}".strip()})
+            if not isinstance(item, tuple) or missing_warning not in item[1]:
+                continue
+            if item[0] == "Title":
+                # One line shows title and year; name only the part that is missing.
+                if not meta.title:
+                    missing_notices.append({"level": "attention", "text": f"Title is missing. {title_hint}"})
+                if not meta.year:
+                    missing_notices.append({"level": "attention", "text": "Year is missing. Use --year."})
+                continue
+            hint = webui_events.plain_text(item[1]).replace("⚠️ Missing", "", 1).strip()
+            missing_notices.append({"level": "attention", "text": f"{item[0]} is missing. {hint}".strip()})
         webui_events.notice_group("confirm", missing_notices)
 
         if meta.unattended and not meta.unattended_confirm:
