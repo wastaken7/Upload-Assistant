@@ -22,6 +22,8 @@
     notices: [],
     noticeSeq: 0,
     prompt: null,
+    // The last "Is this correct?" summary, shown again while correcting it.
+    lastConfirm: null,
     awaiting: false,
     inputType: null,
     dupes: {},
@@ -137,6 +139,8 @@
           data.context && typeof data.context === "object" ? data.context : {};
         return {
           ...state,
+          lastConfirm:
+            context.kind === "confirm" ? { item, context } : state.lastConfirm,
           prompt: {
             id: data.id,
             type: ["yes_no", "choice", "text"].includes(data.type)
@@ -438,6 +442,7 @@
       stages,
       hasStages: stages.some((stage) => stage.status),
       prompt: state.prompt,
+      lastConfirm: state.lastConfirm,
       awaiting: state.awaiting,
       inputType: state.inputType,
       errors: currentErrors,

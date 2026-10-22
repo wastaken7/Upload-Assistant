@@ -2625,6 +2625,8 @@ function AudionutsUAGUI() {
 
   const richOutputRef = useRef(null);
   const inputRef = useRef(null);
+  // The GUI prompt's text field, focused when a correction chip fills it.
+  const runGuiAnswerRef = useRef(null);
   const isSendingInputRef = useRef(false);
   const activeTabIdRef = useRef("tab-1");
   const uploadTabCounterRef = useRef(1);
@@ -8526,6 +8528,144 @@ function AudionutsUAGUI() {
       .map((name) => name.trim())
       .filter(Boolean);
 
+  /** Add ``flag value`` to the GUI answer, unless the flag is already there. */
+  const insertRunGuiArg = (flag, value) => {
+    const text = String(value || "");
+    const quoted = /[\s"']/.test(text)
+      ? `"${text.replace(/"/g, '\\"')}"`
+      : text;
+    setUserInput((current) => {
+      const existing = String(current || "").trim();
+      if (existing.split(/\s+/).includes(flag)) return current;
+      const part = text ? `${flag} ${quoted}` : `${flag} `;
+      return existing ? `${existing} ${part}` : part;
+    });
+    window.requestAnimationFrame(() => {
+      const input = runGuiAnswerRef.current;
+      if (!input) return;
+      input.focus();
+      input.setSelectionRange(input.value.length, input.value.length);
+    });
+  };
+
+  /**
+   * "Input args that need correction": the declined summary, what is missing,
+   * quick corrections filled with the current values, and the corrections
+   * already applied in earlier rounds.
+   */
+  const renderRunGuiEditArgsContext = (context, view, prompt, disabled) => {
+    const confirm =
+      view.lastConfirm && view.lastConfirm.item === prompt.item
+        ? view.lastConfirm.context
+        : null;
+    const missing = view.attention
+      .filter(
+        (notice) => notice.group === "confirm" && notice.item === prompt.item,
+      )
+      .map((notice) => ({
+        notice,
+        flag: (String(notice.text).match(/--[a-z][a-z0-9-]*/i) || [])[0] || "",
+      }));
+    const values = Object.entries(context.values || {});
+    const applied = String(context.applied || "").trim();
+    return (
+      <>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => sendInput(sessionId, "continue")}
+            disabled={disabled}
+            className="ua-run-gui-choice rounded-lg border px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+          >
+            Continue without changes
+          </button>
+          <button
+            type="button"
+            onClick={() => sendInput(sessionId, "skip")}
+            disabled={disabled}
+            title="Leave this release out; a queue moves on to the next item"
+            className="ua-run-gui-choice ua-run-gui-skip rounded-lg border px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+          >
+            Skip this upload
+          </button>
+          <span className="ua-run-gui-muted text-xs">
+            or add corrections below and send them.
+          </span>
+        </div>
+        {confirm && (
+          <div className="space-y-3">
+            {renderRunGuiConfirmContext(confirm, [])}
+          </div>
+        )}
+        {missing.length > 0 && (
+          <div>
+            {renderRunGuiSectionLabel("Missing")}
+            <ul className="mt-1 space-y-1">
+              {missing.map(({ notice, flag }) => (
+                <li
+                  key={notice.id}
+                  className="ua-run-gui-attention-text flex flex-wrap items-center gap-x-2 gap-y-1 text-sm"
+                >
+                  <LucideIcon
+                    name="triangle-alert"
+                    className="h-3.5 w-3.5 shrink-0"
+                  />
+                  <span className="min-w-0 flex-1">{notice.text}</span>
+                  {flag && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        insertRunGuiArg(flag, context.values?.[flag] || "")
+                      }
+                      disabled={disabled}
+                      className="ua-run-gui-arg-chip rounded-md border px-2 py-0.5 font-mono text-xs disabled:opacity-50"
+                    >
+                      Add {flag}
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {values.length > 0 && (
+          <div>
+            {renderRunGuiSectionLabel("Quick corrections")}
+            <div className="mt-1 flex flex-wrap gap-1.5">
+              {values.map(([flag, value]) => (
+                <button
+                  key={flag}
+                  type="button"
+                  onClick={() => insertRunGuiArg(flag, value)}
+                  disabled={disabled}
+                  title={
+                    value
+                      ? `Insert ${flag} with the current value, ready to edit`
+                      : `Insert ${flag}`
+                  }
+                  className="ua-run-gui-arg-chip inline-flex max-w-full items-center gap-1.5 rounded-md border px-2 py-1 text-xs disabled:opacity-50"
+                >
+                  <span className="font-mono font-semibold">{flag}</span>
+                  <span className="ua-run-gui-muted truncate">
+                    {value || "…"}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        {applied && (
+          <div>
+            {renderRunGuiSectionLabel("Applied so far")}
+            <p className="ua-run-gui-release-name mt-1 break-all rounded-md px-2.5 py-1.5 font-mono text-xs">
+              {applied}
+            </p>
+          </div>
+        )}
+      </>
+    );
+  };
+
   const renderRunGuiConfirmContext = (context, missing) => {
     const baseName = context.base_name || "";
     const names = Object.entries(context.release_names || {});
@@ -8663,6 +8803,8 @@ function AudionutsUAGUI() {
     let details = null;
     if (context.kind === "confirm") {
       details = renderRunGuiConfirmContext(context, missing);
+    } else if (context.kind === "edit_args") {
+      details = renderRunGuiEditArgsContext(context, view, prompt, disabled);
     } else if (context.kind === "dupe_clear") {
       details = renderRunGuiDupeClearContext(context);
     } else if (slot || dupe) {
@@ -8676,23 +8818,91 @@ function AudionutsUAGUI() {
     const answer = (value) => sendInput(sessionId, value);
     // Numbered options count from ``start`` (BDMV playlists start at 0).
     const optionStart = Number.parseInt(context.start ?? "1", 10) || 0;
+    // Optional thumbnails (e.g. TMDb/IMDb posters), one per option.
+    const optionImages = Array.isArray(context.images) ? context.images : [];
+    // Optional per-option details: an ID line, a synopsis and a site link.
+    const optionDetails = Array.isArray(context.details) ? context.details : [];
+    const hasOptionImages = optionImages.some((image) =>
+      /^https?:\/\//i.test(String(image || "")),
+    );
     const optionButtons =
       !details && (options.length || actions.length) ? (
         <div className="grid gap-1.5">
-          {options.map((option, index) => (
-            <button
-              key={`${index}-${option}`}
-              type="button"
-              onClick={() => answer(String(optionStart + index))}
-              disabled={disabled}
-              className="ua-run-gui-choice flex min-w-0 items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm disabled:opacity-50"
-            >
-              <span className="ua-run-gui-count shrink-0 rounded px-1.5 text-xs font-semibold">
-                {optionStart + index}
-              </span>
-              <span className="min-w-0 break-words">{option}</span>
-            </button>
-          ))}
+          {options.map((option, index) => {
+            const detail = optionDetails[index] || {};
+            const link = /^https?:\/\//i.test(String(detail.link || ""))
+              ? detail.link
+              : "";
+            return (
+              // The card is not a single button: the site link must be its own
+              // control, and a link inside a button is invalid HTML.
+              <div
+                key={`${index}-${option}`}
+                className="ua-run-gui-choice flex min-w-0 items-stretch rounded-lg border text-sm"
+              >
+                <button
+                  type="button"
+                  onClick={() => answer(String(optionStart + index))}
+                  disabled={disabled}
+                  className={`flex min-w-0 flex-1 gap-3 px-3 py-2 text-left disabled:opacity-50 ${hasOptionImages ? "items-start" : "items-center"}`}
+                >
+                  <span className="ua-run-gui-count mt-0.5 shrink-0 rounded px-1.5 text-xs font-semibold">
+                    {optionStart + index}
+                  </span>
+                  {hasOptionImages && (
+                    <span className="ua-run-gui-option-thumb flex h-[4.5rem] w-12 shrink-0 items-center justify-center overflow-hidden rounded">
+                      {/^https?:\/\//i.test(
+                        String(optionImages[index] || ""),
+                      ) ? (
+                        <img
+                          src={optionImages[index]}
+                          alt=""
+                          loading="lazy"
+                          referrerPolicy="no-referrer"
+                          onError={(event) => {
+                            event.currentTarget.style.display = "none";
+                          }}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <LucideIcon name="clapperboard" className="h-4 w-4" />
+                      )}
+                    </span>
+                  )}
+                  <span className="min-w-0 flex-1">
+                    <span className="block break-words font-semibold">
+                      {option}
+                    </span>
+                    {detail.meta && (
+                      <span className="ua-run-gui-muted mt-0.5 block break-words text-xs">
+                        {detail.meta}
+                      </span>
+                    )}
+                    {detail.text && (
+                      <span
+                        className="ua-run-gui-muted mt-1 block break-words text-xs leading-snug line-clamp-2"
+                        title={detail.text}
+                      >
+                        {detail.text}
+                      </span>
+                    )}
+                  </span>
+                </button>
+                {link && (
+                  <a
+                    href={link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="ua-run-gui-link flex shrink-0 items-start gap-1 px-3 py-2 text-xs font-semibold"
+                    title={`Open on ${detail.link_label || "the site"}`}
+                  >
+                    {detail.link_label || "Open"}
+                    <LucideIcon name="external-link" className="h-3.5 w-3.5" />
+                  </a>
+                )}
+              </div>
+            );
+          })}
           {actions.length > 0 && (
             <div className="flex flex-wrap gap-2">
               {actions.map(([value, label]) => (
@@ -8848,15 +9058,18 @@ function AudionutsUAGUI() {
                 }}
               >
                 <input
+                  ref={runGuiAnswerRef}
                   value={userInput}
                   onChange={(event) => setUserInput(event.target.value)}
                   disabled={disabled}
                   placeholder={
-                    prompt?.default && typeof prompt.default === "string"
-                      ? `Leave empty for "${prompt.default}"`
-                      : options.length || actions.length
-                        ? "Or type your answer"
-                        : "Type your answer"
+                    context.kind === "edit_args"
+                      ? "e.g. --tag NTb --tmdb movie/12345"
+                      : prompt?.default && typeof prompt.default === "string"
+                        ? `Leave empty for "${prompt.default}"`
+                        : options.length || actions.length
+                          ? "Or type your answer"
+                          : "Type your answer"
                   }
                   aria-label="Answer"
                   className="ua-run-gui-input min-w-0 flex-1 rounded-lg border px-3 py-2 text-sm"
@@ -9120,9 +9333,13 @@ function AudionutsUAGUI() {
     const attentionCards = view.attentionCards.filter(
       (card) => !(promptTracker && card.tracker === promptTracker),
     );
+    // The confirmation and correction cards list what is missing themselves.
     const attentionNotices = view.attentionNotices.filter(
       (notice) =>
-        !(prompt?.context?.kind === "confirm" && notice.group === "confirm"),
+        !(
+          ["confirm", "edit_args"].includes(prompt?.context?.kind) &&
+          notice.group === "confirm"
+        ),
     );
     const attentionCount = attentionCards.length + attentionNotices.length;
     const emptyNotes = { cards: [], notices: [], problems: [] };

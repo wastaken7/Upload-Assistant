@@ -254,13 +254,22 @@ async def _find_discogs_release(meta: Meta, release: Any, token: str) -> str:
         return ""
     logger.info("[bold yellow]Multiple exact Discogs releases found; select one or 0 to skip:[/bold yellow]")
     labels: list[str] = []
+    option_details: list[dict[str, str]] = []
     for index, candidate in enumerate(matches, 1):
         details = " / ".join(str(candidate.get(key, "")).strip() for key in ("year", "country", "catno") if str(candidate.get(key, "")).strip())
         logger.info(f"[cyan]{index}.[/cyan] {candidate.get('title', '')} {f'({details})' if details else ''} [dim]ID: {candidate.get('id', '')}[/dim]")
-        labels.append(f"{candidate.get('title', '')} {f'({details})' if details else ''} · ID {candidate.get('id', '')}")
+        labels.append(str(candidate.get("title", "")))
+        identifier = str(candidate.get("id", ""))
+        option_details.append(
+            {
+                "meta": " · ".join(part for part in (details, f"Discogs {identifier}") if part),
+                "link": f"https://www.discogs.com/release/{identifier}" if identifier.isdigit() else "",
+                "link_label": "Discogs",
+            }
+        )
     while True:
         try:
-            with webui_events.numbered_options(labels, actions=[("0", "Skip")]):
+            with webui_events.numbered_options(labels, actions=[("0", "Skip")], details=option_details):
                 choice = (cli_ui.ask_string(f"Discogs release (1-{len(matches)}, 0 to skip): ") or "").strip()
         except EOFError, KeyboardInterrupt:
             logger.info("[yellow]MUSIC: Discogs selection cancelled; skipping Discogs.[/yellow]")

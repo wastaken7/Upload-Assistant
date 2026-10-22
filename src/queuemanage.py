@@ -551,7 +551,8 @@ class QueueManager:
                             logger.info("[yellow]Select which new files to add (comma-separated numbers):[/yellow]")
                             for idx, file in enumerate(sorted(new_files), 1):
                                 logger.info(f"  {idx}. {file}")
-                            selected_raw = cli_ui.ask_string("Enter numbers (e.g., 1,3,5): ")
+                            with webui_events.numbered_options([Path(file).name for file in sorted(new_files)]):
+                                selected_raw = cli_ui.ask_string("Enter numbers (e.g., 1,3,5): ")
                             selected = (selected_raw or "").strip()
                             try:
                                 indices = [int(x) for x in selected.split(",") if x.strip().isdigit()]

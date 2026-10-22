@@ -589,7 +589,8 @@ class Common:
 
         if not meta.unattended:
             try:
-                selection = (await prompt_in_thread(cli_ui.ask_string, f"Do you want to use these IDs from {tracker_name}? (Y/n): ", default="") or "").strip().lower()
+                with webui_events.answer_buttons([("y", "Yes"), ("n", "No")]):
+                    selection = (await prompt_in_thread(cli_ui.ask_string, f"Do you want to use these IDs from {tracker_name}? (Y/n): ", default="") or "").strip().lower()
                 return selection == "" or selection == "y" or selection == "yes"
             except KeyboardInterrupt, EOFError:
                 sys.exit(1)
@@ -599,7 +600,8 @@ class Common:
     async def prompt_user_for_confirmation(self, message: str, meta: Meta | None = None) -> bool:
         if meta and meta.unattended and not meta.unattended_confirm:
             return False
-        response = (await prompt_in_thread(cli_ui.ask_string, f"{message} (Y/n): ", default="") or "").strip().lower()
+        with webui_events.answer_buttons([("y", "Yes"), ("n", "No")]):
+            response = (await prompt_in_thread(cli_ui.ask_string, f"{message} (Y/n): ", default="") or "").strip().lower()
         return response == "" or response == "y"
 
     async def _apply_region_distributor(self, meta: Meta, attributes: dict[str, Any], tracker: str = "") -> None:

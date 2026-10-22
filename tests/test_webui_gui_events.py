@@ -452,3 +452,29 @@ def test_option_and_release_labels_keep_bracketed_text(gui_env, capsys) -> None:
     assert opened["context"]["actions"] == [["", "keep [as is]"]]
     assert opened["choices"] == [label]
     assert dupes["entries"][0]["name"] == label
+
+
+def test_numbered_options_carry_only_web_thumbnails(gui_env, capsys) -> None:
+    images = ["https://image.tmdb.org/t/p/w92/fictional.jpg", "", "javascript:alert(1)"]
+    with webui_events.numbered_options(["First (2020)", "Second (2021)", "Third (2022)"], images=images):
+        webui_events.prompt_open("text", "Enter the number of the correct entry:")
+    with webui_events.numbered_options(["No posters"], images=["", ""]):
+        webui_events.prompt_open("text", "Pick one:")
+
+    with_images, without_images = _events(capsys.readouterr().out)
+    assert with_images["context"]["images"] == ["https://image.tmdb.org/t/p/w92/fictional.jpg", "", ""]
+    assert "images" not in without_images["context"]
+
+
+def test_numbered_options_carry_structured_details(gui_env, capsys) -> None:
+    details = [
+        {"meta": "TMDb 1 · similarity 0.40", "text": "A fictional synopsis.", "link": "https://www.themoviedb.org/movie/1", "link_label": "TMDb"},
+        {"meta": "TMDb 2", "link": "javascript:alert(1)", "link_label": "TMDb"},
+    ]
+    with webui_events.numbered_options(["Fictional Film (2020)", "Other Film (2021)"], details=details):
+        webui_events.prompt_open("text", "Enter the number of the correct entry:")
+
+    (opened,) = _events(capsys.readouterr().out)
+    first, second = opened["context"]["details"]
+    assert first == {"meta": "TMDb 1 · similarity 0.40", "text": "A fictional synopsis.", "link": "https://www.themoviedb.org/movie/1", "link_label": "TMDb"}
+    assert second["link"] == ""

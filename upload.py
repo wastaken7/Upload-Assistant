@@ -89,7 +89,7 @@ from bin.get_mkbrr import MkbrrBinaryManager
 from src import webui_events
 from src.add_comparison import ComparisonManager
 from src.app_paths import CODE_DIR, STATE_DIR
-from src.args import Args, read_paths_from_stdin
+from src.args import Args, cli_argument_catalog, cli_option_choices, read_paths_from_stdin
 from src.artwork import is_public_http_url, is_valid_cover_image
 from src.audio_spectrogram import process_audio_spectrograms
 from src.binaries import configured_binary
@@ -1023,6 +1023,93 @@ async def _prompt_music_meta(meta: Meta) -> None:
         await _refresh_music_meta(meta)
 
 
+def _editarg_suggestions(meta: Meta) -> dict[str, str]:
+    """Quick corrections for the Web UI's "Input args that need correction" prompt.
+
+    The flags follow the category (IDs and fields that apply to it). Each
+    maps to the release's current value, written as the parser accepts it,
+    so a chip can insert it ready to edit. A value the parser would reject
+    (for example an unlisted source) is left empty, and a flag the parser
+    does not know is never offered.
+    """
+    choices = cli_option_choices()
+
+    def allowed(flag: str, value: Any) -> str:
+        text = str(value or "").strip()
+        return next((choice for choice in choices.get(flag, ()) if text and choice.casefold() == text.casefold()), "")
+
+    def number(value: Any) -> str:
+        return re.sub(r"\D", "", str(value or "")).lstrip("0")
+
+    def text(*candidates: Any) -> str:
+        return next((str(value).strip() for value in candidates if value not in (None, "", 0) and str(value).strip()), "")
+
+    category = str(meta.category or "").lower()
+    values: dict[str, str] = {"--category": allowed("--category", category)}
+    if category == "game":
+        values.update(
+            {
+                "--igdb": text(meta.igdb_id, meta.igdb_manual),
+                "--platform": allowed("--platform", meta.platform or meta.manual_platform),
+                "--game-title": text(meta.game_title, meta.title),
+                "--game-version": text(meta.game_version),
+                "--game-subcategory": allowed("--game-subcategory", meta.game_subcategory),
+                "--tag": str(meta.tag or "").lstrip("-"),
+            }
+        )
+    elif category == "book":
+        values.update(
+            {
+                "--book-title": text(meta.book_title, meta.title),
+                "--author": text(meta.author, meta.book_author),
+                "--asin": text(meta.asin, meta.book_asin),
+                "--isbn": text(meta.isbn, meta.book_isbn),
+                "--publisher": text(meta.publisher, meta.book_publisher),
+                "--book-language": text(meta.book_language),
+                "--year": text(meta.year),
+            }
+        )
+        if meta.audiobook:
+            values["--book-narrator"] = text(meta.narrator, meta.book_narrator)
+    elif category == "music":
+        values.update(
+            {
+                "--music-artist": text(_music_field(meta, "artist")),
+                "--music-album": text(_music_field(meta, "album")),
+                "--music-media": allowed("--music-media", _music_field(meta, "media")),
+                "--music-release-type": allowed("--music-release-type", _music_field(meta, "release_type")),
+                "--music-release-year": text(_music_field(meta, "release_year")),
+                "--music-edition-year": text(_music_field(meta, "edition_year")),
+                "--music-label": text(_music_field(meta, "release_label")),
+                "--music-catalogue-number": text(_music_field(meta, "release_catalogue_number")),
+            }
+        )
+    else:
+        # Movies, TV and the other video categories.
+        if category in ("movie", "tv"):
+            values["--tmdb"] = f"{category}/{meta.tmdb_id}" if meta.tmdb_id else ""
+            values["--imdb"] = f"tt{int(meta.imdb_id):07d}" if meta.imdb_id else ""
+        if category == "tv":
+            values["--tvdb"] = text(meta.tvdb_id)
+            values["--tvmaze"] = text(meta.tvmaze_id)
+            if meta.mal_id:
+                values["--mal"] = text(meta.mal_id)
+            values["--season"] = number(meta.season)
+            values["--episode"] = number(meta.episode)
+        values.update(
+            {
+                "--type": allowed("--type", meta.type),
+                "--source": allowed("--source", meta.source),
+                "--resolution": allowed("--resolution", meta.resolution),
+                "--tag": str(meta.tag or "").lstrip("-"),
+                "--edition": text(meta.edition),
+                "--year": text(meta.year),
+            }
+        )
+    known = {item["label"] for item in cli_argument_catalog()}
+    return {flag: value for flag, value in values.items() if flag in known}
+
+
 async def _refresh_music_meta(meta: Meta) -> None:
     """Save prompted music fields and rebuild the release name from them."""
     await _write_music_snapshot(meta)
@@ -1203,7 +1290,18 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
         sys.exit(1)
     while confirm is False:
         try:
-            editargs_str = CLI_UI.ask_string("Input args that need correction e.g. (--tag NTb --category tv --tmdb 12345)")
+            # The Web UI shows the declined summary, quick corrections and the
+            # corrections already applied; "continue" keeps the release as is
+            # and "skip" leaves it out (the queue moves on to the next item).
+            with webui_events.prompt_context(
+                kind="edit_args",
+                values=_editarg_suggestions(meta),
+                applied=shlex.join(editargs_tracking),
+                actions=[("continue", "Continue without changes"), ("skip", "Skip this upload")],
+            ):
+                editargs_str = CLI_UI.ask_string(
+                    "Input args that need correction e.g. (--tag NTb --category tv --tmdb 12345), 'continue' to keep them, or 'skip' to skip this upload"
+                )
         except EOFError:
             logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")
             await cleanup_manager.cleanup()
@@ -1213,8 +1311,15 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
         if editargs_str == "continue":
             break
 
+        if (editargs_str or "").strip().lower() == "skip":
+            logger.info("[yellow]Skipping this upload on request.[/yellow]")
+            webui_events.notice("attention", "Skipped on your request; nothing was uploaded.")
+            webui_events.stage("confirm", "skip")
+            meta.skipped_by_user = True
+            return False
+
         if not editargs_str or not editargs_str.strip():
-            logger.info("[yellow]No input provided. Please enter arguments, type `continue` to continue or press Ctrl+C to exit.[/yellow]")
+            logger.info("[yellow]No input provided. Please enter arguments, type `continue` to continue, `skip` to skip this upload, or press Ctrl+C to exit.[/yellow]")
             continue
 
         try:
@@ -1234,9 +1339,15 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
         next_editargs = editargs_tracking + editargs
         # Carry original args over, let parse handle duplicates
         original_args = meta.item_args if meta.item_args is not None else list(sys.argv[1:])
-        edited_meta, _help, _before_args = cast(
-            tuple[Meta, Any, Any], parser.parse(list(original_args) + list(next_editargs), meta.copy() if webui_roots is not None else meta)
-        )
+        try:
+            edited_meta, _help, _before_args = cast(
+                tuple[Meta, Any, Any], parser.parse(list(original_args) + list(next_editargs), meta.copy() if webui_roots is not None else meta)
+            )
+        except SystemExit:
+            # argparse exits on an unknown option or a value outside its choices;
+            # ask again instead of ending the upload over a typo.
+            logger.info("[red]Those arguments are not valid; check them and try again.[/red]")
+            continue
         if webui_roots is not None:
             try:
                 edited_meta.path = validate_subprocess_path(cast(str, edited_meta.path))
@@ -2644,10 +2755,13 @@ async def do_the_thing(base_dir: str) -> None:
             finally:
                 await cancel_and_drain_early_artifact_tasks(meta.uuid)
             if not meta_success:
-                webui_events.fail_active_stage()
+                # A skip is the user's choice, not a failure: no red stage, no error.
+                outcome = "no_upload" if meta.skipped_by_user else "error"
+                if not meta.skipped_by_user:
+                    webui_events.fail_active_stage()
                 set_stats_context(debug=bool(meta.debug), category=str(meta.category or ""))
-                await record_event_async("item", operation="completed", outcome="error")
-                await record_release_profile_async(meta, "error")
+                await record_event_async("item", operation="completed", outcome=outcome)
+                await record_release_profile_async(meta, outcome)
                 if "queue" in meta and meta.queue is not None:
                     processed_files_count += 1
                     skipped_files_count += 1

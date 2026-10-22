@@ -201,16 +201,42 @@ def prompt_context(**context: Any) -> Generator[None]:
 
 
 @contextlib.contextmanager
-def numbered_options(options: Iterable[Any], *, actions: Iterable[tuple[str, str]] = (), start: int = 1) -> Generator[None]:
+def numbered_options(
+    options: Iterable[Any],
+    *,
+    actions: Iterable[tuple[str, str]] = (),
+    start: int = 1,
+    images: Iterable[str] = (),
+    details: Iterable[Mapping[str, Any]] = (),
+) -> Generator[None]:
     """Show the numbered list printed before a free-text prompt as answer buttons.
 
     The terminal prints the list and asks for its number; the GUI only gets
     the question, so the list is attached here. Option N is answered with
     its number counted from ``start``; ``actions`` are other accepted
     answers as ``(answer, label)``, for example ``("0", "Skip")`` or
-    ``("", "Keep it")`` for pressing Enter.
+    ``("", "Keep it")`` for pressing Enter. ``images`` are optional
+    thumbnail URLs, one per option ("" for none), such as posters.
+    ``details`` are optional, one per option: ``meta`` (a short line such as
+    IDs), ``text`` (a synopsis) and ``link``/``link_label`` (the entry on its
+    site, e.g. TMDb), shown under the option's label.
     """
-    with prompt_context(kind="options", options=list(options), actions=list(actions), start=str(int(start))):
+    thumbnails = [_http_link(image) if image else "" for image in images]
+    context: dict[str, Any] = {"kind": "options", "options": list(options), "actions": list(actions), "start": str(int(start))}
+    if any(thumbnails):
+        context["images"] = thumbnails
+    option_details = [
+        {
+            "meta": plain_text(detail.get("meta"), 300, markup=False),
+            "text": plain_text(detail.get("text"), 400, markup=False),
+            "link": _http_link(detail.get("link")) if detail.get("link") else "",
+            "link_label": plain_text(detail.get("link_label"), 40, markup=False),
+        }
+        for detail in details
+    ]
+    if any(any(detail.values()) for detail in option_details):
+        context["details"] = option_details
+    with prompt_context(**context):
         yield
 
 
@@ -256,7 +282,15 @@ def _context_payload() -> dict[str, Any] | None:
         elif isinstance(value, list):
             # Lists keep their order; (answer, label) pairs become two-item lists.
             items = cast(list[Any], value)[:MAX_LIST_ITEMS]
-            payload[name] = [[plain_text(part, 300, markup=False) for part in item] if isinstance(item, tuple) else plain_text(item, 300, markup=False) for item in items]
+            payload[name] = [
+                [plain_text(part, 300, markup=False) for part in item]
+                if isinstance(item, tuple)
+                # Option details are already plain and bounded by numbered_options.
+                else dict(cast(Mapping[str, Any], item))
+                if isinstance(item, Mapping)
+                else plain_text(item, 300, markup=False)
+                for item in items
+            ]
         elif isinstance(value, bool):
             payload[name] = value
         elif value is not None:

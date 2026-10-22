@@ -725,7 +725,12 @@ class DiscParse:
                             additional_info_str = ", ".join(additional_info)
                             logger.info(f"{idx}: Duration: {duration} Playlist: {title_number}" + (f" ({additional_info_str})" if additional_info else ""))
 
-                        user_input_raw = await prompt_in_thread(cli_ui.ask_string, "Enter the number of the playlist you want to select: ")
+                        labels = [
+                            f"Playlist {playlist.get('titleNumber', '')} · {playlist.get('titleDuration', 'Unknown')} · {playlist.get('totalSize', 0) / (1024 * 1024):.2f} MB"
+                            for playlist in valid_playlists
+                        ]
+                        with webui_events.numbered_options(labels):
+                            user_input_raw = await prompt_in_thread(cli_ui.ask_string, "Enter the number of the playlist you want to select: ")
                         user_input = (user_input_raw or "").strip()
 
                         try:

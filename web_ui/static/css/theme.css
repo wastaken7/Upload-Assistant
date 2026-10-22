@@ -3910,6 +3910,13 @@ html[data-ua-shape="square"]
   -webkit-mask: var(--ua-lucide-icon) center / contain no-repeat;
 }
 
+/* A masked icon is re-rasterized on every frame of a spin, snapping to the
+   pixel grid at each angle, so it seems to wobble (worst at fractional
+   positions or zoom). On its own layer it is drawn once and rotated whole. */
+.ua-lucide-icon.animate-spin {
+  will-change: transform;
+}
+
 /* Upload page GUI output mode */
 .ua-run-gui-mode-toggle {
   background: var(--ua-upload-surface);
@@ -4213,4 +4220,28 @@ html[data-ua-shape="square"]
 .ua-run-gui-item-index {
   background: var(--ua-upload-hover);
   color: var(--ua-upload-muted);
+}
+
+/* Poster thumbnail beside an ID choice; the tile shows when there is none. */
+.ua-run-gui-option-thumb {
+  background: var(--ua-upload-hover);
+  color: var(--ua-upload-muted);
+}
+
+/* Correction chips: insert a flag with its current value into the answer. */
+.ua-run-gui-arg-chip {
+  background: var(--ua-upload-surface);
+  border-color: var(--ua-upload-border);
+  color: var(--ua-upload-text);
+}
+
+.ua-run-gui-arg-chip:hover:not(:disabled) {
+  background: var(--ua-upload-hover);
+  border-color: var(--ua-copper);
+}
+
+/* Skipping drops the release, so it reads as a cautionary choice. */
+.ua-run-gui-skip {
+  color: color-mix(in srgb, #ef4444 70%, var(--ua-upload-text));
+  border-color: color-mix(in srgb, #ef4444 40%, var(--ua-upload-border));
 }

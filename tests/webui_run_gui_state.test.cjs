@@ -487,3 +487,35 @@ test("a failed answer reopens only the prompt it was sent for", () => {
     true,
   );
 });
+
+test("the declined confirmation summary stays available for corrections", () => {
+  const state = run(
+    gui({
+      kind: "prompt",
+      action: "open",
+      id: 1,
+      type: "yes_no",
+      question: "Is this correct?",
+      item: 1,
+      context: { kind: "confirm", base_name: "Fictional.Movie.2020-NOGRP" },
+    }),
+    gui({ kind: "prompt", action: "close", id: 1, item: 1 }),
+    gui({
+      kind: "prompt",
+      action: "open",
+      id: 2,
+      type: "text",
+      question: "Input args that need correction",
+      item: 1,
+      context: { kind: "edit_args", values: { "--tag": "NOGRP" } },
+    }),
+  );
+  const view = selectRunGuiView(state);
+
+  assert.equal(view.prompt.context.kind, "edit_args");
+  assert.equal(view.lastConfirm.item, 1);
+  assert.equal(
+    view.lastConfirm.context.base_name,
+    "Fictional.Movie.2020-NOGRP",
+  );
+});
