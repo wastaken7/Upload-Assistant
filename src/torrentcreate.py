@@ -355,7 +355,8 @@ class TorrentCreator:
 
                         # Run mkbrr subprocess in thread to avoid blocking
                         def run_mkbrr() -> int:
-                            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)  # noqa: S603
+                            # mkbrr prints UTF-8 file names; the Windows locale codec (cp1252) cannot read them.
+                            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace", bufsize=1)  # noqa: S603
 
                             if process.stdout is None:
                                 return process.wait()

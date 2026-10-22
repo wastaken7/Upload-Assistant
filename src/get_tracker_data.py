@@ -17,6 +17,7 @@ import click
 import httpx
 import requests
 
+from src import webui_events
 from src.btnid import BtnIdManager
 from src.console import logger, prompt_in_thread
 from src.meta import Meta
@@ -193,7 +194,9 @@ class TrackerDataManager:
             logger.info("[cyan]Tracker metadata candidates:[/cyan]")
             for index, (tracker_name, candidate, score) in enumerate(ranked, start=1):
                 logger.info(f"  {index}. {tracker_name}: score {score}, {candidate.name or candidate.filename}")
-            choice = await prompt_in_thread(cli_ui.ask_string, f"Choose a tracker candidate [1-{len(ranked)}] (Enter for best): ")
+            labels = [f"{tracker_name}: score {score}, {candidate.name or candidate.filename}" for tracker_name, candidate, score in ranked]
+            with webui_events.numbered_options(labels, actions=[("", "Use the best score")]):
+                choice = await prompt_in_thread(cli_ui.ask_string, f"Choose a tracker candidate [1-{len(ranked)}] (Enter for best): ")
             if choice and choice.strip().isdigit():
                 selected = int(choice.strip()) - 1
                 if 0 <= selected < len(ranked):

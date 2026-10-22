@@ -4,11 +4,13 @@ import hashlib
 import io
 import json
 import subprocess
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Any, cast
 
 import cli_ui
 
+from src import webui_events
 from src.binaries import configured_binary
 from src.console import logger
 from src.meta import Meta
@@ -27,15 +29,16 @@ SPECTROGRAM_N_FFT = 2048
 MAX_TIME_BINS = 1024
 
 
-def prompt_audio_stream_positions() -> str:
+def prompt_audio_stream_positions(labels: Iterable[str] = ()) -> str:
     """Ask for stream positions through the prompt API supported by the WebUI."""
-    return (
-        cli_ui.ask_string(
-            "Select audio stream positions (e.g. 0,1 or all)",
-            default="all",
+    with webui_events.numbered_options(labels, actions=[("all", "All streams")], start=0):
+        return (
+            cli_ui.ask_string(
+                "Select audio stream positions (e.g. 0,1 or all)",
+                default="all",
+            )
+            or "all"
         )
-        or "all"
-    )
 
 
 def get_audio_streams(file_path: str | Path) -> list[dict[str, Any]]:
@@ -53,7 +56,7 @@ def get_audio_streams(file_path: str | Path) -> list[dict[str, Any]]:
         str(file_path),
     ]
     try:
-        result = subprocess.run(command, capture_output=True, text=True, check=False, timeout=60)  # noqa: S603
+        result = subprocess.run(command, capture_output=True, text=True, encoding="utf-8", errors="replace", check=False, timeout=60)  # noqa: S603
     except (OSError, subprocess.TimeoutExpired) as error:
         raise RuntimeError(f"Could not run ffprobe: {error}") from error
 
@@ -300,10 +303,12 @@ async def process_audio_spectrograms(meta: Meta, config: dict[str, Any], uploads
     else:
         _, first_audio_path, first_streams = source_streams[0]
         logger.info(f"Available audio streams for {first_audio_path.name} (use zero-based positions):")
+        labels: list[str] = []
         for position, stream in enumerate(first_streams):
             tags = stream.get("tags", {})
             logger.info(f"[{position}] FFmpeg stream {stream.get('index')} | Lang: {tags.get('language', 'und')} | Title: {tags.get('title', 'No Title')}")
-        choice = prompt_audio_stream_positions()
+            labels.append(f"Stream {stream.get('index')} · {tags.get('language', 'und')} · {tags.get('title', 'No Title')}")
+        choice = prompt_audio_stream_positions(labels)
 
     selected_jobs: list[tuple[int, Path, dict[str, Any]]] = []
     for source_position, audio_path, streams in source_streams:

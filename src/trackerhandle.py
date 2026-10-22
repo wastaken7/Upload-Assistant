@@ -9,6 +9,7 @@ from typing import Any, cast
 import cli_ui
 from rich.markup import escape
 
+from src import webui_events
 from src.artwork import is_valid_cover_image
 from src.cleanup import cleanup_manager
 from src.cogs.redaction import Redaction
@@ -74,6 +75,28 @@ async def process_trackers(
         default=0,
     )
 
+    def publish_tracker_result(tracker: str, tracker_class: Any, status: Mapping[str, Any], is_success: bool) -> None:
+        """Send the result to the Web UI's GUI mode, whatever the terminal print settings are."""
+        if not webui_events.enabled():
+            return
+        duration = meta.get(f"{tracker}_upload_duration")
+        duration_value = float(duration) if isinstance(duration, (int, float)) else None
+        if not is_success:
+            webui_events.tracker_result(tracker, "failed", message=status.get("status_message"), duration=duration_value)
+            return
+        link = status.get("torrent_link")
+        if not link and "torrent_id" in status:
+            link = f"{getattr(tracker_class, 'torrent_url', '')}{status['torrent_id']}"
+        message = str(status.get("status_message", ""))
+        webui_events.tracker_result(
+            tracker,
+            "success",
+            link=link,
+            torrent_id=status.get("torrent_id"),
+            message=message if message and "data error" not in message else None,
+            duration=duration_value,
+        )
+
     def print_tracker_result(
         tracker: str,
         tracker_class: Any,
@@ -81,6 +104,7 @@ async def process_trackers(
         is_success: bool,
     ) -> None:
         """Print tracker upload result immediately after upload completes."""
+        publish_tracker_result(tracker, tracker_class, status, is_success)
         try:
             # Check config settings for what to print
             print_links = meta.print_tracker_links
@@ -118,7 +142,7 @@ async def process_trackers(
             else:
                 status_message = str(status.get("status_message", "")).strip()
                 if status_message:
-                    logger.info(f"[red]{tracker_label} {escape(Redaction.redact_private_info(status_message))}[/red]")
+                    logger.info(f"[red]{tracker_label} {escape(Redaction.redact_private_info(status_message))}[/red]", extra={"ua_gui": False})
                     return
 
             if message is not None:
@@ -249,7 +273,7 @@ async def process_trackers(
                 else:
                     status["upload_success"] = False
                     print_tracker_result(tracker, tracker_class, status, False)
-                    logger.info(f"[red]{tracker} upload failed or returned data error.[/red]")
+                    logger.info(f"[red]{tracker} upload failed or returned data error.[/red]", extra={"ua_gui": False})
 
         elif tracker in other_api_trackers or tracker in http_trackers:
             tracker_status = meta.tracker_status
@@ -290,7 +314,7 @@ async def process_trackers(
                 else:
                     status["upload_success"] = False
                     print_tracker_result(tracker, tracker_class, status, False)
-                    logger.info(f"[red]{tracker} upload failed or returned data error.[/red]")
+                    logger.info(f"[red]{tracker} upload failed or returned data error.[/red]", extra={"ua_gui": False})
 
         elif tracker == "MANUAL":
             if meta.unattended:
@@ -357,7 +381,7 @@ async def process_trackers(
                     else:
                         status["upload_success"] = False
                         print_tracker_result(tracker, ptp, status, False)
-                        logger.info(f"[red]{tracker} upload failed or returned data error.[/red]")
+                        logger.info(f"[red]{tracker} upload failed or returned data error.[/red]", extra={"ua_gui": False})
                 except Exception:
                     logger.info(traceback.format_exc(), extra={"markup": False})
                     return

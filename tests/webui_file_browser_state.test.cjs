@@ -318,6 +318,7 @@ test("file-browser persistence, restoration, refresh and execution outcomes", as
     refreshUploadTabStatus: () => {},
     appendSystemMessage: () => {},
     applyProgressEvent: () => {},
+    applyRunGuiEvent: () => {},
     appendHtmlFragment: () => {},
     sanitizeHtml: (html) => html,
     dismissTabSession: () => {},

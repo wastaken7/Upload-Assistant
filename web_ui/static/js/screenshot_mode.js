@@ -229,9 +229,101 @@ Language                                 : ${track.language}`,
     ],
   };
 
+  // Structured events for the GUI output view: the run is paused at a dupe
+  // prompt, with fictional trackers in each result state.
+  const gib = (value) => Math.round(value * 1024 ** 3);
+  const gui = (data) => ({ type: "gui", data });
+  const guiEvents = [
+    gui({ kind: "stage", key: "prep", status: "start" }),
+    gui({ kind: "stage", key: "prep", status: "done" }),
+    gui({ kind: "stage", key: "confirm", status: "start" }),
+    gui({ kind: "stage", key: "confirm", status: "done" }),
+    gui({ kind: "stage", key: "dupes", status: "start" }),
+    gui({
+      kind: "notice",
+      level: "warning",
+      text: "Image host returned a slow response; retrying with the next host.",
+    }),
+    gui({
+      kind: "notice",
+      level: "attention",
+      text: "Distributor 'Fictional Media' is not recognized.",
+      tracker: "HELIX",
+      key: "distributor:HELIX",
+    }),
+    gui({
+      kind: "slot",
+      tracker: "NOVA",
+      verdict: "review",
+      title: "Review before uploading",
+      reason: "A remux with the same audio already fills the UHD slot.",
+      slot: "UHD Remux",
+      why: "Your release adds HDR10+ metadata, which may qualify it as a trump.",
+      rules:
+        "Rules as of 2026-01-01. This is only a recommendation; tracker rules change over time.",
+    }),
+    gui({
+      kind: "dupes",
+      tracker: "NOVA",
+      trumpable: false,
+      entries: [
+        {
+          name: "The Automation Menace 1968 2160p UHD BluRay REMUX DV HEVC DTS-HD MA 5.1-Other",
+          size: gib(71.9),
+          diff_pct: -1,
+          color: "#ff0000",
+        },
+        {
+          name: "The Automation Menace 1968 1080p BluRay REMUX AVC DTS-HD MA 5.1-Other",
+          size: gib(34.2),
+          diff_pct: -53,
+          color: "#00ff00",
+        },
+      ],
+    }),
+    gui({
+      kind: "tracker",
+      tracker: "ORBIT",
+      status: "pending",
+      message: "No potential dupes found",
+    }),
+    gui({
+      kind: "tracker",
+      tracker: "ZENITH",
+      status: "dupe",
+      message: "Possible dupe on this tracker",
+    }),
+    gui({
+      kind: "tracker",
+      tracker: "HELIX",
+      status: "skipped",
+      message: "Not uploading: missing distributor information.",
+    }),
+    gui({
+      kind: "prompt",
+      action: "open",
+      id: 1,
+      type: "yes_no",
+      question: "Upload to NOVA anyway?",
+      default: false,
+      context: { kind: "dupes", tracker: "NOVA" },
+    }),
+    gui({ kind: "prompt", action: "close", id: 1 }),
+    gui({
+      kind: "prompt",
+      action: "open",
+      id: 3,
+      type: "text",
+      question: "Input args that need correction e.g. (--tag NTb --category tv --tmdb 12345), 'continue' to keep them, or 'skip' to skip this upload",
+      context: { kind: "edit_args", values: { "--category": "movie", "--tmdb": "movie/0000", "--tag": "Group" }, applied: "", actions: [["continue", "Continue without changes"], ["skip", "Skip this upload"]] },
+    }),
+    { type: "prompt_state", awaiting: true, input_type: "yes_no" },
+  ];
+
   window.UAScreenshotMode = {
     media,
     output,
+    guiEvents,
     screenshots,
     description,
     mediainfo,

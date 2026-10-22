@@ -146,6 +146,8 @@ const FILE_BROWSER_SCROLL_KEY = "ua_webui_file_browser_scroll_top";
 const FILE_BROWSER_SORT_KEY = "ua_webui_file_browser_sort";
 const SHOW_AUDIO_TRACKS_KEY = "ua_webui_show_audio_tracks";
 const SHOW_SUBTITLE_TRACKS_KEY = "ua_webui_show_subtitle_tracks";
+const OUTPUT_MODE_KEY = "ua_webui_output_mode";
+const RUN_GUI_RESULTS_COLLAPSED_KEY = "ua_webui_run_gui_results_collapsed";
 const DEFAULT_LEFT_SIDEBAR_WIDTH = 256;
 const DEFAULT_RIGHT_SIDEBAR_WIDTH = 320;
 const APPLICATION_RAIL_WIDTH = 80;
@@ -202,6 +204,15 @@ const createUploadTabForm = () => ({
   userInput: "",
 });
 
+const RunGui = window.UARunGui;
+
+/** GUI state for a new view; the screenshot demo starts with its frozen events. */
+const initialRunGuiState = () =>
+  (screenshotMode?.guiEvents || []).reduce(
+    RunGui.reduceRunGuiEvent,
+    RunGui.createRunGuiState(),
+  );
+
 /** Per-tab state that must survive while the tab is not displayed. */
 const createUploadTabRuntime = () => ({
   output: document.createElement("div"),
@@ -224,6 +235,8 @@ const createUploadTabRuntime = () => ({
   awaiting: false,
   waiting: new Set(),
   result: "",
+  // Structured run state for the GUI output mode; kept even while hidden.
+  gui: RunGui.createRunGuiState(),
 });
 
 const getUploadTabStatus = (runtime) => {
@@ -288,7 +301,8 @@ const interfaceStyles = window.UAInterfaceStyles || [];
 const getStoredInterfaceStyle = window.getUAStoredInterfaceStyle;
 const setInterfaceStyle = window.setUAInterfaceStyle;
 const useModalFocus = window.useUAModalFocus;
-let bbcodePreviewConfigured = false;
+const unit3dBbcode = window.UAUnit3dBbcode;
+const YOUTUBE_EMBED_PREFIX = "https://www.youtube-nocookie.com/embed/";
 
 const escapePreviewHtml = (value) =>
   String(value || "")
@@ -298,23 +312,14 @@ const escapePreviewHtml = (value) =>
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
 
+// Only absolute web URLs: tracker-relative links have no target in a preview.
 const isSafePreviewUrl = (value) => {
   try {
-    const url = new URL(value, window.location.origin);
+    const url = new URL(value);
     return url.protocol === "http:" || url.protocol === "https:";
   } catch (_error) {
     return false;
   }
-};
-
-const getSafeBbcodeColor = (params) => {
-  const color = String(params || "")
-    .replace(/^=/, "")
-    .trim()
-    .toLowerCase();
-  if (/^#[0-9a-f]{6}$/i.test(color)) return color;
-  if (/^[a-z]{3,20}$/i.test(color)) return color;
-  return "";
 };
 
 const sanitizeBbcodePreview = (html) => {
@@ -322,61 +327,69 @@ const sanitizeBbcodePreview = (html) => {
     return `<div>${escapePreviewHtml(html).replace(/\n/g, "<br>")}</div>`;
   }
 
+  // The parser escapes the source first, so inline styles only carry the
+  // values its tag patterns accept (sizes, colors, fonts and alignment).
   const sanitized = window.DOMPurify.sanitize(html, {
     ALLOWED_TAGS: [
       "a",
       "b",
       "blockquote",
       "br",
+      "button",
+      "cite",
       "code",
       "details",
       "div",
-      "em",
+      "figcaption",
+      "figure",
+      "h1",
+      "h2",
+      "h3",
+      "h4",
+      "h5",
+      "h6",
       "hr",
       "i",
+      "iframe",
       "img",
       "li",
       "ol",
       "p",
       "pre",
+      "s",
+      "small",
       "span",
-      "strong",
+      "sub",
       "summary",
+      "sup",
       "table",
-      "tbody",
       "td",
       "th",
-      "thead",
       "tr",
       "u",
       "ul",
     ],
     ALLOWED_ATTR: [
-      "alt",
+      "allow",
+      "allowfullscreen",
       "class",
-      "colspan",
-      "data-bbcode-color",
+      "height",
       "href",
+      "loading",
       "src",
+      "style",
       "title",
+      "type",
+      "width",
     ],
   });
   const preview = new DOMParser().parseFromString(sanitized, "text/html");
 
-  preview.querySelectorAll("[data-bbcode-color]").forEach((element) => {
-    const color = getSafeBbcodeColor(element.getAttribute("data-bbcode-color"));
-    element.removeAttribute("data-bbcode-color");
-    if (color) element.style.color = color;
-  });
-  preview.querySelectorAll("[class*='xbbcode-size-']").forEach((element) => {
-    const size = Number(
-      element.className.match(/(?:^|\s)xbbcode-size-(\d+)(?:\s|$)/)?.[1],
-    );
-    if (Number.isInteger(size) && size >= 4 && size <= 40) {
-      element.style.fontSize = `${size}px`;
+  preview.querySelectorAll("iframe").forEach((frame) => {
+    if (!frame.getAttribute("src")?.startsWith(YOUTUBE_EMBED_PREFIX)) {
+      frame.remove();
     }
   });
-
   preview.querySelectorAll("a[href]").forEach((link) => {
     if (!isSafePreviewUrl(link.getAttribute("href"))) {
       link.removeAttribute("href");
@@ -396,40 +409,32 @@ const sanitizeBbcodePreview = (html) => {
   return preview.body.innerHTML;
 };
 
-const configureBbcodePreview = () => {
-  if (!window.XBBCODE?.addTags || bbcodePreviewConfigured) return;
-
-  window.XBBCODE.addTags({
-    color: {
-      openTag: (params) => {
-        const color = getSafeBbcodeColor(params);
-        return color ? `<span data-bbcode-color="${color}">` : "<span>";
-      },
-      closeTag: () => "</span>",
-    },
-    spoiler: {
-      openTag: () =>
-        '<details class="xbbcode-spoiler"><summary>Spoiler</summary>',
-      closeTag: () => "</details>",
-    },
-  });
-  bbcodePreviewConfigured = true;
-};
-
 const renderBbcodePreview = (content) => {
   const text = String(content || "");
-  if (!window.XBBCODE?.process) {
+  if (!unit3dBbcode) {
     return `<div>${escapePreviewHtml(text).replace(/\n/g, "<br>")}</div>`;
   }
+  return sanitizeBbcodePreview(unit3dBbcode.parseUnit3dBbcode(text));
+};
 
-  configureBbcodePreview();
-  return sanitizeBbcodePreview(
-    window.XBBCODE.process({
-      text,
-      addInLineBreaks: true,
-      removeMisalignedTags: false,
-      escapeHtml: true,
-    }).html,
+// Copy buttons on rendered [code] blocks, as on UNIT3D sites.
+const handleBbcodePreviewClick = (event) => {
+  const button = event.target.closest?.(".bbcode-rendered__clipboard-button");
+  if (!button) return;
+  const code = button
+    .closest(".bbcode-rendered__clipboard")
+    ?.querySelector("pre")?.textContent;
+  if (code == null || !navigator.clipboard?.writeText) return;
+  navigator.clipboard.writeText(code).then(
+    () => {
+      button.classList.add("bbcode-rendered__clipboard-button--copied");
+      window.setTimeout(
+        () =>
+          button.classList.remove("bbcode-rendered__clipboard-button--copied"),
+        1500,
+      );
+    },
+    (error) => console.error("Could not copy the code block:", error),
   );
 };
 
@@ -2101,6 +2106,14 @@ function AudionutsUAGUI() {
   const [showSubtitleTracks, setShowSubtitleTracks] = useState(
     () => storage.get(SHOW_SUBTITLE_TRACKS_KEY) === "true",
   );
+  const [outputMode, setOutputMode] = useState(() =>
+    storage.get(OUTPUT_MODE_KEY) === "gui" ? "gui" : "terminal",
+  );
+  const [runGuiResultsCollapsed, setRunGuiResultsCollapsed] = useState(
+    () => storage.get(RUN_GUI_RESULTS_COLLAPSED_KEY) === "true",
+  );
+  // Mirrors the active tab's runtime.gui; background tabs update only their runtime.
+  const [runGui, setRunGui] = useState(initialRunGuiState);
   const [executionScreenshots, setExecutionScreenshots] = useState(
     () => screenshotMode?.screenshots || [],
   );
@@ -2251,6 +2264,29 @@ function AudionutsUAGUI() {
       showSubtitleTracks ? "true" : "false",
     );
   }, [showSubtitleTracks]);
+
+  useEffect(() => {
+    storage.set(OUTPUT_MODE_KEY, outputMode);
+    // Hidden output cannot scroll; show the latest lines when it reappears.
+    if (outputMode === "terminal") {
+      const host = richOutputRef.current;
+      if (host) host.scrollTop = host.scrollHeight;
+    }
+  }, [outputMode]);
+
+  useEffect(() => {
+    storage.set(RUN_GUI_RESULTS_COLLAPSED_KEY, String(runGuiResultsCollapsed));
+  }, [runGuiResultsCollapsed]);
+
+  // A new question opens at the top of the GUI panel, so its Yes/No buttons
+  // are always in the same place even if the panel was scrolled down.
+  const runGuiPromptId = runGui.prompt?.id ?? null;
+  useEffect(() => {
+    if (runGuiPromptId === null) return;
+    document.querySelectorAll(".ua-run-gui").forEach((panel) => {
+      panel.scrollTop = 0;
+    });
+  }, [runGuiPromptId]);
 
   useEffect(() => {
     storage.set(
@@ -2581,6 +2617,8 @@ function AudionutsUAGUI() {
 
   const richOutputRef = useRef(null);
   const inputRef = useRef(null);
+  // The GUI prompt's text field, focused when a correction chip fills it.
+  const runGuiAnswerRef = useRef(null);
   const isSendingInputRef = useRef(false);
   const activeTabIdRef = useRef("tab-1");
   const uploadTabCounterRef = useRef(1);
@@ -2588,6 +2626,7 @@ function AudionutsUAGUI() {
   if (tabRuntimeRef.current === null) {
     const firstTab = createUploadTabRuntime();
     firstTab.run.isExecuting = Boolean(screenshotMode);
+    firstTab.gui = initialRunGuiState();
     tabRuntimeRef.current = new Map([["tab-1", firstTab]]);
     // Demo background tabs only feed the tab bar; switching to them is disabled.
     screenshotMode?.tabs.slice(1).forEach((tab, index) => {
@@ -2700,6 +2739,23 @@ function AudionutsUAGUI() {
       }
     });
     return sortProgressItems([...itemsById.values()]);
+  };
+
+  /** Fold one session event into a tab's GUI state; only the active tab re-renders. */
+  const applyRunGuiEvent = (event, tabId = activeTabIdRef.current) => {
+    const runtime = getTabRuntime(tabId);
+    if (!runtime) return;
+    const next = RunGui.reduceRunGuiEvent(runtime.gui, event);
+    if (next === runtime.gui) return;
+    runtime.gui = next;
+    if (tabId === activeTabIdRef.current) setRunGui(next);
+  };
+
+  const resetRunGui = (tabId = activeTabIdRef.current) => {
+    const runtime = getTabRuntime(tabId);
+    if (!runtime) return;
+    runtime.gui = RunGui.createRunGuiState();
+    if (tabId === activeTabIdRef.current) setRunGui(runtime.gui);
   };
 
   const applyProgressEvent = (event, tabId = activeTabIdRef.current) => {
@@ -3801,6 +3857,17 @@ function AudionutsUAGUI() {
     if (isMobile) setExpandedReviewPanel("");
   }, [isMobile]);
 
+  // The file browser can open in a larger modal, like the review panels.
+  const [isFileBrowserExpanded, setIsFileBrowserExpanded] = useState(false);
+  const fileBrowserModalRef = useModalFocus(
+    () => setIsFileBrowserExpanded(false),
+    isFileBrowserExpanded,
+  );
+  useEffect(() => {
+    // Starting an upload replaces the sidebar browser with the run's progress.
+    if (isMobile || isExecuting) setIsFileBrowserExpanded(false);
+  }, [isMobile, isExecuting]);
+
   const renderReviewExpandButton = (panel) => {
     if (isMobile) return null;
     const isExpanded = expandedReviewPanel === panel;
@@ -4046,23 +4113,41 @@ function AudionutsUAGUI() {
     setIsSendingInput(true);
     const tabId = activeTabIdRef.current;
     const runtime = getTabRuntime(tabId);
+    const promptId = runtime?.gui.prompt?.id ?? null;
     if (runtime) {
       runtime.awaiting = false;
+      runtime.gui = RunGui.markRunGuiPromptAnswered(runtime.gui);
+      setRunGui(runtime.gui);
       refreshUploadTabStatus(tabId);
     }
+    // Reopen the GUI prompt so the answer can be sent again.
+    const restorePrompt = () => {
+      const current = getTabRuntime(tabId);
+      if (!current || promptId === null) return;
+      current.gui = RunGui.markRunGuiPromptAnswered(
+        current.gui,
+        false,
+        promptId,
+      );
+      current.awaiting = true;
+      if (tabId === activeTabIdRef.current) setRunGui(current.gui);
+      refreshUploadTabStatus(tabId);
+    };
     // Optimistically echo the user's input locally so it appears before
     // any subsequent server-generated prompt / output.
     appendSystemMessage("> " + input, "user-input");
     setUserInput("");
     try {
-      await apiFetch(`${API_BASE}/input`, {
+      const response = await apiFetch(`${API_BASE}/input`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ session_id, input }),
       });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
     } catch (err) {
       console.error("Failed to send input:", err);
-      appendSystemMessage("Failed to send input", "error");
+      appendSystemMessage("Failed to send input", "error", tabId);
+      restorePrompt();
     } finally {
       isSendingInputRef.current = false;
       setIsSendingInput(false);
@@ -5641,10 +5726,13 @@ function AudionutsUAGUI() {
         }
       } else if (data.type === "progress") {
         applyProgressEvent(data.data || {}, tabId);
+      } else if (data.type === "gui") {
+        applyRunGuiEvent(data, tabId);
       } else if (data.type === "prompt_sound") {
         if (live) window.uaPromptSound?.play();
       } else if (data.type === "prompt_state") {
         runtime.awaiting = Boolean(data.awaiting);
+        applyRunGuiEvent(data, tabId);
         refreshUploadTabStatus(tabId);
       } else if (data.type === "replay_done") {
         live = true;
@@ -5661,6 +5749,7 @@ function AudionutsUAGUI() {
         outcome.error = true;
         appendSystemMessage(`Error: ${data.data}`, "error", tabId);
       } else if (data.type === "exit") {
+        applyRunGuiEvent(data, tabId);
         appendSystemMessage("", "info", tabId);
         appendSystemMessage(
           `Success: Process exited with code ${data.code}`,
@@ -5673,6 +5762,7 @@ function AudionutsUAGUI() {
       } else if (data.type === "started") {
         appendSystemMessage("Scheduled upload started.", "info", tabId);
       } else if (data.type === "finished") {
+        applyRunGuiEvent(data, tabId);
         outcome.finished = true;
         if (outcome.exitCode === null && Number.isInteger(data.exit_code)) {
           outcome.exitCode = data.exit_code;
@@ -6236,6 +6326,7 @@ function AudionutsUAGUI() {
       const runtime = getTabRuntime(tabId);
       if (!runtime) return;
       runtime.output.replaceChildren();
+      resetRunGui(tabId);
       await executeSinglePath(
         data.path,
         `session_${tabId}_${Date.now()}`,
@@ -6291,6 +6382,7 @@ function AudionutsUAGUI() {
 
     // Clear this tab's output
     runtime.output.replaceChildren();
+    resetRunGui(tabId);
     updateTabRun(tabId, { progressItems: [] });
     appendWelcomeMessage(tabId);
   };
@@ -6323,6 +6415,7 @@ function AudionutsUAGUI() {
     setIsExecuting(next.run.isExecuting);
     setIsTerminalView(next.view.isTerminalView);
     setProgressItems(next.view.progressItems);
+    setRunGui(next.gui);
     setSelectedPath(form.selectedPath);
     setSelectedPaths(form.selectedPaths);
     setManualPathsText(form.manualPathsText);
@@ -6877,12 +6970,17 @@ function AudionutsUAGUI() {
     const editor = descriptionEditorRef.current;
     if (!editor) return;
 
-    const start = editor.selectionStart;
-    const end = editor.selectionEnd;
-    const selectedText = descriptionDraft.slice(start, end);
-    const nextDraft = `${descriptionDraft.slice(0, start)}${openingTag}${selectedText}${closingTag}${descriptionDraft.slice(end)}`;
-    const selectionStart = start + openingTag.length;
-    const selectionEnd = selectionStart + selectedText.length;
+    const {
+      value: nextDraft,
+      selectionStart,
+      selectionEnd,
+    } = unit3dBbcode.insertBbcodeTags(
+      descriptionDraft,
+      editor.selectionStart,
+      editor.selectionEnd,
+      openingTag,
+      closingTag,
+    );
 
     descriptionVersionRef.current = Math.max(
       descriptionVersionRef.current,
@@ -6968,7 +7066,7 @@ function AudionutsUAGUI() {
                     aria-pressed={descriptionView === view}
                     className={`rounded px-3 py-1 text-xs font-semibold capitalize ${descriptionView === view ? "ua-accent-action" : isDarkMode ? "text-gray-300 hover:bg-gray-700" : "text-gray-600 hover:bg-white"}`}
                   >
-                    {view}
+                    {view === "edit" ? "Write" : view}
                   </button>
                 ))}
               </div>
@@ -6993,33 +7091,36 @@ function AudionutsUAGUI() {
                   <div
                     role="toolbar"
                     aria-label="Description formatting"
-                    className={`mb-2 flex flex-wrap gap-1 rounded-lg border p-1.5 ${isDarkMode ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-gray-50"}`}
+                    className={`mb-2 flex flex-wrap items-center gap-0.5 rounded-lg border p-1.5 ${isDarkMode ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-gray-50"}`}
                   >
-                    {[
-                      ["Bold", "B", "[b]", "[/b]"],
-                      ["Italic", "I", "[i]", "[/i]"],
-                      ["Underline", "U", "[u]", "[/u]"],
-                      ["Strikethrough", "S", "[s]", "[/s]"],
-                      ["Code", "Code", "[code]", "[/code]"],
-                      ["Quote", "Quote", "[quote]", "[/quote]"],
-                      ["Spoiler", "Spoiler", "[spoiler]", "[/spoiler]"],
-                      ["Align left", "Left", "[left]", "[/left]"],
-                      ["Align center", "Center", "[center]", "[/center]"],
-                      ["Align right", "Right", "[right]", "[/right]"],
-                    ].map(([label, text, openingTag, closingTag]) => (
-                      <button
-                        key={label}
-                        type="button"
-                        title={label}
-                        aria-label={label}
-                        onMouseDown={(event) => event.preventDefault()}
-                        onClick={() =>
-                          applyDescriptionBbcode(openingTag, closingTag)
-                        }
-                        className={`ua-accent-hover rounded px-2 py-1 text-xs font-semibold ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}
-                      >
-                        {text}
-                      </button>
+                    {unit3dBbcode.UNIT3D_BBCODE_TOOLBAR.map((group, index) => (
+                      <React.Fragment key={group[0].title}>
+                        {index > 0 && (
+                          <span
+                            aria-hidden="true"
+                            className={`mx-1 h-5 w-px ${isDarkMode ? "bg-gray-600" : "bg-gray-300"}`}
+                          />
+                        )}
+                        {group.map((tool) => (
+                          <button
+                            key={tool.title}
+                            type="button"
+                            title={
+                              tool.key
+                                ? `${tool.title} (Ctrl+${tool.key.toUpperCase()})`
+                                : tool.title
+                            }
+                            aria-label={tool.title}
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={() =>
+                              applyDescriptionBbcode(tool.open, tool.close)
+                            }
+                            className={`ua-accent-hover rounded p-1.5 ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}
+                          >
+                            <LucideIcon name={tool.icon} className="h-4 w-4" />
+                          </button>
+                        ))}
+                      </React.Fragment>
                     ))}
                   </div>
                   <textarea
@@ -7036,6 +7137,18 @@ function AudionutsUAGUI() {
                     onBlur={() => {
                       if (descriptionDirty) saveExecutionDescription();
                     }}
+                    onKeyDown={(event) => {
+                      if (!event.ctrlKey || event.altKey || event.shiftKey) {
+                        return;
+                      }
+                      const tool =
+                        unit3dBbcode.UNIT3D_BBCODE_TOOLBAR.flat().find(
+                          ({ key }) => key === event.key.toLowerCase(),
+                        );
+                      if (!tool) return;
+                      event.preventDefault();
+                      applyDescriptionBbcode(tool.open, tool.close);
+                    }}
                     spellCheck={false}
                     aria-label="Base description"
                     className={`min-h-[20rem] flex-1 resize-y rounded-lg border p-3 font-mono text-xs leading-5 ${isDarkMode ? "border-gray-700 bg-gray-950 text-gray-100" : "border-gray-300 bg-white text-gray-800"}`}
@@ -7045,7 +7158,9 @@ function AudionutsUAGUI() {
               )}
               {showPreview && (
                 <div
-                  className={`bbcode-preview min-h-[20rem] flex-1 overflow-auto whitespace-pre-wrap rounded-lg border p-3 text-sm leading-6 [&_a]:text-sky-400 [&_a]:underline [&_blockquote]:my-3 [&_blockquote]:border-l-4 [&_blockquote]:pl-3 [&_details]:my-3 [&_img]:my-3 [&_img]:max-w-full [&_img]:rounded [&_pre]:overflow-auto [&_pre]:font-mono [&_table]:my-3 [&_table]:border-collapse [&_td]:border [&_td]:p-2 [&_th]:border [&_th]:p-2 ${isDarkMode ? "border-gray-700 bg-gray-950 text-gray-100 [&_td]:border-gray-700 [&_th]:border-gray-700" : "border-gray-300 bg-white text-gray-800 [&_td]:border-gray-300 [&_th]:border-gray-300"}`}
+                  data-mode={isDarkMode ? "dark" : "light"}
+                  onClick={handleBbcodePreviewClick}
+                  className={`bbcode-rendered min-h-[20rem] flex-1 overflow-auto rounded-lg border p-3 ${isDarkMode ? "border-gray-700 bg-gray-950" : "border-gray-300 bg-white"}`}
                   dangerouslySetInnerHTML={{
                     __html: renderBbcodePreview(descriptionDraft),
                   }}
@@ -7599,6 +7714,10 @@ function AudionutsUAGUI() {
         ? media?.episode_overview || media?.overview
         : media?.overview;
     const music = media?.music || {};
+    // Music shows its artist(s) above the album title, as on a record sleeve.
+    const titleArtist =
+      category === "MUSIC" ? String(music.artist || "").trim() : "";
+    const artistSize = compact ? "text-base" : "text-lg";
     const detailSections = Array.isArray(media?.detail_sections)
       ? media.detail_sections.filter(
           (section) =>
@@ -7825,6 +7944,13 @@ function AudionutsUAGUI() {
                   {mediaIconForCategory(category)}
                   <span>{category || "Media"}</span>
                 </div>
+                {titleArtist && (
+                  <p
+                    className={`ua-processing-artist ${artistSize} mb-0.5 font-semibold leading-snug`}
+                  >
+                    {titleArtist}
+                  </p>
+                )}
                 <h3
                   className={`ua-processing-title ${titleSize} font-bold leading-tight`}
                 >
@@ -8065,6 +8191,1577 @@ function AudionutsUAGUI() {
   );
   const isYesNoPrompt = Boolean(
     isAwaitingTerminalInput && executionPreview?.input_type === "yes_no",
+  );
+
+  const isGuiOutput = outputMode === "gui";
+
+  const renderOutputModeToggle = (compact = false) => (
+    <div
+      role="radiogroup"
+      aria-label="Output view"
+      className="ua-run-gui-mode-toggle inline-flex shrink-0 rounded-lg border p-0.5"
+    >
+      {[
+        { mode: "terminal", icon: "square-terminal", label: "Terminal" },
+        { mode: "gui", icon: "layout-dashboard", label: "GUI" },
+      ].map((option) => (
+        <button
+          key={option.mode}
+          type="button"
+          role="radio"
+          aria-checked={outputMode === option.mode}
+          onClick={() => setOutputMode(option.mode)}
+          title={
+            option.mode === "gui"
+              ? "Show errors, prompts and results as panels"
+              : "Show the raw terminal output"
+          }
+          className={`ua-run-gui-mode-option flex items-center gap-1.5 rounded-md ${compact ? "px-2 py-1 text-xs" : "px-2.5 py-1 text-sm"} font-medium`}
+          data-active={outputMode === option.mode}
+        >
+          <LucideIcon name={option.icon} className="h-4 w-4" />
+          {option.label}
+        </button>
+      ))}
+    </div>
+  );
+
+  const RUN_GUI_TRACKER_STATUS = {
+    success: { icon: "circle-check", label: "Uploaded", tone: "success" },
+    failed: { icon: "circle-x", label: "Failed", tone: "error" },
+    pending: { icon: "clock", label: "Queued", tone: "info" },
+    dupe: { icon: "copy-check", label: "Dupe", tone: "attention" },
+    banned: { icon: "ban", label: "Banned", tone: "error" },
+    skipped: { icon: "circle-minus", label: "Skipped", tone: "muted" },
+  };
+
+  const RUN_GUI_SLOT_ICONS = {
+    allow: "circle-check",
+    block: "circle-x",
+    review: "triangle-alert",
+  };
+
+  const renderRunGuiTrackerIcon = (name) => {
+    const tracker = trackers.find((entry) => entry.name === name);
+    if (tracker?.favicon && !failedFavicons.has(name)) {
+      return (
+        <img
+          src={tracker.favicon}
+          alt=""
+          onError={() => setFailedFavicons((prev) => new Set(prev).add(name))}
+          className="h-4 w-4 shrink-0 rounded-sm object-contain"
+        />
+      );
+    }
+    return (
+      <span
+        aria-hidden="true"
+        className="ua-run-gui-tracker-fallback flex h-4 w-4 shrink-0 items-center justify-center rounded-sm text-[9px] font-bold uppercase"
+      >
+        {String(name || "?").slice(0, 1)}
+      </span>
+    );
+  };
+
+  const runGuiTrackerName = (name) =>
+    trackers.find((entry) => entry.name === name)?.display_name || name;
+
+  const renderRunGuiTracker = (name) =>
+    name ? (
+      <span className="inline-flex min-w-0 items-center gap-1.5 font-semibold">
+        {renderRunGuiTrackerIcon(name)}
+        <span className="truncate">{runGuiTrackerName(name)}</span>
+      </span>
+    ) : null;
+
+  const renderRunGuiTrackerChips = (names, tone = "muted") => (
+    <div className="flex flex-wrap gap-1.5">
+      {names.map((name) => (
+        <span
+          key={name}
+          className="ua-run-gui-chip inline-flex items-center rounded-md px-2 py-0.5 text-xs"
+          data-tone={tone}
+        >
+          {renderRunGuiTracker(name)}
+        </span>
+      ))}
+    </div>
+  );
+
+  const renderRunGuiLink = (href, label, className = "") =>
+    /^https?:\/\//i.test(href || "") ? (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={`ua-run-gui-link inline-flex min-w-0 items-center gap-1 ${className}`}
+      >
+        <span className="truncate">{label}</span>
+        <LucideIcon name="external-link" className="h-3.5 w-3.5 shrink-0" />
+      </a>
+    ) : (
+      <span className={`min-w-0 truncate ${className}`}>{label}</span>
+    );
+
+  /** A titled panel; pass onToggle to let the user collapse it to its header. */
+  const renderRunGuiBlock = ({
+    tone,
+    icon,
+    title,
+    count,
+    aside,
+    children,
+    collapsed = false,
+    onToggle = null,
+  }) => (
+    <section className="ua-run-gui-block rounded-lg border" data-tone={tone}>
+      <header
+        className={`ua-run-gui-block-header flex items-center gap-2 px-3 py-2 ${collapsed ? "" : "border-b"}`}
+      >
+        <LucideIcon name={icon} className="ua-run-gui-tone-icon h-4 w-4" />
+        <h3 className="text-sm font-semibold">{title}</h3>
+        {count > 0 && (
+          <span className="ua-run-gui-count rounded-full px-2 text-xs font-semibold">
+            {count}
+          </span>
+        )}
+        {aside && <div className="ml-auto min-w-0">{aside}</div>}
+        {onToggle && (
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-expanded={!collapsed}
+            aria-label={`${collapsed ? "Expand" : "Collapse"} ${title}`}
+            title={collapsed ? "Expand" : "Collapse"}
+            className={`ua-run-gui-collapse flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${aside ? "" : "ml-auto"}`}
+          >
+            <LucideIcon
+              name={collapsed ? "chevron-down" : "chevron-up"}
+              className="h-4 w-4"
+            />
+          </button>
+        )}
+      </header>
+      {!collapsed && <div className="px-3 py-2">{children}</div>}
+    </section>
+  );
+
+  const renderRunGuiSectionLabel = (label) => (
+    <p className="ua-run-gui-section-label text-[0.68rem] font-semibold uppercase tracking-wider">
+      {label}
+    </p>
+  );
+
+  /** Every release on a site, coloured like the terminal: red means nearly your size. */
+  const renderRunGuiReleaseList = (entries) => (
+    <ul className="mt-1 space-y-1">
+      {entries.map((entry, index) => (
+        <li
+          key={`${entry.link || entry.name}-${index}`}
+          className="flex min-w-0 items-center gap-2 text-sm"
+        >
+          {renderRunGuiLink(entry.link, entry.name, "flex-1")}
+          {entry.size ? (
+            <span className="shrink-0 text-xs tabular-nums">
+              <span className="ua-run-gui-muted">{formatSize(entry.size)}</span>
+              {entry.diffPct !== null && (
+                <span
+                  className="ua-run-gui-size-diff ml-1.5 rounded px-1.5 py-0.5 font-semibold"
+                  style={
+                    entry.color
+                      ? { "--ua-run-gui-diff": entry.color }
+                      : undefined
+                  }
+                  title={
+                    Math.abs(entry.diffPct) < 2
+                      ? "About the same size as yours"
+                      : `${Math.abs(entry.diffPct)}% ${entry.diffPct < 0 ? "smaller" : "larger"} than yours`
+                  }
+                >
+                  {entry.diffPct > 0 ? "+" : ""}
+                  {entry.diffPct}%
+                </span>
+              )}
+            </span>
+          ) : null}
+        </li>
+      ))}
+    </ul>
+  );
+
+  const renderRunGuiSlot = (slot) => (
+    <div
+      className="ua-run-gui-slot space-y-2 rounded-md px-3 py-2.5"
+      data-verdict={slot.verdict}
+    >
+      <div className="flex items-start gap-2">
+        <LucideIcon
+          name={RUN_GUI_SLOT_ICONS[slot.verdict] || "circle-help"}
+          className="ua-run-gui-slot-icon mt-0.5 h-4 w-4 shrink-0"
+        />
+        <div className="min-w-0">
+          <p className="text-sm font-semibold">{slot.title}</p>
+          {slot.reason && <p className="text-sm">{slot.reason}</p>}
+        </div>
+      </div>
+      {slot.slot && (
+        <p className="text-sm">
+          <span className="ua-run-gui-muted">Slot: </span>
+          {slot.slot}
+        </p>
+      )}
+      {slot.why && (
+        <div>
+          {renderRunGuiSectionLabel("Why")}
+          <p className="text-sm">{slot.why}</p>
+        </div>
+      )}
+      {slot.conflicts.length > 0 && (
+        <div>
+          {renderRunGuiSectionLabel("Already on the site")}
+          {renderRunGuiReleaseList(slot.conflicts)}
+        </div>
+      )}
+      {slot.notes.map((note, index) => (
+        <p key={index} className="text-sm">
+          <span className="font-semibold">Note: </span>
+          {note}
+        </p>
+      ))}
+      {slot.rules && <p className="ua-run-gui-muted text-xs">{slot.rules}</p>}
+    </div>
+  );
+
+  const renderRunGuiDupe = (dupe) => (
+    <div>
+      {renderRunGuiSectionLabel(
+        dupe.trumpable
+          ? "Trumpable releases on the site"
+          : "Possible dupes on the site",
+      )}
+      {dupe.note && <p className="ua-run-gui-muted text-xs">{dupe.note}</p>}
+      {renderRunGuiReleaseList(dupe.entries)}
+    </div>
+  );
+
+  const renderRunGuiNotice = (notice) => (
+    <li key={notice.id} className="flex min-w-0 items-start gap-2 py-1 text-sm">
+      {notice.tracker ? (
+        <span className="shrink-0">{renderRunGuiTracker(notice.tracker)}</span>
+      ) : null}
+      <span className="min-w-0 flex-1 whitespace-pre-wrap break-words">
+        {notice.text}
+      </span>
+      {notice.count > 1 && (
+        <span className="ua-run-gui-count shrink-0 rounded-full px-1.5 text-xs font-semibold">
+          ×{notice.count}
+        </span>
+      )}
+    </li>
+  );
+
+  /** Slot check, dupes and notices kept for one tracker. */
+  const renderRunGuiTrackerCard = (card, { showTracker = true } = {}) => (
+    <div key={card.key} className="space-y-2">
+      {showTracker && renderRunGuiTracker(card.tracker)}
+      {card.slot && renderRunGuiSlot(card.slot)}
+      {card.dupe && renderRunGuiDupe(card.dupe)}
+      {card.notices.length > 0 && (
+        <ul>
+          {card.notices.map((notice) =>
+            renderRunGuiNotice({ ...notice, tracker: "" }),
+          )}
+        </ul>
+      )}
+    </div>
+  );
+
+  const runGuiCardSummary = (card) =>
+    [
+      card.slot && (card.slot.title || "Slot check"),
+      card.dupe &&
+        (card.dupe.trumpable
+          ? "trumpable release"
+          : `${card.dupe.entries.length} possible dupe${card.dupe.entries.length === 1 ? "" : "s"}`),
+      card.notices.length &&
+        `${card.notices.length} note${card.notices.length === 1 ? "" : "s"}`,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+
+  const getLastTerminalLine = () => {
+    const output = getTabRuntime(activeTabIdRef.current)?.output;
+    const nodes = output ? Array.from(output.childNodes || []) : [];
+    for (let index = nodes.length - 1; index >= 0; index -= 1) {
+      const line = String(nodes[index].textContent || "").trim();
+      if (line) return line.split("\n").pop().trim();
+    }
+    return "";
+  };
+
+  /**
+   * The last lines printed before the current question. A free-text prompt
+   * often refers to a list printed just before it, which the GUI would
+   * otherwise not show.
+   */
+  const getRecentTerminalLines = (question, limit = 40) => {
+    const output = getTabRuntime(activeTabIdRef.current)?.output;
+    const nodes = output ? Array.from(output.childNodes || []) : [];
+    const lines = [];
+    for (
+      let index = nodes.length - 1;
+      index >= 0 && lines.length < limit;
+      index -= 1
+    ) {
+      const nodeLines = String(nodes[index].textContent || "").split("\n");
+      for (
+        let line = nodeLines.length - 1;
+        line >= 0 && lines.length < limit;
+        line -= 1
+      ) {
+        const text = nodeLines[line].trimEnd();
+        if (text.trim()) lines.unshift(text);
+      }
+    }
+    // Drop the question itself and the input marker, which the card shows.
+    const asked = String(question || "").trim();
+    while (lines.length) {
+      const last = lines[lines.length - 1].trim();
+      if (last === ">" || last.startsWith("> ") || (asked && last === asked)) {
+        lines.pop();
+      } else {
+        break;
+      }
+    }
+    return lines;
+  };
+
+  const splitTrackers = (value) =>
+    String(value || "")
+      .split(",")
+      .map((name) => name.trim())
+      .filter(Boolean);
+
+  /** Add ``flag value`` to the GUI answer, unless the flag is already there. */
+  const insertRunGuiArg = (flag, value) => {
+    const text = String(value || "");
+    const quoted = /[\s"']/.test(text)
+      ? `"${text.replace(/"/g, '\\"')}"`
+      : text;
+    setUserInput((current) => {
+      const existing = String(current || "").trim();
+      if (existing.split(/\s+/).includes(flag)) return current;
+      const part = text ? `${flag} ${quoted}` : `${flag} `;
+      return existing ? `${existing} ${part}` : part;
+    });
+    window.requestAnimationFrame(() => {
+      const input = runGuiAnswerRef.current;
+      if (!input) return;
+      input.focus();
+      input.setSelectionRange(input.value.length, input.value.length);
+    });
+  };
+
+  /**
+   * "Input args that need correction": the declined summary, what is missing,
+   * quick corrections filled with the current values, and the corrections
+   * already applied in earlier rounds.
+   */
+  const renderRunGuiEditArgsContext = (context, view, prompt, disabled) => {
+    const confirm =
+      view.lastConfirm && view.lastConfirm.item === prompt.item
+        ? view.lastConfirm.context
+        : null;
+    const missing = view.attention
+      .filter(
+        (notice) => notice.group === "confirm" && notice.item === prompt.item,
+      )
+      .map((notice) => ({
+        notice,
+        flag: (String(notice.text).match(/--[a-z][a-z0-9-]*/i) || [])[0] || "",
+      }));
+    const values = Object.entries(context.values || {});
+    const applied = String(context.applied || "").trim();
+    return (
+      <>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => sendInput(sessionId, "continue")}
+            disabled={disabled}
+            className="ua-run-gui-choice rounded-lg border px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+          >
+            Continue without changes
+          </button>
+          <button
+            type="button"
+            onClick={() => sendInput(sessionId, "skip")}
+            disabled={disabled}
+            title="Leave this release out; a queue moves on to the next item"
+            className="ua-run-gui-choice ua-run-gui-skip rounded-lg border px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+          >
+            Skip this upload
+          </button>
+          <span className="ua-run-gui-muted text-xs">
+            or add corrections below and send them.
+          </span>
+        </div>
+        {confirm && (
+          <div className="space-y-3">
+            {renderRunGuiConfirmContext(confirm, [])}
+          </div>
+        )}
+        {missing.length > 0 && (
+          <div>
+            {renderRunGuiSectionLabel("Missing")}
+            <ul className="mt-1 space-y-1">
+              {missing.map(({ notice, flag }) => (
+                <li
+                  key={notice.id}
+                  className="ua-run-gui-attention-text flex flex-wrap items-center gap-x-2 gap-y-1 text-sm"
+                >
+                  <LucideIcon
+                    name="triangle-alert"
+                    className="h-3.5 w-3.5 shrink-0"
+                  />
+                  <span className="min-w-0 flex-1">{notice.text}</span>
+                  {flag && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        insertRunGuiArg(flag, context.values?.[flag] || "")
+                      }
+                      disabled={disabled}
+                      className="ua-run-gui-arg-chip rounded-md border px-2 py-0.5 font-mono text-xs disabled:opacity-50"
+                    >
+                      Add {flag}
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {values.length > 0 && (
+          <div>
+            {renderRunGuiSectionLabel("Quick corrections")}
+            <div className="mt-1 flex flex-wrap gap-1.5">
+              {values.map(([flag, value]) => (
+                <button
+                  key={flag}
+                  type="button"
+                  onClick={() => insertRunGuiArg(flag, value)}
+                  disabled={disabled}
+                  title={
+                    value
+                      ? `Insert ${flag} with the current value, ready to edit`
+                      : `Insert ${flag}`
+                  }
+                  className="ua-run-gui-arg-chip inline-flex max-w-full items-center gap-1.5 rounded-md border px-2 py-1 text-xs disabled:opacity-50"
+                >
+                  <span className="font-mono font-semibold">{flag}</span>
+                  <span className="ua-run-gui-muted truncate">
+                    {value || "…"}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        {applied && (
+          <div>
+            {renderRunGuiSectionLabel("Applied so far")}
+            <p className="ua-run-gui-release-name mt-1 break-all rounded-md px-2.5 py-1.5 font-mono text-xs">
+              {applied}
+            </p>
+          </div>
+        )}
+      </>
+    );
+  };
+
+  const renderRunGuiConfirmContext = (context, missing) => {
+    const baseName = context.base_name || "";
+    const names = Object.entries(context.release_names || {});
+    const sameName = names
+      .filter(([, name]) => name === baseName)
+      .map(([tracker]) => tracker);
+    const otherNames = names.filter(([, name]) => name !== baseName);
+    return (
+      <>
+        {baseName && (
+          <div>
+            {renderRunGuiSectionLabel("Release name")}
+            <p className="ua-run-gui-release-name mt-1 break-all rounded-md px-2.5 py-1.5 font-mono text-sm">
+              {baseName}
+            </p>
+            {sameName.length > 0 && (
+              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                <span className="ua-run-gui-muted text-xs">Used on</span>
+                {renderRunGuiTrackerChips(sameName)}
+              </div>
+            )}
+          </div>
+        )}
+        {otherNames.length > 0 && (
+          <div>
+            {renderRunGuiSectionLabel(
+              baseName ? "Different name on" : "Release names",
+            )}
+            <dl className="mt-1 space-y-1.5">
+              {otherNames.map(([tracker, name]) => (
+                <div
+                  key={tracker}
+                  className="grid min-w-0 gap-x-3 gap-y-0.5 sm:grid-cols-[9rem_minmax(0,1fr)]"
+                >
+                  <dt className="min-w-0 text-sm">
+                    {renderRunGuiTracker(tracker)}
+                  </dt>
+                  <dd className="ua-run-gui-release-name min-w-0 break-all rounded-md px-2 py-1 font-mono text-xs">
+                    {name}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        )}
+        {missing.length > 0 && (
+          <div>
+            {renderRunGuiSectionLabel("Missing")}
+            <ul className="mt-1 space-y-1">
+              {missing.map((notice) => (
+                <li
+                  key={notice.id}
+                  className="ua-run-gui-attention-text flex gap-1.5 text-sm"
+                >
+                  <LucideIcon
+                    name="triangle-alert"
+                    className="mt-0.5 h-3.5 w-3.5 shrink-0"
+                  />
+                  {notice.text}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </>
+    );
+  };
+
+  const renderRunGuiDupeClearContext = (context) => {
+    const groups = [
+      [
+        "No potential dupes found",
+        splitTrackers(context.clear_trackers),
+        "success",
+      ],
+      [
+        "Possible dupes found",
+        splitTrackers(context.dupe_trackers),
+        "attention",
+      ],
+      [
+        "Skipped by tracker rules",
+        splitTrackers(context.skipped_trackers),
+        "muted",
+      ],
+    ].filter(([, names]) => names.length);
+    return groups.map(([label, names, tone]) => (
+      <div key={label}>
+        {renderRunGuiSectionLabel(label)}
+        <div className="mt-1">{renderRunGuiTrackerChips(names, tone)}</div>
+      </div>
+    ));
+  };
+
+  const renderRunGuiPrompt = (view) => {
+    const prompt = view.prompt;
+    // Every cli_ui prompt is announced. Without an announcement, rely on the
+    // text heuristic only once the 2-second preview poll agrees, so ordinary
+    // lines ending in ":" do not flash a prompt card.
+    const awaiting = view.awaiting && isAwaitingTerminalInput;
+    if (!isExecuting || (!prompt && !awaiting)) return null;
+    const type =
+      prompt?.type || (view.inputType === "yes_no" ? "yes_no" : "text");
+    const question =
+      prompt?.question ||
+      getLastTerminalLine() ||
+      "The upload is waiting for your answer.";
+    const context = prompt?.context || {};
+    // The demo has no session; its buttons look live but sendInput ignores them.
+    const disabled =
+      (!sessionId && !screenshotMode) ||
+      isSendingInput ||
+      Boolean(prompt?.answered);
+    const trackerKey = `${prompt?.item}:${context.tracker}`;
+    const slot = context.kind === "dupes" ? view.slots[trackerKey] : null;
+    const dupe = context.kind === "dupes" ? view.dupes[trackerKey] : null;
+    const missing =
+      context.kind === "confirm"
+        ? view.attention.filter(
+            (notice) =>
+              notice.group === "confirm" && notice.item === prompt.item,
+          )
+        : [];
+    // A numbered list printed before a free-text question, sent as options.
+    const options =
+      context.kind === "options" && Array.isArray(context.options)
+        ? context.options
+        : [];
+    const actions =
+      context.kind === "options" && Array.isArray(context.actions)
+        ? context.actions.filter(
+            (action) => Array.isArray(action) && action.length === 2,
+          )
+        : [];
+    let details = null;
+    if (context.kind === "confirm") {
+      details = renderRunGuiConfirmContext(context, missing);
+    } else if (context.kind === "edit_args") {
+      details = renderRunGuiEditArgsContext(context, view, prompt, disabled);
+    } else if (context.kind === "dupe_clear") {
+      details = renderRunGuiDupeClearContext(context);
+    } else if (slot || dupe) {
+      details = (
+        <>
+          {slot && renderRunGuiSlot(slot)}
+          {dupe && renderRunGuiDupe(dupe)}
+        </>
+      );
+    }
+    const answer = (value) => sendInput(sessionId, value);
+    // Numbered options count from ``start`` (BDMV playlists start at 0).
+    const optionStart = Number.parseInt(context.start ?? "1", 10) || 0;
+    // Optional thumbnails (e.g. TMDb/IMDb posters), one per option.
+    const optionImages = Array.isArray(context.images) ? context.images : [];
+    // Optional per-option details: an ID line, a synopsis and a site link.
+    const optionDetails = Array.isArray(context.details) ? context.details : [];
+    const hasOptionImages = optionImages.some((image) =>
+      /^https?:\/\//i.test(String(image || "")),
+    );
+    const optionButtons =
+      !details && (options.length || actions.length) ? (
+        <div className="grid gap-1.5">
+          {options.map((option, index) => {
+            const detail = optionDetails[index] || {};
+            const link = /^https?:\/\//i.test(String(detail.link || ""))
+              ? detail.link
+              : "";
+            return (
+              // The card is not a single button: the site link must be its own
+              // control, and a link inside a button is invalid HTML.
+              <div
+                key={`${index}-${option}`}
+                className="ua-run-gui-choice flex min-w-0 items-stretch rounded-lg border text-sm"
+              >
+                <button
+                  type="button"
+                  onClick={() => answer(String(optionStart + index))}
+                  disabled={disabled}
+                  className={`flex min-w-0 flex-1 gap-3 px-3 py-2 text-left disabled:opacity-50 ${hasOptionImages ? "items-start" : "items-center"}`}
+                >
+                  <span className="ua-run-gui-count mt-0.5 shrink-0 rounded px-1.5 text-xs font-semibold">
+                    {optionStart + index}
+                  </span>
+                  {hasOptionImages && (
+                    <span className="ua-run-gui-option-thumb flex h-[4.5rem] w-12 shrink-0 items-center justify-center overflow-hidden rounded">
+                      {/^https?:\/\//i.test(
+                        String(optionImages[index] || ""),
+                      ) ? (
+                        <img
+                          src={optionImages[index]}
+                          alt=""
+                          loading="lazy"
+                          referrerPolicy="no-referrer"
+                          onError={(event) => {
+                            event.currentTarget.style.display = "none";
+                          }}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <LucideIcon name="clapperboard" className="h-4 w-4" />
+                      )}
+                    </span>
+                  )}
+                  <span className="min-w-0 flex-1">
+                    <span className="block break-words font-semibold">
+                      {option}
+                    </span>
+                    {detail.meta && (
+                      <span className="ua-run-gui-muted mt-0.5 block break-words text-xs">
+                        {detail.meta}
+                      </span>
+                    )}
+                    {detail.text && (
+                      <span
+                        className="ua-run-gui-muted mt-1 block break-words text-xs leading-snug line-clamp-2"
+                        title={detail.text}
+                      >
+                        {detail.text}
+                      </span>
+                    )}
+                  </span>
+                </button>
+                {link && (
+                  <a
+                    href={link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="ua-run-gui-link flex shrink-0 items-start gap-1 px-3 py-2 text-xs font-semibold"
+                    title={`Open on ${detail.link_label || "the site"}`}
+                  >
+                    {detail.link_label || "Open"}
+                    <LucideIcon name="external-link" className="h-3.5 w-3.5" />
+                  </a>
+                )}
+              </div>
+            );
+          })}
+          {actions.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {actions.map(([value, label]) => (
+                <button
+                  key={value || "enter"}
+                  type="button"
+                  onClick={() => answer(value)}
+                  disabled={disabled}
+                  className="ua-run-gui-choice rounded-lg border px-3 py-1.5 text-sm disabled:opacity-50"
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : null;
+    // A free-text question without its own list shows the output before it:
+    // the list it refers to, or the text (e.g. a description) being decided on.
+    const recent =
+      !details && type === "text" && !options.length
+        ? getRecentTerminalLines(question)
+        : [];
+    const recentOutput = recent.length ? (
+      <details open className="ua-run-gui-details">
+        <summary className="ua-run-gui-muted cursor-pointer text-xs font-semibold">
+          Output before this question
+        </summary>
+        <pre className="ua-run-gui-recent mt-2 max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-md p-2 font-mono text-xs">
+          {recent.join("\n")}
+        </pre>
+      </details>
+    ) : null;
+    if (optionButtons || recentOutput) {
+      details = (
+        <>
+          {optionButtons}
+          {recentOutput}
+        </>
+      );
+    }
+
+    return (
+      <section
+        className="ua-run-gui-prompt rounded-lg border-2 p-3"
+        aria-live="polite"
+        data-answered={Boolean(prompt?.answered)}
+      >
+        {/* Yes/No sit at the top right so they stay put whatever the details below. */}
+        <div className="flex flex-wrap items-start gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <LucideIcon
+                name={prompt?.answered ? "loader-circle" : "circle-help"}
+                className={`ua-run-gui-tone-icon h-4 w-4 ${prompt?.answered ? "animate-spin" : ""}`}
+              />
+              <p className="ua-run-gui-eyebrow text-xs font-semibold uppercase tracking-wide">
+                {prompt?.answered ? "Answer sent" : "Your input is needed"}
+              </p>
+              {context.tracker && (
+                <>
+                  <span className="ua-run-gui-muted text-xs" aria-hidden="true">
+                    ·
+                  </span>
+                  <span className="text-sm">
+                    {renderRunGuiTracker(context.tracker)}
+                  </span>
+                </>
+              )}
+              {context.debug === true && (
+                <span
+                  className="ua-run-gui-chip ml-auto rounded-md px-2 py-0.5 text-xs"
+                  data-tone="info"
+                >
+                  Debug: nothing will be uploaded
+                </span>
+              )}
+            </div>
+            <p className="mt-1.5 break-words text-base font-semibold">
+              {question}
+            </p>
+          </div>
+          {type === "yes_no" && (
+            <div className="flex shrink-0 gap-2">
+              <button
+                type="button"
+                onClick={() => answer("yes")}
+                disabled={disabled}
+                className="ua-run-gui-answer flex items-center gap-1.5 rounded-lg px-4 py-2 font-medium disabled:opacity-50"
+                data-variant="yes"
+                data-default={prompt?.default === true}
+                title={prompt?.default === true ? "Default answer" : undefined}
+              >
+                <LucideIcon name="check" className="h-4 w-4" />
+                Yes
+              </button>
+              <button
+                type="button"
+                onClick={() => answer("no")}
+                disabled={disabled}
+                className="ua-run-gui-answer flex items-center gap-1.5 rounded-lg px-4 py-2 font-medium disabled:opacity-50"
+                data-variant="no"
+                data-default={prompt?.default === false}
+                title={prompt?.default === false ? "Default answer" : undefined}
+              >
+                <LucideIcon name="x" className="h-4 w-4" />
+                No
+              </button>
+            </div>
+          )}
+        </div>
+
+        {details && (
+          <div className="ua-run-gui-prompt-context mt-3 space-y-3 rounded-md p-3">
+            {details}
+          </div>
+        )}
+
+        {type !== "yes_no" && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {type === "choice" && (
+              <div className="grid w-full gap-1.5">
+                {prompt.choices.map((choice, index) => (
+                  <button
+                    key={`${index}-${choice}`}
+                    type="button"
+                    onClick={() => answer(String(index + 1))}
+                    disabled={disabled}
+                    className="ua-run-gui-choice flex min-w-0 items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm disabled:opacity-50"
+                  >
+                    <span className="ua-run-gui-count shrink-0 rounded px-1.5 text-xs font-semibold">
+                      {index + 1}
+                    </span>
+                    <span className="min-w-0 break-words">{choice}</span>
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => answer("")}
+                  disabled={disabled}
+                  className="ua-run-gui-muted justify-self-start text-xs underline disabled:opacity-50"
+                >
+                  Skip
+                </button>
+              </div>
+            )}
+            {type === "text" && (
+              <form
+                className="flex w-full min-w-0 gap-2"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  answer(userInput);
+                }}
+              >
+                <input
+                  ref={runGuiAnswerRef}
+                  value={userInput}
+                  onChange={(event) => setUserInput(event.target.value)}
+                  disabled={disabled}
+                  placeholder={
+                    context.kind === "edit_args"
+                      ? "e.g. --tag NTb --tmdb movie/12345"
+                      : prompt?.default && typeof prompt.default === "string"
+                        ? `Leave empty for "${prompt.default}"`
+                        : options.length || actions.length
+                          ? "Or type your answer"
+                          : "Type your answer"
+                  }
+                  aria-label="Answer"
+                  className="ua-run-gui-input min-w-0 flex-1 rounded-lg border px-3 py-2 text-sm"
+                />
+                <button
+                  type="submit"
+                  disabled={disabled}
+                  className="ua-run-gui-answer rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50"
+                  data-variant="send"
+                >
+                  Send
+                </button>
+              </form>
+            )}
+          </div>
+        )}
+      </section>
+    );
+  };
+
+  const RUN_GUI_STAGE_STATUS_TEXT = {
+    start: "running",
+    waiting: "waiting for your answer",
+    done: "done",
+    fail: "stopped",
+    skip: "skipped",
+  };
+
+  const renderRunGuiStages = (view, waitingForUser) => (
+    <ol
+      className="ua-run-gui-stages flex flex-wrap items-center gap-1.5"
+      aria-label="Upload stages"
+    >
+      {view.stages.map((stage) => {
+        // The running stage is paused while a prompt waits for the user.
+        const status =
+          stage.status === "start" && waitingForUser ? "waiting" : stage.status;
+        const icon =
+          {
+            start: "loader-circle",
+            waiting: "hourglass",
+            done: "circle-check",
+            fail: "circle-x",
+            skip: "circle-minus",
+          }[status] || stage.icon;
+        return (
+          <li
+            key={stage.key}
+            className="ua-run-gui-stage flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium"
+            data-status={status || "idle"}
+            title={`${stage.label}: ${RUN_GUI_STAGE_STATUS_TEXT[status] || "not reached"}`}
+          >
+            <LucideIcon
+              name={icon}
+              className={`h-3.5 w-3.5 ${status === "start" ? "animate-spin" : ""}`}
+            />
+            {stage.label}
+          </li>
+        );
+      })}
+    </ol>
+  );
+
+  const renderRunGuiResultRow = (entry, view) => {
+    const status =
+      RUN_GUI_TRACKER_STATUS[entry.status] || RUN_GUI_TRACKER_STATUS.pending;
+    const card = view.trackerDetails[`${entry.item}:${entry.tracker}`];
+    return (
+      <li key={`${entry.item}-${entry.tracker}`} className="py-1.5 text-sm">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+          <span className="min-w-[8rem] flex-1">
+            {renderRunGuiTracker(entry.tracker)}
+          </span>
+          <span
+            className="ua-run-gui-status inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-semibold"
+            data-tone={status.tone}
+          >
+            <LucideIcon name={status.icon} className="h-3.5 w-3.5" />
+            {status.label}
+          </span>
+          {entry.duration ? (
+            <span className="ua-run-gui-muted text-xs tabular-nums">
+              {entry.duration.toFixed(1)}s
+            </span>
+          ) : null}
+          {entry.link &&
+            renderRunGuiLink(
+              entry.link,
+              entry.torrentId ? `#${entry.torrentId}` : "Open",
+              "text-xs",
+            )}
+        </div>
+        {entry.message && (
+          <p className="ua-run-gui-muted mt-0.5 break-words text-xs">
+            {entry.message}
+          </p>
+        )}
+        {card && (
+          <details className="ua-run-gui-details mt-1">
+            <summary className="ua-run-gui-muted cursor-pointer text-xs font-semibold">
+              {runGuiCardSummary(card)}
+            </summary>
+            <div className="mt-2">
+              {renderRunGuiTrackerCard(card, { showTracker: false })}
+            </div>
+          </details>
+        )}
+      </li>
+    );
+  };
+
+  const plural = (count, word) => `${count} ${word}${count === 1 ? "" : "s"}`;
+
+  /** Overall outcome of one queue item, shown on its card header and stripe. */
+  const runGuiItemOutcome = (group, view) => {
+    const statuses = group.rows.map((entry) => entry.status);
+    const has = (status) => statuses.includes(status);
+    if (!view.finished && group.index === view.currentItem?.index) {
+      return { tone: "info", icon: "loader-circle", label: "In progress" };
+    }
+    if (has("failed")) {
+      return has("success")
+        ? {
+            tone: "attention",
+            icon: "triangle-alert",
+            label: "Partly uploaded",
+          }
+        : { tone: "error", icon: "circle-x", label: "Failed" };
+    }
+    if (has("success")) {
+      return { tone: "success", icon: "circle-check", label: "Uploaded" };
+    }
+    if (has("pending")) {
+      return { tone: "info", icon: "clock", label: "Queued" };
+    }
+    if (has("dupe"))
+      return { tone: "muted", icon: "copy-check", label: "Dupe" };
+    if (has("banned")) return { tone: "muted", icon: "ban", label: "Banned" };
+    if (statuses.length) {
+      return { tone: "muted", icon: "circle-minus", label: "Skipped" };
+    }
+    return { tone: "muted", icon: "circle-minus", label: "No upload" };
+  };
+
+  /** One queue item as a card: the release is the heading, trackers below it. */
+  const renderRunGuiItemCard = (group, view) => {
+    const outcome = runGuiItemOutcome(group, view);
+    return (
+      <section
+        key={group.index}
+        className="ua-run-gui-item rounded-md border"
+        data-tone={outcome.tone}
+      >
+        <header className="ua-run-gui-item-header flex min-w-0 items-center gap-2 px-3 py-2">
+          <span className="ua-run-gui-item-index shrink-0 rounded px-1.5 text-xs font-semibold tabular-nums">
+            {group.index}
+          </span>
+          <h4
+            className="min-w-0 flex-1 truncate text-sm font-semibold"
+            title={group.name || undefined}
+          >
+            {group.name || `Item ${group.index}`}
+          </h4>
+          <span className="ua-run-gui-status inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-0.5 text-xs font-semibold">
+            <LucideIcon
+              name={outcome.icon}
+              className={`h-3.5 w-3.5 ${outcome.icon === "loader-circle" ? "animate-spin" : ""}`}
+            />
+            {outcome.label}
+          </span>
+        </header>
+        <div className="px-3 pb-2">
+          {group.rows.length > 0 && (
+            <ul className="ua-run-gui-divide divide-y">
+              {group.rows.map((entry) => renderRunGuiResultRow(entry, view))}
+            </ul>
+          )}
+          {renderRunGuiItemNotes(group.notes)}
+        </div>
+      </section>
+    );
+  };
+
+  /** Notes, errors and warnings kept for an item the queue has moved past. */
+  const renderRunGuiItemNotes = (notes) => {
+    const problems = notes.problems || [];
+    const errors = problems.filter((notice) => notice.level === "error");
+    const warnings = problems.filter((notice) => notice.level === "warning");
+    const noteCount = notes.cards.length + notes.notices.length;
+    if (!noteCount && !problems.length) return null;
+    const tone = errors.length ? "error" : warnings.length ? "attention" : "";
+    const summary = [
+      errors.length && plural(errors.length, "error"),
+      warnings.length && plural(warnings.length, "warning"),
+      noteCount && plural(noteCount, "note"),
+    ]
+      .filter(Boolean)
+      .join(" · ");
+    return (
+      <details className="ua-run-gui-details mt-1.5" data-tone={tone}>
+        <summary className="ua-run-gui-muted cursor-pointer text-xs font-semibold">
+          {tone && (
+            <LucideIcon
+              name={errors.length ? "circle-x" : "triangle-alert"}
+              className="ua-run-gui-tone-icon mr-1 inline-block h-3.5 w-3.5 align-[-2px]"
+            />
+          )}
+          {summary} from this item
+        </summary>
+        <div className="mt-2 space-y-3">
+          {problems.length > 0 && (
+            <ul>
+              {[...errors, ...warnings].map((notice) => (
+                <li
+                  key={notice.id}
+                  className="flex min-w-0 items-start gap-2 py-1 text-sm"
+                  data-tone={notice.level === "error" ? "error" : "attention"}
+                >
+                  <LucideIcon
+                    name={
+                      notice.level === "error" ? "circle-x" : "triangle-alert"
+                    }
+                    className="ua-run-gui-tone-icon mt-0.5 h-3.5 w-3.5 shrink-0"
+                  />
+                  {notice.tracker ? (
+                    <span className="shrink-0">
+                      {renderRunGuiTracker(notice.tracker)}
+                    </span>
+                  ) : null}
+                  <span className="min-w-0 flex-1 whitespace-pre-wrap break-words">
+                    {notice.text}
+                  </span>
+                  {notice.count > 1 && (
+                    <span className="ua-run-gui-count shrink-0 rounded-full px-1.5 text-xs font-semibold">
+                      ×{notice.count}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          {notes.cards.map((card) => renderRunGuiTrackerCard(card))}
+          {notes.notices.length > 0 && (
+            <ul>{notes.notices.map(renderRunGuiNotice)}</ul>
+          )}
+        </div>
+      </details>
+    );
+  };
+
+  const renderRunGuiPanel = (toggleInStrip = false) => {
+    const view = RunGui.selectRunGuiView(runGui);
+    const prompt = view.prompt;
+    const waitingForUser =
+      isExecuting &&
+      ((prompt && !prompt.answered) ||
+        (view.awaiting && isAwaitingTerminalInput));
+    const promptTracker =
+      prompt?.context?.kind === "dupes" ? prompt.context.tracker : "";
+    // The open prompt already shows its tracker's slot check and dupes.
+    const attentionCards = view.attentionCards.filter(
+      (card) => !(promptTracker && card.tracker === promptTracker),
+    );
+    // The confirmation and correction cards list what is missing themselves.
+    const attentionNotices = view.attentionNotices.filter(
+      (notice) =>
+        !(
+          ["confirm", "edit_args"].includes(prompt?.context?.kind) &&
+          notice.group === "confirm"
+        ),
+    );
+    const attentionCount = attentionCards.length + attentionNotices.length;
+    const emptyNotes = { cards: [], notices: [], problems: [] };
+    const resultGroups = view.multipleItems
+      ? view.items.map((item) => ({
+          index: item.index,
+          name: item.name,
+          rows: view.trackers.filter((entry) => entry.item === item.index),
+          notes: view.itemNotes[item.index] || emptyNotes,
+        }))
+      : [
+          {
+            index: null,
+            rows: view.trackers,
+            notes: Object.values(view.itemNotes).reduce(
+              (all, notes) => ({
+                cards: [...all.cards, ...notes.cards],
+                notices: [...all.notices, ...notes.notices],
+                problems: [...all.problems, ...notes.problems],
+              }),
+              emptyNotes,
+            ),
+          },
+        ];
+    const visibleGroups = resultGroups.filter(
+      (group) =>
+        group.rows.length ||
+        group.notes.cards.length ||
+        group.notes.notices.length ||
+        group.notes.problems.length,
+    );
+    const hasAnything =
+      view.hasStages ||
+      view.trackers.length ||
+      view.errors.length ||
+      view.warnings.length ||
+      attentionCount ||
+      visibleGroups.length;
+    const { counts } = view;
+    const summary = [
+      counts.success && { text: `${counts.success} uploaded` },
+      counts.failed && { text: `${counts.failed} failed`, tone: "error" },
+      counts.dupe && { text: plural(counts.dupe, "dupe") },
+      counts.banned && { text: `${counts.banned} banned` },
+      counts.skipped && { text: `${counts.skipped} skipped` },
+      counts.pending && { text: `${counts.pending} queued` },
+    ].filter(Boolean);
+    // One failure in a mostly successful queue is a partial result, not a red
+    // panel; the failed count itself stays red in the summary.
+    const resultsTone = counts.failed
+      ? counts.success
+        ? "attention"
+        : "error"
+      : counts.success
+        ? "success"
+        : "info";
+
+    return (
+      <div className="ua-run-gui flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
+        {/* The Terminal | GUI switch sits at the right of the stages bar. */}
+        <div className="ua-run-gui-strip flex items-start gap-3 rounded-lg border px-3 py-2">
+          <div className="min-w-0 flex-1">
+            {view.multipleItems && view.currentItem && (
+              <p className="ua-run-gui-muted mb-1.5 flex min-w-0 items-center gap-1.5 text-xs">
+                <LucideIcon
+                  name="file-stack"
+                  className="h-3.5 w-3.5 shrink-0"
+                />
+                <span className="shrink-0 font-semibold">
+                  Item {view.currentItem.index} of {view.currentItem.total}
+                </span>
+                <span className="truncate">{view.currentItem.name}</span>
+              </p>
+            )}
+            {renderRunGuiStages(view, waitingForUser)}
+          </div>
+          {toggleInStrip && renderOutputModeToggle(true)}
+        </div>
+
+        {renderRunGuiPrompt(view)}
+
+        {!hasAnything && !prompt && (
+          <div className="ua-run-gui-empty flex flex-col items-center justify-center gap-2 rounded-lg border p-8 text-center text-sm">
+            {isExecuting ? (
+              <>
+                <SpinnerIcon />
+                <p>Waiting for the upload to report its first step…</p>
+              </>
+            ) : (
+              <>
+                <LucideIcon name="layout-dashboard" className="h-6 w-6" />
+                <p>
+                  Start an upload to see its prompts, problems and results here.
+                </p>
+              </>
+            )}
+          </div>
+        )}
+
+        {attentionCount > 0 &&
+          renderRunGuiBlock({
+            tone: "attention",
+            icon: "triangle-alert",
+            title: "Needs attention",
+            count: attentionCount,
+            aside:
+              view.multipleItems && view.currentItem ? (
+                <span className="ua-run-gui-muted block truncate text-xs">
+                  {view.currentItem.name}
+                </span>
+              ) : null,
+            children: (
+              <div className="space-y-3">
+                {/* Decided trackers stay compact; the prompt shows the full detail. */}
+                {attentionCards.map((card) => (
+                  <div key={card.key}>
+                    {renderRunGuiTracker(card.tracker)}
+                    {card.slot || card.dupe ? (
+                      <details className="ua-run-gui-details mt-1">
+                        <summary className="ua-run-gui-muted cursor-pointer text-xs font-semibold">
+                          {runGuiCardSummary(card)}
+                        </summary>
+                        <div className="mt-2">
+                          {renderRunGuiTrackerCard(card, {
+                            showTracker: false,
+                          })}
+                        </div>
+                      </details>
+                    ) : (
+                      renderRunGuiTrackerCard(card, { showTracker: false })
+                    )}
+                  </div>
+                ))}
+                {attentionNotices.length > 0 && (
+                  <ul>{attentionNotices.map(renderRunGuiNotice)}</ul>
+                )}
+              </div>
+            ),
+          })}
+
+        {(view.errors.length > 0 || view.warnings.length > 0) &&
+          renderRunGuiBlock({
+            tone: view.errors.length ? "error" : "attention",
+            icon: view.errors.length ? "circle-x" : "triangle-alert",
+            title: view.errors.length ? "Errors" : "Warnings",
+            count: view.errors.length || view.warnings.length,
+            aside: (
+              <button
+                type="button"
+                onClick={() => setOutputMode("terminal")}
+                className="ua-run-gui-link inline-flex items-center gap-1 text-xs"
+                title="Open the terminal for full details and tracebacks"
+              >
+                <LucideIcon name="square-terminal" className="h-3.5 w-3.5" />
+                View in terminal
+              </button>
+            ),
+            children: (
+              <>
+                {view.errors.length > 0 && (
+                  <ul className="ua-run-gui-divide divide-y">
+                    {view.errors.map(renderRunGuiNotice)}
+                  </ul>
+                )}
+                {view.warnings.length > 0 &&
+                  (view.errors.length > 0 ? (
+                    <details className="mt-2">
+                      <summary className="ua-run-gui-muted cursor-pointer text-xs font-semibold">
+                        Warnings ({view.warnings.length})
+                      </summary>
+                      <ul className="mt-1">
+                        {view.warnings.map(renderRunGuiNotice)}
+                      </ul>
+                    </details>
+                  ) : (
+                    <ul>{view.warnings.map(renderRunGuiNotice)}</ul>
+                  ))}
+              </>
+            ),
+          })}
+
+        {(visibleGroups.length > 0 || view.requests.length > 0) &&
+          renderRunGuiBlock({
+            tone: resultsTone,
+            icon: "cloud-upload",
+            title: "Results",
+            collapsed: runGuiResultsCollapsed,
+            onToggle: () => setRunGuiResultsCollapsed((value) => !value),
+            aside: summary.length ? (
+              <span className="ua-run-gui-muted block truncate text-xs">
+                {summary.map((part, index) => (
+                  <React.Fragment key={part.text}>
+                    {index > 0 && " · "}
+                    <span
+                      className={
+                        part.tone ? "ua-run-gui-tone-text font-semibold" : ""
+                      }
+                      data-tone={part.tone}
+                    >
+                      {part.text}
+                    </span>
+                  </React.Fragment>
+                ))}
+              </span>
+            ) : null,
+            children: (
+              <div className="space-y-3">
+                {visibleGroups.map((group) =>
+                  group.index === null ? (
+                    <div key="all">
+                      {group.rows.length > 0 && (
+                        <ul className="ua-run-gui-divide divide-y">
+                          {group.rows.map((entry) =>
+                            renderRunGuiResultRow(entry, view),
+                          )}
+                        </ul>
+                      )}
+                      {renderRunGuiItemNotes(group.notes)}
+                    </div>
+                  ) : (
+                    renderRunGuiItemCard(group, view)
+                  ),
+                )}
+                {view.requests.length > 0 && (
+                  <div>
+                    <p className="mb-1 flex items-center gap-1.5 text-xs font-semibold">
+                      <LucideIcon name="hand-coins" className="h-3.5 w-3.5" />
+                      Requests you can fill
+                    </p>
+                    <ul className="ua-run-gui-divide divide-y">
+                      {view.requests.map((request) => (
+                        <li
+                          key={request.key}
+                          className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 py-1.5 text-sm"
+                        >
+                          <span className="shrink-0">
+                            {renderRunGuiTracker(request.tracker)}
+                          </span>
+                          {renderRunGuiLink(
+                            request.link,
+                            request.name,
+                            "min-w-0 flex-1",
+                          )}
+                          {request.reward && (
+                            <span
+                              className="ua-run-gui-status rounded-md px-2 py-0.5 text-xs font-semibold"
+                              data-tone="success"
+                            >
+                              {request.reward}
+                            </span>
+                          )}
+                          <span className="ua-run-gui-muted text-xs">
+                            {[
+                              request.exact ? "exact match" : "partial match",
+                              request.status,
+                            ]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            ),
+          })}
+
+        {view.finished && (
+          <p
+            className="ua-run-gui-muted flex items-center gap-1.5 text-xs"
+            role="status"
+          >
+            <LucideIcon
+              name={view.exitCode ? "circle-x" : "circle-check"}
+              className="h-3.5 w-3.5"
+            />
+            {view.exitCode
+              ? `Upload process exited with code ${view.exitCode}.`
+              : "Upload process finished."}
+          </p>
+        )}
+      </div>
+    );
+  };
+
+  /**
+   * Desktop file browser: header with search, the select-all bar and the tree.
+   * It is shown either in the sidebar or in the larger modal, never both,
+   * because the tree's scroll position and keyboard focus use one ref.
+   */
+  const renderFileBrowserBody = (inModal) => (
+    <>
+      <div className="ua-upload-panel-header p-4 border-b">
+        <div className="flex items-center justify-between gap-2">
+          <h2
+            className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-gray-800"} flex min-w-0 items-center gap-2 whitespace-nowrap`}
+          >
+            <LucideIcon name="folders" className="w-4 h-4" />
+            File Browser
+          </h2>
+          <div className="flex shrink-0 items-center gap-0.5">
+            <button
+              type="button"
+              onClick={() => setIsFileBrowserExpanded(!inModal)}
+              aria-label={
+                inModal ? "Return to sidebar" : "Open in a larger view"
+              }
+              title={inModal ? "Return to sidebar" : "Open in a larger view"}
+              className={`rounded p-1 transition-colors ${isDarkMode ? "text-gray-400 hover:bg-gray-700 hover:text-gray-200" : "text-gray-500 hover:bg-gray-200 hover:text-gray-700"}`}
+            >
+              <LucideIcon
+                name={inModal ? "minimize-2" : "maximize-2"}
+                className="h-4 w-4"
+              />
+            </button>
+            <button
+              type="button"
+              onClick={collapseFileBrowser}
+              aria-label="Collapse all folders"
+              title="Collapse all folders"
+              className={`rounded p-1 transition-colors ${isDarkMode ? "text-gray-400 hover:bg-gray-700 hover:text-gray-200" : "text-gray-500 hover:bg-gray-200 hover:text-gray-700"}`}
+            >
+              <LucideIcon name="list-collapse" className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={refreshFileBrowser}
+              disabled={fileBrowserRefreshing}
+              aria-label="Refresh file browser"
+              title="Refresh file browser"
+              className={`rounded p-1 transition-colors disabled:cursor-wait disabled:opacity-60 ${isDarkMode ? "text-gray-400 hover:bg-gray-700 hover:text-gray-200" : "text-gray-500 hover:bg-gray-200 hover:text-gray-700"}`}
+            >
+              <LucideIcon
+                name="refresh-cw"
+                className={`h-4 w-4 ${fileBrowserRefreshing ? "animate-spin" : ""}`}
+              />
+            </button>
+          </div>
+        </div>
+        <div className="relative mt-2">
+          <input
+            type="text"
+            aria-label="Search files and folders"
+            value={fileBrowserSearch}
+            onChange={(e) => handleFileBrowserSearch(e.target.value)}
+            placeholder="Search files and folders..."
+            className={`w-full pl-8 pr-8 py-1.5 text-sm rounded border ${
+              isDarkMode
+                ? "bg-gray-800 border-gray-600 text-gray-200 placeholder-gray-500"
+                : "bg-white border-gray-300 text-gray-700 placeholder-gray-400 focus:border-blue-500"
+            } focus:outline-none`}
+          />
+          <LucideIcon
+            name="search"
+            className={`absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}
+          />
+          {fileBrowserSearch && (
+            <button
+              type="button"
+              aria-label="Clear file search"
+              onClick={() => handleFileBrowserSearch("")}
+              className={`absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded ${isDarkMode ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-200 text-gray-500"}`}
+            >
+              <LucideIcon name="x" className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
+      {renderSelectAllBar()}
+      <div
+        ref={fileBrowserRef}
+        onScroll={(event) => {
+          if (fileBrowserRestoring) return;
+          fileBrowserScrollTopRef.current = event.currentTarget.scrollTop;
+          storage.set(
+            FILE_BROWSER_SCROLL_KEY,
+            String(fileBrowserScrollTopRef.current),
+          );
+        }}
+        className={`${!inModal && hasDescFile && !descBrowserCollapsed ? "flex-1 max-h-[50%]" : "flex-1"} min-h-0 overflow-y-auto`}
+      >
+        {fileBrowserSearch ? (
+          fileBrowserSearchLoading ? (
+            <div
+              className={`p-4 text-center ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+            >
+              <SpinnerIcon />
+              <p className="text-sm mt-2">Searching...</p>
+            </div>
+          ) : (
+            <>
+              {fileBrowserSearchResults &&
+                fileBrowserSearchResults.truncated && (
+                  <div
+                    className={`px-3 py-1.5 text-xs ${isDarkMode ? "text-yellow-400 bg-gray-900" : "text-yellow-700 bg-yellow-50"} border-b ${isDarkMode ? "border-gray-700" : "border-yellow-200"}`}
+                  >
+                    Results limited to {fileBrowserSearchResults.count} items
+                  </div>
+                )}
+              {renderSearchResults(fileBrowserSearchResults)}
+            </>
+          )
+        ) : (
+          renderFileTree(directories)
+        )}
+      </div>
+    </>
   );
 
   // Mobile Layout
@@ -8484,6 +10181,8 @@ function AudionutsUAGUI() {
                 >
                   Output
                 </h3>
+                {(isExecuting || isTerminalView) &&
+                  renderOutputModeToggle(true)}
                 {isExecuting && (
                   <span className="ml-auto inline-flex items-center gap-1 text-xs text-green-400 animate-pulse">
                     <LucideIcon name="circle" className="h-2.5 w-2.5" />
@@ -8506,7 +10205,7 @@ function AudionutsUAGUI() {
                     onClick={() => setIsTerminalView((expanded) => !expanded)}
                     aria-expanded={isTerminalView}
                     title={
-                      isTerminalView ? "Back to preparation" : "View terminal"
+                      isTerminalView ? "Back to preparation" : "View output"
                     }
                     className={`ml-auto flex items-center gap-1 rounded px-2 py-1 text-xs ${isDarkMode ? "text-gray-300 hover:bg-gray-700" : "text-gray-600 hover:bg-gray-200"}`}
                   >
@@ -8515,16 +10214,19 @@ function AudionutsUAGUI() {
                     ) : (
                       <TerminalIcon />
                     )}
-                    {isTerminalView ? "Back to preparation" : "View terminal"}
+                    {isTerminalView ? "Back to preparation" : "View output"}
                   </button>
                 )}
               </div>
               <div
                 ref={attachRichOutputHost}
                 id="rich-output"
-                className={`min-h-0 rounded-lg overflow-auto p-2 border text-sm bg-black border-gray-700 text-white ${isExecuting || isTerminalView ? "flex-1" : "hidden"}`}
+                className={`min-h-0 rounded-lg overflow-auto p-2 border text-sm bg-black border-gray-700 text-white ${(isExecuting || isTerminalView) && !isGuiOutput ? "flex-1" : "hidden"}`}
               ></div>
-              {isExecuting && (
+              {(isExecuting || isTerminalView) &&
+                isGuiOutput &&
+                renderRunGuiPanel()}
+              {isExecuting && !isGuiOutput && (
                 <div
                   className={`mt-2 flex shrink-0 gap-2 ${isAwaitingTerminalInput ? "animate-pulse" : ""}`}
                 >
@@ -9000,108 +10702,23 @@ function AudionutsUAGUI() {
               renderProgressWorkspace()
             ) : (
               <>
-                <div className="ua-upload-panel-header p-4 border-b">
-                  <div className="flex items-center justify-between gap-2">
-                    <h2
-                      className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-gray-800"} flex items-center gap-2`}
+                {isFileBrowserExpanded ? (
+                  <div
+                    className={`flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center text-sm ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                  >
+                    <LucideIcon name="maximize-2" className="h-5 w-5" />
+                    <p>The file browser is open in a larger view.</p>
+                    <button
+                      type="button"
+                      onClick={() => setIsFileBrowserExpanded(false)}
+                      className={`rounded-md px-3 py-1.5 text-sm font-medium ${isDarkMode ? "bg-gray-700 text-gray-100 hover:bg-gray-600" : "bg-gray-100 text-gray-800 hover:bg-gray-200"}`}
                     >
-                      <LucideIcon name="folders" className="w-4 h-4" />
-                      File Browser
-                    </h2>
-                    <div className="flex shrink-0 items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={collapseFileBrowser}
-                        aria-label="Collapse all folders"
-                        title="Collapse all folders"
-                        className={`rounded p-1.5 transition-colors ${isDarkMode ? "text-gray-400 hover:bg-gray-700 hover:text-gray-200" : "text-gray-500 hover:bg-gray-200 hover:text-gray-700"}`}
-                      >
-                        <LucideIcon name="list-collapse" className="h-4 w-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={refreshFileBrowser}
-                        disabled={fileBrowserRefreshing}
-                        aria-label="Refresh file browser"
-                        title="Refresh file browser"
-                        className={`rounded p-1.5 transition-colors disabled:cursor-wait disabled:opacity-60 ${isDarkMode ? "text-gray-400 hover:bg-gray-700 hover:text-gray-200" : "text-gray-500 hover:bg-gray-200 hover:text-gray-700"}`}
-                      >
-                        <LucideIcon
-                          name="refresh-cw"
-                          className={`h-4 w-4 ${fileBrowserRefreshing ? "animate-spin" : ""}`}
-                        />
-                      </button>
-                    </div>
+                      Return to sidebar
+                    </button>
                   </div>
-                  <div className="relative mt-2">
-                    <input
-                      type="text"
-                      aria-label="Search files and folders"
-                      value={fileBrowserSearch}
-                      onChange={(e) => handleFileBrowserSearch(e.target.value)}
-                      placeholder="Search files and folders..."
-                      className={`w-full pl-8 pr-8 py-1.5 text-sm rounded border ${
-                        isDarkMode
-                          ? "bg-gray-800 border-gray-600 text-gray-200 placeholder-gray-500"
-                          : "bg-white border-gray-300 text-gray-700 placeholder-gray-400 focus:border-blue-500"
-                      } focus:outline-none`}
-                    />
-                    <LucideIcon
-                      name="search"
-                      className={`absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}
-                    />
-                    {fileBrowserSearch && (
-                      <button
-                        type="button"
-                        aria-label="Clear file search"
-                        onClick={() => handleFileBrowserSearch("")}
-                        className={`absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded ${isDarkMode ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-200 text-gray-500"}`}
-                      >
-                        <LucideIcon name="x" className="h-3.5 w-3.5" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-                {renderSelectAllBar()}
-                <div
-                  ref={fileBrowserRef}
-                  onScroll={(event) => {
-                    if (fileBrowserRestoring) return;
-                    fileBrowserScrollTopRef.current =
-                      event.currentTarget.scrollTop;
-                    storage.set(
-                      FILE_BROWSER_SCROLL_KEY,
-                      String(fileBrowserScrollTopRef.current),
-                    );
-                  }}
-                  className={`${hasDescFile && !descBrowserCollapsed ? "flex-1 max-h-[50%]" : "flex-1"} overflow-y-auto`}
-                >
-                  {fileBrowserSearch ? (
-                    fileBrowserSearchLoading ? (
-                      <div
-                        className={`p-4 text-center ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
-                      >
-                        <SpinnerIcon />
-                        <p className="text-sm mt-2">Searching...</p>
-                      </div>
-                    ) : (
-                      <>
-                        {fileBrowserSearchResults &&
-                          fileBrowserSearchResults.truncated && (
-                            <div
-                              className={`px-3 py-1.5 text-xs ${isDarkMode ? "text-yellow-400 bg-gray-900" : "text-yellow-700 bg-yellow-50"} border-b ${isDarkMode ? "border-gray-700" : "border-yellow-200"}`}
-                            >
-                              Results limited to{" "}
-                              {fileBrowserSearchResults.count} items
-                            </div>
-                          )}
-                        {renderSearchResults(fileBrowserSearchResults)}
-                      </>
-                    )
-                  ) : (
-                    renderFileTree(directories)
-                  )}
-                </div>
+                ) : (
+                  renderFileBrowserBody(false)
+                )}
 
                 {/* Description File Browser - shown when --descfile is in args */}
                 {hasDescFile && (
@@ -9437,26 +11054,43 @@ function AudionutsUAGUI() {
                       onClick={() => setIsTerminalView((expanded) => !expanded)}
                       aria-expanded={isTerminalView}
                       title={
-                        isTerminalView ? "Back to preparation" : "View terminal"
+                        isTerminalView ? "Back to preparation" : "View output"
                       }
                       className={`ml-auto flex items-center gap-1.5 rounded px-3 py-1.5 text-sm ${isDarkMode ? "text-gray-300 hover:bg-gray-800" : "text-gray-600 hover:bg-gray-200"}`}
                     >
                       {isTerminalView ? (
                         <LucideIcon name="arrow-left" className="h-4 w-4" />
+                      ) : isGuiOutput ? (
+                        <LucideIcon
+                          name="layout-dashboard"
+                          className="h-4 w-4"
+                        />
                       ) : (
                         <TerminalIcon />
                       )}
-                      {isTerminalView ? "Back to preparation" : "View terminal"}
+                      {isTerminalView ? "Back to preparation" : "View output"}
                     </button>
                   </div>
                 )}
-                {/* Rich HTML output (rendered from Rich export_html fragments) */}
                 <div
-                  ref={attachRichOutputHost}
-                  id="rich-output"
-                  className={`min-h-0 rounded-lg overflow-auto p-3 border bg-black border-gray-700 text-white ${isExecuting || isTerminalView ? "flex-1" : "hidden"}`}
-                ></div>
-                {isExecuting && (
+                  className={`relative min-h-0 flex-col ${isExecuting || isTerminalView ? "flex flex-1" : "hidden"}`}
+                >
+                  {/* In Terminal view the switch floats over the output instead of
+                      taking a row; the GUI view shows it in its stages bar. */}
+                  {!isGuiOutput && (
+                    <div className="ua-run-gui-mode-overlay absolute right-2 top-2 z-10">
+                      {renderOutputModeToggle(true)}
+                    </div>
+                  )}
+                  {/* Rich HTML output (rendered from Rich export_html fragments) */}
+                  <div
+                    ref={attachRichOutputHost}
+                    id="rich-output"
+                    className={`min-h-0 rounded-lg overflow-auto p-3 border bg-black border-gray-700 text-white ${!isGuiOutput ? "flex-1" : "hidden"}`}
+                  ></div>
+                  {isGuiOutput && renderRunGuiPanel(true)}
+                </div>
+                {isExecuting && !isGuiOutput && (
                   <div
                     className={`mt-2 flex shrink-0 gap-2 ${isAwaitingTerminalInput ? "animate-pulse" : ""}`}
                   >
@@ -9712,6 +11346,44 @@ function AudionutsUAGUI() {
           </>
         )}
       </div>
+      {!isExecuting && !isMobile && isFileBrowserExpanded && (
+        <div
+          className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4 sm:p-6"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setIsFileBrowserExpanded(false);
+            }
+          }}
+        >
+          <section
+            ref={fileBrowserModalRef}
+            className={`ua-upload-panel flex h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl border shadow-2xl ${isDarkMode ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-white"}`}
+            role="dialog"
+            aria-modal="true"
+            aria-label="File browser"
+            tabIndex="-1"
+          >
+            {renderFileBrowserBody(true)}
+            <footer
+              className={`flex flex-none items-center justify-between gap-3 border-t px-4 py-3 text-sm ${isDarkMode ? "border-gray-700 text-gray-300" : "border-gray-200 text-gray-600"}`}
+            >
+              <span>
+                {selectedPaths.length
+                  ? `${selectedPaths.length} selected`
+                  : "Nothing selected yet"}
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsFileBrowserExpanded(false)}
+                className="rounded-md bg-blue-600 px-4 py-1.5 font-medium text-white hover:bg-blue-500"
+              >
+                Done
+              </button>
+            </footer>
+          </section>
+        </div>
+      )}
       {isExecuting && !isMobile && expandedReviewPanel && (
         <div
           className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4 sm:p-6"
