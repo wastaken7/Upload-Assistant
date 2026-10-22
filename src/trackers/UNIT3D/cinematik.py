@@ -403,6 +403,10 @@ class Cinematik(UNIT3D):
                 logger.info(f"{self.tracker}: Final description after editing: {description}", extra={"markup": False})
             else:
                 logger.info(f"{self.tracker}: [green]Keeping the original description.[/green]")
+        elif not webui_events.editor_available():
+            # The Web UI's description review edits the base description, not this
+            # template, so its placeholders (extras, ripping program) stay as generated.
+            logger.warning(f"{self.tracker}: the generated description template still has placeholders to fill in; complete it on the site after uploading.")
         else:
             logger.info(f"{self.tracker}: [green]Unattended mode: Keeping the original description.[/green]")
 

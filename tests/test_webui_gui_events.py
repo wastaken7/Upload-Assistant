@@ -439,3 +439,16 @@ def test_numbered_options_can_count_from_zero(gui_env, capsys) -> None:
 
 def test_webui_child_runs_without_a_terminal_editor() -> None:
     assert server._webui_subprocess_env()["UA_WEBUI_ACTIVE"] == "1"
+
+
+def test_option_and_release_labels_keep_bracketed_text(gui_env, capsys) -> None:
+    label = "fictional band - album [remastered] [web]"
+    with webui_events.numbered_options([label], actions=[("", "keep [as is]")]):
+        webui_events.prompt_open("choice", "Pick one", choices=[label])
+    webui_events.dupes("FAKE", [{"name": label}])
+
+    opened, dupes = _events(capsys.readouterr().out)
+    assert opened["context"]["options"] == [label]
+    assert opened["context"]["actions"] == [["", "keep [as is]"]]
+    assert opened["choices"] == [label]
+    assert dupes["entries"][0]["name"] == label

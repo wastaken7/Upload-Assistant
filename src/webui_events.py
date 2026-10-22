@@ -243,6 +243,8 @@ def letter_prompt(choices: Iterable[tuple[str, str]], enter: str) -> tuple[str, 
 
 
 def _context_payload() -> dict[str, Any] | None:
+    # Context values (release names, option labels) are plain text from tags or
+    # trackers; parsing them as markup would drop text like "[remastered]".
     context = _prompt_context.get()
     if not context:
         return None
@@ -250,15 +252,15 @@ def _context_payload() -> dict[str, Any] | None:
     for name, value in context.items():
         if isinstance(value, Mapping):
             entries = list(cast(Mapping[Any, Any], value).items())[:MAX_LIST_ITEMS]
-            payload[name] = {plain_text(k, 64): plain_text(v, 300) for k, v in entries}
+            payload[name] = {plain_text(k, 64, markup=False): plain_text(v, 300, markup=False) for k, v in entries}
         elif isinstance(value, list):
             # Lists keep their order; (answer, label) pairs become two-item lists.
             items = cast(list[Any], value)[:MAX_LIST_ITEMS]
-            payload[name] = [[plain_text(part, 300) for part in item] if isinstance(item, tuple) else plain_text(item, 300) for item in items]
+            payload[name] = [[plain_text(part, 300, markup=False) for part in item] if isinstance(item, tuple) else plain_text(item, 300, markup=False) for item in items]
         elif isinstance(value, bool):
             payload[name] = value
         elif value is not None:
-            payload[name] = plain_text(value, 300)
+            payload[name] = plain_text(value, 300, markup=False)
     return payload
 
 
@@ -268,13 +270,13 @@ def prompt_open(prompt_type: Literal["yes_no", "text", "choice"], question: Any,
         return None
     prompt_id = next(_prompt_ids)
     payload: dict[str, Any] = {"action": "open", "id": prompt_id, "type": prompt_type, "question": plain_text(question)}
-    choice_labels = [plain_text(choice, 300) for choice in itertools.islice(choices, MAX_LIST_ITEMS)]
+    choice_labels = [plain_text(choice, 300, markup=False) for choice in itertools.islice(choices, MAX_LIST_ITEMS)]
     if choice_labels:
         payload["choices"] = choice_labels
     if isinstance(default, bool):
         payload["default"] = default
     elif default is not None:
-        payload["default"] = plain_text(default, 300)
+        payload["default"] = plain_text(default, 300, markup=False)
     context = _context_payload()
     if context:
         payload["context"] = context
@@ -300,7 +302,7 @@ def _release_entries(entries: Iterable[Mapping[str, Any] | str], source_size: in
                 continue
             if link:
                 seen_links.add(link)
-            item: dict[str, Any] = {"name": plain_text(entry.get("name"), 300)}
+            item: dict[str, Any] = {"name": plain_text(entry.get("name"), 300, markup=False)}
             if link:
                 item["link"] = link
             size = parse_size_to_bytes(entry.get("size")) if entry.get("size") else None
@@ -312,7 +314,7 @@ def _release_entries(entries: Iterable[Mapping[str, Any] | str], source_size: in
                     # Red means nearly the same size as the upload, green very different.
                     item["color"] = f"#{get_color_for_diff(abs(diff))}"
         else:
-            item = {"name": plain_text(entry, 300)}
+            item = {"name": plain_text(entry, 300, markup=False)}
         if item["name"]:
             items.append(item)
         if len(items) >= MAX_LIST_ITEMS:
@@ -397,7 +399,7 @@ def tracker_result(
 def request_match(tracker: str, name: Any, *, link: Any = None, reward: Any = None, status: Any = None, exact: bool = False) -> None:
     if not enabled():
         return
-    payload: dict[str, Any] = {"tracker": plain_text(tracker, 64), "name": plain_text(name, 300), "exact": bool(exact)}
+    payload: dict[str, Any] = {"tracker": plain_text(tracker, 64), "name": plain_text(name, 300, markup=False), "exact": bool(exact)}
     url = _http_link(link)
     if url:
         payload["link"] = url
