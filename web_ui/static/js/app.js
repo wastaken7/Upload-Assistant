@@ -3863,6 +3863,17 @@ function AudionutsUAGUI() {
     if (isMobile) setExpandedReviewPanel("");
   }, [isMobile]);
 
+  // The file browser can open in a larger modal, like the review panels.
+  const [isFileBrowserExpanded, setIsFileBrowserExpanded] = useState(false);
+  const fileBrowserModalRef = useModalFocus(
+    () => setIsFileBrowserExpanded(false),
+    isFileBrowserExpanded,
+  );
+  useEffect(() => {
+    // Starting an upload replaces the sidebar browser with the run's progress.
+    if (isMobile || isExecuting) setIsFileBrowserExpanded(false);
+  }, [isMobile, isExecuting]);
+
   const renderReviewExpandButton = (panel) => {
     if (isMobile) return null;
     const isExpanded = expandedReviewPanel === panel;
@@ -9398,6 +9409,130 @@ function AudionutsUAGUI() {
     );
   };
 
+  /**
+   * Desktop file browser: header with search, the select-all bar and the tree.
+   * It is shown either in the sidebar or in the larger modal, never both,
+   * because the tree's scroll position and keyboard focus use one ref.
+   */
+  const renderFileBrowserBody = (inModal) => (
+    <>
+      <div className="ua-upload-panel-header p-4 border-b">
+        <div className="flex items-center justify-between gap-2">
+          <h2
+            className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-gray-800"} flex min-w-0 items-center gap-2 whitespace-nowrap`}
+          >
+            <LucideIcon name="folders" className="w-4 h-4" />
+            File Browser
+          </h2>
+          <div className="flex shrink-0 items-center gap-0.5">
+            <button
+              type="button"
+              onClick={() => setIsFileBrowserExpanded(!inModal)}
+              aria-label={
+                inModal ? "Return to sidebar" : "Open in a larger view"
+              }
+              title={inModal ? "Return to sidebar" : "Open in a larger view"}
+              className={`rounded p-1 transition-colors ${isDarkMode ? "text-gray-400 hover:bg-gray-700 hover:text-gray-200" : "text-gray-500 hover:bg-gray-200 hover:text-gray-700"}`}
+            >
+              <LucideIcon
+                name={inModal ? "minimize-2" : "maximize-2"}
+                className="h-4 w-4"
+              />
+            </button>
+            <button
+              type="button"
+              onClick={collapseFileBrowser}
+              aria-label="Collapse all folders"
+              title="Collapse all folders"
+              className={`rounded p-1 transition-colors ${isDarkMode ? "text-gray-400 hover:bg-gray-700 hover:text-gray-200" : "text-gray-500 hover:bg-gray-200 hover:text-gray-700"}`}
+            >
+              <LucideIcon name="list-collapse" className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={refreshFileBrowser}
+              disabled={fileBrowserRefreshing}
+              aria-label="Refresh file browser"
+              title="Refresh file browser"
+              className={`rounded p-1 transition-colors disabled:cursor-wait disabled:opacity-60 ${isDarkMode ? "text-gray-400 hover:bg-gray-700 hover:text-gray-200" : "text-gray-500 hover:bg-gray-200 hover:text-gray-700"}`}
+            >
+              <LucideIcon
+                name="refresh-cw"
+                className={`h-4 w-4 ${fileBrowserRefreshing ? "animate-spin" : ""}`}
+              />
+            </button>
+          </div>
+        </div>
+        <div className="relative mt-2">
+          <input
+            type="text"
+            aria-label="Search files and folders"
+            value={fileBrowserSearch}
+            onChange={(e) => handleFileBrowserSearch(e.target.value)}
+            placeholder="Search files and folders..."
+            className={`w-full pl-8 pr-8 py-1.5 text-sm rounded border ${
+              isDarkMode
+                ? "bg-gray-800 border-gray-600 text-gray-200 placeholder-gray-500"
+                : "bg-white border-gray-300 text-gray-700 placeholder-gray-400 focus:border-blue-500"
+            } focus:outline-none`}
+          />
+          <LucideIcon
+            name="search"
+            className={`absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}
+          />
+          {fileBrowserSearch && (
+            <button
+              type="button"
+              aria-label="Clear file search"
+              onClick={() => handleFileBrowserSearch("")}
+              className={`absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded ${isDarkMode ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-200 text-gray-500"}`}
+            >
+              <LucideIcon name="x" className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
+      {renderSelectAllBar()}
+      <div
+        ref={fileBrowserRef}
+        onScroll={(event) => {
+          if (fileBrowserRestoring) return;
+          fileBrowserScrollTopRef.current = event.currentTarget.scrollTop;
+          storage.set(
+            FILE_BROWSER_SCROLL_KEY,
+            String(fileBrowserScrollTopRef.current),
+          );
+        }}
+        className={`${!inModal && hasDescFile && !descBrowserCollapsed ? "flex-1 max-h-[50%]" : "flex-1"} min-h-0 overflow-y-auto`}
+      >
+        {fileBrowserSearch ? (
+          fileBrowserSearchLoading ? (
+            <div
+              className={`p-4 text-center ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+            >
+              <SpinnerIcon />
+              <p className="text-sm mt-2">Searching...</p>
+            </div>
+          ) : (
+            <>
+              {fileBrowserSearchResults &&
+                fileBrowserSearchResults.truncated && (
+                  <div
+                    className={`px-3 py-1.5 text-xs ${isDarkMode ? "text-yellow-400 bg-gray-900" : "text-yellow-700 bg-yellow-50"} border-b ${isDarkMode ? "border-gray-700" : "border-yellow-200"}`}
+                  >
+                    Results limited to {fileBrowserSearchResults.count} items
+                  </div>
+                )}
+              {renderSearchResults(fileBrowserSearchResults)}
+            </>
+          )
+        ) : (
+          renderFileTree(directories)
+        )}
+      </div>
+    </>
+  );
+
   // Mobile Layout
   if (isMobile) {
     const navButton = (panel, icon, label) => (
@@ -10336,108 +10471,23 @@ function AudionutsUAGUI() {
               renderProgressWorkspace()
             ) : (
               <>
-                <div className="ua-upload-panel-header p-4 border-b">
-                  <div className="flex items-center justify-between gap-2">
-                    <h2
-                      className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-gray-800"} flex items-center gap-2`}
+                {isFileBrowserExpanded ? (
+                  <div
+                    className={`flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center text-sm ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                  >
+                    <LucideIcon name="maximize-2" className="h-5 w-5" />
+                    <p>The file browser is open in a larger view.</p>
+                    <button
+                      type="button"
+                      onClick={() => setIsFileBrowserExpanded(false)}
+                      className={`rounded-md px-3 py-1.5 text-sm font-medium ${isDarkMode ? "bg-gray-700 text-gray-100 hover:bg-gray-600" : "bg-gray-100 text-gray-800 hover:bg-gray-200"}`}
                     >
-                      <LucideIcon name="folders" className="w-4 h-4" />
-                      File Browser
-                    </h2>
-                    <div className="flex shrink-0 items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={collapseFileBrowser}
-                        aria-label="Collapse all folders"
-                        title="Collapse all folders"
-                        className={`rounded p-1.5 transition-colors ${isDarkMode ? "text-gray-400 hover:bg-gray-700 hover:text-gray-200" : "text-gray-500 hover:bg-gray-200 hover:text-gray-700"}`}
-                      >
-                        <LucideIcon name="list-collapse" className="h-4 w-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={refreshFileBrowser}
-                        disabled={fileBrowserRefreshing}
-                        aria-label="Refresh file browser"
-                        title="Refresh file browser"
-                        className={`rounded p-1.5 transition-colors disabled:cursor-wait disabled:opacity-60 ${isDarkMode ? "text-gray-400 hover:bg-gray-700 hover:text-gray-200" : "text-gray-500 hover:bg-gray-200 hover:text-gray-700"}`}
-                      >
-                        <LucideIcon
-                          name="refresh-cw"
-                          className={`h-4 w-4 ${fileBrowserRefreshing ? "animate-spin" : ""}`}
-                        />
-                      </button>
-                    </div>
+                      Return to sidebar
+                    </button>
                   </div>
-                  <div className="relative mt-2">
-                    <input
-                      type="text"
-                      aria-label="Search files and folders"
-                      value={fileBrowserSearch}
-                      onChange={(e) => handleFileBrowserSearch(e.target.value)}
-                      placeholder="Search files and folders..."
-                      className={`w-full pl-8 pr-8 py-1.5 text-sm rounded border ${
-                        isDarkMode
-                          ? "bg-gray-800 border-gray-600 text-gray-200 placeholder-gray-500"
-                          : "bg-white border-gray-300 text-gray-700 placeholder-gray-400 focus:border-blue-500"
-                      } focus:outline-none`}
-                    />
-                    <LucideIcon
-                      name="search"
-                      className={`absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}
-                    />
-                    {fileBrowserSearch && (
-                      <button
-                        type="button"
-                        aria-label="Clear file search"
-                        onClick={() => handleFileBrowserSearch("")}
-                        className={`absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded ${isDarkMode ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-200 text-gray-500"}`}
-                      >
-                        <LucideIcon name="x" className="h-3.5 w-3.5" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-                {renderSelectAllBar()}
-                <div
-                  ref={fileBrowserRef}
-                  onScroll={(event) => {
-                    if (fileBrowserRestoring) return;
-                    fileBrowserScrollTopRef.current =
-                      event.currentTarget.scrollTop;
-                    storage.set(
-                      FILE_BROWSER_SCROLL_KEY,
-                      String(fileBrowserScrollTopRef.current),
-                    );
-                  }}
-                  className={`${hasDescFile && !descBrowserCollapsed ? "flex-1 max-h-[50%]" : "flex-1"} overflow-y-auto`}
-                >
-                  {fileBrowserSearch ? (
-                    fileBrowserSearchLoading ? (
-                      <div
-                        className={`p-4 text-center ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
-                      >
-                        <SpinnerIcon />
-                        <p className="text-sm mt-2">Searching...</p>
-                      </div>
-                    ) : (
-                      <>
-                        {fileBrowserSearchResults &&
-                          fileBrowserSearchResults.truncated && (
-                            <div
-                              className={`px-3 py-1.5 text-xs ${isDarkMode ? "text-yellow-400 bg-gray-900" : "text-yellow-700 bg-yellow-50"} border-b ${isDarkMode ? "border-gray-700" : "border-yellow-200"}`}
-                            >
-                              Results limited to{" "}
-                              {fileBrowserSearchResults.count} items
-                            </div>
-                          )}
-                        {renderSearchResults(fileBrowserSearchResults)}
-                      </>
-                    )
-                  ) : (
-                    renderFileTree(directories)
-                  )}
-                </div>
+                ) : (
+                  renderFileBrowserBody(false)
+                )}
 
                 {/* Description File Browser - shown when --descfile is in args */}
                 {hasDescFile && (
@@ -11065,6 +11115,44 @@ function AudionutsUAGUI() {
           </>
         )}
       </div>
+      {!isExecuting && !isMobile && isFileBrowserExpanded && (
+        <div
+          className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4 sm:p-6"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setIsFileBrowserExpanded(false);
+            }
+          }}
+        >
+          <section
+            ref={fileBrowserModalRef}
+            className={`ua-upload-panel flex h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl border shadow-2xl ${isDarkMode ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-white"}`}
+            role="dialog"
+            aria-modal="true"
+            aria-label="File browser"
+            tabIndex="-1"
+          >
+            {renderFileBrowserBody(true)}
+            <footer
+              className={`flex flex-none items-center justify-between gap-3 border-t px-4 py-3 text-sm ${isDarkMode ? "border-gray-700 text-gray-300" : "border-gray-200 text-gray-600"}`}
+            >
+              <span>
+                {selectedPaths.length
+                  ? `${selectedPaths.length} selected`
+                  : "Nothing selected yet"}
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsFileBrowserExpanded(false)}
+                className="rounded-md bg-blue-600 px-4 py-1.5 font-medium text-white hover:bg-blue-500"
+              >
+                Done
+              </button>
+            </footer>
+          </section>
+        </div>
+      )}
       {isExecuting && !isMobile && expandedReviewPanel && (
         <div
           className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4 sm:p-6"
