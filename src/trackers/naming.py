@@ -2,11 +2,15 @@
 
 import re
 from dataclasses import dataclass, replace
-from typing import Literal
+from typing import Any, Literal, cast
 
+import httpx
+
+from src.console import logger
 from src.get_name import NameComponents, build_name_components
 from src.languages import languages_manager
 from src.meta import Meta
+from src.tmdb import get_tmdb_localized_data
 
 DVD_SOURCES = ("PAL DVD", "NTSC DVD", "DVD")
 
@@ -239,3 +243,82 @@ def add_incomplete_pack_marker(name: str, meta: Meta, tracker: str) -> str:
         return f"{match.group(1)}{separator}INCOMPLETE"
 
     return re.sub(pattern, insert, name, count=1, flags=re.IGNORECASE)
+
+
+class TmdbTvNaming:
+    """TV names as TMDB title, IMDb AKA, then year if another show has the same title."""
+
+    tracker: str
+    config: dict[str, Any]
+
+    async def _rebuild_tv_name(self, meta: Meta, name: str) -> str | None:
+        """Rebuild everything before the season/episode. Returns None if the name has neither."""
+        marker = f"{meta.season or ''}{meta.episode or ''}".strip()
+        if not marker or marker not in name:
+            return None
+
+        tmdb_title = await self._tmdb_en_title(meta)
+        aka = "" if meta.no_aka else self._localized_aka(meta, tmdb_title)
+        year = str(meta.year or "").strip() if (not meta.no_year and await self._tv_title_needs_year(meta, tmdb_title)) else ""
+        tail = name.partition(marker)[2]
+        lead = " ".join(part for part in (tmdb_title, aka, year) if part)
+        return " ".join(f"{lead} {marker}{tail}".split())
+
+    async def _tmdb_en_title(self, meta: Meta) -> str:
+        # meta.title can be the TVDB name for non-English shows; these sites use the TMDB one.
+        try:
+            tmdb_main = await get_tmdb_localized_data(meta, data_type="main", language="en-US", append_to_response="")
+        except Exception:
+            tmdb_main = {}
+        data = tmdb_main if isinstance(tmdb_main, dict) else {}
+        title = str(data.get("name") or data.get("title") or "").strip()
+        return title or str(meta.title or "").strip()
+
+    @staticmethod
+    def _localized_aka(meta: Meta, tmdb_title: str) -> str:
+        # English shows use the IMDb title, or its original title if that matches TMDB
+        # (House -> AKA House M.D.). Other shows use IMDb's romanized original title.
+        imdb_info = meta.imdb_info if isinstance(meta.imdb_info, dict) else {}
+        original_language = str(meta.original_language or "").strip().lower()
+        original_language = original_language.split("-")[0].split("(")[0].strip()
+        is_english = original_language in ("en", "eng", "english")
+        tmdb_key = tmdb_title.lower()
+        for key in ("title", "aka") if is_english else ("aka",):
+            aka = str(imdb_info.get(key) or "").strip()
+            if aka and aka.lower() != tmdb_key and aka.lower() not in tmdb_key:
+                return f"AKA {aka}"
+        return ""
+
+    async def _tv_title_needs_year(self, meta: Meta, title: str | None = None) -> bool:
+        title = str(title if title is not None else (meta.title or "")).strip()
+        api_key = str(self.config.get("DEFAULT", {}).get("tmdb_api", "")).strip()
+        if not title or not api_key:
+            return False
+        try:
+            logger.info(f"{self.tracker}: Checking if TMDb has multiple shows with the title '{title}'...")
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    "https://api.themoviedb.org/3/search/tv",
+                    params={"api_key": api_key, "query": title, "language": "en-US", "include_adult": "true"},
+                )
+                response.raise_for_status()
+                payload_raw: Any = response.json()
+        except httpx.HTTPError, ValueError, TypeError:
+            return False
+
+        title_key = " ".join(title.casefold().split())
+        current_id = str(meta.tmdb_id or "")
+        payload = cast(dict[str, Any], payload_raw) if isinstance(payload_raw, dict) else {}
+        results_raw: Any = payload.get("results", [])
+        results = cast(list[Any], results_raw) if isinstance(results_raw, list) else []
+        matching_ids: set[str] = set()
+        for result_raw in results:
+            if not isinstance(result_raw, dict):
+                continue
+            result = cast(dict[str, Any], result_raw)
+            result_id = str(result.get("id", ""))
+            names = (result.get("name"), result.get("original_name"))
+            if any(" ".join(str(candidate or "").casefold().split()) == title_key for candidate in names):
+                matching_ids.add(result_id)
+        matching_ids.discard("")
+        return bool(matching_ids - {current_id}) if current_id else len(matching_ids) > 1
