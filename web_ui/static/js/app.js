@@ -10062,15 +10062,20 @@ function AudionutsUAGUI() {
       : counts.success
         ? "success"
         : "info";
+    const showItemHeader =
+      view.currentItem &&
+      (view.multipleItems || view.currentItem.personalRelease);
 
     return (
       <div className="ua-run-gui flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
         {/* The Terminal | GUI switch sits at the right of the stages bar. */}
-        <div className="ua-run-gui-strip flex items-start gap-3 rounded-lg border px-3 py-2">
-          <div className="min-w-0 flex-1">
-            {view.currentItem &&
-              (view.multipleItems || view.currentItem.personalRelease) && (
-                <div className="ua-run-gui-muted mb-1.5 flex min-w-0 flex-wrap items-center gap-1.5 text-xs">
+        <div className="ua-run-gui-strip rounded-lg border px-3 py-2">
+          <div
+            className={`flex min-w-0 gap-3 ${showItemHeader ? "items-center" : "items-start"}`}
+          >
+            <div className="min-w-0 flex-1">
+              {showItemHeader ? (
+                <div className="ua-run-gui-muted flex min-w-0 flex-wrap items-center gap-1.5 text-xs">
                   {view.multipleItems && (
                     <>
                       <LucideIcon
@@ -10086,13 +10091,21 @@ function AudionutsUAGUI() {
                   <span className="min-w-0 flex-1 truncate">
                     {view.currentItem.name}
                   </span>
-                  {view.currentItem.personalRelease &&
-                    renderRunGuiPersonalRelease()}
                 </div>
+              ) : (
+                renderRunGuiStages(view, waitingForUser)
               )}
-            {renderRunGuiStages(view, waitingForUser)}
+            </div>
+            {showItemHeader &&
+              view.currentItem.personalRelease &&
+              renderRunGuiPersonalRelease()}
+            {toggleInStrip && renderOutputModeToggle(true)}
           </div>
-          {toggleInStrip && renderOutputModeToggle(true)}
+          {showItemHeader && (
+            <div className="mt-1.5">
+              {renderRunGuiStages(view, waitingForUser)}
+            </div>
+          )}
         </div>
 
         {renderRunGuiPrompt(view)}
