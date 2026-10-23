@@ -15,6 +15,7 @@ from src.trackersetup import TrackerSetup
 
 @pytest.fixture
 def gui(monkeypatch):
+    """Enable isolated GUI events without using real console input."""
     monkeypatch.setenv(webui_events.GUI_EVENTS_ENV, "1")
     monkeypatch.setenv(webui_events.GUI_EVENT_NONCE_ENV, "check-feedback-test")
     monkeypatch.setattr(webui_events, "_current_item", None)
@@ -22,12 +23,15 @@ def gui(monkeypatch):
 
 
 def events(capsys):
+    """Read the structured events while ignoring ordinary console output."""
     prefix = webui_events.event_prefix("check-feedback-test")
     return [json.loads(line[len(prefix):]) for line in capsys.readouterr().out.splitlines() if line.startswith(prefix)]
 
 
 def answering(answer=False):
+    """Provide a mock decision that still announces the prompt and its context."""
     async def prompt(question, **kwargs):
+        """Open and close a GUI prompt without reading stdin."""
         prompt_id = webui_events.prompt_open("yes_no", question, **kwargs)
         webui_events.prompt_close(prompt_id)
         return answer
@@ -41,6 +45,7 @@ def answering(answer=False):
 ])
 @pytest.mark.parametrize("answer", [False, True])
 async def test_real_tracker_reasons_are_shown_before_deciding_and_retained_only_when_skipped(gui, capsys, tracker_class, reason, answer):
+    """Real RMC/STC checks explain the decision and retain reasons only when declined."""
     tracker = tracker_class.__new__(tracker_class)
     meta = Meta(category="MOVIE", year=2026, genres=["Crime"])
     helper = answering(answer)
@@ -56,6 +61,7 @@ async def test_real_tracker_reasons_are_shown_before_deciding_and_retained_only_
 
 @pytest.mark.asyncio
 async def test_no_reason_is_reported_honestly_without_inventing_a_failure(gui, capsys):
+    """A silent check must not be assigned an invented tracker rejection."""
     helper = answering()
     tracker = SimpleNamespace(get_additional_checks=AsyncMock(return_value=False))
     meta = Meta()
@@ -68,6 +74,7 @@ async def test_no_reason_is_reported_honestly_without_inventing_a_failure(gui, c
 @pytest.mark.asyncio
 @pytest.mark.parametrize("mode", ["unattended", "closed", "eof"])
 async def test_skip_reason_survives_when_override_cannot_be_answered(gui, monkeypatch, mode):
+    """Unattended runs, closed input and EOF keep the check's explanation."""
     meta = Meta(category="MOVIE", year=2026, unattended=mode == "unattended")
     monkeypatch.setattr(trackerstatus.sys, "stdin", SimpleNamespace(closed=mode == "closed"))
     helper = SimpleNamespace(prompt_yes_no=AsyncMock(side_effect=EOFError))
@@ -79,12 +86,15 @@ async def test_skip_reason_survives_when_override_cannot_be_answered(gui, monkey
 
 @pytest.mark.asyncio
 async def test_concurrent_checks_keep_their_own_messages_and_restore_handlers(gui, capsys):
+    """Overlapping checks and worker-thread logs keep tracker contexts isolated."""
     handlers = list(logger.handlers)
     started = 0
     both_started = asyncio.Event()
 
     async def run(name):
+        """Run a check that overlaps with another check before its final explanation."""
         async def check(_meta):
+            """Interleave task and thread logging to exercise context propagation."""
             nonlocal started
             logger.info(f"{name}: [red]{name} first reason[/red]")
             started += 1
@@ -109,6 +119,7 @@ async def test_concurrent_checks_keep_their_own_messages_and_restore_handlers(gu
 
 @pytest.mark.asyncio
 async def test_prompts_inside_a_check_receive_the_same_redacted_context(gui, capsys):
+    """Nested prompts receive explanations without URL tokens or JSON credentials."""
     with webui_events.capture_tracker_checks("FAKE", logger):
         logger.info('FAKE: [red]Rejected {"api_key":"hidden-secret"} at https://example.invalid/api?token=url-secret[/red]')
         await asyncio.to_thread(webui_events.prompt_open, "yes_no", "Continue anyway?", default=False)
@@ -122,6 +133,7 @@ async def test_prompts_inside_a_check_receive_the_same_redacted_context(gui, cap
 
 
 def test_capture_is_bounded_and_keeps_the_latest_reason(gui):
+    """Noisy checks retain a bounded history containing their final rejection."""
     with webui_events.capture_tracker_checks("FAKE", logger) as messages:
         for index in range(30):
             logger.info(f"FAKE: Reason {index}")
@@ -135,6 +147,7 @@ def test_capture_is_bounded_and_keeps_the_latest_reason(gui):
 
 
 def test_capture_is_disabled_for_console_only_runs(gui, monkeypatch):
+    """Console-only runs install no capture handler and retain ordinary logging."""
     monkeypatch.delenv(webui_events.GUI_EVENTS_ENV)
     handlers = list(logger.handlers)
     with webui_events.capture_tracker_checks("FAKE", logger) as messages:
@@ -144,6 +157,7 @@ def test_capture_is_disabled_for_console_only_runs(gui, monkeypatch):
 
 
 def test_explicit_skip_reason_does_not_turn_into_a_dupe_status(gui, capsys):
+    """An explicit skip takes precedence over words such as duplicate in its reason."""
     webui_events.publish_tracker_statuses({"FAKE": {"skipped": True, "status_message": "Duplicate sources are not permitted by this rule"}}, final=True)
     result, = events(capsys)
     assert result["status"] == "skipped"
@@ -152,7 +166,9 @@ def test_explicit_skip_reason_does_not_turn_into_a_dupe_status(gui, capsys):
 
 @pytest.mark.asyncio
 async def test_real_checks_and_claim_reasons_reach_final_results(gui, monkeypatch, capsys):
+    """RMC/STC rejections and a claim match retain their reasons through result merging."""
     async def claimed(meta, name):
+        """Simulate a claim match without contacting a tracker."""
         if name != "AITHER":
             return False
         meta.tracker_status[name]["status_message"] = "Claimed match found: Synthetic Show, Season: 1, TMDB ID: 123"
@@ -175,6 +191,7 @@ async def test_real_checks_and_claim_reasons_reach_final_results(gui, monkeypatc
 
 @pytest.mark.asyncio
 async def test_claim_match_stores_the_actual_title_season_and_tmdb(gui, tmp_path, monkeypatch):
+    """Cached claim matches retain the actual identifiers and literal title text."""
     tracker = SimpleNamespace(get_type_id=AsyncMock(return_value={"WEBDL": "4"}), get_resolution_id=AsyncMock(return_value={"1080p": "3"}))
     setup = TrackerSetup(config={})
     monkeypatch.setattr(setup, "_create_tracker_instance", lambda _name: tracker)
@@ -184,3 +201,48 @@ async def test_claim_match_stores_the_actual_title_season_and_tmdb(gui, tmp_path
     meta = Meta(base_dir=str(tmp_path), type="WEBDL", resolution="1080p", category="TV", tmdb=123, season_int=1)
     assert await setup.check_tracker_claims(meta, "AITHER")
     assert meta.tracker_status["AITHER"]["status_message"] == "Claimed match found: Synthetic [Duplicate] Show, Season: 1, TMDB ID: 123"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("mode", ["declined", "unattended", "eof"])
+async def test_ptp_failed_checks_keep_the_reason_in_final_results(gui, monkeypatch, capsys, mode):
+    """PTP's separate check path must retain the explanation when an upload is skipped."""
+    reason = "This release fails a synthetic PTP upload rule."
+
+    async def check(_meta):
+        """Exercise normal tracker log capture without requesting a tracker endpoint."""
+        logger.info(f"PASSTHEPOPCORN: [red]{reason}[/red]")
+        return False
+
+    tracker = SimpleNamespace(
+        tracker="PASSTHEPOPCORN", banned_groups=[], get_additional_checks=check,
+        get_group_by_imdb=AsyncMock(), search_existing=AsyncMock(),
+    )
+    setup = SimpleNamespace(
+        filter_unsupported_trackers=lambda _meta: None,
+        check_banned_group=AsyncMock(return_value=False), get_torrent_claims=AsyncMock(return_value=False),
+    )
+    helper = answering() if mode != "eof" else SimpleNamespace(prompt_yes_no=AsyncMock(side_effect=EOFError))
+    monkeypatch.setattr(trackerstatus, "TrackerSetup", lambda **_kwargs: setup)
+    monkeypatch.setattr(trackerstatus, "AvistaZNetworkRouter", lambda *_args: SimpleNamespace(apply=AsyncMock()))
+    monkeypatch.setattr(trackerstatus, "UploadHelper", lambda _config: helper)
+    monkeypatch.setattr(trackerstatus, "PassThePopcorn", lambda **_kwargs: tracker)
+    monkeypatch.setattr(trackerstatus, "tracker_class_map", {"PASSTHEPOPCORN": lambda **_kwargs: tracker})
+    meta = Meta(name="Synthetic Feature", category="MOVIE", imdb_id=123, trackers=["PASSTHEPOPCORN"], unattended=mode == "unattended")
+
+    assert await trackerstatus.TrackerStatusManager({}).process_all_trackers(meta) == 0
+    status = meta.tracker_status["PASSTHEPOPCORN"]
+    assert status["skipped"] is True
+    assert status["upload"] is False
+    assert status["status_message"] == reason
+    tracker.get_group_by_imdb.assert_not_awaited()
+    tracker.search_existing.assert_not_awaited()
+    webui_events.publish_tracker_statuses(meta.tracker_status, final=True)
+    emitted = events(capsys)
+    final = [event for event in emitted if event["kind"] == "tracker"][-1]
+    assert final["status"] == "skipped"
+    assert final["message"] == reason
+    assert helper.prompt_yes_no.await_count == (0 if mode == "unattended" else 1)
+    if mode == "declined":
+        opened = next(event for event in emitted if event["kind"] == "prompt" and event["action"] == "open")
+        assert opened["context"]["check_messages"] == [reason]

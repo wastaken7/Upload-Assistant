@@ -196,11 +196,13 @@ class _TrackerCheckMessages(logging.Handler):
     """Keep a check's own explanations separate from concurrent tracker logs."""
 
     def __init__(self, tracker: str) -> None:
+        """Collect INFO-level explanations for one tracker's check context."""
         super().__init__(level=logging.INFO)
         self.tracker = tracker
         self.messages: list[str] = []
 
     def emit(self, record: logging.LogRecord) -> None:
+        """Retain bounded, redacted messages only from the owning check."""
         if _tracker_check.get() is not self:
             return
         try:
@@ -311,6 +313,7 @@ def letter_prompt(choices: Iterable[tuple[str, str]], enter: str) -> tuple[str, 
 
 
 def _context_payload() -> dict[str, Any] | None:
+    """Serialize prompt details, including explanations from an active tracker check."""
     # Context values (release names, option labels) are plain text from tags or
     # trackers; parsing them as markup would drop text like "[remastered]".
     context = dict(_prompt_context.get() or {})

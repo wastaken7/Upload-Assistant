@@ -635,9 +635,11 @@ class TrackerSetup:
         return await self.check_tracker_claims(meta, tracker)
 
     async def check_tracker_claims(self, meta: Meta, tracker: str | list[str]) -> bool:
+        """Match releases against cached claims and retain identifying details for skipped results."""
         trackers = [tracker.strip().upper()] if isinstance(tracker, str) else [str(s).upper() for s in cast(list[Any], tracker)]
 
         async def process_single_tracker(tracker_name: str) -> bool:
+            """Compare this tracker's claim entries with the release's IDs, type and resolution."""
             try:
                 tracker_instance = self._create_tracker_instance(tracker_name)
                 if tracker_instance is None:

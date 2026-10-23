@@ -72,6 +72,7 @@ class TrackerStatusManager:
         return False
 
     async def process_all_trackers(self, meta: Meta) -> int:
+        """Check selected trackers and retain their decisions and explanations in shared metadata."""
         tracker_status: dict[str, dict[str, Any]] = {}
         successful_trackers = 0
         tracker_setup: Any = TrackerSetup(config=self.config)
@@ -138,6 +139,7 @@ class TrackerStatusManager:
             meta.douban_id = await get_douban_id(meta)
 
         async def process_single_tracker(tracker_name: str, shared_meta: Meta) -> tuple[str, dict[str, Any], str | None, Any]:
+            """Check one isolated metadata copy and return its authoritative tracker result."""
             local_meta = copy.deepcopy(shared_meta)  # Ensure each task gets its own copy of meta
             local_tracker_status: dict[str, Any] = {"banned": False, "skipped": False, "dupe": False, "upload": False, "other": False}
             display_name = None
@@ -253,6 +255,7 @@ class TrackerStatusManager:
                         should_continue = await self._run_additional_checks(tracker_name, ptp, local_meta, helper)
                         if not should_continue:
                             local_tracker_status["skipped"] = True
+                            local_tracker_status["status_message"] = local_meta.tracker_status[tracker_name].get("status_message") or "Upload checks failed"
                             local_meta.skipping = tracker_name
 
                         if not local_tracker_status["skipped"]:
