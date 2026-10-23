@@ -1192,6 +1192,7 @@ const RunGuiDebugBadge = ({ options }) => {
   const [popoverId] = useState(
     () => `ua-debug-${Math.random().toString(36).slice(2)}`,
   );
+  /** Keep an open panel anchored to its badge and inside the viewport. */
   const positionPopover = useCallback(() => {
     const popover = popoverRef.current;
     const trigger = triggerRef.current;
@@ -9997,6 +9998,7 @@ function AudionutsUAGUI() {
     return { tone: "muted", icon: "circle-minus", label: "No upload" };
   };
 
+  /** Identify a resolved personal release in the live header or queue results. */
   const renderRunGuiPersonalRelease = () => (
     <span
       className="ua-run-gui-chip inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium"
@@ -10165,6 +10167,8 @@ function AudionutsUAGUI() {
         ];
     const visibleGroups = resultGroups.filter(
       (group) =>
+        group.personalRelease ||
+        group.runOptions?.debug ||
         group.rows.length ||
         group.notes.cards.length ||
         group.notes.notices.length ||

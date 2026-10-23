@@ -35,6 +35,7 @@
   });
 
   const text = (value) => (typeof value === "string" ? value : "");
+  /** Normalize only the published run settings used by release badges. */
   const readRunOptions = (options) =>
     options && typeof options === "object" && !Array.isArray(options)
       ? {
@@ -49,7 +50,7 @@
         }
       : null;
 
-  /** Describe skip flags as enabled/disabled, independently of their effects. */
+  /** Describe whether debug options apply and explain their effects for this run. */
   const getDebugRunRows = (options) => {
     if (!options?.debug) return [];
     const rows = [
