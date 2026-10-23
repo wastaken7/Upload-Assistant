@@ -1306,10 +1306,6 @@ const RunGuiDebugBadge = ({ options }) => {
             </p>
           </div>
         )}
-        <p className="ua-run-gui-muted mt-3 text-xs">
-          Client addition also depends on your selected client and tracker
-          settings.
-        </p>
       </div>
     </>
   );
