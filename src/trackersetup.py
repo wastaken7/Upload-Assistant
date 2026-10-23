@@ -686,6 +686,9 @@ class TrackerSetup:
                         and all(res in api_resolutions for res in resolution_ids)
                         and all(typ in api_types for typ in type_ids)
                     ):
+                        meta.tracker_status.setdefault(tracker_name, {})["status_message"] = webui_events.plain_text(
+                            f"Claimed match found: {title}, Season: {season}, TMDB ID: {api_tmdb_id}", markup=False
+                        )
                         logger.info(f"[green]Claimed match found at [cyan]{tracker}: [yellow]{title}, Season: {season}, TMDB ID: {api_tmdb_id}[/green]")
                         return True
 

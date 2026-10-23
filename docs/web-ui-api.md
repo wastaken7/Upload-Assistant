@@ -54,6 +54,8 @@ Statistics contain no per-release events, names, paths, release-group names or t
 
   Every event has `ts` and, inside a queue, `item`. Text is plain (no markup) and redacted. Answers to prompts still go through `/api/input`.
 
+  Tracker check prompts include `context.tracker` and `context.check_messages` when explanations are available. The GUI shows these messages before the upload decision; a declined check retains its explanation in the tracker's result `message`.
+
 Examples
 
 - Simple streaming curl (Unix-like / WSL / Git Bash). Use forward slashes to avoid escaping backslashes in Windows paths:

@@ -19,6 +19,7 @@ import contextlib
 import contextvars
 import itertools
 import json
+import logging
 import os
 import re
 import sys
@@ -43,6 +44,7 @@ TRACKER_STATUSES = frozenset({"pending", "success", "failed", "skipped", "dupe",
 MAX_TEXT_LENGTH = 1000
 MAX_LIST_ITEMS = 500
 MAX_EVENT_BYTES = 262144
+MAX_CHECK_MESSAGES = 20
 
 type StageStatus = Literal["start", "done", "skip", "fail"]
 type NoticeLevel = Literal["error", "warning", "attention"]
@@ -55,6 +57,7 @@ _active_stage: str | None = None
 # Stages started for the current item, so the final tracker summary knows whether uploading ran.
 _started_stages: set[str] = set()
 _prompt_context: contextvars.ContextVar[dict[str, Any] | None] = contextvars.ContextVar("ua_gui_prompt_context", default=None)
+_tracker_check: contextvars.ContextVar[_TrackerCheckMessages | None] = contextvars.ContextVar("ua_gui_tracker_check", default=None)
 _ANSI_ESCAPE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 _MARKUP_TAG = re.compile(r"\[/?[a-zA-Z#][^\[\]]*\]|\[/\]")
 
@@ -189,6 +192,45 @@ def notice_group(group: str, notices: Iterable[Mapping[str, Any]]) -> None:
     _emit("notice_group", {"group": plain_text(group, 64), "notices": items})
 
 
+class _TrackerCheckMessages(logging.Handler):
+    """Keep a check's own explanations separate from concurrent tracker logs."""
+
+    def __init__(self, tracker: str) -> None:
+        super().__init__(level=logging.INFO)
+        self.tracker = tracker
+        self.messages: list[str] = []
+
+    def emit(self, record: logging.LogRecord) -> None:
+        if _tracker_check.get() is not self:
+            return
+        try:
+            message = plain_text(record.getMessage(), markup=getattr(record, "markup", True) is not False)
+            message = re.sub(rf"(?im)^[ \t]*{re.escape(self.tracker)}:[ \t]*", "", message).strip()
+            if message and message not in self.messages:
+                self.messages.append(message)
+                # Keep the latest explanations, including a failure at the end of a noisy check.
+                self.messages[:] = self.messages[-MAX_CHECK_MESSAGES:]
+        except Exception:
+            self.handleError(record)
+
+
+@contextlib.contextmanager
+def capture_tracker_checks(tracker: str, logger: logging.Logger) -> Generator[list[str]]:
+    """Attach check messages to GUI prompts while leaving normal logging intact."""
+    if not enabled():
+        yield []
+        return
+    handler = _TrackerCheckMessages(tracker)
+    token = _tracker_check.set(handler)
+    logger.addHandler(handler)
+    try:
+        yield handler.messages
+    finally:
+        logger.removeHandler(handler)
+        _tracker_check.reset(token)
+        handler.close()
+
+
 @contextlib.contextmanager
 def prompt_context(**context: Any) -> Generator[None]:
     """Attach context (for example the tracker being asked about) to prompts in this block."""
@@ -271,7 +313,11 @@ def letter_prompt(choices: Iterable[tuple[str, str]], enter: str) -> tuple[str, 
 def _context_payload() -> dict[str, Any] | None:
     # Context values (release names, option labels) are plain text from tags or
     # trackers; parsing them as markup would drop text like "[remastered]".
-    context = _prompt_context.get()
+    context = dict(_prompt_context.get() or {})
+    check = _tracker_check.get()
+    if check is not None and check.messages:
+        context.setdefault("tracker", check.tracker)
+        context.setdefault("check_messages", check.messages)
     if not context:
         return None
     payload: dict[str, Any] = {}
@@ -288,7 +334,7 @@ def _context_payload() -> dict[str, Any] | None:
                 # Option details are already plain and bounded by numbered_options.
                 else dict(cast(Mapping[str, Any], item))
                 if isinstance(item, Mapping)
-                else plain_text(item, 300, markup=False)
+                else plain_text(item, MAX_TEXT_LENGTH if name == "check_messages" else 300, markup=False)
                 for item in items
             ]
         elif isinstance(value, bool):
@@ -458,10 +504,12 @@ def tracker_status_from_meta(status: Mapping[str, Any], *, final: bool, upload_s
         return "success"
     if status.get("upload_success") is False:
         return "failed"
-    if status.get("dupe") or "dupe" in message or "duplicate" in message:
+    if status.get("dupe"):
         return "dupe"
     if status.get("skipped"):
         return "skipped"
+    if "dupe" in message or "duplicate" in message:
+        return "dupe"
     if status.get("upload") is True:
         if not final:
             return "pending"
