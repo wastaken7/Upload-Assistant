@@ -32,6 +32,7 @@ from src.media_extensions import VIDEO_EXTENSIONS
 from src.mediainfo import MediaInfo
 from src.meta import Meta
 from src.resource_coordinator import holds_slot
+from src.screenshot_manifest import capture_pages as manifest_capture_pages
 from src.screenshot_manifest import capture_timestamps
 from src.screenshot_manifest import clear_group as clear_screenshot_group
 from src.screenshot_manifest import files as manifest_files
@@ -1746,6 +1747,10 @@ async def generate_ebook_screenshots(
 
     extension = Path(path).suffix.lower().lstrip(".")
     existing = [] if meta.retake else manifest_files(base_dir, folder_id, "main")
+    if existing and len(manifest_capture_pages(base_dir, folder_id, "main")) != len(existing):
+        # Captures from older runs lack page numbers, which the review needs to avoid repeats.
+        logger.debug("[yellow]Recapturing book screenshots without page numbers.[/yellow]")
+        existing = []
     if existing and not artwork:
         logger.debug(f"[yellow]Reusing {len(existing)} registered book screenshots.[/yellow]")
         return [str(screen) for screen in existing]

@@ -11,7 +11,10 @@ from src.book_extractors import find_copyright_page, find_isbn_page
 from src.meta import Meta
 from src.prep import Prep
 from src.screenshot_manifest import capture_pages
+from src.screenshot_manifest import files as manifest_files
+from src.screenshot_manifest import register as register_screenshots
 from src.screenshot_review import add_screenshot, list_screenshots, replace_screenshot
+from src.temp_paths import screenshots_dir
 from src.takescreens import find_ebook_info_page, generate_ebook_screenshots, select_ebook_pages
 
 
@@ -146,3 +149,19 @@ def test_early_capture_takes_ebook_pages_but_not_audiobooks(audiobook: bool, exp
     asyncio.run(prep._capture_early_screenshots(meta, "Invented Book", "C:/books/Invented Book.pdf", {}))
 
     assert prep.takescreens_manager.calls == expected  # noqa: S101
+
+
+def test_screenshots_without_page_numbers_are_recaptured(tmp_path: Path) -> None:
+    pdf = tmp_path / "Invented Book.pdf"
+    _make_pdf(pdf, [f"Page {i}" for i in range(6)])
+    meta = _book_meta(tmp_path, pdf)
+    legacy = screenshots_dir(meta.base_dir, meta.uuid) / "legacy.png"
+    legacy.parent.mkdir(parents=True, exist_ok=True)
+    legacy.write_bytes(b"not a page")
+    register_screenshots(meta.base_dir, meta.uuid, [legacy], "main")
+
+    result = asyncio.run(generate_ebook_screenshots(str(pdf), "Invented Book", meta.uuid, meta.base_dir, meta, num_screens=2, artwork=False))
+
+    assert len(result) == 2  # noqa: S101
+    assert len(capture_pages(meta.base_dir, meta.uuid, "main")) == 2  # noqa: S101
+    assert manifest_files(meta.base_dir, meta.uuid, "main") == [Path(path) for path in result]  # noqa: S101
