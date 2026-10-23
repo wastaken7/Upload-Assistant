@@ -3737,7 +3737,7 @@ def _build_config_items(
 
     for key in merged_keys:
         # Legacy configs can retain removed settings after default synchronization.
-        if path == ["DEFAULT"] and key == "keep_meta":
+        if path == ["DEFAULT"] and key in {"keep_meta", "dvd_mediainfo_path"}:
             continue
         example_value = example_section.get(key)
         user_value = user_dict.get(key)
