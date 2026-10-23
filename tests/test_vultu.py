@@ -171,6 +171,14 @@ def test_upload_data_limits_screenshots_and_flags_anime(tmp_path: Path) -> None:
     assert asyncio.run(Vultu(CONFIG).get_data(Meta(category="GAME", base_dir=str(tmp_path), uuid="abc", anime=True), "igdb:1"))["anime"] == "false"
 
 
+def test_bdmv_sends_bdinfo_as_mediainfo(tmp_path: Path) -> None:
+    (tmp_path / "tmp" / "abc").mkdir(parents=True)
+    (tmp_path / "tmp" / "abc" / "BD_SUMMARY_00.txt").write_text("Disc Title: Fictional Film\n", encoding="utf-8")
+    meta = Meta(category="MOVIE", base_dir=str(tmp_path), uuid="abc", is_disc="BDMV")
+
+    assert asyncio.run(Vultu(CONFIG).get_mediainfo(meta)) == "Disc Title: Fictional Film\n"
+
+
 def test_upload_posts_form_and_downloads_registered_torrent(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     (tmp_path / "tmp" / "abc").mkdir(parents=True)
     (tmp_path / "tmp" / "abc" / "MEDIAINFO_CLEANPATH.txt").write_text("General\n", encoding="utf-8")

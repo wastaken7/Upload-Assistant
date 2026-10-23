@@ -1,5 +1,4 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-import asyncio
 import json
 import re
 import time
@@ -18,8 +17,8 @@ from src.console import console, logger
 from src.description_review import get_base_description
 from src.exceptions import *  # noqa F403
 from src.meta import Meta
+from src.screenshot_manifest import files as manifest_files
 from src.stats import record_event_async
-from src.temp_paths import screenshots_dir
 from src.torrent_policy import HDBITS_POLICY
 from src.trackers.common import Common
 from src.trackers.naming import add_incomplete_pack_marker
@@ -679,22 +678,7 @@ class HDBits:
                 logger.debug(f"{self.tracker}: [cyan]{i}: {Path(path).name}")
         else:
             thumb_size = "w300"
-            screenshot_dir = screenshots_dir(meta.base_dir, meta.uuid)
-            # similar to uploadscreens.py L546
-            image_patterns = ["*.png", ".[!.]*.png"]
-            image_glob: list[str] = []
-            for image_pattern in image_patterns:
-                glob_results = await asyncio.to_thread(lambda pat=image_pattern: [str(p) for p in Path(screenshot_dir).glob(pat)])
-                image_glob.extend(glob_results)
-            unwanted_patterns = ["FILE*", "PLAYLIST*", "POSTER*"]
-            unwanted_files: set[str] = set()
-            for unwanted_pattern in unwanted_patterns:
-                glob_results = await asyncio.to_thread(lambda pat=unwanted_pattern: [str(p) for p in Path(screenshot_dir).glob(pat)])
-                unwanted_files.update(glob_results)
-                hidden_glob_results = await asyncio.to_thread(lambda pat=unwanted_pattern: [str(p) for p in Path(screenshot_dir).glob(f".{pat}")])
-                unwanted_files.update(hidden_glob_results)
-            image_glob = [file for file in image_glob if file not in unwanted_files]
-            all_image_files = list(set(image_glob))
+            all_image_files = [str(path) for path in manifest_files(meta.base_dir, meta.uuid, "main") if path.suffix.casefold() == ".png"]
 
         # At this point, all_image_files contains paths to all images we want to upload
         if not all_image_files:

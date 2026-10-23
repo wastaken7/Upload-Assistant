@@ -1,6 +1,5 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
-import glob
 import json
 import re
 from pathlib import Path
@@ -19,7 +18,7 @@ from src.cookie_auth import CookieValidator
 from src.description_review import get_base_description
 from src.exceptions import *  # noqa F403
 from src.meta import Meta
-from src.temp_paths import screenshots_dir
+from src.screenshot_manifest import files as manifest_files
 from src.trackers.common import Common
 
 
@@ -384,10 +383,10 @@ class FileList:
             desc = bbcode.remove_spoiler(desc)
             desc = bbcode.convert_code_to_quote(desc)
             desc = bbcode.convert_comparison_to_centered(desc, 900)
-            desc = desc.replace("[img]", "[img]").replace("[/img]", "[/img]")
             desc = re.sub(r"(\[img=\d+)]", "[img]", desc, flags=re.IGNORECASE)
+            data = None
+            final_desc = ""
             if meta.is_disc != "BDMV":
-                url = "https://up.img4k.net/api/description"
                 mediainfo_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/MEDIAINFO_CLEANPATH.txt"
                 async with aiofiles.open(mediainfo_path, encoding="utf-8") as mi_file:
                     data = {
@@ -395,22 +394,12 @@ class FileList:
                     }
                 if meta.imdb_tt:
                     data["imdbURL"] = meta.imdb_tt
-                screen_dir = screenshots_dir(meta.base_dir, meta.uuid)
-                screen_glob = [f.name for f in screen_dir.glob(f"{glob.escape(meta.filename)}-*.png")]
-                files: list[tuple[str, tuple[str, bytes, str]]] = []
-                for screen in screen_glob:
-                    async with aiofiles.open(screen_dir / screen, "rb") as image_file:
-                        image_bytes = await image_file.read()
-                    files.append(("images", (Path(screen).name, image_bytes, "image/png")))
-                async with httpx.AsyncClient(timeout=30.0) as client:
-                    response = await client.post(url, data=data, files=files, auth=(self.fltools["user"], self.fltools["pass"]))
-                final_desc = response.text.replace("\r\n", "\n")
             else:
                 # BD Description Generator
                 bd_summary_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/BD_SUMMARY_EXT.txt"
                 async with aiofiles.open(bd_summary_path, encoding="utf-8") as bd_file:
                     final_desc = await bd_file.read()
-                if final_desc.strip() != "":  # Use BD_SUMMARY_EXT and bbcode format it
+                if final_desc.strip():
                     final_desc = final_desc.replace("[/pre][/quote]", f"[/pre][/quote]\n\n{desc}\n", 1)
                     final_desc = (
                         final_desc.replace("DISC INFO:", "[pre][quote=BD_Info][b][color=#FF0000]DISC INFO:[/color][/b]")
@@ -420,17 +409,17 @@ class FileList:
                         .replace("SUBTITLES:", "[b][color=#FF0000]SUBTITLES:[/color][/b]")
                     )
                     final_desc += "[/pre][/quote]\n"  # Closed bbcode tags
-                    # Upload screens and append to the end of the description
-                    url = "https://up.img4k.net/api/description"
-                    screen_dir = screenshots_dir(meta.base_dir, meta.uuid)
-                    screen_glob = [f.name for f in screen_dir.glob(f"{glob.escape(meta.filename)}-*.png")]
-                    files: list[tuple[str, tuple[str, bytes, str]]] = []
-                    for screen in screen_glob:
-                        async with aiofiles.open(screen_dir / screen, "rb") as image_file:
-                            image_bytes = await image_file.read()
-                        files.append(("images", (Path(screen).name, image_bytes, "image/png")))
+            if meta.is_disc != "BDMV" or final_desc.strip():
+                files: list[tuple[str, tuple[str, bytes, str]]] = []
+                for screen in manifest_files(meta.base_dir, meta.uuid, "main"):
+                    if screen.suffix.casefold() != ".png":
+                        continue
+                    async with aiofiles.open(screen, "rb") as image_file:
+                        image_bytes = await image_file.read()
+                    files.append(("images", (screen.name, image_bytes, "image/png")))
+                if meta.is_disc != "BDMV" or files:
                     async with httpx.AsyncClient(timeout=30.0) as client:
-                        response = await client.post(url, files=files, auth=(self.fltools["user"], self.fltools["pass"]))
+                        response = await client.post("https://up.img4k.net/api/description", data=data, files=files, auth=(self.fltools["user"], self.fltools["pass"]))
                     final_desc += response.text.replace("\r\n", "\n")
             await descfile.write(final_desc)
 

@@ -7,6 +7,7 @@ from bs4 import BeautifulSoup
 from PIL import Image
 
 from src.meta import Meta
+from src.screenshot_manifest import register
 from src.trackers.GAZELLE.bjshare import BJShare
 
 
@@ -25,7 +26,9 @@ class FakeSearchResponse(FakeResponse):
 def test_get_screenshots_converts_webp_to_png(tmp_path: Path) -> None:
     screenshots = tmp_path / "tmp" / "release" / "screenshots"
     screenshots.mkdir(parents=True)
-    Image.new("RGB", (2, 2), "red").save(screenshots / "Release-0.webp", format="WEBP")
+    screenshot = screenshots / "Example-0.webp"
+    Image.new("RGB", (2, 2), "red").save(screenshot, format="WEBP")
+    screenshot = register(tmp_path, "release", [screenshot], "main")[0]
     uploaded: list[tuple[bytes, str]] = []
     tracker = object.__new__(BJShare)
 
@@ -37,7 +40,7 @@ def test_get_screenshots_converts_webp_to_png(tmp_path: Path) -> None:
     result = asyncio.run(tracker.get_screenshots(Meta({"base_dir": str(tmp_path), "uuid": "release"})))
 
     assert result == ["https://img.example/release-0.png"]  # noqa: S101
-    assert uploaded[0][1] == "Release-0.png"  # noqa: S101
+    assert uploaded[0][1] == f"{screenshot.stem}.png"  # noqa: S101
     assert uploaded[0][0].startswith(b"\x89PNG\r\n\x1a\n")  # noqa: S101
 
 

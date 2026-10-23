@@ -8,6 +8,7 @@ from types import SimpleNamespace
 import pytest
 
 from src.meta import Meta
+from src.screenshot_manifest import register
 from src.temp_paths import screenshots_dir
 from src.trackers.AVISTAZ import AZTrackerBase
 from src.trackers.NEXUSPHP.pterclub import PTerClub
@@ -99,6 +100,7 @@ def test_pterimg_records_validated_image_upload(monkeypatch, tmp_path, succeeded
     cookie_file.write_text("fictional cookie", encoding="utf-8")
     image = screenshots_dir(tmp_path, "fictional-release") / "Fictional.Release-01.png"
     image.write_bytes(b"image-bytes")
+    register(tmp_path, "fictional-release", [image], "main")
     meta = Meta(base_dir=str(tmp_path), uuid="fictional-release", filename="Fictional.Release")
     tracker = object.__new__(PTerClub)
     tracker.config = {"TRACKERS": {}}

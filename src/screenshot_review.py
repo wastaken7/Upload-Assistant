@@ -18,11 +18,9 @@ from typing import Any
 from src.meta import Meta
 from src.screenshot_manifest import files as manifest_files
 from src.screenshot_manifest import forget_file, group_for
+from src.screenshot_manifest import register as register_screenshots
 from src.takescreens import capture_screenshot, determine_tonemapping, disc_screenshots, get_frame_info, screenshot_par_scale_factors
 
-_SCREENSHOT_FILE = re.compile(r"^(?P<prefix>.+)-(?P<index>\d+)\.(?:png|jpe?g|webp)$", re.IGNORECASE)
-_EXCLUDED_NAMES = {"poster.png", "cover.png", "music_cover.png"}
-_EXCLUDED_STEMS = {Path(name).stem.casefold() for name in _EXCLUDED_NAMES}
 _review_locks: dict[str, threading.Lock] = {}
 _review_locks_guard = threading.Lock()
 
@@ -62,13 +60,8 @@ def _save_review(temp_dir: Path, review: Mapping[str, Any]) -> None:
     temporary.replace(output)
 
 
-def _is_reviewable_file(path: Path) -> bool:
-    name = path.name.casefold()
-    return path.is_file() and path.suffix.casefold() in {".png", ".jpg", ".jpeg", ".webp"} and path.stem.casefold() not in _EXCLUDED_STEMS and "libplacebo-test" not in name
-
-
 def _local_id(temp_dir: Path, path: Path) -> str:
-    """Return a stable opaque ID without changing legacy screenshot filenames."""
+    """Return a stable opaque ID for a local screenshot."""
     return f"local-{uuid.uuid5(uuid.NAMESPACE_URL, f'{temp_dir.resolve().as_uri()}/{path.name.casefold()}').hex}"
 
 
@@ -79,21 +72,14 @@ def list_screenshots(temp_dir: Path, _meta_data: Mapping[str, object]) -> list[R
     here.  Disc video frames do live in ``screenshots`` and are reviewable.
     """
     candidates: list[ReviewedScreenshot] = []
-    manifest_paths = manifest_files(temp_dir.parent.parent, temp_dir.name)
-    manifest_names = {path.name for path in manifest_paths}
-    screenshot_dir = temp_dir / "screenshots"
-    local_paths = sorted(screenshot_dir.iterdir(), key=lambda path: path.name.casefold()) if screenshot_dir.is_dir() else ()
-    paths = [*manifest_paths, *(path for path in local_paths if path.name not in manifest_names)]
-    for fallback_index, path in enumerate(paths):
-        if not _is_reviewable_file(path):
+    for index, path in enumerate(manifest_files(temp_dir.parent.parent, temp_dir.name)):
+        if path.suffix.casefold() not in {".png", ".jpg", ".jpeg", ".webp"}:
             continue
-        match = _SCREENSHOT_FILE.match(path.name)
-        index = int(match.group("index")) if match else fallback_index
         group = group_for(temp_dir.parent.parent, temp_dir.name, path)
-        if _string(_meta_data.get("is_disc")) and group not in {"main"} and not group.startswith(("FILE_", "PLAYLIST_")):
-            group = "main"
+        if group != "main" and not group.startswith(("FILE_", "PLAYLIST_")):
+            continue
         candidates.append(ReviewedScreenshot(id=_local_id(temp_dir, path), path=path, index=index, group=group))
-    return sorted(candidates, key=lambda item: (item.index, item.path.name.casefold()))
+    return candidates
 
 
 def list_review_items(temp_dir: Path, meta_data: Mapping[str, object]) -> list[ReviewedScreenshot]:
@@ -121,10 +107,7 @@ def list_review_items(temp_dir: Path, meta_data: Mapping[str, object]) -> list[R
         path = temp_dir / "screenshots" / filename if filename else None
         if item_id and path is not None and path.is_file():
             items.append(ReviewedScreenshot(item_id, path, len(remote_images) + offset, "addition"))
-    # Extra disc/playlist frames are produced while descriptions are built,
-    # after the main disc images have already been hosted.  Keep those local
-    # frames visible alongside the remote main set rather than treating the
-    # presence of ``image_list`` as a reason to hide them.
+    # Keep local disc/playlist frames visible alongside hosted images.
     if _string(meta_data.get("is_disc")):
         staged_names = {str(name) for name in [*replacements.values(), *(_string(value.get("file")) for value in additions if isinstance(value, dict))]}
         for local in list_screenshots(temp_dir, meta_data):
@@ -171,6 +154,7 @@ def delete_screenshot(temp_dir: Path, meta_data: Mapping[str, object], screensho
             addition_file = temp_dir / "screenshots" / filename
             if addition_file.is_file():
                 addition_file.unlink()
+            forget_file(temp_dir.parent.parent, temp_dir.name, addition_file)
             for key in ("replacement_times", "generations"):
                 values = review.get(key)
                 if isinstance(values, dict):
@@ -187,24 +171,12 @@ def delete_screenshot(temp_dir: Path, meta_data: Mapping[str, object], screensho
         items = list_screenshots(temp_dir, meta_data)
         target = _find_item(items, screenshot_id)
         target.path.unlink()
-
-        # Disc screenshot names are consumed by playlist/disc globbing.  Do
-        # not renumber those files: a single counter is not meaningful across
-        # multiple discs or playlists.  Normal video captures retain their
-        # compact sequence behaviour.
-        if not _string(meta_data.get("is_disc")):
-            for item in items:
-                if item.index <= target.index:
-                    continue
-                replacement = item.path.with_name(f"{item.path.stem.rsplit('-', 1)[0]}-{item.index - 1}.png")
-                item.path.replace(replacement)
+        forget_file(temp_dir.parent.parent, temp_dir.name, target.path)
 
         remaining = list_screenshots(temp_dir, meta_data)
         review = _load_review(temp_dir)
-        if _string(meta_data.get("is_disc")):
-            review["disc_target_count"] = len(remaining)
-        else:
-            review["target_count"] = len(remaining)
+        if target.group == "main":
+            review["target_count"] = len(manifest_files(temp_dir.parent.parent, temp_dir.name, "main"))
         _save_review(temp_dir, review)
         return remaining
 
@@ -216,6 +188,10 @@ async def add_screenshot(temp_dir: Path, meta_data: Mapping[str, object], group:
             captured = await _capture_disc_review_frame(temp_dir, meta_data, group=group)
             remote_images = _remote_images(meta_data)
             if not remote_images:
+                if group == "main":
+                    review = _load_review(temp_dir)
+                    review["target_count"] = len(manifest_files(temp_dir.parent.parent, temp_dir.name, "main"))
+                    _save_review(temp_dir, review)
                 return captured
             review = _load_review(temp_dir)
             additions = review.get("remote_additions") if isinstance(review.get("remote_additions"), list) else []
@@ -235,15 +211,15 @@ async def add_screenshot(temp_dir: Path, meta_data: Mapping[str, object], group:
             review["remote_additions"] = additions
             _record_capture(temp_dir, item_id, len(_remote_images(meta_data)) + len(additions), timestamp, review)
             return target
-        items = list_screenshots(temp_dir, meta_data)
+        items = [item for item in list_screenshots(temp_dir, meta_data) if item.group == "main"]
         if not items:
             raise FileNotFoundError("Capture the initial screenshots before adding another one")
-        last = items[-1]
-        index = last.index + 1
-        prefix = last.path.stem.rsplit("-", 1)[0]
-        target_path = last.path.with_name(f"{prefix}-{index}.png")
+        index = max(item.index for item in items) + 1
+        target_path = temp_dir / "screenshots" / f"review-{uuid.uuid4().hex}.png"
         target = ReviewedScreenshot(id=_local_id(temp_dir, target_path), path=target_path, index=index)
         timestamp = await _capture_fresh_frame(temp_dir, meta_data, target)
+        registered = register_screenshots(temp_dir.parent.parent, temp_dir.name, [target_path], "main", timestamps={str(target_path): timestamp})
+        target = ReviewedScreenshot(id=_local_id(temp_dir, registered[0]), path=registered[0], index=index)
         _record_capture(temp_dir, target.id, len(items) + 1, timestamp)
         return target
 
@@ -304,6 +280,7 @@ def undo_remote_replacement(temp_dir: Path, screenshot_id: str) -> None:
         replacement_file = temp_dir / "screenshots" / filename
         if replacement_file.is_file():
             replacement_file.unlink()
+        forget_file(temp_dir.parent.parent, temp_dir.name, replacement_file)
         if replacements:
             review["remote_replacements"] = replacements
         else:
@@ -360,12 +337,7 @@ def _find_item(items: list[ReviewedScreenshot], screenshot_id: str) -> ReviewedS
 
 
 async def _capture_disc_review_frame(temp_dir: Path, meta_data: Mapping[str, object], replace_path: Path | None = None, group: str = "main") -> ReviewedScreenshot:
-    """Capture one BDMV frame through the disc pipeline and publish atomically.
-
-    Menu images are never considered because their directory is separate.  A
-    temporary legacy-compatible prefix lets the established BDMV capture code
-    select the correct playlist/stream, HDR handling, and keyframe behaviour.
-    """
+    """Capture one BDMV frame through the disc pipeline and publish atomically."""
     meta = Meta(dict(meta_data))
     bdinfo = _disc_bdinfo_for_group(meta, group)
     if meta.is_disc != "BDMV" or not isinstance(bdinfo, dict):
@@ -381,9 +353,9 @@ async def _capture_disc_review_frame(temp_dir: Path, meta_data: Mapping[str, obj
         source.replace(staged)
         staged.replace(replace_path)
         forget_file(meta.base_dir, meta.uuid, source)
-        return ReviewedScreenshot(_local_id(temp_dir, replace_path), replace_path, 0)
+        return ReviewedScreenshot(_local_id(temp_dir, replace_path), replace_path, 0, group=group)
     index = max((item.index for item in list_screenshots(temp_dir, meta_data)), default=-1) + 1
-    return ReviewedScreenshot(_local_id(temp_dir, source), source, index)
+    return ReviewedScreenshot(_local_id(temp_dir, source), source, index, group=group)
 
 
 def _disc_bdinfo_for_group(meta: Meta, group: str) -> dict[str, Any] | None:

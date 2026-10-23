@@ -7,6 +7,7 @@ import pytest
 from PIL import Image
 
 from src.meta import Meta
+from src.screenshot_manifest import register
 from src.trackers.GAZELLE.bjshare import BJShare
 
 
@@ -66,6 +67,11 @@ def test_bjshare_finds_local_jpeg_screenshot(tmp_path) -> None:
 
     screenshot = screenshots_dir(tmp_path, "fictional-release") / "page-01.jpg"
     screenshot.write_bytes(_jpeg_bytes())
+    screenshot = register(tmp_path, "fictional-release", [screenshot], "main")[0]
+    (screenshot.parent / "stray.jpg").write_bytes(_jpeg_bytes())
+    extra = screenshot.parent / "extra.jpg"
+    extra.write_bytes(_jpeg_bytes())
+    register(tmp_path, "fictional-release", [extra], "FILE_1")
     tracker = object.__new__(BJShare)
     uploaded: list[str] = []
 
@@ -77,7 +83,7 @@ def test_bjshare_finds_local_jpeg_screenshot(tmp_path) -> None:
     result = asyncio.run(tracker.get_screenshots(Meta(base_dir=str(tmp_path), uuid="fictional-release")))
 
     assert result == ["https://images.example/page-01.jpg"]  # noqa: S101
-    assert uploaded == ["page-01.jpg"]  # noqa: S101
+    assert uploaded == [screenshot.name]  # noqa: S101
 
 
 def _jpeg_bytes() -> bytes:
