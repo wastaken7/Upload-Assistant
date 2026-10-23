@@ -2,9 +2,7 @@
 import re
 from contextlib import suppress
 from pathlib import Path
-from typing import Any, ClassVar, cast
-
-import httpx
+from typing import Any, ClassVar
 
 from src.console import logger
 from src.get_desc import DescriptionBuilder
@@ -13,11 +11,11 @@ from src.meta import Meta
 from src.music.models import MusicRelease
 from src.music.validation import MusicValidator, ValidationLevel
 from src.tmdb import TmdbManager
-from src.trackers.naming import add_incomplete_pack_marker
+from src.trackers.naming import TmdbTvNaming, add_incomplete_pack_marker
 from src.trackers.UNIT3D import UNIT3D
 
 
-class DarkPeers(UNIT3D):
+class DarkPeers(TmdbTvNaming, UNIT3D):
     """
     Darkpeers is a Private Torrent Tracker for MOVIES / TV / GENERAL
     """
@@ -90,10 +88,12 @@ class DarkPeers(UNIT3D):
         "VXT",
         "WAF",
         "WKS",
+        "XDMovies",
         "X0r",
         "YIFY",
         "YTS",
     )
+    banned_url = f"{base_url}/api/banned-groups"
     id_url = f"{base_url}/api/torrents/"
     upload_url = f"{base_url}/api/torrents/upload"
     requests_url = f"{base_url}/api/requests/filter"
@@ -255,8 +255,8 @@ class DarkPeers(UNIT3D):
         accepted = self._accepted_languages()
         valid = bool(audio & accepted) or (bool(original) and original in audio and bool(subtitles & accepted))
         if not valid:
-            logger.info(f"{self.tracker}: [bold red]requires English/Nordic audio, or original audio with English/Nordic subtitles. Skipping upload.")
-        return valid
+            return self._reject("requires English/Nordic audio, or original audio with English/Nordic subtitles.")
+        return True
 
     async def validate_video_resolution(self, meta: Meta) -> bool:
         resolution = str(meta.resolution or "")
@@ -265,6 +265,9 @@ class DarkPeers(UNIT3D):
             return True
         if resolution == "360p":
             return self._reject("only permits 360p when no official higher-resolution release exists.")
+        # Odd resolutions like 540p go up as Other. 1440p maps to 1080p, so it's still rejected.
+        if resolution and resolution.upper() != "OTHER" and (await self.get_resolution_id(meta))["resolution_id"] == "10":
+            return True
         logger.info(f"{self.tracker}: [bold red]does not support {resolution or 'an unknown'} video resolution. Skipping upload.")
         return False
 
@@ -430,9 +433,8 @@ class DarkPeers(UNIT3D):
         if meta.category == "BOOK":
             return {"name": self._book_name(meta)}
 
-        # DP prohibits retags.  When the preparation stage identified a scene
-        # release, submit its recorded release name rather than rebuilding it.
-        dp_name = str(meta.name or "")
+        # Movies and TV follow the naming guide even for scene releases.
+        dp_name = str(meta.name or "") if meta.category in {"MOVIE", "TV"} else str(meta.scene_name or meta.name or "")
 
         if meta.category == "TV":
             dp_name = await self._tv_name(meta, dp_name)
@@ -444,45 +446,15 @@ class DarkPeers(UNIT3D):
         return {"name": add_incomplete_pack_marker(dp_name, meta, self.tracker)}
 
     async def _tv_name(self, meta: Meta, name: str) -> str:
+        rebuilt = await self._rebuild_tv_name(meta, name)
+        if rebuilt is not None:
+            return rebuilt
+
         title = str(meta.title or "").strip()
         year = str(meta.year or "").strip()
         if year and not await self._tv_title_needs_year(meta):
             name = re.sub(rf"^({re.escape(title)})\s+{re.escape(year)}(?=\s|$)", r"\1", name, count=1, flags=re.IGNORECASE)
         return " ".join(name.split())
-
-    async def _tv_title_needs_year(self, meta: Meta) -> bool:
-        title = str(meta.title or "").strip()
-        api_key = str(self.config.get("DEFAULT", {}).get("tmdb_api", "")).strip()
-        if not title or not api_key:
-            return False
-        try:
-            logger.info(f"{self.tracker}: Checking if TMDb has multiple shows with the title '{title}'...")
-            async with httpx.AsyncClient() as client:
-                response = await client.get(
-                    "https://api.themoviedb.org/3/search/tv",
-                    params={"api_key": api_key, "query": title, "language": "en-US", "include_adult": "true"},
-                )
-                response.raise_for_status()
-                payload_raw: Any = response.json()
-        except httpx.HTTPError, ValueError, TypeError:
-            return False
-
-        title_key = " ".join(title.casefold().split())
-        current_id = str(meta.tmdb_id or "")
-        payload = cast(dict[str, Any], payload_raw) if isinstance(payload_raw, dict) else {}
-        results_raw: Any = payload.get("results", [])
-        results = cast(list[Any], results_raw) if isinstance(results_raw, list) else []
-        matching_ids: set[str] = set()
-        for result_raw in results:
-            if not isinstance(result_raw, dict):
-                continue
-            result = cast(dict[str, Any], result_raw)
-            result_id = str(result.get("id", ""))
-            names = (result.get("name"), result.get("original_name"))
-            if any(" ".join(str(candidate or "").casefold().split()) == title_key for candidate in names):
-                matching_ids.add(result_id)
-        matching_ids.discard("")
-        return bool(matching_ids - {current_id}) if current_id else len(matching_ids) > 1
 
     @classmethod
     def _release_field(cls, release: dict[str, Any], name: str, default: Any = "") -> Any:

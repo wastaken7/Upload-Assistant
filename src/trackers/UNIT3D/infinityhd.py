@@ -7,12 +7,13 @@ from src.console import logger
 from src.languages import languages_manager
 from src.meta import Meta
 from src.trackers.common import Common
+from src.trackers.naming import TmdbTvNaming
 from src.trackers.UNIT3D import UNIT3D
 
 Config = dict[str, Any]
 
 
-class InfinityHD(UNIT3D):
+class InfinityHD(TmdbTvNaming, UNIT3D):
     """
     INFINITYHD is a Private Torrent Tracker for MOVIES / TV / ANIME
     """
@@ -151,6 +152,7 @@ class InfinityHD(UNIT3D):
         "Zero00",
         "Zeus",
     )
+    banned_url = f"{base_url}/api/banned-groups"
     id_url = f"{base_url}/api/torrents/"
     upload_url = f"{base_url}/api/torrents/upload"
     search_url = f"{base_url}/api/torrents/filter"
@@ -264,6 +266,9 @@ class InfinityHD(UNIT3D):
     async def get_name(self, meta: Meta) -> dict[str, str]:
         ihd_name = meta.name
         resolution = meta.resolution
+
+        if meta.category == "TV":
+            ihd_name = await self._rebuild_tv_name(meta, ihd_name) or " ".join(ihd_name.split())
 
         if not meta.language_checked:
             await languages_manager.process_desc_language(meta, tracker=self.tracker)
