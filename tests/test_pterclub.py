@@ -1,6 +1,11 @@
 import asyncio
+from unittest.mock import AsyncMock, Mock
+
+import httpx
 
 from src.meta import Meta
+from src.screenshot_manifest import register
+from src.temp_paths import screenshots_dir
 from src.trackers.NEXUSPHP.pterclub import PTerClub
 
 
@@ -101,3 +106,32 @@ def test_description_uses_full_size_screenshot_url(tmp_path, monkeypatch):
     description = (work_dir / "[PTERCLUB]DESCRIPTION.txt").read_text(encoding="utf-8")
     assert "[img]https://images.example/full.png[/img]" in description  # noqa: S101
     assert "thumbnail.png" not in description  # noqa: S101
+
+
+def test_rehosting_uploads_registered_main_screenshots(tmp_path, monkeypatch):
+    meta = Meta(base_dir=str(tmp_path), uuid="test", filename="Example.Show")
+    directory = screenshots_dir(tmp_path, meta.uuid)
+    screenshot = directory / f"{meta.filename}-1.png"
+    screenshot.write_bytes(b"png")
+    screenshot = register(tmp_path, meta.uuid, [screenshot], "main")[0]
+    extra = directory / "extra.png"
+    extra.write_bytes(b"extra")
+    register(tmp_path, meta.uuid, [extra], "FILE_1")
+
+    cookie_file = tmp_path / "cookies.txt"
+    cookie_file.touch()
+    client = AsyncMock()
+    client.__aenter__.return_value = client
+    client.post.return_value = httpx.Response(200, json={"image": {"url": "https://images.example/screen.png"}})
+    pterclub = tracker()
+    monkeypatch.setattr(pterclub, "get_auth_token", AsyncMock(return_value="token"))
+    monkeypatch.setattr(pterclub.cookie_validator, "_load_cookies_dict_secure", Mock(return_value={}))
+    monkeypatch.setattr("src.cookie_auth.find_cookie_file", lambda *_args: str(cookie_file))
+    monkeypatch.setattr("src.trackers.NEXUSPHP.pterclub.httpx.AsyncClient", lambda **_kwargs: client)
+    monkeypatch.setattr("src.trackers.NEXUSPHP.pterclub.record_event_async", AsyncMock())
+
+    images = asyncio.run(pterclub.pterimg_upload(meta))
+
+    assert images == [{"web_url": "https://images.example/screen.png", "img_url": "https://images.example/screen.png"}]  # noqa: S101
+    client.post.assert_awaited_once()
+    assert client.post.await_args.kwargs["files"] == {"source": (screenshot.name, b"png")}  # noqa: S101

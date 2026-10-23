@@ -25,8 +25,8 @@ from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder
 from src.languages import languages_manager
 from src.meta import Meta
+from src.screenshot_manifest import files as manifest_files
 from src.stats import record_event_async
-from src.temp_paths import screenshots_dir
 from src.tmdb import TmdbManager
 from src.trackers.common import Common
 
@@ -1248,9 +1248,8 @@ class BJShare:
         return None
 
     async def get_screenshots(self, meta: Meta) -> list[str]:
-        screens_dir = screenshots_dir(meta.base_dir, meta.uuid)
         supported_suffixes = {".pjp", ".jfif", ".jpe", ".pjpeg", ".jpeg", ".jpg", ".png", ".gif", ".webp"}
-        local_files = sorted(path for path in screens_dir.iterdir() if path.is_file() and path.suffix.casefold() in supported_suffixes)
+        local_files = [path for path in manifest_files(meta.base_dir, meta.uuid, "main") if path.suffix.casefold() in supported_suffixes]
 
         disc_menu_links = [img.get("raw_url") for img in meta.menu_images if img.get("raw_url")][:3]
 

@@ -1169,8 +1169,6 @@ def book_screens(meta: Meta, min_successful_uploads: int) -> tuple[int, int]:
         requires more images than actually exist.
     """
     screenshot_files = manifest_files(meta.base_dir, meta.uuid, "main")
-    if not screenshot_files:
-        screenshot_files = [path for path in screenshots_dir(meta.base_dir, meta.uuid).iterdir() if path.is_file() and path.suffix.casefold() in {".jpg", ".jpeg", ".png"}]
     actual_screens = len(screenshot_files)
     capped_min = min(min_successful_uploads, actual_screens)
     return actual_screens, capped_min

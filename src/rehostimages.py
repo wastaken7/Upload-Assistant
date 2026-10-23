@@ -1,6 +1,5 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
-import glob
 import json
 import re
 from collections.abc import Iterable, Mapping
@@ -11,7 +10,6 @@ from urllib.parse import urlparse
 
 import aiofiles
 import httpx
-from aiofiles import os as aio_os
 
 from src.artwork import is_public_http_url, is_valid_image_bytes
 from src.console import logger
@@ -196,7 +194,6 @@ class RehostImagesManager:
         url_host_mapping: dict[str, str],
         approved_image_hosts: list[str] | None = None,
         img_host_index: int = 1,
-        file: str | None = None,
     ) -> tuple[list[dict[str, str]], bool, bool]:
         return await _handle_image_upload(
             meta,
@@ -204,7 +201,6 @@ class RehostImagesManager:
             url_host_mapping,
             approved_image_hosts=approved_image_hosts,
             img_host_index=img_host_index,
-            file=file,
             default_config=self.default_config,
             takescreens_manager=self.takescreens_manager,
             uploadscreens_manager=self.uploadscreens_manager,
@@ -602,7 +598,6 @@ async def _handle_image_upload(
     url_host_mapping: dict[str, str],
     approved_image_hosts: list[str] | None = None,
     img_host_index: int = 1,
-    file: str | None = None,
     default_config: Mapping[str, Any] | None = None,
     takescreens_manager: TakeScreensManager | None = None,
     uploadscreens_manager: UploadScreensManager | None = None,
@@ -620,12 +615,6 @@ async def _handle_image_upload(
     original_imghost = meta.imghost
     retry_mode = False
     images_reuploaded = False
-    filelist: list[str] = []
-    filelist_value = meta.video
-    if isinstance(filelist_value, str):
-        filelist = [filelist_value]
-    elif isinstance(filelist_value, list):
-        filelist = [str(item) for item in filelist_value if item]
     filename = meta.title
     if meta.is_disc == "HDDVD":
         path = str(meta.discs[0].get("largest_evo", ""))
@@ -663,128 +652,13 @@ async def _handle_image_upload(
                         incompatible_basenames.add(basename)
                     break
 
-    screenshot_path = screenshots_dir(base_dir, folder_id)
-    logger.debug(f"[yellow]Searching for screenshots in {screenshot_path}...")
-    all_screenshots: list[str] = [str(path) for path in manifest_files(base_dir, folder_id, "main")]
-    allowed_suffixes = {".png", ".jpg", ".jpeg"} if meta.category == "BOOK" else {".png"}
-
-    # First check if there are any saved screenshots matching those in the image_list
-    if meta.image_list and isinstance(meta.image_list, list):
-        # BOOK screenshots can retain their original JPEG encoding.
-        all_png_files: list[str] = [str(screenshot_path / name) for name in await aio_os.listdir(screenshot_path) if Path(name).suffix.casefold() in allowed_suffixes]
-        if all_png_files and meta.debug:
-            logger.info(f"[cyan]Found {len(all_png_files)} PNG files in screenshots directory")
-
-        # Extract filenames from the image_list
-        image_filenames: list[str] = []
-        for image in cast(list[dict[str, str]], meta.image_list):
-            for url_key in ["raw_url", "img_url", "web_url"]:
-                url_value = _as_str(image.get(url_key))
-                if url_value:
-                    parsed_url = urlparse(url_value)
-                    filename_from_url = Path(parsed_url.path).name
-                    if filename_from_url and Path(filename_from_url).suffix.casefold() in allowed_suffixes:
-                        image_filenames.append(filename_from_url)
-                        break
-
-        if image_filenames and meta.debug:
-            logger.info(f"[cyan]Extracted {len(image_filenames)} filenames from image_list URLs: {image_filenames}")
-
-        # Check if any of the extracted filenames match the actual files in the directory
-        if all_png_files and image_filenames:
-            for png_file in all_png_files:
-                basename = Path(png_file).name
-                if basename in image_filenames:
-                    # Found a match for this filename
-                    all_screenshots.append(png_file)
-                    logger.debug(f"[green]Found existing screenshot matching URL: {basename}")
-
-        # Also check for any screenshots that match the title pattern as a fallback
-        if filename and len(all_screenshots) < multi_screens:
-            sanitized_title = await sanitize_filename(filename)
-            title_pattern_files = [f for f in all_png_files if Path(f).name.startswith(sanitized_title)]
-            logger.debug(f"[yellow]Searching for screenshots with title: {sanitized_title}")
-            if title_pattern_files:
-                # Only add title pattern files that aren't already in all_screenshots
-                for file in title_pattern_files:
-                    if file not in all_screenshots:
-                        all_screenshots.append(file)
-
-                logger.debug(f"[green]Found {len(title_pattern_files)} screenshots matching title pattern")
-
-    # If we haven't found enough screenshots yet, search for files in the normal way
-    if len(all_screenshots) < multi_screens:
-        for _file in filelist:
-            sanitized_title = await sanitize_filename(filename)
-            filename_pattern = f"{glob.escape(sanitized_title)}*"
-            logger.debug(f"[yellow]Searching for screenshots with pattern: {filename_pattern}")
-
-            if meta.is_disc == "DVD":
-                existing_screens = await asyncio.to_thread(
-                    lambda: [str(p) for p in screenshots_dir(meta.base_dir, meta.uuid).glob(f"{glob.escape(meta.discs[0]['name'])}-*.png")]
-                )
-            else:
-                existing_screens = await asyncio.to_thread(lambda fp=filename_pattern: [str(p) for p in screenshot_path.glob(fp) if p.suffix.casefold() in allowed_suffixes])
-
-            # Add any new screenshots to our list
-            for screen in existing_screens:
-                if screen not in all_screenshots:
-                    all_screenshots.append(screen)
-
-    # Fallback: glob for indexed screenshots if still not enough
-    if len(all_screenshots) < multi_screens:
-        suffixes = ("png", "jpg", "jpeg") if meta.category == "BOOK" else ("png",)
-        image_patterns = [pattern for suffix in suffixes for pattern in (f"*.{suffix}", f".[!.]*.{suffix}")]
-        image_glob: list[str] = []
-        for pattern in image_patterns:
-            glob_results = await asyncio.to_thread(lambda p=pattern: [str(path) for path in screenshot_path.glob(p)])
-            image_glob.extend(glob_results)
-            logger.debug(f"[cyan]Found {len(image_glob)} files matching pattern: {pattern}")
-
-        unwanted_patterns = ["FILE*", "PLAYLIST*"]
-        unwanted_files: set[str] = set()
-        for pattern in unwanted_patterns:
-            glob_results = await asyncio.to_thread(lambda p=pattern: [str(path) for path in screenshot_path.glob(p)])
-            unwanted_files.update(glob_results)
-            if pattern.startswith("FILE") or pattern.startswith("PLAYLIST") or pattern.startswith("POSTER"):
-                hidden_pattern = "." + pattern
-                hidden_glob_results = await asyncio.to_thread(lambda hp=hidden_pattern: [str(path) for path in screenshot_path.glob(hp)])
-                unwanted_files.update(hidden_glob_results)
-
-        # Remove unwanted files
-        image_glob = [file for file in image_glob if file not in unwanted_files]
-        image_glob = list(set(image_glob))
-        logger.debug(f"[cyan]Filtered out {len(unwanted_files)} unwanted files, remaining: {len(image_glob)}")
-
-        # Only keep files that match the indexed pattern: xxx-0.png, xxx-1.png, etc.
-        indexed_pattern = re.compile(r".*-\d+\.(?:png|jpe?g)$" if meta.category == "BOOK" else r".*-\d+\.png$", re.IGNORECASE)
-        indexed_files: list[str] = [file for file in image_glob if indexed_pattern.match(Path(file).name)]
-        logger.debug(f"[cyan]Found {len(indexed_files)} indexed files matching pattern")
-
-        # Add any new indexed screenshots to our list
-        for screen in indexed_files:
-            if screen not in all_screenshots:
-                all_screenshots.append(screen)
-                logger.debug(f"[green]Found indexed screenshot: {Path(screen).name}")
-
     if tracker == "covers":
-        all_screenshots = []
-        existing_screens = await asyncio.to_thread(lambda: [str(p) for p in artwork_dir(meta.base_dir, meta.uuid).glob("cover_*.jpg")])
-        for screen in existing_screens:
-            if screen not in all_screenshots:
-                all_screenshots.append(screen)
-
-    # Ensure we have unique screenshots
-    all_screenshots = list(set(all_screenshots))
-    if incompatible_basenames:
-        all_screenshots = [path for path in all_screenshots if Path(path).name not in incompatible_basenames]
-
-    if tracker == "covers":
+        all_screenshots = sorted(str(path) for path in artwork_dir(base_dir, folder_id).glob("cover_*.jpg") if path.name not in incompatible_basenames)
         multi_screens = len(all_screenshots)
+    else:
+        all_screenshots = [str(path) for path in manifest_files(base_dir, folder_id, "main") if path.name not in incompatible_basenames]
 
-    # If we still don't have enough screenshots, generate new ones
     if len(all_screenshots) < multi_screens:
-        # Calculate how many more screenshots we need
         needed_screenshots = multi_screens - len(all_screenshots)
 
         logger.debug(f"[yellow]Found {len(all_screenshots)} screenshots, need {needed_screenshots} more to reach {multi_screens} total.")
@@ -806,36 +680,20 @@ async def _handle_image_upload(
                 await takescreens_manager.dvd_screenshots(meta, disc_num=0, retry_cap=True)
             elif meta.category == "XXX":
                 await takescreens_manager.xxx_contact_sheets(meta.filelist or [], folder_id, base_dir, meta)
+            elif path:
+                await takescreens_manager.screenshots(
+                    path,
+                    filename,
+                    meta.uuid,
+                    base_dir,
+                    meta,
+                    needed_screenshots,
+                    True,
+                    "",
+                    capture_group="main",
+                )
             else:
-                if path:
-                    await takescreens_manager.screenshots(
-                        path,
-                        filename,
-                        meta.uuid,
-                        base_dir,
-                        meta,
-                        needed_screenshots,
-                        True,
-                        "",
-                        capture_group="main",
-                    )
-                else:
-                    logger.info("[red]No valid path available for screenshot generation.[/red]")
-
-            if meta.is_disc == "DVD":
-                new_screens = await asyncio.to_thread(lambda: [str(p) for p in screenshots_dir(meta.base_dir, meta.uuid).glob(f"{glob.escape(meta.discs[0]['name'])}-*.png")])
-            else:
-                new_screens = [str(path) for path in manifest_files(base_dir, folder_id, "main")]
-
-            # Add any new screenshots to our list (only those not already in all_screenshots)
-            if new_screens and meta.debug:
-                logger.info(f"[green]Found {len(new_screens)} new screenshots after generation")
-
-            for screen in new_screens:
-                if screen not in all_screenshots:
-                    all_screenshots.append(screen)
-                    logger.debug(f"[green]Added new screenshot: {Path(screen).name}")
-
+                logger.info("[red]No valid path available for screenshot generation.[/red]")
         except Exception as e:
             logger.error(f"[red]Error during screenshot capture: {e}")
             import traceback
@@ -846,40 +704,16 @@ async def _handle_image_upload(
             if policy_enabled and ("overlay" in blacklist or "overlay" in whitelist):
                 meta.frame_overlay = original_frame_overlay
             meta.force_tonemap = original_force_tonemap
+        all_screenshots = [str(path) for path in manifest_files(base_dir, folder_id, "main") if path.name not in incompatible_basenames]
 
     if not all_screenshots:
         logger.info("[red]No screenshots were generated or found. Please check the screenshot generation process.")
         return [], True, images_reuploaded
 
-    all_screenshots.sort()
-    existing_from_image_list: list[str] = []
-    other_screenshots: list[str] = []
-
-    # First separate the screenshots into two categories
-    image_list_entries = cast(list[dict[str, str]], meta.image_list)
-    for screenshot in all_screenshots:
-        basename = Path(screenshot).name
-        # Check if this is from the image_list we extracted earlier
-        if image_list_entries and any(Path(urlparse(_as_str(img.get("raw_url")) or "").path).name == basename for img in image_list_entries):
-            existing_from_image_list.append(screenshot)
-        else:
-            other_screenshots.append(screenshot)
-
-    # First take all existing screenshots from image_list
-    final_screenshots: list[str] = existing_from_image_list.copy()
-
-    # Then fill up to multi_screens with other screenshots
-    remaining_needed = multi_screens - len(final_screenshots)
-    if remaining_needed > 0 and other_screenshots:
-        final_screenshots.extend(other_screenshots[:remaining_needed])
-
-    # If we still don't have enough, just use whatever we have
-    if len(final_screenshots) < multi_screens and len(all_screenshots) >= multi_screens:
-        # Fill with any remaining screenshots not yet included
-        remaining: list[str] = [s for s in all_screenshots if s not in final_screenshots]
-        final_screenshots.extend(remaining[: multi_screens - len(final_screenshots)])
-
-    all_screenshots = all_screenshots if tracker == "covers" else final_screenshots[:multi_screens]
+    if tracker != "covers":
+        existing_basenames = {Path(urlparse(_as_str(image.get("raw_url")) or "").path).name for image in cast(list[dict[str, str]], meta.image_list)}
+        all_screenshots.sort(key=lambda screenshot: Path(screenshot).name not in existing_basenames)
+        all_screenshots = all_screenshots[:multi_screens]
 
     logger.debug(f"[green]Using {len(all_screenshots)} screenshots:")
     for i, screenshot in enumerate(all_screenshots):
@@ -953,7 +787,7 @@ async def _handle_image_upload(
             mapped_host = url_host_mapping.get(matched_host, matched_host)
             valid_hosts.append(mapped_host in approved_image_hosts)
         if uploaded_images and all(valid_hosts):
-            output_file = Path(meta.base_dir) / "tmp" / meta.uuid / "covers.json" if tracker == "covers" else screenshot_path / "reuploaded_images.json"
+            output_file = Path(meta.base_dir) / "tmp" / meta.uuid / "covers.json" if tracker == "covers" else screenshots_dir(base_dir, folder_id) / "reuploaded_images.json"
 
             existing_data: list[dict[str, str]] = []
             try:

@@ -5,7 +5,6 @@ import contextlib
 import gc
 import itertools
 import math
-import re
 import time
 from collections.abc import Awaitable, Callable, Sequence
 from pathlib import Path
@@ -909,61 +908,7 @@ async def _upload_screens(
         existing_images: list[ImageDict] = []
         existing_count = 0
     else:
-        registered_screens = manifest_files(meta.base_dir, meta.uuid, "main")
-        if registered_screens:
-            # Manifest entries are absolute paths and can live outside the
-            # process working directory on seedboxes.  Keep them absolute:
-            # every image-host adapter accepts a path, and this avoids a
-            # process-global ``cwd`` race between concurrent uploads.
-            image_glob = [str(path) for path in registered_screens]
-        else:
-            suffixes = ("png", "jpg", "jpeg") if meta.category == "BOOK" else ("png",)
-            image_patterns = [pattern for suffix in suffixes for pattern in (f"*.{suffix}", f".[!.]*.{suffix}")]
-            image_glob = []
-            for pattern in image_patterns:
-                glob_results = await asyncio.to_thread(lambda p=pattern: [str(path) for path in screenshot_path.glob(p)])
-                image_glob.extend(glob_results)
-
-            unwanted_patterns = ["FILE*", "PLAYLIST*", "POSTER*"]
-            unwanted_files: set[str] = set()
-            for pattern in unwanted_patterns:
-                glob_results = await asyncio.to_thread(lambda p=pattern: [str(path) for path in screenshot_path.glob(p)])
-                unwanted_files.update(glob_results)
-                if pattern.startswith("FILE") or pattern.startswith("PLAYLIST") or pattern.startswith("POSTER"):
-                    hidden_pattern = "." + pattern
-                    hidden_glob_results = await asyncio.to_thread(lambda hp=hidden_pattern: [str(path) for path in screenshot_path.glob(hp)])
-                    unwanted_files.update(hidden_glob_results)
-
-            image_glob = [file for file in image_glob if file not in unwanted_files]
-            image_glob = list(set(image_glob))
-
-        # Filter out menu screenshots from normal screenshot upload
-        menu_basenames = set()
-        if hasattr(meta, "menu_images") and meta.menu_images:
-            for img in meta.menu_images:
-                if isinstance(img, dict):
-                    local_path = img.get("local_file_path") or img.get("raw_url")
-                    if local_path:
-                        menu_basenames.add(Path(local_path).name)
-
-        def is_menu_screenshot(filename: str) -> bool:
-            """Return whether filename belongs to a DVD menu screenshot."""
-            if filename in menu_basenames:
-                return True
-            return "-VIDEO_TS-" in filename or "-VTS_" in filename
-
-        image_glob = [file for file in image_glob if not is_menu_screenshot(file)]
-
-        # Sort images by numeric suffix
-        def extract_numeric_suffix(filename: str) -> float:
-            """Return the numeric screenshot suffix for stable ordering."""
-            match = re.search(r"-(\d+)\.(?:png|jpe?g)$", filename, re.IGNORECASE)
-            return int(match.group(1)) if match else float("inf")
-
-        image_glob.sort(key=extract_numeric_suffix)
-
-        logger.debug(f"image globs (sorted): {image_glob}")
-
+        image_glob = [str(path) for path in manifest_files(meta.base_dir, meta.uuid, "main")]
         existing_images = [img for img in image_list if img.get("img_url") and img.get("web_url")]
         existing_count = len(existing_images)
 

@@ -123,7 +123,7 @@ def test_upload_screens_does_not_reupload_source_on_fallback(tmp_path: Path) -> 
         }
         shared_return_dict: dict[str, object] = {}
         with (
-            patch("src.uploadscreens.screenshots_dir", return_value=tmp_path),
+            patch("src.uploadscreens.manifest_files", return_value=[tmp_path / "image-1.png"]),
             patch("src.uploadscreens.upload_image_task", new=fake_upload),
         ):
             await _upload_screens(config, meta, 1, 1, 0, 1, [], shared_return_dict)
@@ -206,7 +206,7 @@ def test_upload_screens_preserves_partial_successes_across_fallback(tmp_path: Pa
         }
         shared_return_dict: dict[str, object] = {}
         with (
-            patch("src.uploadscreens.screenshots_dir", return_value=tmp_path),
+            patch("src.uploadscreens.manifest_files", return_value=[tmp_path / "image-1.png", tmp_path / "image-2.png"]),
             patch("src.uploadscreens.upload_image_task", new=fake_upload),
         ):
             image_list, uploaded_count = await _upload_screens(config, meta, 1, 1, 0, 2, [], shared_return_dict)
@@ -325,7 +325,7 @@ def test_upload_screens_manager_reports_webui_progress_across_fallback(tmp_path:
             "TRACKERS": {},
         }
         with (
-            patch("src.uploadscreens.screenshots_dir", return_value=tmp_path),
+            patch("src.uploadscreens.manifest_files", return_value=[tmp_path / "image-1.png", tmp_path / "image-2.png"]),
             patch("src.uploadscreens.upload_image_task", new=fake_upload),
             patch("src.uploadscreens.record_event_async", new=AsyncMock()),
         ):
@@ -366,7 +366,7 @@ def test_upload_screens_manager_fails_progress_card_on_partial_upload(tmp_path: 
         meta = Meta({"base_dir": str(tmp_path), "uuid": "test", "imghost": "imgbox"})
         config = {"DEFAULT": {"img_host_1": "imgbox", "image_upload_concurrency": 1, "image_upload_delay": 0}, "TRACKERS": {}}
         with (
-            patch("src.uploadscreens.screenshots_dir", return_value=tmp_path),
+            patch("src.uploadscreens.manifest_files", return_value=[tmp_path / "image-1.png", tmp_path / "image-2.png"]),
             patch("src.uploadscreens.upload_image_task", new=fake_upload),
             patch("src.uploadscreens.record_event_async", new=AsyncMock()),
         ):
