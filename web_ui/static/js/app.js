@@ -9491,7 +9491,7 @@ function AudionutsUAGUI() {
               <p className="ua-run-gui-eyebrow text-xs font-semibold uppercase tracking-wide">
                 {prompt?.answered ? "Answer sent" : "Your input is needed"}
               </p>
-              {context.tracker && (
+              {context.tracker && !checkMessages.length && (
                 <>
                   <span className="ua-run-gui-muted text-xs" aria-hidden="true">
                     ·
