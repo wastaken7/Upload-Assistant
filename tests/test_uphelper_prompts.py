@@ -88,11 +88,14 @@ async def test_dupe_check_keeps_each_result_list_with_its_prompt(monkeypatch: py
 
 @pytest.mark.asyncio
 async def test_bdinfo_comparison_prompt_uses_plain_text(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The comparison question names its tracker without terminal markup."""
     question: str | None = None
 
     async def prompt_yes_no(value: str, *, default: bool = False) -> bool:
+        """Capture the question and preserve its existing affirmative default."""
         nonlocal question
         question = value
+        assert default is True
         return False
 
     monkeypatch.setattr("src.uphelper.has_bdinfo_content", lambda _entry: True)
@@ -101,7 +104,7 @@ async def test_bdinfo_comparison_prompt_uses_plain_text(monkeypatch: pytest.Monk
 
     await helper.ask_bdinfo_comparison({}, [{}], "AITHER")
 
-    assert question == "Found BDInfo content in potential duplicates. Perform a comparison?"
+    assert question == "Found BDInfo content in potential duplicates on AITHER. Perform a comparison?"
     assert "\033" not in question
 
 

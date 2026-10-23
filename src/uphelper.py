@@ -704,7 +704,7 @@ class UploadHelper:
         if not possible:
             return
 
-        question = "Found BDInfo content in potential duplicates. Perform a comparison?"
+        question = f"Found BDInfo content in potential duplicates on {tracker_name}. Perform a comparison?"
         if await self.prompt_yes_no(question, default=True):
             warnings: list[str] = []
             results: list[str] = []

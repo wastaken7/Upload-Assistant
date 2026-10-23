@@ -133,6 +133,34 @@ async def test_slot_override_and_two_trump_questions_count_once_per_tracker(gui,
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("debug", [False, True])
+async def test_bdinfo_questions_name_their_tracker_and_keep_the_same_review_index(gui, monkeypatch, capsys, debug):
+    """BDInfo and upload follow-ups stay identifiable within one review per tracker."""
+    helper = helper_with_answers(monkeypatch)
+    monkeypatch.setattr("src.uphelper.has_bdinfo_content", lambda _entry: True)
+    with webui_events.dupe_review_scope(["FIRST", "SECOND"]):
+        for tracker in ("FIRST", "SECOND"):
+            await helper.dupe_check([{"name": "Existing disc release"}], Meta(category="MOVIE", name="Example", is_disc="BDMV", debug=debug), tracker)
+    output = events(capsys)
+    opened = [event for event in output if event["kind"] == "prompt" and event["action"] == "open"]
+    assert [event["question"] for event in opened] == [
+        "Found BDInfo content in potential duplicates on FIRST. Perform a comparison?",
+        "Upload to FIRST anyway?",
+        "Found BDInfo content in potential duplicates on SECOND. Perform a comparison?",
+        "Upload to SECOND anyway?",
+    ]
+    assert [event["context"]["tracker"] for event in opened] == ["FIRST", "FIRST", "SECOND", "SECOND"]
+    assert [event["default"] for event in opened] == [True, False, True, False]
+    started = []
+    for event in output:
+        if event["kind"] == "dupe_review":
+            started = event["started"]
+        elif event["kind"] == "prompt" and event["action"] == "open":
+            assert started.index(event["context"]["tracker"]) + 1 == (1 if event["context"]["tracker"] == "FIRST" else 2)
+    assert started == ["FIRST", "SECOND"]
+
+
+@pytest.mark.asyncio
 async def test_concurrent_batches_keep_their_review_lists_separate(gui, capsys):
     """Context propagation never mixes independent tracker batches."""
     async def batch(tracker):
