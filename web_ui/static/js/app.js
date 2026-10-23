@@ -9548,16 +9548,6 @@ function AudionutsUAGUI() {
               <p className="ua-run-gui-eyebrow text-xs font-semibold uppercase tracking-wide">
                 {prompt?.answered ? "Answer sent" : "Your input is needed"}
               </p>
-              {context.tracker && !checkMessages.length && (
-                <>
-                  <span className="ua-run-gui-muted text-xs" aria-hidden="true">
-                    ·
-                  </span>
-                  <span className="text-sm">
-                    {renderRunGuiTracker(context.tracker)}
-                  </span>
-                </>
-              )}
               {context.debug === true && (
                 <span
                   className="ua-run-gui-chip ml-auto rounded-md px-2 py-0.5 text-xs"
@@ -9878,6 +9868,16 @@ function AudionutsUAGUI() {
     return { tone: "muted", icon: "circle-minus", label: "No upload" };
   };
 
+  const renderRunGuiPersonalRelease = () => (
+    <span
+      className="ua-run-gui-chip inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium"
+      data-tone="info"
+    >
+      <LucideIcon name="flag" className="ua-run-gui-tone-icon h-3 w-3" />
+      Personal Release
+    </span>
+  );
+
   /** One queue item as a card: the release is the heading, trackers below it. */
   const renderRunGuiItemCard = (group, view) => {
     const outcome = runGuiItemOutcome(group, view);
@@ -9887,7 +9887,7 @@ function AudionutsUAGUI() {
         className="ua-run-gui-item rounded-md border"
         data-tone={outcome.tone}
       >
-        <header className="ua-run-gui-item-header flex min-w-0 items-center gap-2 px-3 py-2">
+        <header className="ua-run-gui-item-header flex min-w-0 flex-wrap items-center gap-2 px-3 py-2">
           <span className="ua-run-gui-item-index shrink-0 rounded px-1.5 text-xs font-semibold tabular-nums">
             {group.index}
           </span>
@@ -9897,6 +9897,7 @@ function AudionutsUAGUI() {
           >
             {group.name || `Item ${group.index}`}
           </h4>
+          {group.personalRelease && renderRunGuiPersonalRelease()}
           <span className="ua-run-gui-status inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-0.5 text-xs font-semibold">
             <LucideIcon
               name={outcome.icon}
@@ -10011,6 +10012,7 @@ function AudionutsUAGUI() {
       ? view.items.map((item) => ({
           index: item.index,
           name: item.name,
+          personalRelease: item.personalRelease,
           rows: view.trackers.filter((entry) => entry.item === item.index),
           notes: view.itemNotes[item.index] || emptyNotes,
         }))
@@ -10066,18 +10068,28 @@ function AudionutsUAGUI() {
         {/* The Terminal | GUI switch sits at the right of the stages bar. */}
         <div className="ua-run-gui-strip flex items-start gap-3 rounded-lg border px-3 py-2">
           <div className="min-w-0 flex-1">
-            {view.multipleItems && view.currentItem && (
-              <p className="ua-run-gui-muted mb-1.5 flex min-w-0 items-center gap-1.5 text-xs">
-                <LucideIcon
-                  name="file-stack"
-                  className="h-3.5 w-3.5 shrink-0"
-                />
-                <span className="shrink-0 font-semibold">
-                  Item {view.currentItem.index} of {view.currentItem.total}
-                </span>
-                <span className="truncate">{view.currentItem.name}</span>
-              </p>
-            )}
+            {view.currentItem &&
+              (view.multipleItems || view.currentItem.personalRelease) && (
+                <div className="ua-run-gui-muted mb-1.5 flex min-w-0 flex-wrap items-center gap-1.5 text-xs">
+                  {view.multipleItems && (
+                    <>
+                      <LucideIcon
+                        name="file-stack"
+                        className="h-3.5 w-3.5 shrink-0"
+                      />
+                      <span className="shrink-0 font-semibold">
+                        Item {view.currentItem.index} of{" "}
+                        {view.currentItem.total}
+                      </span>
+                    </>
+                  )}
+                  <span className="min-w-0 flex-1 truncate">
+                    {view.currentItem.name}
+                  </span>
+                  {view.currentItem.personalRelease &&
+                    renderRunGuiPersonalRelease()}
+                </div>
+              )}
             {renderRunGuiStages(view, waitingForUser)}
           </div>
           {toggleInStrip && renderOutputModeToggle(true)}

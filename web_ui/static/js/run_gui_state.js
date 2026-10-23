@@ -103,6 +103,7 @@
           index: data.index,
           total: Number.isInteger(data.total) ? data.total : 0,
           name: text(data.name),
+          personalRelease: data.personal_release === true,
         });
         items.sort((a, b) => a.index - b.index);
         return { ...state, items, currentItem: data.index };

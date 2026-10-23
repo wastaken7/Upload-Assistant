@@ -42,7 +42,7 @@ Statistics contain no per-release events, names, paths, release-group names or t
 
   | `kind`         | Fields                                                                                                                                              |
   | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-  | `item`         | `index`, `total`, `name` — a queue item started                                                                                                     |
+  | `item`         | `index`, `total`, `name`, optional `personal_release` — a queue item started or updated after metadata preparation                                  |
   | `stage`        | `key` (`prep`, `confirm`, `dupes`, `screens`, `torrent`, `upload`, `requests`), `status` (`start`, `done`, `skip`, `fail`)                          |
   | `notice`       | `level` (`error`, `warning`, `attention`), `text`, optional `tracker`, `key`                                                                        |
   | `notice_group` | `group`, `notices` — replaces the earlier notices of that group                                                                                     |

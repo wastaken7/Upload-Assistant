@@ -68,6 +68,48 @@ test("unknown stage keys and event kinds are ignored", () => {
   );
 });
 
+test("personal release flags survive completion and stay with their queue item", () => {
+  const state = run(
+    gui({ kind: "item", index: 1, total: 2, name: "Personal.mkv" }),
+    gui({
+      kind: "item",
+      index: 1,
+      total: 2,
+      name: "Personal.mkv",
+      personal_release: true,
+    }),
+    gui({ kind: "item", index: 2, total: 2, name: "Other.mkv" }),
+    { type: "exit", code: 0 },
+  );
+  const view = selectRunGuiView(state);
+  assert.equal(view.items.length, 2);
+  assert.equal(view.items[0].personalRelease, true);
+  assert.equal(view.currentItem.personalRelease, false);
+  assert.equal(view.finished, true);
+});
+
+test("a corrected release flag replaces the previous badge", () => {
+  const view = selectRunGuiView(
+    run(
+      gui({
+        kind: "item",
+        index: 1,
+        total: 1,
+        name: "Example",
+        personal_release: true,
+      }),
+      gui({
+        kind: "item",
+        index: 1,
+        total: 1,
+        name: "Example",
+        personal_release: false,
+      }),
+    ),
+  );
+  assert.equal(view.currentItem.personalRelease, false);
+});
+
 test("repeated notices are counted once, and keyed notices keep the latest text", () => {
   const state = run(
     gui({

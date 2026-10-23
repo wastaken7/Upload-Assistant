@@ -116,10 +116,19 @@ def _emit(kind: str, payload: Mapping[str, Any]) -> None:
 def begin_item(path: str, index: int, total: int) -> None:
     """Start a queue item; later events are tagged with its index."""
     global _current_item, _active_stage
-    _current_item = {"index": int(index), "total": int(total)}
+    _current_item = {"index": int(index), "total": int(total), "name": plain_text(Path(str(path)).name or path, 300)}
     _active_stage = None
     _started_stages.clear()
-    _emit("item", {"index": int(index), "total": int(total), "name": plain_text(Path(str(path)).name or path, 300)})
+    _emit("item", _current_item)
+
+
+def update_item(*, personal_release: bool) -> None:
+    """Update the current release's flags after metadata preparation."""
+    global _current_item
+    if not enabled() or _current_item is None:
+        return
+    _current_item = {**_current_item, "personal_release": bool(personal_release)}
+    _emit("item", _current_item)
 
 
 def stage(key: str, status: StageStatus) -> None:

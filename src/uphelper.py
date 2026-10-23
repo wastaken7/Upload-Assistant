@@ -719,6 +719,7 @@ class UploadHelper:
                 logger.info("")
 
     async def get_confirmation(self, meta: Meta) -> bool:
+        webui_events.update_item(personal_release=meta.personalrelease is True)
         confirm: bool = False
         lines: list[str | tuple[str, str]] = []
         missing_warning = "[bold red]⚠️ Missing[/bold red]"
