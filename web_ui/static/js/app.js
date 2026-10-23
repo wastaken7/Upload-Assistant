@@ -9548,22 +9548,32 @@ function AudionutsUAGUI() {
               <p className="ua-run-gui-eyebrow text-xs font-semibold uppercase tracking-wide">
                 {prompt?.answered ? "Answer sent" : "Your input is needed"}
               </p>
-              {context.tracker && !checkMessages.length && (
-                <>
-                  <span className="ua-run-gui-muted text-xs" aria-hidden="true">
-                    ·
-                  </span>
-                  <span className="text-sm">
-                    {renderRunGuiTracker(context.tracker)}
-                  </span>
-                </>
-              )}
               {context.debug === true && (
                 <span
                   className="ua-run-gui-chip ml-auto rounded-md px-2 py-0.5 text-xs"
                   data-tone="info"
                 >
                   Debug: nothing will be uploaded
+                </span>
+              )}
+              {view.dupeReview && (
+                <span
+                  className="ua-run-gui-muted ml-auto text-right text-xs"
+                  role="status"
+                  title={
+                    view.dupeReview.checking
+                      ? "More trackers are still being checked; the total may increase."
+                      : undefined
+                  }
+                >
+                  <span className="block whitespace-nowrap font-semibold">
+                    Tracker review {view.dupeReview.index} of{" "}
+                    {view.dupeReview.total}
+                    {view.dupeReview.checking ? "+" : ""}
+                  </span>
+                  {view.dupeReview.checking > 0 && (
+                    <span className="block">Still checking trackers…</span>
+                  )}
                 </span>
               )}
             </div>

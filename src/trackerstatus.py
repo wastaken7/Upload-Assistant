@@ -359,8 +359,16 @@ class TrackerStatusManager:
         searching_trackers: list[str] = [name for name in meta.trackers if name in tracker_class_map]
         if searching_trackers:
             logger.info("[yellow]Searching for existing torrents on selected trackers...")
-        tasks = [process_single_tracker(tracker_name, meta) for tracker_name in meta.trackers]
-        results = await asyncio.gather(*tasks)
+
+        async def check_tracker(tracker_name: str) -> tuple[str, dict[str, Any], str | None, Any]:
+            """Finish discovery even when a tracker exits before duplicate review."""
+            try:
+                return await process_single_tracker(tracker_name, meta)
+            finally:
+                webui_events.dupe_review_ready(tracker_name, finished=True)
+
+        with webui_events.dupe_review_scope(meta.trackers):
+            results = await asyncio.gather(*(check_tracker(tracker_name) for tracker_name in meta.trackers))
 
         # Collect passed trackers and skip reasons
         passed_trackers: list[tuple[str, str | None, Any]] = []

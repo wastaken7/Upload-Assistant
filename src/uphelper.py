@@ -290,6 +290,17 @@ class UploadHelper:
 
     async def dupe_check(self, dupes: list[DupeEntry | str], meta: Meta, tracker_name: str, slot_decision: SlotDecision | None = None) -> tuple[bool, Meta]:
         """Show duplicate results and their confirmation as one atomic console interaction."""
+        if webui_events.enabled() and not meta.season_pack_exists:
+            # Register queued reviews before waiting for another tracker's prompt.
+            # Season-pack handling can skip automatically; count those only if a
+            # prompt actually opens, so an automatic skip never inflates the total.
+            interactive = (not meta.unattended or meta.unattended_confirm) and not meta.ask_dupe
+            needs_review = bool(dupes) and (meta.dupe is False or (meta.filename_match and meta.file_count_match))
+            if not dupes and slot_decision is not None:
+                needs_review = meta.dupe is False and (
+                    slot_decision.verdict is Verdict.BLOCK or (slot_decision.verdict is Verdict.REVIEW and bool(slot_decision.conflicts))
+                )
+            webui_events.dupe_review_ready(tracker_name, needs_review=bool(interactive and needs_review))
         async with self._prompt_lock:
             token = _dupe_prompt_lock_held.set(True)
             try:
