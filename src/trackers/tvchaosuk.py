@@ -14,6 +14,7 @@ import httpx
 import requests
 import tmdbsimple as tmdb
 
+from src import webui_events
 from src.bbcode import BBCODE
 from src.cogs.redaction import Redaction
 from src.console import logger
@@ -573,7 +574,15 @@ class TVChaosUK:
         if meta.unattended is False:
             upload_to_tvc = cli_ui.ask_yes_no(f"Upload to {self.tracker} with the name {tvc_name}?", default=False)
             if not upload_to_tvc:
-                tvc_name = cli_ui.ask_string("Please enter New Name:") or tvc_name
+                with webui_events.field_prompt(
+                    f"{self.tracker} name",
+                    {"Current name": tvc_name},
+                    focus="Current name",
+                    hint="The name to upload with. Leaving it blank keeps the current name.",
+                    actions=[("", "Keep the current name")],
+                    placeholder=tvc_name,
+                ):
+                    tvc_name = cli_ui.ask_string("Please enter New Name:") or tvc_name
                 upload_to_tvc = cli_ui.ask_yes_no(f"Upload to {self.tracker} with the name {tvc_name}?", default=False)
 
         data: dict[str, str | int] = {

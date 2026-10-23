@@ -4508,6 +4508,17 @@ html[data-ua-shape="square"]
   background: var(--ua-upload-hover);
 }
 
+.ua-run-gui-choice[data-selected="true"] {
+  border-color: #16a34a;
+  background: color-mix(in srgb, #16a34a 14%, var(--ua-upload-surface));
+}
+
+/* The value a field prompt asks for, among the item's other values. */
+.ua-run-gui-field-row[data-focus="true"] {
+  background: color-mix(in srgb, var(--ua-run-gui-tone) 12%, transparent);
+  box-shadow: inset 3px 0 0 var(--ua-run-gui-tone);
+}
+
 .ua-run-gui-mode-overlay {
   border-radius: 0.6rem;
   box-shadow: 0 4px 14px rgb(0 0 0 / 0.28);

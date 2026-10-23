@@ -734,7 +734,7 @@ class PassThePopcorn:
             "English Softsubs Exist (Mislabeled)": None,
             "Hardcoded Subs (Non-English)": "OTHER",
         }
-        opts = cli_ui.select_choices("Please select any/all applicable options:", choices=list(trumpable_values.keys()))
+        opts = cli_ui.select_choices("Please select any/all applicable options:", choices=list(trumpable_values.keys())) or []
         trumpable_list: list[int] = []
         for opt in opts:
             v = trumpable_values.get(opt)
@@ -756,7 +756,14 @@ class PassThePopcorn:
                 trumpable_list.append(14)
             elif v == "OTHER":
                 trumpable_list.append(15)
-                hc_sub_langs = (cli_ui.ask_string("Enter language code for HC Subtitle languages") or "").strip()
+                with webui_events.field_prompt(
+                    "Hardcoded subtitles",
+                    {"Trumpable": ", ".join(opts)},
+                    hint="The language code of the burned-in subtitles. Leave it blank to skip.",
+                    actions=[("", "Skip")],
+                    placeholder="e.g. es",
+                ):
+                    hc_sub_langs = (cli_ui.ask_string("Enter language code for HC Subtitle languages") or "").strip()
                 if hc_sub_langs:
                     for lang, sub_id in self.sub_lang_map.items():
                         if any(hc_sub_langs == x for x in list(lang)) and sub_id not in sub_langs:

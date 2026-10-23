@@ -143,7 +143,9 @@
             context.kind === "confirm" ? { item, context } : state.lastConfirm,
           prompt: {
             id: data.id,
-            type: ["yes_no", "choice", "text"].includes(data.type)
+            type: ["yes_no", "choice", "multi_choice", "text"].includes(
+              data.type,
+            )
               ? data.type
               : "text",
             question: text(data.question),

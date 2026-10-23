@@ -9,6 +9,7 @@ from typing import Any, cast
 
 import cli_ui
 
+from src import webui_events
 from src.console import logger
 from src.meta import Meta
 from src.uploadscreens import UploadScreensManager
@@ -146,10 +147,24 @@ class ComparisonManager:
         comparison_index = self.meta.comparison_index
         if comparison_index is None:
             logger.info("[red]No comparison index provided. Please specify a comparison index matching the input file.")
+            # Groups are named as in the file names, zero padding included ("01"),
+            # so "1" and "01" stay separate groups.
+            group_keys = sorted((key for key in meta_comparisons if key.isdigit()), key=lambda key: (int(key), key))
+            group_buttons = [(key, f"{key}: {meta_comparisons[key].get('name') or ', '.join(meta_comparisons[key].get('files', []))}") for key in group_keys]
             while True:
-                cli_input = cli_ui.ask_string("Enter comparison index number: ") or ""
+                with webui_events.field_prompt(
+                    "Comparison",
+                    {f"Group {key}": ", ".join(meta_comparisons[key].get("files", [])) for key in group_keys},
+                    hint="The number of the comparison group that matches the file being uploaded.",
+                    actions=group_buttons,
+                    placeholder="Group number",
+                ):
+                    cli_input = cli_ui.ask_string("Enter comparison index number: ") or ""
                 try:
-                    comparison_index = str(int(cli_input.strip()))
+                    answer = cli_input.strip()
+                    number = int(answer)
+                    # An exact group name wins; a plain number also finds a padded one.
+                    comparison_index = answer if answer in meta_comparisons else next((key for key in group_keys if int(key) == number), str(number))
                     break
                 except Exception:
                     logger.info(f"[red]Invalid comparison index: {cli_input.strip()}")

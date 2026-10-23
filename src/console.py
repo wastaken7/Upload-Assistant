@@ -429,6 +429,7 @@ def install_gui_prompt_events() -> None:
     original_yes_no = cli_ui.ask_yes_no
     original_string = cli_ui.ask_string
     original_choice = cli_ui.ask_choice
+    original_select = cli_ui.select_choices
 
     def ask_yes_no(*question: Any, default: bool = False) -> bool:
         prompt_id = webui_events.prompt_open("yes_no", question_text(question), default=default)
@@ -455,9 +456,20 @@ def install_gui_prompt_events() -> None:
         finally:
             webui_events.prompt_close(prompt_id)
 
+    def select_choices(*prompt: Any, choices: list[Any], func_desc: Callable[[Any], str] | None = None, sort: bool | None = True) -> Any:
+        describe = func_desc or str
+        if sort:
+            choices.sort(key=describe)
+        prompt_id = webui_events.prompt_open("multi_choice", question_text(prompt), choices=[describe(choice) for choice in choices])
+        try:
+            return original_select(*prompt, choices=choices, func_desc=func_desc, sort=False)
+        finally:
+            webui_events.prompt_close(prompt_id)
+
     cli_ui.ask_yes_no = ask_yes_no
     cli_ui.ask_string = ask_string
     cli_ui.ask_choice = ask_choice
+    cli_ui.select_choices = select_choices
 
 
 if os.environ.get("UA_WEBUI_GUI_EVENTS") == "1":
