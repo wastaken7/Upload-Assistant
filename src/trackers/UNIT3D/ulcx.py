@@ -161,15 +161,31 @@ class ULCX(UNIT3D):
                             logger.info(f"{self.tracker}: [bold red]LPCM audio tracks are not allowed on non-disc uploads.[/bold red]")
                             return False
 
-                # Helper to get channel count
+                # Helper to get channel count (Channels_Original is "Object Based" on Atmos/DTS:X)
                 def get_channels(t: dict[str, Any]) -> int:
-                    c = t.get("Channels_Original") or t.get("Channels") or t.get("Channel(s)") or 0
-                    match = re.search(r"\d+", str(c))
-                    return int(match.group(0)) if match else 0
+                    for key in ("Channels_Original", "Channels", "Channel(s)"):
+                        match = re.search(r"\d+", str(t.get(key) or ""))
+                        if match:
+                            return int(match.group(0))
+                    return 0
+
+                # Helper to normalize the audio codec. MediaInfo reports TrueHD as "MLP FBA"
+                # and DTS-HD MA / DTS:X as "DTS" with the XLL extension.
+                def get_audio_codec(t: dict[str, Any]) -> str:
+                    fmt = str(t.get("Format") or "").upper()
+                    commercial = str(t.get("Format_Commercial_IfAny") or "").upper()
+                    if fmt.startswith("MLP") or fmt == "TRUEHD" or "TRUEHD" in commercial:
+                        return "TRUEHD"
+                    if fmt.startswith("DTS"):
+                        profile = str(t.get("Format_Profile") or "").upper()
+                        features = str(t.get("Format_AdditionalFeatures") or "").upper()
+                        if "XLL" in features or "MA" in profile.split(" / ") or "MASTER AUDIO" in commercial:
+                            return "DTS-HD MA"
+                    return fmt
 
                 # Helper to determine if audio format is lossless
-                def is_lossless_audio(fmt: str, profile: str) -> bool:
-                    return fmt in ("PCM", "LPCM", "TRUEHD", "FLAC") or (fmt.startswith("DTS") and "MA" in profile)
+                def is_lossless_audio(t: dict[str, Any]) -> bool:
+                    return get_audio_codec(t) in ("PCM", "LPCM", "TRUEHD", "FLAC", "DTS-HD MA")
 
                 # Section 6.9: FLAC mono/stereo only on non-disc
                 if not meta.is_disc:
@@ -182,10 +198,9 @@ class ULCX(UNIT3D):
                 # Section 4.2.1: Remux Audio Rules
                 if meta.type == "REMUX":
                     for a in audio_tracks:
-                        fmt = str(a.get("Format", "")).upper()
-                        profile = str(a.get("Format_Profile", "")).upper()
+                        fmt = get_audio_codec(a)
                         ch = get_channels(a)
-                        is_lossless = is_lossless_audio(fmt, profile)
+                        is_lossless = is_lossless_audio(a)
 
                         # 4.2.1.1: Lossless stereo must be FLAC 2.0
                         if is_lossless and ch == 2 and fmt != "FLAC":
@@ -208,17 +223,15 @@ class ULCX(UNIT3D):
                     height = meta.video_height or 0
                     if res in ("720p", "1080p", "1080i") or (height > 0 and height <= 1080):
                         for a in audio_tracks:
-                            fmt = str(a.get("Format", "")).upper()
-                            profile = str(a.get("Format_Profile", "")).upper()
-                            ch = get_channels(a)
-                            is_lossless = is_lossless_audio(fmt, profile)
-                            if is_lossless and ch > 2:
-                                logger.info(f"{self.tracker}: [bold red]Lossless multi-channel audio is not permitted on 1080p or lower encodes.[/bold red]")
+                            if is_lossless_audio(a) and get_channels(a) > 2:
+                                logger.info(
+                                    f"{self.tracker}: [bold red]Lossless multi-channel audio ({get_audio_codec(a)}) is not permitted on 1080p or lower encodes.[/bold red]"
+                                )
                                 return False
 
                 # Section 6.3: TrueHD compatibility track check
                 if not meta.is_disc:
-                    has_truehd = any(str(a.get("Format", "")).upper() == "TRUEHD" for a in audio_tracks)
+                    has_truehd = any(get_audio_codec(a) == "TRUEHD" for a in audio_tracks)
                     if has_truehd:
                         has_ac3 = any(str(a.get("Format", "")).upper() in ("AC-3", "AC3") for a in audio_tracks)
                         if not has_ac3:
