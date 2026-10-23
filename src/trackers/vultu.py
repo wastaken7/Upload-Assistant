@@ -118,9 +118,15 @@ class Vultu:
     async def get_mediainfo(self, meta: Meta) -> str:
         if str(meta.category).upper() == "GAME":
             return ""
+        tmp_dir = Path(meta.base_dir) / "tmp" / meta.uuid
         if meta.is_disc == "BDMV":
-            return await self.common.get_bdmv_mediainfo(meta)
-        mi_path = Path(meta.base_dir) / "tmp" / meta.uuid / "MEDIAINFO_CLEANPATH.txt"
+            # Vultu accepts BDInfo in the same field as MediaInfo.
+            bd_summary_path = tmp_dir / "BD_SUMMARY_00.txt"
+            if not bd_summary_path.is_file():
+                return await self.common.get_bdmv_mediainfo(meta)
+            async with aiofiles.open(bd_summary_path, encoding="utf-8") as bd_file:
+                return await bd_file.read()
+        mi_path = tmp_dir / "MEDIAINFO_CLEANPATH.txt"
         if not mi_path.is_file():
             return ""
         async with aiofiles.open(mi_path, encoding="utf-8") as mi_file:
