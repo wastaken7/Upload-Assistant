@@ -508,7 +508,8 @@ async def _prompt_book_meta(meta: Meta) -> None:
             prompt_label = "language" if field == "book_language" else ("cover artwork (path to image file or URL)" if field == "artwork" else field)
             if field == "book_language":
                 while True:
-                    value = (CLI_UI.ask_string("Enter language (leave blank to skip): ") or "").strip()
+                    with _book_field_prompt(meta, "Language", hint="A language name or code.", placeholder="e.g. English"):
+                        value = (CLI_UI.ask_string("Enter language (leave blank to skip): ") or "").strip()
                     if not value:
                         break
 
@@ -521,7 +522,8 @@ async def _prompt_book_meta(meta: Meta) -> None:
                     logger.info("[red]Invalid language. Please try again.[/red]")
             elif field == "year":
                 while True:
-                    value = (CLI_UI.ask_string("Enter year (leave blank to skip): ") or "").strip()
+                    with _book_field_prompt(meta, "Year", hint="A 4-digit year.", placeholder="e.g. 1999"):
+                        value = (CLI_UI.ask_string("Enter year (leave blank to skip): ") or "").strip()
                     if not value:
                         break
                     if value.isdigit() and len(value) == 4 and 1000 <= int(value) <= 3000:
@@ -532,7 +534,10 @@ async def _prompt_book_meta(meta: Meta) -> None:
                     logger.info("[red]Invalid year (must be a 4-digit number between 1000 and 3000). Please try again.[/red]")
             elif field == "artwork":
                 while True:
-                    value = (CLI_UI.ask_string("Enter path to cover artwork image (or public image URL) for BOOK: ") or "").strip()
+                    with _book_field_prompt(
+                        meta, "Artwork", hint="Artwork is required: a local image path or a public image URL.", placeholder="Image path or https:// URL", skip=False
+                    ):
+                        value = (CLI_UI.ask_string("Enter path to cover artwork image (or public image URL) for BOOK: ") or "").strip()
                     if not value:
                         logger.info("[red]Artwork is required for BOOK uploads. Please enter a valid file path or image URL.[/red]")
                         continue
@@ -550,7 +555,8 @@ async def _prompt_book_meta(meta: Meta) -> None:
                         break
                     logger.info("[red]Invalid artwork path or URL. The file does not exist or URL is invalid. Please try again.[/red]")
             else:
-                value = (CLI_UI.ask_string(f"Enter {prompt_label} (leave blank to skip): ") or "").strip()
+                with _book_field_prompt(meta, field.capitalize()):
+                    value = (CLI_UI.ask_string(f"Enter {prompt_label} (leave blank to skip): ") or "").strip()
                 if value:
                     meta[field] = value
                     name_needs_rebuild = True
@@ -597,7 +603,8 @@ async def _prompt_game_meta(meta: Meta) -> None:
             for field in game_missing:
                 if field == "year":
                     while True:
-                        value = (CLI_UI.ask_string("Enter year (leave blank to skip): ") or "").strip()
+                        with _game_field_prompt(meta, "Year", hint="A 4-digit year.", placeholder="e.g. 1999"):
+                            value = (CLI_UI.ask_string("Enter year (leave blank to skip): ") or "").strip()
                         if not value:
                             break
                         if value.isdigit() and len(value) == 4 and 1000 <= int(value) <= 3000:
@@ -607,14 +614,15 @@ async def _prompt_game_meta(meta: Meta) -> None:
                             break
                         logger.info("[red]Invalid year (must be a 4-digit number between 1000 and 3000). Please try again.[/red]")
                 elif field == "platform":
-                    try:
-                        value = CLI_UI.ask_choice(
-                            "Select target platform: (can be manually set with -plat / --platform)",
-                            choices=["pc", "mac", "linux", "ps5", "ps4", "ps3", "ps2", "xbox", "x360", "xone", "xsx", "switch", "3ds", "nds", "wiiu", "wii"],
-                            sort=False,
-                        )
-                    except EOFError:
-                        value = ""
+                    with _game_field_prompt(meta, "Platform", skip=False):
+                        try:
+                            value = CLI_UI.ask_choice(
+                                "Select target platform: (can be manually set with -plat / --platform)",
+                                choices=["pc", "mac", "linux", "ps5", "ps4", "ps3", "ps2", "xbox", "x360", "xone", "xsx", "switch", "3ds", "nds", "wiiu", "wii"],
+                                sort=False,
+                            )
+                        except EOFError:
+                            value = ""
 
                     if value:
                         meta[field] = value
@@ -627,12 +635,14 @@ async def _prompt_game_meta(meta: Meta) -> None:
                         "dlc (DLC only)": "dlc",
                         "update (Update only)": "update",
                     }
-                    choice = CLI_UI.ask_choice("Select game subcategory (can be manually set with -gsc / --game-subcategory):", choices=subcategory_choices, sort=False)
+                    with _game_field_prompt(meta, "Subcategory", skip=False):
+                        choice = CLI_UI.ask_choice("Select game subcategory (can be manually set with -gsc / --game-subcategory):", choices=subcategory_choices, sort=False)
                     meta.game_subcategory = subcategory_values.get(choice, "full_game")
                     name_needs_rebuild = True
 
                 else:
-                    value = (CLI_UI.ask_string(f"Enter {field} (leave blank to skip): ") or "").strip()
+                    with _game_field_prompt(meta, field.capitalize()):
+                        value = (CLI_UI.ask_string(f"Enter {field} (leave blank to skip): ") or "").strip()
                     if value:
                         meta[field] = value
                         name_needs_rebuild = True
@@ -928,6 +938,63 @@ async def _ensure_valid_book_artwork(meta: Meta) -> bool:
     return False
 
 
+_MUSIC_FIELD_LABELS = {
+    "artist": "Artist",
+    "album": "Album",
+    "year": "Year",
+    "edition": "Edition",
+    "edition_year": "Edition year",
+    "media": "Media",
+    "release_type": "Release type",
+    "cover_url": "Artwork",
+}
+
+
+def _music_field_prompt(meta: Meta, field: str, *, hint: str = "", placeholder: str = "", keep: bool = True) -> contextlib.AbstractContextManager[None]:
+    """Show a music metadata question in the Web UI with the release's current values.
+
+    Values the files disagree on are offered as answers, and with ``keep``
+    a blank answer (keep the current value, or skip) is offered as well.
+    """
+    summary: dict[str, Any] = {label: _music_field(meta, name) for name, label in _MUSIC_FIELD_LABELS.items()}
+    summary["Artwork"] = summary["Artwork"] or meta.artwork_path
+    current = str(_music_field(meta, field) or "")
+    actions: list[tuple[str, str]] = [("", f"Keep {current}" if current else "Skip")] if keep else []
+    conflicts = meta.music_release.get("conflicts", {}) if isinstance(meta.music_release, dict) else {}
+    candidates = [str(value) for value in (conflicts.get(field) or [] if isinstance(conflicts, dict) else [])]
+    if field in {"year", "edition_year"}:
+        candidates = [value for value in candidates if re.fullmatch(r"\d{4}", value)]
+    offered = [value for value in dict.fromkeys(candidates) if value and value != current]
+    actions += [(value, value) for value in offered]
+    notes = [hint] if hint else []
+    source = _music_field_source(meta, field)
+    if current and source:
+        notes.append(f"The current value comes from {source.replace('_', ' ')}.")
+    if offered:
+        notes.append("The files disagree on this value; pick one or type another.")
+    return webui_events.field_prompt("Music release", summary, focus=_MUSIC_FIELD_LABELS.get(field, field), hint=" ".join(notes), actions=actions, placeholder=placeholder)
+
+
+def _book_field_prompt(meta: Meta, focus: str, *, hint: str = "", placeholder: str = "", skip: bool = True) -> contextlib.AbstractContextManager[None]:
+    """Show a book metadata question in the Web UI with the book's current values."""
+    summary: dict[str, Any] = {
+        "Title": meta.title,
+        "Author": meta.author,
+        "Year": meta.year,
+        "Language": meta.book_language,
+        "Artwork": meta.artwork_url or meta.artwork_path,
+    }
+    if meta.audiobook:
+        summary["Narrator"] = meta.narrator
+    return webui_events.field_prompt("Book", summary, focus=focus, hint=hint, actions=[("", "Skip")] if skip else [], placeholder=placeholder)
+
+
+def _game_field_prompt(meta: Meta, focus: str, *, hint: str = "", placeholder: str = "", skip: bool = True) -> contextlib.AbstractContextManager[None]:
+    """Show a game metadata question in the Web UI with the game's current values."""
+    summary: dict[str, Any] = {"Title": meta.title, "Year": meta.year, "Platform": meta.platform, "Subcategory": meta.game_subcategory}
+    return webui_events.field_prompt("Game", summary, focus=focus, hint=hint, actions=[("", "Skip")] if skip else [], placeholder=placeholder)
+
+
 async def _prompt_music_meta(meta: Meta) -> None:
     """Ask for minimum Orpheus music metadata, never technical stream fields."""
     required = list(MUSIC_REQUIRED_FIELDS)
@@ -969,7 +1036,8 @@ async def _prompt_music_meta(meta: Meta) -> None:
                     while True:
                         current = str(_music_field(meta, field) or "")
                         prompt = f"Enter {labels[field]}" + (f" (current: {current})" if current else "") + " (leave blank to keep/skip): "
-                        value = (CLI_UI.ask_string(prompt) or "").strip()
+                        with _music_field_prompt(meta, field, hint="A 4-digit year.", placeholder="e.g. 1999"):
+                            value = (CLI_UI.ask_string(prompt) or "").strip()
                         if not value:
                             break
                         if value.isdigit() and len(value) == 4 and 1000 <= int(value) <= 3000:
@@ -978,23 +1046,30 @@ async def _prompt_music_meta(meta: Meta) -> None:
                             break
                         logger.info("[red]Invalid year (must be a 4-digit number between 1000 and 3000).[/red]")
                 else:
-                    value = (CLI_UI.ask_string(f"Enter {labels[field]} (leave blank to skip): ") or "").strip()
+                    hint = "Separate several main artists with &." if field == "artist" else ""
+                    with _music_field_prompt(meta, field, hint=hint):
+                        value = (CLI_UI.ask_string(f"Enter {labels[field]} (leave blank to skip): ") or "").strip()
                     if value:
                         _set_music_field(meta, field, value)
                         changed = True
             elif field == "media":
-                value = CLI_UI.ask_choice("Select source media:", choices=list(MUSIC_MEDIA_CHOICES), sort=False)
+                with _music_field_prompt(meta, field):
+                    value = CLI_UI.ask_choice("Select source media:", choices=list(MUSIC_MEDIA_CHOICES), sort=False)
                 if value:
                     _set_music_field(meta, field, value)
                     changed = True
             elif field == "release_type":
-                value = CLI_UI.ask_choice("Select release type:", choices=list(MUSIC_RELEASE_TYPE_CHOICES), sort=False)
+                with _music_field_prompt(meta, field):
+                    value = CLI_UI.ask_choice("Select release type:", choices=list(MUSIC_RELEASE_TYPE_CHOICES), sort=False)
                 if value:
                     _set_music_field(meta, field, value)
                     changed = True
             elif field in ("artwork", "cover_url"):
                 while True:
-                    value = (CLI_UI.ask_string("Enter path to cover artwork image (or public image URL) for MUSIC: ") or "").strip()
+                    with _music_field_prompt(
+                        meta, "cover_url", hint="Artwork is required: a local image path or a public image URL.", placeholder="Image path or https:// URL", keep=False
+                    ):
+                        value = (CLI_UI.ask_string("Enter path to cover artwork image (or public image URL) for MUSIC: ") or "").strip()
                     if not value:
                         logger.info("[red]Artwork is required for MUSIC uploads. Please enter a valid file path or image URL.[/red]")
                         continue

@@ -2052,6 +2052,11 @@ function AudionutsUAGUI() {
   );
   const [isResizingRight, setIsResizingRight] = useState(false);
   const [userInput, setUserInput] = useState("");
+  // Options ticked in the open multiple-choice prompt, kept per prompt id.
+  const [runGuiSelected, setRunGuiSelected] = useState({
+    id: null,
+    values: [],
+  });
   const [isSendingInput, setIsSendingInput] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(getStoredTheme);
   const [colorTheme, setColorThemeState] = useState(getStoredColorTheme);
@@ -9284,6 +9289,71 @@ function AudionutsUAGUI() {
     ));
   };
 
+  // Other accepted answers of a free-text question, as ``[answer, label]``.
+  const getRunGuiActions = (context) =>
+    Array.isArray(context.actions)
+      ? context.actions.filter(
+          (action) => Array.isArray(action) && action.length === 2,
+        )
+      : [];
+
+  const renderRunGuiActionButtons = (actions, answer, disabled) =>
+    actions.length > 0 && (
+      <div className="flex flex-wrap gap-2">
+        {actions.map(([value, label]) => (
+          <button
+            key={value || "enter"}
+            type="button"
+            onClick={() => answer(value)}
+            disabled={disabled}
+            className="ua-run-gui-choice rounded-lg border px-3 py-1.5 text-sm disabled:opacity-50"
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+    );
+
+  // A question about one of a few known values (e.g. a release's metadata):
+  // the values as a table with the one asked for highlighted.
+  const renderRunGuiFieldContext = (context, answer, disabled) => {
+    const rows =
+      context.summary && typeof context.summary === "object"
+        ? Object.entries(context.summary)
+        : [];
+    return (
+      <>
+        {rows.length > 0 && (
+          <div>
+            {context.title && renderRunGuiSectionLabel(context.title)}
+            <dl className="mt-1 space-y-0.5">
+              {rows.map(([label, value]) => (
+                <div
+                  key={label}
+                  className="ua-run-gui-field-row grid min-w-0 gap-x-3 gap-y-0.5 rounded-md px-2 py-1 sm:grid-cols-[9rem_minmax(0,1fr)]"
+                  data-focus={label === context.focus}
+                >
+                  <dt className="ua-run-gui-muted min-w-0 break-words text-xs font-semibold sm:pt-0.5">
+                    {label}
+                  </dt>
+                  <dd className="min-w-0 break-words text-sm">
+                    {value || (
+                      <span className="ua-run-gui-attention-text">Missing</span>
+                    )}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        )}
+        {context.hint && (
+          <p className="ua-run-gui-muted text-xs">{context.hint}</p>
+        )}
+        {renderRunGuiActionButtons(getRunGuiActions(context), answer, disabled)}
+      </>
+    );
+  };
+
   const renderRunGuiPrompt = (view) => {
     const prompt = view.prompt;
     // Every cli_ui prompt is announced. Without an announcement, rely on the
@@ -9318,14 +9388,12 @@ function AudionutsUAGUI() {
       context.kind === "options" && Array.isArray(context.options)
         ? context.options
         : [];
-    const actions =
-      context.kind === "options" && Array.isArray(context.actions)
-        ? context.actions.filter(
-            (action) => Array.isArray(action) && action.length === 2,
-          )
-        : [];
+    const actions = context.kind === "options" ? getRunGuiActions(context) : [];
+    const answer = (value) => sendInput(sessionId, value);
     let details = null;
-    if (context.kind === "confirm") {
+    if (context.kind === "field") {
+      details = renderRunGuiFieldContext(context, answer, disabled);
+    } else if (context.kind === "confirm") {
       details = renderRunGuiConfirmContext(context, missing);
     } else if (context.kind === "edit_args") {
       details = renderRunGuiEditArgsContext(context, view, prompt, disabled);
@@ -9339,7 +9407,6 @@ function AudionutsUAGUI() {
         </>
       );
     }
-    const answer = (value) => sendInput(sessionId, value);
     // Numbered options count from ``start`` (BDMV playlists start at 0).
     const optionStart = Number.parseInt(context.start ?? "1", 10) || 0;
     // Optional thumbnails (e.g. TMDb/IMDb posters), one per option.
@@ -9349,6 +9416,8 @@ function AudionutsUAGUI() {
     const hasOptionImages = optionImages.some((image) =>
       /^https?:\/\//i.test(String(image || "")),
     );
+    const selectedChoices =
+      runGuiSelected.id === prompt?.id ? runGuiSelected.values : [];
     const optionButtons =
       !details && (options.length || actions.length) ? (
         <div className="grid gap-1.5">
@@ -9427,21 +9496,7 @@ function AudionutsUAGUI() {
               </div>
             );
           })}
-          {actions.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {actions.map(([value, label]) => (
-                <button
-                  key={value || "enter"}
-                  type="button"
-                  onClick={() => answer(value)}
-                  disabled={disabled}
-                  className="ua-run-gui-choice rounded-lg border px-3 py-1.5 text-sm disabled:opacity-50"
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          )}
+          {renderRunGuiActionButtons(actions, answer, disabled)}
         </div>
       ) : null;
     // A free-text question without its own list shows the output before it:
@@ -9573,6 +9628,66 @@ function AudionutsUAGUI() {
                 </button>
               </div>
             )}
+            {type === "multi_choice" && (
+              <div className="grid w-full gap-1.5">
+                {prompt.choices.map((choice, index) => {
+                  const number = String(index + 1);
+                  const selected = selectedChoices.includes(number);
+                  return (
+                    <label
+                      key={`${index}-${choice}`}
+                      data-selected={selected}
+                      className="ua-run-gui-choice flex min-w-0 cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm has-[:disabled]:cursor-default has-[:disabled]:opacity-50"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selected}
+                        onChange={() =>
+                          setRunGuiSelected({
+                            id: prompt.id,
+                            values: selected
+                              ? selectedChoices.filter(
+                                  (value) => value !== number,
+                                )
+                              : [...selectedChoices, number],
+                          })
+                        }
+                        disabled={disabled}
+                        className="h-4 w-4 shrink-0"
+                      />
+                      <span className="min-w-0 break-words">{choice}</span>
+                    </label>
+                  );
+                })}
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      answer(
+                        [...selectedChoices]
+                          .sort((a, b) => Number(a) - Number(b))
+                          .join(","),
+                      )
+                    }
+                    disabled={disabled || !selectedChoices.length}
+                    className="ua-run-gui-answer rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50"
+                    data-variant="send"
+                  >
+                    {selectedChoices.length
+                      ? `Send ${selectedChoices.length} selected`
+                      : "Select one or more"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => answer("")}
+                    disabled={disabled}
+                    className="ua-run-gui-muted text-xs underline disabled:opacity-50"
+                  >
+                    None of these
+                  </button>
+                </div>
+              </div>
+            )}
             {type === "text" && (
               <form
                 className="flex w-full min-w-0 gap-2"
@@ -9587,13 +9702,15 @@ function AudionutsUAGUI() {
                   onChange={(event) => setUserInput(event.target.value)}
                   disabled={disabled}
                   placeholder={
-                    context.kind === "edit_args"
-                      ? "e.g. --tag NTb --tmdb movie/12345"
-                      : prompt?.default && typeof prompt.default === "string"
-                        ? `Leave empty for "${prompt.default}"`
-                        : options.length || actions.length
-                          ? "Or type your answer"
-                          : "Type your answer"
+                    context.kind === "field" && context.placeholder
+                      ? context.placeholder
+                      : context.kind === "edit_args"
+                        ? "e.g. --tag NTb --tmdb movie/12345"
+                        : prompt?.default && typeof prompt.default === "string"
+                          ? `Leave empty for "${prompt.default}"`
+                          : options.length || actions.length
+                            ? "Or type your answer"
+                            : "Type your answer"
                   }
                   aria-label="Answer"
                   className="ua-run-gui-input min-w-0 flex-1 rounded-lg border px-3 py-2 text-sm"

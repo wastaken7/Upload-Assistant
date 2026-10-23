@@ -1401,7 +1401,13 @@ class TrackerSetup:
         else:
             if not meta.tv_pack:
                 try:
-                    user_message = cli_ui.ask_string("Enter a reason for the trump report on LST:")
+                    with webui_events.field_prompt(
+                        "Trump report",
+                        {"Tracker": tracker, "Report message": message, "Trumped torrent": f"https://lst.gg/torrents/{trumping_torrent_id}"},
+                        hint="Added to the report message. Leave it blank to send the report without it.",
+                        actions=[("", "Send without a reason")],
+                    ):
+                        user_message = cli_ui.ask_string("Enter a reason for the trump report on LST:")
                 except EOFError, KeyboardInterrupt:
                     logger.info("[yellow]Prompt cancelled; no additional message provided.[/yellow]")
                     user_message = None

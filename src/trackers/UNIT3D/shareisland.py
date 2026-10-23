@@ -292,7 +292,14 @@ class ShareIsland(UNIT3D):
             # Prompt for region if not in meta
             if not region_name and (not meta.unattended or meta.unattended_confirm):
                 while True:
-                    region_name = cli_ui.ask_string("ShareIsland: Region code not found for disc. Please enter it manually (mandatory): ")
+                    with webui_events.field_prompt(
+                        "Disc region",
+                        {"Disc": meta.is_disc, "Release": meta.name, "Region": ""},
+                        focus="Region",
+                        hint="Required: the disc's region code, as listed on the tracker.",
+                        placeholder="e.g. USA",
+                    ):
+                        region_name = cli_ui.ask_string("ShareIsland: Region code not found for disc. Please enter it manually (mandatory): ")
                     region_name = region_name.strip().upper() if region_name else None
                     if region_name:
                         break

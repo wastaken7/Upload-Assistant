@@ -245,6 +245,40 @@ def answer_buttons(actions: Iterable[tuple[str, str]]) -> contextlib.AbstractCon
     return numbered_options((), actions=actions)
 
 
+def field_prompt(
+    title: str,
+    summary: Mapping[str, Any] | None = None,
+    *,
+    focus: str = "",
+    hint: str = "",
+    actions: Iterable[tuple[str, str]] = (),
+    placeholder: str = "",
+) -> contextlib.AbstractContextManager[None]:
+    """Show a free-text question as a form field with what it is about.
+
+    The terminal prints the facts a question refers to (the release's
+    current metadata, the tracks without a language) before asking; the GUI
+    shows them as a table instead of raw output. ``summary`` maps labels to
+    values, and the row named ``focus`` is the one being asked for (shown
+    even when empty). ``actions`` are other accepted answers as
+    ``(answer, label)``, such as ``("", "Keep 2024")`` or a suggested value;
+    ``hint`` explains what is accepted and ``placeholder`` fills the input.
+    """
+    rows: dict[str, str] = {}
+    for label, value in (summary or {}).items():
+        text = ", ".join(str(part) for part in cast(Iterable[Any], value)) if isinstance(value, (list, tuple)) else "" if value is None else str(value)
+        if text.strip() or label == focus:
+            rows[label] = text
+    context: dict[str, Any] = {"kind": "field", "title": title, "summary": rows, "actions": list(actions)}
+    if focus:
+        context["focus"] = focus
+    if hint:
+        context["hint"] = hint
+    if placeholder:
+        context["placeholder"] = placeholder
+    return prompt_context(**context)
+
+
 def editor_available() -> bool:
     """Whether an "edit" answer may open a text editor.
 
@@ -298,7 +332,7 @@ def _context_payload() -> dict[str, Any] | None:
     return payload
 
 
-def prompt_open(prompt_type: Literal["yes_no", "text", "choice"], question: Any, *, choices: Iterable[Any] = (), default: Any = None) -> int | None:
+def prompt_open(prompt_type: Literal["yes_no", "text", "choice", "multi_choice"], question: Any, *, choices: Iterable[Any] = (), default: Any = None) -> int | None:
     """Announce an interactive prompt and return its id for ``prompt_close``."""
     if not enabled():
         return None

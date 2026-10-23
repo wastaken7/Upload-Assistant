@@ -204,10 +204,11 @@ def test_cli_ui_prompts_are_announced_and_still_answered_from_stdin() -> None:
         "print('YES=' + str(cli_ui.ask_yes_no('Continue?', default=False)), flush=True)\n"
         "print('PICK=' + str(cli_ui.ask_choice('Pick one', choices=['zeta', 'alpha'])), flush=True)\n"
         "print('TEXT=' + str(cli_ui.ask_string('Title?', default='Fallback')), flush=True)\n"
+        "print('MULTI=' + str(cli_ui.select_choices('Pick any', choices=['zeta', 'alpha', 'beta'])), flush=True)\n"
     )
     result = subprocess.run(  # noqa: S603 - fixed Python prompt fixture
         [sys.executable, "-u", "-c", code],
-        input="y\n1\n\n",
+        input="y\n1\n\n1,3\n",
         text=True,
         encoding="utf-8",
         capture_output=True,
@@ -219,15 +220,17 @@ def test_cli_ui_prompts_are_announced_and_still_answered_from_stdin() -> None:
     prompts = [event for event in _events(result.stdout, server._GUI_EVENT_NONCE) if event["kind"] == "prompt"]
     opened = [event for event in prompts if event["action"] == "open"]
 
-    assert [event["type"] for event in opened] == ["yes_no", "choice", "text"]
+    assert [event["type"] for event in opened] == ["yes_no", "choice", "text", "multi_choice"]
     assert opened[0]["question"] == "Continue?"
     # Choices are announced in the order cli_ui numbers them.
     assert opened[1]["choices"] == ["alpha", "zeta"]
     assert opened[2]["default"] == "Fallback"
-    assert sum(event["action"] == "close" for event in prompts) == 3
+    assert opened[3]["choices"] == ["alpha", "beta", "zeta"]
+    assert sum(event["action"] == "close" for event in prompts) == 4
     assert "YES=True" in result.stdout
     assert "PICK=alpha" in result.stdout
     assert "TEXT=Fallback" in result.stdout
+    assert "MULTI=['alpha', 'zeta']" in result.stdout
 
 
 def test_server_parses_only_valid_gui_events() -> None:
@@ -478,3 +481,21 @@ def test_numbered_options_carry_structured_details(gui_env, capsys) -> None:
     first, second = opened["context"]["details"]
     assert first == {"meta": "TMDb 1 · similarity 0.40", "text": "A fictional synopsis.", "link": "https://www.themoviedb.org/movie/1", "link_label": "TMDb"}
     assert second["link"] == ""
+
+
+def test_field_prompts_show_the_values_a_question_is_about(gui_env, capsys) -> None:
+    summary = {"Artist": "Fictional Band", "Album": "", "Year": 2020, "Tracks": ["One", "Two"], "Edition": None}
+    with webui_events.field_prompt("Music release", summary, focus="Album", hint="The album title.", actions=[("", "Skip")], placeholder="Album"):
+        webui_events.prompt_open("text", "Enter album title (leave blank to skip): ")
+
+    (opened,) = _events(capsys.readouterr().out)
+    assert opened["context"] == {
+        "kind": "field",
+        "title": "Music release",
+        # Empty values are left out, except the one being asked for.
+        "summary": {"Artist": "Fictional Band", "Album": "", "Year": "2020", "Tracks": "One, Two"},
+        "actions": [["", "Skip"]],
+        "focus": "Album",
+        "hint": "The album title.",
+        "placeholder": "Album",
+    }
