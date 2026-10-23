@@ -2052,9 +2052,10 @@ function AudionutsUAGUI() {
   );
   const [isResizingRight, setIsResizingRight] = useState(false);
   const [userInput, setUserInput] = useState("");
-  // Options ticked in the open multiple-choice prompt, kept per prompt id.
+  // Options ticked in the open multiple-choice prompt. Prompt ids restart
+  // in every upload process, so the key also names the session.
   const [runGuiSelected, setRunGuiSelected] = useState({
-    id: null,
+    key: null,
     values: [],
   });
   const [isSendingInput, setIsSendingInput] = useState(false);
@@ -9416,8 +9417,9 @@ function AudionutsUAGUI() {
     const hasOptionImages = optionImages.some((image) =>
       /^https?:\/\//i.test(String(image || "")),
     );
+    const selectionKey = `${sessionId}:${prompt?.item}:${prompt?.id}`;
     const selectedChoices =
-      runGuiSelected.id === prompt?.id ? runGuiSelected.values : [];
+      runGuiSelected.key === selectionKey ? runGuiSelected.values : [];
     const optionButtons =
       !details && (options.length || actions.length) ? (
         <div className="grid gap-1.5">
@@ -9644,7 +9646,7 @@ function AudionutsUAGUI() {
                         checked={selected}
                         onChange={() =>
                           setRunGuiSelected({
-                            id: prompt.id,
+                            key: selectionKey,
                             values: selected
                               ? selectedChoices.filter(
                                   (value) => value !== number,

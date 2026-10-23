@@ -147,7 +147,9 @@ class ComparisonManager:
         comparison_index = self.meta.comparison_index
         if comparison_index is None:
             logger.info("[red]No comparison index provided. Please specify a comparison index matching the input file.")
+            # Keys keep the file names' zero padding ("01"); answers are plain numbers.
             groups_by_number = {str(int(key)): data for key, data in meta_comparisons.items() if key.isdigit()}
+            group_keys = {str(int(key)): key for key in meta_comparisons if key.isdigit()}
             group_buttons = [
                 (number, f"{number}: {data.get('name') or ', '.join(data.get('files', []))}")
                 for number, data in sorted(groups_by_number.items(), key=lambda item: int(item[0]))
@@ -163,6 +165,7 @@ class ComparisonManager:
                     cli_input = cli_ui.ask_string("Enter comparison index number: ") or ""
                 try:
                     comparison_index = str(int(cli_input.strip()))
+                    comparison_index = group_keys.get(comparison_index, comparison_index)
                     break
                 except Exception:
                     logger.info(f"[red]Invalid comparison index: {cli_input.strip()}")
