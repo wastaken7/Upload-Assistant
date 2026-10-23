@@ -9369,6 +9369,11 @@ function AudionutsUAGUI() {
       getLastTerminalLine() ||
       "The upload is waiting for your answer.";
     const context = prompt?.context || {};
+    const checkMessages = Array.isArray(context.check_messages)
+      ? context.check_messages.filter(
+          (message) => typeof message === "string" && message.trim(),
+        )
+      : [];
     // The demo has no session; its buttons look live but sendInput ignores them.
     const disabled =
       (!sessionId && !screenshotMode) ||
@@ -9504,7 +9509,7 @@ function AudionutsUAGUI() {
     // A free-text question without its own list shows the output before it:
     // the list it refers to, or the text (e.g. a description) being decided on.
     const recent =
-      !details && type === "text" && !options.length
+      !details && type === "text" && !options.length && !checkMessages.length
         ? getRecentTerminalLines(question)
         : [];
     const recentOutput = recent.length ? (
@@ -9532,8 +9537,8 @@ function AudionutsUAGUI() {
         aria-live="polite"
         data-answered={Boolean(prompt?.answered)}
       >
-        {/* Yes/No sit at the top right so they stay put whatever the details below. */}
-        <div className="flex flex-wrap items-start gap-3">
+        {/* Keep answers together, below the question on narrow screens. */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
               <LucideIcon
@@ -9543,7 +9548,7 @@ function AudionutsUAGUI() {
               <p className="ua-run-gui-eyebrow text-xs font-semibold uppercase tracking-wide">
                 {prompt?.answered ? "Answer sent" : "Your input is needed"}
               </p>
-              {context.tracker && (
+              {context.tracker && !checkMessages.length && (
                 <>
                   <span className="ua-run-gui-muted text-xs" aria-hidden="true">
                     ·
@@ -9595,6 +9600,22 @@ function AudionutsUAGUI() {
             </div>
           )}
         </div>
+
+        {checkMessages.length > 0 && (
+          <div
+            className="ua-run-gui-prompt-context mt-3 rounded-md p-3"
+            data-testid="tracker-check-messages"
+          >
+            {renderRunGuiSectionLabel("Tracker check details")}
+            <ul className="mt-1 space-y-1 text-sm">
+              {checkMessages.map((message, index) => (
+                <li key={index} className="whitespace-pre-wrap break-words">
+                  {message}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {details && (
           <div className="ua-run-gui-prompt-context mt-3 space-y-3 rounded-md p-3">
