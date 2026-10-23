@@ -398,7 +398,7 @@ class BEYONDHD:
             logger.info(f"{self.tracker}: [bold red]Remuxes must use the MKV container. Skipping upload.[/bold red]")
             return False
 
-        if meta.type == "ENCODE" and meta.video_encode not in ("x264", "x265"):
+        if meta.type == "ENCODE" and not any(codec in meta.video_encode for codec in ("x264", "x265")):
             logger.info(f"{self.tracker}: [bold red]Encodes must use x264 or x265, found '{escape(str(meta.video_encode))}'. Skipping upload.[/bold red]")
             return False
 
@@ -427,7 +427,7 @@ class BEYONDHD:
                 "Lossless mono/stereo audio in remuxes must be encoded to FLAC",
             ),
             (
-                meta.type == "ENCODE" and meta.video_encode == "x265" and meta.uhd != "UHD" and not meta.hdr and not meta.anime,
+                meta.type == "ENCODE" and "x265" in meta.video_encode and meta.uhd != "UHD" and not meta.hdr and not meta.anime,
                 "x265 encodes are only allowed from a UHD source (anime/cartoons at moderator discretion)",
             ),
             (
