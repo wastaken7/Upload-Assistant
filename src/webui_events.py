@@ -122,12 +122,21 @@ def begin_item(path: str, index: int, total: int) -> None:
     _emit("item", _current_item)
 
 
-def update_item(*, personal_release: bool) -> None:
-    """Update the current release's flags after metadata preparation."""
+def update_item(*, personal_release: bool | None = None, run_options: Mapping[str, Any] | None = None) -> None:
+    """Publish resolved release flags and bounded, non-secret run settings."""
     global _current_item
     if not enabled() or _current_item is None:
         return
-    _current_item = {**_current_item, "personal_release": bool(personal_release)}
+    _current_item = dict(_current_item)
+    if personal_release is not None:
+        _current_item["personal_release"] = bool(personal_release)
+    if run_options is not None:
+        options: dict[str, Any] = {key: run_options.get(key) is True for key in ("debug", "no_seed", "skip_imghost_upload", "nohash", "ffdebug")}
+        options["client_disabled"] = run_options.get("client") == "none"
+        options["category"] = plain_text(run_options.get("category", ""), 20, markup=False)
+        base_dir, folder = run_options.get("base_dir"), run_options.get("uuid")
+        options["prep_directory"] = plain_text(Path(str(base_dir)) / "tmp" / str(folder), markup=False) if base_dir and folder else ""
+        _current_item["run_options"] = options
     _emit("item", _current_item)
 
 
