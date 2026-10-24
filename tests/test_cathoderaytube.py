@@ -210,6 +210,23 @@ def test_renders_crt_category_description_templates():
     )
 
 
+def test_strips_mediainfo_report_by_footer_from_description(monkeypatch):
+    site = tracker()
+    report = (
+        "General\nComplete name : Example.Movie.2010.VTS_01_0.IFO\nReportBy : MediaInfoLib - v26.10\n\n"
+        "General\nComplete name : Example.Movie.2010.VTS_01_1.VOB\nReportBy                                 : MediaInfoLib - v26.10\n"
+    )
+    monkeypatch.setattr(cathoderaytube_module.DescriptionBuilder, "get_bdinfo_section", AsyncMock(return_value=""))
+    monkeypatch.setattr(cathoderaytube_module.DescriptionBuilder, "get_mediainfo_section", AsyncMock(return_value=report))
+
+    description = asyncio.run(site.generate_description(meta()))
+
+    assert "ReportBy" not in description  # noqa: S101
+    assert (  # noqa: S101
+        "[mediainfo]\nGeneral\nComplete name : Example.Movie.2010.VTS_01_0.IFO\n\nGeneral\nComplete name : Example.Movie.2010.VTS_01_1.VOB\n[/mediainfo]" in description
+    )
+
+
 def test_places_supplemental_images_in_notes_and_groups_screenshots_by_three():
     site = tracker()
     item = meta(
