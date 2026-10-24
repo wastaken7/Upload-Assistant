@@ -1184,6 +1184,37 @@ const getArgumentViewSections = (viewId) => {
 // Icon components
 const LucideIcon = window.UALucideIcon;
 
+/**
+ * A queue item's cover in Results, fitted within 96x64 at the image's own
+ * shape (posters, square album art, wide game banners); a missing image falls
+ * back to the category icon.
+ */
+const RunGuiItemCover = ({ src, category, name }) => {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [src]);
+  return (
+    <div
+      className={`ua-run-gui-cover flex shrink-0 items-center justify-center overflow-hidden rounded border ${failed ? "h-16 w-11" : ""}`}
+      title={name || undefined}
+    >
+      {failed ? (
+        <span className="ua-run-gui-muted">
+          {mediaIconForCategory(category)}
+        </span>
+      ) : (
+        <img
+          src={src}
+          alt=""
+          loading="lazy"
+          referrerPolicy="no-referrer"
+          className="block h-auto max-h-16 w-auto max-w-24"
+          onError={() => setFailed(true)}
+        />
+      )}
+    </div>
+  );
+};
+
 /** A native popover escapes the scroll panel and dismisses on Escape or outside click. */
 const RunGuiDebugBadge = ({ options }) => {
   const triggerRef = useRef(null);
@@ -10054,39 +10085,64 @@ function AudionutsUAGUI() {
         className="ua-run-gui-item rounded-md border"
         data-tone={outcome.tone}
       >
-        <header className="ua-run-gui-item-header flex min-w-0 flex-wrap items-center gap-2 px-3 py-2">
-          <span className="ua-run-gui-item-index shrink-0 rounded px-1.5 text-xs font-semibold tabular-nums">
-            {group.index}
-          </span>
-          <h4
-            className="min-w-0 flex-1 truncate text-sm font-semibold"
-            title={group.name || undefined}
-          >
-            {group.name || `Item ${group.index}`}
-          </h4>
-          {group.personalRelease && renderRunGuiPersonalRelease()}
-          {group.runOptions?.debug && (
-            <RunGuiDebugBadge options={group.runOptions} />
-          )}
-          <span className="ua-run-gui-status inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-0.5 text-xs font-semibold">
-            <LucideIcon
-              name={outcome.icon}
-              className={`h-3.5 w-3.5 ${outcome.icon === "loader-circle" ? "animate-spin" : ""}`}
-            />
-            {outcome.label}
-          </span>
-        </header>
-        <div className="px-3 pb-2">
-          {group.rows.length > 0 && (
-            <ul className="ua-run-gui-divide divide-y">
-              {group.rows.map((entry) => renderRunGuiResultRow(entry, view))}
-            </ul>
-          )}
-          {renderRunGuiItemNotes(group.notes)}
-        </div>
+        {renderRunGuiWithCover(
+          group,
+          "py-2 pl-3",
+          <>
+            <header className="ua-run-gui-item-header flex min-w-0 flex-wrap items-center gap-2 px-3 py-2">
+              <span className="ua-run-gui-item-index shrink-0 rounded px-1.5 text-xs font-semibold tabular-nums">
+                {group.index}
+              </span>
+              <h4
+                className="min-w-0 flex-1 truncate text-sm font-semibold"
+                title={group.name || undefined}
+              >
+                {group.name || `Item ${group.index}`}
+              </h4>
+              {group.personalRelease && renderRunGuiPersonalRelease()}
+              {group.runOptions?.debug && (
+                <RunGuiDebugBadge options={group.runOptions} />
+              )}
+              <span className="ua-run-gui-status inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-0.5 text-xs font-semibold">
+                <LucideIcon
+                  name={outcome.icon}
+                  className={`h-3.5 w-3.5 ${outcome.icon === "loader-circle" ? "animate-spin" : ""}`}
+                />
+                {outcome.label}
+              </span>
+            </header>
+            <div className="px-3 pb-2">
+              {group.rows.length > 0 && (
+                <ul className="ua-run-gui-divide divide-y">
+                  {group.rows.map((entry) =>
+                    renderRunGuiResultRow(entry, view),
+                  )}
+                </ul>
+              )}
+              {renderRunGuiItemNotes(group.notes)}
+            </div>
+          </>,
+        )}
       </section>
     );
   };
+
+  /** Put an item's cover beside its results when the run reported one. */
+  const renderRunGuiWithCover = (group, coverClassName, content) =>
+    group.artwork ? (
+      <div className="flex min-w-0">
+        <div className={`shrink-0 ${coverClassName}`}>
+          <RunGuiItemCover
+            src={group.artwork}
+            category={group.category}
+            name={group.name}
+          />
+        </div>
+        <div className="min-w-0 flex-1">{content}</div>
+      </div>
+    ) : (
+      content
+    );
 
   /** Notes, errors and warnings kept for an item the queue has moved past. */
   const renderRunGuiItemNotes = (notes) => {
@@ -10184,12 +10240,17 @@ function AudionutsUAGUI() {
           name: item.name,
           personalRelease: item.personalRelease,
           runOptions: item.runOptions,
+          category: item.runOptions?.category,
+          artwork: item.artwork,
           rows: view.trackers.filter((entry) => entry.item === item.index),
           notes: view.itemNotes[item.index] || emptyNotes,
         }))
       : [
           {
             index: null,
+            name: view.items[0]?.name,
+            category: view.items[0]?.runOptions?.category,
+            artwork: view.items[0]?.artwork,
             rows: view.trackers,
             notes: Object.values(view.itemNotes).reduce(
               (all, notes) => ({
@@ -10427,14 +10488,20 @@ function AudionutsUAGUI() {
                 {visibleGroups.map((group) =>
                   group.index === null ? (
                     <div key="all">
-                      {group.rows.length > 0 && (
-                        <ul className="ua-run-gui-divide divide-y">
-                          {group.rows.map((entry) =>
-                            renderRunGuiResultRow(entry, view),
+                      {renderRunGuiWithCover(
+                        group,
+                        "pr-3 pt-1.5",
+                        <>
+                          {group.rows.length > 0 && (
+                            <ul className="ua-run-gui-divide divide-y">
+                              {group.rows.map((entry) =>
+                                renderRunGuiResultRow(entry, view),
+                              )}
+                            </ul>
                           )}
-                        </ul>
+                          {renderRunGuiItemNotes(group.notes)}
+                        </>,
                       )}
-                      {renderRunGuiItemNotes(group.notes)}
                     </div>
                   ) : (
                     renderRunGuiItemCard(group, view)
