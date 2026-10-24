@@ -2,6 +2,7 @@
 
 import pytest
 
+from src.bluray_com import country_flag_code
 from src.meta import Meta
 from src.prep_helpers import _should_add_bluray_link, _should_fetch_bluray_info
 
@@ -53,3 +54,11 @@ def test_link_lookup_respects_tracker_configuration(default, override, expected,
 def test_link_lookup_uses_configured_default_trackers():
     config = {"DEFAULT": {"add_bluray_link": False}, "TRACKERS": {"default_trackers": "aither, lst", "AITHER": {"add_bluray_link": True}, "LST": {"add_bluray_link": False}}}
     assert _should_add_bluray_link(Meta(), config)
+
+
+@pytest.mark.parametrize(
+    ("country", "code"),
+    [("United States", "us"), ("South Korea", "kr"), ("Russia", "ru"), ("Chinese Taipei", "tw"), ("Unknown", ""), (None, "")],
+)
+def test_country_flag_code_names_bundled_flags(country, code) -> None:
+    assert country_flag_code(country) == code
