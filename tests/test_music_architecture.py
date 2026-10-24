@@ -77,6 +77,21 @@ def test_description_builder_weights_music_bitrate_by_track_duration():
     assert "[td]1250 kbps[/td]" in result
 
 
+def test_description_builder_keeps_bitrate_when_duration_is_invalid():
+    meta = Meta(
+        category="MUSIC",
+        music_release={
+            "fields": {"album": {"value": "Invented Album"}},
+            "tracks": [{"bitrate": 1000000, "duration": "unknown"}, {"bitrate": 2000000, "duration": 100}],
+        },
+    )
+    builder = DescriptionBuilder("PEERGARDEN", {"DEFAULT": {}, "TRACKERS": {"PEERGARDEN": {}}})
+
+    result = builder._build_music_desc_section(meta)
+
+    assert "[td]1500 kbps[/td]" in result
+
+
 def test_description_builder_renders_album_tracklist_in_disc_order():
     meta = Meta(
         category="MUSIC",

@@ -1400,9 +1400,12 @@ class DescriptionBuilder:
                     continue
                 try:
                     bitrate = float(track.get("bitrate") or 0)
-                    duration = float(track.get("duration") or 0)
                 except TypeError, ValueError, OverflowError:
                     continue
+                try:
+                    duration = float(track.get("duration") or 0)
+                except TypeError, ValueError, OverflowError:
+                    duration = 0.0
                 if bitrate > 0 and math.isfinite(bitrate):
                     samples.append((bitrate, duration if duration > 0 and math.isfinite(duration) else 0.0))
             if not samples:
