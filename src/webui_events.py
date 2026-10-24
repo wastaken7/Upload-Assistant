@@ -45,6 +45,9 @@ MAX_TEXT_LENGTH = 1000
 MAX_LIST_ITEMS = 500
 MAX_EVENT_BYTES = 262144
 MAX_CHECK_MESSAGES = 20
+# Local artwork the Web UI may serve as a queue item's cover thumbnail.
+ARTWORK_SUFFIXES = frozenset({".jpg", ".jpeg", ".png", ".webp"})
+TMDB_POSTER_BASE = "https://image.tmdb.org/t/p/w500"
 
 type StageStatus = Literal["start", "done", "skip", "fail"]
 type NoticeLevel = Literal["error", "warning", "attention"]
@@ -125,12 +128,41 @@ def begin_item(path: str, index: int, total: int) -> None:
     _emit("item", _current_item)
 
 
-def update_item(*, personal_release: bool | None = None, run_options: Mapping[str, Any] | None = None) -> None:
-    """Publish resolved release flags and bounded, non-secret run settings."""
+def _item_artwork(meta: Mapping[str, Any]) -> dict[str, str]:
+    """Return the release cover as a public URL or a local image file.
+
+    A local ``artwork_file`` is never shown to the browser: the server swaps
+    it for an authenticated URL before forwarding the event.
+    """
+    url = _http_link(meta.get("artwork_url")) if meta.get("artwork_url") else ""
+    if url:
+        return {"artwork": url}
+    artwork_path = str(meta.get("artwork_path") or "")
+    if artwork_path:
+        with contextlib.suppress(OSError, ValueError):
+            local = Path(artwork_path).resolve()
+            if local.suffix.casefold() in ARTWORK_SUFFIXES and local.is_file():
+                return {"artwork_file": str(local)}
+    tmdb_poster = str(meta.get("tmdb_poster_path") or "")
+    if tmdb_poster.startswith("/"):
+        return {"artwork": _http_link(f"{TMDB_POSTER_BASE}{tmdb_poster}")}
+    return {}
+
+
+def update_item(*, personal_release: bool | None = None, run_options: Mapping[str, Any] | None = None, artwork: Mapping[str, Any] | None = None) -> None:
+    """Publish resolved release flags, bounded run settings and the release cover."""
     global _current_item
     if not enabled() or _current_item is None:
         return
     _current_item = dict(_current_item)
+    if artwork is not None:
+        # Keep a cover already found when a later call no longer has one, e.g.
+        # after its temporary file was removed at the end of the item.
+        resolved = _item_artwork(artwork)
+        if resolved:
+            _current_item.pop("artwork", None)
+            _current_item.pop("artwork_file", None)
+            _current_item.update(resolved)
     if personal_release is not None:
         _current_item["personal_release"] = bool(personal_release)
     if run_options is not None:

@@ -38,7 +38,7 @@ from collections.abc import Mapping, Sequence
 import psutil
 
 import web_ui.auth as auth_mod
-from src.webui_events import GUI_EVENT_KINDS, GUI_EVENT_NONCE_ENV, GUI_EVENT_STDOUT_PREFIX, GUI_EVENTS_ENV, MAX_EVENT_BYTES, event_prefix
+from src.webui_events import ARTWORK_SUFFIXES, GUI_EVENT_KINDS, GUI_EVENT_NONCE_ENV, GUI_EVENT_STDOUT_PREFIX, GUI_EVENTS_ENV, MAX_EVENT_BYTES, event_prefix
 from src.webui_progress import PROGRESS_STDOUT_PREFIX
 from src.prompt_sound import PROMPT_SOUND_STDOUT_MARKER
 from src.app_paths import CODE_DIR, DATA_DIR, STATE_DIR
@@ -1981,6 +1981,48 @@ def _execution_preview_cover_url(preview_session_id: str, cache_key: str) -> str
     """Return a per-item cover URL so the browser cannot reuse the prior cover."""
     version = urllib.parse.quote(str(cache_key), safe="")
     return f"/api/execution_preview_cover?session_id={urllib.parse.quote(preview_session_id, safe='')}&v={version}"
+
+
+def _validated_item_cover(artwork_file: str, release_path: str) -> Path | None:
+    """Accept a queue item's cover only as an image in temp storage or its release folder."""
+    try:
+        candidate = Path(artwork_file).resolve()
+        if candidate.suffix.casefold() not in ARTWORK_SUFFIXES or not candidate.is_file():
+            return None
+        roots = [(STATE_DIR / "tmp").resolve()]
+        if release_path:
+            release = Path(release_path).resolve()
+            roots.append(release if release.is_dir() else release.parent)
+    except OSError, ValueError:
+        return None
+    return candidate if any(candidate.is_relative_to(root) for root in roots) else None
+
+
+def _resolve_gui_item_artwork(session_id: str, process_state: dict[str, object], event: dict[str, object]) -> dict[str, object]:
+    """Swap a queue item's local cover path for an authenticated thumbnail URL.
+
+    The path never reaches the browser or the session log; the server keeps
+    it per item so the Results panel can still show it after the queue moves on.
+    """
+    if event.get("kind") != "item" or "artwork_file" not in event:
+        return event
+    event = dict(event)
+    artwork_file = event.pop("artwork_file")
+    index = event.get("index")
+    if not isinstance(index, int) or isinstance(index, bool) or not isinstance(artwork_file, str):
+        return event
+    cover = _validated_item_cover(artwork_file, _stringify_preview_value(process_state.get("path")))
+    if cover is None:
+        return event
+    try:
+        version = cover.stat().st_mtime_ns
+    except OSError:
+        return event
+    with active_processes_lock:
+        covers = cast(dict[int, Path], process_state.setdefault("item_covers", {}))
+        covers[index] = cover
+    event["artwork"] = f"/api/execution_item_cover?session_id={urllib.parse.quote(session_id, safe='')}&item={index}&v={version}"
+    return event
 
 
 def _execution_preview_cover_cache_key(session_id: str, fallback: str) -> str:
@@ -6802,6 +6844,25 @@ def execution_preview_cover():
     return send_file(cover_file, mimetype=mimetype, conditional=True, max_age=30)
 
 
+@app.route("/api/execution_item_cover")
+@limiter.limit("7200 per hour", key_func=_rate_limit_key_func, override_defaults=True)
+def execution_item_cover():
+    """Serve the local cover of one queue item shown in the Results panel."""
+    session_id = str(request.args.get("session_id", "")).strip()
+    item = str(request.args.get("item", "")).strip()
+    if not session_id or not item.isdecimal():
+        return jsonify({"success": False, "error": "Missing session_id or item"}), 400
+
+    with active_processes_lock:
+        covers = active_processes.get(session_id, {}).get("item_covers")
+        cover_file = covers.get(int(item)) if isinstance(covers, dict) else None
+    if not isinstance(cover_file, Path) or not cover_file.is_file():
+        return jsonify({"success": False, "error": "Cover not found"}), 404
+
+    mimetype = mimetypes.guess_type(str(cover_file))[0] or "application/octet-stream"
+    return send_file(cover_file, mimetype=mimetype, conditional=True, max_age=30)
+
+
 @app.route("/api/execution_preview_cover/regenerate", methods=["POST"])
 @limiter.limit("600 per hour", key_func=_rate_limit_key_func, override_defaults=True)
 def regenerate_execution_preview_cover():
@@ -7686,7 +7747,7 @@ def _pump_session(session_id: str, process_state: dict[str, object], process: _W
             gui_event = _subprocess_gui_event(chunk)
             if gui_event is not None:
                 if gui_event:
-                    _publish_session_event(process_state, {"type": "gui", "data": gui_event})
+                    _publish_session_event(process_state, {"type": "gui", "data": _resolve_gui_item_artwork(session_id, process_state, gui_event)})
                 continue
 
             progress_event = _subprocess_progress_event(chunk)

@@ -302,9 +302,7 @@ class UploadHelper:
             interactive = (not meta.unattended or meta.unattended_confirm) and not meta.ask_dupe
             needs_review = bool(dupes) and not season_pack_skip and (meta.dupe is False or (meta.filename_match and meta.file_count_match))
             if not dupes and slot_decision is not None:
-                needs_review = meta.dupe is False and (
-                    slot_decision.verdict is Verdict.BLOCK or (slot_decision.verdict is Verdict.REVIEW and bool(slot_decision.conflicts))
-                )
+                needs_review = meta.dupe is False and (slot_decision.verdict is Verdict.BLOCK or (slot_decision.verdict is Verdict.REVIEW and bool(slot_decision.conflicts)))
             webui_events.dupe_review_ready(tracker_name, needs_review=bool(interactive and needs_review))
         async with self._prompt_lock:
             token = _dupe_prompt_lock_held.set(True)
@@ -418,6 +416,7 @@ class UploadHelper:
         tracker_class: Any = None,
     ) -> tuple[bool, Meta]:
         """Review one tracker, reusing an instance prepared for its season-pack policy."""
+
         def _format_dupe(entry: DupeEntry | str) -> str:
             if isinstance(entry, dict):
                 name = str(entry.get("name", ""))
@@ -746,7 +745,7 @@ class UploadHelper:
 
     async def get_confirmation(self, meta: Meta) -> bool:
         """Publish resolved release flags and review metadata before continuing."""
-        webui_events.update_item(personal_release=meta.personalrelease is True, run_options=meta)
+        webui_events.update_item(personal_release=meta.personalrelease is True, run_options=meta, artwork=meta)
         confirm: bool = False
         lines: list[str | tuple[str, str]] = []
         missing_warning = "[bold red]⚠️ Missing[/bold red]"
