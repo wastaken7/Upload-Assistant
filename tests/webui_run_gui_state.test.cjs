@@ -21,6 +21,7 @@ const {
   reduceRunGuiEvent,
   markRunGuiPromptAnswered,
   selectRunGuiView,
+  getDebugRunRows,
 } = loadRunGui();
 
 const plain = (value) => JSON.parse(JSON.stringify(value));
@@ -66,6 +67,136 @@ test("unknown stage keys and event kinds are ignored", () => {
     reduceRunGuiEvent(initial, { type: "html", data: "<b>x</b>" }),
     initial,
   );
+});
+
+test("personal release flags survive completion and stay with their queue item", () => {
+  const state = run(
+    gui({ kind: "item", index: 1, total: 2, name: "Personal.mkv" }),
+    gui({
+      kind: "item",
+      index: 1,
+      total: 2,
+      name: "Personal.mkv",
+      personal_release: true,
+    }),
+    gui({ kind: "item", index: 2, total: 2, name: "Other.mkv" }),
+    { type: "exit", code: 0 },
+  );
+  const view = selectRunGuiView(state);
+  assert.equal(view.items.length, 2);
+  assert.equal(view.items[0].personalRelease, true);
+  assert.equal(view.currentItem.personalRelease, false);
+  assert.equal(view.finished, true);
+});
+
+test("a corrected release flag replaces the previous badge", () => {
+  const view = selectRunGuiView(
+    run(
+      gui({
+        kind: "item",
+        index: 1,
+        total: 1,
+        name: "Example",
+        personal_release: true,
+      }),
+      gui({
+        kind: "item",
+        index: 1,
+        total: 1,
+        name: "Example",
+        personal_release: false,
+      }),
+    ),
+  );
+  assert.equal(view.currentItem.personalRelease, false);
+});
+
+test("debug settings arrive before confirmation, survive replay, and stay with their item", () => {
+  const events = [
+    gui({
+      kind: "item",
+      index: 1,
+      total: 2,
+      name: "Debug",
+      run_options: { debug: true, no_seed: true, skip_imghost_upload: false },
+    }),
+    gui({
+      kind: "item",
+      index: 1,
+      total: 2,
+      name: "Debug",
+      personal_release: true,
+      run_options: {
+        debug: true,
+        no_seed: true,
+        skip_imghost_upload: true,
+        prep_directory: "/tmp/prepared",
+      },
+    }),
+    gui({
+      kind: "item",
+      index: 2,
+      total: 2,
+      name: "Normal",
+      run_options: { debug: false },
+    }),
+    { type: "exit", code: 0 },
+  ];
+  const early = selectRunGuiView(run(events[0]));
+  assert.equal(early.currentItem.runOptions.debug, true);
+  assert.equal(early.lastConfirm, null);
+  const view = selectRunGuiView(run(...plain(events)));
+  assert.equal(view.items[0].runOptions.debug, true);
+  assert.equal(view.items[0].runOptions.prepDirectory, "/tmp/prepared");
+  assert.equal(view.currentItem.runOptions.debug, false);
+});
+
+test("skip flags use enabled ticks for skipping and disabled crosses for allowed actions", () => {
+  for (const noSeed of [false, true])
+    for (const skipImagehostUpload of [false, true]) {
+      const rows = getDebugRunRows({
+        debug: true,
+        noSeed,
+        skipImagehostUpload,
+      });
+      assert.equal(rows[0].enabled, true);
+      assert.equal(rows[1].enabled, noSeed);
+      assert.equal(rows[2].enabled, skipImagehostUpload);
+      assert.equal(
+        rows[1].detail,
+        noSeed
+          ? "Prepared torrents will not be added to a client."
+          : "Prepared torrents may be added to configured clients.",
+      );
+      assert.equal(
+        rows[2].detail,
+        skipImagehostUpload
+          ? "Screenshots will not be uploaded to an image host."
+          : "Screenshots may still be uploaded to an image host.",
+      );
+    }
+});
+
+test("debug details explain nohash, disabled clients and music artwork without promising uploads", () => {
+  const rows = getDebugRunRows({
+    debug: true,
+    noSeed: false,
+    skipImagehostUpload: false,
+    noHash: true,
+    ffDebug: true,
+    category: "MUSIC",
+  });
+  assert.match(rows[1].detail, /disabled by --nohash/);
+  assert.match(rows[2].detail, /MUSIC artwork hosting is skipped/);
+  assert.deepEqual(plain(rows.slice(3).map((row) => row.flag)), [
+    "--nohash",
+    "--ffdebug",
+  ]);
+  assert.match(
+    getDebugRunRows({ debug: true, clientDisabled: true })[1].detail,
+    /--client none/,
+  );
+  assert.deepEqual(plain(getDebugRunRows({ debug: false })), []);
 });
 
 test("repeated notices are counted once, and keyed notices keep the latest text", () => {

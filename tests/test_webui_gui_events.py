@@ -79,6 +79,37 @@ def test_tracker_results_drop_non_http_links_and_unknown_statuses(gui_env, capsy
     assert event["duration"] == 1.23
 
 
+def test_personal_release_flag_updates_the_current_item_and_resets_for_the_next(gui_env, capsys) -> None:
+    """Resolved flags retain the release identity without leaking to another item."""
+    webui_events.update_item(personal_release=True)
+    assert capsys.readouterr().out == ""
+    webui_events.begin_item("/media/Personal.mkv", 1, 2)
+    webui_events.update_item(personal_release=True)
+    webui_events.begin_item("/media/Other.mkv", 2, 2)
+
+    started, updated, other = _events(capsys.readouterr().out)
+    assert {key: value for key, value in updated.items() if key != "ts"} == {
+        "kind": "item", "index": 1, "total": 2, "name": "Personal.mkv", "personal_release": True,
+    }
+    assert "personal_release" not in started
+    assert "personal_release" not in other
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("personal_release", [False, True])
+async def test_unattended_confirmation_publishes_the_resolved_personal_release_flag(gui_env, capsys, personal_release) -> None:
+    """Unattended runs publish the badge even though they do not open a prompt."""
+    from src.meta import Meta
+    from src.uphelper import UploadHelper
+
+    webui_events.begin_item("/media/Example.mkv", 1, 1)
+    assert await UploadHelper({"DEFAULT": {}}).get_confirmation(Meta(category="MOVIE", unattended=True, personalrelease=personal_release)) is True
+
+    updates = [event for event in _events(capsys.readouterr().out) if event["kind"] == "item" and "personal_release" in event]
+    assert len(updates) == 1
+    assert updates[0]["personal_release"] is personal_release
+
+
 def test_oversized_events_are_not_written(gui_env, capsys, monkeypatch) -> None:
     monkeypatch.setattr(webui_events, "MAX_EVENT_BYTES", 200)
 

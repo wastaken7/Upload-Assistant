@@ -1183,6 +1183,134 @@ const getArgumentViewSections = (viewId) => {
 
 // Icon components
 const LucideIcon = window.UALucideIcon;
+
+/** A native popover escapes the scroll panel and dismisses on Escape or outside click. */
+const RunGuiDebugBadge = ({ options }) => {
+  const triggerRef = useRef(null);
+  const popoverRef = useRef(null);
+  const [open, setOpen] = useState(false);
+  const [popoverId] = useState(
+    () => `ua-debug-${Math.random().toString(36).slice(2)}`,
+  );
+  /** Keep an open panel anchored to its badge and inside the viewport. */
+  const positionPopover = useCallback(() => {
+    const popover = popoverRef.current;
+    const trigger = triggerRef.current;
+    if (!popover || !trigger || !popover.matches(":popover-open")) return;
+    popover.style.width = `${Math.min(384, window.innerWidth - 24)}px`;
+    const bounds = popover.getBoundingClientRect();
+    const anchor = trigger.getBoundingClientRect();
+    const below = anchor.bottom + 8;
+    const top =
+      below + bounds.height <= window.innerHeight - 12
+        ? below
+        : Math.max(12, anchor.top - bounds.height - 8);
+    const left = Math.max(
+      12,
+      Math.min(
+        anchor.right - bounds.width,
+        window.innerWidth - bounds.width - 12,
+      ),
+    );
+    popover.style.top = `${top}px`;
+    popover.style.left = `${left}px`;
+  }, []);
+  useEffect(() => {
+    const popover = popoverRef.current;
+    const onToggle = (event) => {
+      setOpen(event.newState === "open");
+      if (event.newState === "open") positionPopover();
+    };
+    popover.addEventListener("toggle", onToggle);
+    window.addEventListener("resize", positionPopover);
+    window.addEventListener("scroll", positionPopover, true);
+    return () => {
+      popover.removeEventListener("toggle", onToggle);
+      window.removeEventListener("resize", positionPopover);
+      window.removeEventListener("scroll", positionPopover, true);
+    };
+  }, [positionPopover]);
+  useEffect(() => {
+    if (open) positionPopover();
+  }, [open, options, positionPopover]);
+
+  return (
+    <>
+      <button
+        ref={triggerRef}
+        type="button"
+        popovertarget={popoverId}
+        aria-label="Debug Run details"
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        aria-controls={popoverId}
+        data-tone="attention"
+        className="ua-run-gui-chip inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium"
+      >
+        <LucideIcon
+          name="square-terminal"
+          className="ua-run-gui-tone-icon h-3 w-3"
+        />
+        Debug Run
+        <LucideIcon name="chevron-down" className="h-3 w-3" />
+      </button>
+      <div
+        ref={popoverRef}
+        id={popoverId}
+        popover="auto"
+        role="dialog"
+        aria-label="Debug run details"
+        className="ua-run-gui-debug-popover rounded-lg border p-4 shadow-xl"
+      >
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h4 className="text-sm font-semibold">Debug Run</h4>
+          <button
+            type="button"
+            popovertarget={popoverId}
+            popovertargetaction="hide"
+            aria-label="Close debug run details"
+            className="ua-run-gui-muted rounded p-1"
+          >
+            <LucideIcon name="x" className="h-4 w-4" />
+          </button>
+        </div>
+        <dl className="space-y-3">
+          {window.UARunGui.getDebugRunRows(options).map((row) => (
+            <div key={row.flag}>
+              <dt className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+                <code className="min-w-0 break-all font-semibold">
+                  {row.flag}
+                </code>
+                <span
+                  className="ml-auto inline-flex items-center gap-1"
+                  data-tone={row.enabled ? "success" : "muted"}
+                >
+                  <LucideIcon
+                    name={row.enabled ? "circle-check" : "circle-x"}
+                    className="ua-run-gui-tone-icon h-3.5 w-3.5"
+                  />
+                  {row.enabled ? "Applied" : "Not applied"}
+                </span>
+              </dt>
+              <dd className="mt-1 text-xs">
+                <span className="font-medium">{row.label}</span>
+                <p className="ua-run-gui-muted mt-0.5">{row.detail}</p>
+              </dd>
+            </div>
+          ))}
+        </dl>
+        {options.prepDirectory && (
+          <div className="mt-4">
+            <p className="mb-1 text-xs font-semibold">Prep material</p>
+            <p className="ua-run-gui-muted break-all font-mono text-xs">
+              {options.prepDirectory}
+            </p>
+          </div>
+        )}
+      </div>
+    </>
+  );
+};
 const WebUiIcon = LucideIcon;
 
 const FolderIcon = () => (
@@ -9552,8 +9680,10 @@ function AudionutsUAGUI() {
                 <span
                   className="ua-run-gui-chip ml-auto rounded-md px-2 py-0.5 text-xs"
                   data-tone="info"
+                  hidden={Boolean(view.currentItem?.runOptions)}
                 >
-                  Debug: nothing will be uploaded
+                  {/* Older logs lack the settings used by the persistent header badge. */}
+                  Debug: tracker uploads are disabled
                 </span>
               )}
               {view.dupeReview && (
@@ -9888,6 +10018,17 @@ function AudionutsUAGUI() {
     return { tone: "muted", icon: "circle-minus", label: "No upload" };
   };
 
+  /** Identify a resolved personal release in the live header or queue results. */
+  const renderRunGuiPersonalRelease = () => (
+    <span
+      className="ua-run-gui-chip inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium"
+      data-tone="info"
+    >
+      <LucideIcon name="flag" className="ua-run-gui-tone-icon h-3 w-3" />
+      Personal Release
+    </span>
+  );
+
   /** One queue item as a card: the release is the heading, trackers below it. */
   const renderRunGuiItemCard = (group, view) => {
     const outcome = runGuiItemOutcome(group, view);
@@ -9897,7 +10038,7 @@ function AudionutsUAGUI() {
         className="ua-run-gui-item rounded-md border"
         data-tone={outcome.tone}
       >
-        <header className="ua-run-gui-item-header flex min-w-0 items-center gap-2 px-3 py-2">
+        <header className="ua-run-gui-item-header flex min-w-0 flex-wrap items-center gap-2 px-3 py-2">
           <span className="ua-run-gui-item-index shrink-0 rounded px-1.5 text-xs font-semibold tabular-nums">
             {group.index}
           </span>
@@ -9907,6 +10048,10 @@ function AudionutsUAGUI() {
           >
             {group.name || `Item ${group.index}`}
           </h4>
+          {group.personalRelease && renderRunGuiPersonalRelease()}
+          {group.runOptions?.debug && (
+            <RunGuiDebugBadge options={group.runOptions} />
+          )}
           <span className="ua-run-gui-status inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-0.5 text-xs font-semibold">
             <LucideIcon
               name={outcome.icon}
@@ -10021,6 +10166,8 @@ function AudionutsUAGUI() {
       ? view.items.map((item) => ({
           index: item.index,
           name: item.name,
+          personalRelease: item.personalRelease,
+          runOptions: item.runOptions,
           rows: view.trackers.filter((entry) => entry.item === item.index),
           notes: view.itemNotes[item.index] || emptyNotes,
         }))
@@ -10040,6 +10187,8 @@ function AudionutsUAGUI() {
         ];
     const visibleGroups = resultGroups.filter(
       (group) =>
+        group.personalRelease ||
+        group.runOptions?.debug ||
         group.rows.length ||
         group.notes.cards.length ||
         group.notes.notices.length ||
@@ -10070,27 +10219,65 @@ function AudionutsUAGUI() {
       : counts.success
         ? "success"
         : "info";
+    const showItemHeader =
+      view.currentItem &&
+      (view.multipleItems ||
+        view.currentItem.personalRelease ||
+        view.currentItem.runOptions?.debug);
 
     return (
       <div className="ua-run-gui flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
         {/* The Terminal | GUI switch sits at the right of the stages bar. */}
-        <div className="ua-run-gui-strip flex items-start gap-3 rounded-lg border px-3 py-2">
-          <div className="min-w-0 flex-1">
-            {view.multipleItems && view.currentItem && (
-              <p className="ua-run-gui-muted mb-1.5 flex min-w-0 items-center gap-1.5 text-xs">
-                <LucideIcon
-                  name="file-stack"
-                  className="h-3.5 w-3.5 shrink-0"
-                />
-                <span className="shrink-0 font-semibold">
-                  Item {view.currentItem.index} of {view.currentItem.total}
-                </span>
-                <span className="truncate">{view.currentItem.name}</span>
-              </p>
-            )}
-            {renderRunGuiStages(view, waitingForUser)}
+        <div className="ua-run-gui-strip rounded-lg border px-3 py-2">
+          <div
+            className={`flex min-w-0 flex-wrap gap-3 ${showItemHeader ? "items-center" : "items-start"}`}
+          >
+            <div
+              className={`min-w-0 flex-1 ${view.currentItem?.personalRelease && view.currentItem.runOptions?.debug ? "basis-full sm:basis-0" : ""}`}
+            >
+              {showItemHeader ? (
+                <div className="ua-run-gui-muted flex min-w-0 flex-wrap items-center gap-1.5 text-xs">
+                  {view.multipleItems && (
+                    <>
+                      <LucideIcon
+                        name="file-stack"
+                        className="h-3.5 w-3.5 shrink-0"
+                      />
+                      <span className="shrink-0 font-semibold">
+                        Item {view.currentItem.index} of{" "}
+                        {view.currentItem.total}
+                      </span>
+                    </>
+                  )}
+                  <span className="min-w-0 flex-1 truncate">
+                    {view.currentItem.name}
+                  </span>
+                </div>
+              ) : (
+                renderRunGuiStages(view, waitingForUser)
+              )}
+            </div>
+            {showItemHeader &&
+              (view.currentItem.personalRelease ||
+                view.currentItem.runOptions?.debug) && (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {view.currentItem.personalRelease &&
+                    renderRunGuiPersonalRelease()}
+                  {view.currentItem.runOptions?.debug && (
+                    <RunGuiDebugBadge
+                      key={`${activeTabId}:${view.currentItem.index}`}
+                      options={view.currentItem.runOptions}
+                    />
+                  )}
+                </div>
+              )}
+            {toggleInStrip && renderOutputModeToggle(true)}
           </div>
-          {toggleInStrip && renderOutputModeToggle(true)}
+          {showItemHeader && (
+            <div className="mt-1.5">
+              {renderRunGuiStages(view, waitingForUser)}
+            </div>
+          )}
         </div>
 
         {renderRunGuiPrompt(view)}
@@ -10293,7 +10480,9 @@ function AudionutsUAGUI() {
             />
             {view.exitCode
               ? `Upload process exited with code ${view.exitCode}.`
-              : "Upload process finished."}
+              : !view.multipleItems && view.currentItem?.runOptions?.debug
+                ? "Debug run finished."
+                : "Upload process finished."}
           </p>
         )}
       </div>
