@@ -147,6 +147,38 @@ def test_description_builder_tracklist_uses_plain_text_when_tracker_disables_tab
     assert "[h2]Tracklist[/h2]\n01. Opening (02:01)" in result
 
 
+def test_description_builder_renders_rip_logs_in_spoilers(tmp_path: Path):
+    (tmp_path / "CD1").mkdir()
+    (tmp_path / "CD1" / "Invented Album.log").write_bytes("Exact Audio Copy V1.6\r\n\r\nUsed drive  : Fictional Drive\r\nHidden [/code] tag\r\n".encode("utf-16"))
+    (tmp_path / "XLD.log").write_text("X Lossless Decoder version 20240511\nHidden [/pre] tag\nAll tracks accurately ripped\n", encoding="utf-8")
+    (tmp_path / "notes.log").write_text("Mounted the CD-ROM image\n", encoding="utf-8")
+    release = {
+        "root": str(tmp_path),
+        "tracks": [{"relative_path": "01 - Opening.flac", "track_number": 1, "title": "Opening"}],
+        "auxiliary": {"logs": ["CD1/Invented Album.log", "XLD.log", "notes.log", "missing.log", "../outside.log"]},
+    }
+    builder = DescriptionBuilder("PEERGARDEN", {"DEFAULT": {}, "TRACKERS": {"PEERGARDEN": {}}}, language="pt-BR")
+
+    result = builder._build_music_desc_section(Meta(category="MUSIC", music_release=release))
+
+    assert result.index("[h2]Lista de faixas[/h2]") < result.index("[h2]Logs de Ripagem[/h2]")
+    assert "[spoiler=CD1/Invented Album.log][code]Exact Audio Copy V1.6\n\nUsed drive  : Fictional Drive\nHidden ［/code] tag[/code][/spoiler]" in result
+    assert "[spoiler=XLD.log][code]X Lossless Decoder version 20240511\nHidden ［/pre] tag\nAll tracks accurately ripped[/code][/spoiler]" in result
+    assert "notes.log" not in result
+    assert "\r" not in result
+
+
+def test_description_builder_omits_rip_log_section_without_rip_logs(tmp_path: Path):
+    (tmp_path / "notes.log").write_text("not a rip log\n", encoding="utf-8")
+    release = {"root": str(tmp_path), "tracks": [{"title": "Opening"}], "auxiliary": {"logs": ["notes.log"]}}
+    builder = DescriptionBuilder("PEERGARDEN", {"DEFAULT": {}, "TRACKERS": {"PEERGARDEN": {}}})
+
+    result = builder._build_music_desc_section(Meta(category="MUSIC", music_release=release))
+
+    assert "Rip Logs" not in result
+    assert "[spoiler" not in result
+
+
 def _music_meta_with_cover() -> Meta:
     return Meta(
         category="MUSIC",

@@ -28,6 +28,25 @@ TECHNICAL_BRACKET_RE = re.compile(r"\b\d{2}\s*-?\s*bits?\b|(?:\b|(?<=\d))k?hz\b|
 # optional separator before another ``\d+`` creates many equivalent ways to
 # partition a long run of digits and can backtrack exponentially.
 CATALOGUE_RE = re.compile(r"\b(?:[A-Z]{1,8}[- ]?\d{2,}(?:[- ]\d+)*|\d{1,2}[- ]\d{3,}(?:[- ]\d+)*|\d{5,})\b", re.I)
+RIPPER_NAMES = r"Exact Audio Copy|X Lossless Decoder|CUERipper|whipper"
+# Enough to call the source a CD, but "CD-ROM" alone does not make a .log a rip log.
+RIP_LOG_RE = re.compile(rf"\b(?:{RIPPER_NAMES}|CD-DA|CD-ROM)\b", re.I)
+RIPPER_LOG_RE = re.compile(rf"\b(?:{RIPPER_NAMES})\b", re.I)
+
+
+def read_rip_log(path: Path, limit: int | None = None, signature: re.Pattern[str] = RIP_LOG_RE) -> str:
+    """Return the text of a CD rip log, or "" when the file does not match ``signature``.
+
+    EAC writes UTF-16 logs; XLD, CUERipper and whipper write UTF-8.
+    """
+    try:
+        data = path.read_bytes()
+    except OSError:
+        return ""
+    if limit is not None:
+        data = data[:limit]
+    text = data.decode("utf-16", errors="ignore") if data.startswith((b"\xff\xfe", b"\xfe\xff")) or b"\x00" in data[:256] else data.decode("utf-8-sig", errors="ignore")
+    return text if signature.search(text) else ""
 
 
 def _clean(value: Any) -> str:
@@ -542,12 +561,7 @@ class MusicReleaseAnalyzer:
             return
         root = release.path
         for relative in release.auxiliary.logs:
-            try:
-                data = (root / relative).read_bytes()[:262_144]
-            except OSError:
-                continue
-            text = data.decode("utf-16", errors="ignore") if data.startswith((b"\xff\xfe", b"\xfe\xff")) or b"\x00" in data[:256] else data.decode("utf-8", errors="ignore")
-            if re.search(r"\b(?:Exact Audio Copy|X Lossless Decoder|CUERipper|whipper|CD-DA|CD-ROM)\b", text, re.I):
+            if read_rip_log(root / relative, limit=262_144):
                 release.set_field("media", "CD", MetadataSource.AUXILIARY, 0.9)
                 release.warnings.append("Source media inferred as CD from the rip log.")
                 return

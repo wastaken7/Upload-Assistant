@@ -29,6 +29,7 @@ from src.description_review import apply_saved_draft
 from src.languages import languages_manager
 from src.mediainfo import MediaInfo
 from src.meta import Meta
+from src.music.analyzer import RIPPER_LOG_RE, read_rip_log
 from src.screenshot_manifest import files as manifest_files
 from src.takescreens import TakeScreensManager
 from src.tracker_images import get_tracker_image_collection, has_tracker_image_collection
@@ -1327,6 +1328,35 @@ class DescriptionBuilder:
         return "\n".join(lines)
 
     @staticmethod
+    def _build_music_rip_logs(release: dict[str, Any], labels: dict[str, Any]) -> str:
+        """Render each CD rip log (EAC, XLD, ...) inside its own spoiler and code block."""
+        auxiliary = release.get("auxiliary")
+        logs = auxiliary.get("logs") if isinstance(auxiliary, dict) else None
+        root_value = str(release.get("root") or "")
+        if not isinstance(logs, list) or not root_value:
+            return ""
+        root = Path(root_value).resolve()
+        blocks = []
+        for relative in cast(list[Any], logs):
+            log_path = (root / str(relative)).resolve()
+            try:
+                # Logs are a few dozen KB; anything far larger is not worth embedding.
+                if not log_path.is_relative_to(root) or log_path.stat().st_size > 1_048_576:
+                    continue
+            except OSError:
+                continue
+            log_text = read_rip_log(log_path, signature=RIPPER_LOG_RE).replace("\r\n", "\n").replace("\r", "\n").strip()
+            if not log_text:
+                continue
+            # A closing tag inside the log would end the block early; some trackers turn [code] into [pre].
+            log_text = re.sub(r"\[(/\s*(?:code|pre|spoiler))", "\N{FULLWIDTH LEFT SQUARE BRACKET}\\1", log_text, flags=re.IGNORECASE)
+            name = str(relative).replace("\\", "/").replace("[", "\N{FULLWIDTH LEFT SQUARE BRACKET}").replace("]", "\N{FULLWIDTH RIGHT SQUARE BRACKET}")
+            blocks.append(f"[spoiler={name}][code]{log_text}[/code][/spoiler]")
+        if not blocks:
+            return ""
+        return f"[h2]{labels['rip_logs']}[/h2]\n" + "\n".join(blocks)
+
+    @staticmethod
     def _music_cover_url(meta: Meta) -> str:
         """Return the hosted MUSIC cover URL, or a user-supplied public artwork URL."""
         hosted = meta.hosted_artwork[0] if isinstance(meta.hosted_artwork, list) and meta.hosted_artwork else {}
@@ -1504,6 +1534,7 @@ class DescriptionBuilder:
         )
 
         tracklist = self._build_music_tracklist(tracks, text, table=table)
+        rip_logs = self._build_music_rip_logs(release, text)
 
         music_fields = [
             (text["artist"], display(value("artists", value("artist", meta.artist)))),
@@ -1526,7 +1557,7 @@ class DescriptionBuilder:
         ]
         music_fields = [(label, field_value) for label, field_value in music_fields if field_value]
         if not music_fields:
-            return tracklist
+            return "\n\n".join(part for part in (tracklist, rip_logs) if part)
 
         # Only these trackers get the hosted cover as a first column beside the details.
         cover_url = self._music_cover_url(meta) if self.tracker in ("ASIANCINEMA", "TORRENTLEECH") else ""
@@ -1548,7 +1579,7 @@ class DescriptionBuilder:
                     f'<table><tr><td style="vertical-align: top; padding-right: 15px;"><img src="{safe_url}" style="max-width: 250px;"></td>'
                     f'<td style="vertical-align: top;">{body}</td></tr></table>'
                 )
-        return f"{header}{text['details']}{header_end}\n{body}" + (f"\n\n{tracklist}" if tracklist else "")
+        return f"{header}{text['details']}{header_end}\n{body}" + "".join(f"\n\n{part}" for part in (tracklist, rip_logs) if part)
 
     async def general_description_generator(
         self,
