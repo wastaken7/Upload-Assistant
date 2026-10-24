@@ -11,7 +11,6 @@ import web_ui.server as server
 from src import webui_events
 from src.console import GuiNoticeHandler
 
-
 TEST_NONCE = "fictional-nonce"
 
 
@@ -510,7 +509,7 @@ def test_numbered_options_carry_structured_details(gui_env, capsys) -> None:
 
     (opened,) = _events(capsys.readouterr().out)
     first, second = opened["context"]["details"]
-    assert first == {"meta": "TMDb 1 · similarity 0.40", "text": "A fictional synopsis.", "link": "https://www.themoviedb.org/movie/1", "link_label": "TMDb"}
+    assert first == {"meta": "TMDb 1 · similarity 0.40", "text": "A fictional synopsis.", "link": "https://www.themoviedb.org/movie/1", "link_label": "TMDb", "flag": ""}
     assert second["link"] == ""
 
 
@@ -530,3 +529,13 @@ def test_field_prompts_show_the_values_a_question_is_about(gui_env, capsys) -> N
         "hint": "The album title.",
         "placeholder": "Album",
     }
+
+
+def test_numbered_options_carry_a_hint_and_only_country_flag_codes(gui_env, capsys) -> None:
+    details = [{"meta": "Country: Fictionland", "flag": "us"}, {"flag": "../evil"}, {"flag": "gb-eng"}]
+    with webui_events.numbered_options(["One", "Two", "Three"], details=details, hint="Why this matters.\nWhat a and n do."):
+        webui_events.prompt_open("text", "Pick one:")
+
+    (opened,) = _events(capsys.readouterr().out)
+    assert [detail["flag"] for detail in opened["context"]["details"]] == ["us", "", ""]
+    assert opened["context"]["hint"] == "Why this matters.\nWhat a and n do."

@@ -60,6 +60,8 @@ _prompt_context: contextvars.ContextVar[dict[str, Any] | None] = contextvars.Con
 _tracker_check: contextvars.ContextVar[_TrackerCheckMessages | None] = contextvars.ContextVar("ua_gui_tracker_check", default=None)
 _ANSI_ESCAPE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 _MARKUP_TAG = re.compile(r"\[/?[a-zA-Z#][^\[\]]*\]|\[/\]")
+# ISO 3166-1 alpha-2 code naming a bundled ``static/img/flags/<code>.svg``.
+_FLAG_CODE = re.compile(r"[a-z]{2}")
 
 
 def enabled() -> bool:
@@ -270,6 +272,7 @@ def numbered_options(
     start: int = 1,
     images: Iterable[str] = (),
     details: Iterable[Mapping[str, Any]] = (),
+    hint: str = "",
 ) -> Generator[None]:
     """Show the numbered list printed before a free-text prompt as answer buttons.
 
@@ -281,7 +284,9 @@ def numbered_options(
     thumbnail URLs, one per option ("" for none), such as posters.
     ``details`` are optional, one per option: ``meta`` (a short line such as
     IDs), ``text`` (a synopsis) and ``link``/``link_label`` (the entry on its
-    site, e.g. TMDb), shown under the option's label.
+    site, e.g. TMDb), shown under the option's label, and ``flag`` (a
+    lowercase ISO 3166-1 alpha-2 country code, shown as its flag). ``hint``
+    explains above the list why the question is asked.
     """
     thumbnails = [_http_link(image) if image else "" for image in images]
     context: dict[str, Any] = {"kind": "options", "options": list(options), "actions": list(actions), "start": str(int(start))}
@@ -293,11 +298,14 @@ def numbered_options(
             "text": plain_text(detail.get("text"), 400, markup=False),
             "link": _http_link(detail.get("link")) if detail.get("link") else "",
             "link_label": plain_text(detail.get("link_label"), 40, markup=False),
+            "flag": flag if _FLAG_CODE.fullmatch(flag := str(detail.get("flag") or "")) else "",
         }
         for detail in details
     ]
     if any(any(detail.values()) for detail in option_details):
         context["details"] = option_details
+    if hint:
+        context["hint"] = plain_text(hint, 600, markup=False)
     with prompt_context(**context):
         yield
 

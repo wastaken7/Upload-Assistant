@@ -9556,6 +9556,11 @@ function AudionutsUAGUI() {
     const optionButtons =
       !details && (options.length || actions.length) ? (
         <div className="grid gap-1.5">
+          {context.hint && (
+            <p className="ua-run-gui-muted whitespace-pre-line text-xs leading-snug">
+              {context.hint}
+            </p>
+          )}
           {options.map((option, index) => {
             const detail = optionDetails[index] || {};
             const link = /^https?:\/\//i.test(String(detail.link || ""))
@@ -9601,9 +9606,20 @@ function AudionutsUAGUI() {
                     <span className="block break-words font-semibold">
                       {option}
                     </span>
-                    {detail.meta && (
-                      <span className="ua-run-gui-muted mt-0.5 block break-words text-xs">
-                        {detail.meta}
+                    {(detail.meta || detail.flag) && (
+                      <span className="ua-run-gui-muted mt-0.5 flex min-w-0 items-center gap-1.5 break-words text-xs">
+                        {/^[a-z]{2}$/.test(String(detail.flag || "")) && (
+                          <img
+                            src={`/static/img/flags/${detail.flag}.svg`}
+                            alt=""
+                            loading="lazy"
+                            onError={(event) => {
+                              event.currentTarget.style.display = "none";
+                            }}
+                            className="h-3 w-4 shrink-0 rounded-sm object-cover"
+                          />
+                        )}
+                        <span className="min-w-0">{detail.meta}</span>
                       </span>
                     )}
                     {detail.text && (

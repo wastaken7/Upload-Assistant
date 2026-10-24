@@ -10,6 +10,7 @@ from typing import Any, cast
 
 import cli_ui
 import httpx
+import pycountry
 from bs4 import BeautifulSoup
 from bs4.element import AttributeValueList
 from rich.console import Console
@@ -504,22 +505,47 @@ async def get_bluray_releases(meta: Meta) -> list[Release]:
                 logger.info(f"   [blue]Price: {release['price']}[/blue]")
                 logger.info(f"   [dim]URL: {release['url']}[/dim]")
 
-            if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                logger.info("")
-                logger.info("[green]Release Selection")
-                logger.info("[green]=======================================")
-                logger.info("[dim]Please select a release to use for region and distributor information:")
-                logger.info("[dim]Enter release number, 'a' for all releases, or 'n' to skip")
-                logger.info("[dim]Selecting all releases will search every release for more information...")
-                logger.info("[dim]More releases will require more time to process")
-            else:
-                logger.info("[yellow]Unattended mode - selecting all releases")
+            movie_name = f"{matching_releases[0]['movie_title']} ({matching_releases[0]['movie_year']})"
+            why = (
+                f"Blu-ray.com lists {len(matching_releases)} editions of {movie_name}. Pick the one that matches your disc: "
+                "its country sets the region and its publisher sets the distributor of this upload" + (", and its cover images are added." if meta.use_bluray_images else ".")
+            )
+            choices_help = "'a' compares every edition with this disc's specs and picks the closest (slower, one lookup per edition). 'n' skips Blu-ray.com."
+            logger.info("")
+            logger.info("[green]Which edition is your disc?")
+            logger.info("[green]=======================================")
+            logger.info(why)
+            logger.info(f"[dim]Enter its number. {choices_help}")
+
+            labels = [f"{release['title']} ({release['movie_year']})" if release.get("movie_year") else release["title"] for release in matching_releases]
+            details = [
+                {
+                    "meta": " · ".join(
+                        f"{name}: {value}"
+                        for name, value in (("Country", release.get("country")), ("Publisher", release.get("publisher")), ("Price", release.get("price")))
+                        if str(value or "").strip()
+                    ),
+                    "link": release.get("url") or "",
+                    "link_label": "Blu-ray.com",
+                    "flag": country_flag_code(release.get("country")),
+                }
+                for release in matching_releases
+            ]
+            # Blu-ray.com serves a small cover at a fixed path per release ID; the browser
+            # loads it, so no extra request is made here. DVD covers use another path.
+            covers = [
+                f"https://images.static-bluray.com/movies/covers/{release['release_id']}_medium.jpg"
+                if "blu-ray.com/movies/" in str(release.get("url") or "") and str(release.get("release_id") or "").isdigit()
+                else ""
+                for release in matching_releases
+            ]
 
             while True:
                 try:
-                    labels = [f"{release['title']} · {release['country']} · {release['publisher']} · {release['price']}" for release in matching_releases]
-                    with webui_events.numbered_options(labels, actions=[("a", "Use all releases"), ("n", "Skip Blu-ray.com")]):
-                        selection_raw = cli_ui.ask_string(f"Selection (1-{len(matching_releases)}/a/n): ")
+                    with webui_events.numbered_options(
+                        labels, actions=[("a", "Compare all editions"), ("n", "Skip Blu-ray.com")], images=covers, details=details, hint=f"{why}\n{choices_help}"
+                    ):
+                        selection_raw = cli_ui.ask_string(f"Your disc's edition (1-{len(matching_releases)}, a = compare all, n = skip): ")
                     selection = (selection_raw or "").strip().lower()
                     if selection == "a":
                         cli_ui.info("All releases selected")
@@ -1672,6 +1698,23 @@ async def process_all_releases(releases: Sequence[Release], meta: Meta) -> list[
                     detailed_releases = []
 
     return detailed_releases
+
+
+# Blu-ray.com country names that pycountry does not recognise.
+_FLAG_ALIASES = {"Brunei": "bn", "Cape Verde": "cv", "Chinese Taipei": "tw", "Macau": "mo", "Russia": "ru", "Turkey": "tr"}
+
+
+def country_flag_code(country_name: Any) -> str:
+    """Return the lowercase ISO 3166-1 alpha-2 code for a Blu-ray.com country name, or ""."""
+    name = str(country_name or "").strip()
+    if not name or name == "Unknown":
+        return ""
+    if name in _FLAG_ALIASES:
+        return _FLAG_ALIASES[name]
+    try:
+        return str(pycountry.countries.lookup(name).alpha_2).lower()
+    except LookupError:
+        return ""
 
 
 def map_country_to_region_code(country_name: str) -> str | None:
