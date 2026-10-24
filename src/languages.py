@@ -167,7 +167,9 @@ class LanguagesManager:
 
         lines = mediainfo_content.strip().split("\n")
 
-        section_header_re = re.compile(r"^(General|Video|Audio|Text|Menu)(?:\s*#\d+)?$", re.IGNORECASE)
+        # Include every MediaInfo stream kind so attachments (Image) and Other
+        # sections are not merged into the preceding audio or text track.
+        section_header_re = re.compile(r"^(General|Video|Audio|Text|Other|Image|Menu)(?:\s*#\d+)?$", re.IGNORECASE)
 
         for line in lines:
             line = line.strip()

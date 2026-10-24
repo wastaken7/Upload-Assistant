@@ -945,7 +945,9 @@ class Common:
     class MediaInfoParser:
         def parse_mediainfo(self, mediainfo_text: str) -> dict[str, Any]:
             # Patterns for matching sections and fields
-            section_pattern = re.compile(r"^(General|Video|Audio|Text|Menu)(?:\s#\d+)?", re.IGNORECASE)
+            # Include every MediaInfo stream kind so attachments (Image) and Other
+            # sections are not merged into the preceding audio or text track.
+            section_pattern = re.compile(r"^(General|Video|Audio|Text|Other|Image|Menu)(?:\s#\d+)?$", re.IGNORECASE)
             parsed_data: dict[str, Any] = {"general": {}, "video": [], "audio": [], "text": []}
             current_section: str | None = None
             current_track: dict[str, str] = {}
