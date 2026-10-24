@@ -48,7 +48,6 @@ dependencies = [
     "jinja2==3.1.6",
     "langcodes==3.5.1",
     "language-data==1.4.0",
-    "librosa>=1.0.0",
     "lxml==6.1.0",
     "matplotlib>=3.10.9",
     "mobi==0.4.1",
