@@ -174,6 +174,7 @@ MUSIC_LABELS = {
         "sample_rate": "Sample Rate",
         "channels": "Channels",
         "bitrate": "Bitrate",
+        "audio": "Audio",
         "external_ids": "External IDs",
         "external_id_labels": {
             "musicbrainz_release": "MusicBrainz Release",
@@ -207,6 +208,7 @@ MUSIC_LABELS = {
         "sample_rate": "Taxa de Amostragem",
         "channels": "Canais",
         "bitrate": "Bitrate",
+        "audio": "Áudio",
         "external_ids": "IDs Externos",
         "external_id_labels": {
             "musicbrainz_release": "Lançamento MusicBrainz",
