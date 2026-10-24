@@ -406,54 +406,15 @@ function WorkspaceNav({
             {appearanceOpen && (
               <div className="ua-app-rail-popover absolute bottom-0 left-full z-[60] ml-2 w-64 rounded-xl border p-4 shadow-2xl">
                 <h2 className="text-sm font-semibold">Appearance</h2>
-                <label className="ua-app-rail-popover-label mt-3 block text-xs font-semibold">
-                  Color theme
-                </label>
-                <select
-                  aria-label="Color theme"
-                  value={colorTheme}
-                  onChange={(event) => {
-                    onColorThemeChange(event.target.value);
-                    setAppearanceOpen(false);
-                  }}
-                  className="ua-theme-picker mt-1 w-full rounded-lg px-3 py-2 text-sm"
-                >
-                  {(window.UAThemes || []).map((theme) => (
-                    <option key={theme.id} value={theme.id}>
-                      {theme.label}
-                    </option>
-                  ))}
-                </select>
-                <label className="ua-app-rail-popover-label mt-3 block text-xs font-semibold">
-                  Corner style
-                </label>
-                <select
-                  aria-label="Corner style"
-                  value={interfaceStyle}
-                  onChange={(event) => {
-                    onInterfaceStyleChange(event.target.value);
-                    setAppearanceOpen(false);
-                  }}
-                  className="ua-theme-picker mt-1 w-full rounded-lg px-3 py-2 text-sm"
-                >
-                  {(window.UAInterfaceStyles || []).map((style) => (
-                    <option key={style.id} value={style.id}>
-                      {style.label}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  className="ua-config-mode-button mt-3 flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm"
-                  onClick={onToggleMode}
-                  aria-pressed={isDarkMode}
-                >
-                  <span>{isDarkMode ? "Dark mode" : "Light mode"}</span>
-                  <LucideIcon
-                    name={isDarkMode ? "moon" : "sun"}
-                    className="h-4 w-4"
-                  />
-                </button>
+                <window.UAAppearanceControls
+                  colorTheme={colorTheme}
+                  onColorThemeChange={onColorThemeChange}
+                  interfaceStyle={interfaceStyle}
+                  onInterfaceStyleChange={onInterfaceStyleChange}
+                  isDarkMode={isDarkMode}
+                  onToggleMode={onToggleMode}
+                  labelClassName="ua-app-rail-popover-label"
+                />
               </div>
             )}
           </div>

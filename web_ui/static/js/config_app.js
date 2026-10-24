@@ -293,10 +293,8 @@ const APP_BASE = API_BASE.replace(/\/api$/, "");
 const THEME_KEY = "ua_config_theme";
 const storage = window.UAStorage;
 const getStoredTheme = window.getUAStoredTheme;
-const colorThemes = window.UAThemes || [];
 const getStoredColorTheme = window.getUAStoredColorTheme;
 const setColorTheme = window.setUAColorTheme;
-const interfaceStyles = window.UAInterfaceStyles || [];
 const getStoredInterfaceStyle = window.getUAStoredInterfaceStyle;
 const setInterfaceStyle = window.setUAInterfaceStyle;
 
@@ -472,58 +470,15 @@ function ConfigApplicationRail({
           {isAppearanceOpen && (
             <div className="ua-app-rail-popover absolute bottom-0 left-full z-[60] ml-2 w-64 rounded-xl border p-4 shadow-2xl">
               <h2 className="text-sm font-semibold">Appearance</h2>
-              <label className="ua-app-rail-popover-label mt-3 block text-xs font-semibold">
-                Color theme
-              </label>
-              <select
-                aria-label="Color theme"
-                value={colorTheme}
-                onChange={(event) => {
-                  onColorThemeChange(event);
-                  setIsAppearanceOpen(false);
-                }}
-                className="ua-theme-picker mt-1 w-full rounded-lg px-3 py-2 text-sm"
-              >
-                {colorThemes.map((theme) => (
-                  <option key={theme.id} value={theme.id}>
-                    {theme.label}
-                  </option>
-                ))}
-              </select>
-              <label className="ua-app-rail-popover-label mt-3 block text-xs font-semibold">
-                Corner style
-              </label>
-              <select
-                aria-label="Corner style"
-                value={interfaceStyle}
-                onChange={(event) => {
-                  onInterfaceStyleChange(event);
-                  setIsAppearanceOpen(false);
-                }}
-                className="ua-theme-picker mt-1 w-full rounded-lg px-3 py-2 text-sm"
-              >
-                {interfaceStyles.map((style) => (
-                  <option key={style.id} value={style.id}>
-                    {style.label}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                className="ua-config-mode-button mt-3 flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm"
-                onClick={onToggleMode}
-                aria-pressed={isDarkMode}
-                aria-label={`Switch to ${isDarkMode ? "light" : "dark"} mode`}
-              >
-                <span>{isDarkMode ? "Dark mode" : "Light mode"}</span>
-                <span
-                  className="ua-config-mode-switch relative inline-flex h-6 w-11 items-center rounded-full"
-                  data-enabled={isDarkMode ? "true" : "false"}
-                  aria-hidden="true"
-                >
-                  <span className="ua-config-mode-knob inline-block h-4 w-4 rounded-full bg-white transition-transform"></span>
-                </span>
-              </button>
+              <window.UAAppearanceControls
+                colorTheme={colorTheme}
+                onColorThemeChange={onColorThemeChange}
+                interfaceStyle={interfaceStyle}
+                onInterfaceStyleChange={onInterfaceStyleChange}
+                isDarkMode={isDarkMode}
+                onToggleMode={onToggleMode}
+                labelClassName="ua-app-rail-popover-label"
+              />
             </div>
           )}
         </div>
@@ -9982,59 +9937,15 @@ function ConfigSidebar({
 
         {isAppearanceOpen && (
           <div id="config-appearance-controls" className="mt-3">
-            <label
-              htmlFor="config-color-theme"
-              className="ua-config-service-description block text-xs font-semibold"
-            >
-              Color theme
-            </label>
-            <select
-              id="config-color-theme"
-              value={colorTheme}
-              onChange={onColorThemeChange}
-              aria-label="Color theme"
-              className="ua-theme-picker mt-1 w-full rounded-lg px-3 py-2 text-sm"
-            >
-              {colorThemes.map((theme) => (
-                <option key={theme.id} value={theme.id}>
-                  {theme.label}
-                </option>
-              ))}
-            </select>
-            <label
-              htmlFor="config-interface-style"
-              className="ua-config-service-description mt-3 block text-xs font-semibold"
-            >
-              Corner style
-            </label>
-            <select
-              id="config-interface-style"
-              value={interfaceStyle}
-              onChange={onInterfaceStyleChange}
-              aria-label="Corner style"
-              className="ua-theme-picker mt-1 w-full rounded-lg px-3 py-2 text-sm"
-            >
-              {interfaceStyles.map((style) => (
-                <option key={style.id} value={style.id}>
-                  {style.label}
-                </option>
-              ))}
-            </select>
-            <button
-              type="button"
-              className="ua-config-mode-button mt-2 flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm"
-              onClick={onToggleMode}
-              aria-label={`Switch to ${isDarkMode ? "light" : "dark"} mode`}
-            >
-              <span>{isDarkMode ? "Dark mode" : "Light mode"}</span>
-              <span
-                className="ua-config-mode-switch relative inline-flex h-6 w-11 items-center rounded-full"
-                data-enabled={isDarkMode ? "true" : "false"}
-                aria-hidden="true"
-              >
-                <span className="ua-config-mode-knob inline-block h-4 w-4 rounded-full bg-white transition-transform"></span>
-              </span>
-            </button>
+            <window.UAAppearanceControls
+              colorTheme={colorTheme}
+              onColorThemeChange={onColorThemeChange}
+              interfaceStyle={interfaceStyle}
+              onInterfaceStyleChange={onInterfaceStyleChange}
+              isDarkMode={isDarkMode}
+              onToggleMode={onToggleMode}
+              labelClassName="ua-config-service-description"
+            />
           </div>
         )}
 
@@ -10307,11 +10218,11 @@ function ConfigApp() {
     };
   }, [isPendingSummaryOpen]);
 
-  const handleColorThemeChange = (event) => {
-    setColorThemeState(setColorTheme(event.target.value));
+  const handleColorThemeChange = (themeId) => {
+    setColorThemeState(setColorTheme(themeId));
   };
-  const handleInterfaceStyleChange = (event) => {
-    setInterfaceStyleState(setInterfaceStyle(event.target.value));
+  const handleInterfaceStyleChange = (styleId) => {
+    setInterfaceStyleState(setInterfaceStyle(styleId));
   };
   const getSubTabsForSection = (section) => {
     if (section?.section === "DEFAULT") {

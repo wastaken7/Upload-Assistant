@@ -2157,29 +2157,6 @@ html[data-ua-shape="square"] .ua-upload-tab-add {
   color: var(--ua-upload-text);
 }
 
-.ua-upload-mode-switch {
-  background: color-mix(
-    in srgb,
-    var(--ua-upload-muted) 38%,
-    var(--ua-upload-surface-raised)
-  );
-  padding: 0.25rem;
-  transition: background-color 150ms ease;
-}
-
-.ua-upload-mode-switch[data-enabled="true"] {
-  background: var(--ua-copper);
-}
-
-.ua-upload-mode-knob {
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
-  transform: translateX(0);
-}
-
-.ua-upload-mode-switch[data-enabled="true"] .ua-upload-mode-knob {
-  transform: translateX(1.25rem);
-}
-
 .ua-upload-help-modal,
 .ua-upload-help-card {
   background: var(--ua-upload-surface);
@@ -2796,6 +2773,127 @@ html[data-ua-shape="square"] .ua-upload-tab-add {
 
 .ua-app-rail-popover-label {
   color: var(--ua-muted);
+}
+
+/* Appearance controls shared by the Upload, Config and Stats pages. */
+.ua-appearance-controls {
+  display: grid;
+  gap: 0.5rem;
+}
+
+h2 + .ua-appearance-controls {
+  margin-top: 0.75rem;
+}
+
+.ua-appearance-value {
+  opacity: 0.7;
+}
+
+.ua-appearance-swatches {
+  display: grid;
+  gap: 0.375rem;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.ua-appearance-swatch {
+  align-items: center;
+  aspect-ratio: 1;
+  border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+  border-radius: 0.375rem;
+  color: #fff;
+  display: inline-flex;
+  justify-content: center;
+  transition:
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+}
+
+.ua-appearance-swatch:hover {
+  transform: scale(1.08);
+}
+
+.ua-appearance-swatch[data-active="true"] {
+  box-shadow:
+    0 0 0 2px var(--ua-appearance-ring, var(--ua-charcoal)),
+    0 0 0 4px var(--ua-copper-bright);
+}
+
+.ua-appearance-swatch-check {
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.6));
+}
+
+.ua-appearance-row {
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  margin-top: 0.25rem;
+}
+
+.ua-appearance-segments {
+  border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+  border-radius: 0.5rem;
+  display: inline-flex;
+  gap: 0.125rem;
+  margin-top: 0.375rem;
+  padding: 0.125rem;
+}
+
+.ua-appearance-segment {
+  align-items: center;
+  border-radius: 0.375rem;
+  display: inline-flex;
+  height: 2rem;
+  justify-content: center;
+  opacity: 0.65;
+  transition:
+    background-color 0.15s ease,
+    opacity 0.15s ease;
+  width: 2.25rem;
+}
+
+.ua-appearance-segment:hover {
+  background: color-mix(in srgb, currentColor 10%, transparent);
+  opacity: 1;
+}
+
+.ua-appearance-segment[data-active="true"] {
+  background: color-mix(in srgb, var(--ua-copper-bright) 22%, transparent);
+  color: var(--ua-copper-bright);
+  opacity: 1;
+}
+
+.ua-appearance-swatch:focus-visible,
+.ua-appearance-segment:focus-visible {
+  outline: 2px solid var(--ua-copper-bright);
+  outline-offset: 2px;
+}
+
+/* A top-left corner drawn sharp or curved, independent of the active shape. */
+.ua-appearance-corner-glyph {
+  border-left: 2px solid currentColor;
+  border-top: 2px solid currentColor;
+  display: block;
+  height: 0.875rem;
+  transform: translate(2px, 2px);
+  width: 0.875rem;
+}
+
+.ua-appearance-corner-glyph[data-shape="rounded"] {
+  border-top-left-radius: 0.625rem;
+}
+
+html[data-ua-shape="square"] .ua-appearance-swatch,
+html[data-ua-shape="square"] .ua-appearance-segments,
+html[data-ua-shape="square"] .ua-appearance-segment {
+  border-radius: 0.125rem;
+}
+
+.ua-upload-page .ua-appearance-controls {
+  --ua-appearance-ring: var(--ua-upload-surface);
+}
+
+.ua-config-page .ua-appearance-controls {
+  --ua-appearance-ring: var(--ua-config-surface);
 }
 
 .ua-api-key-alert-button,
@@ -3561,7 +3659,6 @@ html[data-ua-shape="square"] .ua-upload-tab-add {
 }
 
 .ua-config-page .ua-theme-picker,
-.ua-config-mode-button,
 .ua-config-sidebar-action {
   background-color: var(--ua-config-surface-raised);
   border: 1px solid var(--ua-config-border);
@@ -3587,7 +3684,6 @@ select {
   padding-right: 2.5rem !important;
 }
 
-.ua-config-mode-button:hover,
 .ua-config-sidebar-action:hover {
   background: var(--ua-config-hover);
   border-color: color-mix(
@@ -3609,29 +3705,6 @@ select {
     var(--ua-config-border)
   );
   color: var(--ua-copper-bright);
-}
-
-.ua-config-mode-switch {
-  background: color-mix(
-    in srgb,
-    var(--ua-config-muted) 38%,
-    var(--ua-config-surface-raised)
-  );
-  padding: 0.25rem;
-  transition: background-color 150ms ease;
-}
-
-.ua-config-mode-switch[data-enabled="true"] {
-  background: var(--ua-copper);
-}
-
-.ua-config-mode-knob {
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
-  transform: translateX(0);
-}
-
-.ua-config-mode-switch[data-enabled="true"] .ua-config-mode-knob {
-  transform: translateX(1.25rem);
 }
 
 .ua-config-boolean-toggle {
@@ -4457,14 +4530,12 @@ html[data-ua-shape="square"]
   --ua-run-gui-tone: #f59e0b;
   background: var(--ua-upload-surface-raised);
   border-color: color-mix(in srgb, #f59e0b 65%, transparent);
-  box-shadow: 0 0 0 4px color-mix(in srgb, #f59e0b 12%, transparent);
   flex-shrink: 0;
 }
 
 .ua-run-gui-prompt[data-answered="true"] {
   --ua-run-gui-tone: var(--ua-upload-muted);
   border-color: var(--ua-upload-border);
-  box-shadow: none;
 }
 
 .ua-run-gui-eyebrow {
