@@ -16,7 +16,11 @@ THUMB_ONLY_IMAGE = {"img_url": "https://images.example.invalid/thumb-only.jpg"}
         ({"category": "TV", "is_disc": "BDMV"}, True),
         ({"category": "MOVIE", "is_disc": "DVD"}, False),
         ({"category": "GAME"}, False),
-        ({"category": "book"}, False),
+        ({"category": "book", "path": __file__}, True),
+        ({"category": "BOOK", "filelist": [__file__], "path": str(Path(__file__).parent)}, True),
+        ({"category": "BOOK", "path": str(Path(__file__).parent)}, False),
+        ({"category": "BOOK", "path": __file__, "audiobook": True}, False),
+        ({"category": "BOOK", "path": __file__, "image_list": [IGDB_IMAGE]}, False),
         ({"category": "MUSIC"}, False),
     ],
 )
