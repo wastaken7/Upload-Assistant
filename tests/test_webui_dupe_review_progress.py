@@ -91,6 +91,65 @@ async def test_slow_searches_update_the_total_while_the_first_review_waits(gui, 
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("debug", [False, True])
+@pytest.mark.parametrize("case,manual", [
+    ("automatic_skip", False),
+    ("manual_review", True),
+    ("clear", False),
+    ("slot_conflict", True),
+])
+async def test_completed_season_pack_checks_resolve_while_another_review_waits(gui, monkeypatch, capsys, case, manual, debug):
+    """Finished pack checks stop discovery immediately, counting only manual reviews."""
+    waiting = threading.Event()
+    resume = threading.Event()
+
+    def answer(question):
+        """Hold the first review while a second tracker finishes its search."""
+        if "FIRST" in question:
+            waiting.set()
+            assert resume.wait(3)
+        return False
+
+    helper = helper_with_answers(monkeypatch, answer)
+    constructed = []
+
+    def second_tracker(**_kwargs):
+        """Model either the automatic season-pack policy or a manual override."""
+        tracker = Tracker()
+        tracker.reject_episode_if_season_pack_exists = case != "manual_review"
+        constructed.append(tracker)
+        return tracker
+
+    helper.tracker_class_map["SECOND"] = second_tracker
+    second_dupes = [] if case in ("clear", "slot_conflict") else ["Existing season pack"]
+    slot = SlotDecision(Verdict.BLOCK, "Slot filled", "SECOND", date(2026, 10, 15)) if case == "slot_conflict" else None
+    second_meta = Meta(category="TV", name="Example episode", season_pack_exists=True, season_pack_name="Existing season pack", debug=debug)
+    webui_events.begin_item("Example.mkv", 1, 1)
+    with webui_events.dupe_review_scope(["FIRST", "SECOND"]):
+        first = asyncio.create_task(helper.dupe_check(["First existing release"], Meta(category="TV", name="First", debug=debug), "FIRST"))
+        second = None
+        try:
+            assert await asyncio.to_thread(waiting.wait, 3)
+            events(capsys)
+            second = asyncio.create_task(helper.dupe_check(second_dupes, second_meta, "SECOND", slot))
+            await asyncio.sleep(0)
+            progress = [event for event in events(capsys) if event["kind"] == "dupe_review"]
+            assert progress, "Completed season-pack check remained unresolved behind the prompt lock"
+            assert progress[-1]["checking"] == 0
+            assert progress[-1]["trackers"] == (["FIRST", "SECOND"] if manual else ["FIRST"])
+            assert progress[-1]["started"] == ["FIRST"]
+            assert not second.done()
+        finally:
+            resume.set()
+            results = await asyncio.gather(first, *([second] if second is not None else []))
+        assert results[1][0] is (case != "clear")
+        assert len(constructed) == (1 if second_dupes else 0)
+        final = [event for event in events(capsys) if event["kind"] == "dupe_review"]
+        if manual:
+            assert final[-1]["started"] == ["FIRST", "SECOND"]
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("mode,dupes,manual", [
     ({}, [], False),
     ({}, ["existing release"], True),
