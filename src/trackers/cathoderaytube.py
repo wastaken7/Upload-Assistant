@@ -14,6 +14,7 @@ from bs4 import BeautifulSoup
 from src.console import logger
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder
+from src.mediainfo import strip_report_by_line
 from src.meta import Meta
 from src.rehostimages import ImageHostPolicy, RehostImagesManager
 from src.takescreens import download_artwork_from_meta
@@ -357,6 +358,7 @@ class CathodeRayTube:
 
         if category in ("MOVIE", "TV"):
             media_info = await builder.get_bdinfo_section(meta) or await builder.get_mediainfo_section(meta)
+            media_info = strip_report_by_line(media_info).strip()
             if media_info:
                 sections.append(f"[details]\n[mediainfo]\n{media_info}\n[/mediainfo]\n[/details]")
 
