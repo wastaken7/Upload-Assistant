@@ -5,7 +5,9 @@ makes changes made while Upload-Assistant is waiting for confirmation survive
 the later screenshot/upload stages without exposing arbitrary local files.
 """
 
+import asyncio
 import json
+import os
 import re
 import secrets
 import threading
@@ -16,10 +18,10 @@ from pathlib import Path
 from typing import Any
 
 from src.meta import Meta
+from src.screenshot_manifest import capture_pages, forget_file, group_for, set_page
 from src.screenshot_manifest import files as manifest_files
-from src.screenshot_manifest import forget_file, group_for
 from src.screenshot_manifest import register as register_screenshots
-from src.takescreens import capture_screenshot, determine_tonemapping, disc_screenshots, get_frame_info, screenshot_par_scale_factors
+from src.takescreens import capture_ebook_page, capture_screenshot, determine_tonemapping, disc_screenshots, get_frame_info, screenshot_par_scale_factors
 
 _review_locks: dict[str, threading.Lock] = {}
 _review_locks_guard = threading.Lock()
@@ -184,6 +186,8 @@ def delete_screenshot(temp_dir: Path, meta_data: Mapping[str, object], screensho
 async def add_screenshot(temp_dir: Path, meta_data: Mapping[str, object], group: str = "main") -> ReviewedScreenshot:
     """Capture one additional FFmpeg frame without replacing the reviewed set."""
     with _lock_for(temp_dir):
+        if _is_book(meta_data):
+            return await _add_book_page(temp_dir, meta_data)
         if _string(meta_data.get("is_disc")):
             captured = await _capture_disc_review_frame(temp_dir, meta_data, group=group)
             remote_images = _remote_images(meta_data)
@@ -227,6 +231,8 @@ async def add_screenshot(temp_dir: Path, meta_data: Mapping[str, object], group:
 async def replace_screenshot(temp_dir: Path, meta_data: Mapping[str, object], screenshot_id: str) -> ReviewedScreenshot:
     """Capture a new frame atomically at a fresh random point in the source."""
     with _lock_for(temp_dir):
+        if _is_book(meta_data):
+            return await _replace_book_page(temp_dir, meta_data, screenshot_id)
         if _string(meta_data.get("is_disc")):
             if screenshot_id.startswith("remote-"):
                 remote_images = _remote_images(meta_data)
@@ -313,6 +319,57 @@ async def _capture_fresh_frame(temp_dir: Path, meta_data: Mapping[str, object], 
         if staged.exists():
             staged.unlink()
     return timestamp
+
+
+def _is_book(meta_data: Mapping[str, object]) -> bool:
+    return _string(meta_data.get("category")).upper() == "BOOK"
+
+
+def _source_book(meta: Meta) -> str:
+    """Return the same primary book file the prep stage used (the largest one)."""
+    candidates = [str(candidate) for candidate in list(meta.filelist or []) if Path(candidate).is_file()]
+    if not candidates and meta.path and Path(meta.path).is_file():
+        candidates = [str(meta.path)]
+    if not candidates:
+        raise FileNotFoundError("The source book is no longer available")
+    return max(candidates, key=os.path.getsize)
+
+
+async def _capture_book_page(temp_dir: Path, meta_data: Mapping[str, object], dest_stem: Path, force_suffix: str | None = None) -> tuple[Path, int]:
+    """Write a random book page that is not already shown by another screenshot."""
+    if _remote_images(meta_data):
+        raise ValueError("Book pages cannot be added to hosted images")
+    source = _source_book(Meta(dict(meta_data)))
+    used = capture_pages(temp_dir.parent.parent, temp_dir.name, "main")
+    return await asyncio.to_thread(capture_ebook_page, source, dest_stem, used, force_suffix)
+
+
+async def _add_book_page(temp_dir: Path, meta_data: Mapping[str, object]) -> ReviewedScreenshot:
+    items = [item for item in list_screenshots(temp_dir, meta_data) if item.group == "main"]
+    if not items:
+        raise FileNotFoundError("Capture the initial screenshots before adding another one")
+    index = max(item.index for item in items) + 1
+    captured, page = await _capture_book_page(temp_dir, meta_data, temp_dir / "screenshots" / f"review-{uuid.uuid4().hex}")
+    registered = register_screenshots(temp_dir.parent.parent, temp_dir.name, [captured], "main", pages={str(captured): page})
+    target = ReviewedScreenshot(id=_local_id(temp_dir, registered[0]), path=registered[0], index=index)
+    _record_capture(temp_dir, target.id, len(items) + 1, float(page))
+    return target
+
+
+async def _replace_book_page(temp_dir: Path, meta_data: Mapping[str, object], screenshot_id: str) -> ReviewedScreenshot:
+    items = list_screenshots(temp_dir, meta_data)
+    target = _find_item(items, screenshot_id)
+    # Keep the file name (and so the screenshot ID and order) by writing the new page in the same format.
+    staged_stem = target.path.with_name(f".{target.path.stem}.capture-{secrets.token_hex(4)}")
+    staged, page = await _capture_book_page(temp_dir, meta_data, staged_stem, target.path.suffix.lower())
+    try:
+        staged.replace(target.path)
+    finally:
+        if staged.exists():
+            staged.unlink()
+    set_page(temp_dir.parent.parent, temp_dir.name, target.path, page)
+    _record_capture(temp_dir, screenshot_id, len(items), float(page))
+    return target
 
 
 def _record_capture(temp_dir: Path, screenshot_id: str, count: int, timestamp: float, review: dict[str, Any] | None = None) -> None:

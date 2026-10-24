@@ -2837,13 +2837,22 @@ def _description_review_lock(temp_dir: Path) -> threading.Lock:
 
 
 def _screenshot_capture_supported(meta_data: Mapping[str, object]) -> bool:
-    """Return whether review actions may capture new frames with FFmpeg.
+    """Return whether review actions may capture new frames or book pages.
 
-    GAME images come from IGDB, BOOK pages/covers and MUSIC artwork are not
-    video, so FFmpeg has nothing meaningful to capture for those categories.
+    GAME images come from IGDB and MUSIC artwork is not video, so there is
+    nothing meaningful to capture for those categories. Ebooks capture pages
+    locally; audiobooks have no pages and hosted book images cannot be mixed.
     """
-    if _stringify_preview_value(meta_data.get("category")).upper() in {"GAME", "BOOK", "MUSIC"}:
+    category = _stringify_preview_value(meta_data.get("category")).upper()
+    if category in {"GAME", "MUSIC"}:
         return False
+    if category == "BOOK":
+        # The early snapshot may still point at the release folder; pages need the resolved book file.
+        filelist = meta_data.get("filelist")
+        candidates = [*(filelist if isinstance(filelist, list) else []), meta_data.get("path")]
+        has_source = any(isinstance(candidate, str) and candidate and Path(candidate).is_file() for candidate in candidates)
+        image_list = meta_data.get("image_list")
+        return has_source and not meta_data.get("audiobook") and not (isinstance(image_list, list) and image_list)
     is_disc = meta_data.get("is_disc")
     return not is_disc or is_disc == "BDMV"
 

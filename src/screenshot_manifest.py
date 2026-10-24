@@ -51,6 +51,7 @@ def register(
     *,
     timestamps: dict[str, float] | None = None,
     slot_timestamps: dict[str, float] | None = None,
+    pages: dict[str, int] | None = None,
 ) -> list[Path]:
     """Publish capture files under UUID names and return their new paths."""
     with _lock(base_dir, release_id):
@@ -75,6 +76,8 @@ def register(
                 entries[screenshot_id]["timestamp"] = timestamps[str(source)]
             if slot_timestamps is not None and str(source) in slot_timestamps:
                 entries[screenshot_id]["slot_timestamp"] = slot_timestamps[str(source)]
+            if pages is not None and str(source) in pages:
+                entries[screenshot_id]["page"] = pages[str(source)]
             result.append(target)
         _save(base_dir, release_id, manifest)
         return result
@@ -110,6 +113,32 @@ def capture_timestamps(base_dir: str | Path, release_id: str, group: str, *, ori
         if isinstance(timestamp, (int, float)) and (directory / str(value.get("file", ""))).is_file():
             result.append(float(timestamp))
     return result
+
+
+def capture_pages(base_dir: str | Path, release_id: str, group: str) -> set[int]:
+    """Return the book pages behind the active screenshots of one group."""
+    directory = screenshots_dir(base_dir, release_id)
+    entries = _load(base_dir, release_id).get("screenshots", {})
+    if not isinstance(entries, dict):
+        return set()
+    return {
+        value["page"]
+        for value in entries.values()
+        if isinstance(value, dict) and value.get("group") == group and isinstance(value.get("page"), int) and (directory / str(value.get("file", ""))).is_file()
+    }
+
+
+def set_page(base_dir: str | Path, release_id: str, path: Path, page: int) -> None:
+    """Record the book page now shown by an existing screenshot file."""
+    with _lock(base_dir, release_id):
+        manifest = _load(base_dir, release_id)
+        entries = manifest.get("screenshots")
+        if not isinstance(entries, dict):
+            return
+        for value in entries.values():
+            if isinstance(value, dict) and value.get("file") == path.name:
+                value["page"] = page
+        _save(base_dir, release_id, manifest)
 
 
 def clear_group(base_dir: str | Path, release_id: str, group: str) -> None:
