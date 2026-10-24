@@ -477,8 +477,8 @@ def test_scene_checkbox_is_only_sent_for_scene_uploads():
 def test_dupe_search_finds_a_group_written_differently():
     # Mirrors a real miss: different artist alias, punctuation and state name.
     release = _release(
-        artist="Robbie Lane & Night Owls",
-        artists=["Robbie Lane & Night Owls"],
+        artist="Robbie Vantor & Velvet Moths",
+        artists=["Robbie Vantor & Velvet Moths"],
         album="2023 12 31: Grand Hall Of Fictional Arts, Springfield, Florida",
         year="2023",
         release_year="2023",
@@ -487,7 +487,7 @@ def test_dupe_search_finds_a_group_written_differently():
     existing = {
         "groupId": 77,
         "groupName": "2023-12-31 Grand Hall of Fictional Arts, Springfield, FL",
-        "artist": "Rob Lane and Night Owls",
+        "artist": "Rob Vantor and Velvet Moths",
         "groupYear": 2023,
         "torrents": [{"torrentId": 5, "remasterYear": 2023, "media": "WEB", "format": "FLAC", "encoding": "Lossless"}],
     }
@@ -505,12 +505,12 @@ def test_dupe_search_finds_a_group_written_differently():
 
 
 def test_group_matching_rejects_other_shows_and_artists():
-    release = _release(artist="Robbie Lane & Night Owls", artists=["Robbie Lane & Night Owls"])
+    release = _release(artist="Robbie Vantor & Velvet Moths", artists=["Robbie Vantor & Velvet Moths"])
     assert not Orpheus._same_group_title("2023 12 31 Grand Hall", "2023-12-30 Grand Hall")
     assert Orpheus._same_group_title("Paper Moons (Deluxe)", "Paper Moons Deluxe")
     assert not Orpheus._same_group_title("Paper Moons", "Paper Moons Remixed And Extended")
     assert not Orpheus._shares_artist(release, "Someone Else Entirely")
-    assert Orpheus._shares_artist(release, "Rob Lane and Night Owls")
+    assert Orpheus._shares_artist(release, "Rob Vantor and Velvet Moths")
 
 
 def test_dated_titles_are_concert_recordings(tmp_path):
@@ -529,11 +529,11 @@ def test_same_date_at_another_venue_is_not_the_same_group():
 
 
 def test_artist_matching_is_strict_for_title_only_results():
-    single = _release(artist="Robbie Lane", artists=["Robbie Lane"])
+    single = _release(artist="Robbie Vantor", artists=["Robbie Vantor"])
     # Server-side artist filter (first query): a co-credit still matches.
-    assert Orpheus._shares_artist(single, "Robbie Lane & Marco Fictus")
+    assert Orpheus._shares_artist(single, "Robbie Vantor & Marco Fictus")
     # Title/date-only queries need most of the larger credit to match.
-    assert not Orpheus._shares_artist(single, "Robbie Lane & Marco Fictus & Third Person", strict=True)
+    assert not Orpheus._shares_artist(single, "Robbie Vantor & Marco Fictus & Third Person", strict=True)
     assert not Orpheus._shares_artist(single, "", strict=True)
     assert not Orpheus._shares_artist(single, "Various Artists", strict=True)
     compilation = _release(release_type="Compilation")
