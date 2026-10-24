@@ -14,7 +14,7 @@ import aiofiles
 import cli_ui
 from rich.markup import escape
 
-from src import webui_events
+from src import confirm_options, webui_events
 from src.audible import resolve_audible_url
 from src.bdinfo_comparator import compare_bdinfo, has_bdinfo_content
 from src.cleanup import cleanup_manager
@@ -287,6 +287,24 @@ class UploadHelper:
             return await prompt_in_thread(cli_ui.ask_yes_no, question, default=default)
         async with self._prompt_lock:
             return await prompt_in_thread(cli_ui.ask_yes_no, question, default=default)
+
+    async def _ask_confirmation(self, question: str) -> tuple[bool, dict[str, Any]]:
+        """Ask a yes/no question whose GUI answer may carry run option values."""
+
+        def ask() -> tuple[bool, dict[str, Any]]:
+            prompt_id = webui_events.prompt_open("yes_no", question, default=False)
+            try:
+                while True:
+                    cli_ui.info(cli_ui.green, "::", cli_ui.reset, question, cli_ui.reset, "(y/N)")
+                    confirmed, values = confirm_options.parse_answer(cli_ui.read_input(), default=False)
+                    if confirmed is not None:
+                        return confirmed, values
+                    cli_ui.warning("Please answer by 'y' (yes) or 'n' (no) ")
+            finally:
+                webui_events.prompt_close(prompt_id)
+
+        async with self._prompt_lock:
+            return await prompt_in_thread(ask)
 
     async def dupe_check(self, dupes: list[DupeEntry | str], meta: Meta, tracker_name: str, slot_decision: SlotDecision | None = None) -> tuple[bool, Meta]:
         """Show duplicate results and their confirmation as one atomic console interaction."""
@@ -1020,9 +1038,16 @@ class UploadHelper:
         else:
             logger.info(f"[bold]Base Name:[/bold] {meta.name}\n", extra={"highlighter": None})
 
-        with webui_events.prompt_context(kind="confirm", base_name=meta.name, release_names=tracker_release_names, debug=bool(meta.debug)):
-            confirm = await self.prompt_yes_no("Is this correct?")
+        run_options = confirm_options.available(meta, self.config) if webui_events.enabled() else []
+        with webui_events.prompt_context(kind="confirm", base_name=meta.name, release_names=tracker_release_names, debug=bool(meta.debug), run_options=run_options):
+            confirm, option_values = await self._ask_confirmation("Is this correct?") if run_options else (await self.prompt_yes_no("Is this correct?"), {})
         logger.info("")
+
+        if confirm and option_values:
+            changed = confirm_options.apply(meta, run_options, option_values)
+            if changed:
+                logger.info(f"[green]Options changed in the Web UI:[/green] {escape(', '.join(changed))}")
+                webui_events.update_item(personal_release=meta.personalrelease is True, run_options=meta)
 
         if confirm:
             if (

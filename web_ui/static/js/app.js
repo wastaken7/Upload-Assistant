@@ -150,6 +150,7 @@ const SHOW_AUDIO_TRACKS_KEY = "ua_webui_show_audio_tracks";
 const SHOW_SUBTITLE_TRACKS_KEY = "ua_webui_show_subtitle_tracks";
 const OUTPUT_MODE_KEY = "ua_webui_output_mode";
 const RUN_GUI_RESULTS_COLLAPSED_KEY = "ua_webui_run_gui_results_collapsed";
+const REVIEW_PANELS_IN_MODAL_KEY = "ua_webui_review_panels_in_modal";
 const DEFAULT_LEFT_SIDEBAR_WIDTH = 256;
 const DEFAULT_RIGHT_SIDEBAR_WIDTH = 320;
 const APPLICATION_RAIL_WIDTH = 80;
@@ -296,10 +297,8 @@ const getUploadTabTitle = (items) => {
 
 const storage = window.UAStorage;
 const getStoredTheme = window.getUAStoredTheme;
-const colorThemes = window.UAThemes || [];
 const getStoredColorTheme = window.getUAStoredColorTheme;
 const setColorTheme = window.setUAColorTheme;
-const interfaceStyles = window.UAInterfaceStyles || [];
 const getStoredInterfaceStyle = window.getUAStoredInterfaceStyle;
 const setInterfaceStyle = window.setUAInterfaceStyle;
 const useModalFocus = window.useUAModalFocus;
@@ -2217,6 +2216,12 @@ function AudionutsUAGUI() {
     key: null,
     values: [],
   });
+  // Run options changed on the open "Is this correct?" prompt, by option key;
+  // only values that differ from what the run reported are kept.
+  const [runGuiRunOptions, setRunGuiRunOptions] = useState({
+    key: null,
+    values: {},
+  });
   const [isSendingInput, setIsSendingInput] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(getStoredTheme);
   const [colorTheme, setColorThemeState] = useState(getStoredColorTheme);
@@ -2260,7 +2265,7 @@ function AudionutsUAGUI() {
     () => storage.get(SHOW_SUBTITLE_TRACKS_KEY) === "true",
   );
   const [outputMode, setOutputMode] = useState(() =>
-    storage.get(OUTPUT_MODE_KEY) === "gui" ? "gui" : "terminal",
+    storage.get(OUTPUT_MODE_KEY) === "terminal" ? "terminal" : "gui",
   );
   const [runGuiResultsCollapsed, setRunGuiResultsCollapsed] = useState(
     () => storage.get(RUN_GUI_RESULTS_COLLAPSED_KEY) === "true",
@@ -2325,6 +2330,11 @@ function AudionutsUAGUI() {
   // Desktop-only enlarged view of one review panel; the sidebar keeps showing
   // the media preview meanwhile so a panel is never mounted twice.
   const [expandedReviewPanel, setExpandedReviewPanel] = useState("");
+  // Remembers whether the user last chose the larger view, so the header
+  // buttons open review panels straight into it.
+  const [reviewPanelsInModal, setReviewPanelsInModal] = useState(
+    () => storage.get(REVIEW_PANELS_IN_MODAL_KEY) === "true",
+  );
   const [progressItems, setProgressItems] = useState(
     screenshotMode?.media.progress || [],
   );
@@ -2524,13 +2534,22 @@ function AudionutsUAGUI() {
     };
   }, [isThemePaletteOpen]);
 
-  const handleColorThemeChange = (event) => {
-    setColorThemeState(setColorTheme(event.target.value));
-  };
-
-  const handleInterfaceStyleChange = (event) => {
-    setInterfaceStyleState(setInterfaceStyle(event.target.value));
-  };
+  const AppearanceControls = window.UAAppearanceControls;
+  const renderAppearanceControls = (labelClassName) => (
+    <AppearanceControls
+      colorTheme={colorTheme}
+      onColorThemeChange={(themeId) =>
+        setColorThemeState(setColorTheme(themeId))
+      }
+      interfaceStyle={interfaceStyle}
+      onInterfaceStyleChange={(styleId) =>
+        setInterfaceStyleState(setInterfaceStyle(styleId))
+      }
+      isDarkMode={isDarkMode}
+      onToggleMode={() => setIsDarkMode((dark) => !dark)}
+      labelClassName={labelClassName}
+    />
+  );
 
   const renderThemePalette = () => (
     <div ref={themePaletteRef} className="relative">
@@ -2548,59 +2567,7 @@ function AudionutsUAGUI() {
         <div
           className={`ua-upload-panel absolute right-0 top-full z-50 mt-2 w-56 rounded-lg border p-3 shadow-xl ${isDarkMode ? "border-gray-700 bg-gray-800 text-gray-100" : "border-gray-200 bg-white text-gray-800"}`}
         >
-          <label className="block text-xs font-semibold uppercase tracking-wide opacity-70">
-            Color theme
-          </label>
-          <select
-            value={colorTheme}
-            onChange={(event) => {
-              handleColorThemeChange(event);
-              setIsThemePaletteOpen(false);
-            }}
-            aria-label="Color theme"
-            className="ua-theme-picker mt-1.5 w-full rounded px-2 py-1.5 text-sm"
-          >
-            {colorThemes.map((theme) => (
-              <option key={theme.id} value={theme.id}>
-                {theme.label}
-              </option>
-            ))}
-          </select>
-          <label className="mt-3 block text-xs font-semibold uppercase tracking-wide opacity-70">
-            Corner style
-          </label>
-          <select
-            value={interfaceStyle}
-            onChange={(event) => {
-              handleInterfaceStyleChange(event);
-              setIsThemePaletteOpen(false);
-            }}
-            aria-label="Corner style"
-            className="ua-theme-picker mt-1.5 w-full rounded px-2 py-1.5 text-sm"
-          >
-            {interfaceStyles.map((style) => (
-              <option key={style.id} value={style.id}>
-                {style.label}
-              </option>
-            ))}
-          </select>
-          <div className="mt-3 flex items-center justify-between gap-3">
-            <span className="text-sm">
-              {isDarkMode ? "Dark mode" : "Light mode"}
-            </span>
-            <button
-              type="button"
-              onClick={() => setIsDarkMode((dark) => !dark)}
-              aria-label={
-                isDarkMode ? "Switch to light mode" : "Switch to dark mode"
-              }
-              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${isDarkMode ? "ua-accent-indicator" : "bg-gray-300"}`}
-            >
-              <span
-                className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${isDarkMode ? "translate-x-5" : "translate-x-1"}`}
-              />
-            </button>
-          </div>
+          {renderAppearanceControls("opacity-70")}
         </div>
       )}
     </div>
@@ -2668,56 +2635,7 @@ function AudionutsUAGUI() {
       {isThemePaletteOpen && (
         <div className="ua-app-rail-popover absolute bottom-0 left-full z-[60] ml-2 w-64 rounded-xl border p-4 shadow-2xl">
           <h2 className="text-sm font-semibold">Appearance</h2>
-          <label className="ua-app-rail-popover-label mt-3 block text-xs font-semibold">
-            Color theme
-          </label>
-          <select
-            value={colorTheme}
-            onChange={(event) => {
-              handleColorThemeChange(event);
-              setIsThemePaletteOpen(false);
-            }}
-            className="ua-theme-picker mt-1 w-full rounded-lg px-3 py-2 text-sm"
-          >
-            {colorThemes.map((theme) => (
-              <option key={theme.id} value={theme.id}>
-                {theme.label}
-              </option>
-            ))}
-          </select>
-          <label className="ua-app-rail-popover-label mt-3 block text-xs font-semibold">
-            Corner style
-          </label>
-          <select
-            value={interfaceStyle}
-            onChange={(event) => {
-              handleInterfaceStyleChange(event);
-              setIsThemePaletteOpen(false);
-            }}
-            className="ua-theme-picker mt-1 w-full rounded-lg px-3 py-2 text-sm"
-          >
-            {interfaceStyles.map((style) => (
-              <option key={style.id} value={style.id}>
-                {style.label}
-              </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            className="ua-upload-modal-action mt-3 flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm"
-            onClick={() => setIsDarkMode((dark) => !dark)}
-            aria-pressed={isDarkMode}
-            aria-label={`Switch to ${isDarkMode ? "light" : "dark"} mode`}
-          >
-            <span>{isDarkMode ? "Dark mode" : "Light mode"}</span>
-            <span
-              className="ua-upload-mode-switch relative inline-flex h-6 w-11 items-center rounded-full"
-              data-enabled={isDarkMode ? "true" : "false"}
-              aria-hidden="true"
-            >
-              <span className="ua-upload-mode-knob inline-block h-4 w-4 rounded-full bg-white transition-transform"></span>
-            </span>
-          </button>
+          {renderAppearanceControls("ua-app-rail-popover-label")}
         </div>
       )}
     </div>
@@ -3950,13 +3868,36 @@ function AudionutsUAGUI() {
     executionPreview?.path,
   ]);
 
-  const closeReviewModal = () => {
+  const setReviewPanelOpen = (panel, open) => {
+    setIsScreenshotReviewOpen(open && panel === "screenshots");
+    setIsDescriptionReviewOpen(open && panel === "description");
+    setIsMediaInfoOpen(open && panel === "mediainfo");
+    setExpandedReviewPanel(
+      open && reviewPanelsInModal && !isMobile ? panel : "",
+    );
+  };
+
+  const rememberReviewPanelsInModal = (inModal) => {
+    setReviewPanelsInModal(inModal);
+    storage.set(REVIEW_PANELS_IN_MODAL_KEY, inModal ? "true" : "false");
+  };
+
+  // Closing the larger view also closes the panel when it was opened there,
+  // unless the user asked to return it to the sidebar.
+  const closeReviewModal = ({ toSidebar = false } = {}) => {
     // The screenshot lightbox handles its own Escape key first.
     if (expandedScreenshot) return;
     if (expandedReviewPanel === "description" && descriptionDirty) {
       saveExecutionDescription();
     }
-    setExpandedReviewPanel("");
+    if (toSidebar) {
+      rememberReviewPanelsInModal(false);
+      setExpandedReviewPanel("");
+    } else if (reviewPanelsInModal) {
+      setReviewPanelOpen(expandedReviewPanel, false);
+    } else {
+      setExpandedReviewPanel("");
+    }
   };
   const reviewModalRef = useModalFocus(
     closeReviewModal,
@@ -3992,21 +3933,40 @@ function AudionutsUAGUI() {
     if (isMobile) return null;
     const isExpanded = expandedReviewPanel === panel;
     const label = isExpanded ? "Return to sidebar" : "Open in a larger view";
+    const buttonClassName = `flex-none rounded-md p-2 transition-colors ${isDarkMode ? "text-gray-300 hover:bg-gray-700" : "text-gray-600 hover:bg-gray-100"}`;
     return (
-      <button
-        type="button"
-        onClick={() =>
-          isExpanded ? closeReviewModal() : setExpandedReviewPanel(panel)
-        }
-        className={`flex-none rounded-md p-2 transition-colors ${isDarkMode ? "text-gray-300 hover:bg-gray-700" : "text-gray-600 hover:bg-gray-100"}`}
-        title={label}
-        aria-label={label}
-      >
-        <LucideIcon
-          name={isExpanded ? "minimize-2" : "maximize-2"}
-          className="w-4 h-4"
-        />
-      </button>
+      <div className="flex flex-none items-center gap-0.5">
+        <button
+          type="button"
+          onClick={() => {
+            if (isExpanded) {
+              closeReviewModal({ toSidebar: true });
+            } else {
+              rememberReviewPanelsInModal(true);
+              setExpandedReviewPanel(panel);
+            }
+          }}
+          className={buttonClassName}
+          title={label}
+          aria-label={label}
+        >
+          <LucideIcon
+            name={isExpanded ? "minimize-2" : "maximize-2"}
+            className="w-4 h-4"
+          />
+        </button>
+        {isExpanded && (
+          <button
+            type="button"
+            onClick={() => closeReviewModal()}
+            className={buttonClassName}
+            title="Close"
+            aria-label="Close"
+          >
+            <LucideIcon name="x" className="w-4 h-4" />
+          </button>
+        )}
+      </div>
     );
   };
 
@@ -7401,22 +7361,35 @@ function AudionutsUAGUI() {
               </span>
             )}
           </h2>
-          {!isMobile && (
-            <button
-              type="button"
-              onClick={() => setIsArgumentsExpanded(!inModal)}
-              className={`flex-none rounded p-1 transition-colors ${isDarkMode ? "text-gray-400 hover:bg-gray-700 hover:text-gray-200" : "text-gray-500 hover:bg-gray-200 hover:text-gray-700"}`}
-              title={inModal ? "Return to sidebar" : "Open in a larger view"}
-              aria-label={
-                inModal ? "Return to sidebar" : "Open in a larger view"
-              }
-            >
-              <LucideIcon
-                name={inModal ? "minimize-2" : "maximize-2"}
-                className="w-4 h-4"
-              />
-            </button>
-          )}
+          <div className="flex flex-none items-center gap-0.5">
+            {!isMobile && (
+              <button
+                type="button"
+                onClick={() => setIsArgumentsExpanded(!inModal)}
+                className={`flex-none rounded p-1 transition-colors ${isDarkMode ? "text-gray-400 hover:bg-gray-700 hover:text-gray-200" : "text-gray-500 hover:bg-gray-200 hover:text-gray-700"}`}
+                title={inModal ? "Return to sidebar" : "Open in a larger view"}
+                aria-label={
+                  inModal ? "Return to sidebar" : "Open in a larger view"
+                }
+              >
+                <LucideIcon
+                  name={inModal ? "minimize-2" : "maximize-2"}
+                  className="w-4 h-4"
+                />
+              </button>
+            )}
+            {inModal && (
+              <button
+                type="button"
+                onClick={() => setIsArgumentsExpanded(false)}
+                className={`flex-none rounded p-1 transition-colors ${isDarkMode ? "text-gray-400 hover:bg-gray-700 hover:text-gray-200" : "text-gray-500 hover:bg-gray-200 hover:text-gray-700"}`}
+                title="Close"
+                aria-label="Close"
+              >
+                <LucideIcon name="x" className="w-4 h-4" />
+              </button>
+            )}
+          </div>
         </div>
 
         <div
@@ -9426,6 +9399,78 @@ function AudionutsUAGUI() {
     );
   };
 
+  // Flags read after the release is confirmed, offered as toggles so a
+  // forgotten one can be turned on without restarting. They are sent with
+  // "yes" and ignored on "no".
+  const renderRunGuiRunOptions = (options, changed, key, disabled) => {
+    const update = (option, value) => {
+      const next = { ...changed };
+      if (value === option.value) delete next[option.key];
+      else next[option.key] = value;
+      setRunGuiRunOptions({ key, values: next });
+    };
+    return [
+      ["media", "Also generate"],
+      ["upload", "Upload options"],
+    ].map(([group, label]) => {
+      const items = options.filter((option) => option.group === group);
+      if (!items.length) return null;
+      return (
+        <div key={group}>
+          {renderRunGuiSectionLabel(label)}
+          <div className="mt-1 flex flex-wrap gap-1.5">
+            {items.map((option) => {
+              const value =
+                option.key in changed ? changed[option.key] : option.value;
+              if (option.type === "choice") {
+                const choices = Array.isArray(option.choices)
+                  ? option.choices
+                  : [];
+                return (
+                  <label
+                    key={option.key}
+                    className="ua-run-gui-choice flex items-center gap-2 rounded-lg border px-2.5 py-1 text-sm"
+                  >
+                    {option.label}
+                    <select
+                      value={value}
+                      onChange={(event) => update(option, event.target.value)}
+                      disabled={disabled}
+                      className="ua-run-gui-input rounded border px-1.5 py-0.5 text-sm disabled:opacity-50"
+                    >
+                      {choices.map((choice) => (
+                        <option key={choice} value={choice}>
+                          {choice}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                );
+              }
+              return (
+                <label
+                  key={option.key}
+                  title={option.locked || option.hint || undefined}
+                  data-selected={value === true}
+                  className="ua-run-gui-choice flex cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-1 text-sm has-[:disabled]:cursor-default has-[:disabled]:opacity-60"
+                >
+                  <input
+                    type="checkbox"
+                    checked={value === true}
+                    onChange={() => update(option, value !== true)}
+                    disabled={disabled || Boolean(option.locked)}
+                    className="h-4 w-4 shrink-0"
+                  />
+                  {option.label}
+                </label>
+              );
+            })}
+          </div>
+        </div>
+      );
+    });
+  };
+
   const renderRunGuiDupeClearContext = (context) => {
     const groups = [
       [
@@ -9708,6 +9753,30 @@ function AudionutsUAGUI() {
         </>
       );
     }
+    const runOptions =
+      context.kind === "confirm" && Array.isArray(context.run_options)
+        ? context.run_options.filter(
+            (option) => option && typeof option.key === "string",
+          )
+        : [];
+    const changedRunOptions =
+      runGuiRunOptions.key === selectionKey ? runGuiRunOptions.values : {};
+    const yesAnswer = Object.keys(changedRunOptions).length
+      ? `yes ${JSON.stringify(changedRunOptions)}`
+      : "yes";
+    if (runOptions.length) {
+      details = (
+        <>
+          {details}
+          {renderRunGuiRunOptions(
+            runOptions,
+            changedRunOptions,
+            selectionKey,
+            disabled,
+          )}
+        </>
+      );
+    }
 
     return (
       <section
@@ -9765,7 +9834,7 @@ function AudionutsUAGUI() {
             <div className="flex shrink-0 gap-2">
               <button
                 type="button"
-                onClick={() => answer("yes")}
+                onClick={() => answer(yesAnswer)}
                 disabled={disabled}
                 className="ua-run-gui-answer flex items-center gap-1.5 rounded-lg px-4 py-2 font-medium disabled:opacity-50"
                 data-variant="yes"
@@ -10313,7 +10382,7 @@ function AudionutsUAGUI() {
             className={`flex min-w-0 flex-wrap gap-3 ${showItemHeader ? "items-center" : "items-start"}`}
           >
             <div
-              className={`min-w-0 flex-1 ${view.currentItem?.personalRelease && view.currentItem.runOptions?.debug ? "basis-full sm:basis-0" : ""}`}
+              className={`min-w-0 flex-1 ${showItemHeader ? "" : "flex min-h-[1.875rem] flex-col justify-center"} ${view.currentItem?.personalRelease && view.currentItem.runOptions?.debug ? "basis-full sm:basis-0" : ""}`}
             >
               {showItemHeader ? (
                 <div className="ua-run-gui-muted flex min-w-0 flex-wrap items-center gap-1.5 text-xs">
@@ -10627,6 +10696,17 @@ function AudionutsUAGUI() {
                 className={`h-4 w-4 ${fileBrowserRefreshing ? "animate-spin" : ""}`}
               />
             </button>
+            {inModal && (
+              <button
+                type="button"
+                onClick={() => setIsFileBrowserExpanded(false)}
+                aria-label="Close"
+                title="Close"
+                className={`rounded p-1 transition-colors ${isDarkMode ? "text-gray-400 hover:bg-gray-700 hover:text-gray-200" : "text-gray-500 hover:bg-gray-200 hover:text-gray-700"}`}
+              >
+                <LucideIcon name="x" className="h-4 w-4" />
+              </button>
+            )}
           </div>
         </div>
         <div className="relative mt-2">
@@ -11389,11 +11469,9 @@ function AudionutsUAGUI() {
               <div className="flex shrink-0 items-center gap-2">
                 {showScreenshotsButton && (
                   <button
-                    onClick={() => {
-                      setIsScreenshotReviewOpen((open) => !open);
-                      setIsDescriptionReviewOpen(false);
-                      setIsMediaInfoOpen(false);
-                    }}
+                    onClick={() =>
+                      setReviewPanelOpen("screenshots", !isScreenshotReviewOpen)
+                    }
                     aria-pressed={isScreenshotReviewOpen}
                     className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${isScreenshotReviewOpen ? "ua-accent-action" : isDarkMode ? "bg-gray-700 hover:bg-gray-600 text-gray-100" : "bg-gray-100 hover:bg-gray-200 text-gray-700"}`}
                     title="Review generated screenshots"
@@ -11406,11 +11484,9 @@ function AudionutsUAGUI() {
                   </button>
                 )}
                 <button
-                  onClick={() => {
-                    setIsDescriptionReviewOpen((open) => !open);
-                    setIsScreenshotReviewOpen(false);
-                    setIsMediaInfoOpen(false);
-                  }}
+                  onClick={() =>
+                    setReviewPanelOpen("description", !isDescriptionReviewOpen)
+                  }
                   aria-pressed={isDescriptionReviewOpen}
                   className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${isDescriptionReviewOpen ? "ua-accent-action" : isDarkMode ? "bg-gray-700 hover:bg-gray-600 text-gray-100" : "bg-gray-100 hover:bg-gray-200 text-gray-700"}`}
                   title="Review and edit the base description"
@@ -11420,11 +11496,9 @@ function AudionutsUAGUI() {
                 </button>
                 {showMediaInfoButton && (
                   <button
-                    onClick={() => {
-                      setIsMediaInfoOpen((open) => !open);
-                      setIsScreenshotReviewOpen(false);
-                      setIsDescriptionReviewOpen(false);
-                    }}
+                    onClick={() =>
+                      setReviewPanelOpen("mediainfo", !isMediaInfoOpen)
+                    }
                     aria-pressed={isMediaInfoOpen}
                     className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${isMediaInfoOpen ? "ua-accent-action" : isDarkMode ? "bg-gray-700 hover:bg-gray-600 text-gray-100" : "bg-gray-100 hover:bg-gray-200 text-gray-700"}`}
                     title={`View the ${mediaInfoLabel} report`}
