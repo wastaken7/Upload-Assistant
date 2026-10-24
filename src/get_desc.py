@@ -28,7 +28,7 @@ from src.description_review import apply_saved_draft
 from src.languages import languages_manager
 from src.mediainfo import MediaInfo
 from src.meta import Meta
-from src.music.analyzer import read_rip_log
+from src.music.analyzer import RIPPER_LOG_RE, read_rip_log
 from src.screenshot_manifest import files as manifest_files
 from src.takescreens import TakeScreensManager
 from src.tracker_images import get_tracker_image_collection, has_tracker_image_collection
@@ -1344,11 +1344,11 @@ class DescriptionBuilder:
                     continue
             except OSError:
                 continue
-            log_text = read_rip_log(log_path).replace("\r\n", "\n").replace("\r", "\n").strip()
+            log_text = read_rip_log(log_path, signature=RIPPER_LOG_RE).replace("\r\n", "\n").replace("\r", "\n").strip()
             if not log_text:
                 continue
-            # A closing tag inside the log would end the code block or spoiler early.
-            log_text = re.sub(r"\[(/\s*(?:code|spoiler))", "\N{FULLWIDTH LEFT SQUARE BRACKET}\\1", log_text, flags=re.IGNORECASE)
+            # A closing tag inside the log would end the block early; some trackers turn [code] into [pre].
+            log_text = re.sub(r"\[(/\s*(?:code|pre|spoiler))", "\N{FULLWIDTH LEFT SQUARE BRACKET}\\1", log_text, flags=re.IGNORECASE)
             name = str(relative).replace("\\", "/").replace("[", "\N{FULLWIDTH LEFT SQUARE BRACKET}").replace("]", "\N{FULLWIDTH RIGHT SQUARE BRACKET}")
             blocks.append(f"[spoiler={name}][code]{log_text}[/code][/spoiler]")
         if not blocks:
