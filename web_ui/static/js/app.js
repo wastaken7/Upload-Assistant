@@ -9702,6 +9702,26 @@ function AudionutsUAGUI() {
                   Debug: tracker uploads are disabled
                 </span>
               )}
+              {view.dupeReview && (
+                <span
+                  className="ua-run-gui-muted ml-auto text-right text-xs"
+                  role="status"
+                  title={
+                    view.dupeReview.checking
+                      ? "More trackers are still being checked; the total may increase."
+                      : undefined
+                  }
+                >
+                  <span className="block whitespace-nowrap font-semibold">
+                    Tracker review {view.dupeReview.index} of{" "}
+                    {view.dupeReview.total}
+                    {view.dupeReview.checking ? "+" : ""}
+                  </span>
+                  {view.dupeReview.checking > 0 && (
+                    <span className="block">Still checking trackers…</span>
+                  )}
+                </span>
+              )}
             </div>
             <p className="mt-1.5 break-words text-base font-semibold">
               {question}

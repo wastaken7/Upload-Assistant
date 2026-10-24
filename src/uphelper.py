@@ -290,11 +290,27 @@ class UploadHelper:
 
     async def dupe_check(self, dupes: list[DupeEntry | str], meta: Meta, tracker_name: str, slot_decision: SlotDecision | None = None) -> tuple[bool, Meta]:
         """Show duplicate results and their confirmation as one atomic console interaction."""
+        prepared_tracker: Any = None
+        if webui_events.enabled():
+            # Register queued reviews before waiting for another tracker's prompt.
+            # Resolve automatic season-pack skips without counting them as reviews.
+            season_pack_skip = False
+            if dupes and meta.dupe is False and meta.season_pack_exists:
+                tracker_factory = cast(Callable[..., Any], self.tracker_class_map[tracker_name])
+                prepared_tracker = tracker_factory(config=self.config)
+                season_pack_skip = bool(getattr(prepared_tracker, "reject_episode_if_season_pack_exists", False))
+            interactive = (not meta.unattended or meta.unattended_confirm) and not meta.ask_dupe
+            needs_review = bool(dupes) and not season_pack_skip and (meta.dupe is False or (meta.filename_match and meta.file_count_match))
+            if not dupes and slot_decision is not None:
+                needs_review = meta.dupe is False and (
+                    slot_decision.verdict is Verdict.BLOCK or (slot_decision.verdict is Verdict.REVIEW and bool(slot_decision.conflicts))
+                )
+            webui_events.dupe_review_ready(tracker_name, needs_review=bool(interactive and needs_review))
         async with self._prompt_lock:
             token = _dupe_prompt_lock_held.set(True)
             try:
                 with webui_events.prompt_context(kind="dupes", tracker=tracker_name):
-                    return await self._dupe_check(dupes, meta, tracker_name, slot_decision)
+                    return await self._dupe_check(dupes, meta, tracker_name, slot_decision, tracker_class=prepared_tracker)
             finally:
                 _dupe_prompt_lock_held.reset(token)
 
@@ -392,7 +408,16 @@ class UploadHelper:
         else:
             logger.info(f"[dim]{tracker_name}: slot rules are not implemented for this tracker; using the basic dupe check.[/dim]")
 
-    async def _dupe_check(self, dupes: list[DupeEntry | str], meta: Meta, tracker_name: str, slot_decision: SlotDecision | None = None) -> tuple[bool, Meta]:
+    async def _dupe_check(
+        self,
+        dupes: list[DupeEntry | str],
+        meta: Meta,
+        tracker_name: str,
+        slot_decision: SlotDecision | None = None,
+        *,
+        tracker_class: Any = None,
+    ) -> tuple[bool, Meta]:
+        """Review one tracker, reusing an instance prepared for its season-pack policy."""
         def _format_dupe(entry: DupeEntry | str) -> str:
             if isinstance(entry, dict):
                 name = str(entry.get("name", ""))
@@ -460,8 +485,9 @@ class UploadHelper:
                 self._show_slot_decision(slot_decision, meta)
             logger.debug(f"[green]No dupes found at[/green] [yellow]{tracker_name}[/yellow]")
             return False, meta
-        tracker_class_factory = cast(Callable[..., Any], self.tracker_class_map[tracker_name])
-        tracker_class = tracker_class_factory(config=self.config)
+        if tracker_class is None:
+            tracker_class_factory = cast(Callable[..., Any], self.tracker_class_map[tracker_name])
+            tracker_class = tracker_class_factory(config=self.config)
         try:
             tracker_rename = await tracker_class.get_name(meta)
         except Exception:
@@ -693,7 +719,7 @@ class UploadHelper:
         if not possible:
             return
 
-        question = "Found BDInfo content in potential duplicates. Perform a comparison?"
+        question = f"Found BDInfo content in potential duplicates on {tracker_name}. Perform a comparison?"
         if await self.prompt_yes_no(question, default=True):
             warnings: list[str] = []
             results: list[str] = []

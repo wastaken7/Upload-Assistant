@@ -48,6 +48,7 @@ Statistics contain no per-release events, names, paths, release-group names or t
   | `notice_group` | `group`, `notices` — replaces the earlier notices of that group                                                                                     |
   | `prompt`       | `action` (`open`, `close`), `id`; on open: `type` (`yes_no`, `choice`, `text`), `question`, optional `choices`, `default`, `context`                |
   | `dupes`        | `tracker`, `entries` (`name`, optional `link`, `size`, `diff_pct`, `color`: hex size-difference colour), `note`, `trumpable`                        |
+  | `dupe_review`  | `trackers` needing manual review, `started` in actual review order, `checking` — unresolved checks in this item                                     |
   | `slot`         | `tracker`, `verdict` (`allow`, `review`, `block`), `title`, `reason`; optional `slot`, `why`, `conflicts` (entries as in `dupes`), `notes`, `rules` |
   | `tracker`      | `tracker`, `status` (`pending`, `success`, `failed`, `skipped`, `dupe`, `banned`), optional `link`, `torrent_id`, `message`, `duration`             |
   | `request`      | `tracker`, `name`, `exact`, optional `link`, `reward`, `status`                                                                                     |
@@ -57,6 +58,8 @@ Statistics contain no per-release events, names, paths, release-group names or t
   `item.run_options` carries resolved booleans `debug`, `no_seed`, `skip_imghost_upload`, `nohash`, `ffdebug`, `client_disabled`, plus plain-text `category` and `prep_directory`. It is published before preparation and refreshed at confirmation, including unattended runs. The Debug Run badge explains active skip flags; client addition and image-host uploads can still occur when their skip options are disabled.
 
   Tracker check prompts include `context.tracker` and `context.check_messages` when explanations are available. The GUI shows these messages before the upload decision; a declined check retains its explanation in the tracker's result `message`.
+
+  During duplicate review, the GUI counts trackers requiring manual decisions, including slot-rule overrides and trumping. Several questions for one tracker count as one review. A `+` after the total and “Still checking trackers…” mean discovery is incomplete; the total becomes final once `checking` reaches zero. Review state is isolated to each queue item and upload session.
 
 Examples
 

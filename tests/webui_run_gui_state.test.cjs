@@ -650,3 +650,113 @@ test("the declined confirmation summary stays available for corrections", () => 
     "Fictional.Movie.2020-NOGRP",
   );
 });
+
+test("review progress grows during discovery and counts a tracker only once", () => {
+  let state = run(
+    gui({ kind: "item", index: 1, total: 2, name: "First" }),
+    gui({
+      kind: "dupe_review",
+      item: 1,
+      trackers: ["FIRST"],
+      started: ["FIRST"],
+      checking: 2,
+    }),
+    gui({
+      kind: "prompt",
+      action: "open",
+      id: 1,
+      type: "yes_no",
+      context: { kind: "dupes", tracker: "FIRST" },
+    }),
+  );
+  assert.deepEqual(plain(selectRunGuiView(state).dupeReview), {
+    index: 1,
+    total: 1,
+    checking: 2,
+  });
+  state = reduceRunGuiEvent(
+    state,
+    gui({
+      kind: "dupe_review",
+      item: 1,
+      trackers: ["FIRST", "SECOND"],
+      started: ["FIRST"],
+      checking: 0,
+    }),
+  );
+  assert.deepEqual(plain(selectRunGuiView(state).dupeReview), {
+    index: 1,
+    total: 2,
+    checking: 0,
+  });
+  state = reduceRunGuiEvent(
+    state,
+    gui({
+      kind: "prompt",
+      action: "open",
+      id: 2,
+      type: "yes_no",
+      context: { kind: "dupes", tracker: "FIRST" },
+    }),
+  );
+  assert.equal(selectRunGuiView(state).dupeReview.index, 1);
+  state = reduceRunGuiEvent(
+    state,
+    gui({
+      kind: "dupe_review",
+      item: 1,
+      trackers: ["FIRST", "SECOND"],
+      started: ["FIRST", "SECOND"],
+      checking: 0,
+    }),
+  );
+  state = reduceRunGuiEvent(
+    state,
+    gui({
+      kind: "prompt",
+      action: "open",
+      id: 3,
+      type: "yes_no",
+      context: { kind: "dupes", tracker: "SECOND" },
+    }),
+  );
+  assert.deepEqual(plain(selectRunGuiView(state).dupeReview), {
+    index: 2,
+    total: 2,
+    checking: 0,
+  });
+  state = reduceRunGuiEvent(
+    state,
+    gui({ kind: "item", index: 2, total: 2, name: "Second" }),
+  );
+  state = reduceRunGuiEvent(
+    state,
+    gui({
+      kind: "prompt",
+      action: "open",
+      id: 4,
+      type: "yes_no",
+      context: { kind: "dupes", tracker: "FIRST" },
+    }),
+  );
+  assert.equal(selectRunGuiView(state).dupeReview, null);
+});
+
+test("unrelated prompts and another session do not inherit a review counter", () => {
+  const state = run(
+    gui({
+      kind: "dupe_review",
+      trackers: ["FIRST"],
+      started: ["FIRST"],
+      checking: 0,
+    }),
+    gui({
+      kind: "prompt",
+      action: "open",
+      id: 1,
+      context: { kind: "tracker_checks", tracker: "FIRST" },
+    }),
+  );
+  assert.equal(selectRunGuiView(state).dupeReview, null);
+  assert.equal(selectRunGuiView(createRunGuiState()).dupeReview, null);
+});
