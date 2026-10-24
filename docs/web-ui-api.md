@@ -42,7 +42,7 @@ Statistics contain no per-release events, names, paths, release-group names or t
 
   | `kind`         | Fields                                                                                                                                              |
   | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-  | `item`         | `index`, `total`, `name` — a queue item started                                                                                                     |
+  | `item`         | `index`, `total`, `name`, optional `personal_release`, `run_options` — a queue item started or updated after metadata preparation                   |
   | `stage`        | `key` (`prep`, `confirm`, `dupes`, `screens`, `torrent`, `upload`, `requests`), `status` (`start`, `done`, `skip`, `fail`)                          |
   | `notice`       | `level` (`error`, `warning`, `attention`), `text`, optional `tracker`, `key`                                                                        |
   | `notice_group` | `group`, `notices` — replaces the earlier notices of that group                                                                                     |
@@ -53,6 +53,8 @@ Statistics contain no per-release events, names, paths, release-group names or t
   | `request`      | `tracker`, `name`, `exact`, optional `link`, `reward`, `status`                                                                                     |
 
   Every event has `ts` and, inside a queue, `item`. Text is plain (no markup) and redacted. Answers to prompts still go through `/api/input`.
+
+  `item.run_options` carries resolved booleans `debug`, `no_seed`, `skip_imghost_upload`, `nohash`, `ffdebug`, `client_disabled`, plus plain-text `category` and `prep_directory`. It is published before preparation and refreshed at confirmation, including unattended runs. The Debug Run badge explains active skip flags; client addition and image-host uploads can still occur when their skip options are disabled.
 
   Tracker check prompts include `context.tracker` and `context.check_messages` when explanations are available. The GUI shows these messages before the upload decision; a declined check retains its explanation in the tracker's result `message`.
 

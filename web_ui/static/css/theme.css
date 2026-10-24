@@ -4545,6 +4545,16 @@ html[data-ua-shape="square"]
   border: 1px solid color-mix(in srgb, var(--ua-run-gui-tone) 30%, transparent);
 }
 
+.ua-run-gui-debug-popover {
+  inset: auto;
+  margin: 0;
+  max-height: min(32rem, calc(100dvh - 1.5rem));
+  overflow: auto;
+  background: var(--ua-upload-surface-solid);
+  border-color: var(--ua-upload-border);
+  color: var(--ua-upload-text);
+}
+
 .ua-run-gui-release-name {
   background: var(--ua-upload-surface-raised);
   border: 1px solid var(--ua-upload-border);

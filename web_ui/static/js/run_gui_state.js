@@ -35,6 +35,70 @@
   });
 
   const text = (value) => (typeof value === "string" ? value : "");
+  /** Normalize only the published run settings used by release badges. */
+  const readRunOptions = (options) =>
+    options && typeof options === "object" && !Array.isArray(options)
+      ? {
+          debug: options.debug === true,
+          noSeed: options.no_seed === true,
+          skipImagehostUpload: options.skip_imghost_upload === true,
+          noHash: options.nohash === true,
+          ffDebug: options.ffdebug === true,
+          clientDisabled: options.client_disabled === true,
+          category: text(options.category),
+          prepDirectory: text(options.prep_directory),
+        }
+      : null;
+
+  /** Describe whether debug options apply and explain their effects for this run. */
+  const getDebugRunRows = (options) => {
+    if (!options?.debug) return [];
+    const rows = [
+      {
+        flag: "--debug",
+        label: "Basic Debug",
+        enabled: true,
+        detail: "Tracker uploads are disabled.",
+      },
+      {
+        flag: "-ns / --no-seed",
+        label: "Skip client addition",
+        enabled: options.noSeed,
+        detail: options.noSeed
+          ? "Prepared torrents will not be added to a client."
+          : options.noHash
+            ? "Client addition is disabled by --nohash."
+            : options.clientDisabled
+              ? "Client addition is disabled by --client none."
+              : "Prepared torrents may be added to configured clients.",
+      },
+      {
+        flag: "-siu / --skip-imagehost-upload",
+        label: "Skip image uploads",
+        enabled: options.skipImagehostUpload,
+        detail: options.skipImagehostUpload
+          ? "Screenshots will not be uploaded to an image host."
+          : options.category === "MUSIC"
+            ? "MUSIC artwork hosting is skipped during debug runs."
+            : "Screenshots may still be uploaded to an image host.",
+      },
+    ];
+    if (options.noHash)
+      rows.push({
+        flag: "--nohash",
+        label: "Skip torrent hashing",
+        enabled: true,
+        detail: "New torrent hashing is disabled.",
+      });
+    if (options.ffDebug)
+      rows.push({
+        flag: "--ffdebug",
+        label: "Verbose FFmpeg output",
+        enabled: true,
+        detail: "Extra FFmpeg information is shown while taking screenshots.",
+      });
+    return rows;
+  };
   // Only plain hex colours from the server reach an inline style.
   const hexColor = (value) =>
     typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value) ? value : "";
@@ -103,6 +167,8 @@
           index: data.index,
           total: Number.isInteger(data.total) ? data.total : 0,
           name: text(data.name),
+          personalRelease: data.personal_release === true,
+          runOptions: readRunOptions(data.run_options),
         });
         items.sort((a, b) => a.index - b.index);
         return { ...state, items, currentItem: data.index };
@@ -470,6 +536,7 @@
     reduceRunGuiEvent,
     markRunGuiPromptAnswered,
     selectRunGuiView,
+    getDebugRunRows,
   };
   window.UARunGui = api;
 })();

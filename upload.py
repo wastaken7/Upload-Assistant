@@ -2784,6 +2784,7 @@ async def do_the_thing(base_dir: str) -> None:
                 await record_event_async("item", operation="started", outcome="success")
                 _publish_webui_preview_target(path)
                 webui_events.begin_item(path, item_number, total_files)
+                webui_events.update_item(personal_release=meta.personalrelease is True, run_options=meta)
 
                 if not path:
                     raise ValueError("The 'path' variable is not defined or is empty.")
