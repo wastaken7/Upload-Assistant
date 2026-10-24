@@ -6,7 +6,7 @@ from typing import Any, cast
 import cli_ui
 
 from src.artwork import is_valid_cover_image
-from src.console import logger
+from src.console import logger, prompt_in_thread
 from src.meta import Meta
 from src.trackers.common import Common
 from src.trackers.UNIT3D import UNIT3D
@@ -238,6 +238,16 @@ class Seedpool(UNIT3D):
                 else:
                     return False
             else:
+                return False
+
+        # Album genres are sent as keywords; the IRC announce bot needs them.
+        if meta.category == "MUSIC" and not any(str(genre).strip() for genre in meta.genres):
+            logger.info(f"{self.tracker}: [bold red]Album genres are required in keywords for the {self.tracker} IRC announce.[/bold red]")
+            if meta.unattended and not meta.unattended_confirm:
+                return False
+            user_genres = await prompt_in_thread(cli_ui.ask_string, "Enter the album genres, comma-separated", default="")
+            meta.genres = [genre.strip() for genre in str(user_genres or "").split(",") if genre.strip()]
+            if not meta.genres:
                 return False
 
         return True
