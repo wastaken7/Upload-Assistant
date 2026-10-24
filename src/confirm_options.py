@@ -88,7 +88,11 @@ def available(meta: Meta, config: Mapping[str, Any]) -> list[dict[str, Any]]:
     options.append(_toggle("anon", "Anonymous", "upload", bool(meta.anon), hint="Trackers set to anonymous in your config stay anonymous"))
     if category in VIDEO_CATEGORIES:
         options.append(_toggle("personalrelease", "Personal release", "upload", bool(meta.personalrelease)))
-    options.append(_toggle("modq", "Moderation queue", "upload", bool(meta.modq), hint="On trackers that support it"))
+    # A tracker's own modq setting applies only to it, so the toggle stays free for the others.
+    tracker_configs = config.get("TRACKERS", {})
+    modq_configured = sorted(tracker for tracker in trackers if isinstance(tracker_configs.get(tracker), dict) and tracker_configs[tracker].get("modq") is True)
+    modq_hint = f"Already on for {', '.join(modq_configured)} in your config" if modq_configured else "On trackers that support it"
+    options.append(_toggle("modq", "Moderation queue", "upload", bool(meta.modq), hint=modq_hint))
     if trackers & DRAFT_TRACKERS:
         options.append(_toggle("draft", "Send as draft", "upload", bool(meta.draft), hint="BeyondHD and LST"))
     options.append(_toggle("no_seed", "Don't add to the torrent client", "upload", bool(meta.no_seed)))

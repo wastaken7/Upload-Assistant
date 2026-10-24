@@ -2075,8 +2075,7 @@
         {
           key,
           type: "button",
-          role: "radio",
-          "aria-checked": active,
+          "aria-pressed": active,
           "aria-label": title,
           title,
           className: "ua-appearance-segment",
@@ -2104,7 +2103,7 @@
         "div",
         {
           className: "ua-appearance-swatches",
-          role: "radiogroup",
+          role: "group",
           "aria-label": "Color theme",
         },
         UA_THEMES.map((theme) => {
@@ -2115,8 +2114,7 @@
             {
               key: theme.id,
               type: "button",
-              role: "radio",
-              "aria-checked": active,
+              "aria-pressed": active,
               "aria-label": theme.label,
               title: `${theme.label} — ${theme.description}`,
               className: "ua-appearance-swatch",
@@ -2145,7 +2143,7 @@
             "div",
             {
               className: "ua-appearance-segments",
-              role: "radiogroup",
+              role: "group",
               "aria-label": "Corner style",
             },
             UA_INTERFACE_STYLES.map((style) =>
@@ -2171,7 +2169,7 @@
             "div",
             {
               className: "ua-appearance-segments",
-              role: "radiogroup",
+              role: "group",
               "aria-label": "Color mode",
             },
             [

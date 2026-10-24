@@ -33,6 +33,16 @@ def test_media_options_follow_the_release() -> None:
     assert "personalrelease" not in keys(game)
 
 
+def test_moderation_queue_names_trackers_that_already_enable_it() -> None:
+    config = {"DEFAULT": {}, "TRACKERS": {"AITHER": {"modq": True}, "BLU": {"modq": False}}}
+    option = by_key(confirm_options.available(Meta(category="MOVIE", trackers=["AITHER", "BLU"]), config), "modq")
+
+    assert option["hint"] == "Already on for AITHER in your config"
+    # The setting covers only AITHER, so the queue can still be turned on for BLU.
+    assert option["value"] is False
+    assert "locked" not in option
+
+
 def test_tracker_specific_options_need_a_tracker_that_reads_them() -> None:
     without = confirm_options.available(Meta(category="MOVIE", trackers=["AITHER"]), {"DEFAULT": {}})
     with_them = confirm_options.available(Meta(category="MOVIE", trackers=["LST", "GREATPOSTERWALL"]), {"DEFAULT": {}})
