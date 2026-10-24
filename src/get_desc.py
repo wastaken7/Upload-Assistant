@@ -28,6 +28,7 @@ from src.description_review import apply_saved_draft
 from src.languages import languages_manager
 from src.mediainfo import MediaInfo
 from src.meta import Meta
+from src.music.analyzer import read_rip_log
 from src.screenshot_manifest import files as manifest_files
 from src.takescreens import TakeScreensManager
 from src.tracker_images import get_tracker_image_collection, has_tracker_image_collection
@@ -1325,6 +1326,35 @@ class DescriptionBuilder:
             lines.append("[/table]")
         return "\n".join(lines)
 
+    @staticmethod
+    def _build_music_rip_logs(release: dict[str, Any], labels: dict[str, Any]) -> str:
+        """Render each CD rip log (EAC, XLD, ...) inside its own spoiler and code block."""
+        auxiliary = release.get("auxiliary")
+        logs = auxiliary.get("logs") if isinstance(auxiliary, dict) else None
+        root_value = str(release.get("root") or "")
+        if not isinstance(logs, list) or not root_value:
+            return ""
+        root = Path(root_value).resolve()
+        blocks = []
+        for relative in cast(list[Any], logs):
+            log_path = (root / str(relative)).resolve()
+            try:
+                # Logs are a few dozen KB; anything far larger is not worth embedding.
+                if not log_path.is_relative_to(root) or log_path.stat().st_size > 1_048_576:
+                    continue
+            except OSError:
+                continue
+            log_text = read_rip_log(log_path).replace("\r\n", "\n").replace("\r", "\n").strip()
+            if not log_text:
+                continue
+            # A closing tag inside the log would end the code block or spoiler early.
+            log_text = re.sub(r"\[(/\s*(?:code|spoiler))", "\N{FULLWIDTH LEFT SQUARE BRACKET}\\1", log_text, flags=re.IGNORECASE)
+            name = str(relative).replace("\\", "/").replace("[", "\N{FULLWIDTH LEFT SQUARE BRACKET}").replace("]", "\N{FULLWIDTH RIGHT SQUARE BRACKET}")
+            blocks.append(f"[spoiler={name}][code]{log_text}[/code][/spoiler]")
+        if not blocks:
+            return ""
+        return f"[h2]{labels['rip_logs']}[/h2]\n" + "\n".join(blocks)
+
     def _build_music_desc_section(self, meta: Meta, table: bool = True) -> str:
         """Build a tracker-neutral BBCode summary for MUSIC-category uploads."""
         if meta.category != "MUSIC" or not isinstance(meta.music_release, dict):
@@ -1467,7 +1497,8 @@ class DescriptionBuilder:
         else:
             body = "\n".join(f"[b]{label}:[/b] {field_value}" for label, field_value in music_fields)
         tracklist = self._build_music_tracklist(tracks, text, table=table)
-        return f"{header}{text['details']}{header_end}\n{body}" + (f"\n\n{tracklist}" if tracklist else "")
+        rip_logs = self._build_music_rip_logs(release, text)
+        return f"{header}{text['details']}{header_end}\n{body}" + "".join(f"\n\n{part}" for part in (tracklist, rip_logs) if part)
 
     async def general_description_generator(
         self,
