@@ -5,6 +5,7 @@ from typing import Any, cast
 
 import cli_ui
 
+from src.artwork import is_valid_cover_image
 from src.console import logger
 from src.meta import Meta
 from src.trackers.common import Common
@@ -206,6 +207,10 @@ class Seedpool(UNIT3D):
         return {"name": name}
 
     async def get_additional_checks(self, meta: Meta) -> bool:
+        if meta.category == "MUSIC" and not is_valid_cover_image(meta.artwork_path):
+            logger.info(f"{self.tracker}: [bold red]A cover image is required for music uploads at {self.tracker}.[/bold red]")
+            return False
+
         resolution = meta.resolution
         if meta.category in {"MOVIE", "TV"} and resolution not in ["8640p", "4320p", "2160p", "1440p", "1080p", "1080i"]:
             logger.info(f"{self.tracker}: [bold red]Only 1080 or higher resolutions allowed at {self.tracker}.[/bold red]")

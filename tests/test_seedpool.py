@@ -94,3 +94,19 @@ def test_seedpool_retains_generated_names_for_discs_and_anime(overrides):
     )
 
     assert asyncio.run(_tracker().get_name(meta)) == {"name": "Movie.2025.1080p.BluRay.DDP.5.1-GROUP"}
+
+
+def test_seedpool_rejects_music_without_cover(tmp_path):
+    meta = Meta(category="MUSIC", artwork_path=str(tmp_path / "missing.jpg"))
+
+    assert asyncio.run(_tracker().get_additional_checks(meta)) is False
+
+
+def test_seedpool_accepts_music_with_valid_cover(tmp_path):
+    from PIL import Image
+
+    cover = tmp_path / "cover.png"
+    Image.new("RGB", (300, 300), "white").save(cover)
+    meta = Meta(category="MUSIC", artwork_path=str(cover))
+
+    assert asyncio.run(_tracker().get_additional_checks(meta)) is True
