@@ -94,3 +94,54 @@ def test_seedpool_retains_generated_names_for_discs_and_anime(overrides):
     )
 
     assert asyncio.run(_tracker().get_name(meta)) == {"name": "Movie.2025.1080p.BluRay.DDP.5.1-GROUP"}
+
+
+def test_seedpool_rejects_music_without_cover(tmp_path):
+    meta = Meta(category="MUSIC", artwork_path=str(tmp_path / "missing.jpg"))
+
+    assert asyncio.run(_tracker().get_additional_checks(meta)) is False
+
+
+def test_seedpool_accepts_music_with_valid_cover(tmp_path):
+    from PIL import Image
+
+    cover = tmp_path / "cover.png"
+    Image.new("RGB", (300, 300), "white").save(cover)
+    meta = Meta(category="MUSIC", artwork_path=str(cover), genres=["Synthwave"])
+
+    assert asyncio.run(_tracker().get_additional_checks(meta)) is True
+
+
+def _music_meta(tmp_path, **kwargs) -> Meta:
+    from PIL import Image
+
+    cover = tmp_path / "cover.png"
+    Image.new("RGB", (300, 300), "white").save(cover)
+    return Meta(category="MUSIC", artwork_path=str(cover), **kwargs)
+
+
+def test_seedpool_music_sends_album_genres_as_keywords(tmp_path):
+    meta = _music_meta(tmp_path, genres=["Synthwave", "Dream Pop"])
+
+    assert asyncio.run(_tracker().get_additional_checks(meta)) is True
+    assert asyncio.run(_tracker().get_keywords(meta)) == {"keywords": "Synthwave, Dream Pop"}
+
+
+def test_seedpool_music_without_genres_skips_unattended(tmp_path):
+    meta = _music_meta(tmp_path, genres=[" "], keywords=["Neon Coast"], unattended=True)
+
+    assert asyncio.run(_tracker().get_additional_checks(meta)) is False
+
+
+def test_seedpool_music_without_genres_prompts_for_them(tmp_path, monkeypatch):
+    monkeypatch.setattr("src.trackers.UNIT3D.seedpool.cli_ui.ask_string", lambda *_args, **_kwargs: "Ambient, Chillwave")
+    meta = _music_meta(tmp_path)
+
+    assert asyncio.run(_tracker().get_additional_checks(meta)) is True
+    assert asyncio.run(_tracker().get_keywords(meta)) == {"keywords": "Ambient, Chillwave"}
+
+
+def test_seedpool_music_without_genres_rejects_empty_prompt(tmp_path, monkeypatch):
+    monkeypatch.setattr("src.trackers.UNIT3D.seedpool.cli_ui.ask_string", lambda *_args, **_kwargs: "")
+
+    assert asyncio.run(_tracker().get_additional_checks(_music_meta(tmp_path))) is False

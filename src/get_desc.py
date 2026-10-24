@@ -3,6 +3,7 @@ import asyncio
 import contextlib
 import html
 import json
+import math
 import os
 import re
 import urllib.parse
@@ -1355,6 +1356,16 @@ class DescriptionBuilder:
             return ""
         return f"[h2]{labels['rip_logs']}[/h2]\n" + "\n".join(blocks)
 
+    @staticmethod
+    def _music_cover_url(meta: Meta) -> str:
+        """Return the hosted MUSIC cover URL, or a user-supplied public artwork URL."""
+        hosted = meta.hosted_artwork[0] if isinstance(meta.hosted_artwork, list) and meta.hosted_artwork else {}
+        for candidate in (hosted.get("raw_url") if isinstance(hosted, dict) else "", meta.artwork_url):
+            url = str(candidate or "").strip()
+            if re.match(r"^https?://\S+$", url, flags=re.IGNORECASE):
+                return url
+        return ""
+
     def _build_music_desc_section(self, meta: Meta, table: bool = True) -> str:
         """Build a tracker-neutral BBCode summary for MUSIC-category uploads."""
         if meta.category != "MUSIC" or not isinstance(meta.music_release, dict):
@@ -1411,6 +1422,31 @@ class DescriptionBuilder:
                     formatted_values[item] = formatted
             return ", ".join(formatted_values[item] for item in sorted(formatted_values, key=str))
 
+        def average_bitrate() -> str:
+            """Return the release's average bitrate, weighted by track duration when every track has one."""
+            samples: list[tuple[float, float]] = []
+            for track in tracks:
+                if not isinstance(track, dict):
+                    continue
+                try:
+                    bitrate = float(track.get("bitrate") or 0)
+                except TypeError, ValueError, OverflowError:
+                    continue
+                try:
+                    duration = float(track.get("duration") or 0)
+                except TypeError, ValueError, OverflowError:
+                    duration = 0.0
+                if bitrate > 0 and math.isfinite(bitrate):
+                    samples.append((bitrate, duration if duration > 0 and math.isfinite(duration) else 0.0))
+            if not samples:
+                return ""
+            total_duration = sum(duration for _, duration in samples)
+            if all(duration > 0 for _, duration in samples):
+                average = sum(bitrate * duration for bitrate, duration in samples) / total_duration
+            else:
+                average = sum(bitrate for bitrate, _ in samples) / len(samples)
+            return f"{round(average / 1000)} kbps"
+
         text = {
             "details": "Music Details" if not use_pt_br else "Detalhes da Música",
             "artist": "Artist" if not use_pt_br else "Artista",
@@ -1432,6 +1468,7 @@ class DescriptionBuilder:
             "sample_rate": "Sample Rate" if not use_pt_br else "Taxa de Amostragem",
             "channels": "Channels" if not use_pt_br else "Canais",
             "bitrate": "Bitrate",
+            "audio": "Audio" if not use_pt_br else "Áudio",
             "external_ids": "External IDs" if not use_pt_br else "IDs Externos",
         }
         text.update(get_labels(MUSIC_LABELS, self.language))
@@ -1455,49 +1492,93 @@ class DescriptionBuilder:
             numeric_identifier = match.group(1) if match else raw_identifier if raw_identifier.isdecimal() else ""
             return f"[url=https://www.discogs.com/{kind}/{numeric_identifier}]{numeric_identifier}[/url]" if numeric_identifier else ""
 
+        # The release IDs pin the exact edition; the group/master IDs only stand in when the release ID is unknown.
+        musicbrainz_release = musicbrainz_link("release", external_ids.get("musicbrainz_release"))
+        discogs_release = discogs_link("release", external_ids.get("discogs_release"))
         external_id_links = [
-            (external_id_labels["musicbrainz_release"], musicbrainz_link("release", external_ids.get("musicbrainz_release"))),
-            (external_id_labels["musicbrainz_release_group"], musicbrainz_link("release-group", external_ids.get("musicbrainz_release_group"))),
-            (external_id_labels["discogs_release"], discogs_link("release", external_ids.get("discogs_release"))),
-            (external_id_labels["discogs_master"], discogs_link("master", external_ids.get("discogs_master"))),
+            (external_id_labels["musicbrainz_release"], musicbrainz_release),
+            (external_id_labels["musicbrainz_release_group"], "" if musicbrainz_release else musicbrainz_link("release-group", external_ids.get("musicbrainz_release_group"))),
+            (external_id_labels["discogs_release"], discogs_release),
+            (external_id_labels["discogs_master"], "" if discogs_release else discogs_link("master", external_ids.get("discogs_master"))),
         ]
         external_id_links = [f"{label}: {link}" for label, link in external_id_links if link]
+
+        # Later years are only worth a row when they differ from an earlier one.
+        year = display(value("year", meta.year))
+        release_year = display(value("release_year"))
+        if release_year == year:
+            release_year = ""
+        edition_year = display(value("edition_year"))
+        if edition_year in (year, release_year):
+            edition_year = ""
+
+        try:
+            disc_count = int(value("disc_count", 1))
+        except TypeError, ValueError:
+            disc_count = 1
+
+        # Format, codec, bit depth, sample rate and channels share one row, e.g. "FLAC / 24-bit / 96 kHz / Stereo".
+        audio_format = display(value("format", technical_values("format")))
+        codec = technical_values("codec")
+        if codec and codec.casefold() != audio_format.casefold():
+            audio_format = f"{audio_format} ({codec})" if audio_format else codec
+        audio = " / ".join(
+            part
+            for part in (
+                audio_format,
+                technical_values("bit_depth", lambda item: f"{item}-bit"),
+                technical_values("sample_rate", lambda item: f"{int(item) / 1000:g} kHz"),
+                technical_values("channels", lambda item: {1: "Mono", 2: "Stereo"}.get(int(item), f"{item} channels")),
+            )
+            if part
+        )
+
+        tracklist = self._build_music_tracklist(tracks, text, table=table)
+        rip_logs = self._build_music_rip_logs(release, text)
 
         music_fields = [
             (text["artist"], display(value("artists", value("artist", meta.artist)))),
             (text["album"], display(value("album", meta.title))),
-            (text["year"], display(value("year", meta.year))),
-            (text["release_year"], display(value("release_year"))),
+            (text["year"], year),
+            (text["release_year"], release_year),
             (text["edition"], display(value("edition"))),
-            (text["edition_year"], display(value("edition_year"))),
+            (text["edition_year"], edition_year),
             (text["type"], display(value("release_type"))),
             (text["media"], display(value("media", meta.source))),
             (text["label"], display(value("release_label", value("label")))),
             (text["catalogue"], display(value("release_catalogue_number"))),
             (text["genres"], display(value("genres"))),
-            (text["tracks"], display(value("track_count", len(tracks)))),
-            (text["discs"], display(value("disc_count", 1))),
-            (text["format"], display(value("format", technical_values("format")))),
-            (text["codec"], technical_values("codec")),
-            (text["bit_depth"], technical_values("bit_depth", lambda item: f"{item}-bit")),
-            (text["sample_rate"], technical_values("sample_rate", lambda item: f"{int(item) / 1000:g} kHz")),
-            (text["channels"], technical_values("channels", lambda item: {1: "Mono", 2: "Stereo"}.get(int(item), f"{item} channels"))),
-            (text["bitrate"], technical_values("bitrate", lambda item: f"{round(int(item) / 1000)} kbps")),
+            # The tracklist below already lists every track.
+            (text["tracks"], "" if tracklist else display(value("track_count"))),
+            (text["discs"], str(disc_count) if disc_count > 1 else ""),
+            (text["audio"], audio),
+            (text["bitrate"], average_bitrate()),
             (text["external_ids"], ", ".join(external_id_links) if table else "\n".join(external_id_links)),
         ]
         music_fields = [(label, field_value) for label, field_value in music_fields if field_value]
         if not music_fields:
-            return ""
+            return "\n\n".join(part for part in (tracklist, rip_logs) if part)
+
+        # Only these trackers get the hosted cover as a first column beside the details.
+        cover_url = self._music_cover_url(meta) if self.tracker in ("ASIANCINEMA", "TORRENTLEECH") else ""
 
         if table:
             table_lines = ["[table]"]
             table_lines.extend(f"[tr][td][b]{label}[/b][/td][td]{field_value}[/td][/tr]" for label, field_value in music_fields)
             table_lines.append("[/table]")
             body = "\n".join(table_lines)
+            if cover_url and "[" not in cover_url and "]" not in cover_url:
+                body = f"[table]\n[tr][td][img=250]{cover_url}[/img][/td][td]\n{body}\n[/td][/tr]\n[/table]"
         else:
             body = "\n".join(f"[b]{label}:[/b] {field_value}" for label, field_value in music_fields)
-        tracklist = self._build_music_tracklist(tracks, text, table=table)
-        rip_logs = self._build_music_rip_logs(release, text)
+            if cover_url and self.tracker == "TORRENTLEECH":
+                # TorrentLeech has no BBCode tables but accepts HTML; keep the markup on one
+                # line so the tracker's newline-to-<br> conversion stays inside the cell.
+                safe_url = html.escape(cover_url, quote=True)
+                body = (
+                    f'<table><tr><td style="vertical-align: top; padding-right: 15px;"><img src="{safe_url}" style="max-width: 250px;"></td>'
+                    f'<td style="vertical-align: top;">{body}</td></tr></table>'
+                )
         return f"{header}{text['details']}{header_end}\n{body}" + "".join(f"\n\n{part}" for part in (tracklist, rip_logs) if part)
 
     async def general_description_generator(
@@ -2638,6 +2719,8 @@ class DescriptionBuilder:
 
         if tracker == "TORRENTLEECH":
             description = description.replace("[center]", "<center>").replace("[/center]", "</center>")
+            # TorrentLeech has no heading BBCode; render headings as bold text instead.
+            description = re.sub(r"\[(/?)h[1-6]\]", r"[\1b]", description, flags=re.IGNORECASE)
             description = re.sub(r"\[\*\]", "\n[*]", description, flags=re.IGNORECASE)
             description = re.sub(r"\[c\](.*?)\[/c\]", r"[code]\1[/code]", description, flags=re.IGNORECASE | re.DOTALL)
             description = re.sub(r"\[hr\]", "---", description, flags=re.IGNORECASE)
