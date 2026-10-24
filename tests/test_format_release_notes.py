@@ -56,6 +56,18 @@ def test_omits_empty_sections_and_ignores_case() -> None:
     assert format_release_notes(notes) == "## Fix\n" + _line("fix: apple core", 2) + "\n" + _line("fix: Zebra stripes", 1) + "\n"
 
 
+def test_skips_blank_lines_before_change_list() -> None:
+    notes = "## What's Changed\n\n" + _line("feat: add banner", 1)
+
+    assert format_release_notes(notes) == "## Feature\n" + _line("feat: add banner", 1) + "\n"
+
+
+def test_keeps_heading_without_pull_requests() -> None:
+    notes = "## What's Changed\n\n**Full Changelog**: https://github.com/example/Project/compare/v1.0...v1.1"
+
+    assert format_release_notes(notes) == notes + "\n"
+
+
 def test_leaves_notes_without_change_list_untouched() -> None:
     notes = "**Full Changelog**: https://github.com/example/Project/compare/v1.0...v1.1"
 

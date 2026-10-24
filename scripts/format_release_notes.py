@@ -36,12 +36,17 @@ def format_release_notes(notes: str) -> str:
     except StopIteration:
         return notes.strip() + "\n"
 
-    end = start + 1
+    first = start + 1
+    while first < len(lines) and not lines[first].strip():
+        first += 1
+    end = first
     while end < len(lines) and PR_LINE.match(lines[end]):
         end += 1
+    if end == first:
+        return notes.strip() + "\n"
 
     grouped: dict[str, list[tuple[tuple[str, str, str], str]]] = {}
-    for line in lines[start + 1 : end]:
+    for line in lines[first:end]:
         title = PR_LINE.match(line)["title"]  # type: ignore[index]
         grouped.setdefault(_section_for(title), []).append((_sort_key(title), line))
 
