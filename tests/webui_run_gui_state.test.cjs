@@ -760,3 +760,38 @@ test("unrelated prompts and another session do not inherit a review counter", ()
   assert.equal(selectRunGuiView(state).dupeReview, null);
   assert.equal(selectRunGuiView(createRunGuiState()).dupeReview, null);
 });
+
+test("queue item covers stay with their item and reject unsafe sources", () => {
+  const view = selectRunGuiView(
+    run(
+      gui({ kind: "item", index: 1, total: 3, name: "First.mkv" }),
+      gui({
+        kind: "item",
+        index: 1,
+        total: 3,
+        name: "First.mkv",
+        artwork: "https://images.invalid/first.jpg",
+      }),
+      gui({
+        kind: "item",
+        index: 2,
+        total: 3,
+        name: "Second",
+        artwork: "/api/execution_item_cover?session_id=s&item=2&v=1",
+      }),
+      gui({
+        kind: "item",
+        index: 3,
+        total: 3,
+        name: "Third",
+        artwork: "javascript:alert(1)",
+      }),
+      { type: "exit", code: 0 },
+    ),
+  );
+  assert.deepEqual(plain(view.items.map((item) => item.artwork)), [
+    "https://images.invalid/first.jpg",
+    "/api/execution_item_cover?session_id=s&item=2&v=1",
+    "",
+  ]);
+});

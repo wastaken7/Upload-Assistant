@@ -113,6 +113,12 @@
         diffPct: Number.isFinite(entry.diff_pct) ? entry.diff_pct : null,
         color: hexColor(entry.color),
       }));
+  // A cover is a public image or the server's per-item endpoint, never a path.
+  const artworkUrl = (value) =>
+    typeof value === "string" &&
+    /^(https?:\/\/|\/api\/execution_item_cover\?)/i.test(value)
+      ? value
+      : "";
   const itemOf = (data, state) =>
     Number.isInteger(data.item) ? data.item : state.currentItem;
   const trackerKey = (item, tracker) => `${item}:${tracker}`;
@@ -170,6 +176,7 @@
           name: text(data.name),
           personalRelease: data.personal_release === true,
           runOptions: readRunOptions(data.run_options),
+          artwork: artworkUrl(data.artwork),
         });
         items.sort((a, b) => a.index - b.index);
         return { ...state, items, currentItem: data.index };

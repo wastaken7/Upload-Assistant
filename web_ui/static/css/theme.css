@@ -4629,6 +4629,12 @@ html[data-ua-shape="square"]
   color: var(--ua-upload-muted);
 }
 
+/* A queue item's cover in Results; the image keeps its own aspect ratio. */
+.ua-run-gui-cover {
+  background: var(--ua-upload-hover);
+  border-color: var(--ua-upload-border);
+}
+
 /* Poster thumbnail beside an ID choice; the tile shows when there is none. */
 .ua-run-gui-option-thumb {
   background: var(--ua-upload-hover);

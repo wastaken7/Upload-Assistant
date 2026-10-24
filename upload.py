@@ -3261,6 +3261,7 @@ async def do_the_thing(base_dir: str) -> None:
                 webui_events.stage("requests", "done")
 
             webui_events.publish_tracker_statuses(meta.tracker_status, final=True)
+            webui_events.update_item(artwork=meta)
             # Persist and expose the completed item before user-managed hooks run.
             # Hooks may inspect the final tracker status and files have not yet been cleaned.
             await record_completed_item_stats_async(meta, tracker_class_map)
