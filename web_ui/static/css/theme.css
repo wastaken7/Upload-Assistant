@@ -4393,7 +4393,7 @@ html[data-ua-shape="square"]
 }
 
 .ua-run-gui-link {
-  color: color-mix(in srgb, #38bdf8 70%, var(--ua-upload-text));
+  color: color-mix(in srgb, var(--ua-copper-bright) 72%, var(--ua-upload-text));
 }
 
 .ua-run-gui-link:hover {
@@ -4504,8 +4504,13 @@ html[data-ua-shape="square"]
   color: var(--ua-upload-text);
 }
 
+/* Accent-tinted hover, matching the Stats page controls. */
 .ua-run-gui-choice:hover:not(:disabled) {
-  background: var(--ua-upload-hover);
+  background: color-mix(
+    in srgb,
+    var(--ua-copper-bright) 10%,
+    var(--ua-upload-surface-raised)
+  );
 }
 
 .ua-run-gui-choice[data-selected="true"] {
@@ -4594,7 +4599,11 @@ html[data-ua-shape="square"]
 }
 
 .ua-run-gui-collapse:hover {
-  background: var(--ua-upload-hover);
+  background: color-mix(
+    in srgb,
+    var(--ua-copper-bright) 10%,
+    var(--ua-upload-surface-raised)
+  );
   color: var(--ua-upload-text);
 }
 

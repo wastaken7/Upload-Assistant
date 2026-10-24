@@ -8989,7 +8989,10 @@ function AudionutsUAGUI() {
     collapsed = false,
     onToggle = null,
   }) => (
-    <section className="ua-run-gui-block rounded-lg border" data-tone={tone}>
+    <section
+      className="ua-run-gui-block rounded-xl border shadow-sm"
+      data-tone={tone}
+    >
       <header
         className={`ua-run-gui-block-header flex items-center gap-2 px-3 py-2 ${collapsed ? "" : "border-b"}`}
       >
@@ -9708,7 +9711,7 @@ function AudionutsUAGUI() {
 
     return (
       <section
-        className="ua-run-gui-prompt rounded-lg border-2 p-3"
+        className="ua-run-gui-prompt rounded-xl border-2 p-3"
         aria-live="polite"
         data-answered={Boolean(prompt?.answered)}
       >
@@ -10305,7 +10308,7 @@ function AudionutsUAGUI() {
     return (
       <div className="ua-run-gui flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
         {/* The Terminal | GUI switch sits at the right of the stages bar. */}
-        <div className="ua-run-gui-strip rounded-lg border px-3 py-2">
+        <div className="ua-run-gui-strip rounded-xl border px-3 py-2 shadow-sm">
           <div
             className={`flex min-w-0 flex-wrap gap-3 ${showItemHeader ? "items-center" : "items-start"}`}
           >
@@ -10360,7 +10363,7 @@ function AudionutsUAGUI() {
         {renderRunGuiPrompt(view)}
 
         {!hasAnything && !prompt && (
-          <div className="ua-run-gui-empty flex flex-col items-center justify-center gap-2 rounded-lg border p-8 text-center text-sm">
+          <div className="ua-run-gui-empty flex flex-col items-center justify-center gap-2 rounded-xl border p-8 shadow-sm text-center text-sm">
             {isExecuting ? (
               <>
                 <SpinnerIcon />
