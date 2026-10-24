@@ -6,6 +6,7 @@ from typing import Any, Literal, cast
 
 import httpx
 
+from src import tmdb
 from src.console import logger
 from src.get_name import NameComponents, build_name_components
 from src.languages import languages_manager
@@ -48,7 +49,8 @@ class VideoNameRules:
     hybrid_on_webdl: bool = True
     # The generic name drops a manual year on TV unless the year came from the filename.
     honor_manual_year_on_tv: bool = False
-    # TV titles carry a year only when TVDB disambiguates the series with one, e.g. "Show (2021)".
+    # TV titles carry a year only when TVDB disambiguates the series with one, e.g. "Show (2021)",
+    # or, without a TVDB name, when TMDB lists another show with the same title.
     tv_year_from_tvdb: bool = True
 
 
@@ -105,13 +107,17 @@ async def build_video_name(meta: Meta, rules: VideoNameRules, tracker: str, comp
     dvd_sourced = (is_disc and meta.is_disc == "DVD") or (name_type == "REMUX" and source in DVD_SOURCES)
 
     year = parts.year
-    if meta.category == "TV" and rules.tv_year_from_tvdb and not meta.no_year:
-        tvdb_year = tvdb_title_year(meta)
-        if tvdb_year is not None:
-            year = tvdb_year
     manual_year = meta.manual_year or 0
     if rules.honor_manual_year_on_tv and manual_year > 0 and not meta.no_year:
         year = str(manual_year)
+    elif meta.category == "TV" and rules.tv_year_from_tvdb and not meta.no_year:
+        tv_year = tvdb_title_year(meta)
+        if tv_year is None:
+            has_homonym = await tmdb_tv_title_has_homonym(meta, parts.title, tmdb.tmdb_api_key or "", tracker)
+            if has_homonym is not None:
+                tv_year = str(meta.year or "").strip() if has_homonym else ""
+        if tv_year is not None:
+            year = tv_year
 
     language = "" if is_disc or not rules.language_slot else await get_language_label(meta, tracker)
     audio = await _get_audio(meta, parts.audio, rules)
@@ -292,33 +298,40 @@ class TmdbTvNaming:
     async def _tv_title_needs_year(self, meta: Meta, title: str | None = None) -> bool:
         title = str(title if title is not None else (meta.title or "")).strip()
         api_key = str(self.config.get("DEFAULT", {}).get("tmdb_api", "")).strip()
-        if not title or not api_key:
-            return False
-        try:
-            logger.info(f"{self.tracker}: Checking if TMDb has multiple shows with the title '{title}'...")
-            async with httpx.AsyncClient() as client:
-                response = await client.get(
-                    "https://api.themoviedb.org/3/search/tv",
-                    params={"api_key": api_key, "query": title, "language": "en-US", "include_adult": "true"},
-                )
-                response.raise_for_status()
-                payload_raw: Any = response.json()
-        except httpx.HTTPError, ValueError, TypeError:
-            return False
+        return await tmdb_tv_title_has_homonym(meta, title, api_key, self.tracker) is True
 
-        title_key = " ".join(title.casefold().split())
-        current_id = str(meta.tmdb_id or "")
-        payload = cast(dict[str, Any], payload_raw) if isinstance(payload_raw, dict) else {}
-        results_raw: Any = payload.get("results", [])
-        results = cast(list[Any], results_raw) if isinstance(results_raw, list) else []
-        matching_ids: set[str] = set()
-        for result_raw in results:
-            if not isinstance(result_raw, dict):
-                continue
-            result = cast(dict[str, Any], result_raw)
-            result_id = str(result.get("id", ""))
-            names = (result.get("name"), result.get("original_name"))
-            if any(" ".join(str(candidate or "").casefold().split()) == title_key for candidate in names):
-                matching_ids.add(result_id)
-        matching_ids.discard("")
-        return bool(matching_ids - {current_id}) if current_id else len(matching_ids) > 1
+
+async def tmdb_tv_title_has_homonym(meta: Meta, title: str, api_key: str, tracker: str) -> bool | None:
+    """Whether TMDB lists another show with exactly this title; None when TMDB cannot tell."""
+    title = title.strip()
+    api_key = api_key.strip()
+    if not title or not api_key:
+        return None
+    try:
+        logger.info(f"{tracker}: Checking if TMDb has multiple shows with the title '{title}'...")
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                "https://api.themoviedb.org/3/search/tv",
+                params={"api_key": api_key, "query": title, "language": "en-US", "include_adult": "true"},
+            )
+            response.raise_for_status()
+            payload_raw: Any = response.json()
+    except httpx.HTTPError, ValueError, TypeError:
+        return None
+
+    title_key = " ".join(title.casefold().split())
+    current_id = str(meta.tmdb_id or "")
+    payload = cast(dict[str, Any], payload_raw) if isinstance(payload_raw, dict) else {}
+    results_raw: Any = payload.get("results", [])
+    results = cast(list[Any], results_raw) if isinstance(results_raw, list) else []
+    matching_ids: set[str] = set()
+    for result_raw in results:
+        if not isinstance(result_raw, dict):
+            continue
+        result = cast(dict[str, Any], result_raw)
+        result_id = str(result.get("id", ""))
+        names = (result.get("name"), result.get("original_name"))
+        if any(" ".join(str(candidate or "").casefold().split()) == title_key for candidate in names):
+            matching_ids.add(result_id)
+    matching_ids.discard("")
+    return bool(matching_ids - {current_id}) if current_id else len(matching_ids) > 1

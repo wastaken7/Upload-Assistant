@@ -1,5 +1,6 @@
 # ruff: noqa: S101
 import asyncio
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -300,7 +301,7 @@ def _show(**overrides: object) -> Meta:
         ({"series_name": "Synthetic Show", "series_title": "Synthetic Show (2017)"}, "", "2017 "),
         # A TVDB name without a year drops a year taken from the filename.
         ({"series_name": "Synthetic Show"}, "2019", ""),
-        # Without TVDB data the filename decides, as before.
+        # Without TVDB data or a TMDB answer the filename decides, as before.
         ({}, "2019", "2019 "),
         ({}, "", ""),
     ],
@@ -309,6 +310,39 @@ def test_tv_year_follows_tvdb_title(episode_data: dict[str, str], search_year: s
     meta = _show(tvdb_episode_data=episode_data, search_year=search_year)
 
     assert _build(meta) == f"Synthetic Show {expected_year}S01 1080p AMZN WEB-DL DD+ 5.1 H.264-TESTGROUP"
+
+
+@pytest.mark.parametrize(
+    ("has_homonym", "search_year", "expected_year"),
+    [
+        # Without a TVDB name, TMDB decides whether another show needs the year.
+        (False, "2019", ""),
+        (True, "", "2019 "),
+        (True, "2019", "2019 "),
+        # TMDB could not answer: the filename decides.
+        (None, "2019", "2019 "),
+        (None, "", ""),
+    ],
+)
+def test_tv_year_falls_back_to_tmdb_homonyms(has_homonym: bool | None, search_year: str, expected_year: str) -> None:
+    meta = _show(tvdb_episode_data={}, search_year=search_year)
+
+    with patch("src.trackers.naming.tmdb_tv_title_has_homonym", new=AsyncMock(return_value=has_homonym)) as check:
+        assert _build(meta) == f"Synthetic Show {expected_year}S01 1080p AMZN WEB-DL DD+ 5.1 H.264-TESTGROUP"
+
+    assert check.await_args is not None
+    assert check.await_args.args[1] == "Synthetic Show"
+
+
+def test_tmdb_homonym_check_skipped_when_tvdb_or_manual_year_decides() -> None:
+    tvdb = _show(tvdb_episode_data={"series_name": "Synthetic Show"}, search_year="2019")
+    manual = _show(tvdb_episode_data={}, manual_year=2015)
+
+    with patch("src.trackers.naming.tmdb_tv_title_has_homonym", new=AsyncMock(return_value=True)) as check:
+        assert _build(tvdb) == "Synthetic Show S01 1080p AMZN WEB-DL DD+ 5.1 H.264-TESTGROUP"
+        assert _build(manual, VideoNameRules(honor_manual_year_on_tv=True)) == "Synthetic Show 2015 S01 1080p AMZN WEB-DL DD+ 5.1 H.264-TESTGROUP"
+
+    check.assert_not_awaited()
 
 
 def test_tvdb_year_respects_no_year_and_manual_year() -> None:
