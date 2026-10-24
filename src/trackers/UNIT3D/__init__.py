@@ -445,18 +445,30 @@ class UNIT3D:
     async def get_sd(self, meta: Meta) -> dict[str, str]:
         return {"sd": f"{meta.sd}"}
 
-    async def get_keywords(self, meta: Meta) -> dict[str, str]:
+    def get_keyword_terms(self, meta: Meta) -> list[str]:
+        """Return non-empty, case-insensitively unique keyword terms.
+
+        Music releases have no TMDB keywords, so their album genres are sent first.
+        """
+        source = [*meta.genres, *meta.keywords] if meta.category == "MUSIC" else meta.keywords
+        terms: list[str] = []
+        seen: set[str] = set()
+        for kw in source:
+            kw_str = str(kw).strip()
+            if kw_str and kw_str.casefold() not in seen:
+                seen.add(kw_str.casefold())
+                terms.append(kw_str)
+        return terms
+
+    async def get_keywords(self, meta: Meta, max_terms: int | None = None) -> dict[str, str]:
         """
         Enforces a 255-character limit on the keywords payload without cutting off individual words.
         This complies with the UNIT3D database schema (VARCHAR(255)) and API validation rules
-        ('keywords' => 'nullable|string|max:255').
+        ('keywords' => 'nullable|string|max:255'). Trackers with a term cap pass max_terms.
         """
         keywords_list: list[str] = []
         current_len = 0
-        for kw in meta.keywords:
-            kw_str = kw.strip()
-            if not kw_str:
-                continue
+        for kw_str in self.get_keyword_terms(meta)[:max_terms]:
             needed = len(kw_str) + (2 if keywords_list else 0)
             if current_len + needed > 255:
                 if not keywords_list and len(kw_str) > 255:
