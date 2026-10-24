@@ -1,7 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
 import hashlib
-import io
 import json
 import subprocess
 from collections.abc import Iterable
@@ -19,14 +18,11 @@ from src.temp_paths import spectrograms_dir
 from src.webui_progress import complete_progress, publish_progress
 
 DURATION_LIMIT = 600
-SAMPLE_RATE = 48000
-WIDTH_INCH = 16
-HEIGHT_INCH = 9
-DPI_VALUE = 240
-CACHE_VERSION = 2
+CACHE_VERSION = 3
 AUDIOBOOK_EXTENSIONS = {".aac", ".aax", ".flac", ".m4a", ".m4b", ".mp3", ".ogg", ".opus", ".wav", ".wma"}
-SPECTROGRAM_N_FFT = 2048
-MAX_TIME_BINS = 1024
+SPECTRUM_SIZE = "1920x1080"
+MAX_SEPARATE_CHANNELS = 2
+HEADER_HEIGHT = 100
 
 
 def prompt_audio_stream_positions(labels: Iterable[str] = ()) -> str:
@@ -48,7 +44,7 @@ def get_audio_streams(file_path: str | Path) -> list[dict[str, Any]]:
         "-v",
         "error",
         "-show_entries",
-        "stream=index:stream_tags=language,title",
+        "stream=index,channels:stream_tags=language,title",
         "-select_streams",
         "a",
         "-of",
@@ -117,21 +113,11 @@ def get_spectrogram_sources(category: str, filelist: list[Any], disc_final_path:
     return sources[:max_source_files]
 
 
-def get_stft_parameters(sample_count: int) -> tuple[int, int]:
-    """Bound the matrix plotted by Matplotlib while retaining useful frequency detail."""
-    import numpy as np
-
-    n_fft = min(SPECTROGRAM_N_FFT, max(32, 2 ** int(np.floor(np.log2(max(sample_count, 1))))))
-    hop_length = max(n_fft // 4, int(np.ceil(sample_count / MAX_TIME_BINS)))
-    return n_fft, hop_length
-
-
-def _cache_fingerprint(audio_sources: list[Path], duration: int, sample_rate: int, stream_indexes: list[tuple[Path, int]]) -> str:
+def _cache_fingerprint(audio_sources: list[Path], duration: int, stream_indexes: list[tuple[Path, int]]) -> str:
     data: dict[str, object] = {
         "cache_version": CACHE_VERSION,
         "sources": [{"path": str(source.resolve()), "size": source.stat().st_size, "mtime_ns": source.stat().st_mtime_ns} for source in audio_sources],
         "duration": duration,
-        "sample_rate": sample_rate,
         "stream_indexes": [{"path": str(source.resolve()), "index": index} for source, index in stream_indexes],
     }
     return hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()
@@ -151,97 +137,73 @@ def _load_cached_images(cache_path: Path, fingerprint: str) -> list[Any]:
     return []
 
 
+def build_spectrogram_filter(stream_index: int, channels: int) -> str:
+    """Plot stereo/mono channels separately; downmix surround so the panels stay legible."""
+    downmix = "aformat=channel_layouts=mono," if channels > MAX_SEPARATE_CHANNELS else ""
+    return f"[0:{stream_index}]{downmix}showspectrumpic=s={SPECTRUM_SIZE}:mode=separate:legend=1[spectrum]"
+
+
+def _add_header(image_path: Path, title: str, subtitle: str) -> None:
+    """Add a title band above the FFmpeg plot so each image identifies its source."""
+    from PIL import Image, ImageDraw, ImageFont
+
+    with Image.open(image_path) as spectrum:
+        spectrum.load()
+        canvas = Image.new("RGB", (spectrum.width, spectrum.height + HEADER_HEIGHT), "black")
+        canvas.paste(spectrum, (0, HEADER_HEIGHT))
+    draw = ImageDraw.Draw(canvas)
+    center = canvas.width // 2
+    draw.text((center, 18), title, font=ImageFont.load_default(size=34), fill="white", anchor="mt")
+    draw.text((center, 66), subtitle, font=ImageFont.load_default(size=20), fill=(200, 200, 200), anchor="mt")
+    canvas.save(image_path)
+
+
 def generate_spectrogram(
     stream_index: int,
     stream_label: str,
     stream_lang: str,
+    channels: int,
     file_path: str | Path,
     output_dir: Path,
     duration: int,
-    sample_rate: int,
     source_position: int,
     source_name: str,
 ) -> Path:
-    """Decode one stream and generate a frequency/time image suitable for review."""
+    """Render one stream at its native sample rate so content above 24 kHz stays visible."""
+    output_name = output_dir / f"spectrogram_source_{source_position:02d}_stream_{stream_index}.png"
     command = [
         configured_binary("ffmpeg_path") or "ffmpeg",
         "-v",
         "error",
         "-nostdin",
-        "-i",
-        str(file_path),
-        "-map",
-        f"0:{stream_index}",
+        "-y",
         "-t",
         str(duration),
-        "-ac",
+        "-i",
+        str(file_path),
+        "-filter_complex",
+        build_spectrogram_filter(stream_index, channels),
+        "-map",
+        "[spectrum]",
+        "-frames:v",
         "1",
-        "-ar",
-        str(sample_rate),
-        "-f",
-        "wav",
-        "pipe:1",
+        str(output_name),
     ]
     try:
         result = subprocess.run(command, capture_output=True, check=False, timeout=duration + 120)  # noqa: S603
     except (OSError, subprocess.TimeoutExpired) as error:
-        raise RuntimeError(f"Could not decode audio stream {stream_index}: {error}") from error
-    if result.returncode or not result.stdout:
-        detail = result.stderr.decode(errors="replace").strip() or "no audio was produced"
-        raise RuntimeError(f"FFmpeg could not decode audio stream {stream_index}: {detail}")
+        raise RuntimeError(f"Could not render audio stream {stream_index}: {error}") from error
+    if result.returncode or not output_name.is_file():
+        detail = result.stderr.decode(errors="replace").strip() or "no image was produced"
+        raise RuntimeError(f"FFmpeg could not render audio stream {stream_index}: {detail}")
 
-    try:
-        import librosa
-        import librosa.display
-        import matplotlib
-
-        matplotlib.use("Agg")
-        import matplotlib.pyplot as plt
-        import numpy as np
-    except ImportError as e:
-        raise RuntimeError("Missing required libraries for spectrogram generation. Install librosa and matplotlib.") from e
-
-    try:
-        samples, actual_sample_rate = librosa.load(io.BytesIO(result.stdout), sr=None, mono=True)
-    except Exception as error:
-        raise RuntimeError(f"Could not read decoded audio for stream {stream_index}: {error}") from error
-    if samples.size == 0:
-        raise RuntimeError(f"Audio stream {stream_index} contains no decodable samples.")
-
-    n_fft, hop_length = get_stft_parameters(samples.size)
-    stft = np.abs(librosa.stft(samples, n_fft=n_fft, hop_length=hop_length))
-    db_spectrogram = librosa.amplitude_to_db(stft, ref=np.max)  # pyright: ignore[reportUnknownMemberType]  # librosa stub has an untyped callback overload.
-
-    figure, axis = plt.subplots(figsize=(WIDTH_INCH, HEIGHT_INCH), dpi=DPI_VALUE)  # pyright: ignore[reportUnknownMemberType]  # matplotlib stub types **fig_kw as Unknown.
-    image = librosa.display.specshow(
-        db_spectrogram,
-        sr=actual_sample_rate,
-        hop_length=hop_length,
-        x_axis="time",
-        y_axis="hz",
-        cmap="inferno",
-        ax=axis,
-        rasterized=True,
-    )
-    figure.colorbar(image, ax=axis, format="%+2.0f dB")  # pyright: ignore[reportUnknownMemberType]  # matplotlib stub types **kwargs as Unknown.
     display_label = stream_label if stream_label and stream_label != f"Stream_{stream_index}" else source_name
-    axis.set_title(display_label, fontsize=18, fontweight="bold", pad=22)  # pyright: ignore[reportUnknownMemberType]  # matplotlib stub types **kwargs as Unknown.
-    axis.text(  # pyright: ignore[reportUnknownMemberType]  # matplotlib stub types **kwargs as Unknown.
-        0.5,
-        1.01,
-        f"File: {source_name}  •  Stream {stream_index}  •  {stream_lang}  •  First {duration}s  •  mono mix @ {actual_sample_rate / 1000:g} kHz",
-        transform=axis.transAxes,
-        ha="center",
-        va="bottom",
-        fontsize=10,
-    )
-    axis.set_xlabel("Time (s)")  # pyright: ignore[reportUnknownMemberType]  # matplotlib stub types **kwargs as Unknown.
-    axis.set_ylabel("Frequency (Hz)")  # pyright: ignore[reportUnknownMemberType]  # matplotlib stub types **kwargs as Unknown.
-
-    output_name = output_dir / f"spectrogram_source_{source_position:02d}_stream_{stream_index}.png"
-    figure.tight_layout()
-    figure.savefig(output_name, dpi=DPI_VALUE, bbox_inches="tight")  # pyright: ignore[reportUnknownMemberType]  # matplotlib stub types **kwargs as Unknown.
-    plt.close(figure)
+    mix = "  |  downmixed to mono" if channels > MAX_SEPARATE_CHANNELS else ""
+    subtitle = f"File: {source_name}  |  Stream {stream_index}  |  {stream_lang}  |  First {duration}s{mix}"
+    try:
+        _add_header(output_name, display_label, subtitle)
+    except Exception as error:
+        logger.warning(f"[yellow]Could not add a title to {output_name.name}: {error}[/yellow]")
     return output_name
 
 
@@ -323,8 +285,7 @@ async def process_audio_spectrograms(meta: Meta, config: dict[str, Any], uploads
         return []
 
     duration = _positive_config_int(config, "audio_spectrogram_duration", DURATION_LIMIT)
-    sample_rate = _positive_config_int(config, "audio_spectrogram_sample_rate", SAMPLE_RATE)
-    fingerprint = _cache_fingerprint(audio_sources, duration, sample_rate, [(audio_path, int(stream["index"])) for _, audio_path, stream in selected_jobs])
+    fingerprint = _cache_fingerprint(audio_sources, duration, [(audio_path, int(stream["index"])) for _, audio_path, stream in selected_jobs])
     cached_images = await asyncio.to_thread(_load_cached_images, cache_path, fingerprint)
     if cached_images:
         meta.spectrograms_images = cached_images
@@ -340,7 +301,16 @@ async def process_audio_spectrograms(meta: Meta, config: dict[str, Any], uploads
         language = tags.get("language", "und")
         try:
             file_path = await asyncio.to_thread(
-                generate_spectrogram, int(stream["index"]), label, language, audio_path, output_dir, duration, sample_rate, source_position, audio_path.stem
+                generate_spectrogram,
+                int(stream["index"]),
+                label,
+                language,
+                int(stream.get("channels") or 0),
+                audio_path,
+                output_dir,
+                duration,
+                source_position,
+                audio_path.stem,
             )
         except RuntimeError as error:
             logger.error(f"[red]{error}[/red]")

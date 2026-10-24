@@ -471,8 +471,6 @@ config: dict[str, Any] = {
         "process_all_audio_spectrogram": False,
         # Seconds from the beginning of each selected stream to analyse.
         "audio_spectrogram_duration": 600,
-        # Decode at this sample rate (48 kHz retains frequencies up to 24 kHz).
-        "audio_spectrogram_sample_rate": 48000,
         # For music and audiobooks, limit the number of tracks or chapters processed.
         "audio_spectrogram_max_files": 12,
         # Dynamic HDR plots

@@ -1,4 +1,4 @@
-from src.audio_spectrogram import MAX_TIME_BINS, get_spectrogram_sources, get_stft_parameters, prompt_audio_stream_positions, select_audio_streams
+from src.audio_spectrogram import build_spectrogram_filter, get_spectrogram_sources, prompt_audio_stream_positions, select_audio_streams
 
 
 def test_prompt_audio_stream_positions_uses_cli_ui_and_defaults_to_all(monkeypatch):
@@ -45,10 +45,13 @@ def test_get_spectrogram_sources_only_uses_audio_files_for_audiobooks(tmp_path):
     assert get_spectrogram_sources("BOOK", [str(cover), str(chapter)], None, 12) == [chapter]  # noqa: S101
 
 
-def test_stft_parameters_bound_the_number_of_time_bins_for_long_audio():
-    sample_count = 600 * 48000
+def test_spectrogram_filter_keeps_stereo_channels_separate_without_resampling():
+    graph = build_spectrogram_filter(3, 2)
 
-    n_fft, hop_length = get_stft_parameters(sample_count)
+    assert graph.startswith("[0:3]showspectrumpic=")  # noqa: S101
+    assert "mode=separate" in graph  # noqa: S101
+    assert "aresample" not in graph  # noqa: S101
 
-    assert n_fft == 2048  # noqa: S101
-    assert sample_count / hop_length <= MAX_TIME_BINS  # noqa: S101
+
+def test_spectrogram_filter_downmixes_surround_streams():
+    assert build_spectrogram_filter(1, 6).startswith("[0:1]aformat=channel_layouts=mono,showspectrumpic=")  # noqa: S101
