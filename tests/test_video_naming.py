@@ -1,11 +1,11 @@
 # ruff: noqa: S101
 import asyncio
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
 from src.meta import Meta
-from src.trackers.naming import BLU_NAME_RULES, VideoNameRules, build_video_name
+from src.trackers.naming import BLU_NAME_RULES, TMDB_HOMONYM_MAX_PAGES, VideoNameRules, build_video_name, tmdb_tv_title_has_homonym
 from src.trackers.UNIT3D.blutopia import Blutopia
 from src.trackers.UNIT3D.lst import LST
 from src.trackers.UNIT3D.oldtoonsworld import OldToonsWorld
@@ -332,6 +332,43 @@ def test_tv_year_falls_back_to_tmdb_homonyms(has_homonym: bool | None, search_ye
 
     assert check.await_args is not None
     assert check.await_args.args[1] == "Synthetic Show"
+
+
+def _tmdb_pages(*pages: list[dict[str, object]], total_pages: int | None = None) -> AsyncMock:
+    responses = []
+    for results in pages:
+        response = Mock()
+        response.json.return_value = {"results": results, "total_pages": total_pages or len(pages)}
+        responses.append(response)
+    return AsyncMock(side_effect=responses)
+
+
+def _homonym(get: AsyncMock) -> bool | None:
+    meta = _show(tmdb_id=101)
+    with patch("src.trackers.naming.httpx.AsyncClient.get", new=get):
+        return asyncio.run(tmdb_tv_title_has_homonym(meta, "Synthetic Show", "test-key", "TEST"))
+
+
+def test_tmdb_homonym_check_reads_later_pages() -> None:
+    other = {"id": 202, "name": "Synthetic Show"}
+    get = _tmdb_pages([{"id": 101, "name": "Synthetic Show"}], [other], [{"id": 303, "name": "Unrelated"}])
+
+    assert _homonym(get) is True
+    assert get.await_count == 2
+
+
+def test_tmdb_homonym_check_without_match_on_every_page_is_false() -> None:
+    get = _tmdb_pages([{"id": 101, "name": "Synthetic Show"}], [{"id": 202, "name": "Synthetic Show Revival"}])
+
+    assert _homonym(get) is False
+
+
+def test_tmdb_homonym_check_is_inconclusive_past_the_page_limit() -> None:
+    pages = [[{"id": 900 + page, "name": "Unrelated"}] for page in range(TMDB_HOMONYM_MAX_PAGES)]
+    get = _tmdb_pages(*pages, total_pages=TMDB_HOMONYM_MAX_PAGES + 1)
+
+    assert _homonym(get) is None
+    assert get.await_count == TMDB_HOMONYM_MAX_PAGES
 
 
 def test_tmdb_homonym_check_skipped_when_tvdb_or_manual_year_decides() -> None:

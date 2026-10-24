@@ -59,6 +59,9 @@ class VideoNameRules:
 BLU_NAME_RULES = VideoNameRules(english_dub_only=True, edition_terms=BLU_EDITION_TERMS)
 
 
+# Search pages read before a homonym check gives up as inconclusive (20 results per page).
+TMDB_HOMONYM_MAX_PAGES = 5
+
 TVDB_TITLE_YEAR = re.compile(r"\((19\d{2}|20\d{2})\)\s*$")
 
 
@@ -307,31 +310,44 @@ async def tmdb_tv_title_has_homonym(meta: Meta, title: str, api_key: str, tracke
     api_key = api_key.strip()
     if not title or not api_key:
         return None
-    try:
-        logger.info(f"{tracker}: Checking if TMDb has multiple shows with the title '{title}'...")
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                "https://api.themoviedb.org/3/search/tv",
-                params={"api_key": api_key, "query": title, "language": "en-US", "include_adult": "true"},
-            )
-            response.raise_for_status()
-            payload_raw: Any = response.json()
-    except httpx.HTTPError, ValueError, TypeError:
-        return None
 
     title_key = " ".join(title.casefold().split())
     current_id = str(meta.tmdb_id or "")
-    payload = cast(dict[str, Any], payload_raw) if isinstance(payload_raw, dict) else {}
-    results_raw: Any = payload.get("results", [])
-    results = cast(list[Any], results_raw) if isinstance(results_raw, list) else []
     matching_ids: set[str] = set()
-    for result_raw in results:
-        if not isinstance(result_raw, dict):
-            continue
-        result = cast(dict[str, Any], result_raw)
-        result_id = str(result.get("id", ""))
-        names = (result.get("name"), result.get("original_name"))
-        if any(" ".join(str(candidate or "").casefold().split()) == title_key for candidate in names):
-            matching_ids.add(result_id)
-    matching_ids.discard("")
-    return bool(matching_ids - {current_id}) if current_id else len(matching_ids) > 1
+
+    def has_homonym() -> bool:
+        return bool(matching_ids - {current_id, ""}) if current_id else len(matching_ids - {""}) > 1
+
+    logger.info(f"{tracker}: Checking if TMDb has multiple shows with the title '{title}'...")
+    total_pages = 1
+    page = 1
+    async with httpx.AsyncClient() as client:
+        while page <= min(total_pages, TMDB_HOMONYM_MAX_PAGES):
+            try:
+                response = await client.get(
+                    "https://api.themoviedb.org/3/search/tv",
+                    params={"api_key": api_key, "query": title, "language": "en-US", "include_adult": "true", "page": page},
+                )
+                response.raise_for_status()
+                payload_raw: Any = response.json()
+            except httpx.HTTPError, ValueError, TypeError:
+                return None
+
+            payload = cast(dict[str, Any], payload_raw) if isinstance(payload_raw, dict) else {}
+            results_raw: Any = payload.get("results", [])
+            results = cast(list[Any], results_raw) if isinstance(results_raw, list) else []
+            for result_raw in results:
+                if not isinstance(result_raw, dict):
+                    continue
+                result = cast(dict[str, Any], result_raw)
+                names = (result.get("name"), result.get("original_name"))
+                if any(" ".join(str(candidate or "").casefold().split()) == title_key for candidate in names):
+                    matching_ids.add(str(result.get("id", "")))
+            if has_homonym():
+                return True
+            total_pages_raw: Any = payload.get("total_pages", 1)
+            total_pages = total_pages_raw if isinstance(total_pages_raw, int) else 1
+            page += 1
+
+    # Unread pages could still hold a same-titled show.
+    return None if total_pages > TMDB_HOMONYM_MAX_PAGES else False
