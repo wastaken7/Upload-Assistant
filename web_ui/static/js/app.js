@@ -7545,6 +7545,8 @@ function AudionutsUAGUI() {
 
   const saveExecutionDescription = async (content = descriptionDraft) => {
     if (!sessionId || descriptionAction) return;
+    // A response that arrives after the queue moved on belongs to the previous item.
+    const mediaId = descriptionMediaRef.current;
     setDescriptionAction("save");
     try {
       const response = await apiFetch(`${API_BASE}/execution_description`, {
@@ -7557,6 +7559,7 @@ function AudionutsUAGUI() {
         }),
       });
       const data = await response.json().catch(() => null);
+      if (mediaId !== descriptionMediaRef.current) return;
       if (!response.ok || !data?.success) {
         if (response.status === 409 && Number.isInteger(data?.version)) {
           descriptionVersionRef.current = data.version;
@@ -7588,6 +7591,7 @@ function AudionutsUAGUI() {
 
   const resetExecutionDescription = async (sourceKey) => {
     if (!sessionId || descriptionAction) return;
+    const mediaId = descriptionMediaRef.current;
     setDescriptionAction(`reset:${sourceKey}`);
     try {
       const response = await apiFetch(
@@ -7603,6 +7607,7 @@ function AudionutsUAGUI() {
         },
       );
       const data = await response.json().catch(() => null);
+      if (mediaId !== descriptionMediaRef.current) return;
       if (!response.ok || !data?.success) {
         if (response.status === 409 && Number.isInteger(data?.version)) {
           descriptionVersionRef.current = data.version;
