@@ -2646,6 +2646,10 @@ function AudionutsUAGUI() {
   const [activePanel, setActivePanel] = useState("main"); // 'main' | 'files' | 'args'
 
   // File Browser search states
+  const [fileBrowserFolderOnly, setFileBrowserFolderOnly] = useState(false);
+  const [fileBrowserFolder, setFileBrowserFolder] = useState("");
+  const fileBrowserFolderOnlyRef = useRef(false);
+  const fileBrowserFolderRef = useRef("");
   const [fileBrowserSearch, setFileBrowserSearch] = useState("");
   const [fileBrowserSearchResults, setFileBrowserSearchResults] =
     useState(null);
@@ -4483,7 +4487,10 @@ function AudionutsUAGUI() {
 
   /** Paths in the order the file browser displays them. */
   const getVisiblePaths = () => {
-    if (fileBrowserSearch) {
+    if (
+      fileBrowserSearch &&
+      (fileBrowserSearchLoading || fileBrowserSearchResults)
+    ) {
       if (!fileBrowserSearchResults || !fileBrowserSearchResults.items)
         return [];
       return sortItems(fileBrowserSearchResults.items).map((item) => item.path);
@@ -5134,11 +5141,35 @@ function AudionutsUAGUI() {
     return pathEditor;
   };
 
+  const invalidateFileBrowserSearch = () => {
+    ++fileBrowserSearchId.current;
+    clearTimeout(fileBrowserSearchTimer.current);
+    fileBrowserSearchCompletion.current?.();
+    fileBrowserSearchCompletion.current = null;
+    fileBrowserSearchQuery.current = "";
+    setFileBrowserSearchResults(null);
+    setFileBrowserSearchLoading(false);
+  };
+
+  const changeFileBrowserSearchMode = (enabled) => {
+    fileBrowserFolderOnlyRef.current = enabled;
+    setFileBrowserFolderOnly(enabled);
+    invalidateFileBrowserSearch();
+  };
+
+  const setFileBrowserSearchFolder = (path) => {
+    fileBrowserFolderRef.current = path;
+    setFileBrowserFolder(path);
+    invalidateFileBrowserSearch();
+  };
+
   const collapseFileBrowser = () => {
+    setFileBrowserSearchFolder("");
     setExpandedFolders(new Set());
   };
 
   const toggleFolder = async (path) => {
+    setFileBrowserSearchFolder(path);
     const newExpanded = new Set(expandedFolders);
 
     if (newExpanded.has(path)) {
@@ -5237,6 +5268,15 @@ function AudionutsUAGUI() {
         settle();
         return;
       }
+      const folderOnly = fileBrowserFolderOnlyRef.current;
+      const folder = fileBrowserFolderRef.current;
+      if (folderOnly && !folder) {
+        // The adjacent scope prompt stays visible; keep the tree usable.
+        setFileBrowserSearchResults(null);
+        setFileBrowserSearchLoading(false);
+        settle();
+        return;
+      }
       setFileBrowserSearchLoading(true);
       const onAbort = () => {
         if (fileBrowserSearchId.current === searchId) {
@@ -5248,20 +5288,22 @@ function AudionutsUAGUI() {
       };
       signal?.addEventListener("abort", onAbort, { once: true });
       fileBrowserSearchTimer.current = setTimeout(async () => {
-        if (signal?.aborted) {
+        if (signal?.aborted || fileBrowserSearchId.current !== searchId) {
           settle();
           return;
         }
         try {
           const response = await apiFetch(
-            `${API_BASE}/browse_search?q=${encodeURIComponent(searchQuery)}`,
+            `${API_BASE}/browse_search?q=${encodeURIComponent(searchQuery)}${folderOnly ? `&path=${encodeURIComponent(folder)}` : ""}`,
             { signal },
           );
           if (signal?.aborted) return;
-          if (!response.ok) {
-            throw new Error(`Search request failed (${response.status})`);
-          }
           const data = await response.json();
+          if (!response.ok) {
+            throw new Error(
+              data.error || `Search request failed (${response.status})`,
+            );
+          }
           if (signal?.aborted) return;
           // Early return if the search has changed since this request
           if (fileBrowserSearchId.current !== searchId) return;
@@ -5279,6 +5321,7 @@ function AudionutsUAGUI() {
           console.error("File browser search failed:", error);
           if (fileBrowserSearchId.current === searchId) {
             setFileBrowserSearchResults({
+              error: error.message || "Search failed. Please try again.",
               items: [],
               query: searchQuery,
               count: 0,
@@ -5318,7 +5361,9 @@ function AudionutsUAGUI() {
         <div
           className={`p-4 text-center ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
         >
-          <p className="text-sm">No results found</p>
+          <p className="text-sm" role="status">
+            {results.error || "No results found"}
+          </p>
         </div>
       );
     }
@@ -10649,6 +10694,27 @@ function AudionutsUAGUI() {
    * It is shown either in the sidebar or in the larger modal, never both,
    * because the tree's scroll position and keyboard focus use one ref.
    */
+  const renderFolderSearchControl = () => (
+    <div className="mt-2 min-w-0 text-xs">
+      <label className="inline-flex cursor-pointer items-center gap-2">
+        <input
+          type="checkbox"
+          className="ua-theme-checkbox h-4 w-4"
+          checked={fileBrowserFolderOnly}
+          onChange={(event) =>
+            changeFileBrowserSearchMode(event.target.checked)
+          }
+        />
+        Search this folder
+      </label>
+      {fileBrowserFolderOnly && (
+        <p className="mt-1 break-all" role="status">
+          {fileBrowserFolder || "Select a folder in the tree before searching."}
+        </p>
+      )}
+    </div>
+  );
+
   const renderFileBrowserBody = (inModal) => (
     <>
       <div className="ua-upload-panel-header p-4 border-b">
@@ -10715,6 +10781,10 @@ function AudionutsUAGUI() {
             aria-label="Search files and folders"
             value={fileBrowserSearch}
             onChange={(e) => handleFileBrowserSearch(e.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter")
+                handleFileBrowserSearch(event.currentTarget.value);
+            }}
             placeholder="Search files and folders..."
             className={`w-full pl-8 pr-8 py-1.5 text-sm rounded border ${
               isDarkMode
@@ -10737,6 +10807,7 @@ function AudionutsUAGUI() {
             </button>
           )}
         </div>
+        {renderFolderSearchControl()}
       </div>
       {renderSelectAllBar()}
       <div
@@ -10751,7 +10822,8 @@ function AudionutsUAGUI() {
         }}
         className={`${!inModal && hasDescFile && !descBrowserCollapsed ? "flex-1 max-h-[50%]" : "flex-1"} min-h-0 overflow-y-auto`}
       >
-        {fileBrowserSearch ? (
+        {fileBrowserSearch &&
+        (fileBrowserSearchLoading || fileBrowserSearchResults) ? (
           fileBrowserSearchLoading ? (
             <div
               className={`p-4 text-center ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
@@ -10917,6 +10989,10 @@ function AudionutsUAGUI() {
                       aria-label="Search files and folders"
                       value={fileBrowserSearch}
                       onChange={(e) => handleFileBrowserSearch(e.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter")
+                          handleFileBrowserSearch(event.currentTarget.value);
+                      }}
                       placeholder="Search files and folders..."
                       className={`w-full pl-8 pr-8 py-1.5 text-sm rounded border ${
                         isDarkMode
@@ -10939,12 +11015,14 @@ function AudionutsUAGUI() {
                       </button>
                     )}
                   </div>
+                  {renderFolderSearchControl()}
                 </div>
                 {renderSelectAllBar()}
                 <div
                   className={`flex-1 overflow-y-auto ${hasDescFile && !descBrowserCollapsed ? "max-h-[50%]" : ""}`}
                 >
-                  {fileBrowserSearch ? (
+                  {fileBrowserSearch &&
+                  (fileBrowserSearchLoading || fileBrowserSearchResults) ? (
                     fileBrowserSearchLoading ? (
                       <div
                         className={`p-4 text-center ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}

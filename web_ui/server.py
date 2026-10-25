@@ -6642,6 +6642,31 @@ def browse_search():
     if not roots:
         return jsonify({"success": False, "error": "Browsing is not configured"}), 400
 
+    # A supplied scope must never silently fall back to all configured roots.
+    if "path" in request.args:
+        if len(request.args.getlist("path")) != 1 or not request.args["path"].strip():
+            return jsonify({"success": False, "error": "Select a folder to search"}), 400
+        try:
+            # Keep the lexical path to reject links before resolving it.
+            lexical_scope = Path(os.path.abspath(request.args["path"]))  # noqa: PTH100
+            scope = Path(_resolve_browse_path(str(lexical_scope)))
+            allowed = [Path(root) for root in roots if lexical_scope.is_relative_to(root)]
+            if not allowed:
+                raise ValueError("Scope is outside browse roots")
+            anchor = max(allowed, key=lambda root: len(root.parts))
+            for component in (lexical_scope, *lexical_scope.parents):
+                if component.is_symlink() or component.is_junction():
+                    raise ValueError("Linked search scopes are not supported")
+                if component == anchor:
+                    break
+            roots = [str(scope)]
+            # Surface an unavailable/unreadable explicit selection instead of
+            # returning a misleading empty successful search.
+            with os.scandir(scope):
+                pass
+        except (ValueError, OSError):
+            return jsonify({"success": False, "error": "Search folder is unavailable or not allowed"}), 400
+
     # Split on common separators
     query_tokens = [t for t in _BROWSE_SEARCH_SEP_RE.split(query.lower()) if t]
     if not query_tokens:
@@ -6664,6 +6689,8 @@ def browse_search():
         return True
 
     items: list[BrowseItem] = []
+    files: list[BrowseItem] = []
+    seen: set[str] = set()
 
     try:
         for root in roots:
@@ -6671,9 +6698,22 @@ def browse_search():
             if not Path(root_abs).is_dir():
                 continue
             try:
-                for dirpath, dirnames, filenames in os.walk(root_abs):
-                    # Prune system/hidden directories before os.walk enters them.
-                    dirnames[:] = [d for d in dirnames if not _is_hidden_browse_entry(Path(dirpath) / d)]
+                for dirpath, dirnames, filenames in os.walk(root_abs, followlinks=False):
+                    # Portable pathname checks, not an atomic no-follow walk:
+                    # concurrent filesystem replacement remains possible.
+                    current = Path(dirpath)
+                    if current.is_symlink() or current.is_junction() or not current.resolve().is_relative_to(root_abs):
+                        dirnames[:] = []
+                        continue
+                    _assert_safe_resolved_path(current)
+                    # os.walk does not follow symlinks, but Windows junctions
+                    # also need explicit pruning before descent.
+                    dirnames[:] = [
+                        d for d in dirnames
+                        if not _is_hidden_browse_entry(current / d)
+                        and not (current / d).is_symlink()
+                        and not (current / d).is_junction()
+                    ]
 
                     # Check dirs
                     for dirname in dirnames:
@@ -6690,6 +6730,9 @@ def browse_search():
                             except Exception:
                                 mtime = 0.0
                                 size = 0
+                            if str(full_path) in seen:
+                                continue
+                            seen.add(str(full_path))
                             items.append(
                                 {
                                     "name": dirname,
@@ -6706,8 +6749,11 @@ def browse_search():
                     if len(items) >= max_results:
                         break
 
-                    # Check files
+                    # Keep only bounded provisional files; later folders take
+                    # their places before the response is truncated.
                     for filename in filenames:
+                        if len(files) >= max_results:
+                            break
                         if not name_matches(filename):
                             continue
                         if _is_hidden_browse_entry(Path(dirpath) / filename):
@@ -6728,7 +6774,10 @@ def browse_search():
                         except Exception:
                             mtime = 0.0
                             size = 0
-                        items.append(
+                        if full_path.is_symlink() or full_path.is_junction() or str(full_path) in seen:
+                            continue
+                        seen.add(str(full_path))
+                        files.append(
                             {
                                 "name": filename,
                                 "path": str(full_path),
@@ -6738,11 +6787,6 @@ def browse_search():
                                 "size": size,
                             }
                         )
-                        if len(items) >= max_results:
-                            break
-
-                    if len(items) >= max_results:
-                        break
             except PermissionError:
                 continue
             except Exception as e:
@@ -6752,7 +6796,8 @@ def browse_search():
             if len(items) >= max_results:
                 break
 
-        # Sort by folders first and then alphabetically
+        items.extend(files[:max_results - len(items)])
+        # Sort the selected folders/files alphabetically within each group.
         items.sort(key=lambda x: (0 if x.get("type") == "folder" else 1, (x.get("name") or "").lower()))
 
         return jsonify({"success": True, "items": items, "query": query, "count": len(items), "truncated": len(items) >= max_results})
