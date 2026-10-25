@@ -1,4 +1,5 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+import asyncio
 import json
 from pathlib import Path
 from typing import Any, cast
@@ -9,6 +10,9 @@ from src.console import logger
 from src.exceptions import NoAudioMediaError
 from src.mediainfo import MediaInfo
 from src.meta import Meta
+
+# Seconds before telling the user that MediaInfo is still reading the file.
+MEDIAINFO_SLOW_NOTICE_SECONDS = 5.0
 
 
 async def mi_resolution(
@@ -325,7 +329,21 @@ async def export_info(
         return filtered
 
     logger.debug("[bold yellow]Exporting MediaInfo...")
-    media_info = cast(str, MediaInfo.parse(video, output="STRING", full=False))
+    # Each CLI pass rereads the file, which is slow, so run both concurrently.
+    reports = asyncio.gather(
+        asyncio.to_thread(MediaInfo.parse, video, output="STRING", full=False),
+        asyncio.to_thread(MediaInfo.parse, video, output="JSON"),
+        # Wait for both passes so a failure does not leave the other one running unawaited.
+        return_exceptions=True,
+    )
+    done, _pending = await asyncio.wait({reports}, timeout=MEDIAINFO_SLOW_NOTICE_SECONDS)
+    if not done:
+        logger.warning("[yellow]MediaInfo is still reading the file. Files with many tracks can take a few minutes.[/yellow]")
+    results = await reports
+    for result in results:
+        if isinstance(result, BaseException):
+            raise result
+    media_info, media_info_json = cast(tuple[str, str], results)
 
     # Keep the CLI footer so every exported text report identifies its MediaInfo version.
     filtered_media_info = media_info
@@ -336,7 +354,6 @@ async def export_info(
         await export_cleanpath.write(filtered_media_info.replace(video, Path(video).name))
     logger.debug("[bold green]MediaInfo Exported.")
 
-    media_info_json = cast(str, MediaInfo.parse(video, output="JSON"))
     media_info_dict = json.loads(media_info_json)
 
     filtered_info = filter_mediainfo(media_info_dict)
