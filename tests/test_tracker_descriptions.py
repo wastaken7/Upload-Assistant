@@ -158,19 +158,60 @@ def test_unit3d_source_id_does_not_skip_interactive_description_review(monkeypat
     asyncio.run(run())
 
 
-def test_webui_tracker_description_is_saved_without_prompting(tmp_path, monkeypatch):
+def test_webui_tracker_description_is_saved_and_shown(tmp_path, monkeypatch):
+    # Local change: Web UI runs show the description and ask like a terminal run, without an editor.
     async def run():
         manager = TrackerDataManager({"DEFAULT": {}, "TRACKERS": {}})
         meta = Meta({"base_dir": str(tmp_path), "uuid": "release", "unattended": False})
         candidate = Meta({"description": "tracker text", "description_provenance": {"source": "AITHER"}})
         monkeypatch.setenv("UA_WEBUI_ACTIVE", "1")
-        monkeypatch.setattr("src.get_tracker_data.cli_ui.ask_string", lambda _prompt: (_ for _ in ()).throw(AssertionError("WebUI must not prompt")))
+        messages = []
+        questions = []
+        monkeypatch.setattr("src.get_tracker_data.logger.info", lambda message, **_kwargs: messages.append(str(message)))
+        monkeypatch.setattr("src.get_tracker_data.cli_ui.ask_string", lambda prompt: questions.append(prompt) or "")
         monkeypatch.setattr("src.get_tracker_data.click.edit", lambda _text: (_ for _ in ()).throw(AssertionError("editor must not open")))
 
         await manager._review_explicit_tracker_description(meta, "AITHER", candidate)
 
         assert load_review(tmp_path / "tmp" / "release")["content"] == "tracker text"
         assert candidate.description == "tracker text"
+        assert any(message.startswith("Selected description from AITHER:") for message in messages)
+        assert questions and "'e'" not in questions[0] and "'d' to discard" in questions[0]
+
+    asyncio.run(run())
+
+
+def test_webui_tracker_description_edit_answer_does_not_open_editor(tmp_path, monkeypatch):
+    async def run():
+        manager = TrackerDataManager({"DEFAULT": {}, "TRACKERS": {}})
+        meta = Meta({"base_dir": str(tmp_path), "uuid": "release", "unattended": False})
+        candidate = Meta({"description": "tracker text", "description_provenance": {"source": "AITHER"}})
+        monkeypatch.setenv("UA_WEBUI_ACTIVE", "1")
+        monkeypatch.setattr("src.get_tracker_data.cli_ui.ask_string", lambda _prompt: "e")
+        monkeypatch.setattr("src.get_tracker_data.click.edit", lambda _text: (_ for _ in ()).throw(AssertionError("editor must not open")))
+
+        await manager._review_explicit_tracker_description(meta, "AITHER", candidate)
+
+        assert candidate.description == "tracker text"
+        assert "edited" not in candidate.description_provenance
+
+    asyncio.run(run())
+
+
+def test_webui_tracker_description_discard_clears_saved_draft(tmp_path, monkeypatch):
+    async def run():
+        manager = TrackerDataManager({"DEFAULT": {}, "TRACKERS": {}})
+        meta = Meta({"base_dir": str(tmp_path), "uuid": "release", "unattended": False})
+        candidate = Meta({"description": "tracker text", "description_provenance": {"source": "AITHER"}})
+        monkeypatch.setenv("UA_WEBUI_ACTIVE", "1")
+        monkeypatch.setattr("src.get_tracker_data.cli_ui.ask_string", lambda _prompt: "d")
+
+        await manager._review_explicit_tracker_description(meta, "AITHER", candidate)
+
+        assert candidate.description == ""
+        assert candidate.description_provenance["discarded"] is True
+        assert load_review(tmp_path / "tmp" / "release")["content"] == ""
+        assert draft({"description": "tracker text"}, tmp_path / "tmp" / "release")[0] == ""
 
     asyncio.run(run())
 
