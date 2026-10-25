@@ -32,6 +32,7 @@ from src.media_extensions import VIDEO_EXTENSIONS
 from src.mediainfo import MediaInfo
 from src.meta import Meta
 from src.resource_coordinator import holds_slot
+from src.screenshot_manifest import capture_pages as manifest_capture_pages
 from src.screenshot_manifest import capture_timestamps
 from src.screenshot_manifest import clear_group as clear_screenshot_group
 from src.screenshot_manifest import files as manifest_files
@@ -497,7 +498,13 @@ async def disc_screenshots(
     capture_group: str | None = None,
 ) -> list[Path]:
     img_host = await get_image_host(meta)
+    capture_group = capture_group or "main"
     screens = meta.screens
+    if capture_group == "main":
+        from src.screenshot_review import target_count
+
+        screens = target_count(Path(base_dir) / "tmp" / folder_id, screens)
+        meta.screens = screens
     start_time = time.time() if meta.debug else 0.0
     if "image_list" not in meta:
         meta.image_list = []
@@ -548,7 +555,7 @@ async def disc_screenshots(
     keyframe = "nokey" if "VC-1" in bdinfo["video"][0]["codec"] or bdinfo["video"][0]["hdr_dv"] != "" else "none"
     logger.debug(f"File: {file_path}, Length: {length}, Frame Rate: {frame_rate}", extra={"markup": False})
     screenshot_dir = screenshots_dir(base_dir, folder_id)
-    existing_screens = [p.name for p in manifest_files(base_dir, folder_id, capture_group or sanitized_filename)]
+    existing_screens = [p.name for p in manifest_files(base_dir, folder_id, capture_group)]
     total_existing = len(existing_screens) + len(existing_images)
     num_screens = max(0, screens - total_existing) if not force_screenshots else num_screens
     is_hdr = any(marker in meta.hdr for marker in ("HDR", "DV", "HLG"))
@@ -777,7 +784,7 @@ async def disc_screenshots(
 
     # The temporary descriptive names above are only used while capture is in
     # progress.  Publish completed frames under opaque UUID filenames.
-    registered = register_screenshots(base_dir, folder_id, valid_results, capture_group or sanitized_filename) if valid_results else []
+    registered = register_screenshots(base_dir, folder_id, valid_results, capture_group) if valid_results else []
     await record_event_async("artifact", service="screenshot", operation="created", category="standard", count=len(registered))
 
     multi_screens = int(default_config.get("multiScreens", 2))
@@ -831,7 +838,7 @@ async def capture_disc_task(index: int, file: str, ss_time: str, image_path: str
 
         if returncode == 0:
             return (index, image_path)
-        logger.info(f"[red]FFmpeg error capturing screenshot: {stderr.decode()}")
+        logger.info(f"[red]FFmpeg error capturing screenshot: {stderr.decode(errors='replace')}")
         return None  # Ensure tuple format
     except Exception as e:
         logger.error(f"[red]Error capturing screenshot: {e}")
@@ -881,9 +888,10 @@ async def dvd_screenshots(
     if num_screens == 0 or (len(meta.image_list) >= screens and disc_num == 0):
         return
 
+    capture_group = "main" if disc_num == 0 else f"FILE_{disc_num}"
     sanitized_disc_name = await sanitize_filename(meta.discs[disc_num]["name"])
     screenshot_dir = screenshots_dir(meta.base_dir, meta.uuid)
-    existing_screens = [str(p) for p in manifest_files(meta.base_dir, meta.uuid, sanitized_disc_name)]
+    existing_screens = [str(p) for p in manifest_files(meta.base_dir, meta.uuid, capture_group)]
     normal_screens = []
     for image in existing_screens:
         if dvd_screenshot_has_content(image):
@@ -892,8 +900,8 @@ async def dvd_screenshots(
         logger.info(f"[yellow]Removing blank or unreadable registered DVD screenshot: {image}[/yellow]")
         Path(image).unlink(missing_ok=True)
         forget_screenshot_file(meta.base_dir, meta.uuid, Path(image))
-    if len(normal_screens) >= num_screens:
-        i = num_screens
+    num_screens = max(0, num_screens - len(normal_screens))
+    if num_screens == 0:
         logger.info("[bold green]Reusing screenshots")
         return
 
@@ -948,25 +956,6 @@ async def dvd_screenshots(
     if ifo_duration:
         voblength = ifo_duration
     ss_times = await valid_ss_time([], num_screens, voblength, frame_rate, meta, retake=retry_cap)
-    capture_tasks: list[Awaitable[tuple[int, str | None]]] = []
-    existing_images_count = 0
-    existing_image_paths: list[str] = []
-
-    for i in range(num_screens + 1):
-        image = str(screenshot_dir / f"{sanitized_disc_name}-{i}.png")
-        if Path(image).exists() and not meta.retake:
-            if not dvd_screenshot_has_content(image):
-                logger.info(f"[yellow]Removing blank or unreadable DVD screenshot: {image}[/yellow]")
-                Path(image).unlink(missing_ok=True)
-                continue
-            existing_images_count += 1
-            existing_image_paths.append(image)
-
-    if existing_images_count == num_screens and not meta.retake:
-        logger.debug("[yellow]The correct number of screenshots already exists. Skipping capture process.")
-        capture_results: list[str] = existing_image_paths
-        return
-    capture_tasks = []
     image_paths: list[str] = []
     input_files: list[str] = []
 
@@ -977,9 +966,7 @@ async def dvd_screenshots(
 
     if meta.frame_overlay and any(overlay_options(default_config)[key] for key in ("overlay_frame_number", "overlay_frame_type")):
         logger.debug("[yellow]Getting frame information for overlays...")
-        frame_info_tasks = [
-            get_frame_info(input_files[i], ss_times[i], meta, dvd_title=dvd_title) for i in range(num_screens + 1) if not Path(image_paths[i]).exists() or meta.retake
-        ]
+        frame_info_tasks = [get_frame_info(input_files[i], ss_times[i], meta, dvd_title=dvd_title) for i in range(num_screens + 1)]
 
         frame_info_results = await asyncio.gather(*frame_info_tasks)
         meta.frame_info_map = {}
@@ -1000,9 +987,7 @@ async def dvd_screenshots(
         async with semaphore:
             return await capture_dvd_screenshot(args)
 
-    for i in range(num_screens + 1):
-        if not Path(image_paths[i]).exists() or meta.retake:
-            capture_tasks.append(capture_dvd_with_semaphore((i, input_files[i], image_paths[i], ss_times[i], meta, width, height, w_sar, h_sar, dvd_title)))
+    capture_tasks = [capture_dvd_with_semaphore((i, input_files[i], image_paths[i], ss_times[i], meta, width, height, w_sar, h_sar, dvd_title)) for i in range(num_screens + 1)]
 
     capture_results: list[str] = []
     results = await asyncio.gather(*capture_tasks)
@@ -1070,7 +1055,7 @@ async def dvd_screenshots(
         logger.info(f"[red]The following images could not be retaken successfully: {remaining_retakes}[/red]")
 
     if valid_results:
-        registered = register_screenshots(meta.base_dir, meta.uuid, valid_results, sanitized_disc_name)
+        registered = register_screenshots(meta.base_dir, meta.uuid, valid_results, capture_group)
         await record_event_async("artifact", service="screenshot", operation="created", category="standard", count=len(registered))
 
     if not retry_cap and meta.debug:
@@ -1144,7 +1129,7 @@ async def capture_dvd_screenshot(
             returncode, _stdout, stderr = await run_ffmpeg(fallback_command)
 
         if returncode != 0:
-            logger.error(f"[red]Error capturing screenshot for {input_file} at {seek_time}s:[/red]\n{stderr.decode()}")
+            logger.error(f"[red]Error capturing screenshot for {input_file} at {seek_time}s:[/red]\n{stderr.decode(errors='replace')}")
             return (index, None)
 
         if Path(image).exists():
@@ -1620,6 +1605,124 @@ async def prepare_book_cover(path: str, folder_id: str, base_dir: str, meta: Met
     return None
 
 
+def select_ebook_pages(total_pages: int, num_screens: int, fixed_pages: list[int], exclude_pages: set[int] | None = None) -> list[int]:
+    """Keep the fixed pages (in priority order) and fill the rest with random pages.
+
+    Random pages avoid `exclude_pages` while enough other pages remain.
+    """
+    num_screens = min(num_screens, total_pages)
+    selected = list(dict.fromkeys(p for p in fixed_pages if 0 <= p < total_pages))[:num_screens]
+    remaining = [p for p in range(total_pages) if p not in selected]
+    preferred = [p for p in remaining if p not in (exclude_pages or set())]
+    if len(preferred) >= num_screens - len(selected):
+        remaining = preferred
+    selected += random.sample(remaining, num_screens - len(selected))
+    return sorted(selected)
+
+
+def find_ebook_info_page(doc: Any) -> int | None:
+    """Copyright page with the ISBN, else any page with the ISBN, else the copyright page."""
+    from src.book_extractors import find_copyright_page, find_isbn_page
+
+    copyright_isbn_page = find_copyright_page(doc, with_isbn=True)
+    if copyright_isbn_page is not None:
+        logger.debug(f"[cyan]Using copyright/ISBN page {copyright_isbn_page} as an ebook screenshot[/cyan]")
+        return copyright_isbn_page
+    found = find_isbn_page(doc)
+    if found:
+        logger.debug(f"[cyan]Using ISBN page {found[0]} ({found[1]}) as an ebook screenshot[/cyan]")
+        return found[0]
+    copyright_page = find_copyright_page(doc)
+    if copyright_page is not None:
+        logger.debug(f"[cyan]Using copyright page {copyright_page} as an ebook screenshot[/cyan]")
+    return copyright_page
+
+
+COMIC_IMAGE_SUFFIXES = (".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp")
+
+
+def _open_comic_archive(path: str) -> tuple[Any, list[str]] | None:
+    """Open a CBZ/CBR (zip or rar, whatever the extension says) and list its pages in reading order."""
+    unrar_path = str(data_config.config.get("DEFAULT", {}).get("unrar_path", "") or "").strip()
+    if unrar_path:
+        import rarfile as _rarfile
+
+        os.environ["UNRAR_TOOL"] = unrar_path
+        _rarfile.CURRENT_SETUP = None
+    from rarfile import RarFile
+
+    openers = (zipfile.ZipFile, RarFile) if path.lower().endswith(".cbz") else (RarFile, zipfile.ZipFile)
+    archive = None
+    for opener in openers:
+        with contextlib.suppress(Exception):
+            archive = opener(path, "r")
+            break
+    if archive is None:
+        return None
+
+    def natural_sort_key(s: str) -> list[int | str]:
+        return [int(text) if text.isdigit() else text.lower() for text in re.split(r"(\d+)", s)]
+
+    image_files = sorted((f for f in archive.namelist() if f.lower().endswith(COMIC_IMAGE_SUFFIXES)), key=natural_sort_key)
+    return archive, image_files
+
+
+def _write_comic_page(archive: Any, name: str, dest_stem: Path, force_suffix: str | None = None) -> Path:
+    """Write one archive image next to `dest_stem`, keeping JPEG/PNG bytes and converting other formats to PNG."""
+    import io
+
+    def image_format(suffix: str) -> str | None:
+        return "JPEG" if suffix in {".jpg", ".jpeg"} else "PNG" if suffix == ".png" else None
+
+    source_suffix = Path(name).suffix.lower()
+    suffix = force_suffix or (source_suffix if image_format(source_suffix) else ".png")
+    dest_path = dest_stem.with_name(f"{dest_stem.name}{suffix}")
+    data = archive.read(name)
+    target_format = image_format(suffix) or "PNG"
+    if image_format(source_suffix) == target_format:
+        dest_path.write_bytes(data)
+    else:
+        with Image.open(io.BytesIO(data)) as img:
+            (img.convert("RGB") if target_format == "JPEG" else img).save(dest_path, target_format)
+    return dest_path
+
+
+def _render_document_page(doc: Any, page_num: int, dest_stem: Path, suffix: str = ".png") -> Path:
+    import fitz  # PyMuPDF
+
+    dest_path = dest_stem.with_name(f"{dest_stem.name}{suffix}")
+    pix = doc[page_num].get_pixmap(matrix=fitz.Matrix(2.0, 2.0))
+    if suffix == ".png":
+        pix.save(dest_path)
+    else:
+        pix.pil_save(dest_path, format="JPEG")
+    return dest_path
+
+
+def capture_ebook_page(path: str, dest_stem: Path, exclude_pages: set[int], force_suffix: str | None = None) -> tuple[Path, int]:
+    """Write one random page of an ebook/comic that is not in `exclude_pages` (any page once all are used)."""
+    import fitz  # PyMuPDF
+
+    if Path(path).suffix.lower() in {".cbz", ".cbr"}:
+        opened = _open_comic_archive(path)
+        if opened is None:
+            raise ValueError("Invalid CBR/CBZ file")
+        archive, image_files = opened
+        with archive:
+            if not image_files:
+                raise ValueError("CBR/CBZ does not contain images")
+            page = select_ebook_pages(len(image_files), 1, [], exclude_pages)[0]
+            return _write_comic_page(archive, image_files[page], dest_stem, force_suffix), page
+
+    with contextlib.suppress(Exception):
+        fitz.TOOLS.mupdf_display_errors(False)
+    with fitz.open(path) as doc:
+        if len(doc) == 0:
+            raise ValueError("The book does not have pages")
+        page = select_ebook_pages(len(doc), 1, [], exclude_pages)[0]
+        return _render_document_page(doc, page, dest_stem, force_suffix or ".png"), page
+
+
 async def generate_ebook_screenshots(
     path: str,
     filename: str,
@@ -1627,32 +1730,33 @@ async def generate_ebook_screenshots(
     base_dir: str,
     meta: Meta,
     num_screens: int = 5,
+    artwork: bool = True,
 ) -> list[str]:
-    import random
-    import shutil
-    import zipfile
+    """Capture book pages and, when `artwork` is set, the book cover and banner.
 
+    Pages already registered (for example by the early background capture and
+    then reviewed in the Web UI) are reused unless `meta.retake` is set.
+    """
     import fitz  # PyMuPDF
-    from PIL import Image
-
-    unrar_path = str(data_config.config.get("DEFAULT", {}).get("unrar_path", "") or "").strip()
-    if unrar_path:
-        import rarfile as _rarfile
-
-        os.environ["UNRAR_TOOL"] = unrar_path
-        _rarfile.CURRENT_SETUP = None
-        from rarfile import RarFile
-    else:
-        from rarfile import RarFile
 
     with contextlib.suppress(Exception):
         fitz.TOOLS.mupdf_display_errors(False)
 
-    output_dir = str(screenshots_dir(base_dir, folder_id).resolve())
+    output_dir = screenshots_dir(base_dir, folder_id).resolve()
     sanitized_filename = await sanitize_filename(filename)
 
     extension = Path(path).suffix.lower().lstrip(".")
-    screenshots = []
+    existing = [] if meta.retake else manifest_files(base_dir, folder_id, "main")
+    if existing and len(manifest_capture_pages(base_dir, folder_id, "main")) != len(existing):
+        # Captures from older runs lack page numbers, which the review needs to avoid repeats.
+        logger.debug("[yellow]Recapturing book screenshots without page numbers.[/yellow]")
+        existing = []
+    if existing and not artwork:
+        logger.debug(f"[yellow]Reusing {len(existing)} registered book screenshots.[/yellow]")
+        return [str(screen) for screen in existing]
+    capture_pages = not existing
+    screenshots: list[Path] = []
+    pages: dict[str, int] = {}
 
     poster_dir = artwork_dir(base_dir, folder_id)
     cover_path = poster_dir / "POSTER.png"
@@ -1664,144 +1768,92 @@ async def generate_ebook_screenshots(
         ),
         poster_dir / "POSTER_BANNER.png",
     )
-    banner_cached = is_valid_cover_image(banner_path) and not meta.retake
+    need_banner = artwork and not (is_valid_cover_image(banner_path) and not meta.retake)
 
-    prepared_cover = await prepare_book_cover(path, folder_id, base_dir, meta)
-    local_found = bool(prepared_cover)
-    prepared_artwork = bool(prepared_cover)
+    prepared_cover = await prepare_book_cover(path, folder_id, base_dir, meta) if artwork else None
     if prepared_cover:
         cover_path = Path(prepared_cover)
+    need_cover = artwork and not prepared_cover
 
     if extension in ["cbr", "cbz"]:
-        temp_extract = Path(output_dir) / "temp_compressed_extract"
-        Path(temp_extract).mkdir(parents=True, exist_ok=True)
-        try:
-            compressed_file = None
-            if "cbz" in extension:
-                try:
-                    compressed_file = zipfile.ZipFile(path, "r")
-                except Exception:
-                    with contextlib.suppress(Exception):
-                        compressed_file = RarFile(path, "r")
-            else:
-                try:
-                    compressed_file = RarFile(path, "r")
-                except Exception:
-                    with contextlib.suppress(Exception):
-                        compressed_file = zipfile.ZipFile(path, "r")
-
-            if not compressed_file:
-                logger.info(f"[red]Invalid CBR/CBZ file: {path}[/red]")
-                return []
-
-            image_files = [f for f in compressed_file.namelist() if f.lower().endswith((".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"))]
-
-            def natural_sort_key(s):
-                return [int(text) if text.isdigit() else text.lower() for text in re.split(r"(\d+)", s)]
-
-            image_files.sort(key=natural_sort_key)
-
+        opened = _open_comic_archive(path)
+        if opened is None:
+            logger.info(f"[red]Invalid CBR/CBZ file: {path}[/red]")
+            return []
+        compressed_file, image_files = opened
+        with compressed_file:
             if not image_files:
                 logger.info("[yellow]CBR/CBZ does not contain images[/yellow]")
-                compressed_file.close()
                 return []
 
-            num_screens = min(num_screens, len(image_files))
-            selected_images = sorted(random.sample(range(len(image_files)), num_screens))
+            async def process_compressed_image(img_idx: int, dest_stem: Path) -> Path:
+                return await asyncio.to_thread(_write_comic_page, compressed_file, image_files[img_idx], dest_stem)
 
-            async def process_compressed_image(img_idx: int, out_name: str, destination_dir: Path) -> Path:
-                img_name = image_files[img_idx]
-                compressed_file.extract(img_name, temp_extract)
-                src_path = Path(temp_extract) / img_name
-                suffix = src_path.suffix.lower()
-                dest_path = destination_dir / f"{out_name}{suffix if suffix in {'.jpg', '.jpeg', '.png'} else '.png'}"
+            if capture_pages:
+                for i, img_idx in enumerate(select_ebook_pages(len(image_files), num_screens, [0])):
+                    scr_path = await process_compressed_image(img_idx, output_dir / f"{sanitized_filename}-{i}")
+                    screenshots.append(scr_path)
+                    pages[str(scr_path)] = img_idx
 
-                def _convert():
-                    with Image.open(src_path) as img:
-                        img.save(dest_path, "PNG")
-
-                if suffix not in {".jpg", ".jpeg", ".png"}:
-                    await asyncio.to_thread(_convert)
-                else:
-                    shutil.copy2(src_path, dest_path)
-                return dest_path
-
-            for i, img_idx in enumerate(selected_images):
-                scr_path = await process_compressed_image(img_idx, f"{sanitized_filename}-{i}", Path(output_dir))
-                screenshots.append(scr_path)
-
-            if not local_found and not prepared_artwork:
-                cover_path = await process_compressed_image(0, "POSTER", poster_dir)
-            if not banner_cached:
-                banner_path = await process_compressed_image(len(image_files) - 1, "POSTER_BANNER", poster_dir)
+            if need_cover:
+                cover_path = await process_compressed_image(0, poster_dir / "POSTER")
+            if need_banner:
+                banner_path = await process_compressed_image(len(image_files) - 1, poster_dir / "POSTER_BANNER")
                 for old_suffix in (".jpg", ".jpeg", ".png"):
                     old_banner = poster_dir / f"POSTER_BANNER{old_suffix}"
                     if old_banner != banner_path:
                         old_banner.unlink(missing_ok=True)
 
-            meta.artwork_path = str(cover_path)
-            meta.artwork_banner_path = str(banner_path)
-
-            compressed_file.close()
-
-        finally:
-            if Path(temp_extract).exists():
-                shutil.rmtree(temp_extract, ignore_errors=True)
+            if artwork:
+                meta.artwork_path = str(cover_path)
+                meta.artwork_banner_path = str(banner_path)
 
     elif extension in ["pdf", "mobi", "epub"]:
         try:
-            if extension == "epub" and not local_found and not prepared_artwork:
+            if extension == "epub" and need_cover:
                 try:
-                    epub_cover_extracted = await extract_epub_cover(path, cover_path, confirmed_only=False)
-                    if epub_cover_extracted:
-                        prepared_artwork = True
+                    if await extract_epub_cover(path, str(cover_path), confirmed_only=False):
+                        need_cover = False
                         meta.artwork_path = str(cover_path)
                 except Exception as e:
                     logger.debug(f"[yellow]Warning: EPUB cover extraction failed: {e}[/yellow]")
 
-            doc = fitz.open(path)
-            total_pages = len(doc)
+            with fitz.open(path) as doc:
+                total_pages = len(doc)
+                if total_pages == 0:
+                    logger.info(f"[yellow]{extension.upper()} does not have pages[/yellow]")
+                    return []
 
-            if total_pages == 0:
-                logger.info(f"[yellow]{extension.upper()} does not have pages[/yellow]")
-                return []
+                async def process_page(page_num: int, dest_stem: Path) -> Path:
+                    return await asyncio.to_thread(_render_document_page, doc, page_num, dest_stem)
 
-            num_screens = min(num_screens, total_pages)
-            selected_pages = sorted(random.sample(range(total_pages), num_screens))
+                if capture_pages:
+                    info_page = await asyncio.to_thread(find_ebook_info_page, doc) if num_screens > 1 else None
+                    selected_pages = select_ebook_pages(total_pages, num_screens, [0] if info_page is None else [0, info_page])
+                    for i, page_num in enumerate(selected_pages):
+                        scr_path = await process_page(page_num, output_dir / f"{sanitized_filename}-{i}")
+                        screenshots.append(scr_path)
+                        pages[str(scr_path)] = page_num
 
-            async def process_page(page_num: int, out_name: str, destination_dir: Path) -> Path:
-                def _render():
-                    page = doc[page_num]
-                    mat = fitz.Matrix(2.0, 2.0)
-                    pix = page.get_pixmap(matrix=mat)
-                    scr_path = destination_dir / f"{out_name}.png"
-                    pix.save(scr_path)
-                    return scr_path
+                if need_cover:
+                    cover_path = await process_page(0, poster_dir / "POSTER")
+                if need_banner:
+                    banner_path = await process_page(total_pages - 1, poster_dir / "POSTER_BANNER")
 
-                return await asyncio.to_thread(_render)
-
-            for i, page_num in enumerate(selected_pages):
-                scr_path = await process_page(page_num, f"{sanitized_filename}-{i}", Path(output_dir))
-                screenshots.append(scr_path)
-
-            if not local_found and not prepared_artwork:
-                cover_path = await process_page(0, "POSTER", poster_dir)
-            if not banner_cached:
-                banner_path = await process_page(total_pages - 1, "POSTER_BANNER", poster_dir)
-
-            meta.artwork_path = str(cover_path)
-            meta.artwork_banner_path = str(banner_path)
-
-            doc.close()
+            if artwork:
+                meta.artwork_path = str(cover_path)
+                meta.artwork_banner_path = str(banner_path)
         except Exception as e:
             logger.error(f"[red]Error while generating {extension.upper()} screenshots: {e}[/red]")
-            import traceback
-
             logger.info(traceback.format_exc())
+
+    if not capture_pages:
+        logger.debug(f"[yellow]Reusing {len(existing)} registered book screenshots.[/yellow]")
+        return [str(screen) for screen in existing]
 
     if screenshots:
         clear_screenshot_group(base_dir, folder_id, "main")
-        screenshots = register_screenshots(base_dir, folder_id, screenshots, "main")
+        screenshots = register_screenshots(base_dir, folder_id, screenshots, "main", pages=pages)
     await record_event_async("artifact", service="screenshot", operation="created", category="standard", count=len(screenshots))
     return [str(screen) for screen in screenshots]
 
@@ -2912,6 +2964,10 @@ class TakeScreensManager:
 
     async def prepare_book_cover(self, path: str, folder_id: str, base_dir: str, meta: Meta) -> str | None:
         return await prepare_book_cover(path, folder_id, base_dir, meta)
+
+    async def ebook_page_screenshots(self, path: str, filename: str, folder_id: str, base_dir: str, meta: Meta) -> list[str]:
+        """Capture only book pages, leaving cover and banner to the later upload stage."""
+        return await generate_ebook_screenshots(path, filename, folder_id, base_dir, meta, meta.screens, artwork=False)
 
     async def capture_screenshot(self, args: tuple[int, str, float, str, float, float, float, float, str, bool, Meta]) -> tuple[int, str | None] | None:
         return await capture_screenshot(args)

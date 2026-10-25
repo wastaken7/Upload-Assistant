@@ -185,6 +185,9 @@ class Prep:
             await self._gather_music_prep(meta)
             prep_helpers.calculate_source_size(self, meta, str(meta.path or ""))
             await prep_helpers.process_trackers_and_torrent(self, meta, client, hash_ids, tracker_ids, "", "")
+            # Hash or reuse the base torrent while external lookups and the
+            # music metadata prompts run, as the video path does.
+            await restart_early_artifact_tasks(meta, client, self.config)
             await _enrich_music_from_orpheus_fn(meta, self.config)
             await _enrich_music_from_discogs_fn(meta, self.config)
             await prepare_artwork(meta)
@@ -285,14 +288,18 @@ class Prep:
         """Generate local screenshots while metadata and tracker IDs are fetched."""
         if meta.keep_images:
             return None
-        if meta.category in ("MUSIC", "GAME", "BOOK") or meta.screens <= 0:
+        if meta.category in ("MUSIC", "GAME") or meta.audiobook or meta.screens <= 0:
             return None
         if _frame_overlay_requires_late_capture(meta, self.config):
             logger.debug("[cyan]Deferring frame-overlay screenshots until tracker upload eligibility is known.[/cyan]")
             return None
 
         try:
-            if meta.is_disc == "BDMV":
+            if meta.category == "BOOK":
+                # Pages only: the cover and banner depend on metadata searched meanwhile.
+                if videopath:
+                    await self.takescreens_manager.ebook_page_screenshots(videopath, filename, meta.uuid, meta.base_dir, meta)
+            elif meta.is_disc == "BDMV":
                 await self.takescreens_manager.disc_screenshots(
                     meta,
                     meta.filename or filename,

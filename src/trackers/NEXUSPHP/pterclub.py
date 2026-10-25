@@ -1,5 +1,4 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-import glob
 import json
 import re
 import time
@@ -17,8 +16,8 @@ from src.console import logger
 from src.cookie_auth import CookieValidator
 from src.exceptions import *  # noqa E403
 from src.meta import Meta
+from src.screenshot_manifest import files as manifest_files
 from src.stats import record_event_async
-from src.temp_paths import screenshots_dir
 from src.trackers.common import Common
 
 Config = dict[str, Any]
@@ -330,7 +329,7 @@ class PTerClub:
         return response.text.find("""<a href="https://s3.pterclub.com/logout/?""") != -1
 
     async def pterimg_upload(self, meta: Meta) -> list[dict[str, str]]:
-        images = [str(p) for p in screenshots_dir(meta.base_dir, meta.uuid).glob(f"{glob.escape(meta.filename)}-*.png")]
+        images = manifest_files(meta.base_dir, meta.uuid, "main")
         url = "https://s3.pterclub.com"
         image_list: list[dict[str, str]] = []
         data: dict[str, Any] = {"type": "file", "action": "upload", "nsfw": 0, "auth_token": await self.get_auth_token(meta)}

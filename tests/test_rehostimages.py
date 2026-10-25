@@ -5,19 +5,85 @@
 import asyncio
 import json
 from pathlib import Path
+from types import SimpleNamespace
 from typing import ClassVar
 from unittest.mock import AsyncMock
+
+import pytest
 
 from src.meta import Meta
 from src.rehostimages import (
     ImageHostPolicy,
     RehostImagesManager,
     _deduplicate_image_records,
+    _handle_image_upload,
     check_tracker_image_hosts,
     has_restricted_image_hosts,
     select_common_image_host,
 )
+from src.screenshot_manifest import register
+from src.temp_paths import screenshots_dir
 from src.tracker_images import get_tracker_image_collection, has_tracker_image_collection
+
+
+@pytest.mark.parametrize("is_disc, capture_method", [("", "screenshots"), ("DVD", "dvd_screenshots"), ("BDMV", "disc_screenshots"), ("", "xxx_contact_sheets")])
+@pytest.mark.parametrize("replace_existing", [False, True])
+def test_rehosting_discovers_registered_screenshots_after_capture(tmp_path, is_disc, capture_method, replace_existing):
+    directory = screenshots_dir(tmp_path, "release")
+    is_contact_sheet = capture_method == "xxx_contact_sheets"
+    suffix = ".webp" if is_contact_sheet else ".png"
+    screenshot = directory / f"original{suffix}"
+    screenshot.write_bytes(b"png")
+    screenshot = register(tmp_path, "release", [screenshot], "main")[0]
+    (directory / "Example-0.png").write_bytes(b"stray")
+    extra = directory / "extra.png"
+    extra.write_bytes(b"extra")
+    register(tmp_path, "release", [extra], "FILE_1")
+    created = []
+
+    def capture(*_args, **_kwargs):
+        if replace_existing:
+            screenshot.unlink()
+        for index in range(2 if replace_existing else 1):
+            image = directory / f"captured-{index}{suffix}"
+            image.write_bytes(b"png")
+            created.extend(register(tmp_path, "release", [image], "main"))
+
+    async def host(*args, **_kwargs):
+        images = [{key: f"https://imgbox.com/{Path(path).name}" for key in ("img_url", "raw_url", "web_url")} for path in args[5]]
+        return images, len(images)
+
+    capture_mock = AsyncMock(side_effect=capture)
+    hosting = AsyncMock(side_effect=host)
+    meta = Meta(
+        base_dir=str(tmp_path),
+        uuid="release",
+        title="Example",
+        screens=2,
+        filelist=["source.mkv"],
+        is_disc=is_disc,
+        category="XXX" if is_contact_sheet else "MOVIE",
+        image_list=[{key: f"https://imgbox.com/{screenshot.name}" for key in ("img_url", "raw_url", "web_url")}],
+    )
+    result, retry, _reuploaded = asyncio.run(
+        _handle_image_upload(
+            meta,
+            "TEST",
+            {"imgbox.com": "imgbox"},
+            ["imgbox"],
+            default_config={"img_host_1": "imgbox"},
+            takescreens_manager=SimpleNamespace(**{capture_method: capture_mock}),
+            uploadscreens_manager=SimpleNamespace(upload_screens=hosting),
+        )
+    )
+
+    capture_mock.assert_awaited_once()
+    assert not retry
+    assert len(result) == 2
+    expected = created if replace_existing else [screenshot, *created]
+    assert set(hosting.await_args.args[5]) == set(map(str, expected))
+    if not replace_existing:
+        assert hosting.await_args.args[5][0] == str(screenshot)
 
 
 class _Alpha:

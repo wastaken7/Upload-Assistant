@@ -86,9 +86,10 @@ from rich.markup import escape
 
 from bin.get_ffmpeg import FfmpegBinaryManager
 from bin.get_mkbrr import MkbrrBinaryManager
+from src import webui_events
 from src.add_comparison import ComparisonManager
 from src.app_paths import CODE_DIR, STATE_DIR
-from src.args import Args, read_paths_from_stdin
+from src.args import Args, cli_argument_catalog, cli_option_choices, read_paths_from_stdin
 from src.artwork import is_public_http_url, is_valid_cover_image
 from src.audio_spectrogram import process_audio_spectrograms
 from src.binaries import configured_binary
@@ -97,7 +98,7 @@ from src.cleanup import cleanup_manager
 from src.clients import Clients
 from src.cogs.redaction import PathAwareEncoder, Redaction
 from src.config_helpers import format_terminal_link, parse_bool
-from src.console import current_release_log_path, logger  # pyright: ignore[reportUnknownVariableType]
+from src.console import current_release_log_path, install_gui_prompt_events, logger  # pyright: ignore[reportUnknownVariableType]
 from src.console import rich_handler as _rich_handler
 from src.disc_menus import process_disc_menus
 from src.dupe_checking import DupeChecker
@@ -396,7 +397,7 @@ async def print_progress(message: str, interval: int = 10) -> None:
     try:
         while True:
             await asyncio.sleep(interval)
-            logger.info(message)
+            logger.info(message, extra={"ua_gui": False})
     except asyncio.CancelledError:
         pass
 
@@ -507,7 +508,8 @@ async def _prompt_book_meta(meta: Meta) -> None:
             prompt_label = "language" if field == "book_language" else ("cover artwork (path to image file or URL)" if field == "artwork" else field)
             if field == "book_language":
                 while True:
-                    value = (CLI_UI.ask_string("Enter language (leave blank to skip): ") or "").strip()
+                    with _book_field_prompt(meta, "Language", hint="A language name or code.", placeholder="e.g. English"):
+                        value = (CLI_UI.ask_string("Enter language (leave blank to skip): ") or "").strip()
                     if not value:
                         break
 
@@ -520,7 +522,8 @@ async def _prompt_book_meta(meta: Meta) -> None:
                     logger.info("[red]Invalid language. Please try again.[/red]")
             elif field == "year":
                 while True:
-                    value = (CLI_UI.ask_string("Enter year (leave blank to skip): ") or "").strip()
+                    with _book_field_prompt(meta, "Year", hint="A 4-digit year.", placeholder="e.g. 1999"):
+                        value = (CLI_UI.ask_string("Enter year (leave blank to skip): ") or "").strip()
                     if not value:
                         break
                     if value.isdigit() and len(value) == 4 and 1000 <= int(value) <= 3000:
@@ -531,7 +534,10 @@ async def _prompt_book_meta(meta: Meta) -> None:
                     logger.info("[red]Invalid year (must be a 4-digit number between 1000 and 3000). Please try again.[/red]")
             elif field == "artwork":
                 while True:
-                    value = (CLI_UI.ask_string("Enter path to cover artwork image (or public image URL) for BOOK: ") or "").strip()
+                    with _book_field_prompt(
+                        meta, "Artwork", hint="Artwork is required: a local image path or a public image URL.", placeholder="Image path or https:// URL", skip=False
+                    ):
+                        value = (CLI_UI.ask_string("Enter path to cover artwork image (or public image URL) for BOOK: ") or "").strip()
                     if not value:
                         logger.info("[red]Artwork is required for BOOK uploads. Please enter a valid file path or image URL.[/red]")
                         continue
@@ -549,7 +555,8 @@ async def _prompt_book_meta(meta: Meta) -> None:
                         break
                     logger.info("[red]Invalid artwork path or URL. The file does not exist or URL is invalid. Please try again.[/red]")
             else:
-                value = (CLI_UI.ask_string(f"Enter {prompt_label} (leave blank to skip): ") or "").strip()
+                with _book_field_prompt(meta, field.capitalize()):
+                    value = (CLI_UI.ask_string(f"Enter {prompt_label} (leave blank to skip): ") or "").strip()
                 if value:
                     meta[field] = value
                     name_needs_rebuild = True
@@ -596,7 +603,8 @@ async def _prompt_game_meta(meta: Meta) -> None:
             for field in game_missing:
                 if field == "year":
                     while True:
-                        value = (CLI_UI.ask_string("Enter year (leave blank to skip): ") or "").strip()
+                        with _game_field_prompt(meta, "Year", hint="A 4-digit year.", placeholder="e.g. 1999"):
+                            value = (CLI_UI.ask_string("Enter year (leave blank to skip): ") or "").strip()
                         if not value:
                             break
                         if value.isdigit() and len(value) == 4 and 1000 <= int(value) <= 3000:
@@ -606,14 +614,15 @@ async def _prompt_game_meta(meta: Meta) -> None:
                             break
                         logger.info("[red]Invalid year (must be a 4-digit number between 1000 and 3000). Please try again.[/red]")
                 elif field == "platform":
-                    try:
-                        value = CLI_UI.ask_choice(
-                            "Select target platform: (can be manually set with -plat / --platform)",
-                            choices=["pc", "mac", "linux", "ps5", "ps4", "ps3", "ps2", "xbox", "x360", "xone", "xsx", "switch", "3ds", "nds", "wiiu", "wii"],
-                            sort=False,
-                        )
-                    except EOFError:
-                        value = ""
+                    with _game_field_prompt(meta, "Platform", skip=False):
+                        try:
+                            value = CLI_UI.ask_choice(
+                                "Select target platform: (can be manually set with -plat / --platform)",
+                                choices=["pc", "mac", "linux", "ps5", "ps4", "ps3", "ps2", "xbox", "x360", "xone", "xsx", "switch", "3ds", "nds", "wiiu", "wii"],
+                                sort=False,
+                            )
+                        except EOFError:
+                            value = ""
 
                     if value:
                         meta[field] = value
@@ -626,12 +635,14 @@ async def _prompt_game_meta(meta: Meta) -> None:
                         "dlc (DLC only)": "dlc",
                         "update (Update only)": "update",
                     }
-                    choice = CLI_UI.ask_choice("Select game subcategory (can be manually set with -gsc / --game-subcategory):", choices=subcategory_choices, sort=False)
+                    with _game_field_prompt(meta, "Subcategory", skip=False):
+                        choice = CLI_UI.ask_choice("Select game subcategory (can be manually set with -gsc / --game-subcategory):", choices=subcategory_choices, sort=False)
                     meta.game_subcategory = subcategory_values.get(choice, "full_game")
                     name_needs_rebuild = True
 
                 else:
-                    value = (CLI_UI.ask_string(f"Enter {field} (leave blank to skip): ") or "").strip()
+                    with _game_field_prompt(meta, field.capitalize()):
+                        value = (CLI_UI.ask_string(f"Enter {field} (leave blank to skip): ") or "").strip()
                     if value:
                         meta[field] = value
                         name_needs_rebuild = True
@@ -927,6 +938,63 @@ async def _ensure_valid_book_artwork(meta: Meta) -> bool:
     return False
 
 
+_MUSIC_FIELD_LABELS = {
+    "artist": "Artist",
+    "album": "Album",
+    "year": "Year",
+    "edition": "Edition",
+    "edition_year": "Edition year",
+    "media": "Media",
+    "release_type": "Release type",
+    "cover_url": "Artwork",
+}
+
+
+def _music_field_prompt(meta: Meta, field: str, *, hint: str = "", placeholder: str = "", keep: bool = True) -> contextlib.AbstractContextManager[None]:
+    """Show a music metadata question in the Web UI with the release's current values.
+
+    Values the files disagree on are offered as answers, and with ``keep``
+    a blank answer (keep the current value, or skip) is offered as well.
+    """
+    summary: dict[str, Any] = {label: _music_field(meta, name) for name, label in _MUSIC_FIELD_LABELS.items()}
+    summary["Artwork"] = summary["Artwork"] or meta.artwork_path
+    current = str(_music_field(meta, field) or "")
+    actions: list[tuple[str, str]] = [("", f"Keep {current}" if current else "Skip")] if keep else []
+    conflicts = meta.music_release.get("conflicts", {}) if isinstance(meta.music_release, dict) else {}
+    candidates = [str(value) for value in (conflicts.get(field) or [] if isinstance(conflicts, dict) else [])]
+    if field in {"year", "edition_year"}:
+        candidates = [value for value in candidates if re.fullmatch(r"\d{4}", value)]
+    offered = [value for value in dict.fromkeys(candidates) if value and value != current]
+    actions += [(value, value) for value in offered]
+    notes = [hint] if hint else []
+    source = _music_field_source(meta, field)
+    if current and source:
+        notes.append(f"The current value comes from {source.replace('_', ' ')}.")
+    if offered:
+        notes.append("The files disagree on this value; pick one or type another.")
+    return webui_events.field_prompt("Music release", summary, focus=_MUSIC_FIELD_LABELS.get(field, field), hint=" ".join(notes), actions=actions, placeholder=placeholder)
+
+
+def _book_field_prompt(meta: Meta, focus: str, *, hint: str = "", placeholder: str = "", skip: bool = True) -> contextlib.AbstractContextManager[None]:
+    """Show a book metadata question in the Web UI with the book's current values."""
+    summary: dict[str, Any] = {
+        "Title": meta.title,
+        "Author": meta.author,
+        "Year": meta.year,
+        "Language": meta.book_language,
+        "Artwork": meta.artwork_url or meta.artwork_path,
+    }
+    if meta.audiobook:
+        summary["Narrator"] = meta.narrator
+    return webui_events.field_prompt("Book", summary, focus=focus, hint=hint, actions=[("", "Skip")] if skip else [], placeholder=placeholder)
+
+
+def _game_field_prompt(meta: Meta, focus: str, *, hint: str = "", placeholder: str = "", skip: bool = True) -> contextlib.AbstractContextManager[None]:
+    """Show a game metadata question in the Web UI with the game's current values."""
+    summary: dict[str, Any] = {"Title": meta.title, "Year": meta.year, "Platform": meta.platform, "Subcategory": meta.game_subcategory}
+    return webui_events.field_prompt("Game", summary, focus=focus, hint=hint, actions=[("", "Skip")] if skip else [], placeholder=placeholder)
+
+
 async def _prompt_music_meta(meta: Meta) -> None:
     """Ask for minimum Orpheus music metadata, never technical stream fields."""
     required = list(MUSIC_REQUIRED_FIELDS)
@@ -968,7 +1036,8 @@ async def _prompt_music_meta(meta: Meta) -> None:
                     while True:
                         current = str(_music_field(meta, field) or "")
                         prompt = f"Enter {labels[field]}" + (f" (current: {current})" if current else "") + " (leave blank to keep/skip): "
-                        value = (CLI_UI.ask_string(prompt) or "").strip()
+                        with _music_field_prompt(meta, field, hint="A 4-digit year.", placeholder="e.g. 1999"):
+                            value = (CLI_UI.ask_string(prompt) or "").strip()
                         if not value:
                             break
                         if value.isdigit() and len(value) == 4 and 1000 <= int(value) <= 3000:
@@ -977,23 +1046,30 @@ async def _prompt_music_meta(meta: Meta) -> None:
                             break
                         logger.info("[red]Invalid year (must be a 4-digit number between 1000 and 3000).[/red]")
                 else:
-                    value = (CLI_UI.ask_string(f"Enter {labels[field]} (leave blank to skip): ") or "").strip()
+                    hint = "Separate several main artists with &." if field == "artist" else ""
+                    with _music_field_prompt(meta, field, hint=hint):
+                        value = (CLI_UI.ask_string(f"Enter {labels[field]} (leave blank to skip): ") or "").strip()
                     if value:
                         _set_music_field(meta, field, value)
                         changed = True
             elif field == "media":
-                value = CLI_UI.ask_choice("Select source media:", choices=list(MUSIC_MEDIA_CHOICES), sort=False)
+                with _music_field_prompt(meta, field):
+                    value = CLI_UI.ask_choice("Select source media:", choices=list(MUSIC_MEDIA_CHOICES), sort=False)
                 if value:
                     _set_music_field(meta, field, value)
                     changed = True
             elif field == "release_type":
-                value = CLI_UI.ask_choice("Select release type:", choices=list(MUSIC_RELEASE_TYPE_CHOICES), sort=False)
+                with _music_field_prompt(meta, field):
+                    value = CLI_UI.ask_choice("Select release type:", choices=list(MUSIC_RELEASE_TYPE_CHOICES), sort=False)
                 if value:
                     _set_music_field(meta, field, value)
                     changed = True
             elif field in ("artwork", "cover_url"):
                 while True:
-                    value = (CLI_UI.ask_string("Enter path to cover artwork image (or public image URL) for MUSIC: ") or "").strip()
+                    with _music_field_prompt(
+                        meta, "cover_url", hint="Artwork is required: a local image path or a public image URL.", placeholder="Image path or https:// URL", keep=False
+                    ):
+                        value = (CLI_UI.ask_string("Enter path to cover artwork image (or public image URL) for MUSIC: ") or "").strip()
                     if not value:
                         logger.info("[red]Artwork is required for MUSIC uploads. Please enter a valid file path or image URL.[/red]")
                         continue
@@ -1019,11 +1095,139 @@ async def _prompt_music_meta(meta: Meta) -> None:
         return
 
     if changed:
-        await _write_music_snapshot(meta)
-        year = f" [{meta.year}]" if meta.year else ""
-        media = str(_music_field(meta, "media") or "")
-        meta.name_notag = f"{meta.artist} - {meta.title}{year} [{media} {meta.format}]".strip()
-        meta.name_notag, meta.name, meta.clean_name, meta.potential_missing = await name_manager.get_name(meta)
+        await _refresh_music_meta(meta)
+
+
+def _editarg_suggestions(meta: Meta) -> dict[str, str]:
+    """Quick corrections for the Web UI's "Input args that need correction" prompt.
+
+    The flags follow the category (IDs and fields that apply to it). Each
+    maps to the release's current value, written as the parser accepts it,
+    so a chip can insert it ready to edit. A value the parser would reject
+    (for example an unlisted source) is left empty, and a flag the parser
+    does not know is never offered.
+    """
+    choices = cli_option_choices()
+
+    def allowed(flag: str, value: Any) -> str:
+        text = str(value or "").strip()
+        return next((choice for choice in choices.get(flag, ()) if text and choice.casefold() == text.casefold()), "")
+
+    def number(value: Any) -> str:
+        return re.sub(r"\D", "", str(value or "")).lstrip("0")
+
+    def text(*candidates: Any) -> str:
+        return next((str(value).strip() for value in candidates if value not in (None, "", 0) and str(value).strip()), "")
+
+    category = str(meta.category or "").lower()
+    values: dict[str, str] = {"--category": allowed("--category", category)}
+    if category == "game":
+        values.update(
+            {
+                "--igdb": text(meta.igdb_id, meta.igdb_manual),
+                "--platform": allowed("--platform", meta.platform or meta.manual_platform),
+                "--game-title": text(meta.game_title, meta.title),
+                "--game-version": text(meta.game_version),
+                "--game-subcategory": allowed("--game-subcategory", meta.game_subcategory),
+                "--tag": str(meta.tag or "").lstrip("-"),
+            }
+        )
+    elif category == "book":
+        values.update(
+            {
+                "--book-title": text(meta.book_title, meta.title),
+                "--author": text(meta.author, meta.book_author),
+                "--asin": text(meta.asin, meta.book_asin),
+                "--isbn": text(meta.isbn, meta.book_isbn),
+                "--publisher": text(meta.publisher, meta.book_publisher),
+                "--book-language": text(meta.book_language),
+                "--year": text(meta.year),
+            }
+        )
+        if meta.audiobook:
+            values["--book-narrator"] = text(meta.narrator, meta.book_narrator)
+    elif category == "music":
+        values.update(
+            {
+                "--music-artist": text(_music_field(meta, "artist")),
+                "--music-album": text(_music_field(meta, "album")),
+                "--music-media": allowed("--music-media", _music_field(meta, "media")),
+                "--music-release-type": allowed("--music-release-type", _music_field(meta, "release_type")),
+                "--music-release-year": text(_music_field(meta, "release_year")),
+                "--music-edition-year": text(_music_field(meta, "edition_year")),
+                "--music-label": text(_music_field(meta, "release_label")),
+                "--music-catalogue-number": text(_music_field(meta, "release_catalogue_number")),
+            }
+        )
+    else:
+        # Movies, TV and the other video categories.
+        if category in ("movie", "tv"):
+            values["--tmdb"] = f"{category}/{meta.tmdb_id}" if meta.tmdb_id else ""
+            values["--imdb"] = f"tt{int(meta.imdb_id):07d}" if meta.imdb_id else ""
+        if category == "tv":
+            values["--tvdb"] = text(meta.tvdb_id)
+            values["--tvmaze"] = text(meta.tvmaze_id)
+            if meta.mal_id:
+                values["--mal"] = text(meta.mal_id)
+            values["--season"] = number(meta.season)
+            values["--episode"] = number(meta.episode)
+        values.update(
+            {
+                "--type": allowed("--type", meta.type),
+                "--source": allowed("--source", meta.source),
+                "--resolution": allowed("--resolution", meta.resolution),
+                "--tag": str(meta.tag or "").lstrip("-"),
+                "--edition": text(meta.edition),
+                "--year": text(meta.year),
+            }
+        )
+    known = {item["label"] for item in cli_argument_catalog()}
+    return {flag: value for flag, value in values.items() if flag in known}
+
+
+async def _refresh_music_meta(meta: Meta) -> None:
+    """Save prompted music fields and rebuild the release name from them."""
+    await _write_music_snapshot(meta)
+    year = f" [{meta.year}]" if meta.year else ""
+    media = str(_music_field(meta, "media") or "")
+    meta.name_notag = f"{meta.artist} - {meta.title}{year} [{media} {meta.format}]".strip()
+    meta.name_notag, meta.name, meta.clean_name, meta.potential_missing = await name_manager.get_name(meta)
+
+
+# Folder-name hints and the trusted field a confirmed value is stored in,
+# the same field the matching command-line option sets.
+_MUSIC_FOLDER_HINT_FIELDS = {"label": "release_label", "catalogue number": "release_catalogue_number", "edition title": "edition"}
+
+
+async def _confirm_music_folder_hints(meta: Meta) -> None:
+    """Ask before sending edition details that only come from the folder name.
+
+    Orpheus never sends folder-derived label, catalogue number or edition
+    title on its own (rule 2.1.19). Interactive runs ask about each one, so it
+    is not dropped silently; unattended runs keep the validation warning.
+    """
+    if meta.unattended or not isinstance(meta.music_release, dict):
+        return
+    if not any(str(tracker).upper() == "ORPHEUS" for tracker in meta.trackers or []):
+        return
+    from src.music.models import MusicRelease
+    from src.music.validation import resolve_orpheus_edition
+
+    hints = resolve_orpheus_edition(MusicRelease.from_dict(meta.music_release)).folder_hints
+    if not hints:
+        return
+    changed = False
+    try:
+        for name, value in hints:
+            field = _MUSIC_FOLDER_HINT_FIELDS.get(name)
+            if field and CLI_UI.ask_yes_no(f"Send {name} '{value}' from the folder name to Orpheus?", default=False):
+                _set_music_field(meta, field, value)
+                changed = True
+    except EOFError:
+        logger.info("[yellow]Input cancelled — folder-name edition details are not sent.[/yellow]")
+        return
+    if changed:
+        await _refresh_music_meta(meta)
 
 
 def book_screens(meta: Meta, min_successful_uploads: int) -> tuple[int, int]:
@@ -1040,8 +1244,6 @@ def book_screens(meta: Meta, min_successful_uploads: int) -> tuple[int, int]:
         requires more images than actually exist.
     """
     screenshot_files = manifest_files(meta.base_dir, meta.uuid, "main")
-    if not screenshot_files:
-        screenshot_files = [path for path in screenshots_dir(meta.base_dir, meta.uuid).iterdir() if path.is_file() and path.suffix.casefold() in {".jpg", ".jpeg", ".png"}]
     actual_screens = len(screenshot_files)
     capped_min = min(min_successful_uploads, actual_screens)
     return actual_screens, capped_min
@@ -1075,6 +1277,7 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
             meta.unattended = True
             logger.info("[yellow]Running in Auto Mode")
     prep = Prep(screens=meta.screens, img_host=meta.imghost, config=config, publish_preview=_publish_webui_preview_target)
+    webui_events.stage("prep", "start")
     try:
         meta = await prep.gather_prep(meta=meta, mode="cli")
     except Exception as e:
@@ -1143,11 +1346,14 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
 
     if meta.category == "MUSIC":
         await _prompt_music_meta(meta)
+        await _confirm_music_folder_hints(meta)
 
     meta = await gen_desc(meta, takescreens_manager, uploadscreens_manager)
+    webui_events.stage("prep", "done")
 
     editargs_tracking: tuple[str, ...] = ()
     previous_trackers = meta.trackers
+    webui_events.stage("confirm", "start")
     try:
         confirm = await helper.get_confirmation(meta)
     except EOFError:
@@ -1157,7 +1363,18 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
         sys.exit(1)
     while confirm is False:
         try:
-            editargs_str = CLI_UI.ask_string("Input args that need correction e.g. (--tag NTb --category tv --tmdb 12345)")
+            # The Web UI shows the declined summary, quick corrections and the
+            # corrections already applied; "continue" keeps the release as is
+            # and "skip" leaves it out (the queue moves on to the next item).
+            with webui_events.prompt_context(
+                kind="edit_args",
+                values=_editarg_suggestions(meta),
+                applied=shlex.join(editargs_tracking),
+                actions=[("continue", "Continue without changes"), ("skip", "Skip this upload")],
+            ):
+                editargs_str = CLI_UI.ask_string(
+                    "Input args that need correction e.g. (--tag NTb --category tv --tmdb 12345), 'continue' to keep them, or 'skip' to skip this upload"
+                )
         except EOFError:
             logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")
             await cleanup_manager.cleanup()
@@ -1167,8 +1384,15 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
         if editargs_str == "continue":
             break
 
+        if (editargs_str or "").strip().lower() == "skip":
+            logger.info("[yellow]Skipping this upload on request.[/yellow]")
+            webui_events.notice("attention", "Skipped on your request; nothing was uploaded.")
+            webui_events.stage("confirm", "skip")
+            meta.skipped_by_user = True
+            return False
+
         if not editargs_str or not editargs_str.strip():
-            logger.info("[yellow]No input provided. Please enter arguments, type `continue` to continue or press Ctrl+C to exit.[/yellow]")
+            logger.info("[yellow]No input provided. Please enter arguments, type `continue` to continue, `skip` to skip this upload, or press Ctrl+C to exit.[/yellow]")
             continue
 
         try:
@@ -1188,16 +1412,24 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
         next_editargs = editargs_tracking + editargs
         # Carry original args over, let parse handle duplicates
         original_args = meta.item_args if meta.item_args is not None else list(sys.argv[1:])
-        edited_meta, _help, _before_args = cast(
-            tuple[Meta, Any, Any], parser.parse(list(original_args) + list(next_editargs), meta.copy() if webui_roots is not None else meta)
-        )
+        try:
+            edited_meta, _help, _before_args = cast(
+                tuple[Meta, Any, Any], parser.parse(list(original_args) + list(next_editargs), meta.copy() if webui_roots is not None else meta)
+            )
+        except SystemExit:
+            # argparse exits on an unknown option or a value outside its choices;
+            # ask again instead of ending the upload over a typo.
+            logger.info("[red]Those arguments are not valid; check them and try again.[/red]")
+            continue
         if webui_roots is not None:
             try:
                 edited_meta.path = validate_subprocess_path(cast(str, edited_meta.path))
             except ValueError as error:
                 logger.info("%s", error, extra={"markup": False})
                 continue
-        meta = edited_meta
+        if edited_meta is not meta:
+            # Apply the validated copy in place: the caller keeps using this object for the upload.
+            meta.update(edited_meta)
         editargs_tracking = next_editargs
         if not meta.trackers:
             meta.trackers = previous_trackers
@@ -1223,6 +1455,9 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
             cleanup_manager.reset_terminal()
             sys.exit(1)
 
+    webui_events.stage("confirm", "done")
+
+    meta.client_skipped_trackers = []
     if meta.remove_trackers:
         removed: list[str] = []
         remove_trackers_list = [t for t in meta.remove_trackers if t] if isinstance(meta.remove_trackers, list) else [str(meta.remove_trackers)]
@@ -1236,9 +1471,11 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
                     removed.append(tracker)
         meta.trackers = current_trackers
         if removed:
+            meta.client_skipped_trackers = list(dict.fromkeys(removed))
             logger.info(f"[yellow]Removing trackers already in your client: {', '.join(removed)}[/yellow]")
     if not meta.trackers:
         logger.info("[red]No trackers remain after removal.[/red]")
+        webui_events.stage("dupes", "skip")
         successful_trackers = 0
         meta.skip_uploading = 10
 
@@ -1297,7 +1534,9 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
         except Exception as e:
             logger.warning(f"[yellow]Warning: Tracker validation encountered an error: {e}[/yellow]")
 
+        webui_events.stage("dupes", "start")
         successful_trackers = await TrackerStatusManager(config=config).process_all_trackers(meta)
+        webui_events.stage("dupes", "done")
 
         if meta.trackers_pass is not None:
             try:
@@ -1401,6 +1640,7 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
             await common.get_bdmv_mediainfo(meta)
             bdmv_mi_created = True
 
+    webui_events.stage("screens", "start")
     progress_task = asyncio.create_task(print_progress("[yellow]Still processing, please wait...", interval=10))
     try:
         if not meta.manual_frames:
@@ -1599,7 +1839,8 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
             from src.screenshot_review import staged_remote_uploads
 
             reviewed_uploads = staged_remote_uploads(Path(meta.base_dir) / "tmp" / meta.uuid, cast(list[dict[str, Any]], meta.image_list or []))
-            if (len(meta.image_list) < cutoff or reviewed_uploads) and meta.skip_imghost_upload is False and meta.category not in ("GAME", "MUSIC"):
+            needs_shared_image_host = any(tracker not in {"HDBITS", "PTERCLUB"} or not tracker_class_map[tracker](config=config).rehost_images for tracker in meta.trackers)
+            if (len(meta.image_list) < cutoff or reviewed_uploads) and meta.skip_imghost_upload is False and meta.category not in ("GAME", "MUSIC") and needs_shared_image_host:
                 # Validate and (if needed) rehost images to tracker-approved hosts before uploading any new screenshots.
                 trackers_with_image_host_requirements = {
                     "BEYONDHD",
@@ -1903,7 +2144,9 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
         progress_task.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await progress_task
+    webui_events.stage("screens", "done")
 
+    webui_events.stage("torrent", "start")
     has_local_subs = bool(meta.subtitle_files)
     torrent_manifest = TorrentManifest(meta.base_dir, meta.uuid)
 
@@ -1973,6 +2216,7 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
 
     if meta.randomized >= 1 and not meta.mkbrr and not is_usenet_only:
         TORRENT_CREATOR.create_random_torrents(meta.base_dir, meta.uuid, meta.randomized, cast(str, meta.path))
+    webui_events.stage("torrent", "done")
 
     await write_meta_file(meta)
     _publish_webui_preview_target(cast(str, meta.path or ""), meta.uuid or None)
@@ -2186,6 +2430,7 @@ def load_heavy_globals() -> None:
     CLI_UI = cli_ui
     TORF_Torrent = Torrent
     CLI_UI.setup(color="always", title="Upload Assistant")
+    install_gui_prompt_events()
 
 
 async def do_the_thing(base_dir: str) -> None:
@@ -2476,7 +2721,7 @@ async def do_the_thing(base_dir: str) -> None:
         skipped_files_count = 0
         base_meta = meta.copy()
 
-        for queue_item in queue_list:
+        for item_number, queue_item in enumerate(queue_list, start=1):
             total_files = len(queue_list)
             current_item_path: str = ""
             tmp_path = ""
@@ -2540,6 +2785,8 @@ async def do_the_thing(base_dir: str) -> None:
                 set_stats_context(debug=bool(meta.debug), category="")
                 await record_event_async("item", operation="started", outcome="success")
                 _publish_webui_preview_target(path)
+                webui_events.begin_item(path, item_number, total_files)
+                webui_events.update_item(personal_release=meta.personalrelease is True, run_options=meta)
 
                 if not path:
                     raise ValueError("The 'path' variable is not defined or is empty.")
@@ -2581,12 +2828,19 @@ async def do_the_thing(base_dir: str) -> None:
 
             try:
                 meta_success = await process_meta(meta, base_dir)
+            except BaseException:
+                webui_events.fail_active_stage()
+                raise
             finally:
                 await cancel_and_drain_early_artifact_tasks(meta.uuid)
             if not meta_success:
+                # A skip is the user's choice, not a failure: no red stage, no error.
+                outcome = "no_upload" if meta.skipped_by_user else "error"
+                if not meta.skipped_by_user:
+                    webui_events.fail_active_stage()
                 set_stats_context(debug=bool(meta.debug), category=str(meta.category or ""))
-                await record_event_async("item", operation="completed", outcome="error")
-                await record_release_profile_async(meta, "error")
+                await record_event_async("item", operation="completed", outcome=outcome)
+                await record_release_profile_async(meta, outcome)
                 if "queue" in meta and meta.queue is not None:
                     processed_files_count += 1
                     skipped_files_count += 1
@@ -2681,7 +2935,9 @@ async def do_the_thing(base_dir: str) -> None:
 
                 if successful_trackers < skip_uploading_int and not meta.debug:
                     logger.info(f"[red]Not enough successful trackers ({successful_trackers}/{skip_uploading_int}). No uploads being processed.[/red]")
+                    webui_events.stage("upload", "skip")
                 else:
+                    webui_events.stage("upload", "start")
                     trackers_upper = [(t).upper() for t in meta.trackers]
                     # Partition trackers into torrent trackers and Usenet indexers
                     torrent_trackers: list[str] = []
@@ -2962,6 +3218,7 @@ async def do_the_thing(base_dir: str) -> None:
                         has_usenet_upload=need_usenet_post,
                         has_torrent_trackers=bool(torrent_trackers),
                     )
+                    webui_events.stage("upload", "done")
                     if config["DEFAULT"].get("cross_seeding", True):
                         await process_cross_seeds(meta)
 
@@ -3001,8 +3258,12 @@ async def do_the_thing(base_dir: str) -> None:
                 else:
                     trackers = [t for t in cast(list[Any], meta.trackers) if isinstance(t, str)]
                     logger.debug(f"[cyan]Using trackers for request search: {trackers}[/cyan]")
+                webui_events.stage("requests", "start")
                 await tracker_setup.tracker_request(meta, trackers)
+                webui_events.stage("requests", "done")
 
+            webui_events.publish_tracker_statuses(meta.tracker_status, final=True)
+            webui_events.update_item(artwork=meta)
             # Persist and expose the completed item before user-managed hooks run.
             # Hooks may inspect the final tracker status and files have not yet been cleaned.
             await record_completed_item_stats_async(meta, tracker_class_map)
@@ -3044,6 +3305,7 @@ async def do_the_thing(base_dir: str) -> None:
         current_release_log_path.set(None)
 
     except Exception as e:
+        webui_events.fail_active_stage()
         logger.info(f"[bold red]An unexpected error occurred: {escape(str(e))}[/bold red]")
         if sanitize_meta:
             meta = await Redaction.clean_meta_for_export(meta)

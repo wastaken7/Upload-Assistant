@@ -213,3 +213,33 @@ test("demo subtitles resolve to ten distinct available flags", () => {
     assert.ok(fs.existsSync(path.join(__dirname, "../web_ui", flag)));
   }
 });
+
+test("demo GUI events open a dupe prompt with results in every state", () => {
+  const context = fixture(true);
+  vm.runInContext(read("run_gui_state.js"), context);
+  const { createRunGuiState, reduceRunGuiEvent, selectRunGuiView } =
+    context.window.UARunGui;
+  const state = context.window.UAScreenshotMode.guiEvents.reduce(
+    reduceRunGuiEvent,
+    createRunGuiState(),
+  );
+  const view = selectRunGuiView(state);
+
+  assert.equal(view.prompt.type, "yes_no");
+  assert.equal(view.prompt.context.kind, "dupes");
+  assert.ok(view.slots[`0:${view.prompt.context.tracker}`]);
+  assert.ok(view.dupes[`0:${view.prompt.context.tracker}`].entries.length);
+  assert.equal(view.awaiting, true);
+  assert.equal(
+    view.trackers
+      .map((entry) => entry.status)
+      .sort()
+      .join(),
+    "dupe,pending,skipped",
+  );
+  assert.equal(view.warnings.length, 1);
+  assert.equal(
+    view.stages.find((stage) => stage.key === "dupes").status,
+    "start",
+  );
+});

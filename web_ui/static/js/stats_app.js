@@ -406,54 +406,15 @@ function WorkspaceNav({
             {appearanceOpen && (
               <div className="ua-app-rail-popover absolute bottom-0 left-full z-[60] ml-2 w-64 rounded-xl border p-4 shadow-2xl">
                 <h2 className="text-sm font-semibold">Appearance</h2>
-                <label className="ua-app-rail-popover-label mt-3 block text-xs font-semibold">
-                  Color theme
-                </label>
-                <select
-                  aria-label="Color theme"
-                  value={colorTheme}
-                  onChange={(event) => {
-                    onColorThemeChange(event.target.value);
-                    setAppearanceOpen(false);
-                  }}
-                  className="ua-theme-picker mt-1 w-full rounded-lg px-3 py-2 text-sm"
-                >
-                  {(window.UAThemes || []).map((theme) => (
-                    <option key={theme.id} value={theme.id}>
-                      {theme.label}
-                    </option>
-                  ))}
-                </select>
-                <label className="ua-app-rail-popover-label mt-3 block text-xs font-semibold">
-                  Corner style
-                </label>
-                <select
-                  aria-label="Corner style"
-                  value={interfaceStyle}
-                  onChange={(event) => {
-                    onInterfaceStyleChange(event.target.value);
-                    setAppearanceOpen(false);
-                  }}
-                  className="ua-theme-picker mt-1 w-full rounded-lg px-3 py-2 text-sm"
-                >
-                  {(window.UAInterfaceStyles || []).map((style) => (
-                    <option key={style.id} value={style.id}>
-                      {style.label}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  className="ua-config-mode-button mt-3 flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm"
-                  onClick={onToggleMode}
-                  aria-pressed={isDarkMode}
-                >
-                  <span>{isDarkMode ? "Dark mode" : "Light mode"}</span>
-                  <LucideIcon
-                    name={isDarkMode ? "moon" : "sun"}
-                    className="h-4 w-4"
-                  />
-                </button>
+                <window.UAAppearanceControls
+                  colorTheme={colorTheme}
+                  onColorThemeChange={onColorThemeChange}
+                  interfaceStyle={interfaceStyle}
+                  onInterfaceStyleChange={onInterfaceStyleChange}
+                  isDarkMode={isDarkMode}
+                  onToggleMode={onToggleMode}
+                  labelClassName="ua-app-rail-popover-label"
+                />
               </div>
             )}
           </div>
@@ -1780,6 +1741,31 @@ function ReleaseProfiles({ releaseProfiles }) {
   );
 }
 
+const DONUT_CENTER = 21;
+const DONUT_RADIUS = 15.9155;
+
+// Explicit arcs instead of stroke-dasharray: browsers approximate the circle
+// length differently per zoom level, which made dash patterns wrap and leak.
+function donutArcPath(startPercentage, percentage) {
+  const pointAt = (value) => {
+    const angle = (value / 100) * 2 * Math.PI;
+    return [
+      DONUT_CENTER + DONUT_RADIUS * Math.sin(angle),
+      DONUT_CENTER - DONUT_RADIUS * Math.cos(angle),
+    ];
+  };
+  const radius = `${DONUT_RADIUS} ${DONUT_RADIUS}`;
+  if (percentage >= 99.999) {
+    const top = DONUT_CENTER - DONUT_RADIUS;
+    const bottom = DONUT_CENTER + DONUT_RADIUS;
+    return `M ${DONUT_CENTER} ${top} A ${radius} 0 1 1 ${DONUT_CENTER} ${bottom} A ${radius} 0 1 1 ${DONUT_CENTER} ${top}`;
+  }
+  const [startX, startY] = pointAt(startPercentage);
+  const [endX, endY] = pointAt(startPercentage + percentage);
+  const largeArc = percentage > 50 ? 1 : 0;
+  return `M ${startX} ${startY} A ${radius} 0 ${largeArc} 1 ${endX} ${endY}`;
+}
+
 function DonutChart({
   rows,
   ariaLabel,
@@ -1834,18 +1820,13 @@ function DonutChart({
             opacity="0.1"
           />
           {segments.map((segment) => (
-            <circle
+            <path
               key={segment.label}
-              cx="21"
-              cy="21"
-              r="15.9155"
+              d={donutArcPath(segment.offset, segment.percentage)}
               fill="none"
               stroke={segment.color}
               strokeWidth="6"
-              strokeDasharray={`${segment.percentage} ${100 - segment.percentage}`}
-              strokeDashoffset={-segment.offset}
               strokeLinecap="butt"
-              transform="rotate(-90 21 21)"
               className={onSelect && segment.id ? "cursor-pointer" : ""}
               opacity={activeLabel && activeLabel !== segment.id ? "0.3" : "1"}
               onClick={() => segment.id && onSelect?.(segment.id)}

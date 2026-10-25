@@ -30,18 +30,33 @@ def test_webui_catalog_uses_cli_flags_and_help() -> None:
 
 def test_webui_grouped_flags_exist_in_cli() -> None:
     source = (Path(__file__).resolve().parents[1] / "web_ui" / "static" / "js" / "app.js").read_text(encoding="utf-8")
-    categories = source.split("let argumentCategories = [", 1)[1].split("const cliArguments =", 1)[0]
-    grouped_flags = set(re.findall(r'label: "(--[\w-]+)"', categories))
+    layout = source.split("const argumentSections = [", 1)[1].split("const argumentBuilder =", 1)[0]
+    grouped_flags = set(re.findall(r'"(--[\w-]+)', layout))
     available_flags = {item["label"] for item in cli_argument_catalog()}
 
     assert grouped_flags <= available_flags
     assert "--tracker-id" in grouped_flags
     assert "--ptp" not in grouped_flags
     assert "Other CLI options" in source
-    for item in re.findall(r'\{[^{}]*label: "(--[^\"]+)"[^{}]*\}', categories):
-        if item not in {"--unattended", "--unattended_confirm"}:
-            block = re.search(r'\{[^{}]*label: "' + re.escape(item) + r'"[^{}]*\}', categories)
-            assert block is not None and "description:" not in block.group()
+    # Help text comes from the parser; only these hidden options carry their own.
+    described = set(re.findall(r'flag: "(--[\w-]+)",\s*description:', layout))
+    assert described == {"--unattended", "--unattended_confirm"}
+
+
+def test_webui_catalog_describes_value_shapes() -> None:
+    catalog = {item["label"]: item for item in cli_argument_catalog()}
+
+    assert catalog["--debug"]["kind"] == "flag"
+    assert catalog["--category"]["kind"] == "choice"
+    assert catalog["--category"]["choices"] == ["movie", "tv", "sports", "fanres", "book", "game", "music", "xxx"]
+    assert "-c" in catalog["--category"]["aliases"]
+    assert catalog["--tag"]["kind"] == "multi"
+    assert catalog["--tracker-id"]["kind"] == "append"
+    assert catalog["--tmdb"]["kind"] == "value"
+    assert "--platforms" in catalog["--platform"]["aliases"]
+    assert catalog["--music-enrich"]["conflicts"] == ["--no-music-enrich"]
+    assert catalog["--no-imdb"]["conflicts"] == ["--imdb"]
+    assert "choices" not in catalog["--tmdb"]
 
 
 def test_webui_template_receives_cli_catalog() -> None:
@@ -51,3 +66,12 @@ def test_webui_template_receives_cli_catalog() -> None:
     assert "window.UA_CLI_ARGUMENTS = [{" in html
     assert '"label": "--developer"' in html
     assert '"label": "--tracker-id"' in html
+
+
+def test_webui_catalog_marks_lowercased_choices() -> None:
+    catalog = {item["label"]: item for item in cli_argument_catalog()}
+
+    for option in ("--platform", "--game-subcategory", "--music-media", "--music-release-type"):
+        assert catalog[option]["case_insensitive"] is True
+    assert "case_insensitive" not in catalog["--imghost"]
+    assert "case_insensitive" not in catalog["--category"]

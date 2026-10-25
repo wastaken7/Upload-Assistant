@@ -12,6 +12,7 @@ import aiofiles
 import cli_ui
 import mutagen
 
+from src import webui_events
 from src.cogs.redaction import PathAwareEncoder
 from src.console import logger
 from src.meta import Meta
@@ -182,6 +183,15 @@ def _apply_music_cli_overrides(meta: Meta, release: Any) -> None:
     if genres:
         set_user("genres", genres)
 
+    if meta.music_unknown_release:
+        set_user("unknown_release", True)
+    lineage_path = str(meta.music_lineage or "").strip()
+    if lineage_path:
+        if Path(lineage_path).expanduser().is_file():
+            set_user("lineage", lineage_path)
+        else:
+            logger.warning(f"[yellow]MUSIC: --music-lineage file not found: {lineage_path}[/yellow]")
+
     edition = meta.manual_edition
     if isinstance(edition, list):
         edition = " ".join(str(item).strip() for item in edition if str(item).strip())
@@ -243,12 +253,24 @@ async def _find_discogs_release(meta: Meta, release: Any, token: str) -> str:
         logger.info("[yellow]MUSIC: multiple exact Discogs release matches in unattended mode; skipping Discogs.[/yellow]")
         return ""
     logger.info("[bold yellow]Multiple exact Discogs releases found; select one or 0 to skip:[/bold yellow]")
+    labels: list[str] = []
+    option_details: list[dict[str, str]] = []
     for index, candidate in enumerate(matches, 1):
         details = " / ".join(str(candidate.get(key, "")).strip() for key in ("year", "country", "catno") if str(candidate.get(key, "")).strip())
         logger.info(f"[cyan]{index}.[/cyan] {candidate.get('title', '')} {f'({details})' if details else ''} [dim]ID: {candidate.get('id', '')}[/dim]")
+        labels.append(str(candidate.get("title", "")))
+        identifier = str(candidate.get("id", ""))
+        option_details.append(
+            {
+                "meta": " · ".join(part for part in (details, f"Discogs {identifier}") if part),
+                "link": f"https://www.discogs.com/release/{identifier}" if identifier.isdigit() else "",
+                "link_label": "Discogs",
+            }
+        )
     while True:
         try:
-            choice = (cli_ui.ask_string(f"Discogs release (1-{len(matches)}, 0 to skip): ") or "").strip()
+            with webui_events.numbered_options(labels, actions=[("0", "Skip")], details=option_details):
+                choice = (cli_ui.ask_string(f"Discogs release (1-{len(matches)}, 0 to skip): ") or "").strip()
         except EOFError, KeyboardInterrupt:
             logger.info("[yellow]MUSIC: Discogs selection cancelled; skipping Discogs.[/yellow]")
             return ""

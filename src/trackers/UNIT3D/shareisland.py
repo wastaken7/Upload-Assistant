@@ -13,6 +13,7 @@ import requests
 from babel import Locale
 from babel.core import UnknownLocaleError
 
+from src import webui_events
 from src.audio import AudioManager
 from src.console import logger
 from src.languages import languages_manager
@@ -291,7 +292,14 @@ class ShareIsland(UNIT3D):
             # Prompt for region if not in meta
             if not region_name and (not meta.unattended or meta.unattended_confirm):
                 while True:
-                    region_name = cli_ui.ask_string("ShareIsland: Region code not found for disc. Please enter it manually (mandatory): ")
+                    with webui_events.field_prompt(
+                        "Disc region",
+                        {"Disc": meta.is_disc, "Release": meta.name, "Region": ""},
+                        focus="Region",
+                        hint="Required: the disc's region code, as listed on the tracker.",
+                        placeholder="e.g. USA",
+                    ):
+                        region_name = cli_ui.ask_string("ShareIsland: Region code not found for disc. Please enter it manually (mandatory): ")
                     region_name = region_name.strip().upper() if region_name else None
                     if region_name:
                         break
@@ -300,19 +308,22 @@ class ShareIsland(UNIT3D):
             # Validate region name was provided
             if not region_name:
                 cli_ui.error("Region required; skipping ShareIsland.")
+                webui_events.notice("attention", "Not uploading: a region is required for disc uploads.", tracker=self.tracker)
                 raise ValueError("Region required for disc upload")
 
             # Validate region code with API
             region_id = await self.common.unit3d_region_ids(region_name, tracker=self.tracker)
             if not region_id:
                 cli_ui.error(f"Invalid region code '{region_name}'; skipping ShareIsland.")
+                webui_events.notice("attention", f"Not uploading: region '{region_name}' is not recognized.", tracker=self.tracker)
                 raise ValueError(f"Invalid region code: {region_name}")
 
             # Handle optional distributor
             distributor_name = meta.distributor
             distributor_id = None
             if not distributor_name and not meta.unattended:
-                distributor_name = cli_ui.ask_string("ShareIsland: Distributor (optional, Enter to skip): ")
+                with webui_events.answer_buttons([("", "Skip")]):
+                    distributor_name = cli_ui.ask_string("ShareIsland: Distributor (optional, Enter to skip): ")
                 distributor_name = distributor_name.strip().upper() if distributor_name else None
 
             if distributor_name:

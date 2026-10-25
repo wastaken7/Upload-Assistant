@@ -2,11 +2,16 @@
 
 import re
 from dataclasses import dataclass, replace
-from typing import Literal
+from typing import Any, Literal, cast
 
+import httpx
+
+from src import tmdb
+from src.console import logger
 from src.get_name import NameComponents, build_name_components
 from src.languages import languages_manager
 from src.meta import Meta
+from src.tmdb import get_tmdb_localized_data
 
 DVD_SOURCES = ("PAL DVD", "NTSC DVD", "DVD")
 
@@ -44,7 +49,8 @@ class VideoNameRules:
     hybrid_on_webdl: bool = True
     # The generic name drops a manual year on TV unless the year came from the filename.
     honor_manual_year_on_tv: bool = False
-    # TV titles carry a year only when TVDB disambiguates the series with one, e.g. "Show (2021)".
+    # TV titles carry a year only when TVDB disambiguates the series with one, e.g. "Show (2021)",
+    # or, without a TVDB name, when TMDB lists another show with the same title.
     tv_year_from_tvdb: bool = True
 
 
@@ -52,6 +58,9 @@ class VideoNameRules:
 # 3D right before the source, and no resolution or video codec for DVD-sourced releases.
 BLU_NAME_RULES = VideoNameRules(english_dub_only=True, edition_terms=BLU_EDITION_TERMS)
 
+
+# Search pages read before a homonym check gives up as inconclusive (20 results per page).
+TMDB_HOMONYM_MAX_PAGES = 5
 
 TVDB_TITLE_YEAR = re.compile(r"\((19\d{2}|20\d{2})\)\s*$")
 
@@ -101,13 +110,17 @@ async def build_video_name(meta: Meta, rules: VideoNameRules, tracker: str, comp
     dvd_sourced = (is_disc and meta.is_disc == "DVD") or (name_type == "REMUX" and source in DVD_SOURCES)
 
     year = parts.year
-    if meta.category == "TV" and rules.tv_year_from_tvdb and not meta.no_year:
-        tvdb_year = tvdb_title_year(meta)
-        if tvdb_year is not None:
-            year = tvdb_year
     manual_year = meta.manual_year or 0
     if rules.honor_manual_year_on_tv and manual_year > 0 and not meta.no_year:
         year = str(manual_year)
+    elif meta.category == "TV" and rules.tv_year_from_tvdb and not meta.no_year:
+        tv_year = tvdb_title_year(meta)
+        if tv_year is None:
+            has_homonym = await tmdb_tv_title_has_homonym(meta, parts.title, tmdb.tmdb_api_key or "", tracker)
+            if has_homonym is not None:
+                tv_year = str(meta.year or "").strip() if has_homonym else ""
+        if tv_year is not None:
+            year = tv_year
 
     language = "" if is_disc or not rules.language_slot else await get_language_label(meta, tracker)
     audio = await _get_audio(meta, parts.audio, rules)
@@ -239,3 +252,102 @@ def add_incomplete_pack_marker(name: str, meta: Meta, tracker: str) -> str:
         return f"{match.group(1)}{separator}INCOMPLETE"
 
     return re.sub(pattern, insert, name, count=1, flags=re.IGNORECASE)
+
+
+class TmdbTvNaming:
+    """TV names as TMDB title, IMDb AKA, then year if another show has the same title."""
+
+    tracker: str
+    config: dict[str, Any]
+
+    async def _rebuild_tv_name(self, meta: Meta, name: str) -> str | None:
+        """Rebuild everything before the season/episode. Returns None if the name has neither."""
+        marker = f"{meta.season or ''}{meta.episode or ''}".strip()
+        if not marker or marker not in name:
+            return None
+
+        tmdb_title = await self._tmdb_en_title(meta)
+        aka = "" if meta.no_aka else self._localized_aka(meta, tmdb_title)
+        year = str(meta.year or "").strip() if (not meta.no_year and await self._tv_title_needs_year(meta, tmdb_title)) else ""
+        tail = name.partition(marker)[2]
+        lead = " ".join(part for part in (tmdb_title, aka, year) if part)
+        return " ".join(f"{lead} {marker}{tail}".split())
+
+    async def _tmdb_en_title(self, meta: Meta) -> str:
+        # meta.title can be the TVDB name for non-English shows; these sites use the TMDB one.
+        try:
+            tmdb_main = await get_tmdb_localized_data(meta, data_type="main", language="en-US", append_to_response="")
+        except Exception:
+            tmdb_main = {}
+        data = tmdb_main if isinstance(tmdb_main, dict) else {}
+        title = str(data.get("name") or data.get("title") or "").strip()
+        return title or str(meta.title or "").strip()
+
+    @staticmethod
+    def _localized_aka(meta: Meta, tmdb_title: str) -> str:
+        # English shows use the IMDb title, or its original title if that matches TMDB
+        # (House -> AKA House M.D.). Other shows use IMDb's romanized original title.
+        imdb_info = meta.imdb_info if isinstance(meta.imdb_info, dict) else {}
+        original_language = str(meta.original_language or "").strip().lower()
+        original_language = original_language.split("-")[0].split("(")[0].strip()
+        is_english = original_language in ("en", "eng", "english")
+        tmdb_key = tmdb_title.lower()
+        for key in ("title", "aka") if is_english else ("aka",):
+            aka = str(imdb_info.get(key) or "").strip()
+            if aka and aka.lower() != tmdb_key and aka.lower() not in tmdb_key:
+                return f"AKA {aka}"
+        return ""
+
+    async def _tv_title_needs_year(self, meta: Meta, title: str | None = None) -> bool:
+        title = str(title if title is not None else (meta.title or "")).strip()
+        api_key = str(self.config.get("DEFAULT", {}).get("tmdb_api", "")).strip()
+        return await tmdb_tv_title_has_homonym(meta, title, api_key, self.tracker) is True
+
+
+async def tmdb_tv_title_has_homonym(meta: Meta, title: str, api_key: str, tracker: str) -> bool | None:
+    """Whether TMDB lists another show with exactly this title; None when TMDB cannot tell."""
+    title = title.strip()
+    api_key = api_key.strip()
+    if not title or not api_key:
+        return None
+
+    title_key = " ".join(title.casefold().split())
+    current_id = str(meta.tmdb_id or "")
+    matching_ids: set[str] = set()
+
+    def has_homonym() -> bool:
+        return bool(matching_ids - {current_id, ""}) if current_id else len(matching_ids - {""}) > 1
+
+    logger.info(f"{tracker}: Checking if TMDb has multiple shows with the title '{title}'...")
+    total_pages = 1
+    page = 1
+    async with httpx.AsyncClient() as client:
+        while page <= min(total_pages, TMDB_HOMONYM_MAX_PAGES):
+            try:
+                response = await client.get(
+                    "https://api.themoviedb.org/3/search/tv",
+                    params={"api_key": api_key, "query": title, "language": "en-US", "include_adult": "true", "page": page},
+                )
+                response.raise_for_status()
+                payload_raw: Any = response.json()
+            except httpx.HTTPError, ValueError, TypeError:
+                return None
+
+            payload = cast(dict[str, Any], payload_raw) if isinstance(payload_raw, dict) else {}
+            results_raw: Any = payload.get("results", [])
+            results = cast(list[Any], results_raw) if isinstance(results_raw, list) else []
+            for result_raw in results:
+                if not isinstance(result_raw, dict):
+                    continue
+                result = cast(dict[str, Any], result_raw)
+                names = (result.get("name"), result.get("original_name"))
+                if any(" ".join(str(candidate or "").casefold().split()) == title_key for candidate in names):
+                    matching_ids.add(str(result.get("id", "")))
+            if has_homonym():
+                return True
+            total_pages_raw: Any = payload.get("total_pages", 1)
+            total_pages = total_pages_raw if isinstance(total_pages_raw, int) else 1
+            page += 1
+
+    # Unread pages could still hold a same-titled show.
+    return None if total_pages > TMDB_HOMONYM_MAX_PAGES else False

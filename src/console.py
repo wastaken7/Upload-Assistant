@@ -30,9 +30,20 @@ def _safe_input(prompt: str = "") -> str:
     by using `sys.stdin.readline` natively fixes this at the cost of history and
     advanced editing commands, which aren't needed for our CLI prompts.
     """
+    prompt_id = None
+    if prompt and os.environ.get("UA_WEBUI_GUI_EVENTS") == "1":
+        from src import webui_events
+
+        prompt_id = webui_events.prompt_open("text", prompt)
     sys.stdout.write(prompt)
     sys.stdout.flush()
-    line = sys.stdin.readline()
+    try:
+        line = sys.stdin.readline()
+    finally:
+        if prompt_id is not None:
+            from src import webui_events
+
+            webui_events.prompt_close(prompt_id)
     if not line:
         raise EOFError
     return line.rstrip("\n")
@@ -342,3 +353,125 @@ class DynamicFileHandler(logging.Handler):
 # Add the dynamic file handler to UploadAssistant logger
 dynamic_file_handler = DynamicFileHandler(LogFileFormatter())
 logger.addHandler(dynamic_file_handler)
+
+
+# Most errors are logged at INFO level with red markup, so the log level alone
+# cannot find them. Yellow markup is also used for ordinary progress messages
+# and is therefore left to the terminal; only WARNING-level records count.
+_RED_MARKUP_PREFIX = re.compile(r"^\s*\[(?:bold red|red bold|red|bold #ff0000|#ff0000)\]", re.I)
+_MAX_GUI_NOTICES = 500
+
+
+class GuiNoticeHandler(logging.Handler):
+    """Forward errors and warnings to the Web UI's GUI mode.
+
+    Records logged with ``extra={"ua_gui": False}`` are skipped; they are
+    either decoration or already reported as a structured event.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(level=logging.INFO)
+        self.sent = 0
+        self.item: int | None = None
+
+    def emit(self, record: logging.LogRecord) -> None:
+        if getattr(record, "ua_gui", True) is False:
+            return
+        from src import webui_events
+
+        # The limit applies per queue item, so a noisy item cannot hide later ones.
+        item = webui_events.current_item_index()
+        if item != self.item:
+            self.item = item
+            self.sent = 0
+        if self.sent >= _MAX_GUI_NOTICES:
+            return
+        try:
+            message = record.getMessage()
+            first_line = message.lstrip("\n").split("\n", 1)[0]
+            if record.levelno >= logging.ERROR or _RED_MARKUP_PREFIX.match(first_line):
+                level = "error"
+            elif record.levelno >= logging.WARNING:
+                level = "warning"
+            else:
+                return
+            text = webui_events.plain_text(message, markup=getattr(record, "markup", True) is not False)
+            # Skip box drawing, separators and other lines without words.
+            if sum(char.isalnum() for char in text) < 3:
+                return
+            self.sent += 1
+            webui_events.notice(level, text)
+        except Exception:
+            self.handleError(record)
+
+
+_gui_prompt_events_installed = False
+
+
+def install_gui_prompt_events() -> None:
+    """Announce cli_ui prompts as structured events; answers still go through stdin.
+
+    Called by the upload entry point rather than at import time: importing
+    cli_ui initialises colorama, which must not happen as a side effect of
+    importing this module.
+    """
+    global _gui_prompt_events_installed
+    if _gui_prompt_events_installed or os.environ.get("UA_WEBUI_GUI_EVENTS") != "1":
+        return
+    _gui_prompt_events_installed = True
+    import cli_ui
+
+    from src import webui_events
+
+    def question_text(tokens: tuple[Any, ...]) -> str:
+        return " ".join(str(token) for token in tokens if isinstance(token, str)).strip()
+
+    original_yes_no = cli_ui.ask_yes_no
+    original_string = cli_ui.ask_string
+    original_choice = cli_ui.ask_choice
+    original_select = cli_ui.select_choices
+
+    def ask_yes_no(*question: Any, default: bool = False) -> bool:
+        prompt_id = webui_events.prompt_open("yes_no", question_text(question), default=default)
+        try:
+            return original_yes_no(*question, default=default)
+        finally:
+            webui_events.prompt_close(prompt_id)
+
+    def ask_string(*question: Any, default: str | None = None) -> str | None:
+        prompt_id = webui_events.prompt_open("text", question_text(question), default=default)
+        try:
+            return original_string(*question, default=default)
+        finally:
+            webui_events.prompt_close(prompt_id)
+
+    def ask_choice(*prompt: Any, choices: list[Any], func_desc: Callable[[Any], str] | None = None, sort: bool | None = True) -> Any:
+        describe = func_desc or str
+        # Sort first so the announced order matches the numbers cli_ui prints.
+        if sort:
+            choices.sort(key=describe)
+        prompt_id = webui_events.prompt_open("choice", question_text(prompt), choices=[describe(choice) for choice in choices])
+        try:
+            return original_choice(*prompt, choices=choices, func_desc=func_desc, sort=False)
+        finally:
+            webui_events.prompt_close(prompt_id)
+
+    def select_choices(*prompt: Any, choices: list[Any], func_desc: Callable[[Any], str] | None = None, sort: bool | None = True) -> Any:
+        describe = func_desc or str
+        if sort:
+            choices.sort(key=describe)
+        prompt_id = webui_events.prompt_open("multi_choice", question_text(prompt), choices=[describe(choice) for choice in choices])
+        try:
+            return original_select(*prompt, choices=choices, func_desc=func_desc, sort=False)
+        finally:
+            webui_events.prompt_close(prompt_id)
+
+    cli_ui.ask_yes_no = ask_yes_no
+    cli_ui.ask_string = ask_string
+    cli_ui.ask_choice = ask_choice
+    cli_ui.select_choices = select_choices
+
+
+if os.environ.get("UA_WEBUI_GUI_EVENTS") == "1":
+    gui_notice_handler = GuiNoticeHandler()
+    logger.addHandler(gui_notice_handler)

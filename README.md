@@ -156,7 +156,7 @@ You can specify multiple browse roots by separating them with commas. In this ex
 ua "/path/to/media" --webui
 ```
 
-Open **<http://127.0.0.1:5000>** in a browser on the same computer. On your first visit, create a username and password for the WebUI's local account. This account is separate from your tracker accounts.
+Open **<http://127.0.0.1:5000>** in a browser on the same computer. On your first visit, enter the setup code printed in the terminal, then create a username and password for the WebUI's local account. This account is separate from your tracker accounts.
 
 **Check:** You should see the Upload workspace and be able to browse the folder you supplied.
 
@@ -391,6 +391,7 @@ uv tool install --force git+https://github.com/wastaken7/Upload-Assistant.git
 | <img src="web_ui/static/img/trackers/theleachzone.png" width="16" height="16" />              | The Leach Zone         | THELEACHZONE           | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/theoldschool.png" alt="" width="16" height="16" />       | The Old School         | THEOLDSCHOOL           | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/torrenteros.png" width="16" height="16" />               | Torrenteros            | TORRENTEROS            | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/torrenthaven.png" width="16" height="16" />              | TorrentHaven           | TORRENTHAVEN           | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/torrenthr.png" width="16" height="16" />                 | TorrentHR              | TORRENTHR              | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/torrentleech.png" width="16" height="16" />              | TorrentLeech           | TORRENTLEECH           | MOVIE, TV, BOOK, GAME, MUSIC |
 | <img src="web_ui/static/img/trackers/totheglory.png" width="16" height="16" />                | ToTheGlory             | TOTHEGLORY             | MOVIE, TV                    |
@@ -398,6 +399,7 @@ uv tool install --force git+https://github.com/wastaken7/Upload-Assistant.git
 | <img src="web_ui/static/img/trackers/xingyungept.png" width="16" height="16" />               | XingyungePT            | XINGYUNGEPT            | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/ulcx.png" width="16" height="16" />                      | ULCX                   | ULCX                   | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/utopia.png" width="16" height="16" />                    | UTOPIA                 | UTOPIA                 | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/vultu.png" width="16" height="16" />                     | vultu                  | VULTU                  | MOVIE, TV, GAME              |
 | <img src="web_ui/static/img/trackers/yuscene.png" width="16" height="16" />                   | YUSCENE                | YUSCENE                | MOVIE, TV, BOOK, GAME, MUSIC |
 | <img src="web_ui/static/img/trackers/zenith.png" width="16" height="16" />                    | Zenith                 | ZENITH                 | MOVIE, TV, BOOK, GAME, MUSIC |
 
@@ -444,7 +446,7 @@ This branch introduces new media categories and automation features not present 
 
 ### 2. Audio Stream Spectrogram Generation
 
-- **Spectrogram Extraction & Plotting**: Use `-as` / `--audio-spectrogram` to automatically extract audio streams from MKVs, Blu-ray BDInfo, music tracks, or audiobook chapters using FFmpeg and plot frequency/time graphs (inferno theme) via `librosa` and `matplotlib`. Music and audiobook processing is capped by `audio_spectrogram_max_files`.
+- **Spectrogram Extraction & Plotting**: Use `-as` / `--audio-spectrogram` to automatically extract audio streams from MKVs, Blu-ray BDInfo, music tracks, or audiobook chapters using FFmpeg and plot frequency/time graphs with FFmpeg at each stream's native sample rate (stereo channels shown separately, surround downmixed to mono). Music and audiobook processing is capped by `audio_spectrogram_max_files`.
 - **Dynamic HDR Metadata Plots**: Use `--dynamic-hdr-plot` to create and upload separate Dolby Vision and HDR10+ metadata plots. The required `dovi_tool` and `hdr10plus_tool` binaries are downloaded automatically for the current platform on first use.
 - **Automated Upload**: Automatically uploads generated spectrograms along with your screenshots for release verification.
 - **Stream Selection**: Supports targeting specific tracks using `-ast` / `--audio-spectrogram-tracks` (e.g., track indexes or `all`).

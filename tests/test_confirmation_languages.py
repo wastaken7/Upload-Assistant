@@ -24,13 +24,9 @@ def test_detected_languages_survive_repeated_confirmation_corrections(tmp_path, 
     init_meta(prep, meta, "cli")
     release_dir = tmp_path / "tmp" / meta.uuid
     if is_disc == "BDMV":
-        (release_dir / "BD_SUMMARY_00.txt").write_text(
-            "Audio: English / Dolby Digital / 2.0 / 48 kHz / 640 kbps\nSubtitle: Spanish / 20 kbps\n", encoding="utf-8"
-        )
+        (release_dir / "BD_SUMMARY_00.txt").write_text("Audio: English / Dolby Digital / 2.0 / 48 kHz / 640 kbps\nSubtitle: Spanish / 20 kbps\n", encoding="utf-8")
     else:
-        (release_dir / "MEDIAINFO.txt").write_text(
-            "Audio\nFormat : E-AC-3\nLanguage : English\nText\nFormat : UTF-8\nLanguage : Spanish\n", encoding="utf-8"
-        )
+        (release_dir / "MEDIAINFO.txt").write_text("Audio\nFormat : E-AC-3\nLanguage : English\nText\nFormat : UTF-8\nLanguage : Spanish\n", encoding="utf-8")
     ask_string = Mock(side_effect=AssertionError("Detected languages must not prompt for manual input"))
     monkeypatch.setattr("src.languages.cli_ui.ask_string", ask_string)
     manager = LanguagesManager()
@@ -52,9 +48,7 @@ def test_detected_languages_survive_repeated_confirmation_corrections(tmp_path, 
         assert meta.service == "AMZN"
         common = Common(config)
         assert asyncio.run(common.check_language_requirements(meta, "LST", ["English"], check_audio=True, check_subtitle=True, prompt_on_failure=False))
-        assert asyncio.run(common.check_language_requirements(
-            meta, "AITHER", [], original_language=True, original_required=True, prompt_on_failure=False
-        ))
+        assert asyncio.run(common.check_language_requirements(meta, "AITHER", [], original_language=True, original_required=True, prompt_on_failure=False))
     ask_string.assert_not_called()
 
 
@@ -64,9 +58,7 @@ def test_manually_entered_languages_survive_confirmation_correction(tmp_path, mo
     original_args = [str(tmp_path / "Release.mkv")]
     meta, _, _ = Args(config).parse(original_args, Meta(base_dir=str(tmp_path), category="MOVIE"))
     init_meta(prep, meta, "cli")
-    (tmp_path / "tmp" / meta.uuid / "MEDIAINFO.txt").write_text(
-        "Audio\nFormat : E-AC-3\nText\nFormat : UTF-8\n", encoding="utf-8"
-    )
+    (tmp_path / "tmp" / meta.uuid / "MEDIAINFO.txt").write_text("Audio\nFormat : E-AC-3\nText\nFormat : UTF-8\n", encoding="utf-8")
     ask_string = Mock(side_effect=["English, French", "Spanish"])
     monkeypatch.setattr("src.languages.cli_ui.ask_string", ask_string)
     manager = LanguagesManager()
@@ -117,9 +109,7 @@ def test_hardcoded_subtitle_correction_updates_checked_languages(tmp_path, monke
         assert meta.no_subs is False
         assert meta.audio_languages == ["English"]
         assert bool(meta.write_audio_languages) is manual_audio
-        assert asyncio.run(Common(config).check_language_requirements(
-            meta, "LST", [language], check_subtitle=True, prompt_on_failure=False
-        ))
+        assert asyncio.run(Common(config).check_language_requirements(meta, "LST", [language], check_subtitle=True, prompt_on_failure=False))
     assert ask_string.call_count == int(manual_audio)
 
 
@@ -134,9 +124,7 @@ def test_category_correction_runs_previously_inapplicable_language_check(tmp_pat
     )
     meta, _, _ = Args(config).parse(original_args, Meta(base_dir=str(tmp_path), category=initial_category, original_language="English"))
     init_meta(prep, meta, "cli")
-    (tmp_path / "tmp" / meta.uuid / "MEDIAINFO.txt").write_text(
-        "Audio\nFormat : E-AC-3\nLanguage : English\nText\nFormat : UTF-8\nLanguage : Spanish\n", encoding="utf-8"
-    )
+    (tmp_path / "tmp" / meta.uuid / "MEDIAINFO.txt").write_text("Audio\nFormat : E-AC-3\nLanguage : English\nText\nFormat : UTF-8\nLanguage : Spanish\n", encoding="utf-8")
     ask_string = Mock(side_effect=AssertionError("Detected languages must not prompt for manual input"))
     monkeypatch.setattr("src.languages.cli_ui.ask_string", ask_string)
     manager = LanguagesManager()
@@ -154,7 +142,23 @@ def test_category_correction_runs_previously_inapplicable_language_check(tmp_pat
     assert meta.language_checked is True
     assert meta.audio_languages == ["English"]
     assert meta.subtitle_languages == ["Spanish"]
-    assert asyncio.run(Common(config).check_language_requirements(
-        meta, "AITHER", [], original_language=True, original_required=True, prompt_on_failure=False
-    ))
+    assert asyncio.run(Common(config).check_language_requirements(meta, "AITHER", [], original_language=True, original_required=True, prompt_on_failure=False))
     ask_string.assert_not_called()
+
+
+def test_mkv_cover_attachment_is_not_parsed_as_audio_track(tmp_path):
+    meta = Meta(base_dir=str(tmp_path), uuid="Fictional.Movie.2001")
+    release_dir = tmp_path / "tmp" / meta.uuid
+    release_dir.mkdir(parents=True)
+    (release_dir / "MEDIAINFO.txt").write_text(
+        "General\nFormat : Matroska\n\nAudio\nFormat : AAC\nTitle : Stereo\n\nImage\nType : Cover\nTitle : cover.jpg\nFormat : JPEG\nMuxing mode : Attachment\n",
+        encoding="utf-8",
+    )
+    parsed = asyncio.run(LanguagesManager().parsed_mediainfo(meta))
+    assert parsed["audio"] == [{"format": "AAC", "title": "Stereo"}]
+
+
+def test_description_mediainfo_parser_ignores_cover_attachment():
+    mediainfo_text = "Audio\nFormat : AAC\nTitle : Stereo\n\nImage\nType : Cover\nTitle : cover.jpg\nFormat : JPEG\n"
+    parsed = Common.MediaInfoParser().parse_mediainfo(mediainfo_text)
+    assert parsed["audio"] == [{"format": "AAC", "title": "Stereo"}]

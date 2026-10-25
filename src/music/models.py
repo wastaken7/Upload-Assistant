@@ -54,6 +54,14 @@ class AudioTrack:
     genre: list[str] = field(default_factory=list)
     isrc: str = ""
     tags: dict[str, list[str]] = field(default_factory=dict)
+    # Encoder evidence (LAME header for MP3) used to label presets such as V0.
+    encoder_info: str = ""
+    encoder_settings: str = ""
+    # Bytes used by embedded pictures plus metadata padding.  Trackers limit
+    # this per file, so it is measured without changing the file.
+    embedded_image_bytes: int = 0
+    # True when an ID3 header or ID3v1 footer is wrapped around a FLAC stream.
+    has_id3_tags: bool = False
 
 
 @dataclass

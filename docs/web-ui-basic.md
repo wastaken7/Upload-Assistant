@@ -25,7 +25,7 @@ The File Browser only exposes configured browse roots. They can be supplied as:
 
 ## 2. Create the local account
 
-The first visit opens account setup. Choose the username and a strong password for the single local WebUI account. Later visits open the sign-in page.
+The first visit opens account setup. Enter the setup code printed in the Upload Assistant console output (`docker logs` for containers), then choose the username and a strong password for the single local WebUI account. Later visits open the sign-in page.
 
 The account can optionally use Remember me, authenticator-app two-factor authentication (2FA), and one-time recovery codes.
 

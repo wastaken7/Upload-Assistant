@@ -10,6 +10,7 @@ import sys
 import unicodedata
 from collections.abc import Callable
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 from typing import Any, cast
 
 import aiofiles
@@ -22,6 +23,7 @@ from langcodes import tag_parser
 from torf import Torrent
 from unidecode import unidecode
 
+from src import webui_events
 from src.api_key_expiry import observe_tracker_response
 from src.bbcode import BBCODE
 from src.console import console, logger, prompt_in_thread
@@ -357,6 +359,7 @@ class Common:
     ) -> str | None:
         path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{tracker}_cross].torrent" if cross else f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{tracker}].torrent"
         if downurl:
+            temporary_path: Path | None = None
             try:
                 cookie_jar = None
                 from src.trackersetup import http_trackers
@@ -373,9 +376,14 @@ class Common:
                     session.stream("GET", downurl) as r,
                 ):
                     r.raise_for_status()
-                    async with aiofiles.open(path, "wb") as f:
+                    with NamedTemporaryFile(dir=Path(path).parent, prefix=f".{Path(path).name}.", suffix=".tmp", delete=False) as temporary_file:
+                        temporary_path = Path(temporary_file.name)
+                    async with aiofiles.open(temporary_path, "wb") as f:
                         async for chunk in r.aiter_bytes():
                             await f.write(chunk)
+
+                await asyncio.to_thread(Torrent.read, temporary_path)
+                temporary_path.replace(path)
 
                 if cross:
                     return None
@@ -388,6 +396,10 @@ class Common:
                 logger.warning(f"[yellow]Warning: Could not download torrent file: {e!s}[/yellow]")
                 logger.info("[yellow]Download manually from the tracker.[/yellow]")
                 return None
+            finally:
+                if temporary_path is not None:
+                    with contextlib.suppress(OSError):
+                        temporary_path.unlink(missing_ok=True)
 
         return None
 
@@ -577,7 +589,8 @@ class Common:
 
         if not meta.unattended:
             try:
-                selection = (await prompt_in_thread(cli_ui.ask_string, f"Do you want to use these IDs from {tracker_name}? (Y/n): ", default="") or "").strip().lower()
+                with webui_events.answer_buttons([("y", "Yes"), ("n", "No")]):
+                    selection = (await prompt_in_thread(cli_ui.ask_string, f"Do you want to use these IDs from {tracker_name}? (Y/n): ", default="") or "").strip().lower()
                 return selection == "" or selection == "y" or selection == "yes"
             except KeyboardInterrupt, EOFError:
                 sys.exit(1)
@@ -587,7 +600,8 @@ class Common:
     async def prompt_user_for_confirmation(self, message: str, meta: Meta | None = None) -> bool:
         if meta and meta.unattended and not meta.unattended_confirm:
             return False
-        response = (await prompt_in_thread(cli_ui.ask_string, f"{message} (Y/n): ", default="") or "").strip().lower()
+        with webui_events.answer_buttons([("y", "Yes"), ("n", "No")]):
+            response = (await prompt_in_thread(cli_ui.ask_string, f"{message} (Y/n): ", default="") or "").strip().lower()
         return response == "" or response == "y"
 
     async def _apply_region_distributor(self, meta: Meta, attributes: dict[str, Any], tracker: str = "") -> None:
@@ -809,9 +823,11 @@ class Common:
                     if meta.unattended:
                         return tmdb, imdb, tvdb, mal, description, category, infohash, imagelist, file_name
                     logger.info("[cyan]Do you want to edit, discard or keep the description?[/cyan]")
-                    edit_choice = cli_ui.ask_string("Enter 'e' to edit, 'd' to discard, or press Enter to keep it as is:")
+                    question, buttons = webui_events.letter_prompt([("e", "edit"), ("d", "discard")], "keep it as is")
+                    with webui_events.answer_buttons(buttons):
+                        edit_choice = cli_ui.ask_string(question)
 
-                    if (edit_choice or "").lower() == "e":
+                    if (edit_choice or "").lower() == "e" and webui_events.editor_available():
                         edited_description = cast(str | None, click.edit(cast(Any, description)))
                         if edited_description:
                             description = edited_description.strip()
@@ -929,7 +945,9 @@ class Common:
     class MediaInfoParser:
         def parse_mediainfo(self, mediainfo_text: str) -> dict[str, Any]:
             # Patterns for matching sections and fields
-            section_pattern = re.compile(r"^(General|Video|Audio|Text|Menu)(?:\s#\d+)?", re.IGNORECASE)
+            # Include every MediaInfo stream kind so attachments (Image) and Other
+            # sections are not merged into the preceding audio or text track.
+            section_pattern = re.compile(r"^(General|Video|Audio|Text|Other|Image|Menu)(?:\s#\d+)?$", re.IGNORECASE)
             parsed_data: dict[str, Any] = {"general": {}, "video": [], "audio": [], "text": []}
             current_section: str | None = None
             current_track: dict[str, str] = {}

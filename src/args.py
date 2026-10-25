@@ -209,21 +209,89 @@ class CustomArgumentParser(argparse.ArgumentParser):
 
 
 @lru_cache(maxsize=1)
-def cli_argument_catalog() -> tuple[dict[str, str], ...]:
-    """Expose the parser's actual long options and help text to the WebUI."""
+def _reference_parser() -> argparse.ArgumentParser:
+    """Build the real parser once, to read its options without parsing a run."""
     from src.meta import Meta
 
     _, parser, _ = Args({"DEFAULT": {"screens": 1}}).parse(["--webui"], Meta())
-    catalog = []
+    return parser
+
+
+def _webui_argument_kind(action: argparse.Action) -> str:
+    """Tell the WebUI which control edits an option: a toggle, a list, or text."""
+    if action.nargs == 0:
+        return "flag"
+    if action.choices:
+        return "choice"
+    if isinstance(action, argparse._AppendAction):
+        return "append"
+    if action.nargs in ("*", "+"):
+        return "multi"
+    return "value"
+
+
+def _webui_argument_conflicts(parser: argparse.ArgumentParser) -> dict[int, set[str]]:
+    """Map each action to the long options it cannot be combined with."""
+    conflicts: dict[int, set[str]] = {}
+
+    def link(actions: list[argparse.Action]) -> None:
+        for action in actions:
+            others = {option for other in actions if other is not action for option in other.option_strings if option.startswith("--")}
+            conflicts.setdefault(id(action), set()).update(others)
+
+    for group in parser._mutually_exclusive_groups:
+        link(list(group._group_actions))
+    by_dest: dict[str, list[argparse.Action]] = {}
+    for action in parser._actions:
+        by_dest.setdefault(action.dest, []).append(action)
+    for actions in by_dest.values():
+        # Opposite switches such as --music-enrich and --no-music-enrich share a dest.
+        if len(actions) > 1:
+            link(actions)
+    return conflicts
+
+
+@lru_cache(maxsize=1)
+def cli_argument_catalog() -> tuple[dict[str, Any], ...]:
+    """Expose the parser's actual long options, help text and value shape to the WebUI."""
+    parser = _reference_parser()
+    conflicts = _webui_argument_conflicts(parser)
+    catalog: list[dict[str, Any]] = []
     for action in parser._actions:
         for option in action.option_strings:
             if not option.startswith("--") or option in WEBUI_UNSUPPORTED_OPTIONS:
                 continue
-            item = {"label": option, "description": "" if action.help == argparse.SUPPRESS else str(action.help or "")}
+            item: dict[str, Any] = {
+                "label": option,
+                "description": "" if action.help == argparse.SUPPRESS else str(action.help or ""),
+                "kind": _webui_argument_kind(action),
+            }
             if action.nargs != 0:
                 item["placeholder"] = str(action.metavar or action.dest).upper()
+            if action.choices:
+                item["choices"] = [str(choice) for choice in action.choices]
+                # argparse converts with `type` before checking choices, so "PC" is valid here.
+                if action.type in (str.lower, str.casefold):
+                    item["case_insensitive"] = True
+            aliases = [other for other in action.option_strings if other != option]
+            if aliases:
+                item["aliases"] = aliases
+            if conflicts.get(id(action)):
+                item["conflicts"] = sorted(conflicts[id(action)])
             catalog.append(item)
     return tuple(catalog)
+
+
+@lru_cache(maxsize=1)
+def cli_option_choices() -> dict[str, tuple[str, ...]]:
+    """Return the accepted values of each long option that has a fixed list."""
+    return {
+        option: tuple(str(choice) for choice in action.choices)
+        for action in _reference_parser()._actions
+        if action.choices
+        for option in action.option_strings
+        if option.startswith("--")
+    }
 
 
 def tracker_cli_aliases(config: Mapping[str, Any]) -> dict[str, str]:
@@ -511,6 +579,48 @@ class Args:
             "--music-release-year", nargs=1, required=False, help="MUSIC: concrete release/pressing year (not the original group year)", dest="music_release_year"
         )
         parser.add_argument("--music-edition-year", nargs=1, required=False, help="MUSIC: remaster/reissue/edition year", dest="music_edition_year")
+        parser.add_argument(
+            "--music-unknown-release",
+            action="store_true",
+            default=None,
+            help="MUSIC: mark the edition as Unknown Release when its year, label and catalogue cannot be established",
+            dest="music_unknown_release",
+        )
+        parser.add_argument(
+            "--music-artist-role",
+            nargs=1,
+            required=False,
+            metavar="NAME=ROLE",
+            help="MUSIC: extra artist credits as 'Name=role; Name=role' (main, guest, composer, conductor, dj, remixer, producer, arranger)",
+            dest="music_artist_roles",
+        )
+        parser.add_argument(
+            "--music-request-id", nargs=1, required=False, metavar="ID_OR_URL", help="MUSIC: Orpheus request to fill with this upload (checked first)", dest="music_request_id"
+        )
+        parser.add_argument(
+            "--music-group-id", nargs=1, required=False, metavar="ID_OR_URL", help="MUSIC: existing Orpheus torrent group to add this upload to", dest="music_group_id"
+        )
+        parser.add_argument(
+            "--music-watermark",
+            nargs=1,
+            required=False,
+            metavar="NOTE",
+            help="MUSIC: describe watermarks or voice-overs in the release (required disclosure)",
+            dest="music_watermark",
+        )
+        parser.add_argument(
+            "--music-lineage", nargs=1, required=False, metavar="PATH", help="MUSIC: text file with source lineage for the release description", dest="music_lineage"
+        )
+        parser.add_argument(
+            "--music-showcase", action="store_true", default=None, help="MUSIC: Orpheus Showcase release (your own work or on behalf of the artist)", dest="music_showcase"
+        )
+        parser.add_argument(
+            "--music-check-log",
+            action="store_true",
+            default=None,
+            help="MUSIC: score rip logs with the Orpheus logchecker before uploading",
+            dest="music_check_log",
+        )
         parser.add_argument("--music-label", nargs=1, required=False, help="MUSIC: label for this release", dest="music_label")
         parser.add_argument("--music-catalogue-number", nargs=1, required=False, help="MUSIC: catalogue number for this release", dest="music_catalogue_number")
         parser.add_argument("--music-genre", nargs=1, required=False, help="MUSIC: comma-separated genre override", dest="music_genres")

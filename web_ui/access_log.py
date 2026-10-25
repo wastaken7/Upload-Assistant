@@ -7,6 +7,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from web_ui.auth import write_private_text
+
 DEFAULT_LEVEL = "access_denied"  # default: log only failed/denied attempts
 VALID_LEVELS = {"access_denied", "access", "disabled"}
 
@@ -47,7 +49,7 @@ class AccessLogger:
                 data = {}
             data["access_log_level"] = level
             # write back safely
-            self.user_file.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+            write_private_text(self.user_file, json.dumps(data, ensure_ascii=False, indent=2))
             return True
         except Exception:
             return False

@@ -1,4 +1,5 @@
 import pytest
+
 from src.meta import Meta
 from src.prep_helpers import check_pre_release
 from src.trackers.UNIT3D.ulcx import ULCX
@@ -214,3 +215,33 @@ async def test_ulcx_audio_subtitle_mediainfo_rules():
         },
     )
     assert await tracker.get_additional_checks(meta_default_sub_non_personal) is True
+
+
+TRUEHD_ATMOS = {"@type": "Audio", "Format": "MLP FBA", "Format_Commercial_IfAny": "Dolby TrueHD with Dolby Atmos", "Format_AdditionalFeatures": "16-ch", "Channels": "8", "Channels_Original": "Object Based"}
+DTS_HD_MA = {"@type": "Audio", "Format": "DTS", "Format_Commercial_IfAny": "DTS-HD Master Audio", "Format_AdditionalFeatures": "XLL", "Channels": "6"}
+DTS_X = {"@type": "Audio", "Format": "DTS", "Format_Commercial_IfAny": "DTS-HD Master Audio", "Format_AdditionalFeatures": "XLL X", "Channels": "8", "Channels_Original": "Object Based"}
+DTS_HD_HRA = {"@type": "Audio", "Format": "DTS", "Format_Commercial_IfAny": "DTS-HD High Resolution Audio", "Format_AdditionalFeatures": "XBR", "Channels": "6"}
+AC3_CORE = {"@type": "Audio", "Format": "AC-3", "Channels": "6"}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("tracks", [[TRUEHD_ATMOS, AC3_CORE], [DTS_HD_MA], [DTS_X]], ids=["truehd-atmos", "dts-hd-ma", "dts-x"])
+async def test_ulcx_rejects_lossless_multichannel_on_1080p_encode(tracks):
+    meta = make_ulcx_meta(type="ENCODE", mediainfo={"media": {"track": tracks}})
+    assert await make_ulcx().get_additional_checks(meta) is False
+
+
+@pytest.mark.asyncio
+async def test_ulcx_allows_lossy_dts_on_1080p_and_lossless_on_2160p_encode():
+    tracker = make_ulcx()
+    meta_hra = make_ulcx_meta(type="ENCODE", mediainfo={"media": {"track": [DTS_HD_HRA]}})
+    assert await tracker.get_additional_checks(meta_hra) is True
+
+    meta_uhd = make_ulcx_meta(type="ENCODE", resolution="2160p", video_height=2160, video_width=3840, mediainfo={"media": {"track": [TRUEHD_ATMOS, AC3_CORE]}})
+    assert await tracker.get_additional_checks(meta_uhd) is True
+
+
+@pytest.mark.asyncio
+async def test_ulcx_truehd_from_mediainfo_needs_ac3_track():
+    meta = make_ulcx_meta(type="ENCODE", resolution="2160p", video_height=2160, video_width=3840, mediainfo={"media": {"track": [TRUEHD_ATMOS]}})
+    assert await make_ulcx().get_additional_checks(meta) is False

@@ -72,24 +72,38 @@
       id: "amethyst",
       label: "Amethyst",
       description: "Slate purple and lavender",
+      swatch: ["#1a1226", "#a78bfa"],
     },
     {
       id: "charcoal",
       label: "Charcoal",
       description: "Neutral charcoal and blue",
+      swatch: ["#1a1d1f", "#3b82f6"],
     },
     {
       id: "evergreen",
       label: "Evergreen",
       description: "Deep green and teal",
+      swatch: ["#0d1b17", "#10b981"],
     },
-    { id: "graphite", label: "Graphite", description: "Cool blue graphite" },
+    {
+      id: "graphite",
+      label: "Graphite",
+      description: "Cool blue graphite",
+      swatch: ["#111827", "#38bdf8"],
+    },
     {
       id: "midnight",
       label: "Midnight",
       description: "Near-black and indigo",
+      swatch: ["#0d1220", "#818cf8"],
     },
-    { id: "obsidian", label: "Obsidian", description: "Copper and gold" },
+    {
+      id: "obsidian",
+      label: "Obsidian",
+      description: "Copper and gold",
+      swatch: ["#1c1917", "#d97706"],
+    },
   ]);
   const UA_INTERFACE_STYLES = Object.freeze([
     { id: "rounded", label: "Rounded" },
@@ -2035,11 +2049,156 @@
     }
   }
 
+  // Shared Appearance controls: theme swatches, corner style and mode toggles.
+  function UAAppearanceControls({
+    colorTheme,
+    onColorThemeChange,
+    interfaceStyle,
+    onInterfaceStyleChange,
+    isDarkMode,
+    onToggleMode,
+    labelClassName = "",
+  }) {
+    const h = React.createElement;
+    const label = (text) =>
+      h(
+        "div",
+        {
+          className: `ua-appearance-label text-xs font-semibold ${labelClassName}`,
+        },
+        text,
+      );
+    const activeTheme = UA_THEMES.find((theme) => theme.id === colorTheme);
+    const segment = ({ key, active, title, onClick, children }) =>
+      h(
+        "button",
+        {
+          key,
+          type: "button",
+          "aria-pressed": active,
+          "aria-label": title,
+          title,
+          className: "ua-appearance-segment",
+          "data-active": active ? "true" : "false",
+          onClick,
+        },
+        children,
+      );
+
+    return h(
+      "div",
+      { className: "ua-appearance-controls" },
+      h(
+        "div",
+        { className: "flex items-baseline justify-between gap-2" },
+        label("Color theme"),
+        activeTheme &&
+          h(
+            "span",
+            { className: "ua-appearance-value text-xs" },
+            activeTheme.label,
+          ),
+      ),
+      h(
+        "div",
+        {
+          className: "ua-appearance-swatches",
+          role: "group",
+          "aria-label": "Color theme",
+        },
+        UA_THEMES.map((theme) => {
+          const active = theme.id === colorTheme;
+          const [base, accent] = theme.swatch;
+          return h(
+            "button",
+            {
+              key: theme.id,
+              type: "button",
+              "aria-pressed": active,
+              "aria-label": theme.label,
+              title: `${theme.label} — ${theme.description}`,
+              className: "ua-appearance-swatch",
+              "data-active": active ? "true" : "false",
+              style: {
+                background: `linear-gradient(135deg, ${base} 0 50%, ${accent} 50% 100%)`,
+              },
+              onClick: () => onColorThemeChange(theme.id),
+            },
+            active &&
+              h(UALucideIcon, {
+                name: "check",
+                className: "ua-appearance-swatch-check h-3.5 w-3.5",
+              }),
+          );
+        }),
+      ),
+      h(
+        "div",
+        { className: "ua-appearance-row" },
+        h(
+          "div",
+          null,
+          label("Corners"),
+          h(
+            "div",
+            {
+              className: "ua-appearance-segments",
+              role: "group",
+              "aria-label": "Corner style",
+            },
+            UA_INTERFACE_STYLES.map((style) =>
+              segment({
+                key: style.id,
+                active: style.id === interfaceStyle,
+                title: style.label,
+                onClick: () => onInterfaceStyleChange(style.id),
+                children: h("span", {
+                  className: "ua-appearance-corner-glyph",
+                  "data-shape": style.id,
+                  "aria-hidden": true,
+                }),
+              }),
+            ),
+          ),
+        ),
+        h(
+          "div",
+          null,
+          label("Mode"),
+          h(
+            "div",
+            {
+              className: "ua-appearance-segments",
+              role: "group",
+              "aria-label": "Color mode",
+            },
+            [
+              ["light", "Light mode", "sun", false],
+              ["dark", "Dark mode", "moon", true],
+            ].map(([key, title, icon, dark]) =>
+              segment({
+                key,
+                active: isDarkMode === dark,
+                title,
+                onClick: () => {
+                  if (isDarkMode !== dark) onToggleMode();
+                },
+                children: h(UALucideIcon, { name: icon, className: "h-4 w-4" }),
+              }),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   // Expose as globals for non-module usage by existing scripts.
   if (typeof window !== "undefined") {
     window.UAStorage = window.UAStorage || uaStorage;
     window.UAThemes = window.UAThemes || UA_THEMES;
     window.UAInterfaceStyles = window.UAInterfaceStyles || UA_INTERFACE_STYLES;
+    window.UAAppearanceControls =
+      window.UAAppearanceControls || UAAppearanceControls;
     window.UAHelpResourceGroups =
       window.UAHelpResourceGroups || UA_HELP_RESOURCE_GROUPS;
     window.getUAStoredTheme = window.getUAStoredTheme || getUAStoredTheme;

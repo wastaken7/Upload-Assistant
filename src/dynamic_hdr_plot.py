@@ -65,7 +65,7 @@ def _fingerprint(sources: list[Path], formats: list[str]) -> str:
 
 
 def _run(command: list[str]) -> None:
-    result = subprocess.run(command, capture_output=True, text=True, check=False)  # noqa: S603
+    result = subprocess.run(command, capture_output=True, text=True, encoding="utf-8", errors="replace", check=False)  # noqa: S603
     if result.returncode:
         detail = (result.stderr or result.stdout).strip()
         raise RuntimeError(detail or f"{' '.join(command[:2])} failed with exit code {result.returncode}")

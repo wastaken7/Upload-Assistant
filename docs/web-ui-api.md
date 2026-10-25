@@ -38,6 +38,30 @@ Statistics contain no per-release events, names, paths, release-group names or t
   - JSON values must use double quotes. When sending Windows paths from shells that perform quoting/escaping (PowerShell, cmd.exe), backslashes need special handling (escape them or use forward slashes). To avoid brittle quoting, prefer one of the approaches in the examples below.
   - The server attempts tolerant parsing: it accepts JSON, form-encoded bodies, or will attempt conservative normalization of raw bodies to extract `path` and `session_id` if standard JSON parsing fails. However, relying on correct JSON or a file payload is recommended for reliability.
 - Response: SSE stream on success. On immediate validation or parse errors the API returns JSON like {"error":"...","success":false} (HTTP 4xx/5xx as appropriate).
+- Structured run events: besides `html` terminal output, the stream carries `{"type":"gui","data":{...}}` events, which the WebUI's GUI output mode uses. `data.kind` is one of:
+
+  | `kind`         | Fields                                                                                                                                              |
+  | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | `item`         | `index`, `total`, `name`, optional `personal_release`, `run_options` — a queue item started or updated after metadata preparation                   |
+  | `stage`        | `key` (`prep`, `confirm`, `dupes`, `screens`, `torrent`, `upload`, `requests`), `status` (`start`, `done`, `skip`, `fail`)                          |
+  | `notice`       | `level` (`error`, `warning`, `attention`), `text`, optional `tracker`, `key`                                                                        |
+  | `notice_group` | `group`, `notices` — replaces the earlier notices of that group                                                                                     |
+  | `prompt`       | `action` (`open`, `close`), `id`; on open: `type` (`yes_no`, `choice`, `text`), `question`, optional `choices`, `default`, `context`                |
+  | `dupes`        | `tracker`, `entries` (`name`, optional `link`, `size`, `diff_pct`, `color`: hex size-difference colour), `note`, `trumpable`                        |
+  | `dupe_review`  | `trackers` needing manual review, `started` in actual review order, `checking` — unresolved checks in this item                                     |
+  | `slot`         | `tracker`, `verdict` (`allow`, `review`, `block`), `title`, `reason`; optional `slot`, `why`, `conflicts` (entries as in `dupes`), `notes`, `rules` |
+  | `tracker`      | `tracker`, `status` (`pending`, `success`, `failed`, `skipped`, `dupe`, `banned`), optional `link`, `torrent_id`, `message`, `duration`             |
+  | `request`      | `tracker`, `name`, `exact`, optional `link`, `reward`, `status`                                                                                     |
+
+  Every event has `ts` and, inside a queue, `item`. Text is plain (no markup) and redacted. Answers to prompts still go through `/api/input`.
+
+  `item.run_options` carries resolved booleans `debug`, `no_seed`, `skip_imghost_upload`, `nohash`, `ffdebug`, `client_disabled`, plus plain-text `category` and `prep_directory`. It is published before preparation and refreshed at confirmation, including unattended runs. The Debug Run badge explains active skip flags; client addition and image-host uploads can still occur when their skip options are disabled.
+
+  Tracker check prompts include `context.tracker` and `context.check_messages` when explanations are available. The GUI shows these messages before the upload decision; a declined check retains its explanation in the tracker's result `message`.
+
+  During duplicate review, the GUI counts trackers requiring manual decisions, including slot-rule overrides and trumping. Several questions for one tracker count as one review. A `+` after the total and “Still checking trackers…” mean discovery is incomplete; the total becomes final once `checking` reaches zero. Review state is isolated to each queue item and upload session.
+
+  The final `dupe_clear` confirmation includes `context.client_skipped_trackers`, a list of selected trackers actually removed because they were found in the torrent client. The upload question contains only the upload targets; a separate, always-expanded **Skipped** panel groups possible duplicates, tracker-rule skips and client skips. Empty groups and an empty panel are omitted. The client-skip list resets for each run item and stays empty in debug mode, where client matches are retained for checks.
 
 Examples
 
@@ -284,4 +308,5 @@ Notes & security model summary:
 
 - Web session authentication (login + encrypted session cookie) is required for any endpoints that modify server state (config, tokens, IP lists, enabling/disabling 2FA). Bearer tokens are intended for programmatic calls and are accepted only on a subset of read/execute endpoints; tokens are validated as valid/invalid (no per-token scope enforcement).
 - CSRF protection: state-changing endpoints invoked from the browser require a per-session CSRF token passed in a header (see `/api/csrf_token`). Token management endpoints explicitly disallow Basic/Bearer auth to ensure management is performed from the authenticated UI with CSRF protection.
+- HTTP Basic auth is rejected while 2FA is enabled, because it cannot carry a second factor. Use a Bearer API token for programmatic access.
 - Rate limits: defaults apply to routes without an override or exemption. Counters are separate per endpoint and client IP; most explicitly limited API routes also distinguish authenticated and unauthenticated requests. See [Request limits](web-ui.md#request-limits) for the full table and HTTP 429 behaviour.

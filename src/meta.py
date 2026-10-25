@@ -12,6 +12,7 @@ _TRACKER_ID_ALIASES = {
     "BLU": "BLUTOPIA",
     "BTN": "BROADCASTHENET",
     "DVL": "DREADVAULT",
+    "THN": "TORRENTHAVEN",
     "BROADCASTHENET": "BROADCASTHENET",
     "HDB": "HDBITS",
     "HUNO": "HAWKEUNO",
@@ -99,6 +100,7 @@ class Meta:
     clean_name: str = ""
     cleanup: bool = False
     client: str | None = None
+    client_skipped_trackers: list[str] = field(default_factory=list)
     combined_genres: list[str] | str = field(default_factory=list)
     comic: bool = False
     content_duration_category: str = ""
@@ -326,6 +328,14 @@ class Meta:
     music_release_type: str = ""
     music_release_year: int = 0
     music_release: dict[str, Any] = field(default_factory=dict)
+    music_unknown_release: bool = False
+    music_artist_roles: str = ""
+    music_request_id: str = ""
+    music_group_id: str = ""
+    music_watermark: str = ""
+    music_lineage: str = ""
+    music_showcase: bool = False
+    music_check_log: bool = False
     name_notag: str = ""
     name: str = ""
     narrator: str = ""
@@ -474,6 +484,8 @@ class Meta:
     skip_upload_trackers: list[Any] = field(default_factory=list)
     skip_uploading: int | bool = False
     skipit: bool = False
+    # The user chose to skip this release at the confirmation prompt.
+    skipped_by_user: bool = False
     skipping: str | None = None
     sorted_filelist: bool = False
     source_size: int = 0

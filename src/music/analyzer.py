@@ -9,7 +9,7 @@ import re
 import unicodedata
 from collections import Counter
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import mutagen
 
@@ -23,10 +23,30 @@ LEADING_YEAR_RE = re.compile(r"^\s*[\[(]?\s*((?:19|20)\d{2})\b")
 EDITION_RE = re.compile(r"(?:\[|\()([^\]\)]*(?:deluxe|remaster|anniversary|reissue|expanded|edition)[^\]\)]*)(?:\]|\))", re.I)
 EDITION_WITH_YEAR_RE = re.compile(r"(?:\[|\()\s*((?:19|20)\d{2})[\s,.-]+([^\]\)]+)(?:\]|\))", re.I)
 BRACKET_RE = re.compile(r"\[([^\]]+)\]|\{([^\}]+)\}")
+TECHNICAL_BRACKET_RE = re.compile(r"\b\d{2}\s*-?\s*bits?\b|(?:\b|(?<=\d))k?hz\b|\b(?:EAC|XLD|LOG|CUE|LOSSLESS|24-?\d{2,3})\b", re.I)
 # Subsequent catalogue components must have an actual separator.  Allowing an
 # optional separator before another ``\d+`` creates many equivalent ways to
 # partition a long run of digits and can backtrack exponentially.
 CATALOGUE_RE = re.compile(r"\b(?:[A-Z]{1,8}[- ]?\d{2,}(?:[- ]\d+)*|\d{1,2}[- ]\d{3,}(?:[- ]\d+)*|\d{5,})\b", re.I)
+RIPPER_NAMES = r"Exact Audio Copy|X Lossless Decoder|CUERipper|whipper"
+# Enough to call the source a CD, but "CD-ROM" alone does not make a .log a rip log.
+RIP_LOG_RE = re.compile(rf"\b(?:{RIPPER_NAMES}|CD-DA|CD-ROM)\b", re.I)
+RIPPER_LOG_RE = re.compile(rf"\b(?:{RIPPER_NAMES})\b", re.I)
+
+
+def read_rip_log(path: Path, limit: int | None = None, signature: re.Pattern[str] = RIP_LOG_RE) -> str:
+    """Return the text of a CD rip log, or "" when the file does not match ``signature``.
+
+    EAC writes UTF-16 logs; XLD, CUERipper and whipper write UTF-8.
+    """
+    try:
+        data = path.read_bytes()
+    except OSError:
+        return ""
+    if limit is not None:
+        data = data[:limit]
+    text = data.decode("utf-16", errors="ignore") if data.startswith((b"\xff\xfe", b"\xfe\xff")) or b"\x00" in data[:256] else data.decode("utf-8-sig", errors="ignore")
+    return text if signature.search(text) else ""
 
 
 def _clean(value: Any) -> str:
@@ -110,6 +130,50 @@ def _bitrate_mode(info: Any) -> str | None:
     return None
 
 
+def _embedded_image_bytes(technical: Any) -> int:
+    """Return bytes used by embedded artwork plus metadata padding.
+
+    FLAC padding is reported directly; for ID3 the declared tag size already
+    covers frames and padding.  MP4 artwork is the sum of ``covr`` atoms.
+    """
+    if technical is None:
+        return 0
+    total = 0
+    try:
+        pictures = cast(list[Any], getattr(technical, "pictures", None) or [])
+        for picture in pictures:
+            total += len(getattr(picture, "data", b"") or b"")
+        blocks = cast(list[Any], getattr(technical, "metadata_blocks", None) or [])
+        for block in blocks:
+            if type(block).__name__ == "Padding":
+                total += int(getattr(block, "length", 0) or 0)
+        tags: Any = getattr(technical, "tags", None)
+        if tags is not None and type(tags).__name__ == "ID3":
+            total = max(total, int(getattr(tags, "size", 0) or 0))
+        elif tags is not None and hasattr(tags, "get"):
+            covers = cast(list[Any], tags.get("covr", None) or [])
+            for cover in covers:
+                total += len(bytes(cover))
+    except TypeError, ValueError, AttributeError:
+        return total
+    return total
+
+
+def _flac_has_id3(path: Path) -> bool:
+    """Detect an ID3v2 header or ID3v1 footer wrapped around a FLAC file."""
+    try:
+        with path.open("rb") as handle:
+            if handle.read(3) == b"ID3":
+                return True
+            size = path.stat().st_size
+            if size >= 128:
+                handle.seek(size - 128)
+                return handle.read(3) == b"TAG"
+    except OSError:
+        return False
+    return False
+
+
 class MusicReleaseAnalyzer:
     """Build a normalized release from tags, sidecars and file structure."""
 
@@ -179,6 +243,10 @@ class MusicReleaseAnalyzer:
             genre=tags.get("genre", []),
             isrc=_first(tags, "isrc"),
             tags=tags,
+            encoder_info=_clean(getattr(info, "encoder_info", "") or ""),
+            encoder_settings=_clean(getattr(info, "encoder_settings", "") or ""),
+            embedded_image_bytes=_embedded_image_bytes(technical),
+            has_id3_tags=format_name == "FLAC" and _flac_has_id3(path),
         )
 
     def _classify_auxiliary(self, release: MusicRelease, path: Path, root: Path) -> None:
@@ -462,6 +530,10 @@ class MusicReleaseAnalyzer:
         for index, detail in enumerate(brackets):
             if index in edition_bracket_indexes:
                 continue
+            # Technical blocks such as ``[16-bit 44100 Hz]`` or ``[EAC]`` are
+            # never imprint or catalogue information.
+            if TECHNICAL_BRACKET_RE.search(detail):
+                continue
             if CATALOGUE_RE.fullmatch(detail):
                 release.set_field("release_catalogue_number", detail, MetadataSource.DIRECTORY, 0.65)
                 release.set_field("directory_catalogue_number", detail, MetadataSource.DIRECTORY, 0.7)
@@ -489,12 +561,7 @@ class MusicReleaseAnalyzer:
             return
         root = release.path
         for relative in release.auxiliary.logs:
-            try:
-                data = (root / relative).read_bytes()[:262_144]
-            except OSError:
-                continue
-            text = data.decode("utf-16", errors="ignore") if data.startswith((b"\xff\xfe", b"\xfe\xff")) or b"\x00" in data[:256] else data.decode("utf-8", errors="ignore")
-            if re.search(r"\b(?:Exact Audio Copy|X Lossless Decoder|CUERipper|whipper|CD-DA|CD-ROM)\b", text, re.I):
+            if read_rip_log(root / relative, limit=262_144):
                 release.set_field("media", "CD", MetadataSource.AUXILIARY, 0.9)
                 release.warnings.append("Source media inferred as CD from the rip log.")
                 return
@@ -528,6 +595,10 @@ class MusicReleaseAnalyzer:
         # ``NOSTALGIA`` as a soundtrack or ``Olive`` as a live album.
         if "soundtrack" in album or re.search(r"(?:^|[^\w])ost(?:$|[^\w])", album):
             value = "Soundtrack"
+        elif re.match(r"\s*(?:19|20)\d{2}[\s._/-]+\d{1,2}[\s._/-]+\d{1,2}(?!\d)", album):
+            # Dated show titles (``2023-12-31 Venue, City``) are concert
+            # recordings on Orpheus, not studio albums.
+            value = "Concert recording"
         elif re.search(r"\blive\b", album):
             value = "Live album"
         elif explicit_compilation or has_explicit_various_artists or len(album_artist_credits) > 1 or inferred_from_tracks:

@@ -392,6 +392,49 @@ def validate_isbn_checksum(candidate: str) -> str | None:
     return None
 
 
+ISBN_CANDIDATE_RE = re.compile(r"\b(?:ISBN(?:-1[03])?:?\s*)?((?:97[89][- ]?)?\d(?:[- ]?\d){8,11}[- ]?[\dX])\b", re.IGNORECASE)
+COPYRIGHT_PAGE_RE = re.compile(r"copyright|©|all rights reserved|todos os direitos reservados|derechos reservados", re.IGNORECASE)
+
+
+def _page_search_order(num_pages: int, edge: int = 30) -> list[int]:
+    """First and last `edge` pages, then the middle of the document."""
+    front = list(range(min(edge, num_pages)))
+    back = list(range(max(edge, num_pages - edge), num_pages))
+    middle = list(range(min(edge, num_pages), max(edge, num_pages - edge)))
+    return front + back + middle
+
+
+def _page_text(doc: Any, page_num: int) -> str:
+    with contextlib.suppress(Exception):
+        text = doc[page_num].get_text()
+        if isinstance(text, str):
+            return text
+    return ""
+
+
+def _first_valid_isbn(text: str) -> str | None:
+    return next((isbn for cand in ISBN_CANDIDATE_RE.findall(text) if (isbn := validate_isbn_checksum(cand))), None)
+
+
+def find_isbn_page(doc: Any) -> tuple[int, str] | None:
+    """Return (page index, ISBN) for the first page of an open PyMuPDF document with a valid ISBN."""
+    for page_num in _page_search_order(len(doc)):
+        isbn = _first_valid_isbn(_page_text(doc, page_num))
+        if isbn:
+            return page_num, isbn
+    return None
+
+
+def find_copyright_page(doc: Any, max_pages: int = 30, with_isbn: bool = False) -> int | None:
+    """Return the first front or back page of an open PyMuPDF document that looks like a copyright page."""
+    num_pages = len(doc)
+    for page_num in _page_search_order(num_pages, max_pages)[: min(num_pages, 2 * max_pages)]:
+        text = _page_text(doc, page_num)
+        if COPYRIGHT_PAGE_RE.search(text) and (not with_isbn or _first_valid_isbn(text)):
+            return page_num
+    return None
+
+
 def extract_isbn_from_pdf(pdf_path: str) -> str | None:
     """Search for and extract a valid ISBN from a PDF file using PyMuPDF (fitz)."""
     try:
@@ -409,36 +452,11 @@ def extract_isbn_from_pdf(pdf_path: str) -> str | None:
             fitz.TOOLS.mupdf_display_errors(False)
 
         with fitz.open(pdf_path) as doc:
-            num_pages = len(doc)
-            if num_pages == 0:
-                return None
-
-            # Determine page ranges: check first 30 and last 30 pages first
-            front_limit = min(30, num_pages)
-            back_limit = max(0, num_pages - 30)
-
-            pages_to_check: list[int] = list(range(front_limit))
-            # Last N pages (avoiding duplicates)
-            for p in range(back_limit, num_pages):
-                if p not in pages_to_check:
-                    pages_to_check.append(p)
-            # Middle pages as fallback
-            for p in range(num_pages):
-                if p not in pages_to_check:
-                    pages_to_check.append(p)
-
-            for page_num in pages_to_check:
-                text = doc[page_num].get_text()
-                if not isinstance(text, str) or not text:
-                    continue
-
-                # Find ISBN candidates
-                candidates = re.findall(r"\b(?:ISBN(?:-1[03])?:?\s*)?((?:97[89][- ]?)?\d(?:[- ]?\d){8,11}[- ]?[\dX])\b", text, re.IGNORECASE)
-                for cand in candidates:
-                    validated = validate_isbn_checksum(cand)
-                    if validated:
-                        logger.info(f"[cyan]Found valid ISBN {validated} on PDF page {page_num}[/cyan]")
-                        return validated
+            found = find_isbn_page(doc)
+            if found:
+                page_num, isbn = found
+                logger.info(f"[cyan]Found valid ISBN {isbn} on PDF page {page_num}[/cyan]")
+                return isbn
     except Exception as e:
         logger.debug(f"[yellow]Warning: Error extracting ISBN from PDF: {e}[/yellow]")
 

@@ -164,6 +164,7 @@ MUSIC_LABELS = {
         "genres": "Genres",
         "tracks": "Tracks",
         "tracklist": "Tracklist",
+        "rip_logs": "Rip Logs",
         "track_number": "Track No.",
         "title": "Title",
         "duration": "Duration",
@@ -174,6 +175,7 @@ MUSIC_LABELS = {
         "sample_rate": "Sample Rate",
         "channels": "Channels",
         "bitrate": "Bitrate",
+        "audio": "Audio",
         "external_ids": "External IDs",
         "external_id_labels": {
             "musicbrainz_release": "MusicBrainz Release",
@@ -197,6 +199,7 @@ MUSIC_LABELS = {
         "genres": "Gêneros",
         "tracks": "Faixas",
         "tracklist": "Lista de faixas",
+        "rip_logs": "Logs de Ripagem",
         "track_number": "N. da faixa",
         "title": "Título",
         "duration": "Duração",
@@ -207,6 +210,7 @@ MUSIC_LABELS = {
         "sample_rate": "Taxa de Amostragem",
         "channels": "Canais",
         "bitrate": "Bitrate",
+        "audio": "Áudio",
         "external_ids": "IDs Externos",
         "external_id_labels": {
             "musicbrainz_release": "Lançamento MusicBrainz",

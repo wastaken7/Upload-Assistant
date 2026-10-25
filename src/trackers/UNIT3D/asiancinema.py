@@ -154,10 +154,8 @@ class AsianCinema(UNIT3D):
             return " [No Eng subs]"
         return f" [{subs[0][:3]} subs only]"
 
-    async def get_keywords(self, meta: Meta) -> dict[str, str]:
-        keywords_list = [k.strip() for k in meta.keywords if k.strip()]
-
-        return {"keywords": ", ".join(keywords_list[:10])}
+    async def get_keywords(self, meta: Meta, max_terms: int | None = 10) -> dict[str, str]:
+        return await super().get_keywords(meta, max_terms)
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
         name: str = meta.name

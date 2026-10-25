@@ -413,8 +413,394 @@ button:focus-visible {
   color: var(--ua-gold) !important;
 }
 
-.bbcode-preview blockquote {
-  border-color: var(--ua-copper-bright) !important;
+/* Description preview, ported from UNIT3D's _bbcode-rendered.scss so BBCode
+   looks as it will on UNIT3D trackers. */
+.bbcode-rendered {
+  --bbcode-rendered-fg-default: #1f2328;
+  --bbcode-rendered-fg-muted: #59636e;
+  --bbcode-rendered-canvas-subtle: #f6f8fa;
+  --bbcode-rendered-border-default: #d1d9e0;
+  --bbcode-rendered-border-muted: #d1d9e0b3;
+  --bbcode-rendered-neutral-muted: #818b981f;
+  --bbcode-rendered-accent-fg: var(--ua-copper);
+  --bbcode-rendered-danger-fg: #d1242f;
+  --bbcode-rendered-attention-fg: #9a6700;
+  --bbcode-rendered-quote-border: var(--ua-copper-bright);
+  --bbcode-rendered-quote-bg: #818b9814;
+  font-size: 15px;
+  line-height: 1.5;
+  overflow-wrap: break-word;
+  color: var(--bbcode-rendered-fg-default);
+}
+
+.bbcode-rendered[data-mode="dark"] {
+  --bbcode-rendered-fg-default: #e6edf3;
+  --bbcode-rendered-fg-muted: #9198a1;
+  --bbcode-rendered-canvas-subtle: #ffffff0a;
+  --bbcode-rendered-border-default: #3d444d;
+  --bbcode-rendered-border-muted: #3d444db3;
+  --bbcode-rendered-neutral-muted: #656c7633;
+  --bbcode-rendered-accent-fg: var(--ua-gold);
+  --bbcode-rendered-danger-fg: #f85149;
+  --bbcode-rendered-attention-fg: #d29922;
+  --bbcode-rendered-quote-bg: #656c761a;
+}
+
+.bbcode-rendered b {
+  font-weight: 600;
+}
+
+.bbcode-rendered small {
+  font-size: 90%;
+}
+
+.bbcode-rendered sub,
+.bbcode-rendered sup {
+  font-size: 75%;
+  line-height: 0;
+  position: relative;
+  vertical-align: baseline;
+}
+
+.bbcode-rendered sub {
+  bottom: -0.25em;
+}
+
+.bbcode-rendered sup {
+  top: -0.5em;
+}
+
+.bbcode-rendered a {
+  color: var(--bbcode-rendered-accent-fg);
+  text-decoration: none;
+}
+
+.bbcode-rendered a:hover {
+  text-decoration: underline;
+}
+
+.bbcode-rendered hr {
+  height: 1px;
+  margin: 24px 0;
+  padding: 0;
+  border: 0;
+  background-color: var(--bbcode-rendered-border-default);
+}
+
+.bbcode-rendered details {
+  display: inline-block;
+  max-width: 100%;
+  margin: 0 0 2px;
+  padding: 0 6px;
+}
+
+.bbcode-rendered details summary {
+  cursor: pointer;
+  display: list-item;
+}
+
+.bbcode-rendered h1,
+.bbcode-rendered h2,
+.bbcode-rendered h3,
+.bbcode-rendered h4,
+.bbcode-rendered h5,
+.bbcode-rendered h6 {
+  margin-top: 24px;
+  margin-bottom: 16px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.bbcode-rendered h1 {
+  margin: 0.67em 0;
+  padding-bottom: 0.3em;
+  font-size: 30px;
+  border-bottom: 1px solid var(--bbcode-rendered-border-muted);
+}
+
+.bbcode-rendered h2 {
+  padding-bottom: 0.3em;
+  font-size: 23px;
+  border-bottom: 1px solid var(--bbcode-rendered-border-muted);
+}
+
+.bbcode-rendered h3 {
+  font-size: 19px;
+}
+
+.bbcode-rendered h4 {
+  font-size: 15px;
+}
+
+.bbcode-rendered h5 {
+  font-size: 13px;
+}
+
+.bbcode-rendered h6 {
+  font-size: 13px;
+  color: var(--bbcode-rendered-fg-muted);
+}
+
+.bbcode-rendered blockquote {
+  margin-left: 2px;
+  margin-right: 2px;
+  padding: 0.25em 0.25em 0.25em 1em;
+  color: var(--bbcode-rendered-fg-muted);
+  border-left: 0.25em solid var(--bbcode-rendered-quote-border);
+  font-size: 15px;
+  background-color: var(--bbcode-rendered-quote-bg);
+  border-radius: 3px 6px 6px 3px / 8px 6px 6px 8px;
+}
+
+.bbcode-rendered blockquote > cite {
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.bbcode-rendered blockquote > .fa-quote-left::before {
+  content: "\201C";
+  font-style: normal;
+  font-weight: bold;
+}
+
+.bbcode-rendered blockquote > blockquote {
+  margin-left: 6px;
+  margin-right: 20px;
+}
+
+.bbcode-rendered p,
+.bbcode-rendered blockquote,
+.bbcode-rendered ul,
+.bbcode-rendered ol,
+.bbcode-rendered table,
+.bbcode-rendered .bbcode-rendered__center,
+.bbcode-rendered .bbcode-rendered__left,
+.bbcode-rendered .bbcode-rendered__right,
+.bbcode-rendered .bbcode-rendered__alert,
+.bbcode-rendered .bbcode-rendered__note,
+.bbcode-rendered .bbcode-rendered__clipboard {
+  margin-top: 12px;
+  margin-bottom: 12px;
+}
+
+.bbcode-rendered ul,
+.bbcode-rendered ol {
+  padding-left: 2em;
+}
+
+.bbcode-rendered ul {
+  list-style-type: disc;
+}
+
+.bbcode-rendered ol {
+  list-style-type: decimal;
+}
+
+.bbcode-rendered ol[type="a"] {
+  list-style-type: lower-alpha;
+}
+
+.bbcode-rendered :is(ul, ol) :is(ul, ol) {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.bbcode-rendered :is(ul, ol) ol {
+  list-style-type: lower-roman;
+}
+
+.bbcode-rendered li + li {
+  margin-top: 0.25em;
+}
+
+/* UNIT3D's fallback for [*] used without a [list] around it. */
+.bbcode-rendered :not(ul):not(ol) > li {
+  list-style-position: inside;
+  list-style-type: circle;
+}
+
+.bbcode-rendered table {
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  overflow: auto;
+  border-collapse: collapse;
+  border-spacing: 0;
+}
+
+.bbcode-rendered th {
+  font-weight: 600;
+}
+
+.bbcode-rendered th,
+.bbcode-rendered td {
+  padding: 6px 13px;
+  border: 1px solid var(--bbcode-rendered-border-default);
+}
+
+.bbcode-rendered tr {
+  border-top: 1px solid var(--bbcode-rendered-border-muted);
+}
+
+.bbcode-rendered tr:nth-child(2n) {
+  background-color: var(--bbcode-rendered-canvas-subtle);
+}
+
+/* Inline, as on UNIT3D, so screenshot rows sit side by side; Tailwind's
+   preflight would make images blocks. */
+.bbcode-rendered img {
+  display: inline;
+  max-width: 100%;
+  border-style: none;
+}
+
+.bbcode-rendered code,
+.bbcode-rendered pre {
+  font-family:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono",
+    monospace;
+}
+
+.bbcode-rendered pre {
+  margin: 0;
+  padding: 12px;
+  overflow: auto;
+  font-size: 12px;
+  line-height: inherit;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.bbcode-rendered code {
+  margin: 0;
+  padding: 0.2em 0.4em;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+  white-space: break-spaces;
+  background-color: var(--bbcode-rendered-neutral-muted);
+  border-radius: 6px;
+}
+
+.bbcode-rendered pre code {
+  display: inline;
+  padding: 0;
+  overflow: visible;
+  line-height: inherit;
+  white-space: pre;
+  background-color: transparent;
+  border: 0;
+}
+
+.bbcode-rendered .bbcode-rendered__clipboard {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  overflow: auto;
+  color: var(--bbcode-rendered-fg-default);
+  background-color: var(--bbcode-rendered-neutral-muted);
+  border-radius: 6px;
+}
+
+.bbcode-rendered .bbcode-rendered__clipboard-button {
+  display: block;
+  width: 14px;
+  height: 14px;
+  margin: 8px;
+  border: none;
+  cursor: pointer;
+  background-color: var(--bbcode-rendered-fg-muted);
+  -webkit-mask: url(/static/img/lucide-icons/copy.svg) center / contain
+    no-repeat;
+  mask: url(/static/img/lucide-icons/copy.svg) center / contain no-repeat;
+}
+
+.bbcode-rendered .bbcode-rendered__clipboard-button:hover,
+.bbcode-rendered .bbcode-rendered__clipboard-button:focus {
+  background-color: var(--bbcode-rendered-fg-default);
+}
+
+.bbcode-rendered .bbcode-rendered__clipboard-button--copied {
+  -webkit-mask-image: url(/static/img/lucide-icons/check.svg);
+  mask-image: url(/static/img/lucide-icons/check.svg);
+}
+
+.bbcode-rendered .bbcode-rendered__alert {
+  padding: 8px;
+  border: 2px solid var(--bbcode-rendered-danger-fg);
+  border-radius: 5px;
+}
+
+.bbcode-rendered .bbcode-rendered__alert::before {
+  content: "Alert: ";
+  display: inline-block;
+  padding-right: 1ch;
+  color: var(--bbcode-rendered-danger-fg);
+}
+
+.bbcode-rendered .bbcode-rendered__note {
+  padding: 8px;
+  border: 2px solid var(--bbcode-rendered-attention-fg);
+  border-radius: 4px;
+}
+
+.bbcode-rendered .bbcode-rendered__note::before {
+  content: "Note: ";
+  display: inline-block;
+  padding-right: 1ch;
+  color: var(--bbcode-rendered-attention-fg);
+}
+
+.bbcode-rendered iframe {
+  max-width: 100%;
+  border: 0;
+}
+
+/* [comparison]: UNIT3D opens a full-screen viewer; the preview expands the
+   screenshots side by side instead. */
+.bbcode-rendered .comparison {
+  display: block;
+  padding: 0;
+}
+
+.bbcode-rendered .comparison__divider {
+  color: var(--bbcode-rendered-fg-muted);
+}
+
+.bbcode-rendered .comparison__button {
+  color: var(--bbcode-rendered-accent-fg);
+  font-weight: 600;
+}
+
+.bbcode-rendered .comparison[open] .comparison__button {
+  display: none;
+}
+
+.bbcode-rendered .comparison__screenshots,
+.bbcode-rendered .comparison__row {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bbcode-rendered .comparison__row {
+  display: grid;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.bbcode-rendered .comparison__figure {
+  margin: 0;
+}
+
+.bbcode-rendered .comparison__figcaption {
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.bbcode-rendered .comparison__image {
+  display: block;
+  width: 100%;
 }
 
 /* Compatibility translation for remaining older blue utility classes. */
@@ -1334,6 +1720,11 @@ html.ua-upload-document #root {
   color: var(--ua-upload-text);
 }
 
+/* A step below the title: still readable, but clearly secondary. */
+.ua-processing-artist {
+  color: color-mix(in srgb, var(--ua-upload-text) 72%, var(--ua-upload-muted));
+}
+
 .ua-processing-muted,
 .ua-processing-year,
 .ua-processing-source {
@@ -1764,29 +2155,6 @@ html[data-ua-shape="square"] .ua-upload-tab-add {
 .ua-upload-page .ua-theme-picker option {
   background: var(--ua-upload-surface-raised);
   color: var(--ua-upload-text);
-}
-
-.ua-upload-mode-switch {
-  background: color-mix(
-    in srgb,
-    var(--ua-upload-muted) 38%,
-    var(--ua-upload-surface-raised)
-  );
-  padding: 0.25rem;
-  transition: background-color 150ms ease;
-}
-
-.ua-upload-mode-switch[data-enabled="true"] {
-  background: var(--ua-copper);
-}
-
-.ua-upload-mode-knob {
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
-  transform: translateX(0);
-}
-
-.ua-upload-mode-switch[data-enabled="true"] .ua-upload-mode-knob {
-  transform: translateX(1.25rem);
 }
 
 .ua-upload-help-modal,
@@ -2405,6 +2773,127 @@ html[data-ua-shape="square"] .ua-upload-tab-add {
 
 .ua-app-rail-popover-label {
   color: var(--ua-muted);
+}
+
+/* Appearance controls shared by the Upload, Config and Stats pages. */
+.ua-appearance-controls {
+  display: grid;
+  gap: 0.5rem;
+}
+
+h2 + .ua-appearance-controls {
+  margin-top: 0.75rem;
+}
+
+.ua-appearance-value {
+  opacity: 0.7;
+}
+
+.ua-appearance-swatches {
+  display: grid;
+  gap: 0.375rem;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.ua-appearance-swatch {
+  align-items: center;
+  aspect-ratio: 1;
+  border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+  border-radius: 0.375rem;
+  color: #fff;
+  display: inline-flex;
+  justify-content: center;
+  transition:
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+}
+
+.ua-appearance-swatch:hover {
+  transform: scale(1.08);
+}
+
+.ua-appearance-swatch[data-active="true"] {
+  box-shadow:
+    0 0 0 2px var(--ua-appearance-ring, var(--ua-charcoal)),
+    0 0 0 4px var(--ua-copper-bright);
+}
+
+.ua-appearance-swatch-check {
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.6));
+}
+
+.ua-appearance-row {
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  margin-top: 0.25rem;
+}
+
+.ua-appearance-segments {
+  border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+  border-radius: 0.5rem;
+  display: inline-flex;
+  gap: 0.125rem;
+  margin-top: 0.375rem;
+  padding: 0.125rem;
+}
+
+.ua-appearance-segment {
+  align-items: center;
+  border-radius: 0.375rem;
+  display: inline-flex;
+  height: 2rem;
+  justify-content: center;
+  opacity: 0.65;
+  transition:
+    background-color 0.15s ease,
+    opacity 0.15s ease;
+  width: 2.25rem;
+}
+
+.ua-appearance-segment:hover {
+  background: color-mix(in srgb, currentColor 10%, transparent);
+  opacity: 1;
+}
+
+.ua-appearance-segment[data-active="true"] {
+  background: color-mix(in srgb, var(--ua-copper-bright) 22%, transparent);
+  color: var(--ua-copper-bright);
+  opacity: 1;
+}
+
+.ua-appearance-swatch:focus-visible,
+.ua-appearance-segment:focus-visible {
+  outline: 2px solid var(--ua-copper-bright);
+  outline-offset: 2px;
+}
+
+/* A top-left corner drawn sharp or curved, independent of the active shape. */
+.ua-appearance-corner-glyph {
+  border-left: 2px solid currentColor;
+  border-top: 2px solid currentColor;
+  display: block;
+  height: 0.875rem;
+  transform: translate(2px, 2px);
+  width: 0.875rem;
+}
+
+.ua-appearance-corner-glyph[data-shape="rounded"] {
+  border-top-left-radius: 0.625rem;
+}
+
+html[data-ua-shape="square"] .ua-appearance-swatch,
+html[data-ua-shape="square"] .ua-appearance-segments,
+html[data-ua-shape="square"] .ua-appearance-segment {
+  border-radius: 0.125rem;
+}
+
+.ua-upload-page .ua-appearance-controls {
+  --ua-appearance-ring: var(--ua-upload-surface);
+}
+
+.ua-config-page .ua-appearance-controls {
+  --ua-appearance-ring: var(--ua-config-surface);
 }
 
 .ua-api-key-alert-button,
@@ -3170,7 +3659,6 @@ html[data-ua-shape="square"] .ua-upload-tab-add {
 }
 
 .ua-config-page .ua-theme-picker,
-.ua-config-mode-button,
 .ua-config-sidebar-action {
   background-color: var(--ua-config-surface-raised);
   border: 1px solid var(--ua-config-border);
@@ -3196,7 +3684,6 @@ select {
   padding-right: 2.5rem !important;
 }
 
-.ua-config-mode-button:hover,
 .ua-config-sidebar-action:hover {
   background: var(--ua-config-hover);
   border-color: color-mix(
@@ -3218,29 +3705,6 @@ select {
     var(--ua-config-border)
   );
   color: var(--ua-copper-bright);
-}
-
-.ua-config-mode-switch {
-  background: color-mix(
-    in srgb,
-    var(--ua-config-muted) 38%,
-    var(--ua-config-surface-raised)
-  );
-  padding: 0.25rem;
-  transition: background-color 150ms ease;
-}
-
-.ua-config-mode-switch[data-enabled="true"] {
-  background: var(--ua-copper);
-}
-
-.ua-config-mode-knob {
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
-  transform: translateX(0);
-}
-
-.ua-config-mode-switch[data-enabled="true"] .ua-config-mode-knob {
-  transform: translateX(1.25rem);
 }
 
 .ua-config-boolean-toggle {
@@ -3903,4 +4367,374 @@ html[data-ua-shape="square"]
   background-color: currentColor;
   mask: var(--ua-lucide-icon) center / contain no-repeat;
   -webkit-mask: var(--ua-lucide-icon) center / contain no-repeat;
+}
+
+/* A masked icon is re-rasterized on every frame of a spin, snapping to the
+   pixel grid at each angle, so it seems to wobble (worst at fractional
+   positions or zoom). On its own layer it is drawn once and rotated whole. */
+.ua-lucide-icon.animate-spin {
+  will-change: transform;
+}
+
+/* Upload page GUI output mode */
+.ua-run-gui-mode-toggle {
+  background: var(--ua-upload-surface);
+  border-color: var(--ua-upload-border);
+}
+
+.ua-run-gui-mode-option {
+  color: var(--ua-upload-muted);
+  transition:
+    background-color 150ms ease,
+    color 150ms ease;
+}
+
+.ua-run-gui-mode-option:hover {
+  background: var(--ua-upload-hover);
+  color: var(--ua-upload-text);
+}
+
+.ua-run-gui-mode-option[data-active="true"] {
+  background: var(--ua-copper);
+  color: #ffffff;
+}
+
+.ua-run-gui {
+  --ua-run-gui-tone: var(--ua-upload-muted);
+  color: var(--ua-upload-text);
+  overscroll-behavior: contain;
+}
+
+.ua-run-gui [data-tone="success"] {
+  --ua-run-gui-tone: #22c55e;
+}
+
+.ua-run-gui [data-tone="error"] {
+  --ua-run-gui-tone: #ef4444;
+}
+
+.ua-run-gui [data-tone="attention"] {
+  --ua-run-gui-tone: #f59e0b;
+}
+
+.ua-run-gui [data-tone="info"] {
+  --ua-run-gui-tone: #38bdf8;
+}
+
+.ua-run-gui [data-tone="muted"] {
+  --ua-run-gui-tone: var(--ua-upload-muted);
+}
+
+.ua-run-gui-strip,
+.ua-run-gui-block,
+.ua-run-gui-empty {
+  background: var(--ua-upload-surface);
+  border-color: var(--ua-upload-border);
+}
+
+.ua-run-gui-block {
+  border-left: 3px solid var(--ua-run-gui-tone);
+  flex-shrink: 0;
+}
+
+/* Stages stay in view while scrolling, under the overlaid Terminal | GUI switch. */
+.ua-run-gui-strip {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  flex-shrink: 0;
+  backdrop-filter: blur(10px);
+}
+
+.ua-run-gui-block-header,
+.ua-run-gui-divide > * + * {
+  border-color: var(--ua-upload-border);
+}
+
+.ua-run-gui-tone-icon {
+  color: var(--ua-run-gui-tone);
+}
+
+.ua-run-gui-count {
+  background: color-mix(in srgb, var(--ua-run-gui-tone) 18%, transparent);
+  color: color-mix(in srgb, var(--ua-run-gui-tone) 60%, var(--ua-upload-text));
+}
+
+.ua-run-gui-muted,
+.ua-run-gui-empty {
+  color: var(--ua-upload-muted);
+}
+
+.ua-run-gui-link {
+  color: color-mix(in srgb, var(--ua-copper-bright) 72%, var(--ua-upload-text));
+}
+
+.ua-run-gui-link:hover {
+  text-decoration: underline;
+}
+
+.ua-run-gui-tracker-fallback {
+  background: var(--ua-upload-hover);
+  color: var(--ua-upload-text);
+}
+
+.ua-run-gui-stage {
+  border-color: var(--ua-upload-border);
+  color: var(--ua-upload-muted);
+}
+
+.ua-run-gui-stage[data-status="idle"] {
+  opacity: 0.55;
+}
+
+.ua-run-gui-stage[data-status="start"] {
+  border-color: var(--ua-copper);
+  color: var(--ua-upload-text);
+}
+
+.ua-run-gui-stage[data-status="done"] {
+  color: color-mix(in srgb, #22c55e 65%, var(--ua-upload-text));
+}
+
+.ua-run-gui-stage[data-status="fail"] {
+  border-color: color-mix(in srgb, #ef4444 50%, transparent);
+  color: color-mix(in srgb, #ef4444 70%, var(--ua-upload-text));
+}
+
+.ua-run-gui-stage[data-status="skip"] {
+  text-decoration: line-through;
+}
+
+.ua-run-gui-status {
+  background: color-mix(in srgb, var(--ua-run-gui-tone) 16%, transparent);
+  color: color-mix(in srgb, var(--ua-run-gui-tone) 65%, var(--ua-upload-text));
+}
+
+.ua-run-gui-slot {
+  background: color-mix(in srgb, #f59e0b 12%, transparent);
+}
+
+.ua-run-gui-slot[data-verdict="block"] {
+  background: color-mix(in srgb, #ef4444 12%, transparent);
+}
+
+.ua-run-gui-slot[data-verdict="allow"] {
+  background: color-mix(in srgb, #22c55e 12%, transparent);
+}
+
+.ua-run-gui-attention-text {
+  color: color-mix(in srgb, #f59e0b 70%, var(--ua-upload-text));
+}
+
+.ua-run-gui-prompt {
+  --ua-run-gui-tone: #f59e0b;
+  background: var(--ua-upload-surface-raised);
+  border-color: color-mix(in srgb, #f59e0b 65%, transparent);
+  flex-shrink: 0;
+}
+
+.ua-run-gui-prompt[data-answered="true"] {
+  --ua-run-gui-tone: var(--ua-upload-muted);
+  border-color: var(--ua-upload-border);
+}
+
+.ua-run-gui-eyebrow {
+  color: var(--ua-run-gui-tone);
+}
+
+.ua-run-gui-prompt-context {
+  background: var(--ua-upload-surface);
+}
+
+.ua-run-gui-answer {
+  background: var(--ua-upload-hover);
+  color: var(--ua-upload-text);
+}
+
+.ua-run-gui-answer[data-variant="yes"],
+.ua-run-gui-answer[data-variant="send"] {
+  background: #16a34a;
+  color: #ffffff;
+}
+
+.ua-run-gui-answer[data-variant="no"] {
+  background: #dc2626;
+  color: #ffffff;
+}
+
+.ua-run-gui-answer[data-default="true"] {
+  box-shadow:
+    0 0 0 2px var(--ua-upload-surface-raised),
+    0 0 0 4px color-mix(in srgb, var(--ua-upload-text) 45%, transparent);
+}
+
+.ua-run-gui-choice,
+.ua-run-gui-input {
+  background: var(--ua-upload-surface);
+  border-color: var(--ua-upload-border);
+  color: var(--ua-upload-text);
+}
+
+/* Accent-tinted hover, matching the Stats page controls. */
+.ua-run-gui-choice:hover:not(:disabled) {
+  background: color-mix(
+    in srgb,
+    var(--ua-copper-bright) 10%,
+    var(--ua-upload-surface-raised)
+  );
+}
+
+.ua-run-gui-choice[data-selected="true"] {
+  border-color: #16a34a;
+  background: color-mix(in srgb, #16a34a 14%, var(--ua-upload-surface));
+}
+
+/* The value a field prompt asks for, among the item's other values. */
+.ua-run-gui-field-row[data-focus="true"] {
+  background: color-mix(in srgb, var(--ua-run-gui-tone) 12%, transparent);
+  box-shadow: inset 3px 0 0 var(--ua-run-gui-tone);
+}
+
+.ua-run-gui-mode-overlay {
+  border-radius: 0.6rem;
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.28);
+  opacity: 0.92;
+  transition: opacity 150ms ease;
+}
+
+.ua-run-gui-mode-overlay:hover,
+.ua-run-gui-mode-overlay:focus-within {
+  opacity: 1;
+}
+
+.ua-run-gui-stage[data-status="waiting"] {
+  border-color: color-mix(in srgb, #f59e0b 60%, transparent);
+  color: color-mix(in srgb, #f59e0b 75%, var(--ua-upload-text));
+}
+
+.ua-run-gui-section-label {
+  color: var(--ua-upload-muted);
+}
+
+.ua-run-gui-chip {
+  background: color-mix(in srgb, var(--ua-run-gui-tone) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ua-run-gui-tone) 30%, transparent);
+}
+
+.ua-run-gui-debug-popover {
+  inset: auto;
+  margin: 0;
+  max-height: min(32rem, calc(100dvh - 1.5rem));
+  overflow: auto;
+  background: var(--ua-upload-surface-solid);
+  border-color: var(--ua-upload-border);
+  color: var(--ua-upload-text);
+}
+
+.ua-run-gui-release-name {
+  background: var(--ua-upload-surface-raised);
+  border: 1px solid var(--ua-upload-border);
+}
+
+.ua-run-gui-size-diff {
+  --ua-run-gui-diff: var(--ua-upload-muted);
+  background: color-mix(in srgb, var(--ua-run-gui-diff) 18%, transparent);
+  color: color-mix(in srgb, var(--ua-run-gui-diff) 55%, var(--ua-upload-text));
+}
+
+.ua-run-gui-slot-icon {
+  color: #f59e0b;
+}
+
+.ua-run-gui-slot[data-verdict="block"] .ua-run-gui-slot-icon {
+  color: #ef4444;
+}
+
+.ua-run-gui-slot[data-verdict="allow"] .ua-run-gui-slot-icon {
+  color: #22c55e;
+}
+
+.ua-run-gui-details > summary {
+  list-style-position: inside;
+}
+
+.ua-run-gui-details[open] > summary {
+  color: var(--ua-upload-text);
+}
+
+.ua-run-gui-collapse {
+  color: var(--ua-upload-muted);
+  transition:
+    background-color 150ms ease,
+    color 150ms ease;
+}
+
+.ua-run-gui-collapse:hover {
+  background: color-mix(
+    in srgb,
+    var(--ua-copper-bright) 10%,
+    var(--ua-upload-surface-raised)
+  );
+  color: var(--ua-upload-text);
+}
+
+.ua-run-gui-tone-text {
+  color: color-mix(in srgb, var(--ua-run-gui-tone) 75%, var(--ua-upload-text));
+}
+
+.ua-run-gui-recent {
+  background: var(--ua-upload-surface-raised);
+  border: 1px solid var(--ua-upload-border);
+  color: var(--ua-upload-text);
+}
+
+/* Results: one card per queue item, its stripe showing the item's outcome. */
+.ua-run-gui-item {
+  background: color-mix(
+    in srgb,
+    var(--ua-upload-surface-raised) 55%,
+    transparent
+  );
+  border-color: var(--ua-upload-border);
+  border-left: 3px solid var(--ua-run-gui-tone);
+}
+
+.ua-run-gui-item-header {
+  border-bottom: 1px solid var(--ua-upload-border);
+  color: var(--ua-upload-text);
+}
+
+.ua-run-gui-item-index {
+  background: var(--ua-upload-hover);
+  color: var(--ua-upload-muted);
+}
+
+/* A queue item's cover in Results; the image keeps its own aspect ratio. */
+.ua-run-gui-cover {
+  background: var(--ua-upload-hover);
+  border-color: var(--ua-upload-border);
+}
+
+/* Poster thumbnail beside an ID choice; the tile shows when there is none. */
+.ua-run-gui-option-thumb {
+  background: var(--ua-upload-hover);
+  color: var(--ua-upload-muted);
+}
+
+/* Correction chips: insert a flag with its current value into the answer. */
+.ua-run-gui-arg-chip {
+  background: var(--ua-upload-surface);
+  border-color: var(--ua-upload-border);
+  color: var(--ua-upload-text);
+}
+
+.ua-run-gui-arg-chip:hover:not(:disabled) {
+  background: var(--ua-upload-hover);
+  border-color: var(--ua-copper);
+}
+
+/* Skipping drops the release, so it reads as a cautionary choice. */
+.ua-run-gui-skip {
+  color: color-mix(in srgb, #ef4444 70%, var(--ua-upload-text));
+  border-color: color-mix(in srgb, #ef4444 40%, var(--ua-upload-border));
 }

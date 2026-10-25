@@ -159,7 +159,8 @@ sudo chown -R 1000:1000 /host/path/Upload-Assistant
 chown -R 99:100 /mnt/user/appdata/Upload-Assistant
 ```
 
-- The WebUI will try to tighten `webui_auth.json` and `session_secret` permissions to `0600` after writing when the platform supports chmod.
+- The WebUI creates `webui_auth.json`, `session_secret` and `session_key` with `0600` permissions when the platform supports them.
+- On first start without an account, the WebUI prints a one-time setup code to the container log. Read it with `docker logs <container>` and enter it on the account setup page.
 
 ---
 

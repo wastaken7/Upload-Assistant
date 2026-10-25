@@ -31,11 +31,12 @@ def browser(tmp_path, monkeypatch):
     (movie / "movie.mkv").touch()
     monkeypatch.setenv("UA_BROWSE_ROOTS", str(media_root))
     server.limiter.reset()
+    server.auth_mod.create_user("fictional-user", "Fictional-Passphrase-2026!")
     client = server.app.test_client()
     with client.session_transaction() as session:
         session["enc"] = server.auth_mod.encrypt_text(
             server._derive_aes_key(),
-            json.dumps({"authenticated": True, "csrf_token": HEADERS["X-CSRF-Token"]}),
+            json.dumps({"authenticated": True, "account": server._account_fingerprint(), "csrf_token": HEADERS["X-CSRF-Token"]}),
         )
     yield client
     server.limiter.reset()
@@ -102,8 +103,14 @@ def test_browsing_still_requires_authentication(browser, route, query):
 def test_other_routes_keep_their_default_limits(browser):
     """Preserve the hourly default on endpoints without browsing overrides."""
     for _ in range(50):
+        assert browser.get("/api/2fa/status", headers=HEADERS).status_code == 200
+    assert browser.get("/api/2fa/status", headers=HEADERS).status_code == 429
+
+
+def test_page_load_routes_allow_more_than_default_limit(browser):
+    """Keep routes fetched on every Web UI load usable past the hourly default."""
+    for _ in range(51):
         assert browser.get("/api/csrf_token").status_code == 200
-    assert browser.get("/api/csrf_token").status_code == 429
 
 
 def test_invalid_basic_credentials_are_counted_before_html_redirect(browser, monkeypatch):

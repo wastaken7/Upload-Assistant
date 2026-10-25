@@ -3,13 +3,20 @@ from pathlib import Path
 from unittest.mock import AsyncMock
 
 from src.meta import Meta
+from src.screenshot_manifest import register
 from src.trackers.AVISTAZ.avistaz import AvistaZ
 
 
 def test_avistaz_get_screenshots_only_uploads_menus_and_standard_screenshots(tmp_path: Path, monkeypatch) -> None:
     screens_dir = tmp_path / "tmp" / "test-uuid" / "screenshots"
     screens_dir.mkdir(parents=True)
-    (screens_dir / "generated.png").write_bytes(b"local_png_data")
+    screenshot = screens_dir / "generated.png"
+    screenshot.write_bytes(b"local_png_data")
+    screenshot = register(tmp_path, "test-uuid", [screenshot], "main")[0]
+    (screens_dir / "stray.png").write_bytes(b"unregistered")
+    extra = screens_dir / "extra.png"
+    extra.write_bytes(b"supplemental")
+    register(tmp_path, "test-uuid", [extra], "FILE_1")
 
     meta = Meta(
         base_dir=str(tmp_path),
@@ -48,7 +55,7 @@ def test_avistaz_get_screenshots_only_uploads_menus_and_standard_screenshots(tmp
 
     results = asyncio.run(az.get_screenshots(meta))
 
-    assert results == ["id_menu1.png", "id_generated.png"]  # noqa: S101
+    assert results == ["id_menu1.png", f"id_{screenshot.name}"]  # noqa: S101
     assert "https://imgbox.com/screen1.png" not in uploaded_urls  # noqa: S101
     assert "https://imgbox.com/screen2.png" not in uploaded_urls  # noqa: S101
     assert "https://imgbox.com/spectro.png" not in uploaded_urls  # noqa: S101

@@ -12,6 +12,7 @@ import cli_ui
 import guessit
 import httpx
 
+from src import webui_events
 from src.console import console, logger, prompt_in_thread
 from src.exceptions import *  # noqa: F403
 from src.meta import Meta
@@ -353,10 +354,11 @@ class SeasonEpisodeManager:
             else:
                 while files_shown < len(filelist):
                     remaining_files = len(filelist) - files_shown
-                    response = await prompt_in_thread(
-                        cli_ui.ask_string,
-                        f"{remaining_files} more files: show (n)ext {batch_size}, (a)ll, (c)ontinue to confirmation, or (q)uit? (n/a/c/Q): ",
-                    )
+                    with webui_events.answer_buttons([("n", f"Show next {batch_size}"), ("a", "Show all"), ("c", "Continue"), ("q", "Quit")]):
+                        response = await prompt_in_thread(
+                            cli_ui.ask_string,
+                            f"{remaining_files} more files: show (n)ext {batch_size}, (a)ll, (c)ontinue to confirmation, or (q)uit? (n/a/c/Q): ",
+                        )
                     response = (response or "").strip().lower()
                     if response in ("n", "a"):
                         end = min(files_shown + batch_size, len(filelist)) if response == "n" else len(filelist)
@@ -374,7 +376,9 @@ class SeasonEpisodeManager:
                     if missing_list
                     else "Continue with these extra episodes (possible specials or different numbering)? (y/N): "
                 )
-                response = await prompt_in_thread(cli_ui.ask_string, question)
+                buttons = [("y", "Incomplete: mark it"), ("n", "Complete: continue"), ("q", "Quit")] if missing_list else [("y", "Continue"), ("n", "Stop")]
+                with webui_events.answer_buttons(buttons):
+                    response = await prompt_in_thread(cli_ui.ask_string, question)
                 response = (response or "").strip().lower()
                 if response in ("y", "yes"):
                     meta.season_pack_incomplete = bool(missing_list)

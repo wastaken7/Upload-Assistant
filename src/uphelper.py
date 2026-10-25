@@ -14,6 +14,7 @@ import aiofiles
 import cli_ui
 from rich.markup import escape
 
+from src import confirm_options, webui_events
 from src.audible import resolve_audible_url
 from src.bdinfo_comparator import compare_bdinfo, has_bdinfo_content
 from src.cleanup import cleanup_manager
@@ -287,12 +288,45 @@ class UploadHelper:
         async with self._prompt_lock:
             return await prompt_in_thread(cli_ui.ask_yes_no, question, default=default)
 
+    async def _ask_confirmation(self, question: str) -> tuple[bool, dict[str, Any]]:
+        """Ask a yes/no question whose GUI answer may carry run option values."""
+
+        def ask() -> tuple[bool, dict[str, Any]]:
+            prompt_id = webui_events.prompt_open("yes_no", question, default=False)
+            try:
+                while True:
+                    cli_ui.info(cli_ui.green, "::", cli_ui.reset, question, cli_ui.reset, "(y/N)")
+                    confirmed, values = confirm_options.parse_answer(cli_ui.read_input(), default=False)
+                    if confirmed is not None:
+                        return confirmed, values
+                    cli_ui.warning("Please answer by 'y' (yes) or 'n' (no) ")
+            finally:
+                webui_events.prompt_close(prompt_id)
+
+        async with self._prompt_lock:
+            return await prompt_in_thread(ask)
+
     async def dupe_check(self, dupes: list[DupeEntry | str], meta: Meta, tracker_name: str, slot_decision: SlotDecision | None = None) -> tuple[bool, Meta]:
         """Show duplicate results and their confirmation as one atomic console interaction."""
+        prepared_tracker: Any = None
+        if webui_events.enabled():
+            # Register queued reviews before waiting for another tracker's prompt.
+            # Resolve automatic season-pack skips without counting them as reviews.
+            season_pack_skip = False
+            if dupes and meta.dupe is False and meta.season_pack_exists:
+                tracker_factory = cast(Callable[..., Any], self.tracker_class_map[tracker_name])
+                prepared_tracker = tracker_factory(config=self.config)
+                season_pack_skip = bool(getattr(prepared_tracker, "reject_episode_if_season_pack_exists", False))
+            interactive = (not meta.unattended or meta.unattended_confirm) and not meta.ask_dupe
+            needs_review = bool(dupes) and not season_pack_skip and (meta.dupe is False or (meta.filename_match and meta.file_count_match))
+            if not dupes and slot_decision is not None:
+                needs_review = meta.dupe is False and (slot_decision.verdict is Verdict.BLOCK or (slot_decision.verdict is Verdict.REVIEW and bool(slot_decision.conflicts)))
+            webui_events.dupe_review_ready(tracker_name, needs_review=bool(interactive and needs_review))
         async with self._prompt_lock:
             token = _dupe_prompt_lock_held.set(True)
             try:
-                return await self._dupe_check(dupes, meta, tracker_name, slot_decision)
+                with webui_events.prompt_context(kind="dupes", tracker=tracker_name):
+                    return await self._dupe_check(dupes, meta, tracker_name, slot_decision, tracker_class=prepared_tracker)
             finally:
                 _dupe_prompt_lock_held.reset(token)
 
@@ -321,8 +355,23 @@ class UploadHelper:
         def plain(text: str) -> str:
             return text if unicode_ok else text.replace("·", dot).replace("…", more)
 
+        # The GUI gets the decision as one structured event instead of these box lines.
+        webui_events.slot(
+            decision.tracker,
+            decision.verdict.value,
+            title,
+            decision.reason,
+            slot_name=decision.slot,
+            why=decision.why,
+            conflicts=decision.conflicts,
+            notes=decision.notes,
+            rules_date=decision.rules_date,
+            source_size=meta.source_size,
+        )
+        gui_off = {"highlighter": None, "ua_gui": False}
+
         def line(markup: str = "") -> None:
-            logger.info(f"{bar} {markup}" if markup else bar, extra={"highlighter": None})
+            logger.info(f"{bar} {markup}" if markup else bar, extra=gui_off)
 
         def paragraph(text: str, *, indent: str = "", style: str = "") -> None:
             for chunk in textwrap.wrap(plain(text), width=width - len(indent)) or [""]:
@@ -330,7 +379,7 @@ class UploadHelper:
                 line(f"{indent}[{style}]{body}[/{style}]" if style else f"{indent}{body}")
 
         logger.info("")
-        logger.info(f"[{color}]{top}[/{color}] [bold]{decision.tracker}[/bold] [dim]{dot} slot check[/dim]", extra={"highlighter": None})
+        logger.info(f"[{color}]{top}[/{color}] [bold]{decision.tracker}[/bold] [dim]{dot} slot check[/dim]", extra=gui_off)
         line(f"[bold {color}]{icon} {title}[/bold {color}]")
         paragraph(decision.reason)
         if decision.slot:
@@ -361,7 +410,7 @@ class UploadHelper:
         age = "today" if age_days <= 0 else f"{age_days} day{'s' if age_days != 1 else ''} ago"
         line()
         paragraph(f"Rules as of {decision.rules_date.isoformat()} ({age}). This is only a recommendation; tracker rules change over time.", style="dim")
-        logger.info(f"[{color}]{bottom}[/{color}]", extra={"highlighter": None})
+        logger.info(f"[{color}]{bottom}[/{color}]", extra=gui_off)
         logger.info("")
 
     def _show_slot_fallback(self, meta: Meta, tracker_name: str) -> None:
@@ -375,7 +424,17 @@ class UploadHelper:
         else:
             logger.info(f"[dim]{tracker_name}: slot rules are not implemented for this tracker; using the basic dupe check.[/dim]")
 
-    async def _dupe_check(self, dupes: list[DupeEntry | str], meta: Meta, tracker_name: str, slot_decision: SlotDecision | None = None) -> tuple[bool, Meta]:
+    async def _dupe_check(
+        self,
+        dupes: list[DupeEntry | str],
+        meta: Meta,
+        tracker_name: str,
+        slot_decision: SlotDecision | None = None,
+        *,
+        tracker_class: Any = None,
+    ) -> tuple[bool, Meta]:
+        """Review one tracker, reusing an instance prepared for its season-pack policy."""
+
         def _format_dupe(entry: DupeEntry | str) -> str:
             if isinstance(entry, dict):
                 name = str(entry.get("name", ""))
@@ -428,7 +487,7 @@ class UploadHelper:
                     if slot_verdict is Verdict.REVIEW:
                         # Unattended review keeps the basic result, which found no dupes.
                         return False, meta
-                    logger.info(f"[bold red]{tracker_name}: skipping upload, slot rules recommend against it.[/bold red]")
+                    logger.info(f"[bold red]{tracker_name}: skipping upload, slot rules recommend against it.[/bold red]", extra={"ua_gui": False})
                     return True, meta
                 try:
                     upload = await self.prompt_yes_no(f"Upload to {tracker_name} anyway?", default=False)
@@ -443,8 +502,9 @@ class UploadHelper:
                 self._show_slot_decision(slot_decision, meta)
             logger.debug(f"[green]No dupes found at[/green] [yellow]{tracker_name}[/yellow]")
             return False, meta
-        tracker_class_factory = cast(Callable[..., Any], self.tracker_class_map[tracker_name])
-        tracker_class = tracker_class_factory(config=self.config)
+        if tracker_class is None:
+            tracker_class_factory = cast(Callable[..., Any], self.tracker_class_map[tracker_name])
+            tracker_class = tracker_class_factory(config=self.config)
         try:
             tracker_rename = await tracker_class.get_name(meta)
         except Exception:
@@ -459,7 +519,8 @@ class UploadHelper:
 
         if meta.dupe is False and meta.season_pack_exists and bool(getattr(tracker_class, "reject_episode_if_season_pack_exists", False)):
             pack_name = meta.season_pack_name or "matching season pack"
-            logger.info(f"[bold red]{tracker_name}: {pack_name} already contains this episode. Skipping individual episode upload.[/bold red]")
+            logger.info(f"[bold red]{tracker_name}: {pack_name} already contains this episode. Skipping individual episode upload.[/bold red]", extra={"ua_gui": False})
+            webui_events.notice("attention", f"{pack_name} already contains this episode, so the episode is not uploaded.", tracker=tracker_name)
             return True, meta
 
         # Show naming change before dupe prompts so user knows what the final name will be
@@ -470,7 +531,8 @@ class UploadHelper:
             trumpable_dupes = [entry for entry in dupes_list if isinstance(entry, dict) and entry.get("trumpable")]
             if trumpable_dupes:
                 trumpable_text = _format_dupes_list(trumpable_dupes)
-                logger.info("[bold red]Trumpable found![/bold red]")
+                logger.info("[bold red]Trumpable found![/bold red]", extra={"ua_gui": False})
+                webui_events.dupes(tracker_name, trumpable_dupes, source_size=meta.source_size, trumpable=True)
             elif meta.season_pack_contains_episode and meta.get(f"{tracker_name}_matched_episode_ids", []):
                 matched_episodes = cast(list[DupeEntry], meta.get(f"{tracker_name}_matched_episode_ids", []))
                 user_tag = meta.tag.lstrip("-").lower() if meta.tag else ""  # Remove leading dash for comparison
@@ -492,7 +554,8 @@ class UploadHelper:
                     selected_match = matched_episodes[0]
 
                 trumpable_text = _format_dupe(selected_match)
-                logger.info("[bold red]Trumpable found based on episode matching![/bold red]")
+                logger.info("[bold red]Trumpable found based on episode matching![/bold red]", extra={"ua_gui": False})
+                webui_events.dupes(tracker_name, [selected_match], source_size=meta.source_size, trumpable=True)
 
                 if user_tag and not tag_matched:
                     logger.info(f"[yellow]Note: No release found with matching tag '{meta.tag}'. Selected release may be from a different group.[/yellow]")
@@ -539,7 +602,8 @@ class UploadHelper:
 
             if not meta.were_trumping:
                 if meta.filename_match and meta.file_count_match:
-                    logger.info(f"[bold red]Exact match found! - {meta.filename_match}[/bold red]")
+                    logger.info(f"[bold red]Exact match found! - {meta.filename_match}[/bold red]", extra={"ua_gui": False})
+                    webui_events.notice("attention", f"Exact match already on the site: {meta.filename_match}", tracker=tracker_name)
                     try:
                         if tracker_name in ["AITHER", "LST"]:
                             logger.info(f"[yellow]{tracker_name} supports automatic trumping of exact matches, if the file is allowed to be trumped.[/yellow]")
@@ -570,10 +634,16 @@ class UploadHelper:
                         logger.info("[yellow]Ensure your upload is not part of that season pack, or is otherwise allowed.[/yellow]")
                         logger.info("")
                         logger.info(f"[bold cyan]{season_pack_text}[/bold cyan]")
+                        webui_events.dupes(
+                            tracker_name,
+                            [{"name": season_pack_name, "link": season_pack_link}],
+                            note="A season pack exists. Make sure this upload is not part of it, or is otherwise allowed.",
+                        )
                     else:
                         logger.info(f"[bold blue]{tracker_name}[/bold blue]: Check if these are actually dupes:")
                         logger.info("")
                         logger.info(f"[bold cyan]{dupe_text}[/bold cyan]", extra={"highlighter": None})
+                        webui_events.dupes(tracker_name, dupes_list, source_size=meta.source_size)
                     if meta.dupe is False:
                         try:
                             if meta.is_disc == "BDMV":
@@ -599,7 +669,7 @@ class UploadHelper:
             upload = True
         else:
             if slot_verdict is Verdict.BLOCK:
-                logger.info(f"[bold red]{tracker_name}: skipping upload, slot rules recommend against it.[/bold red]")
+                logger.info(f"[bold red]{tracker_name}: skipping upload, slot rules recommend against it.[/bold red]", extra={"ua_gui": False})
             upload = False
 
         display_name = display_name if display_name is not None else meta.name
@@ -666,7 +736,7 @@ class UploadHelper:
         if not possible:
             return
 
-        question = "Found BDInfo content in potential duplicates. Perform a comparison?"
+        question = f"Found BDInfo content in potential duplicates on {tracker_name}. Perform a comparison?"
         if await self.prompt_yes_no(question, default=True):
             warnings: list[str] = []
             results: list[str] = []
@@ -692,6 +762,8 @@ class UploadHelper:
                 logger.info("")
 
     async def get_confirmation(self, meta: Meta) -> bool:
+        """Publish resolved release flags and review metadata before continuing."""
+        webui_events.update_item(personal_release=meta.personalrelease is True, run_options=meta, artwork=meta)
         confirm: bool = False
         lines: list[str | tuple[str, str]] = []
         missing_warning = "[bold red]⚠️ Missing[/bold red]"
@@ -883,7 +955,22 @@ class UploadHelper:
             else:
                 formatted_lines.append(item)
 
-        logger.info("\n".join(formatted_lines), extra={"highlighter": None})
+        logger.info("\n".join(formatted_lines), extra={"highlighter": None, "ua_gui": False})
+        # The GUI already shows the metadata in its preview; it only needs what is missing.
+        missing_notices: list[dict[str, str]] = []
+        for item in lines:
+            if not isinstance(item, tuple) or missing_warning not in item[1]:
+                continue
+            if item[0] == "Title":
+                # One line shows title and year; name only the part that is missing.
+                if not meta.title:
+                    missing_notices.append({"level": "attention", "text": f"Title is missing. {title_hint}"})
+                if not meta.year:
+                    missing_notices.append({"level": "attention", "text": "Year is missing. Use --year."})
+                continue
+            hint = webui_events.plain_text(item[1]).replace("⚠️ Missing", "", 1).strip()
+            missing_notices.append({"level": "attention", "text": f"{item[0]} is missing. {hint}".strip()})
+        webui_events.notice_group("confirm", missing_notices)
 
         if meta.unattended and not meta.unattended_confirm:
             if meta.debug is True:
@@ -951,8 +1038,16 @@ class UploadHelper:
         else:
             logger.info(f"[bold]Base Name:[/bold] {meta.name}\n", extra={"highlighter": None})
 
-        confirm = await self.prompt_yes_no("Is this correct?")
+        run_options = confirm_options.available(meta, self.config) if webui_events.enabled() else []
+        with webui_events.prompt_context(kind="confirm", base_name=meta.name, release_names=tracker_release_names, debug=bool(meta.debug), run_options=run_options):
+            confirm, option_values = await self._ask_confirmation("Is this correct?") if run_options else (await self.prompt_yes_no("Is this correct?"), {})
         logger.info("")
+
+        if confirm and option_values:
+            changed = confirm_options.apply(meta, run_options, option_values)
+            if changed:
+                logger.info(f"[green]Options changed in the Web UI:[/green] {escape(', '.join(changed))}")
+                webui_events.update_item(personal_release=meta.personalrelease is True, run_options=meta)
 
         if confirm:
             if (

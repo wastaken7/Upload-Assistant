@@ -330,13 +330,12 @@ class AlphaRatio:
                     if match:
                         auth_key = match.group(1)
                         # Save it for next time
-                        from src.cookie_auth import find_cookie_file
+                        from src.cookie_auth import find_cookie_file, write_owner_only_text
 
                         cookie_file = find_cookie_file(meta.base_dir, self.tracker, self.config)
                         auth_file = cookie_file.replace(".txt", "_auth.txt")
                         with contextlib.suppress(Exception):
-                            async with aiofiles.open(auth_file, "w", encoding="utf-8") as f:
-                                await f.write(auth_key)
+                            write_owner_only_text(auth_file, auth_key)
                             logger.info(f"{self.tracker}: [green]Auth key saved for future use[/green]")
                         return auth_key
         except Exception as e:

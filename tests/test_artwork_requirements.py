@@ -10,6 +10,7 @@ import upload
 from src.args import Args
 from src.artwork import prepare_artwork
 from src.meta import Meta
+from src import webui_events
 from src.trackers.UNIT3D import UNIT3D
 from upload import _prompt_book_meta, _prompt_music_meta
 
@@ -275,3 +276,33 @@ async def test_unit3d_attaches_only_a_decodable_book_cover(tmp_path: Path) -> No
     cover_file.write_bytes(b"not an image")
     files = await tracker.get_additional_files(meta)
     assert "torrent-cover" not in files
+
+
+@pytest.mark.asyncio
+async def test_prompt_music_meta_offers_conflicting_years_in_the_web_ui() -> None:
+    meta = Meta(
+        category="MUSIC",
+        artist="Test Artist",
+        title="Test Album",
+        source="WEB",
+        artwork_url="https://example.invalid/cover.jpg",
+        music_release={
+            "fields": {"year": {"value": 2026, "source": "file_tag"}, "release_type": {"value": "Single"}},
+            "conflicts": {"year": ["2026", "2019", "not a year"]},
+        },
+    )
+    contexts = []
+
+    def ask_string(_question):
+        contexts.append(webui_events._prompt_context.get())
+        return ""
+
+    with patch("upload.CLI_UI.ask_string", side_effect=ask_string):
+        await _prompt_music_meta(meta)
+
+    (context,) = contexts
+    assert context["kind"] == "field"
+    assert context["focus"] == "Year"
+    assert context["summary"]["Album"] == "Test Album"
+    assert context["actions"] == [("", "Keep 2026"), ("2019", "2019")]
+    assert "file tag" in context["hint"]

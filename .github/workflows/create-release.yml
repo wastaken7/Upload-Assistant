@@ -59,6 +59,7 @@ jobs:
             -f tag_name="$NEW_VERSION" \
             -f target_commitish="$GITHUB_SHA" \
             --jq .body > "$RUNNER_TEMP/release-notes.md"
+          python scripts/format_release_notes.py "$RUNNER_TEMP/release-notes.md"
 
       - name: Save release notes
         uses: actions/upload-artifact@v4
