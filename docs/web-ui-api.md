@@ -61,6 +61,8 @@ Statistics contain no per-release events, names, paths, release-group names or t
 
   During duplicate review, the GUI counts trackers requiring manual decisions, including slot-rule overrides and trumping. Several questions for one tracker count as one review. A `+` after the total and “Still checking trackers…” mean discovery is incomplete; the total becomes final once `checking` reaches zero. Review state is isolated to each queue item and upload session.
 
+  The final `dupe_clear` confirmation includes `context.client_skipped_trackers`, a list of selected trackers actually removed because they were found in the torrent client. The GUI lists these separately from trackers skipped by tracker rules. This list resets for each run item and stays empty in debug mode, where client matches are retained for checks.
+
 Examples
 
 - Simple streaming curl (Unix-like / WSL / Git Bash). Use forward slashes to avoid escaping backslashes in Windows paths:

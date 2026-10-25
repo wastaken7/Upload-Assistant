@@ -9471,6 +9471,7 @@ function AudionutsUAGUI() {
     });
   };
 
+  /** Summarize tracker checks and client skips before the final upload decision. */
   const renderRunGuiDupeClearContext = (context) => {
     const groups = [
       [
@@ -9486,6 +9487,11 @@ function AudionutsUAGUI() {
       [
         "Skipped by tracker rules",
         splitTrackers(context.skipped_trackers),
+        "muted",
+      ],
+      [
+        "Skipped: already in client",
+        splitTrackers(context.client_skipped_trackers),
         "muted",
       ],
     ].filter(([, names]) => names.length);
