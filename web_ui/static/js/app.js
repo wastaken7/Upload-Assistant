@@ -9471,13 +9471,21 @@ function AudionutsUAGUI() {
     });
   };
 
+  /** List only the upload targets inside the final confirmation question. */
   const renderRunGuiDupeClearContext = (context) => {
-    const groups = [
-      [
-        "No potential dupes found",
-        splitTrackers(context.clear_trackers),
-        "success",
-      ],
+    const names = splitTrackers(context.clear_trackers);
+    if (!names.length) return null;
+    return (
+      <div>
+        {renderRunGuiSectionLabel("No potential dupes found")}
+        <div className="mt-1">{renderRunGuiTrackerChips(names, "success")}</div>
+      </div>
+    );
+  };
+
+  /** Group excluded trackers for the separate, expanded Skipped panel. */
+  const getRunGuiSkippedGroups = (context) =>
+    [
       [
         "Possible dupes found",
         splitTrackers(context.dupe_trackers),
@@ -9488,14 +9496,12 @@ function AudionutsUAGUI() {
         splitTrackers(context.skipped_trackers),
         "muted",
       ],
+      [
+        "Already in client",
+        splitTrackers(context.client_skipped_trackers),
+        "muted",
+      ],
     ].filter(([, names]) => names.length);
-    return groups.map(([label, names, tone]) => (
-      <div key={label}>
-        {renderRunGuiSectionLabel(label)}
-        <div className="mt-1">{renderRunGuiTrackerChips(names, tone)}</div>
-      </div>
-    ));
-  };
 
   // Other accepted answers of a free-text question, as ``[answer, label]``.
   const getRunGuiActions = (context) =>
@@ -10305,6 +10311,10 @@ function AudionutsUAGUI() {
         ),
     );
     const attentionCount = attentionCards.length + attentionNotices.length;
+    const skippedGroups =
+      isExecuting && prompt?.context?.kind === "dupe_clear"
+        ? getRunGuiSkippedGroups(prompt.context)
+        : [];
     const emptyNotes = { cards: [], notices: [], problems: [] };
     const resultGroups = view.multipleItems
       ? view.items.map((item) => ({
@@ -10430,6 +10440,35 @@ function AudionutsUAGUI() {
         </div>
 
         {renderRunGuiPrompt(view)}
+
+        {skippedGroups.length > 0 &&
+          renderRunGuiBlock({
+            icon: "circle-minus",
+            title: "Skipped",
+            aside: (
+              <span className="ua-run-gui-muted text-xs">
+                {plural(
+                  skippedGroups.reduce(
+                    (total, [, names]) => total + names.length,
+                    0,
+                  ),
+                  "tracker",
+                )}
+              </span>
+            ),
+            children: (
+              <div className="space-y-3">
+                {skippedGroups.map(([label, names, tone]) => (
+                  <div key={label}>
+                    {renderRunGuiSectionLabel(label)}
+                    <div className="mt-1">
+                      {renderRunGuiTrackerChips(names, tone)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ),
+          })}
 
         {!hasAnything && !prompt && (
           <div className="ua-run-gui-empty flex flex-col items-center justify-center gap-2 rounded-xl border p-8 shadow-sm text-center text-sm">

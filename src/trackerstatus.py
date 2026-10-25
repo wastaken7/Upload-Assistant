@@ -419,6 +419,7 @@ class TrackerStatusManager:
                         clear_trackers=",".join(prompt_trackers),
                         dupe_trackers=",".join(dupe_trackers),
                         skipped_trackers=",".join(skipped_trackers),
+                        client_skipped_trackers=meta.client_skipped_trackers,
                     ):
                         upload_all = await helper.prompt_yes_no(prompt_msg, default=False)
                 except EOFError:

@@ -100,6 +100,7 @@ class Meta:
     clean_name: str = ""
     cleanup: bool = False
     client: str | None = None
+    client_skipped_trackers: list[str] = field(default_factory=list)
     combined_genres: list[str] | str = field(default_factory=list)
     comic: bool = False
     content_duration_category: str = ""
