@@ -9491,7 +9491,11 @@ function AudionutsUAGUI() {
         splitTrackers(context.dupe_trackers),
         "attention",
       ],
-      ["Tracker rules", splitTrackers(context.skipped_trackers), "muted"],
+      [
+        "Skipped by tracker rules",
+        splitTrackers(context.skipped_trackers),
+        "muted",
+      ],
       [
         "Already in client",
         splitTrackers(context.client_skipped_trackers),
