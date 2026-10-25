@@ -333,11 +333,17 @@ async def export_info(
     reports = asyncio.gather(
         asyncio.to_thread(MediaInfo.parse, video, output="STRING", full=False),
         asyncio.to_thread(MediaInfo.parse, video, output="JSON"),
+        # Wait for both passes so a failure does not leave the other one running unawaited.
+        return_exceptions=True,
     )
     done, _pending = await asyncio.wait({reports}, timeout=MEDIAINFO_SLOW_NOTICE_SECONDS)
     if not done:
         logger.warning("[yellow]MediaInfo is still reading the file. Files with many tracks can take a few minutes.[/yellow]")
-    media_info, media_info_json = cast(tuple[str, str], await reports)
+    results = await reports
+    for result in results:
+        if isinstance(result, BaseException):
+            raise result
+    media_info, media_info_json = cast(tuple[str, str], results)
 
     # Keep the CLI footer so every exported text report identifies its MediaInfo version.
     filtered_media_info = media_info

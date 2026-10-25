@@ -7,6 +7,8 @@ import time
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from src.exportmi import export_info
 
 
@@ -75,3 +77,24 @@ def test_export_info_does_not_warn_when_mediainfo_is_fast(tmp_path: Path) -> Non
         asyncio.run(export_info(str(media_file), False, "release", str(tmp_path)))
 
     logger.warning.assert_not_called()
+
+
+def test_export_info_waits_for_both_reports_before_raising(tmp_path: Path) -> None:
+    media_file = _write_reports_fixture(tmp_path)
+    json_finished = threading.Event()
+
+    def fake_parse(_video: str, *, output: str, **_kwargs: object) -> str:
+        if output == "JSON":
+            time.sleep(0.2)
+            json_finished.set()
+            return '{"media": {"track": [{"@type": "General"}]}}'
+        raise RuntimeError("text report failed")
+
+    async def run_export() -> bool:
+        with pytest.raises(RuntimeError, match="text report failed"):
+            await export_info(str(media_file), False, "release", str(tmp_path))
+        # Checked before asyncio.run joins the worker threads on shutdown.
+        return json_finished.is_set()
+
+    with patch("src.exportmi.MediaInfo.parse", side_effect=fake_parse):
+        assert asyncio.run(run_export())
