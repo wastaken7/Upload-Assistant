@@ -161,6 +161,7 @@ STATIC_AUTH_TYPES = {
     "XINGYUNGEPT": "cookies",
     "YUSCENE": "unit3d_api",
     "ZENITH": "unit3d_api",
+    "ZMPT": "cookies",
 }
 
 
@@ -1546,6 +1547,7 @@ tracker_class_map: Any = LazyTrackerDict(
         "XINGYUNGEPT": ("src.trackers.NEXUSPHP.xingyungept", "XingyungePT"),
         "YUSCENE": ("src.trackers.UNIT3D.yuscene", "YUSCENE"),
         "ZENITH": ("src.trackers.UNIT3D.zenith", "Zenith"),
+        "ZMPT": ("src.trackers.NEXUSPHP.zmpt", "ZmPT"),
     }
 )
 
