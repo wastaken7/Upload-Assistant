@@ -190,6 +190,9 @@ class RocketHD(UNIT3D):
         """
         Rebuild release name from meta components following RocketHD naming rules.
         """
+        if meta.manual_name is not None:
+            return {"name": meta.manual_name.strip()}
+
         if not meta.language_checked:
             await languages_manager.process_desc_language(meta, tracker=self.tracker)
 

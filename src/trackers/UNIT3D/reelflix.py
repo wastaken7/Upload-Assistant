@@ -36,6 +36,9 @@ class ReelFlix(UNIT3D):
         return self.common.check_and_confirm_adult_media_upload(meta, self.tracker)
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
+        if meta.manual_name is not None:
+            return {"name": meta.manual_name.strip()}
+
         rf_name = meta.name
         tag_value = meta.tag or ""
         tag_lower = tag_value.lower()

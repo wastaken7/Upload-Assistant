@@ -56,6 +56,9 @@ class Portugas(UNIT3D):
         return {"resolution_id": resolution_id}
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
+        if meta.manual_name is not None:
+            return {"name": meta.manual_name.strip()}
+
         name = meta.name.replace(" ", ".")
 
         pt_name = name

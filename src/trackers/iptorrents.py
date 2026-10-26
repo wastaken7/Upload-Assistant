@@ -365,6 +365,9 @@ class IPTorrents:
         return 0
 
     async def get_name(self, meta: Meta):
+        if meta.manual_name is not None:
+            return meta.manual_name.strip()
+
         name: str = meta.scene_name if meta.scene_name else meta.clean_name
 
         replacements = {

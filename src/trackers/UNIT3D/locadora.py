@@ -35,6 +35,9 @@ class Locadora(UNIT3D):
         self.common = Common(config)
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
+        if meta.manual_name is not None:
+            return {"name": meta.manual_name.strip()}
+
         name_value = meta.name if meta.is_disc == "BDMV" else meta.basename_no_ext
         name = name_value
 

@@ -799,6 +799,9 @@ class AZTrackerBase:
         # https://avistaz.to/guides/how-to-properly-titlename-a-torrent
         # https://cinemaz.to/guides/how-to-properly-titlename-a-torrent
         # https://privatehd.to/rules/upload-rules
+        if meta.manual_name is not None:
+            return meta.manual_name.strip()
+
         aka_name = meta.aka or ""
         manual_episode_title = meta.manual_episode_title or ""
         daily_episode_title = meta.daily_episode_title or ""

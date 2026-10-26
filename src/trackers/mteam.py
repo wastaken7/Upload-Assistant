@@ -595,6 +595,9 @@ class MTeam:
 
     async def get_name(self, meta: Meta) -> str:
         """https://wiki.m-team.cc/zh-tw/upload-title-rules"""
+        if meta.manual_name is not None:
+            return meta.manual_name.strip()
+
         name = meta.name
 
         # 1. Normalize Blu-ray / BLURAY / Blu-Ray to BluRay (incorporates UHD Blu-ray -> UHD BluRay)

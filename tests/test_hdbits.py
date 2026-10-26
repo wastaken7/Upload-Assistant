@@ -39,7 +39,7 @@ async def test_hdbits_preserves_custom_title_ellipsis(custom_name):
     ("Example Title... 2015 1080p", "Example Title... 2015 1080p"),
 ])
 async def test_hdbits_requires_complete_title_prefix(custom_name, expected_name):
-    meta = make_meta(name=custom_name, manual_name=custom_name, imdb_info={"aka": "Original Title"})
+    meta = make_meta(name=custom_name, imdb_info={"aka": "Original Title"})
 
     name = await HDBits({}).get_name(meta)
 
@@ -217,10 +217,18 @@ async def test_hdbits_miniseries_keeps_custom_title_at_start():
         category="TV",
         tv_pack=True,
         name=custom_name,
-        manual_name=custom_name,
         imdb_info={"aka": "Example Series", "type": "tvMiniSeries", "year": 2019},
     )
 
     name = await HDBits({}).get_name(meta)
 
     assert name == "Custom Title S01 1080p WEB-DL DD+5.1 H.264"  # noqa: S101
+
+
+async def test_hdbits_uses_manual_name_verbatim():
+    custom_name = "Example Title 2015 1080p WEB-DL DD+ 5.1 H.264-GROUP"
+    meta = make_meta(manual_name=custom_name, imdb_info={"aka": "Original Title", "year": 2016})
+
+    name = await HDBits({}).get_name(meta)
+
+    assert name == custom_name  # noqa: S101

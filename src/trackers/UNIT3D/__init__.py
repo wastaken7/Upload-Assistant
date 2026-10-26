@@ -292,6 +292,9 @@ class UNIT3D:
                     entry[key] = attributes.get(key)
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
+        if meta.manual_name is not None:
+            return {"name": meta.manual_name.strip()}
+
         return {"name": add_incomplete_pack_marker(meta.name, meta, self.tracker)}
 
     async def get_description(self, meta: Meta) -> Any:

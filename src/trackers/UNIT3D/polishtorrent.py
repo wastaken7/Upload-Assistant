@@ -45,6 +45,9 @@ class PolishTorrent(UNIT3D):
         return {"category_id": resolved_id}
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
+        if meta.manual_name is not None:
+            return {"name": meta.manual_name.strip()}
+
         ptt_name = meta.name
         imdb_info = meta.imdb_info
         if meta.original_language == "pl" and imdb_info:

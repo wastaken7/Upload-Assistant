@@ -177,6 +177,9 @@ class HawkeUno(UNIT3D):
         return normalized
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
+        if meta.manual_name is not None:
+            return {"name": meta.manual_name.strip()}
+
         name = self._normalize_upload_name(meta.name, meta)
         return {"name": add_incomplete_pack_marker(name, meta, self.tracker)}
 

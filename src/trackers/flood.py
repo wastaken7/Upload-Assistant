@@ -264,6 +264,9 @@ class Flood:
         return []
 
     async def get_name(self, meta: Meta) -> str:
+        if meta.manual_name is not None:
+            return meta.manual_name.strip()
+
         name = meta.name
         if meta.source in ("PAL DVD", "NTSC DVD", "DVD", "NTSC", "PAL"):
             audio = meta.audio

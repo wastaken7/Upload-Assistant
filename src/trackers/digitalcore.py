@@ -189,6 +189,9 @@ class DigitalCore:
         Mod also mentioned that metadata-based titles are acceptable.
         https://digitalcore.club/forum/6/topic/2810/clarification-needed-p2p-non-scene-torrent-naming-conventions
         """
+        if meta.manual_name is not None:
+            return meta.manual_name.strip()
+
         tracker_name = meta.basename_no_ext
         scene_name = meta.scene_name or ""
 

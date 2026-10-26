@@ -575,6 +575,9 @@ class BEYONDHD:
         return tags
 
     async def get_name(self, meta: Meta) -> str:
+        if meta.manual_name is not None:
+            return meta.manual_name.strip()
+
         name = meta.name or ""
         # BHD wants "English Title AKA Original Title". When TMDB has no English translation its title is the
         # original one and the AKA holds IMDb's English title, so the order comes out reversed.

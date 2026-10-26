@@ -37,6 +37,9 @@ class Torrenteros(UNIT3D):
         self.common = Common(config)
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
+        if meta.manual_name is not None:
+            return {"name": meta.manual_name.strip()}
+
         name = self.ttr_name or self.build_name(meta)
 
         return {"name": name}

@@ -96,6 +96,9 @@ class DreadVault(UNIT3D):
         self.common = Common(config)
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
+        if meta.manual_name is not None:
+            return {"name": meta.manual_name.strip()}
+
         dreadvault_name: str = meta.name
         resolution: str = meta.resolution if meta.resolution != "OTHER" else ""
         video_encode: str = meta.video_encode
