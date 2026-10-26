@@ -294,9 +294,11 @@ class CZTeam:
             return False
 
         try:
-            result = cast(dict[str, Any], response.json())
+            parsed: Any = response.json()
         except ValueError:
-            result = {}
+            parsed = None
+        # Anything other than a JSON object is reported through the error branch below.
+        result: dict[str, Any] = cast(dict[str, Any], parsed) if isinstance(parsed, dict) else {}
 
         if response.status_code == 409:
             existing = result.get("id")

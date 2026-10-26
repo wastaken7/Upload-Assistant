@@ -325,3 +325,14 @@ def test_game_section_drops_tables_only_for_czteam(tracker: str) -> None:
 
     assert ("[table]" in section) is (tracker != "CZTEAM")
     assert "PC" in section
+
+
+@pytest.mark.parametrize("status", [201, 409])
+def test_upload_handles_non_object_json(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, status: int) -> None:
+    meta = _upload_meta(tmp_path)
+    _mock_client(monkeypatch, lambda _request: httpx.Response(status, json=["unexpected"]))
+    tracker = _tracker()
+    _prepare_upload(tracker, monkeypatch, tmp_path / "tmp" / "abc" / "[CZTEAM].torrent")
+
+    assert asyncio.run(tracker.upload(meta)) is False
+    assert meta.tracker_status["CZTEAM"]["status_message"].startswith("data error:")
