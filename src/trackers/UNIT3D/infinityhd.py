@@ -264,6 +264,9 @@ class InfinityHD(TmdbTvNaming, UNIT3D):
         return False
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
+        if meta.manual_name is not None:
+            return {"name": meta.manual_name.strip()}
+
         ihd_name = meta.name
         resolution = meta.resolution
 

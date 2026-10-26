@@ -365,6 +365,9 @@ class IPTorrents:
         return 0
 
     async def get_name(self, meta: Meta):
+        if meta.manual_name is not None:
+            return meta.manual_name.strip()
+
         name: str = meta.scene_name if meta.scene_name else meta.clean_name
 
         replacements = {
@@ -431,7 +434,7 @@ class IPTorrents:
 
     async def get_data(self, meta: Meta) -> dict[str, str | int]:
         data: dict[str, str | int] = {
-            "name": add_incomplete_pack_marker(meta.name, meta, self.tracker),
+            "name": await self.get_name(meta),
             "descr": await self.generate_description(meta),
             "type": self.get_category_id(meta),
         }
@@ -476,7 +479,7 @@ class IPTorrents:
     async def edit_post_upload(self, meta: Meta):
         torrent_id = meta.tracker_status[self.tracker]["torrent_id"]
         data: dict[str, str | int] = {
-            "name": add_incomplete_pack_marker(meta.name, meta, self.tracker),
+            "name": await self.get_name(meta),
             "descr": await self.generate_description(meta),
             "type": self.get_category_id(meta),
             "imdb_id": str(meta.tmdb_id),

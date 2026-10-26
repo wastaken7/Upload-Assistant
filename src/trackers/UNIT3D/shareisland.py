@@ -93,6 +93,9 @@ class ShareIsland(UNIT3D):
         - Release group tag cleaning and validation
         - DISC region injection
         """
+        if meta.manual_name is not None:
+            return {"name": meta.manual_name.strip()}
+
         if not meta.language_checked:
             await languages_manager.process_desc_language(meta, tracker=self.tracker)
 

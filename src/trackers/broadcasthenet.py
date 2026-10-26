@@ -514,6 +514,9 @@ class BroadcasTheNet:
         return re.sub(r"\.{2,}", ".", value).strip(".-")
 
     async def get_name(self, meta: Meta) -> str:
+        if meta.manual_name is not None:
+            return meta.manual_name.strip()
+
         name = str(meta.get("scene_name") or meta.name or meta.basename_no_ext or "")
         name = re.sub(r"(?i)\.(avi|mkv|mp4|ts|m4v|m2ts|wmv|mpeg|mpg|vob)$", "", name)
         name = self._clean_name(name)

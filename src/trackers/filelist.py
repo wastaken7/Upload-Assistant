@@ -96,6 +96,9 @@ class FileList:
         return cat_id
 
     async def get_name(self, meta: Meta) -> str:
+        if meta.manual_name is not None:
+            return meta.manual_name.strip()
+
         fl_name = meta.name
         hdr = meta.hdr
         audio = meta.audio

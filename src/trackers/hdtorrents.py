@@ -127,6 +127,9 @@ class HDTorrents:
         return cat_id
 
     async def get_name(self, meta: Meta) -> str:
+        if meta.manual_name is not None:
+            return meta.manual_name.strip()
+
         hdt_name = meta.name
         audio = meta.audio
         hdr = meta.hdr

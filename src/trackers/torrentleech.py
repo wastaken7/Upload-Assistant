@@ -210,6 +210,9 @@ class TorrentLeech:
         return [image["raw_url"] for image in images if image.get("raw_url")]
 
     async def get_name(self, meta: Meta) -> str:
+        if meta.manual_name is not None:
+            return meta.manual_name.strip()
+
         tl_name = meta.name.replace(meta.aka, "")
         return add_incomplete_pack_marker(re.sub(r"\s{2,}", " ", tl_name), meta, self.tracker)
 
