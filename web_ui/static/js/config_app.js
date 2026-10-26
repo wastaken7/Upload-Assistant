@@ -1401,6 +1401,7 @@ const trackerNameMap = {
   XINGYUNGEPT: "XingyungePT",
   YUSCENE: "YUSCENE",
   ZENITH: "Zenith",
+  ZMPT: "ZmPT",
   "1PTBA": "1PTBA",
 };
 

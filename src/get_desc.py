@@ -1839,6 +1839,7 @@ class DescriptionBuilder:
                 "QINGWA",
                 "RAILGUNPT",
                 "XINGYUNGEPT",
+                "ZMPT",
                 "NEXUSPHP",
             }
             and meta.nexusphp_description

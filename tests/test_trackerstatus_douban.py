@@ -58,3 +58,37 @@ def test_douban_lookup_uses_imdb_id_from_attended_prompt(monkeypatch):
         asyncio.run(trackerstatus.TrackerStatusManager({"TRACKERS": {}}).process_all_trackers(meta))
 
     assert events == ["prompt", ("douban", "tt1234567")]  # noqa: S101
+
+
+def test_douban_lookup_runs_for_zmpt(monkeypatch):
+    events = []
+
+    class TrackerSetup:
+        def __init__(self, config):
+            self.config = config
+
+        def filter_unsupported_trackers(self, meta):
+            return meta
+
+    class Router:
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        async def apply(self, meta):
+            return meta
+
+    async def douban_lookup(meta):
+        events.append(("douban", meta.imdb_tt))
+        raise LookupReached
+
+    monkeypatch.setattr(trackerstatus, "TrackerSetup", TrackerSetup)
+    monkeypatch.setattr(trackerstatus, "AvistaZNetworkRouter", Router)
+    monkeypatch.setattr(trackerstatus, "UploadHelper", lambda _config: object())
+    monkeypatch.setattr(trackerstatus, "DupeChecker", lambda _config: object())
+    monkeypatch.setattr(trackerstatus, "get_douban_id", douban_lookup)
+    meta = Meta(trackers=["ZMPT"], tracker_status={}, unattended=True, imdb_id=1234567, imdb_tt="tt1234567")
+
+    with pytest.raises(LookupReached):
+        asyncio.run(trackerstatus.TrackerStatusManager({"TRACKERS": {}}).process_all_trackers(meta))
+
+    assert events == [("douban", "tt1234567")]  # noqa: S101
