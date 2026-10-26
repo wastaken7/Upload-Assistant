@@ -1,20 +1,31 @@
 """Exercise InfinityHD's exact-prefix fallback with actual Meta/shared templates."""
 # ruff: noqa: S101
 import asyncio
+from functools import partial
 from unittest.mock import AsyncMock
 
+import httpx
 import pytest
 
 from src.get_name import NameManager
 from src.meta import Meta
+from src.trackers import naming
 from src.trackers.UNIT3D.infinityhd import InfinityHD
 
-CONFIG = {'DEFAULT': {}, 'TRACKERS': {'INFINITYHD': {}}}
+CONFIG = {'DEFAULT': {'tmdb_api': 'offline-fixture'}, 'TRACKERS': {'INFINITYHD': {}}}
 
 
 @pytest.fixture(autouse=True)
 def isolate_tv_fallback(monkeypatch, request):
     """Isolate fallback cases while retaining explicit real-rebuild integration tests."""
+    # Existing ordering fixtures represent a homonymous show; keep the real
+    # year policy and TMDB response parsing, substituting only HTTP transport.
+    def handle(request):
+        title = request.url.params['query']
+        return httpx.Response(200, json={'results': [
+            {'id': 10, 'name': title}, {'id': 20, 'name': title}], 'total_pages': 1})
+
+    monkeypatch.setattr(naming.httpx, 'AsyncClient', partial(httpx.AsyncClient, transport=httpx.MockTransport(handle)))
     # Upstream now rebuilds normal TV names from TMDB/IMDb. Exercise only the
     # fallback here; separate integration cases below keep that real path intact.
     if request.node.name not in {'test_real_no_marker_fallback', 'test_existing_tv_rebuild_takes_precedence'}:
@@ -146,7 +157,7 @@ def test_real_no_marker_fallback():
     assert meta.to_dict() == before
 
 
-def test_existing_tv_rebuild_takes_precedence():
+def test_existing_tv_rebuild_takes_precedence(monkeypatch):
     """Preserve the localized title produced by the existing TV rebuild."""
     meta = Meta(title='Metadata Title', aka='AKA Metadata Alternate', year=2024,
                 category='TV', search_year=2024, season='S01',
@@ -155,8 +166,7 @@ def test_existing_tv_rebuild_takes_precedence():
                 original_language='en', resolution='1080p',
                 language_checked=True, audio_languages=['English'])
     adapter = InfinityHD(CONFIG)
-    adapter._tmdb_en_title = AsyncMock(return_value='Localized Title')
-    adapter._tv_title_needs_year = AsyncMock(return_value=True)
+    monkeypatch.setattr(naming, 'get_tmdb_localized_data', AsyncMock(return_value={'name': 'Localized Title'}))
     before = meta.to_dict()
     assert asyncio.run(adapter.get_name(meta)) == {
         'name': 'Localized Title AKA Localized Alternate 2024 S01 1080p WEB-DL-GROUP'}

@@ -281,7 +281,10 @@ class InfinityHD(TmdbTvNaming, UNIT3D):
                 or ihd_name.startswith(old_prefix + " ")
                 or (components.tag and ihd_name == old_prefix + components.tag)
             ):
-                new_prefix = " ".join(f"{components.title} {components.alt_title} {components.year}".split())
+                year = components.year
+                if meta.category == "TV" and not await self._tv_title_needs_year(meta):
+                    year = ""
+                new_prefix = " ".join(f"{components.title} {components.alt_title} {year}".split())
                 ihd_name = new_prefix + ihd_name[len(old_prefix):]
 
         if not meta.language_checked:
