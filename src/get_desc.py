@@ -9,7 +9,7 @@ import re
 import urllib.parse
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, ClassVar, cast
 from urllib.parse import ParseResult, urlsplit
 
 import aiofiles
@@ -459,20 +459,34 @@ class DescriptionBuilder:
             logger.warning(f"[yellow]Warning: Error setting tonemapped header: {e!s}[/yellow]")
         return ""
 
-    def _tonemapped_header_candidates(self, meta: Meta) -> tuple[str, ...]:
+    def _header_candidates(self, key: str, meta: Meta, *legacy: str) -> tuple[str, ...]:
         """Header spellings an imported description can carry: tag override, tracker
-        override, DEFAULT and the legacy literal. Markup-bearing only (a bare word is
+        override, DEFAULT and legacy literals. Markup-bearing only (a bare word is
         indistinguishable from prose), longest first, deterministic tie-break."""
-        # uploads made before a config change carry this exact spelling
-        candidates = {"[center][code] Screenshots have been tonemapped for reference [/code][/center]"}
-        tag_override = self._get_tag_override("tonemapped_header", meta)
+        candidates = set(legacy)
+        tag_override = self._get_tag_override(key, meta)
         if tag_override is not None:
             candidates.add(str(tag_override))
         for source in (self.tracker_config, self.config["DEFAULT"]):
-            value = source.get("tonemapped_header")
+            value = source.get(key)
             if value is not None:
                 candidates.add(str(value))
-        return tuple(sorted((candidate for candidate in candidates if "[" in candidate), key=lambda candidate: (-len(candidate), candidate)))
+        return self._markup_blocks(candidates)
+
+    @staticmethod
+    def _markup_blocks(blocks: Any) -> tuple[str, ...]:
+        """Markup-bearing, stripped, longest first, deterministic tie-break."""
+        return tuple(sorted({block.strip() for block in blocks if "[" in block}, key=lambda block: (-len(block), block)))
+
+    @staticmethod
+    def _block_regex(blocks: tuple[str, ...]) -> str:
+        """Match any block anchored to whitespace, a bracket or a string edge, loose whitespace between tokens."""
+        alternatives = "|".join("(?:" + r"\s*".join(re.escape(token) for token in block.split()) + ")" for block in blocks)
+        return r"(?:^|(?<=[\s\]]))(?:" + alternatives + r")(?=[\s\[]|$)"
+
+    def _tonemapped_header_candidates(self, meta: Meta) -> tuple[str, ...]:
+        # uploads made before a config change carry this exact spelling
+        return self._header_candidates("tonemapped_header", meta, "[center][code] Screenshots have been tonemapped for reference [/code][/center]")
 
     def _strip_tonemapped_header(self, text: str, meta: Meta, *, replacing: bool) -> str:
         """Collapse duplicated tonemapped headers in an imported description.
@@ -488,8 +502,7 @@ class DescriptionBuilder:
         except Exception as e:
             logger.warning(f"[yellow]Warning: Error reading tonemapped header: {e!s}[/yellow]")
             return text
-        alternatives = "|".join("(?:" + r"\s*".join(re.escape(token) for token in header.split()) + ")" for header in headers)
-        pattern = re.compile(r"(?:^|(?<=[\s\]]))(?:" + alternatives + r")(?=[\s\[]|$)", re.IGNORECASE)
+        pattern = re.compile(self._block_regex(headers), re.IGNORECASE)
         keep = 0 if replacing else 1
         matches = list(pattern.finditer(text))
         pieces = []
@@ -499,6 +512,54 @@ class DescriptionBuilder:
             cursor = match.end()
         pieces.append(text[cursor:])
         return "".join(pieces)
+
+    # Image-section headers with their code defaults and example-config spellings.
+    _IMAGE_SECTION_HEADERS: ClassVar[dict[str, tuple[str, ...]]] = {
+        "screenshot_header": ("[h2]Screenshots[/h2]",),
+        "disc_menu_header": ("[h2]Disc Menu Screenshots[/h2]",),
+        "audio_spectrogram_header": ("[center][b]Audio Spectrogram[/b][/center]", "[h2]Audio Spectrogram[/h2]"),
+        "dynamic_hdr_plot_header": ("[center][b]Dynamic HDR Metadata[/b][/center]", "[h2]Dynamic HDR Metadata[/h2]"),
+    }
+    # A header still introduces images when, past opening layout tags, an image, link or comparison follows.
+    _SECTION_IMAGES = r"\s*(?:\[(?:center|left|right|align|spoiler|hide|size|b|u|i)\b[^\]]*\]\s*)*\[(?:img|url|comparison)\b"
+
+    @staticmethod
+    def _collapse_removed(text: str, removed: str) -> str:
+        """Close the gap left by each removal, keeping at most one blank line."""
+        return re.sub(rf"\s*{removed}(?:\s*{removed})*\s*", lambda match: "\n" * min(2, match.group(0).count("\n")) or " ", text).strip()
+
+    def _strip_orphan_section_headers(self, text: str, meta: Meta) -> str:
+        """Remove generated image-section headers left without their images.
+
+        The import cleaners extract images into the image list, so a header from an
+        imported UA upload is left above nothing while this run renders its own.
+        A header still followed by images is kept.
+        """
+        try:
+            headers = self._markup_blocks(header for key, legacy in self._IMAGE_SECTION_HEADERS.items() for header in self._header_candidates(key, meta, *legacy))
+        except Exception as e:
+            logger.warning(f"[yellow]Warning: Error reading image section headers: {e!s}[/yellow]")
+            return text
+        if not headers:
+            return text
+        pattern = re.compile(rf"{self._block_regex(headers)}(?!{self._SECTION_IMAGES})", re.IGNORECASE)
+        stripped, count = pattern.subn("\x00", text)
+        return self._collapse_removed(stripped, "\x00") if count else text
+
+    def _strip_regenerated_parts(self, text: str, parts: list[str]) -> str:
+        """Remove copies of sections this run renders again, such as the custom header,
+        language lines, episode overview and signature carried by an imported UA upload."""
+        blocks = self._markup_blocks(part for part in parts if part.strip())
+        if not blocks:
+            return text
+        stripped, count = re.subn(self._block_regex(blocks), "\x00", text, flags=re.IGNORECASE)
+        return self._collapse_removed(stripped, "\x00") if count else text
+
+    def _clean_imported_description(self, text: str, meta: Meta, regenerated_parts: list[str], *, replacing_tonemapped_header: bool) -> str:
+        """Remove what UA itself generated from a description imported from another upload."""
+        text = self._strip_tonemapped_header(text, meta, replacing=replacing_tonemapped_header)
+        text = self._strip_regenerated_parts(text, regenerated_parts)
+        return self._strip_orphan_section_headers(text, meta)
 
     async def get_logo_section(self, meta: Meta) -> tuple[str, str]:
         """Returns the logo URL and size if applicable."""
@@ -1759,6 +1820,10 @@ class DescriptionBuilder:
         ):
             desc_parts.append(meta.nexusphp_description)
 
+        # Imported UA uploads carry these sections, which this run renders again.
+        custom_signature_section = await self.get_custom_signature(meta) if custom_signature else ""
+        regenerated_parts = [*desc_parts, custom_signature_section]
+
         # resolve once: the strip decision must match what is actually appended
         tonemapped_header_text = await self.get_tonemapped_header(meta) if tonemapped_header else ""
         replacing_tonemapped_header = bool(tonemapped_header_text.strip())
@@ -1797,9 +1862,9 @@ class DescriptionBuilder:
                         flags=re.DOTALL,
                     )
                     if meta_description:
-                        desc_parts.append(self._strip_tonemapped_header(meta_description, meta, replacing=replacing_tonemapped_header))
+                        desc_parts.append(self._clean_imported_description(meta_description, meta, regenerated_parts, replacing_tonemapped_header=replacing_tonemapped_header))
             elif meta_description:
-                desc_parts.append(self._strip_tonemapped_header(meta_description, meta, replacing=replacing_tonemapped_header))
+                desc_parts.append(self._clean_imported_description(meta_description, meta, regenerated_parts, replacing_tonemapped_header=replacing_tonemapped_header))
 
         # NFO details
         if nfo:
@@ -1827,7 +1892,6 @@ class DescriptionBuilder:
         tonemapped_section = tonemapped_header_text if tonemapped_header else ""
         audio_spectrogram_section = await self.get_audio_spectrogram_section(meta) if audio_spectrogram else ""
         dynamic_hdr_plot_section = await self.get_dynamic_hdr_plot_section(meta) if dynamic_hdr_plot else ""
-        custom_signature_section = await self.get_custom_signature(meta) if custom_signature else ""
 
         discs_and_screenshots = await self._handle_discs_and_screenshots(meta, approved_image_hosts, images, multi_screens) if screenshots else ""
         if self._get_bool_config("hide_screenshot_header_if_only_section", True, meta):
