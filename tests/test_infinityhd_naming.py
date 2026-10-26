@@ -14,6 +14,7 @@ CONFIG = {'DEFAULT': {}, 'TRACKERS': {'INFINITYHD': {}}}
 
 @pytest.fixture(autouse=True)
 def isolate_tv_fallback(monkeypatch, request):
+    """Isolate fallback cases while retaining explicit real-rebuild integration tests."""
     # Upstream now rebuilds normal TV names from TMDB/IMDb. Exercise only the
     # fallback here; separate integration cases below keep that real path intact.
     if request.node.name not in {'test_real_no_marker_fallback', 'test_existing_tv_rebuild_takes_precedence'}:
@@ -21,6 +22,7 @@ def isolate_tv_fallback(monkeypatch, request):
 
 
 def test_generated_tv_year_follows_aka():
+    """Place the generated TV year after AKA without mutating metadata."""
     meta = Meta(title='Title', aka='AKA Alternate', year=2024,
                 category='TV', type='WEBDL', search_year=2024,
                 season='S01', episode='E02', episode_title='Pilot',
@@ -44,6 +46,7 @@ def test_generated_tv_year_follows_aka():
     ('Title', 'AKA Alternate AKA Another 2024', 2024),
 ])
 def test_moves_only_metadata_year_preserving_title_and_aka_digits(title, aka, year):
+    """Move only the metadata year and preserve numeric titles and suffixes."""
     suffix = ' S02E03 Episode 2024 REPACK Extended 2160p NF WEB-DL DDP5.1 DV H.265-GROUP'
     meta = Meta(title=title, aka=aka, year=year, category='TV', search_year=year,
                 name=f'{title} {year} {aka}{suffix}', resolution='2160p',
@@ -70,6 +73,7 @@ def test_moves_only_metadata_year_preserving_title_and_aka_digits(title, aka, ye
     ('Title 2024 AKA Alternate 1080p WEB-DL-GROUP', {'aka': ''}),
 ])
 def test_unchanged_names_and_exact_aka_boundary(name, overrides):
+    """Preserve disabled, unmatched, and already-normalized prefixes."""
     values = {'title': 'Title', 'aka': 'AKA Alternate', 'year': 2024, 'category': 'TV',
               'search_year': 2024, 'name': name, 'resolution': '1080p',
               'language_checked': True, 'audio_languages': ['English']}
@@ -84,6 +88,7 @@ def test_unchanged_names_and_exact_aka_boundary(name, overrides):
     (['French', 'English'], ''), (['English'], ''), ([], ''),
 ])
 def test_preserves_existing_language_insertion(languages, label):
+    """Keep existing non-English audio language labels in the release suffix."""
     meta = Meta(title='Title', aka='AKA Alternate', year=2024, category='TV',
                 search_year=2024, name='Title 2024 AKA Alternate S01E02 1080p WEB-DL-GROUP',
                 resolution='1080p', language_checked=True, audio_languages=languages)
@@ -98,6 +103,7 @@ def test_preserves_existing_language_insertion(languages, label):
     ('MOVIE', 'WEBDL', ''), ('MOVIE', 'REMUX', ''), ('MOVIE', 'DISC', 'BDMV'),
 ])
 def test_real_shared_templates_keep_suffix_and_movie_names(category, release_type, is_disc):
+    """Normalize actual shared templates without changing their release suffixes."""
     meta = Meta(title='Title 1984', aka='AKA Alternate 2001', year=2024,
                 category=category, type=release_type, is_disc=is_disc,
                 search_year=2024, season='S02', episode='E03',
@@ -119,6 +125,7 @@ def test_real_shared_templates_keep_suffix_and_movie_names(category, release_typ
     ('MOVIE', 2025, 2025), ('TV', 2025, 2024),
 ])
 def test_uses_shared_effective_year_rules(category, manual_year, effective_year):
+    """Respect existing movie manual-year and TV search-year semantics."""
     meta = Meta(title='Title', aka='AKA Alternate', year=2024,
                 manual_year=manual_year, category=category, search_year=2024,
                 name=f'Title {effective_year} AKA Alternate S01 1080p-GROUP',
@@ -128,6 +135,7 @@ def test_uses_shared_effective_year_rules(category, manual_year, effective_year)
 
 
 def test_real_no_marker_fallback():
+    """Normalize the actual TV fallback when no season marker is present."""
     meta = Meta(title='Title', aka='AKA Alternate', year=2024,
                 category='TV', search_year=2024,
                 name='Title 2024 AKA Alternate 1080p WEB-DL-GROUP',
@@ -139,6 +147,7 @@ def test_real_no_marker_fallback():
 
 
 def test_existing_tv_rebuild_takes_precedence():
+    """Preserve the localized title produced by the existing TV rebuild."""
     meta = Meta(title='Metadata Title', aka='AKA Metadata Alternate', year=2024,
                 category='TV', search_year=2024, season='S01',
                 name='Metadata Title 2024 AKA Metadata Alternate S01 1080p WEB-DL-GROUP',
@@ -154,7 +163,34 @@ def test_existing_tv_rebuild_takes_precedence():
     assert meta.to_dict() == before
 
 
+def test_manual_name_with_attached_configured_tag():
+    """Reorder a manual-name prefix when its configured tag follows directly."""
+    meta = Meta(title='Title', aka='AKA Alternate', year=2024,
+                category='TV', search_year=2024,
+                manual_name='Title 2024 AKA Alternate-GROUP', tag='-GROUP',
+                resolution='1080p', language_checked=True, audio_languages=['English'])
+    meta.name = asyncio.run(NameManager(CONFIG).get_name(meta))[1]
+    assert meta.name == 'Title 2024 AKA Alternate-GROUP'
+    before = meta.to_dict()
+    assert asyncio.run(InfinityHD(CONFIG).get_name(meta)) == {
+        'name': 'Title AKA Alternate 2024-GROUP'}
+    assert meta.to_dict() == before
+
+
+@pytest.mark.parametrize('suffix,tag', [
+    ('-OTHER', '-GROUP'), ('-GROUP-extra', '-GROUP'), ('-GROUP', ''),
+])
+def test_rejects_unconfigured_attached_suffix(suffix, tag):
+    """Do not treat arbitrary hyphens or partial group matches as boundaries."""
+    name = 'Title 2024 AKA Alternate' + suffix
+    meta = Meta(title='Title', aka='AKA Alternate', year=2024,
+                category='TV', search_year=2024, name=name, tag=tag,
+                resolution='1080p', language_checked=True, audio_languages=['English'])
+    assert asyncio.run(InfinityHD(CONFIG).get_name(meta)) == {'name': name}
+
+
 def test_matches_shared_whitespace_normalization():
+    """Match metadata prefixes using shared whitespace normalization."""
     meta = Meta(title='Title  Two', aka='AKA  Alternate', year=2024,
                 category='TV', search_year=2024,
                 name='Title Two 2024 AKA Alternate S01 1080p-GROUP',

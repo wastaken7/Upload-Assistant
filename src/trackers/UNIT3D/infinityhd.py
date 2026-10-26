@@ -265,6 +265,7 @@ class InfinityHD(TmdbTvNaming, UNIT3D):
         return False
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
+        """Build the tracker name with AKA before year and existing language labels."""
         ihd_name = meta.name
         resolution = meta.resolution
 
@@ -275,7 +276,11 @@ class InfinityHD(TmdbTvNaming, UNIT3D):
         if components.title and components.alt_title and components.year:
             # Normalize the exact metadata prefix when TV rebuilding cannot do so.
             old_prefix = " ".join(f"{components.title} {components.year} {components.alt_title}".split())
-            if ihd_name == old_prefix or ihd_name.startswith(old_prefix + " "):
+            if (
+                ihd_name == old_prefix
+                or ihd_name.startswith(old_prefix + " ")
+                or (components.tag and ihd_name == old_prefix + components.tag)
+            ):
                 new_prefix = " ".join(f"{components.title} {components.alt_title} {components.year}".split())
                 ihd_name = new_prefix + ihd_name[len(old_prefix):]
 
