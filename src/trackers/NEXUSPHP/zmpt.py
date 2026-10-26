@@ -44,7 +44,8 @@ class ZmPT(NEXUSPHP):
                 "tv show",
                 "variety",
             ]
-            if any(re.search(rf"(^|,\s*){re.escape(keyword)}(\s*,|$)", genres, re.IGNORECASE) for keyword in game_show_keywords):
+            variety_terms = f"{genres}, {keywords}"
+            if any(re.search(rf"(^|,\s*){re.escape(keyword)}(\s*,|$)", variety_terms, re.IGNORECASE) for keyword in game_show_keywords):
                 return 403
             return 402
         return 401
