@@ -329,6 +329,7 @@ uv tool install --force git+https://github.com/wastaken7/Upload-Assistant.git
 | <img src="web_ui/static/img/trackers/cathoderaytube.png" width="16" height="16" />            | Cathode-Ray.Tube       | CATHODERAYTUBE         | MOVIE, TV, GAME              |
 | <img src="web_ui/static/img/trackers/cinematik.png" width="16" height="16" />                 | Cinematik              | CINEMATIK              | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/cinemaz.png" width="16" height="16" />                   | CinemaZ                | CINEMAZ                | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/czteam.png" width="16" height="16" />                    | CZTeam                 | CZTEAM                 | MOVIE, TV, GAME, MUSIC, XXX  |
 | <img src="web_ui/static/img/trackers/darkpeers.png" width="16" height="16" />                 | DarkPeers              | DARKPEERS              | MOVIE, TV, BOOK, GAME, MUSIC |
 | <img src="web_ui/static/img/trackers/desitorrents.png" width="16" height="16" />              | DesiTorrents           | DESITORRENTS           | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/digitalcore.png" width="16" height="16" />               | DigitalCore            | DIGITALCORE            | MOVIE, TV, BOOK, GAME, MUSIC |

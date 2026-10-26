@@ -1325,6 +1325,7 @@ const trackerNameMap = {
   CINEMAZ: "CinemaZ",
   CINEMATIK: "Cinematik",
   CURUPIRA: "Curupira",
+  CZTEAM: "CZTeam",
   DARKPEERS: "DarkPeers",
   DESITORRENTS: "DesiTorrents",
   DIGITALCORE: "DigitalCore",
