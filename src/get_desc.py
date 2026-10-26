@@ -555,11 +555,33 @@ class DescriptionBuilder:
         stripped, count = re.subn(self._block_regex(blocks), "\x00", text, flags=re.IGNORECASE)
         return self._collapse_removed(stripped, "\x00") if count else text
 
-    def _clean_imported_description(self, text: str, meta: Meta, regenerated_parts: list[str], *, replacing_tonemapped_header: bool) -> str:
+    @staticmethod
+    def _strip_plain_text_edges(text: str, header: str, signature: str) -> str:
+        """Remove a plain-text custom header or signature rendered again. Without markup it
+        cannot be told from prose, so only a whole first or last line is removed."""
+        stripped = text
+        header, signature = header.strip(), signature.strip()
+        if header and "[" not in header:
+            stripped = re.sub(rf"^\s*{re.escape(header)}[ \t]*(?:\n|$)", "", stripped, count=1)
+        if signature and "[" not in signature:
+            stripped = re.sub(rf"(?:^|\n)[ \t]*{re.escape(signature)}\s*$", "", stripped, count=1)
+        return stripped.strip() if stripped != text else text
+
+    def _clean_imported_description(
+        self,
+        text: str,
+        meta: Meta,
+        regenerated_parts: list[str],
+        *,
+        replacing_tonemapped_header: bool,
+        custom_header: str = "",
+        custom_signature: str = "",
+    ) -> str:
         """Remove what UA itself generated from a description imported from another upload."""
         text = self._strip_tonemapped_header(text, meta, replacing=replacing_tonemapped_header)
         text = self._strip_regenerated_parts(text, regenerated_parts)
-        return self._strip_orphan_section_headers(text, meta)
+        text = self._strip_orphan_section_headers(text, meta)
+        return self._strip_plain_text_edges(text, custom_header, custom_signature)
 
     async def get_logo_section(self, meta: Meta) -> tuple[str, str]:
         """Returns the logo URL and size if applicable."""
@@ -1862,9 +1884,27 @@ class DescriptionBuilder:
                         flags=re.DOTALL,
                     )
                     if meta_description:
-                        desc_parts.append(self._clean_imported_description(meta_description, meta, regenerated_parts, replacing_tonemapped_header=replacing_tonemapped_header))
+                        desc_parts.append(
+                            self._clean_imported_description(
+                                meta_description,
+                                meta,
+                                regenerated_parts,
+                                replacing_tonemapped_header=replacing_tonemapped_header,
+                                custom_header=desc_header if custom_header else "",
+                                custom_signature=custom_signature_section,
+                            )
+                        )
             elif meta_description:
-                desc_parts.append(self._clean_imported_description(meta_description, meta, regenerated_parts, replacing_tonemapped_header=replacing_tonemapped_header))
+                desc_parts.append(
+                    self._clean_imported_description(
+                        meta_description,
+                        meta,
+                        regenerated_parts,
+                        replacing_tonemapped_header=replacing_tonemapped_header,
+                        custom_header=desc_header if custom_header else "",
+                        custom_signature=custom_signature_section,
+                    )
+                )
 
         # NFO details
         if nfo:

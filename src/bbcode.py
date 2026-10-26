@@ -25,6 +25,8 @@ def _css4_colors_by_hex() -> dict[str, str]:
 
 _INLINE_OPEN = r"(?:\[(?:b|i|u|small|size=\d+|color=[^\]]*|font=[^\]]*)\]\s*)*"
 _INLINE_CLOSE = r"(?:\s*\[/(?:b|i|u|small|size|color|font)\])*"
+# A link's text up to its own [/url], never running into the next link.
+_URL_BODY = r"(?:(?!\[/?url\b)[\s\S])*?\[/url\]"
 
 
 def _block(core: str) -> str:
@@ -51,7 +53,7 @@ RELEASE_GROUP_BOILERPLATE: dict[str, tuple[str, ...]] = {
         # banner right above the decorated "Screenshots" divider
         r"\[img[^\]]*\][^\[]*\[/img\]\s*(?=•❅─+✧❅✦)",
         r"•❅─+✧❅✦\s*(?:\[color=[^\]]*\])?\s*Screenshots\s*(?:\[/color\])?\s*✦❅✧─+❅•",
-        r"Find\s+our\s+uploads\s*\[url=[^\]]*name=Kitsune[^\]]*\][\s\S]*?\[/url\]",
+        r"Find\s+our\s+uploads\s*\[url=[^\]]*name=Kitsune[^\]]*\]" + _URL_BODY,
     ),
     "AXON": (_image(r"https?://file\.aither\.cc/u/y6nfEPrCxpW57juD\.png"),),
     "Jeditwo": (_image(r"https?://file\.aither\.cc/u/(?:pwkbrhyrBNiIIdeY|l7zi3mymrA1L2Xd1)\.png"),),
@@ -76,14 +78,14 @@ RELEASE_GROUP_BOILERPLATE: dict[str, tuple[str, ...]] = {
 # Signatures that other upload tools add. To support another tool, add its name with
 # the signature's core regex wrapped in _signature (matched case-insensitively).
 UPLOAD_TOOL_SIGNATURES: dict[str, tuple[str, ...]] = {
-    "Uploadrr": (_signature(r"\[url=https?://codeberg\.org/CvT/Uploadrr/?\][\s\S]*?\[/url\]"),),
-    "upbrr": (_signature(r"\[url=https?://github\.com/autobrr/upbrr/?\][\s\S]*?\[/url\]"),),
-    "NfoForge": (_signature(r"Shared\s+with\s+\[url=https?://github\.com/jesterr0/NfoForge/?\][\s\S]*?\[/url\]"),),
+    "Uploadrr": (_signature(r"\[url=https?://codeberg\.org/CvT/Uploadrr/?\]" + _URL_BODY),),
+    "upbrr": (_signature(r"\[url=https?://github\.com/autobrr/upbrr/?\]" + _URL_BODY),),
+    "NfoForge": (_signature(r"Shared\s+with\s+\[url=https?://github\.com/jesterr0/NfoForge/?\]" + _URL_BODY),),
     "EASY UPLOAD3R": (_signature(r"⚡?\s*Uploaded\s+using\s+EASY\s+UPLOAD3R\s*⚡?"),),
-    "upsies": (_signature(r"Shared\s+with\s+\[url=https?://upsies\.readthedocs\.io/?\][\s\S]*?\[/url\]"),),
-    "AK Automated Uploader": (_signature(r"Uploaded\s+with\s+\[url=https?://github\.com/AQTKU/ak-automated-uploader/?\][\s\S]*?\[/url\]"),),
-    "Only-Uploader": (_signature(r"\[url=https?://github\.com/edge20200/Only-Uploader/?\][\s\S]*?\[/url\]"),),
-    "MAGUS": (_signature(r"\[url=https?://dailyusetools\.com/MAGUS/?\][\s\S]*?\[/url\]"),),
+    "upsies": (_signature(r"Shared\s+with\s+\[url=https?://upsies\.readthedocs\.io/?\]" + _URL_BODY),),
+    "AK Automated Uploader": (_signature(r"Uploaded\s+with\s+\[url=https?://github\.com/AQTKU/ak-automated-uploader/?\]" + _URL_BODY),),
+    "Only-Uploader": (_signature(r"\[url=https?://github\.com/edge20200/Only-Uploader/?\]" + _URL_BODY),),
+    "MAGUS": (_signature(r"\[url=https?://dailyusetools\.com/MAGUS/?\]" + _URL_BODY),),
 }
 
 

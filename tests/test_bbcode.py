@@ -319,3 +319,9 @@ def test_block_patterns_only_remove_whole_blocks(monkeypatch) -> None:
     desc = "[center][color=#a61805][size=18][font=Arial]SCREENSHOTS[/font][/size][/color][/center]\nThe SCREENSHOTS below are fictional."
 
     assert _clean_unit3d(desc)[0] == "The SCREENSHOTS below are fictional."
+
+
+def test_upload_tool_signature_does_not_swallow_a_screenshot_in_the_same_block() -> None:
+    desc = f"Fictional notes.\n[center][url=https://github.com/autobrr/upbrr][size=4]Uploaded by upbrr[/size][/url]\n{SHOT}[/center]"
+
+    assert _clean_unit3d(desc) == ("Fictional notes.", ["https://img.example/s1.png"])

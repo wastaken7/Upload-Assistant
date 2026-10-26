@@ -160,3 +160,20 @@ def test_tmdb_artwork_is_not_extracted_as_a_screenshot():
     _cleaned, images = BBCODE().clean_unit3d_description(desc, "https://unit3d.example/torrents/1")
 
     assert [image["img_url"] for image in images] == ["https://img.example/s1.png"]
+
+
+def test_plain_text_header_and_signature_are_not_rendered_twice():
+    builder = _builder(custom_description_header="Fictional Group presents", custom_signature="Thanks for seeding!")
+    meta = Meta(description="Fictional Group presents\nUploader notes, thanks for seeding!\n\nThanks for seeding!")
+
+    rendered = _render(meta, builder)
+
+    assert rendered.count("Fictional Group presents") == 1
+    assert rendered.count("Thanks for seeding!") == 1
+    assert "Uploader notes, thanks for seeding!" in rendered
+
+
+def test_plain_text_signature_inside_prose_is_kept():
+    text = "Thanks for seeding! is what we always say."
+
+    assert DescriptionBuilder._strip_plain_text_edges(text, "", "Thanks for seeding!") == text
