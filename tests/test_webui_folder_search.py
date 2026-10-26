@@ -133,11 +133,122 @@ def test_nested_folders_displace_files(browser):
     assert all(item["type"] == "folder" for item in items)
 
 
-def test_internal_link_is_not_an_alternative_scope(browser):
+def test_internal_links_are_listed_and_searchable_as_scope(browser):
     root = Path(server._get_browse_roots()[0])
-    link = root / "alias"
+    target = root / "Movie"
+    link = root / "movie alias"
+    file_link = root / "movie link.mkv"
     try:
-        link.symlink_to(root / "Movie", target_is_directory=True)
+        link.symlink_to(target, target_is_directory=True)
+        file_link.symlink_to(target / "movie.mkv")
     except OSError:
         pytest.skip("Creating symlinks requires OS permission")
+    paths = [item["path"] for item in search(browser).json["items"]]
+    assert str(link) in paths
+    assert str(file_link) in paths
+    assert not any(Path(path).is_relative_to(link) and Path(path) != link for path in paths)
+    response = search(browser, path=str(link))
+    assert response.status_code == 200
+    assert [item["path"] for item in response.json["items"]] == [str(target.resolve() / "movie.mkv")]
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Real Windows junction creation")
+def test_internal_junction_is_listed_not_descended_and_searchable_as_scope(browser):
+    root = Path(server._get_browse_roots()[0])
+    target = root / "Movie"
+    junction = root / "movie junction"
+    subprocess.run(["cmd.exe", "/c", "mklink", "/J", str(junction), str(target)], check=True, capture_output=True)
+    try:
+        paths = [item["path"] for item in search(browser).json["items"]]
+        assert str(junction) in paths
+        assert str(junction / "movie.mkv") not in paths
+        response = search(browser, path=str(junction))
+        assert response.status_code == 200
+        assert [item["path"] for item in response.json["items"]] == [str(target.resolve() / "movie.mkv")]
+    finally:
+        junction.rmdir()
+
+
+@pytest.mark.parametrize("kind", ["symlink", "junction"])
+@pytest.mark.parametrize("child_scope", [False, True])
+def test_linked_scope_can_target_another_configured_root(browser, monkeypatch, tmp_path, kind, child_scope):
+    if kind == "junction" and os.name != "nt":
+        pytest.skip("Real Windows junction creation")
+    root = Path(server._get_browse_roots()[0])
+    other = tmp_path / "other"
+    target = other / "target"
+    (target / "nested").mkdir(parents=True)
+    (target / "nested" / "movie.mkv").touch()
+    (other / "movie excluded.mkv").touch()
+    link = root / "movie alias"
+    if kind == "junction":
+        subprocess.run(["cmd.exe", "/c", "mklink", "/J", str(link), str(target)], check=True, capture_output=True)
+    else:
+        try:
+            link.symlink_to(target, target_is_directory=True)
+        except OSError:
+            pytest.skip("Creating symlinks requires OS permission")
+    monkeypatch.setenv("UA_BROWSE_ROOTS", f"{root},{other}")
+    walk = server.os.walk
+    visited = []
+
+    def record(path, **kwargs):
+        for entry in walk(path, **kwargs):
+            visited.append(Path(entry[0]))
+            yield entry
+
+    monkeypatch.setattr(server.os, "walk", record)
+    try:
+        assert str(link) in [item["path"] for item in search(browser).json["items"]]
+        visited.clear()
+        selected = link / "nested" if child_scope else link
+        expected = target / "nested" if child_scope else target
+        response = search(browser, path=str(selected))
+        assert response.status_code == 200
+        assert [item["path"] for item in response.json["items"]] == [str(target / "nested" / "movie.mkv")]
+        assert visited and all(path.is_relative_to(expected) for path in visited)
+    finally:
+        if kind == "junction":
+            link.rmdir()
+
+
+def test_scope_link_outside_configured_roots_is_not_accepted(browser, monkeypatch, tmp_path):
+    root = Path(server._get_browse_roots()[0])
+    link = tmp_path / "outside alias"
+    try:
+        link.symlink_to(root, target_is_directory=True)
+    except OSError:
+        pytest.skip("Creating symlinks requires OS permission")
+    monkeypatch.setattr(server.os, "walk", lambda *a, **k: pytest.fail("Outside scope must not walk"))
     assert search(browser, path=str(link)).status_code == 400
+
+
+def test_relative_scope_is_rejected(browser, monkeypatch):
+    monkeypatch.setattr(server.os, "walk", lambda *a, **k: pytest.fail("Relative scope must not walk"))
+    assert search(browser, path="Movie").status_code == 400
+
+
+@pytest.mark.parametrize("budget", [0, 1, 5, 500])
+def test_full_results_stop_after_folder_scan_budget(browser, monkeypatch, budget):
+    root = Path(server._get_browse_roots()[0])
+    for index in range(120):
+        (root / f"movie {index}.mkv").touch()
+    for index in range(budget + 20):
+        (root / f"empty {index:04d}").mkdir()
+    visited = []
+    scandir = server.os.scandir
+
+    def record(path):
+        visited.append(Path(path))
+        return scandir(path)
+
+    monkeypatch.setattr(server.os, "scandir", record)
+    monkeypatch.setattr(server, "_BROWSE_SEARCH_FOLDER_SCAN_DIRS", budget)
+    response = search(browser)
+    items = response.json["items"]
+    assert len(items) == 100
+    assert response.json["truncated"] is True
+    # os.walk scans before yielding: count actual enumerations, not loop bodies.
+    assert len(visited) == 1 + budget
+    assert visited[0] == root
+    assert items[0]["name"] == "Movie" and items[0]["type"] == "folder"

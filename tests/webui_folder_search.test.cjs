@@ -181,3 +181,28 @@ test("old refresh callbacks read current mode in both directions", async () => {
     );
   }
 });
+
+test("tree navigation keeps all-locations results and HTML errors stay readable", async () => {
+  const { context: c, run } = fixture();
+  c.console = { ...console, error() {} };
+  c.handleFileBrowserSearch("movie");
+  await run();
+  assert.ok(c.results, "Search should produce results");
+  await c.toggleFolder("/media/parent");
+  assert.ok(c.results, "Navigation must not clear all-locations results");
+  c.changeFileBrowserSearchMode(true);
+  c.handleFileBrowserSearch("movie");
+  await run();
+  await c.toggleFolder("/media/parent");
+  assert.ok(c.results, "Re-activating the same scope must not clear results");
+  c.apiFetch = async () => ({
+    ok: false,
+    status: 504,
+    json: async () => {
+      throw new SyntaxError("Unexpected token '<'");
+    },
+  });
+  c.handleFileBrowserSearch("movie");
+  await run();
+  assert.equal(c.results.error, "Search request failed (504)");
+});

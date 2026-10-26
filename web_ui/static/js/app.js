@@ -5158,9 +5158,13 @@ function AudionutsUAGUI() {
   };
 
   const setFileBrowserSearchFolder = (path) => {
+    const changed = fileBrowserFolderRef.current !== path;
     fileBrowserFolderRef.current = path;
     setFileBrowserFolder(path);
-    invalidateFileBrowserSearch();
+    // Only a changed scope invalidates results; all-locations searches
+    // do not depend on tree navigation.
+    if (changed && fileBrowserFolderOnlyRef.current)
+      invalidateFileBrowserSearch();
   };
 
   const collapseFileBrowser = () => {
@@ -5298,12 +5302,15 @@ function AudionutsUAGUI() {
             { signal },
           );
           if (signal?.aborted) return;
-          const data = await response.json();
+          // Proxies can answer with an HTML error page; never surface a
+          // JSON parse error as the search message.
+          const data = await response.json().catch(() => null);
           if (!response.ok) {
             throw new Error(
-              data.error || `Search request failed (${response.status})`,
+              data?.error || `Search request failed (${response.status})`,
             );
           }
+          if (!data) throw new Error("Search failed. Please try again.");
           if (signal?.aborted) return;
           // Early return if the search has changed since this request
           if (fileBrowserSearchId.current !== searchId) return;
@@ -10708,7 +10715,10 @@ function AudionutsUAGUI() {
         Search this folder
       </label>
       {fileBrowserFolderOnly && (
-        <p className="mt-1 break-all" role="status">
+        <p
+          className="mt-1 break-all"
+          role={fileBrowserFolder ? undefined : "status"}
+        >
           {fileBrowserFolder || "Select a folder in the tree before searching."}
         </p>
       )}
@@ -10782,7 +10792,7 @@ function AudionutsUAGUI() {
             value={fileBrowserSearch}
             onChange={(e) => handleFileBrowserSearch(e.target.value)}
             onKeyDown={(event) => {
-              if (event.key === "Enter")
+              if (event.key === "Enter" && !event.nativeEvent.isComposing)
                 handleFileBrowserSearch(event.currentTarget.value);
             }}
             placeholder="Search files and folders..."
@@ -10990,7 +11000,10 @@ function AudionutsUAGUI() {
                       value={fileBrowserSearch}
                       onChange={(e) => handleFileBrowserSearch(e.target.value)}
                       onKeyDown={(event) => {
-                        if (event.key === "Enter")
+                        if (
+                          event.key === "Enter" &&
+                          !event.nativeEvent.isComposing
+                        )
                           handleFileBrowserSearch(event.currentTarget.value);
                       }}
                       placeholder="Search files and folders..."
