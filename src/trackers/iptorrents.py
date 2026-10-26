@@ -434,7 +434,7 @@ class IPTorrents:
 
     async def get_data(self, meta: Meta) -> dict[str, str | int]:
         data: dict[str, str | int] = {
-            "name": add_incomplete_pack_marker(meta.name, meta, self.tracker),
+            "name": await self.get_name(meta),
             "descr": await self.generate_description(meta),
             "type": self.get_category_id(meta),
         }
@@ -479,7 +479,7 @@ class IPTorrents:
     async def edit_post_upload(self, meta: Meta):
         torrent_id = meta.tracker_status[self.tracker]["torrent_id"]
         data: dict[str, str | int] = {
-            "name": add_incomplete_pack_marker(meta.name, meta, self.tracker),
+            "name": await self.get_name(meta),
             "descr": await self.generate_description(meta),
             "type": self.get_category_id(meta),
             "imdb_id": str(meta.tmdb_id),

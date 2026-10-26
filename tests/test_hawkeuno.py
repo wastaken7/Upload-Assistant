@@ -101,5 +101,43 @@ async def test_hawkeuno_accepts_webrip_as_encode_and_uses_webdl_name():
     assert tracker._normalize_upload_name(meta.clean_name, meta) == "Movie.2026.1080p.AMZN.WEB-DL.x265-GROUP"
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("category, tv_pack, incomplete", [
+    ("MOVIE", False, False),
+    ("TV", False, False),
+    ("TV", True, False),
+    ("TV", True, True),
+])
+@pytest.mark.parametrize("manual_name", [None, "  Custom  Release S03 WEBRip  "])
+async def test_hawkeuno_upload_names(tmp_path, category, tv_pack, incomplete, manual_name):
+    tracker = HawkeUno({"TRACKERS": {"HAWKEUNO": {}}})
+    tracker.get_description = AsyncMock()
+    tracker.common.create_torrent_for_upload = AsyncMock()
+    meta = Meta(
+        base_dir=str(tmp_path), uuid="release", category=category, type="WEBRIP",
+        tv_pack=tv_pack, season_pack_incomplete=incomplete, season="S03", season_int=3,
+        name="Generated Release S03 WEBRip", clean_name="Generated.Release.S03.WEBRip",
+        manual_name=manual_name,
+    )
+    folder = tmp_path / "tmp" / "release"
+    folder.mkdir(parents=True)
+    for filename in ("[HAWKEUNO].torrent", "[HAWKEUNO]DESCRIPTION.txt", "MEDIAINFO_CLEANPATH.txt"):
+        (folder / filename).write_bytes(b"fixture")
+
+    data = await tracker.get_data(meta)
+    files = await tracker.get_files(meta)
+
+    if manual_name is not None:
+        assert data["name"] == "Custom  Release S03 WEBRip"
+        assert files["torrent"][0] == "Custom  Release S03 WEBRip.torrent"
+    elif incomplete:
+        assert data["name"] == "Generated Release S03 INCOMPLETE NADA WEB-DL-NOGROUP"
+        assert files["torrent"][0] == "Generated.Release.S03.INCOMPLETE.NADA.WEB-DL-NOGROUP.torrent"
+    else:
+        assert "name" not in data
+        assert files["torrent"][0] == "Generated.Release.S03.NADA.WEB-DL-NOGROUP.torrent"
+    assert files["torrent"][1] == b"fixture"
+
+
 async def _noop():
     return None
