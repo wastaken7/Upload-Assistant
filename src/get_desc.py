@@ -1115,6 +1115,9 @@ class DescriptionBuilder:
         if meta.category != "GAME":
             return ""
 
+        if self.tracker in ("CZTEAM",):
+            table = False
+
         game_parts: list[str] = []
 
         header = "[h2]"
@@ -1454,7 +1457,7 @@ class DescriptionBuilder:
         if meta.category != "MUSIC" or not isinstance(meta.music_release, dict):
             return ""
 
-        if self.tracker in ("TORRENTLEECH", "IMMORTALSEED", "IPTORRENTS", "SPEEDAPP"):
+        if self.tracker in ("CZTEAM", "TORRENTLEECH", "IMMORTALSEED", "IPTORRENTS", "SPEEDAPP"):
             table = False
 
         release = meta.music_release
@@ -2625,6 +2628,19 @@ class DescriptionBuilder:
 
         if get_tracker_framework(tracker) == "NEXUSPHP":
             description = bbcode.remove_img_resize(description)
+
+        if tracker == "CZTEAM":
+            # Supported tags were checked with docs/bbcode-benchmark.txt.
+            description = bbcode.convert_comparison_to_centered(description, 1000)
+            description = bbcode.remove_img_resize(description)
+            description = bbcode.convert_code_to_pre(description)
+            description = bbcode.convert_hide_to_spoiler(description)
+            # Titled spoilers are not supported, so keep the title as bold text above a plain spoiler.
+            description = re.sub(r"\[spoiler=([^\]]+)\]", lambda m: f"[b]{m.group(1).strip()}[/b]\n[spoiler]", description, flags=re.IGNORECASE)
+            description = bbcode.convert_headings_to_sizes(description)
+            description = bbcode.clamp_size_tags(description, 7)
+            description = re.sub(r"\[align=(center|right)\](.*?)\[/align\]", r"[\1]\2[/\1]", description, flags=re.IGNORECASE | re.DOTALL)
+            description = re.sub(r"\[/?(?:align(?:=[^\]]*)?|left|note|alert|hr|sup|sub)\]", "", description, flags=re.IGNORECASE)
 
         if tracker in {"ANTHELION", "BJSHARE", "BRASILTRACKER", "GREATPOSTERWALL"}:
             description = bbcode.clamp_size_tags(description)
