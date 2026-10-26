@@ -564,7 +564,7 @@ config: dict[str, Any] = {
         #   PEERGARDEN, POLISHTORRENT, PORTUGAS, PRIVATEHD, PTCAFE, PTERCLUB, PTFANS, PTGTK, PTSKIT, PTZONE, QINGWA, RACING4EVERYONE, RAILGUNPT,
         #   RASTASTUGAN, REELFLIX, RETROFLIX, RETROMOVIESCLUB, ROCKETHD, SAMARITANO, SEEDPOOL, SHAREISLAND, SKIPTHECOMMERCIALS, SPEEDAPP,
         #   SUIO, SWARMAZON, THELEACHZONE, THEOLDSCHOOL, TORRENTEROS, TORRENTHAVEN, TORRENTHR, TORRENTLEECH, TOTHEGLORY, TVCHAOSUK, ULCX, UTOPIA,
-        #   VULTU, XINGYUNGEPT, YUSCENE, ZENITH
+        #   VULTU, XINGYUNGEPT, YUSCENE, ZENITH, ZMPT
         # This list is validated against the tracker blocks below by the test suite.
         # Only add the trackers you want to upload to on a regular basis
         "default_trackers": "",
@@ -3585,6 +3585,13 @@ config: dict[str, Any] = {
             "bluray_image_size": "",
             "add_audio_spectrogram": True,
             "inject_delay": 0,
+        },
+        "ZMPT": {
+            "cli_alias": "ZMPT",
+            # Cookies required (export from https://zmpt.cc/ to data/cookies/ZMPT.txt).
+            # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md#how-to-export-cookies
+            "announce_url": "",
+            "anon": False,
         },
         "MANUAL": {
             "cli_alias": "MANUAL",
