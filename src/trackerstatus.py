@@ -134,6 +134,7 @@ class TrackerStatusManager:
                 "QINGWA",
                 "RAILGUNPT",
                 "XINGYUNGEPT",
+                "ZMPT",
             ]
         ):
             meta.douban_id = await get_douban_id(meta)
