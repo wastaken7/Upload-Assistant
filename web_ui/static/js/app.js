@@ -2086,6 +2086,488 @@ function ArgumentPathBrowser({ mode, apiBase, isDarkMode, onPick }) {
   );
 }
 
+function TrackerGroupName({ group, onRename }) {
+  const [name, setName] = useState(group.name);
+  useEffect(() => setName(group.name), [group.name]);
+  return (
+    <input
+      className="ua-tracker-group-name"
+      aria-label={`Rename ${group.name} group`}
+      draggable={false}
+      value={name}
+      maxLength={60}
+      onChange={(event) => setName(event.target.value)}
+      onBlur={(event) => {
+        const nextName = event.target.value.trim() || group.name;
+        setName(nextName);
+        onRename(nextName);
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Escape") event.currentTarget.value = group.name;
+        if (event.key === "Enter" || event.key === "Escape") {
+          event.preventDefault();
+          event.currentTarget.blur();
+        }
+      }}
+    />
+  );
+}
+
+function TrackerOrganizer({
+  trackers,
+  catalog,
+  selectedTrackers,
+  onGroupSelection,
+  editing,
+  disabled,
+  compact,
+  children,
+}) {
+  const model = window.UATrackerLayout;
+  const [layout, setLayout] = useState(() => model.load(storage));
+  const [newGroupName, setNewGroupName] = useState("");
+  const [announcement, setAnnouncement] = useState("");
+  const [dropTarget, setDropTarget] = useState(null);
+  const [resetPending, setResetPending] = useState(false);
+  const dragRef = useRef(null);
+  useEffect(() => {
+    storage.set(model.STORAGE_KEY, JSON.stringify(layout));
+  }, [layout]);
+  useEffect(() => {
+    if (!editing) {
+      dragRef.current = null;
+      setDropTarget(null);
+      setResetPending(false);
+    }
+  }, [editing]);
+
+  const sections = model.sections(layout, trackers);
+  const hasLayout = layout.pinned.length > 0 || layout.groups.length > 0;
+  const moveTracker = (name, sectionId, before = null) => {
+    setLayout((current) =>
+      model.moveTracker(current, name, sectionId, before, catalog),
+    );
+    const displayName =
+      trackers.find((tracker) => tracker.name === name)?.display_name || name;
+    setAnnouncement(
+      `${displayName} moved to ${sections.find((section) => section.id === sectionId)?.name || "group"}.`,
+    );
+  };
+  const finishDrag = () => {
+    dragRef.current = null;
+    setDropTarget(null);
+  };
+  const startDrag = (event, item) => {
+    if (!editing || disabled) {
+      event.preventDefault();
+      return;
+    }
+    dragRef.current = item;
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", item.id);
+  };
+  const allowDrop = (event, sectionId, before = null) => {
+    const drag = dragRef.current;
+    if (!editing || disabled || !drag) return;
+    if (drag.type === "group" && sectionId === model.PINNED) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.dataTransfer.dropEffect = "move";
+    const targetBefore = drag.type === "group" ? null : before;
+    if (
+      dropTarget?.sectionId !== sectionId ||
+      dropTarget?.before !== targetBefore
+    )
+      setDropTarget({ sectionId, before: targetBefore });
+  };
+  const drop = (event, sectionId, before = null) => {
+    const drag = dragRef.current;
+    if (!editing || disabled || !drag) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (drag.type === "tracker") moveTracker(drag.id, sectionId, before);
+    else if (sectionId !== model.PINNED) {
+      setLayout((current) =>
+        model.moveGroup(
+          current,
+          drag.id,
+          sectionId === model.UNGROUPED ? null : sectionId,
+        ),
+      );
+      setAnnouncement("Group order updated.");
+    }
+    finishDrag();
+  };
+  const nudgeTracker = (section, index, direction) => {
+    const before =
+      direction < 0
+        ? section.trackers[index - 1]?.name
+        : section.trackers[index + 2]?.name;
+    moveTracker(section.trackers[index].name, section.id, before || null);
+  };
+  const nudgeGroup = (id, direction) => {
+    const index = layout.groups.findIndex((group) => group.id === id);
+    const before =
+      direction < 0
+        ? layout.groups[index - 1]?.id
+        : layout.groups[index + 2]?.id;
+    setLayout((current) => model.moveGroup(current, id, before || null));
+    setAnnouncement("Group order updated.");
+  };
+  const addGroup = () => {
+    const name = newGroupName.trim();
+    if (!name) return;
+    setLayout((current) => ({
+      ...current,
+      groups: [
+        ...current.groups,
+        {
+          id: `group-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`,
+          name,
+          trackers: [],
+        },
+      ],
+    }));
+    setNewGroupName("");
+    setAnnouncement(`${name} group created.`);
+  };
+
+  return (
+    <div className="ua-tracker-organizer" data-editing={editing || undefined}>
+      {editing && (
+        <div className="ua-tracker-layout-editor">
+          <p>
+            Use the pin icon to keep favourites in Pinned, or add your own
+            groups and drag trackers into them. Use the handles to reorder
+            groups. Your layout saves automatically in this browser.
+          </p>
+          <div className="ua-tracker-layout-toolbar">
+            <input
+              aria-label="New tracker group name"
+              placeholder="New group name…"
+              maxLength={60}
+              value={newGroupName}
+              onChange={(event) => setNewGroupName(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  addGroup();
+                }
+              }}
+            />
+            <button
+              type="button"
+              className="ua-tracker-layout-button"
+              onClick={addGroup}
+              disabled={!newGroupName.trim()}
+            >
+              <LucideIcon name="plus" className="h-3 w-3" /> Add group
+            </button>
+            <button
+              type="button"
+              className="ua-tracker-layout-button ua-tracker-layout-reset"
+              onClick={() => setResetPending(true)}
+            >
+              Reset layout
+            </button>
+          </div>
+          {resetPending && (
+            <div className="ua-tracker-layout-confirm" role="alert">
+              <span>Remove all pins, groups and custom ordering?</span>
+              <button
+                type="button"
+                className="ua-tracker-layout-button"
+                onClick={() => {
+                  setLayout(model.normalize(null));
+                  setResetPending(false);
+                  setAnnouncement(
+                    "Tracker layout reset. Upload selection is unchanged.",
+                  );
+                }}
+              >
+                Reset layout
+              </button>
+              <button
+                type="button"
+                className="ua-tracker-layout-button"
+                onClick={() => setResetPending(false)}
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+      <div
+        className={compact && !editing ? "max-h-48 overflow-y-auto pr-1" : ""}
+      >
+        {trackers.length === 0 && (
+          <p className="text-xs opacity-70">
+            No configured trackers. Turn on Show all supported trackers to
+            choose one.
+          </p>
+        )}
+        {sections.map((section) => {
+          const custom = ![model.PINNED, model.UNGROUPED].includes(section.id);
+          if (!editing && section.trackers.length === 0) return null;
+          const groupIndex = layout.groups.findIndex(
+            (group) => group.id === section.id,
+          );
+          const selectedCount = section.trackers.filter((tracker) =>
+            selectedTrackers.has(tracker.name),
+          ).length;
+          const allSelected =
+            selectedCount > 0 && selectedCount === section.trackers.length;
+          const selectionAction = allSelected ? "Deselect all" : "Select all";
+          return (
+            <section
+              key={section.id}
+              className="ua-tracker-group"
+              aria-label={section.name}
+              data-drop-target={
+                (dropTarget?.sectionId === section.id && !dropTarget.before) ||
+                undefined
+              }
+              onDragOver={(event) => allowDrop(event, section.id)}
+              onDrop={(event) => drop(event, section.id)}
+              onDragLeave={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget))
+                  setDropTarget(null);
+              }}
+            >
+              {(editing || hasLayout) && (
+                <div className="ua-tracker-group-heading">
+                  {editing && custom && (
+                    <button
+                      type="button"
+                      className="ua-tracker-drag-handle"
+                      draggable
+                      onDragStart={(event) =>
+                        startDrag(event, { type: "group", id: section.id })
+                      }
+                      onDragEnd={finishDrag}
+                      aria-label={`Drag ${section.name} group`}
+                      title="Drag to reorder group"
+                    >
+                      <LucideIcon
+                        name="grip-vertical"
+                        className="h-3.5 w-3.5"
+                      />
+                    </button>
+                  )}
+                  {editing && custom ? (
+                    <TrackerGroupName
+                      group={section}
+                      onRename={(name) =>
+                        setLayout((current) => ({
+                          ...current,
+                          groups: current.groups.map((group) =>
+                            group.id === section.id
+                              ? { ...group, name }
+                              : group,
+                          ),
+                        }))
+                      }
+                    />
+                  ) : (
+                    <h3>{section.name}</h3>
+                  )}
+                  <span className="ua-tracker-group-count">
+                    {editing
+                      ? section.trackers.length
+                      : `${selectedCount} of ${section.trackers.length} selected`}
+                  </span>
+                  {!editing && (
+                    <div
+                      className="ua-tracker-group-selection"
+                      role="group"
+                      aria-label={`Tracker selection for ${section.name}`}
+                    >
+                      <button
+                        type="button"
+                        className="ua-tracker-layout-button"
+                        aria-label={`${selectionAction} visible trackers in ${section.name}`}
+                        title={`${selectionAction} visible trackers in ${section.name}`}
+                        disabled={disabled || section.trackers.length === 0}
+                        onClick={() =>
+                          onGroupSelection(
+                            section.trackers.map((tracker) => tracker.name),
+                            !allSelected,
+                          )
+                        }
+                      >
+                        {selectionAction}
+                      </button>
+                    </div>
+                  )}
+                  {editing && custom && (
+                    <div className="ua-tracker-group-actions">
+                      <button
+                        type="button"
+                        className="ua-tracker-layout-icon"
+                        aria-label={`Move ${section.name} group up`}
+                        title="Move group up"
+                        disabled={groupIndex === 0}
+                        onClick={() => nudgeGroup(section.id, -1)}
+                      >
+                        <LucideIcon name="chevron-up" className="h-3 w-3" />
+                      </button>
+                      <button
+                        type="button"
+                        className="ua-tracker-layout-icon"
+                        aria-label={`Move ${section.name} group down`}
+                        title="Move group down"
+                        disabled={groupIndex === layout.groups.length - 1}
+                        onClick={() => nudgeGroup(section.id, 1)}
+                      >
+                        <LucideIcon name="chevron-down" className="h-3 w-3" />
+                      </button>
+                      <button
+                        type="button"
+                        className="ua-tracker-layout-button"
+                        onClick={() => {
+                          setLayout((current) =>
+                            model.removeGroup(current, section.id),
+                          );
+                          setAnnouncement(
+                            `${section.name} group removed. Its trackers are now ungrouped.`,
+                          );
+                        }}
+                        title="Remove heading and return its trackers to Ungrouped"
+                      >
+                        Remove group
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+              <div className="ua-tracker-chip-list grid gap-2">
+                {section.trackers.map((tracker, index) => {
+                  const pinned = layout.pinned.includes(tracker.name);
+                  const displayName = tracker.display_name || tracker.name;
+                  return (
+                    <div
+                      key={tracker.name}
+                      className="ua-tracker-card"
+                      draggable={editing}
+                      onDragStart={(event) =>
+                        startDrag(event, { type: "tracker", id: tracker.name })
+                      }
+                      onDragEnd={finishDrag}
+                      data-drop-before={
+                        (dropTarget?.sectionId === section.id &&
+                          dropTarget.before === tracker.name) ||
+                        undefined
+                      }
+                      onDragOver={(event) =>
+                        allowDrop(event, section.id, tracker.name)
+                      }
+                      onDrop={(event) => drop(event, section.id, tracker.name)}
+                    >
+                      <div className="ua-tracker-card-main">
+                        {editing && (
+                          <button
+                            type="button"
+                            className="ua-tracker-drag-handle"
+                            draggable
+                            onDragStart={(event) =>
+                              startDrag(event, {
+                                type: "tracker",
+                                id: tracker.name,
+                              })
+                            }
+                            onDragEnd={finishDrag}
+                            aria-label={`Drag ${displayName}`}
+                            title="Drag to move tracker"
+                          >
+                            <LucideIcon
+                              name="grip-vertical"
+                              className="h-3 w-3"
+                            />
+                          </button>
+                        )}
+                        {children(tracker, editing)}
+                        {editing && (
+                          <button
+                            type="button"
+                            className="ua-tracker-pin"
+                            aria-label={`${pinned ? "Unpin" : "Pin"} ${displayName}`}
+                            aria-pressed={pinned}
+                            title={`${pinned ? "Unpin" : "Pin"} ${displayName}`}
+                            disabled={disabled}
+                            onClick={() => {
+                              setLayout((current) =>
+                                model.togglePin(current, tracker.name),
+                              );
+                              setAnnouncement(
+                                `${displayName} ${pinned ? "unpinned" : "pinned"}.`,
+                              );
+                            }}
+                          >
+                            <svg
+                              width="13"
+                              height="13"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="1.7"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              aria-hidden="true"
+                            >
+                              <path d="M16 3 21 8l-4 1-3 5-1 4-7-7 4-1 5-3zM9 15l-6 6" />
+                            </svg>
+                          </button>
+                        )}
+                      </div>
+                      {editing && (
+                        <div className="ua-tracker-card-tools">
+                          <button
+                            type="button"
+                            className="ua-tracker-layout-icon"
+                            aria-label={`Move ${displayName} earlier`}
+                            title="Move earlier"
+                            disabled={index === 0}
+                            onClick={() => nudgeTracker(section, index, -1)}
+                          >
+                            <LucideIcon
+                              name="chevron-left"
+                              className="h-3 w-3"
+                            />
+                          </button>
+                          <button
+                            type="button"
+                            className="ua-tracker-layout-icon"
+                            aria-label={`Move ${displayName} later`}
+                            title="Move later"
+                            disabled={index === section.trackers.length - 1}
+                            onClick={() => nudgeTracker(section, index, 1)}
+                          >
+                            <LucideIcon
+                              name="chevron-right"
+                              className="h-3 w-3"
+                            />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                {editing && section.trackers.length === 0 && (
+                  <p className="ua-tracker-group-empty">Drop trackers here.</p>
+                )}
+              </div>
+            </section>
+          );
+        })}
+      </div>
+      <span className="sr-only" role="status" aria-live="polite">
+        {announcement}
+      </span>
+    </div>
+  );
+}
+
 function AudionutsUAGUI() {
   const API_BASE = window.location.origin + "/api";
   // Derive an application base path from the API base so links work under subpath deployments
@@ -2171,6 +2653,7 @@ function AudionutsUAGUI() {
   const [showAllSupportedTrackers, setShowAllSupportedTrackers] =
     useState(false);
   const [failedFavicons, setFailedFavicons] = useState(new Set());
+  const [isEditingTrackerLayout, setIsEditingTrackerLayout] = useState(false);
   const [isExecuting, setIsExecuting] = useState(Boolean(screenshotMode));
   const [isTerminalView, setIsTerminalView] = useState(Boolean(screenshotMode));
   const [expandedFolders, setExpandedFolders] = useState(
@@ -3241,6 +3724,17 @@ function AudionutsUAGUI() {
     setCustomArgs((prev) => syncTrackersToArgs(prev, nextSet, defaultTrackers));
   };
 
+  const handleTrackerGroupSelection = (trackerNames, selected) => {
+    if (isExecuting) return;
+    const nextSet = new Set(selectedTrackers);
+    for (const name of trackerNames) {
+      if (selected) nextSet.add(name);
+      else nextSet.delete(name);
+    }
+    setSelectedTrackers(nextSet);
+    setCustomArgs((prev) => syncTrackersToArgs(prev, nextSet, defaultTrackers));
+  };
+
   const toggleTrackerStatusDetails = (trackerName) => {
     setExpandedTrackerStatusDetails((current) => {
       const next = new Set(current);
@@ -3327,73 +3821,130 @@ function AudionutsUAGUI() {
     };
 
     return (
-      <div
-        className={`mt-3 space-y-2 p-3 rounded-lg border ${isDarkMode ? "bg-gray-900 border-gray-700 text-white" : "bg-gray-50 border-gray-200 text-gray-800"}`}
-      >
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="text-xs font-semibold uppercase tracking-wider opacity-75">
+      <div className="ua-tracker-selector mt-3 space-y-2 p-3 rounded-lg border">
+        <div className="ua-tracker-selector-header">
+          <span className="ua-tracker-selector-title text-xs font-semibold uppercase tracking-wider opacity-75">
             Select Trackers (-tk):
           </span>
-          <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => checkTrackerStatuses(statusTargets)}
-                className="ua-tracker-status-check rounded-md border px-2 py-1 text-[10px] font-semibold"
-                disabled={
-                  isExecuting ||
-                  isCheckingTrackerStatuses ||
-                  statusTargets.length === 0
-                }
-              >
-                {isCheckingTrackerStatuses ? "Checking…" : "Check status"}
-              </button>
-              <span className="text-[10px] opacity-60">{checkedAge}</span>
+          <div className="ua-tracker-toolbar">
+            <div
+              className="ua-tracker-toolbar-group"
+              role="group"
+              aria-label="Tracker selection"
+            >
+              <span className="ua-tracker-toolbar-caption" aria-hidden="true">
+                Tracker selection
+              </span>
+              <div className="ua-tracker-toolbar-controls">
+                <button
+                  type="button"
+                  title="Restore your configured default tracker selection"
+                  onClick={() => {
+                    setSelectedTrackers(new Set(defaultTrackers));
+                    setCustomArgs(
+                      syncTrackersToArgs(
+                        customArgs,
+                        defaultTrackers,
+                        defaultTrackers,
+                      ),
+                    );
+                  }}
+                  className="ua-tracker-layout-button ua-tracker-toolbar-button"
+                  disabled={isExecuting}
+                >
+                  Reset to Defaults
+                </button>
+                <button
+                  type="button"
+                  title="Deselect all trackers for this upload"
+                  onClick={() => {
+                    const nextSet = new Set();
+                    setSelectedTrackers(nextSet);
+                    setCustomArgs(
+                      syncTrackersToArgs(customArgs, nextSet, defaultTrackers),
+                    );
+                  }}
+                  className="ua-tracker-layout-button ua-tracker-toolbar-button"
+                  disabled={isExecuting}
+                >
+                  Clear All
+                </button>
+              </div>
             </div>
-            <label className="inline-flex cursor-pointer items-center gap-1.5 text-[10px] font-medium">
-              <input
-                type="checkbox"
-                checked={showAllSupportedTrackers}
-                onChange={(event) =>
-                  setShowAllSupportedTrackers(event.target.checked)
-                }
-                className="ua-theme-checkbox h-3.5 w-3.5"
-                disabled={isExecuting}
-              />
-              <span>Show all supported trackers</span>
-            </label>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedTrackers(new Set(defaultTrackers));
-                  setCustomArgs(
-                    syncTrackersToArgs(
-                      customArgs,
-                      defaultTrackers,
-                      defaultTrackers,
-                    ),
-                  );
-                }}
-                className="ua-accent-link text-[10px] underline font-medium"
-                disabled={isExecuting}
-              >
-                Reset to Defaults
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  const nextSet = new Set();
-                  setSelectedTrackers(nextSet);
-                  setCustomArgs(
-                    syncTrackersToArgs(customArgs, nextSet, defaultTrackers),
-                  );
-                }}
-                className="ua-accent-link text-[10px] underline font-medium"
-                disabled={isExecuting}
-              >
-                Clear All
-              </button>
+            <div
+              className="ua-tracker-toolbar-group"
+              role="group"
+              aria-label="Tracker status"
+            >
+              <span className="ua-tracker-toolbar-caption" aria-hidden="true">
+                Tracker status
+              </span>
+              <div className="ua-tracker-toolbar-status">
+                <button
+                  type="button"
+                  onClick={() => checkTrackerStatuses(statusTargets)}
+                  className="ua-tracker-layout-button ua-tracker-toolbar-button ua-tracker-status-check"
+                  title="Check whether tracker websites are reachable"
+                  disabled={
+                    isExecuting ||
+                    isCheckingTrackerStatuses ||
+                    statusTargets.length === 0
+                  }
+                >
+                  {isCheckingTrackerStatuses ? "Checking…" : "Check now"}
+                </button>
+                <span className="text-[10px] opacity-60">{checkedAge}</span>
+              </div>
+            </div>
+            <div
+              className="ua-tracker-toolbar-group"
+              role="group"
+              aria-label="Layout and view"
+            >
+              <span className="ua-tracker-toolbar-caption" aria-hidden="true">
+                Layout &amp; view
+              </span>
+              <div className="ua-tracker-toolbar-controls">
+                <button
+                  type="button"
+                  className="ua-tracker-layout-button ua-tracker-toolbar-button"
+                  aria-pressed={isEditingTrackerLayout && !isExecuting}
+                  disabled={isExecuting}
+                  onClick={() =>
+                    setIsEditingTrackerLayout((current) => !current)
+                  }
+                >
+                  {isEditingTrackerLayout && !isExecuting
+                    ? "Done"
+                    : "Edit layout"}
+                </button>
+                <button
+                  type="button"
+                  className="ua-tracker-layout-button ua-tracker-toolbar-button ua-tracker-filter-toggle"
+                  aria-label="Show all supported trackers"
+                  aria-pressed={showAllSupportedTrackers}
+                  title={
+                    showAllSupportedTrackers
+                      ? "Show only configured or selected trackers"
+                      : "Show all supported trackers, including unconfigured trackers"
+                  }
+                  disabled={isExecuting}
+                  onClick={() =>
+                    setShowAllSupportedTrackers((current) => !current)
+                  }
+                >
+                  <span
+                    className="ua-tracker-filter-indicator"
+                    aria-hidden="true"
+                  >
+                    <LucideIcon
+                      name="check"
+                      className={`h-2.5 w-2.5 ${showAllSupportedTrackers ? "" : "invisible"}`}
+                    />
+                  </span>
+                  Show all supported trackers
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -3496,16 +4047,16 @@ function AudionutsUAGUI() {
             })}
           </div>
         )}
-        <div
-          className={`ua-tracker-chip-list grid gap-2 pr-1 ${!isExecuting && !isTerminalView ? "" : "max-h-48 overflow-y-auto"}`}
+        <TrackerOrganizer
+          trackers={visibleTrackers}
+          catalog={trackers}
+          selectedTrackers={selectedTrackers}
+          onGroupSelection={handleTrackerGroupSelection}
+          editing={isEditingTrackerLayout && !isExecuting}
+          disabled={isExecuting}
+          compact={isExecuting || isTerminalView}
         >
-          {visibleTrackers.length === 0 && (
-            <span className="text-xs opacity-70">
-              No configured trackers. Turn on Show all supported trackers to
-              choose one.
-            </span>
-          )}
-          {visibleTrackers.map((tracker) => {
+          {(tracker, editing) => {
             const isSelected = selectedTrackers.has(tracker.name);
             const isDefault = defaultTrackers.has(tracker.name);
             const isConfigured = tracker.configured !== false;
@@ -3524,14 +4075,11 @@ function AudionutsUAGUI() {
                 type="button"
                 key={tracker.name}
                 onClick={() => handleTrackerToggle(tracker.name)}
-                disabled={isExecuting}
+                disabled={isExecuting || editing}
+                aria-pressed={isSelected}
                 data-color-mode={isDarkMode ? "dark" : "light"}
                 className={`ua-tracker-chip flex min-w-0 items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium border transition-all ${
-                  isSelected
-                    ? "ua-tracker-chip-selected"
-                    : isDarkMode
-                      ? "bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700 hover:text-gray-200"
-                      : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                  isSelected ? "ua-tracker-chip-selected" : ""
                 }`}
                 title={`${tracker.display_name}${isDefault ? " (Default)" : ""}${
                   !isConfigured ? " (Not configured)" : ""
@@ -3578,8 +4126,8 @@ function AudionutsUAGUI() {
                 />
               </button>
             );
-          })}
-        </div>
+          }}
+        </TrackerOrganizer>
       </div>
     );
   };
