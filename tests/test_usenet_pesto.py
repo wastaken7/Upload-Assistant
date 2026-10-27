@@ -680,3 +680,32 @@ async def test_run_pesto_survives_a_failing_labeler(monkeypatch) -> None:
     first = next(i for i, e in enumerate(upload) if e["label"] == "Posting to Usenet [1/3] E01")
     assert {e["label"] for e in upload[first + 1 :]} == {"Posting to Usenet"}
     assert upload[-1]["status"] == "completed"
+
+
+@pytest.mark.asyncio
+async def test_run_pesto_escapes_labels_for_rich_markup(monkeypatch) -> None:
+    from rich.console import Console
+    from rich.progress import Progress
+
+    descriptions: list[str] = []
+    real_add_task, real_update = Progress.add_task, Progress.update
+
+    def add_task(self, description, *args, **kwargs):
+        descriptions.append(description)
+        return real_add_task(self, description, *args, **kwargs)
+
+    def update(self, task_id, *args, description=None, **kwargs):
+        if description is not None:
+            descriptions.append(description)
+        return real_update(self, task_id, *args, description=description, **kwargs)
+
+    monkeypatch.setattr(Progress, "add_task", add_task)
+    monkeypatch.setattr(Progress, "update", update)
+    names = ["[grp] Show.S01E01", "[grp] Show.S01E02", "[grp] Show.S01E03"]
+    events = await _run_and_collect(episode_labels=names)
+
+    rendered = [Console().render_str(description).plain for description in descriptions]
+    assert "Posting to Usenet [season PAR2]" in rendered
+    assert "Posting to Usenet [1/3] [grp] Show.S01E01" in rendered
+    starts = [e["label"] for e in events if e["id"] == "pesto-upload" and e.get("detail") == "Starting"]
+    assert starts == [*_episode_start_labels(names), "Posting to Usenet [season PAR2]"]

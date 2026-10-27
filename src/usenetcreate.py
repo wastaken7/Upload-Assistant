@@ -19,6 +19,7 @@ import aiofiles
 import aiofiles.os
 import aiofiles.ospath
 import psutil
+from rich.markup import escape
 from rich.progress import BarColumn, TaskID, TaskProgressColumn, TextColumn
 
 from src.console import console, logger, progress_display
@@ -869,18 +870,18 @@ async def run_pesto_with_progress(cmd: list[str], cwd: str | None = None, env: d
                             labeler = None
                             upload_label = PESTO_UPLOAD_LABEL
                             if "upload" in tasks:
-                                progress.update(tasks["upload"], description=upload_label)
+                                progress.update(tasks["upload"], description=escape(upload_label))
                         else:
                             if new_label is not None:
                                 upload_label = new_label
                                 if "upload" not in tasks:
-                                    tasks["upload"] = progress.add_task(upload_label, total=100)
-                                progress.update(tasks["upload"], description=upload_label, completed=0)
+                                    tasks["upload"] = progress.add_task(escape(upload_label), total=100)
+                                progress.update(tasks["upload"], description=escape(upload_label), completed=0)
                                 publish_progress("pesto-upload", upload_label, current=0, total=100, detail="Starting")
                     if etype == "segment_done":
                         pct = float(event.get("progress_pct", 0))
                         if "upload" not in tasks:
-                            tasks["upload"] = progress.add_task(upload_label, total=100)
+                            tasks["upload"] = progress.add_task(escape(upload_label), total=100)
                         progress.update(tasks["upload"], completed=pct)
                         check_expected_total = event.get("total_segments", check_expected_total)
                         total_segments = int(event.get("total_segments", 0) or 0)
