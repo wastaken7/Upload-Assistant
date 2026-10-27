@@ -939,15 +939,55 @@ button:focus-visible {
 }
 
 @container (max-width: 42rem) {
+  .ua-tracker-selector-header {
+    gap: 0.5rem;
+  }
+
   .ua-tracker-toolbar {
-    align-items: flex-start;
-    flex-direction: column;
+    align-items: start;
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    justify-content: start;
+    row-gap: 0.5rem;
     width: 100%;
   }
 
   .ua-tracker-toolbar-group + .ua-tracker-toolbar-group {
     border-inline-start: 0;
     padding-inline-start: 0;
+  }
+
+  .ua-tracker-toolbar-layout {
+    grid-column: 1 / -1;
+  }
+
+  .ua-tracker-toolbar-controls,
+  .ua-tracker-toolbar-status {
+    flex-wrap: wrap;
+  }
+
+  .ua-tracker-toolbar-status {
+    row-gap: 0.125rem;
+  }
+}
+
+@container (min-width: 31rem) and (max-width: 42rem) {
+  .ua-tracker-toolbar {
+    grid-template-columns: max-content minmax(0, 1fr) max-content;
+  }
+
+  .ua-tracker-toolbar-layout {
+    grid-column: auto;
+  }
+}
+
+@container (max-width: 21rem) {
+  .ua-tracker-toolbar {
+    column-gap: 0.5rem;
+  }
+
+  .ua-tracker-toolbar-controls {
+    gap: 0.25rem;
   }
 }
 

@@ -3897,7 +3897,7 @@ function AudionutsUAGUI() {
               </div>
             </div>
             <div
-              className="ua-tracker-toolbar-group"
+              className="ua-tracker-toolbar-group ua-tracker-toolbar-layout"
               role="group"
               aria-label="Layout and view"
             >
