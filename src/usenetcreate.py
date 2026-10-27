@@ -119,7 +119,7 @@ def pesto_season_episode_labels(source_root: Path, entries: dict[str, Path]) -> 
             return None
     ordered = sorted(entries.items(), key=functools.cmp_to_key(lambda left, right: pesto_natural_cmp(left[1].name, right[1].name)))
     if not all(path.name.isascii() for _, path in ordered):
-        return ["" for _ in ordered]
+        return [""] * len(ordered)
     return [stem for stem, _ in ordered]
 
 
@@ -803,7 +803,7 @@ async def run_pesto_with_progress(cmd: list[str], cwd: str | None = None, env: d
     logger.debug(f"[cyan]Running command: {redacted_str}{cwd_str}[/cyan]")
 
     try:
-        publish_progress("pesto-upload", "Posting to Usenet", current=0, total=100, detail="Starting pesto upload")
+        publish_progress("pesto-upload", PESTO_UPLOAD_LABEL, current=0, total=100, detail="Starting pesto upload")
         process = await asyncio.create_subprocess_exec(
             *cmd,
             stdout=asyncio.subprocess.PIPE,
@@ -1019,7 +1019,7 @@ async def run_pesto_with_progress(cmd: list[str], cwd: str | None = None, env: d
                 )
         else:
             if "upload" in tasks:
-                publish_progress("pesto-upload", "Posting to Usenet", current=0, total=100, detail=f"Pesto exited with status code {result}", status="failed")
+                publish_progress("pesto-upload", upload_label, current=0, total=100, detail=f"Pesto exited with status code {result}", status="failed")
             if "par2_encode" in tasks:
                 task_data = progress.tasks[tasks["par2_encode"]]
                 publish_progress(
@@ -1375,12 +1375,14 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
     prepared_files = meta.get("usenet_prepared_files", [])
     use_prepared_files = not skip_archive and isinstance(prepared_files, list) and bool(prepared_files) and all(Path(str(file_path)).is_file() for file_path in prepared_files)
 
+    episode_labels: list[str] | None = None
     if pesto_season_upload:
         # Pesto must see the season directory itself so it can treat each
         # top-level entry as an episode. UA's normal whole-release archive
         # would collapse that structure into one upload.
         upload_root = Path(input_path)
         season_entries = discover_pesto_season_entries(upload_root)
+        episode_labels = pesto_season_episode_labels(upload_root, season_entries)
         cleanup_upload_root = False
         upload_files = [upload_root]
         if volume_size and str(volume_size).lower() == "auto":
@@ -1727,7 +1729,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
                         cmd_pesto,
                         cwd=str(upload_root),
                         env=pesto_env,
-                        episode_labels=pesto_season_episode_labels(upload_root, season_entries) if pesto_season_upload else None,
+                        episode_labels=episode_labels,
                     )
                 nntp_duration_ms = (time.monotonic() - post_started) * 1000
             except Exception:
