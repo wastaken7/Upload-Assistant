@@ -190,6 +190,7 @@ Before returning the compiled string, the builder executes `tracker_specific_for
 | :------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **BRASILTRACKER**    | Removes image resizing attributes (`[img=size]`) and `[list]` structures.                                                                                                                                           |
 | **BJSHARE**          | Converts `[spoiler]` tags to `[hide]`, removes image resize attributes, removes list tags, and formats alignments.                                                                                                  |
+| **CZTEAM**           | Strips image resizing, `[left]`, `[align]`, `[hr]`, `[note]`, `[alert]`, `[sup]`, `[sub]`. Converts `[code]` to `[pre]`, titled spoilers/`[hide]` to bold title + `[spoiler]`, headings to sizes (max 7).           |
 | **ANTHELION**        | Removes image resizing, `[sup]`, `[sub]`, and `[list]` tags. Normalizes special typographic characters (e.g., smart quotes and dashes).                                                                             |
 | **DIGITALCORE**      | Removes `[user]`, `[align]`, `[alert]`, `[note]`, `[hr]`, `[ul]`, and `[ol]`. Converts headers (`[h1]`, `[h2]`, `[h3]`) to bold-underline (`[u][b]`), and converts named spoilers to standard ones.                 |
 | **FUNFILE**          | Replaces all BBCode images and grids with raw HTML markup (`<a href="..." target="_blank"><img src="..." width="..."></a>`), centering elements, and removing spoilers/hide blocks.                                 |
@@ -198,6 +199,10 @@ Before returning the compiled string, the builder executes `tracker_specific_for
 | **HDTORRENTS**       | Converts standard spoilers to `[hide]`, strips image resizing, and limits cover heights to a rigid `137px` via HTML elements.                                                                                       |
 | **TORRENTLEECH**     | Converts BBCode centralizing to HTML `<center>`. Converts `[hr]` to `---`. Replaces screenshot blocks with pure HTML links utilizing inline CSS `style="max-width: XXXpx;"` formatting. Removes lists and spoilers. |
 | **UNIT3D (Generic)** | Converts all legacy `[hide]` blocks to `[spoiler]` for visual consistency across modern UNIT3D tracker layouts. Converts image comparisons to collapsible details tags (`[collapse]`).                              |
+
+### Testing a tracker's BBCode support
+
+[`bbcode-benchmark.txt`](bbcode-benchmark.txt) contains numbered tests for common BBCode tags, each with its expected result. Paste it into the tracker's description preview (or a private test upload), note the IDs that show raw tags or break the layout, and add the matching conversions for that tracker in `tracker_specific_formats()`.
 
 ---
 

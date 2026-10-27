@@ -2270,6 +2270,10 @@ function AudionutsUAGUI() {
   const [runGuiResultsCollapsed, setRunGuiResultsCollapsed] = useState(
     () => storage.get(RUN_GUI_RESULTS_COLLAPSED_KEY) === "true",
   );
+  // Queue items folded in Results, as "tabId:index"; cleared when a tab's run resets.
+  const [collapsedRunGuiItems, setCollapsedRunGuiItems] = useState(
+    () => new Set(),
+  );
   // Mirrors the active tab's runtime.gui; background tabs update only their runtime.
   const [runGui, setRunGui] = useState(initialRunGuiState);
   const [executionScreenshots, setExecutionScreenshots] = useState(
@@ -2835,6 +2839,10 @@ function AudionutsUAGUI() {
     if (!runtime) return;
     runtime.gui = RunGui.createRunGuiState();
     if (tabId === activeTabIdRef.current) setRunGui(runtime.gui);
+    setCollapsedRunGuiItems((prev) => {
+      const kept = [...prev].filter((key) => !key.startsWith(`${tabId}:`));
+      return kept.length === prev.size ? prev : new Set(kept);
+    });
   };
 
   const applyProgressEvent = (event, tabId = activeTabIdRef.current) => {
@@ -10157,50 +10165,76 @@ function AudionutsUAGUI() {
   /** One queue item as a card: the release is the heading, trackers below it. */
   const renderRunGuiItemCard = (group, view) => {
     const outcome = runGuiItemOutcome(group, view);
+    const collapseKey = `${activeTabId}:${group.index}`;
+    const collapsed = collapsedRunGuiItems.has(collapseKey);
+    const toggleCollapsed = () =>
+      setCollapsedRunGuiItems((prev) => {
+        const next = new Set(prev);
+        if (!next.delete(collapseKey)) next.add(collapseKey);
+        return next;
+      });
+    const header = (
+      <header className="ua-run-gui-item-header flex min-w-0 flex-wrap items-center gap-2 px-3 py-2">
+        <span className="ua-run-gui-item-index shrink-0 rounded px-1.5 text-xs font-semibold tabular-nums">
+          {group.index}
+        </span>
+        <h4
+          className="min-w-0 flex-1 truncate text-sm font-semibold"
+          title={group.name || undefined}
+        >
+          {group.name || `Item ${group.index}`}
+        </h4>
+        {group.personalRelease && renderRunGuiPersonalRelease()}
+        {group.runOptions?.debug && (
+          <RunGuiDebugBadge options={group.runOptions} />
+        )}
+        <span className="ua-run-gui-status inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-0.5 text-xs font-semibold">
+          <LucideIcon
+            name={outcome.icon}
+            className={`h-3.5 w-3.5 ${outcome.icon === "loader-circle" ? "animate-spin" : ""}`}
+          />
+          {outcome.label}
+        </span>
+        <button
+          type="button"
+          onClick={toggleCollapsed}
+          aria-expanded={!collapsed}
+          aria-label={`${collapsed ? "Expand" : "Collapse"} ${group.name || `item ${group.index}`}`}
+          title={collapsed ? "Expand" : "Collapse"}
+          className="ua-run-gui-collapse flex h-6 w-6 shrink-0 items-center justify-center rounded-md"
+        >
+          <LucideIcon
+            name={collapsed ? "chevron-down" : "chevron-up"}
+            className="h-4 w-4"
+          />
+        </button>
+      </header>
+    );
     return (
       <section
         key={group.index}
         className="ua-run-gui-item rounded-md border"
         data-tone={outcome.tone}
       >
-        {renderRunGuiWithCover(
-          group,
-          "py-2 pl-3",
-          <>
-            <header className="ua-run-gui-item-header flex min-w-0 flex-wrap items-center gap-2 px-3 py-2">
-              <span className="ua-run-gui-item-index shrink-0 rounded px-1.5 text-xs font-semibold tabular-nums">
-                {group.index}
-              </span>
-              <h4
-                className="min-w-0 flex-1 truncate text-sm font-semibold"
-                title={group.name || undefined}
-              >
-                {group.name || `Item ${group.index}`}
-              </h4>
-              {group.personalRelease && renderRunGuiPersonalRelease()}
-              {group.runOptions?.debug && (
-                <RunGuiDebugBadge options={group.runOptions} />
-              )}
-              <span className="ua-run-gui-status inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-0.5 text-xs font-semibold">
-                <LucideIcon
-                  name={outcome.icon}
-                  className={`h-3.5 w-3.5 ${outcome.icon === "loader-circle" ? "animate-spin" : ""}`}
-                />
-                {outcome.label}
-              </span>
-            </header>
-            <div className="px-3 pb-2">
-              {group.rows.length > 0 && (
-                <ul className="ua-run-gui-divide divide-y">
-                  {group.rows.map((entry) =>
-                    renderRunGuiResultRow(entry, view),
+        {collapsed
+          ? header
+          : renderRunGuiWithCover(
+              group,
+              "py-2 pl-3",
+              <>
+                {header}
+                <div className="px-3 pb-2">
+                  {group.rows.length > 0 && (
+                    <ul className="ua-run-gui-divide divide-y">
+                      {group.rows.map((entry) =>
+                        renderRunGuiResultRow(entry, view),
+                      )}
+                    </ul>
                   )}
-                </ul>
-              )}
-              {renderRunGuiItemNotes(group.notes)}
-            </div>
-          </>,
-        )}
+                  {renderRunGuiItemNotes(group.notes)}
+                </div>
+              </>,
+            )}
       </section>
     );
   };

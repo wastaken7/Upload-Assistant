@@ -72,6 +72,7 @@ def meta(**overrides):
         "artwork_url": "",
         "hosted_artwork": [],
         "valid_mi": True,
+        "manual_name": None,
     }
     values.update(overrides)
     result = SimpleNamespace(**values)

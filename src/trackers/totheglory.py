@@ -101,6 +101,9 @@ class ToTheGlory:
         return cookies
 
     async def get_name(self, meta: Meta) -> str:
+        if meta.manual_name is not None:
+            return meta.manual_name.strip()
+
         ttg_name = meta.name
 
         remove_list = ["Dubbed", "Dual-Audio"]

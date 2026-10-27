@@ -158,6 +158,9 @@ class AsianCinema(UNIT3D):
         return await super().get_keywords(meta, max_terms)
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
+        if meta.manual_name is not None:
+            return {"name": meta.manual_name.strip()}
+
         name: str = meta.name
         aka: str = meta.aka
         original_title: str = meta.original_title

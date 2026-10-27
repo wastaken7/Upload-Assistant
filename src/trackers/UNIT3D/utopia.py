@@ -141,6 +141,9 @@ class Utopia(UNIT3D):
         TV:    Name AKA Original LOCALE S##E## Year Cut Ratio Hybrid REPACK PROPER RERip Edition Region 3D SOURCE TYPE Resolution HDR VCodec ACodec Channels Object-Tag
 
         """
+        if meta.manual_name is not None:
+            return {"name": meta.manual_name.strip()}
+
         category = str(meta.category)
         release_type = str(meta.type).upper()
 

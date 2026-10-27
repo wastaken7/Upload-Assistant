@@ -23,6 +23,72 @@ def _css4_colors_by_hex() -> dict[str, str]:
     return {color_hex.lower(): color_name for color_name, color_hex in _css4_colors().items()}
 
 
+_INLINE_OPEN = r"(?:\[(?:b|i|u|small|size=\d+|color=[^\]]*|font=[^\]]*)\]\s*)*"
+_INLINE_CLOSE = r"(?:\s*\[/(?:b|i|u|small|size|color|font)\])*"
+# A link's text up to its own [/url], never running into the next link.
+_URL_BODY = r"(?:(?!\[/?url\b)[\s\S])*?\[/url\]"
+
+
+def _block(core: str) -> str:
+    """Match a center/right block holding only core and its inline formatting."""
+    return rf"\[(center|right)\]\s*{_INLINE_OPEN}(?:{core}){_INLINE_CLOSE}\s*\[/\1\]"
+
+
+def _signature(core: str) -> str:
+    """Match a signature with its inline formatting, and its own center/right block when it fills one."""
+    return rf"{_block(core)}|{_INLINE_OPEN}(?:{core}){_INLINE_CLOSE}"
+
+
+def _image(url: str) -> str:
+    """Match an image with that URL, and its own center block."""
+    return rf"(?:\[center\]\s*)?\[img[^\]]*\]{url}\[/img\](?:\s*\[/center\])?"
+
+
+# Boilerplate that release groups add to their descriptions, removed before images
+# are extracted so a group banner is not taken as a screenshot. To support another
+# group, add its name with regexes (matched case-insensitively) for each piece.
+# Prefer _block or _image so a common word is never removed from running text.
+RELEASE_GROUP_BOILERPLATE: dict[str, tuple[str, ...]] = {
+    "Kitsune": (
+        # banner right above the decorated "Screenshots" divider
+        r"\[img[^\]]*\][^\[]*\[/img\]\s*(?=•❅─+✧❅✦)",
+        r"•❅─+✧❅✦\s*(?:\[color=[^\]]*\])?\s*Screenshots\s*(?:\[/color\])?\s*✦❅✧─+❅•",
+        r"Find\s+our\s+uploads\s*\[url=[^\]]*name=Kitsune[^\]]*\]" + _URL_BODY,
+    ),
+    "AXON": (_image(r"https?://file\.aither\.cc/u/y6nfEPrCxpW57juD\.png"),),
+    "Jeditwo": (_image(r"https?://file\.aither\.cc/u/(?:pwkbrhyrBNiIIdeY|l7zi3mymrA1L2Xd1)\.png"),),
+    "BiOMA": (_image(r"https?://i\.ibb\.co/N61fR8h3/bioma-v3\.png"),),
+    "GRiMM": (
+        _block(r"A\s+GRiMM\b[^\[]*?PRESENTS"),
+        _image(r"https?://img1\.imgoe\.download/kOv5q\.png"),
+        _block(r"Web\s+Source\s*~[^\[]*"),
+        _block(r"\[font=Comic\s+Sans\s+MS\]\s*SCREENSHOTS\s*\[/font\]"),
+        _block(r"~\s*A\s+GRiMM\b[^\[~]*?RELEASE\s*~"),
+        _block(r"GRiMM\s*\|\s*OnlyWeb"),
+        _block(r"~\s*An\s+Elegance\s+of\s+Simplicity,\s*Socializing\s*&\s*Sharing\s*~"),
+    ),
+    "Maghuro": (
+        r"\[b\]\s*🖼️\s*Screenshots\s*\[/b\]",
+        r"\[note\]\s*\[i\][^\[]*screenshots\s+have\s+been\s+tonemapped\s+to\s+SDR\s+for\s+web\s+preview\.?\s*\[/i\]\s*\[/note\]",
+        r"(?:\[hr\]\s*)?" + _image(r"https?://img\.ptscreens\.com/1000203577\.png"),
+    ),
+}
+
+
+# Signatures that other upload tools add. To support another tool, add its name with
+# the signature's core regex wrapped in _signature (matched case-insensitively).
+UPLOAD_TOOL_SIGNATURES: dict[str, tuple[str, ...]] = {
+    "Uploadrr": (_signature(r"\[url=https?://codeberg\.org/CvT/Uploadrr/?\]" + _URL_BODY),),
+    "upbrr": (_signature(r"\[url=https?://github\.com/autobrr/upbrr/?\]" + _URL_BODY),),
+    "NfoForge": (_signature(r"Shared\s+with\s+\[url=https?://github\.com/jesterr0/NfoForge/?\]" + _URL_BODY),),
+    "EASY UPLOAD3R": (_signature(r"⚡?\s*Uploaded\s+using\s+EASY\s+UPLOAD3R\s*⚡?"),),
+    "upsies": (_signature(r"Shared\s+with\s+\[url=https?://upsies\.readthedocs\.io/?\]" + _URL_BODY),),
+    "AK Automated Uploader": (_signature(r"Uploaded\s+with\s+\[url=https?://github\.com/AQTKU/ak-automated-uploader/?\]" + _URL_BODY),),
+    "Only-Uploader": (_signature(r"\[url=https?://github\.com/edge20200/Only-Uploader/?\]" + _URL_BODY),),
+    "MAGUS": (_signature(r"\[url=https?://dailyusetools\.com/MAGUS/?\]" + _URL_BODY),),
+}
+
+
 # Bold - KEEP
 # Italic - KEEP
 # Underline - KEEP
@@ -66,6 +132,7 @@ class BBCODE:
         # Unescape html
         desc = html.unescape(description)
         desc = desc.replace("\r\n", "\n")
+        desc = self.remove_known_boilerplate(desc)
         imagelist: list[dict[str, Any]] = []
 
         # First pass: Remove entire comparison sections
@@ -172,6 +239,8 @@ class BBCODE:
             meta.nfo = True
             meta.bhd_nfo = True
 
+        desc = self.remove_known_boilerplate(desc)
+
         # Remove size tags
         desc = re.sub(r"\[size=.*?\]", "", desc)
         desc = desc.replace("[/size]", "")
@@ -233,6 +302,7 @@ class BBCODE:
         # Unescape html
         desc = html.unescape(desc)
         desc = desc.replace("\r\n", "\n")
+        desc = self.remove_known_boilerplate(desc)
 
         # Remove url tags with PASSTHEPOPCORN/HDBITS links
         url_tags: list[str] = re.findall(
@@ -429,6 +499,7 @@ class BBCODE:
         desc = html.unescape(desc)
         # Replace carriage returns with newlines
         desc = desc.replace("\r\n", "\n")
+        desc = self.remove_known_boilerplate(desc)
 
         # Remove links to site
         site_netloc = urllib.parse.urlparse(site).netloc
@@ -443,7 +514,8 @@ class BBCODE:
                 url_tag_removed = url_tag_removed.replace("[/url]", "")
                 desc = desc.replace(site_url_tag, url_tag_removed)
 
-        desc = desc.replace(site_netloc, site_domain)
+        # Subdomains such as an image host on the site must keep their full host
+        desc = re.sub(rf"(?<![\w.-]){re.escape(site_netloc)}", site_domain, desc)
 
         # Temporarily hide spoiler tags
         spoilers = re.findall(r"\[spoiler[\s\S]*?\[\/spoiler\]", desc)
@@ -494,6 +566,8 @@ class BBCODE:
             # Add any other known bot image URLs here
         ]
         imagelist = [img for img in imagelist if img["img_url"] not in bot_image_urls and not re.search(r"thumbs", img["img_url"], re.IGNORECASE)]
+        # TMDB artwork (logos, posters, stills) is never a screenshot
+        imagelist = [img for img in imagelist if (urllib.parse.urlparse(img["img_url"]).hostname or "").lower() != "image.tmdb.org"]
 
         # Restore spoiler tags
         if spoiler_placeholders:
@@ -536,7 +610,7 @@ class BBCODE:
         ua_signature_regex = r"""
             ^[ \t]*
             \[(?:right|center|align=(?:right|center))\][ \t]*(?:\n[ \t]*)?
-            \[url=https:\/\/github\.com\/[^\]]*\/Upload-Assistant\][ \t]*(?:\n[ \t]*)?
+            \[url=https:\/\/github\.com\/[^\]\/]+\/[^\]\/]*Upload-Assistant\][ \t]*(?:\n[ \t]*)?
             (?:\[size=\d+\][ \t]*(?:\n[ \t]*)?)?
             (?:Shared\s+with|Compartilhado\s+com)\s+Upload[-\s]+Assistant
             (?:[ \t]+v?\d+(?:[.+-]\d+)*)?
@@ -561,6 +635,13 @@ class BBCODE:
         if self.is_only_bbcode(desc):
             return "", imagelist
         return desc, imagelist
+
+    def remove_known_boilerplate(self, desc: str) -> str:
+        """Remove release group boilerplate and upload tool signatures."""
+        for patterns in (*RELEASE_GROUP_BOILERPLATE.values(), *UPLOAD_TOOL_SIGNATURES.values()):
+            for pattern in patterns:
+                desc = re.sub(pattern, "", desc, flags=re.IGNORECASE)
+        return desc
 
     def is_only_bbcode(self, desc: str) -> bool:
         # Remove all BBCode tags

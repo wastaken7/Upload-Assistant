@@ -314,8 +314,21 @@ Language                                 : ${track.language}`,
       action: "open",
       id: 3,
       type: "text",
-      question: "Input args that need correction e.g. (--tag NTb --category tv --tmdb 12345), 'continue' to keep them, or 'skip' to skip this upload",
-      context: { kind: "edit_args", values: { "--category": "movie", "--tmdb": "movie/0000", "--tag": "Group" }, applied: "", actions: [["continue", "Continue without changes"], ["skip", "Skip this upload"]] },
+      question:
+        "Input args that need correction e.g. (--tag NTb --category tv --tmdb 12345), 'continue' to keep them, or 'skip' to skip this upload",
+      context: {
+        kind: "edit_args",
+        values: {
+          "--category": "movie",
+          "--tmdb": "movie/0000",
+          "--tag": "Group",
+        },
+        applied: "",
+        actions: [
+          ["continue", "Continue without changes"],
+          ["skip", "Skip this upload"],
+        ],
+      },
     }),
     { type: "prompt_state", awaiting: true, input_type: "yes_no" },
   ];
