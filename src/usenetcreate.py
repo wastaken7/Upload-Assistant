@@ -1,6 +1,8 @@
 # Upload Assistant © 2026 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
 import contextlib
+import fnmatch
+import functools
 import hashlib
 import json
 import os
@@ -72,6 +74,53 @@ def discover_pesto_season_entries(source_root: Path) -> dict[str, Path]:
     if not entries:
         raise ValueError("Pesto season mode did not find any SxxExx episode entries in the season root")
     return entries
+
+
+PESTO_DEFAULT_EXCLUDES = (".DS_Store", "._*", ".fuse_hidden*", ".Spotlight-V100", ".Trashes", ".fseventsd", "Thumbs.db", "ehthumbs.db", "desktop.ini", "@eaDir")
+
+
+def pesto_natural_cmp(left: str, right: str) -> int:
+    """Compare ASCII names the way Pesto orders season entries (lexical-sort 0.3.1 natural_lexical_cmp)."""
+    a, b = left.lower(), right.lower()
+    i = j = 0
+    while i < len(a) and j < len(b):
+        if "0" <= a[i] <= "9" and "0" <= b[j] <= "9":
+            start_a, start_b = i, j
+            while i < len(a) and j < len(b) and "0" <= a[i] <= "9" and "0" <= b[j] <= "9":
+                i += 1
+                j += 1
+            more_a = i < len(a) and "0" <= a[i] <= "9"
+            more_b = j < len(b) and "0" <= b[j] <= "9"
+            if more_a != more_b:
+                return 1 if more_a else -1
+            number_a, number_b = int(a[start_a:i]), int(b[start_b:j])
+            if number_a != number_b:
+                return -1 if number_a < number_b else 1
+            continue
+        if a[i] != b[j]:
+            if a[i].isalnum() == b[j].isalnum():
+                return -1 if a[i] < b[j] else 1
+            return 1 if a[i].isalnum() else -1
+        i += 1
+        j += 1
+    if i < len(a):
+        return 1
+    if j < len(b):
+        return -1
+    return (left > right) - (left < right)
+
+
+def pesto_season_episode_labels(source_root: Path, entries: dict[str, Path]) -> list[str] | None:
+    """Return episode stems in Pesto's posting order, or None when Pesto would post entries UA skipped."""
+    for entry in source_root.iterdir():
+        if not entry.name.startswith(".") or any(fnmatch.fnmatchcase(entry.name, pattern) for pattern in PESTO_DEFAULT_EXCLUDES):
+            continue
+        if entry.is_dir() or entry.suffix.lower() in VIDEO_EXTENSIONS:
+            return None
+    ordered = sorted(entries.items(), key=functools.cmp_to_key(lambda left, right: pesto_natural_cmp(left[1].name, right[1].name)))
+    if not all(path.name.isascii() for _, path in ordered):
+        return ["" for _ in ordered]
+    return [stem for stem, _ in ordered]
 
 
 async def build_usenet_indexer_metas(

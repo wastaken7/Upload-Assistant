@@ -1,7 +1,9 @@
 # ruff: noqa: S101
 
 import asyncio
+import functools
 import os
+import random
 from pathlib import Path
 from unittest.mock import AsyncMock
 
@@ -517,3 +519,45 @@ async def test_episode_screenshots_fail_when_not_all_are_hosted(tmp_path: Path, 
 
     with pytest.raises(RuntimeError, match="2/3 screenshots were captured"):
         await usenetcreate.prepare_usenet_episode_screenshots(meta, {"DEFAULT": {}})
+
+
+FIXTURES = Path(__file__).parent / "fixtures"
+
+
+def test_pesto_natural_cmp_matches_lexical_sort_crate() -> None:
+    expected = (FIXTURES / "pesto_natural_order.txt").read_text(encoding="utf-8").splitlines()
+    shuffled = expected[:]
+    random.Random(828).shuffle(shuffled)
+    assert sorted(shuffled, key=functools.cmp_to_key(usenetcreate.pesto_natural_cmp)) == expected
+
+
+def _season(tmp_path: Path, names: list[str]) -> Path:
+    season_dir = tmp_path / "Show.S01.1080p.WEB-DL-GROUP"
+    season_dir.mkdir()
+    for name in names:
+        (season_dir / name).write_bytes(b"x")
+    return season_dir
+
+
+def test_pesto_season_episode_labels_follow_pesto_order(tmp_path: Path) -> None:
+    season_dir = _season(tmp_path, ["Show.S01E10.mkv", "Show.S01E2.mkv", "show.s01e3.mkv"])
+    entries = usenetcreate.discover_pesto_season_entries(season_dir)
+    assert usenetcreate.pesto_season_episode_labels(season_dir, entries) == ["Show.S01E2", "show.s01e3", "Show.S01E10"]
+
+
+def test_pesto_season_episode_labels_hide_names_when_not_ascii(tmp_path: Path) -> None:
+    season_dir = _season(tmp_path, ["Show.S01E01.mkv", "Shōw.S01E02.mkv"])
+    entries = usenetcreate.discover_pesto_season_entries(season_dir)
+    assert usenetcreate.pesto_season_episode_labels(season_dir, entries) == ["", ""]
+
+
+def test_pesto_season_episode_labels_off_when_pesto_would_post_a_hidden_entry(tmp_path: Path) -> None:
+    season_dir = _season(tmp_path, ["Show.S01E01.mkv", ".hidden.mkv"])
+    entries = usenetcreate.discover_pesto_season_entries(season_dir)
+    assert usenetcreate.pesto_season_episode_labels(season_dir, entries) is None
+
+
+def test_pesto_season_episode_labels_ignore_entries_pesto_excludes(tmp_path: Path) -> None:
+    season_dir = _season(tmp_path, ["Show.S01E01.mkv", "._Show.S01E01.mkv", ".DS_Store", ".notes.txt"])
+    entries = usenetcreate.discover_pesto_season_entries(season_dir)
+    assert usenetcreate.pesto_season_episode_labels(season_dir, entries) == ["Show.S01E01"]
