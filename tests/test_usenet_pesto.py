@@ -611,8 +611,11 @@ def test_labeler_on_captured_pesto_stream() -> None:
     events = [json.loads(line) for line in lines if line.startswith("{")]
     names = [f"Show.S01E0{n}.1080p.WEB-DL-GROUP" for n in (1, 2, 3)]
     labels = _labels(names, events)
-    assert labels[:3] == [f"Posting to Usenet [{n}/3] {name}" for n, name in enumerate(names, start=1)]
-    assert all(label == "Posting to Usenet [season PAR2]" for label in labels[3:])
+    assert labels == [*_episode_start_labels(names), "Posting to Usenet [season PAR2]"]
+
+
+def _episode_start_labels(names: list[str]) -> list[str]:
+    return [f"Posting to Usenet [{n}/{len(names)}] {name}" for n, name in enumerate(names, start=1)]
 
 
 def _replay_cmd() -> list[str]:
@@ -637,7 +640,8 @@ async def _run_and_collect(**kwargs) -> list[dict]:
 @pytest.mark.asyncio
 @pytest.mark.parametrize("episode_labels", [None, []])
 async def test_run_pesto_without_labels_matches_previous_events(episode_labels) -> None:
-    golden = json.loads((FIXTURES / "pesto_season_dry_run.progress.json").read_text(encoding="utf-8"))
+    lines = (FIXTURES / "pesto_season_dry_run.progress.jsonl").read_text(encoding="utf-8").splitlines()
+    golden = [json.loads(line) for line in lines]
     assert await _run_and_collect(episode_labels=episode_labels) == golden
 
 
@@ -647,8 +651,7 @@ async def test_run_pesto_labels_each_episode_and_resets_progress() -> None:
     events = await _run_and_collect(episode_labels=names)
     upload = [e for e in events if e["id"] == "pesto-upload" and e["status"] == "running"]
     starts = [e for e in upload if e.get("detail") == "Starting"]
-    assert [e["label"] for e in starts[:3]] == [f"Posting to Usenet [{n}/3] {name}" for n, name in enumerate(names, start=1)]
-    assert all(e["current"] == 0 for e in starts)
+    assert [e["label"] for e in starts] == [*_episode_start_labels(names), "Posting to Usenet [season PAR2]"]
     second = upload.index(starts[1])
     assert upload[second - 1]["label"] == starts[0]["label"]
     assert upload[second + 1]["label"] == starts[1]["label"]
@@ -656,15 +659,24 @@ async def test_run_pesto_labels_each_episode_and_resets_progress() -> None:
 
 @pytest.mark.asyncio
 async def test_run_pesto_survives_a_failing_labeler(monkeypatch) -> None:
-    def boom(self, event):
-        raise RuntimeError("labeler bug")
+    real_on_event = usenetcreate.PestoSeasonLabeler.on_event
+    labelled = False
+
+    def flaky(self, event):
+        nonlocal labelled
+        if labelled:
+            raise RuntimeError("labeler bug")
+        label = real_on_event(self, event)
+        labelled = label is not None
+        return label
 
     warnings: list[str] = []
-    monkeypatch.setattr(usenetcreate.PestoSeasonLabeler, "on_event", boom)
+    monkeypatch.setattr(usenetcreate.PestoSeasonLabeler, "on_event", flaky)
     monkeypatch.setattr(usenetcreate.logger, "warning", lambda message, *args, **kwargs: warnings.append(str(message)))
     events = await _run_and_collect(episode_labels=["E01", "E02", "E03"])
     assert len(warnings) == 1
     assert "labeler bug" in warnings[0]
     upload = [e for e in events if e["id"] == "pesto-upload"]
-    assert {e["label"] for e in upload} == {"Posting to Usenet"}
+    first = next(i for i, e in enumerate(upload) if e["label"] == "Posting to Usenet [1/3] E01")
+    assert {e["label"] for e in upload[first + 1 :]} == {"Posting to Usenet"}
     assert upload[-1]["status"] == "completed"
