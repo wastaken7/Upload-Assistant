@@ -427,6 +427,9 @@ class DarkPeers(TmdbTvNaming, UNIT3D):
         return f"{next(iter(other)).title()} MULTi" if len(other) == 1 and len(audio) == 2 else "SKIPPED"
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
+        if meta.manual_name is not None:
+            return {"name": meta.manual_name.strip()}
+
         if meta.category == "MUSIC":
             return {"name": self._music_name(meta)}
 

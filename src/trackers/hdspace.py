@@ -296,4 +296,7 @@ class HDSpace:
         )
 
     async def get_name(self, meta: Meta) -> str:
+        if meta.manual_name is not None:
+            return meta.manual_name.strip()
+
         return add_incomplete_pack_marker(meta.name, meta, self.tracker)

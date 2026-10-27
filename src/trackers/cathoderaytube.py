@@ -85,6 +85,9 @@ class CathodeRayTube:
 
     async def get_name(self, meta: Meta) -> str:
         """Format CRT titles according to its category-specific upload rules."""
+        if meta.manual_name is not None:
+            return meta.manual_name.strip()
+
         name = str(meta.title or meta.name).strip()
         aka = str(meta.aka or "").strip()
         year = str(meta.year or "").strip()

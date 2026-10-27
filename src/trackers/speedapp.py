@@ -221,6 +221,9 @@ class SpeedApp:
         )
 
     async def get_name(self, meta: Meta) -> str:
+        if meta.manual_name is not None:
+            return meta.manual_name.strip()
+
         tracker_name = meta.basename_no_ext
         scene_name = meta.scene_name or ""
 

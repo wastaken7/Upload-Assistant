@@ -399,6 +399,9 @@ class PTerClub:
         return image_list
 
     async def get_name(self, meta: Meta) -> str:
+        if meta.manual_name is not None:
+            return meta.manual_name.strip()
+
         pter_name = meta.name
 
         remove_list = ["Dubbed", "Dual-Audio"]

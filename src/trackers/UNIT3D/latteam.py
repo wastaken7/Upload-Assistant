@@ -179,6 +179,9 @@ class LatTeam(UNIT3D):
         return {"type_id": val}
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
+        if meta.manual_name is not None:
+            return {"name": meta.manual_name.strip()}
+
         if meta.category == "BOOK":
             author = meta.author.strip()
             title = meta.title.strip()

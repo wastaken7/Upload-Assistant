@@ -11,6 +11,7 @@ def make_meta(**overrides):
         "manual_episode_title": "",
         "daily_episode_title": "",
         "name": "Example 2024 1080p WEB-DL DD 5.1 H.264-GROUP",
+        "manual_name": None,
         "has_encode_settings": False,
         "tag": "GROUP",
         "category": "MOVIE",
