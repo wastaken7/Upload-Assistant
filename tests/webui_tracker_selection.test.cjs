@@ -89,6 +89,7 @@ test("unknown identifiers never resolve through Object.prototype", () => {
   ]);
 });
 
+/** Run the real bulk-selection handler with isolated selection and argument state. */
 function groupSelection(args, selectedNames, defaults = [], running = false) {
   const scope = vm.createContext({
     Set,

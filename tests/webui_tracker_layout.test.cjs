@@ -218,7 +218,7 @@ test("reordering preserves the saved place of pinned and hidden ungrouped tracke
   );
 });
 
-// Exercise the component's actual drag handlers without a DOM or uploads.
+/** Exercise the organizer's real layout handlers without a DOM or uploads. */
 function organizerFixture(initial, props = {}) {
   const babel = require("../web_ui/static/js/node_modules/@babel/core");
   const source = fs.readFileSync(
@@ -235,7 +235,9 @@ function organizerFixture(initial, props = {}) {
   const states = [];
   const stored = new Map([[model.STORAGE_KEY, JSON.stringify(initial)]]);
   const dragRef = { current: null };
+  const refs = [dragRef];
   let stateIndex = 0;
+  let refIndex = 0;
   const scope = vm.createContext({
     window: { UATrackerLayout: model },
     storage: {
@@ -254,16 +256,21 @@ function organizerFixture(initial, props = {}) {
         },
       ];
     },
-    useRef: () => dragRef,
+    useRef: (initial) => {
+      const index = refIndex++;
+      if (!(index in refs)) refs[index] = { current: initial };
+      return refs[index];
+    },
     useEffect: (effect) => effect(),
   });
   const renderBody = vm.runInContext(
-    `(function({trackers, catalog, editing, disabled}) { ${source.slice(component.body.start + 1, end)} return { startDrag, allowDrop, drop }; })`,
+    `(function({trackers, catalog, editing, disabled}) { ${source.slice(component.body.start + 1, end)} return { startDrag, allowDrop, drop, chooseMoveTarget, nudgeTracker }; })`,
     scope,
   );
   return {
     render: () => {
       stateIndex = 0;
+      refIndex = 0;
       return renderBody({
         trackers: catalog,
         catalog,
@@ -292,6 +299,50 @@ const dragEvent = () => ({
   stopPropagation() {
     this.stopped = true;
   },
+});
+
+test("non-drag moves assign groups, unpin, return to Ungrouped and persist", () => {
+  const layout = model.togglePin(fixture(), "AITHER");
+  layout.groups.push({ id: "tv", name: "TV", trackers: [] });
+  const page = organizerFixture(layout);
+  page.render().chooseMoveTarget("AITHER", "tv");
+  assert.deepEqual(order(page.layout(), model.PINNED), []);
+  assert.deepEqual(order(page.layout(), "movies"), ["BLUTOPIA"]);
+  assert.deepEqual(order(page.layout(), "tv"), ["AITHER"]);
+  page.render().chooseMoveTarget("AITHER", model.UNGROUPED);
+  assert.deepEqual(order(page.layout(), "tv"), []);
+  assert.ok(order(page.layout(), model.UNGROUPED).includes("AITHER"));
+  page.render().chooseMoveTarget("AITHER", model.PINNED);
+  assert.deepEqual(order(page.layout(), model.PINNED), ["AITHER"]);
+  page.render();
+  assert.deepEqual(
+    plain(model.load({ get: (key) => page.stored.get(key) })),
+    plain(page.layout()),
+  );
+});
+
+test("non-drag moves are ignored outside edit mode and during a run", () => {
+  for (const props of [{ editing: false }, { disabled: true }]) {
+    const original = fixture();
+    const page = organizerFixture(original, props);
+    page.render().chooseMoveTarget("AITHER", model.UNGROUPED);
+    page.render().nudgeTracker(model.sections(original, catalog)[1], 1, -1);
+    assert.deepEqual(plain(page.layout()), plain(original));
+  }
+});
+
+test("tracker option reordering stays inside its group and ignores boundary moves", () => {
+  const page = organizerFixture(fixture());
+  const movies = () => model.sections(page.layout(), catalog)[1];
+  page.render().nudgeTracker(movies(), 1, -1);
+  assert.deepEqual(order(page.layout(), "movies"), ["AITHER", "BLUTOPIA"]);
+  page.render().nudgeTracker(movies(), 0, -1);
+  assert.deepEqual(order(page.layout(), "movies"), ["AITHER", "BLUTOPIA"]);
+  page.render().nudgeTracker(movies(), 0, 1);
+  assert.deepEqual(order(page.layout(), "movies"), ["BLUTOPIA", "AITHER"]);
+  page.render().nudgeTracker(movies(), 1, 1);
+  assert.deepEqual(order(page.layout(), "movies"), ["BLUTOPIA", "AITHER"]);
+  assert.deepEqual(order(page.layout(), model.UNGROUPED), ["LST", "ULCX"]);
 });
 
 test("native tracker drag handlers accept drops, reorder cards and persist the result", () => {

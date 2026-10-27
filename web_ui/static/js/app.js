@@ -2086,6 +2086,7 @@ function ArgumentPathBrowser({ mode, apiBase, isDarkMode, onPick }) {
   );
 }
 
+/** Commit group names on blur while preserving normal text editing. */
 function TrackerGroupName({ group, onRename }) {
   const [name, setName] = useState(group.name);
   useEffect(() => setName(group.name), [group.name]);
@@ -2113,6 +2114,7 @@ function TrackerGroupName({ group, onRename }) {
   );
 }
 
+/** Organize browser-local tracker placement independently from upload selection. */
 function TrackerOrganizer({
   trackers,
   catalog,
@@ -2129,21 +2131,50 @@ function TrackerOrganizer({
   const [announcement, setAnnouncement] = useState("");
   const [dropTarget, setDropTarget] = useState(null);
   const [resetPending, setResetPending] = useState(false);
+  const [optionsTracker, setOptionsTracker] = useState(null);
+  const [showMoveTargets, setShowMoveTargets] = useState(false);
   const dragRef = useRef(null);
+  const optionsButtonsRef = useRef(new Map());
+  const restoreOptionsFocusRef = useRef(null);
   useEffect(() => {
     storage.set(model.STORAGE_KEY, JSON.stringify(layout));
   }, [layout]);
   useEffect(() => {
-    if (!editing) {
+    if (!editing || disabled) {
       dragRef.current = null;
       setDropTarget(null);
       setResetPending(false);
+      setOptionsTracker(null);
+      setShowMoveTargets(false);
+      restoreOptionsFocusRef.current = null;
     }
-  }, [editing]);
+  }, [editing, disabled]);
+  useEffect(() => {
+    if (!optionsTracker && restoreOptionsFocusRef.current) {
+      optionsButtonsRef.current.get(restoreOptionsFocusRef.current)?.focus();
+      restoreOptionsFocusRef.current = null;
+    }
+  }, [optionsTracker, layout]);
+  useEffect(() => {
+    if (!optionsTracker) return undefined;
+    const closeOnOutsidePointer = (event) => {
+      const card = optionsButtonsRef.current
+        .get(optionsTracker)
+        ?.closest(".ua-tracker-card");
+      if (card?.contains(event.target)) return;
+      restoreOptionsFocusRef.current = null;
+      setOptionsTracker(null);
+      setShowMoveTargets(false);
+    };
+    document.addEventListener("pointerdown", closeOnOutsidePointer, true);
+    return () =>
+      document.removeEventListener("pointerdown", closeOnOutsidePointer, true);
+  }, [optionsTracker]);
 
   const sections = model.sections(layout, trackers);
   const hasLayout = layout.pinned.length > 0 || layout.groups.length > 0;
   const moveTracker = (name, sectionId, before = null) => {
+    if (!editing || disabled) return;
     setLayout((current) =>
       model.moveTracker(current, name, sectionId, before, catalog),
     );
@@ -2152,6 +2183,18 @@ function TrackerOrganizer({
     setAnnouncement(
       `${displayName} moved to ${sections.find((section) => section.id === sectionId)?.name || "group"}.`,
     );
+  };
+  const closeTrackerOptions = () => {
+    restoreOptionsFocusRef.current = optionsTracker;
+    setOptionsTracker(null);
+    setShowMoveTargets(false);
+  };
+  const chooseMoveTarget = (name, sectionId, before = null) => {
+    if (!editing || disabled) return;
+    moveTracker(name, sectionId, before);
+    restoreOptionsFocusRef.current = name;
+    setOptionsTracker(null);
+    setShowMoveTargets(false);
   };
   const finishDrag = () => {
     dragRef.current = null;
@@ -2199,11 +2242,13 @@ function TrackerOrganizer({
     finishDrag();
   };
   const nudgeTracker = (section, index, direction) => {
+    if (index + direction < 0 || index + direction >= section.trackers.length)
+      return;
     const before =
       direction < 0
         ? section.trackers[index - 1]?.name
         : section.trackers[index + 2]?.name;
-    moveTracker(section.trackers[index].name, section.id, before || null);
+    chooseMoveTarget(section.trackers[index].name, section.id, before || null);
   };
   const nudgeGroup = (id, direction) => {
     const index = layout.groups.findIndex((group) => group.id === id);
@@ -2238,8 +2283,9 @@ function TrackerOrganizer({
         <div className="ua-tracker-layout-editor">
           <p>
             Use the pin icon to keep favourites in Pinned, or add your own
-            groups and drag trackers into them. Use the handles to reorder
-            groups. Your layout saves automatically in this browser.
+            groups. Drag trackers to arrange them, or use a tracker’s ⋯ button
+            to move it between groups or change its order. Use the handles to
+            reorder groups. Your layout saves automatically in this browser.
           </p>
           <div className="ua-tracker-layout-toolbar">
             <input
@@ -2449,7 +2495,7 @@ function TrackerOrganizer({
                     <div
                       key={tracker.name}
                       className="ua-tracker-card"
-                      draggable={editing}
+                      draggable={editing && optionsTracker !== tracker.name}
                       onDragStart={(event) =>
                         startDrag(event, { type: "tracker", id: tracker.name })
                       }
@@ -2489,6 +2535,50 @@ function TrackerOrganizer({
                         {children(tracker, editing)}
                         {editing && (
                           <button
+                            ref={(element) => {
+                              if (element)
+                                optionsButtonsRef.current.set(
+                                  tracker.name,
+                                  element,
+                                );
+                              else
+                                optionsButtonsRef.current.delete(tracker.name);
+                            }}
+                            type="button"
+                            className="ua-tracker-options-trigger"
+                            aria-label={`Options for ${displayName}`}
+                            title="Tracker options"
+                            aria-expanded={optionsTracker === tracker.name}
+                            aria-controls={
+                              optionsTracker === tracker.name
+                                ? `tracker-options-${tracker.name}`
+                                : undefined
+                            }
+                            disabled={disabled}
+                            onClick={() => {
+                              if (optionsTracker === tracker.name)
+                                closeTrackerOptions();
+                              else {
+                                setOptionsTracker(tracker.name);
+                                setShowMoveTargets(false);
+                              }
+                            }}
+                          >
+                            <svg
+                              width="14"
+                              height="14"
+                              viewBox="0 0 24 24"
+                              fill="currentColor"
+                              aria-hidden="true"
+                            >
+                              <circle cx="5" cy="12" r="2" />
+                              <circle cx="12" cy="12" r="2" />
+                              <circle cx="19" cy="12" r="2" />
+                            </svg>
+                          </button>
+                        )}
+                        {editing && (
+                          <button
                             type="button"
                             className="ua-tracker-pin"
                             aria-label={`${pinned ? "Unpin" : "Pin"} ${displayName}`}
@@ -2496,6 +2586,8 @@ function TrackerOrganizer({
                             title={`${pinned ? "Unpin" : "Pin"} ${displayName}`}
                             disabled={disabled}
                             onClick={() => {
+                              if (optionsTracker === tracker.name)
+                                closeTrackerOptions();
                               setLayout((current) =>
                                 model.togglePin(current, tracker.name),
                               );
@@ -2520,33 +2612,101 @@ function TrackerOrganizer({
                           </button>
                         )}
                       </div>
-                      {editing && (
-                        <div className="ua-tracker-card-tools">
+                      {editing && optionsTracker === tracker.name && (
+                        <div
+                          id={`tracker-options-${tracker.name}`}
+                          className="ua-tracker-options-panel"
+                          role="group"
+                          aria-label={
+                            showMoveTargets
+                              ? `Choose a group for ${displayName}`
+                              : `Tracker options for ${displayName}`
+                          }
+                          onKeyDown={(event) => {
+                            if (event.key === "Escape") {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              closeTrackerOptions();
+                            }
+                          }}
+                        >
+                          {showMoveTargets ? (
+                            <>
+                              <span className="ua-tracker-options-heading">
+                                Move to group
+                              </span>
+                              {sections
+                                .filter((target) => target.id !== section.id)
+                                .map((target, targetIndex) => (
+                                  <button
+                                    key={target.id}
+                                    type="button"
+                                    className="ua-tracker-layout-button"
+                                    autoFocus={targetIndex === 0}
+                                    disabled={disabled}
+                                    onClick={() =>
+                                      chooseMoveTarget(tracker.name, target.id)
+                                    }
+                                  >
+                                    {target.name}
+                                  </button>
+                                ))}
+                              <button
+                                type="button"
+                                className="ua-tracker-layout-button"
+                                onClick={() => setShowMoveTargets(false)}
+                              >
+                                Back
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                type="button"
+                                className="ua-tracker-layout-button"
+                                autoFocus
+                                disabled={disabled}
+                                onClick={() => setShowMoveTargets(true)}
+                              >
+                                Move to…
+                              </button>
+                              <button
+                                type="button"
+                                className="ua-tracker-layout-button"
+                                aria-label={`Move ${displayName} earlier`}
+                                disabled={disabled || index === 0}
+                                onClick={() => nudgeTracker(section, index, -1)}
+                              >
+                                <LucideIcon
+                                  name="chevron-left"
+                                  className="h-3 w-3"
+                                />
+                                Move earlier
+                              </button>
+                              <button
+                                type="button"
+                                className="ua-tracker-layout-button"
+                                aria-label={`Move ${displayName} later`}
+                                disabled={
+                                  disabled ||
+                                  index === section.trackers.length - 1
+                                }
+                                onClick={() => nudgeTracker(section, index, 1)}
+                              >
+                                <LucideIcon
+                                  name="chevron-right"
+                                  className="h-3 w-3"
+                                />
+                                Move later
+                              </button>
+                            </>
+                          )}
                           <button
                             type="button"
-                            className="ua-tracker-layout-icon"
-                            aria-label={`Move ${displayName} earlier`}
-                            title="Move earlier"
-                            disabled={index === 0}
-                            onClick={() => nudgeTracker(section, index, -1)}
+                            className="ua-tracker-layout-button"
+                            onClick={closeTrackerOptions}
                           >
-                            <LucideIcon
-                              name="chevron-left"
-                              className="h-3 w-3"
-                            />
-                          </button>
-                          <button
-                            type="button"
-                            className="ua-tracker-layout-icon"
-                            aria-label={`Move ${displayName} later`}
-                            title="Move later"
-                            disabled={index === section.trackers.length - 1}
-                            onClick={() => nudgeTracker(section, index, 1)}
-                          >
-                            <LucideIcon
-                              name="chevron-right"
-                              className="h-3 w-3"
-                            />
+                            Close
                           </button>
                         </div>
                       )}
@@ -2568,6 +2728,7 @@ function TrackerOrganizer({
   );
 }
 
+/** Coordinate the Upload page, its browser preferences, and upload runs. */
 function AudionutsUAGUI() {
   const API_BASE = window.location.origin + "/api";
   // Derive an application base path from the API base so links work under subpath deployments

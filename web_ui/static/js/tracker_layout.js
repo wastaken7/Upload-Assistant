@@ -11,6 +11,7 @@
     ),
   ];
 
+  /** Validate saved groups and deduplicate membership without discarding unknown trackers. */
   const normalize = (value) => {
     const source = value && typeof value === "object" ? value : {};
     const groupIds = new Set([PINNED, UNGROUPED]);
@@ -44,6 +45,7 @@
     };
   };
 
+  /** Restore browser preferences, falling back to an empty layout when storage fails. */
   const load = (storage) => {
     try {
       return normalize(JSON.parse(storage.get(STORAGE_KEY) || "null"));
@@ -52,6 +54,7 @@
     }
   };
 
+  /** Project visible trackers into ordered sections, showing each tracker once. */
   const sections = (layout, trackers) => {
     const catalog = new Map(trackers.map((tracker) => [tracker.name, tracker]));
     const pinned = new Set(layout.pinned);
@@ -89,7 +92,7 @@
     ];
   };
 
-  // Pinning remembers the original group so unpinning restores its place.
+  /** Toggle a pin while retaining the original group and position for unpinning. */
   const togglePin = (layout, name) => ({
     ...layout,
     pinned: layout.pinned.includes(name)
@@ -97,6 +100,7 @@
       : [...layout.pinned, name],
   });
 
+  /** Move or reorder a tracker without mutating the layout or losing hidden preferences. */
   const moveTracker = (layout, name, targetId, before = null, catalog = []) => {
     if (
       before === name ||
@@ -139,6 +143,7 @@
     return next;
   };
 
+  /** Reorder custom groups, ignoring stale or self-referential destinations. */
   const moveGroup = (layout, id, before = null) => {
     if (id === before || !layout.groups.some((group) => group.id === id))
       return layout;
@@ -154,6 +159,7 @@
     return { ...layout, groups };
   };
 
+  /** Return a removed group's trackers to Ungrouped while preserving their pins. */
   const removeGroup = (layout, id) => ({
     ...layout,
     ungrouped: [
