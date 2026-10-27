@@ -795,7 +795,7 @@ def _redact_pesto_command(cmd: list[str]) -> str:
     return _redact_command(cmd, {"-p", "--proxy", "-u", "--username", "--auth-password", "--password", "--nzb-password"})
 
 
-async def run_pesto_with_progress(cmd: list[str], cwd: str | None = None, env: dict[str, str] | None = None) -> None:
+async def run_pesto_with_progress(cmd: list[str], cwd: str | None = None, env: dict[str, str] | None = None, episode_labels: list[str] | None = None) -> None:
     """Execute pesto upload consuming its JSON event stream for progress reporting."""
     redacted_str = _redact_pesto_command(cmd)
 
@@ -841,6 +841,8 @@ async def run_pesto_with_progress(cmd: list[str], cwd: str | None = None, env: d
         # overwritten line, so they don't stomp on each other visually.
         tasks: dict[str, TaskID] = {}
         check_done_seen = False
+        labeler = PestoSeasonLabeler(episode_labels) if episode_labels else None
+        upload_label = PESTO_UPLOAD_LABEL
         with progress_display(
             TextColumn("[progress.description]{task.description}"),
             BarColumn(),
@@ -859,16 +861,32 @@ async def run_pesto_with_progress(cmd: list[str], cwd: str | None = None, env: d
                 try:
                     event = json.loads(line)
                     etype = event.get("type")
+                    if labeler is not None:
+                        try:
+                            new_label = labeler.on_event(event)
+                        except Exception as e:
+                            logger.warning(f"[yellow]Pesto season progress labels disabled: {e}[/yellow]")
+                            labeler = None
+                            upload_label = PESTO_UPLOAD_LABEL
+                            if "upload" in tasks:
+                                progress.update(tasks["upload"], description=upload_label)
+                        else:
+                            if new_label is not None:
+                                upload_label = new_label
+                                if "upload" not in tasks:
+                                    tasks["upload"] = progress.add_task(upload_label, total=100)
+                                progress.update(tasks["upload"], description=upload_label, completed=0)
+                                publish_progress("pesto-upload", upload_label, current=0, total=100, detail="Starting")
                     if etype == "segment_done":
                         pct = float(event.get("progress_pct", 0))
                         if "upload" not in tasks:
-                            tasks["upload"] = progress.add_task("Posting to Usenet", total=100)
+                            tasks["upload"] = progress.add_task(upload_label, total=100)
                         progress.update(tasks["upload"], completed=pct)
                         check_expected_total = event.get("total_segments", check_expected_total)
                         total_segments = int(event.get("total_segments", 0) or 0)
                         done_segments = int(event.get("segment_done", 0) or 0)
                         detail = f"{done_segments}/{total_segments} segments posted" if total_segments else ""
-                        publish_progress("pesto-upload", "Posting to Usenet", current=pct, total=100, detail=detail)
+                        publish_progress("pesto-upload", upload_label, current=pct, total=100, detail=detail)
                     elif etype == "status":
                         text = event.get("text", "").strip()
                         if text:
@@ -969,7 +987,7 @@ async def run_pesto_with_progress(cmd: list[str], cwd: str | None = None, env: d
         if result == 0:
             if "upload" in tasks:
                 progress.update(tasks["upload"], completed=100)
-                complete_progress("pesto-upload", "Posting to Usenet", current=100, total=100)
+                complete_progress("pesto-upload", upload_label, current=100, total=100)
             if "par2_encode" in tasks:
                 task_data = progress.tasks[tasks["par2_encode"]]
                 complete_progress(
@@ -1705,7 +1723,12 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
             post_started = time.monotonic()
             try:
                 async with resource_slot("usenet-post", "Usenet posting"):
-                    await run_pesto_with_progress(cmd_pesto, cwd=str(upload_root), env=pesto_env)
+                    await run_pesto_with_progress(
+                        cmd_pesto,
+                        cwd=str(upload_root),
+                        env=pesto_env,
+                        episode_labels=pesto_season_episode_labels(upload_root, season_entries) if pesto_season_upload else None,
+                    )
                 nntp_duration_ms = (time.monotonic() - post_started) * 1000
             except Exception:
                 # pesto writes the NZB to --out before it knows the post-check
