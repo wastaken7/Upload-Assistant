@@ -83,6 +83,7 @@ STATIC_AUTH_TYPES = {
     "CINEMATIK": "unit3d_api",
     "CINEMAZ": "cookies",
     "CURUPIRA": "other_api",
+    "CZTEAM": "other_api",
     "DARKPEERS": "unit3d_api",
     "DESITORRENTS": "unit3d_api",
     "DIGITALCORE": "other_api",
@@ -160,6 +161,7 @@ STATIC_AUTH_TYPES = {
     "XINGYUNGEPT": "cookies",
     "YUSCENE": "unit3d_api",
     "ZENITH": "unit3d_api",
+    "ZMPT": "cookies",
 }
 
 
@@ -1467,6 +1469,7 @@ tracker_class_map: Any = LazyTrackerDict(
         "CINEMATIK": ("src.trackers.UNIT3D.cinematik", "Cinematik"),
         "CINEMAZ": ("src.trackers.AVISTAZ.cinemaz", "CinemaZ"),
         "CURUPIRA": ("src.trackers.USENET.curupira", "Curupira"),
+        "CZTEAM": ("src.trackers.czteam", "CZTeam"),
         "DARKPEERS": ("src.trackers.UNIT3D.darkpeers", "DarkPeers"),
         "DESITORRENTS": ("src.trackers.UNIT3D.torrentdesi", "DesiTorrents"),
         "DIGITALCORE": ("src.trackers.digitalcore", "DigitalCore"),
@@ -1544,6 +1547,7 @@ tracker_class_map: Any = LazyTrackerDict(
         "XINGYUNGEPT": ("src.trackers.NEXUSPHP.xingyungept", "XingyungePT"),
         "YUSCENE": ("src.trackers.UNIT3D.yuscene", "YUSCENE"),
         "ZENITH": ("src.trackers.UNIT3D.zenith", "Zenith"),
+        "ZMPT": ("src.trackers.NEXUSPHP.zmpt", "ZmPT"),
     }
 )
 

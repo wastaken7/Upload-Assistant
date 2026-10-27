@@ -1,0 +1,174 @@
+BBCode benchmark for tracker descriptions
+Paste this whole file into a tracker's description preview (or a private test upload) to see which tags it renders.
+Each test has an ID and the expected result. A test fails when the raw tag text shows up or the layout is wrong.
+Test labels name tags without brackets so that the label itself is never parsed as BBCode.
+Record the failing IDs, then convert or strip those tags for the tracker in DescriptionBuilder.tracker_specific_formats (src/get_desc.py).
+
+==================== 1. TEXT FORMATTING ====================
+T01 bold: [b]this text is bold[/b]
+T02 italic: [i]this text is italic[/i]
+T03 underline: [u]this text is underlined[/u]
+T04 strikethrough s: [s]this text is struck through[/s]
+T05 strikethrough strike: [strike]this text is struck through[/strike]
+T06 superscript: x[sup]2[/sup] (2 raised)
+T07 subscript: H[sub]2[/sub]O (2 lowered)
+T08 named color: [color=red]this text is red[/color]
+T09 hex color: [color=#1E90FF]this text is blue[/color]
+T10 short hex color: [color=#0a0]this text is green[/color]
+T11 size 1-7 scale: [size=1]size1[/size] [size=2]size2[/size] [size=3]size3[/size] [size=4]size4[/size] [size=5]size5[/size] [size=6]size6[/size] [size=7]size7[/size]
+T12 size in pixels (UNIT3D style): [size=10]10px[/size] [size=20]20px[/size] [size=30]30px[/size]
+T13 font family: [font=Courier New]this text is monospaced[/font]
+T14 nested formatting: [b][i][u][color=orange]bold italic underlined orange[/color][/u][/i][/b]
+T15 uppercase tags: [B]bold with uppercase tag[/B]
+
+==================== 2. HEADINGS AND RULES ====================
+T16 heading h1: [h1]Heading 1[/h1]
+T17 heading h2: [h2]Heading 2[/h2]
+T18 heading h3: [h3]Heading 3[/h3]
+T19 heading h4-h6: [h4]Heading 4[/h4] [h5]Heading 5[/h5] [h6]Heading 6[/h6]
+T20 horizontal rule (line below):
+[hr]
+
+==================== 3. ALIGNMENT ====================
+T21 center:
+[center]this line is centered[/center]
+T22 right:
+[right]this line is right aligned[/right]
+T23 left:
+[left]this line is left aligned[/left]
+T24 align=center:
+[align=center]this line is centered[/align]
+T25 align=right:
+[align=right]this line is right aligned[/align]
+T26 align=justify:
+[align=justify]this paragraph is justified. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris.[/align]
+T27 indent:
+[indent]this line is indented[/indent]
+
+==================== 4. LINKS ====================
+T28 plain url tag: [url]https://github.com/wastaken7/Upload-Assistant[/url]
+T29 named url: [url=https://github.com/wastaken7/Upload-Assistant]Upload Assistant[/url]
+T30 quoted url: [url="https://github.com/wastaken7/Upload-Assistant"]Upload Assistant (quoted)[/url]
+T31 formatted link text: [url=https://github.com/wastaken7/Upload-Assistant][b][color=red]bold red link[/color][/b][/url]
+T32 bare url autolink: https://github.com/wastaken7/Upload-Assistant
+T33 url with query string: [url=https://www.imdb.com/find/?q=fictional&s=tt]IMDb search[/url]
+
+==================== 5. IMAGES ====================
+T34 plain image (large logo):
+[img]https://raw.githubusercontent.com/wastaken7/Upload-Assistant/development/docs/assets/logo.png[/img]
+T35 image width img=100 (small logo):
+[img=100]https://raw.githubusercontent.com/wastaken7/Upload-Assistant/development/docs/assets/logo.png[/img]
+T36 image width x height img=100x100 (small logo):
+[img=100x100]https://raw.githubusercontent.com/wastaken7/Upload-Assistant/development/docs/assets/logo.png[/img]
+T37 image width attribute img width=100 (small logo):
+[img width=100]https://raw.githubusercontent.com/wastaken7/Upload-Assistant/development/docs/assets/logo.png[/img]
+T38 clickable image (small logo opening the repo):
+[url=https://github.com/wastaken7/Upload-Assistant][img=100]https://raw.githubusercontent.com/wastaken7/Upload-Assistant/development/docs/assets/logo.png[/img][/url]
+T39 screenshot row as Upload Assistant builds it (three centered clickable thumbnails):
+[center][url=https://raw.githubusercontent.com/wastaken7/Upload-Assistant/development/docs/assets/logo.png][img=100]https://raw.githubusercontent.com/wastaken7/Upload-Assistant/development/docs/assets/logo.png[/img][/url] [url=https://raw.githubusercontent.com/wastaken7/Upload-Assistant/development/docs/assets/logo.png][img=100]https://raw.githubusercontent.com/wastaken7/Upload-Assistant/development/docs/assets/logo.png[/img][/url] [url=https://raw.githubusercontent.com/wastaken7/Upload-Assistant/development/docs/assets/logo.png][img=100]https://raw.githubusercontent.com/wastaken7/Upload-Assistant/development/docs/assets/logo.png[/img][/url][/center]
+
+==================== 6. QUOTES AND CODE ====================
+T40 quote:
+[quote]this text is quoted[/quote]
+T41 named quote:
+[quote=Fictional User]this text is quoted with an author[/quote]
+T42 nested quote:
+[quote=Outer][quote=Inner]inner quote[/quote]outer quote[/quote]
+T43 code (columns below must stay aligned):
+[code]
+Video:    1080p   23.976 fps
+Audio:    DTS-HD  5.1    English
+Subtitle: PGS            Romanian
+[/code]
+T44 pre (columns below must stay aligned):
+[pre]
+Video:    1080p   23.976 fps
+Audio:    DTS-HD  5.1    English
+Subtitle: PGS            Romanian
+[/pre]
+T45 tags inside code must stay literal: [code][b]not bold[/b][/code]
+T46 mediainfo tag:
+[mediainfo]General
+Format : Matroska[/mediainfo]
+T47 note tag: [note]this is a note[/note]
+
+==================== 7. SPOILERS AND COLLAPSIBLE BLOCKS ====================
+T48 spoiler:
+[spoiler]hidden text revealed by a click[/spoiler]
+T49 named spoiler:
+[spoiler=Fictional Title]hidden text with a title[/spoiler]
+T50 hide:
+[hide]hidden text revealed by a click[/hide]
+T51 named hide:
+[hide=Fictional Title]hidden text with a title[/hide]
+T52 collapse:
+[collapse]hidden text revealed by a click[/collapse]
+T53 named collapse:
+[collapse=Fictional Title]hidden text with a title[/collapse]
+T54 expand:
+[expand]hidden text revealed by a click[/expand]
+T55 code inside a named spoiler (how BDInfo/MediaInfo is often posted):
+[spoiler=BDInfo][code]Disc Title:     Fictional Film
+Disc Size:      12,345,678,901 bytes[/code][/spoiler]
+
+==================== 8. LISTS ====================
+T56 bullet list:
+[list]
+[*]first item
+[*]second item
+[/list]
+T57 numbered list:
+[list=1]
+[*]first item
+[*]second item
+[/list]
+T58 lettered list:
+[list=a]
+[*]first item
+[*]second item
+[/list]
+T59 HTML-like list tags:
+[ul][li]first item[/li][li]second item[/li][/ul]
+
+==================== 9. TABLES ====================
+T60 table (2 columns, header row in bold):
+[table][tr][th]Header A[/th][th]Header B[/th][/tr][tr][td]cell A1[/td][td]cell B1[/td][/tr][/table]
+
+==================== 10. EMBEDDED MEDIA ====================
+T61 youtube by id (video player): [youtube]aqz-KE-bpKQ[/youtube]
+T62 youtube by url (video player): [youtube]https://www.youtube.com/watch?v=aqz-KE-bpKQ[/youtube]
+T63 video tag (video player): [video]https://www.youtube.com/watch?v=aqz-KE-bpKQ[/video]
+
+==================== 11. UPLOAD ASSISTANT SPECIFIC ====================
+T64 comparison (UNIT3D image comparison widget, or the raw tag elsewhere):
+[comparison=Source, Encode]
+https://raw.githubusercontent.com/wastaken7/Upload-Assistant/development/docs/assets/logo.png
+https://raw.githubusercontent.com/wastaken7/Upload-Assistant/development/docs/assets/logo.png
+[/comparison]
+T65 signature, centered small link:
+[center][url=https://github.com/wastaken7/Upload-Assistant][size=1]Created by Upload Assistant[/size][/url][/center]
+T66 signature, right aligned link:
+[right][url=https://github.com/wastaken7/Upload-Assistant][size=4]Created by Upload Assistant[/size][/url][/right]
+
+==================== 12. CHARACTERS AND ESCAPING ====================
+T67 accented text: ação, coração, ăâîșț ĂÂÎȘȚ, ñ, ü, ø, ß
+T68 non-latin text: 日本語, Ελληνικά, Русский, العربية
+T69 emoji: 🎬 🍿 ✅ ⚠️
+T70 symbols: & < > " ' © ® ™ • – — …
+T71 HTML must NOT render (should show the literal tags): <b>not bold</b> <i>not italic</i>
+T72 brackets that are not tags: [1080p] [DTS-HD MA 5.1] [Fictional-GROUP]
+T73 unclosed tag (should not break the rest of the page): [b]unclosed bold
+T74 this line must be normal weight (checks that T73 did not leak)
+
+==================== 13. WHITESPACE ====================
+T75 single line break: line one
+line two
+T76 two blank lines between the next lines (should they collapse?):
+line one
+
+
+line two
+T77 leading spaces:    four leading spaces
+T78 tab character:	after a tab
+
+END OF BENCHMARK

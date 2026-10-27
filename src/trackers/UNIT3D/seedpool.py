@@ -186,6 +186,9 @@ class Seedpool(UNIT3D):
         return {"type_id": type_id.get(type_value, "17" if meta.category in {"BOOK", "GAME", "MUSIC"} else "0")}
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
+        if meta.manual_name is not None:
+            return {"name": meta.manual_name.strip()}
+
         known_extensions = {".mkv", ".mp4", ".avi", ".ts"}
         source_name = meta.basename_no_ext or meta.uuid or meta.name
         if meta.category in {"MOVIE", "TV"} and not meta.is_disc and len(meta.filelist) == 1:

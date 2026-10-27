@@ -196,6 +196,9 @@ class MidnightScene(UNIT3D):
         return {"type_id": val}
 
     async def get_name(self, meta: Meta):
+        if meta.manual_name is not None:
+            return {"name": meta.manual_name.strip()}
+
         if meta.category == "MUSIC":
             # Scene titles retain their original segment separators; only the
             # artist/title underscores are rendered as spaces on the site.

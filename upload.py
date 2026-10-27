@@ -1518,6 +1518,7 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
             "TVCHAOSUK",
             "ULCX",
             "XINGYUNGEPT",
+            "ZMPT",
         ]:
             if tracker in trackers:
                 status_dict = meta.tracker_status.setdefault(tracker, {})

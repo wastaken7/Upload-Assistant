@@ -339,6 +339,9 @@ class FunFile:
         return "x264"
 
     async def get_name(self, meta: Meta) -> str:
+        if meta.manual_name is not None:
+            return meta.manual_name.strip()
+
         return (meta.scene_name if meta.scene_name else meta.basename_no_ext.replace(" ", ".")) if meta.scene else meta.clean_name.replace(" ", ".")
 
     async def languages(self, meta: Meta) -> dict[str, list[str]]:

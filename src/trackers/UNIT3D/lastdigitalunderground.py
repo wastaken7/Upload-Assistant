@@ -154,6 +154,9 @@ class LastDigitalUnderground(UNIT3D):
         return {"type_id": val}
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
+        if meta.manual_name is not None:
+            return {"name": meta.manual_name.strip()}
+
         ldu_name = meta.name
         cat_id = (await self.get_category_id(meta))["category_id"]
         non_eng = False

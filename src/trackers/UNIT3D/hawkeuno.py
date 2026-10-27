@@ -177,6 +177,9 @@ class HawkeUno(UNIT3D):
         return normalized
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
+        if meta.manual_name is not None:
+            return {"name": meta.manual_name.strip()}
+
         name = self._normalize_upload_name(meta.name, meta)
         return {"name": add_incomplete_pack_marker(name, meta, self.tracker)}
 
@@ -262,7 +265,7 @@ class HawkeUno(UNIT3D):
         if internal == 1:
             data["internal"] = 1
 
-        if meta.tv_pack and meta.season_pack_incomplete:
+        if meta.manual_name is not None or (meta.tv_pack and meta.season_pack_incomplete):
             data.update(await self.get_name(meta))
 
         data["edition"] = meta.edition
@@ -300,8 +303,12 @@ class HawkeUno(UNIT3D):
         await self.common.create_torrent_for_upload(meta, self.tracker, self.source_flag, announce_url=self.announce_url)
         torrent_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}].torrent"
         async with aiofiles.open(torrent_path, "rb") as f:
-            upload_name = self._normalize_upload_name(meta.clean_name, meta)
-            files["torrent"] = (f"{add_incomplete_pack_marker(upload_name, meta, self.tracker)}.torrent", await f.read(), "application/x-bittorrent")
+            if meta.manual_name is not None:
+                upload_name = meta.manual_name.strip()
+            else:
+                upload_name = self._normalize_upload_name(meta.clean_name, meta)
+                upload_name = add_incomplete_pack_marker(upload_name, meta, self.tracker)
+            files["torrent"] = (f"{upload_name}.torrent", await f.read(), "application/x-bittorrent")
 
         desc_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt"
         async with aiofiles.open(desc_path, "rb") as f:
