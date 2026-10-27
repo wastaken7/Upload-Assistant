@@ -123,6 +123,37 @@ def pesto_season_episode_labels(source_root: Path, entries: dict[str, Path]) -> 
     return [stem for stem, _ in ordered]
 
 
+PESTO_UPLOAD_LABEL = "Posting to Usenet"
+PESTO_SEASON_PAR2_STATUS = re.compile(r"Uploading \d+ season recovery volume\(s\)")
+
+
+class PestoSeasonLabeler:
+    """Turn a ``pesto --season`` JSON event stream into per-episode progress labels."""
+
+    def __init__(self, names: list[str]) -> None:
+        self._names = names
+        self._started = 0
+        self._season_par2 = False
+
+    def on_event(self, event: dict[str, Any]) -> str | None:
+        """Return the new upload label when ``event`` starts another entry, otherwise None."""
+        etype = event.get("type")
+        if etype == "status" and PESTO_SEASON_PAR2_STATUS.fullmatch(str(event.get("text", "")).strip()):
+            self._season_par2 = True
+            return None
+        if etype != "started":
+            return None
+        if self._season_par2:
+            return f"{PESTO_UPLOAD_LABEL} [season PAR2]"
+        self._started += 1
+        total = len(self._names)
+        if self._started > total:
+            logger.debug(f"[yellow]Pesto started entry {self._started}, but UA expected {total}.[/yellow]")
+            return f"{PESTO_UPLOAD_LABEL} [{self._started}/?]"
+        name = self._names[self._started - 1]
+        return f"{PESTO_UPLOAD_LABEL} [{self._started}/{total}] {name}" if name else f"{PESTO_UPLOAD_LABEL} [{self._started}/{total}]"
+
+
 async def build_usenet_indexer_metas(
     meta: Meta,
     nzb_paths: list[str],

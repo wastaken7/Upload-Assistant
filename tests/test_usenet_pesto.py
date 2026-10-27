@@ -2,6 +2,7 @@
 
 import asyncio
 import functools
+import json
 import os
 import random
 from pathlib import Path
@@ -561,3 +562,49 @@ def test_pesto_season_episode_labels_ignore_entries_pesto_excludes(tmp_path: Pat
     season_dir = _season(tmp_path, ["Show.S01E01.mkv", "._Show.S01E01.mkv", ".DS_Store", ".notes.txt"])
     entries = usenetcreate.discover_pesto_season_entries(season_dir)
     assert usenetcreate.pesto_season_episode_labels(season_dir, entries) == ["Show.S01E01"]
+
+
+def _labels(names: list[str], events: list[dict]) -> list[str]:
+    labeler = usenetcreate.PestoSeasonLabeler(names)
+    return [label for event in events if (label := labeler.on_event(event)) is not None]
+
+
+def test_labeler_names_each_episode_in_order() -> None:
+    events = [{"type": "started"}, {"type": "segment_done"}, {"type": "started"}, {"type": "check_progress"}, {"type": "started"}]
+    assert _labels(["E01", "E02", "E03"], events) == [
+        "Posting to Usenet [1/3] E01",
+        "Posting to Usenet [2/3] E02",
+        "Posting to Usenet [3/3] E03",
+    ]
+
+
+def test_labeler_shows_counts_only_for_unnamed_entries() -> None:
+    assert _labels(["", ""], [{"type": "started"}, {"type": "started"}]) == ["Posting to Usenet [1/2]", "Posting to Usenet [2/2]"]
+
+
+def test_labeler_marks_season_par2_after_its_status() -> None:
+    events = [
+        {"type": "started"},
+        {"type": "status", "text": "Uploading 4 season recovery volume(s)"},
+        {"type": "started"},
+    ]
+    assert _labels(["E01"], events) == ["Posting to Usenet [1/1] E01", "Posting to Usenet [season PAR2]"]
+
+
+def test_labeler_flags_an_unexpected_extra_entry() -> None:
+    assert _labels(["E01"], [{"type": "started"}, {"type": "started"}]) == ["Posting to Usenet [1/1] E01", "Posting to Usenet [2/?]"]
+
+
+def test_labeler_ignores_other_events() -> None:
+    events = [{"type": t} for t in ("segment_done", "par2_encode_started", "par2_encode_progress", "check_progress", "check_done", "finished", "nzb_written")]
+    events.append({"type": "status", "text": "something else"})
+    assert _labels(["E01"], events) == []
+
+
+def test_labeler_on_captured_pesto_stream() -> None:
+    lines = (FIXTURES / "pesto_season_dry_run.jsonl").read_text(encoding="utf-8").splitlines()
+    events = [json.loads(line) for line in lines if line.startswith("{")]
+    names = [f"Show.S01E0{n}.1080p.WEB-DL-GROUP" for n in (1, 2, 3)]
+    labels = _labels(names, events)
+    assert labels[:3] == [f"Posting to Usenet [{n}/3] {name}" for n, name in enumerate(names, start=1)]
+    assert all(label == "Posting to Usenet [season PAR2]" for label in labels[3:])
