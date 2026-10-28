@@ -950,7 +950,7 @@ async def get_tmdb_id(
     try:
         with webui_events.field_prompt(
             "TMDb ID",
-            {"Search title": title, "Year": search_year, "TMDb ID": ""},
+            {"Search title": filename, "Year": search_year, "TMDb ID": ""},
             focus="TMDb ID",
             hint="No TMDb match was found. Enter the ID as tv/12345 or movie/12345.",
             placeholder="movie/12345",

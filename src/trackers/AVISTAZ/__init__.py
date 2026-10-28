@@ -425,7 +425,11 @@ class AZTrackerBase:
                     logger.info(f"{self.tracker}: You must enter (comma-separated) languages for all audio tracks, eg: English, Spanish: ")
                     with webui_events.field_prompt(
                         "Audio languages",
-                        {f"Audio track {index}": track.get("Language") or "No language tag" for index, track in enumerate(missing_audio_languages, 1)},
+                        {
+                            f"Audio track {position}": track.get("Language") or "No language tag"
+                            for position, track in enumerate((t for t in tracks if t.get("@type") == "Audio"), 1)
+                            if any(track is missing for missing in missing_audio_languages)
+                        },
                         hint="Comma-separated languages for all audio tracks.",
                         placeholder="e.g. English, Spanish",
                     ):
