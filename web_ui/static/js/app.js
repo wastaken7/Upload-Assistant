@@ -9634,6 +9634,16 @@ function AudionutsUAGUI() {
     const trackerKey = `${prompt?.item}:${context.tracker}`;
     const slot = context.kind === "dupes" ? view.slots[trackerKey] : null;
     const dupe = context.kind === "dupes" ? view.dupes[trackerKey] : null;
+    // The tracker's attention card is hidden while its prompt is open, so its
+    // notes must show here.
+    const trackerNotices =
+      context.kind === "dupes"
+        ? view.attention.filter(
+            (notice) =>
+              notice.item === prompt.item &&
+              notice.tracker === context.tracker,
+          )
+        : [];
     const missing =
       context.kind === "confirm"
         ? view.attention.filter(
@@ -9657,11 +9667,18 @@ function AudionutsUAGUI() {
       details = renderRunGuiEditArgsContext(context, view, prompt, disabled);
     } else if (context.kind === "dupe_clear") {
       details = renderRunGuiDupeClearContext(context);
-    } else if (slot || dupe) {
+    } else if (slot || dupe || trackerNotices.length) {
       details = (
         <>
           {slot && renderRunGuiSlot(slot)}
           {dupe && renderRunGuiDupe(dupe)}
+          {trackerNotices.length > 0 && (
+            <ul>
+              {trackerNotices.map((notice) =>
+                renderRunGuiNotice({ ...notice, tracker: "" }),
+              )}
+            </ul>
+          )}
         </>
       );
     }

@@ -603,7 +603,8 @@ class UploadHelper:
             if not meta.were_trumping:
                 if meta.filename_match and meta.file_count_match:
                     logger.info(f"[bold red]Exact match found! - {meta.filename_match}[/bold red]", extra={"ua_gui": False})
-                    webui_events.notice("attention", f"Exact match already on the site: {meta.filename_match}", tracker=tracker_name)
+                    exact_dupes = [entry for entry in dupes_list if isinstance(entry, dict) and f"{entry.get('name')} = {entry.get('link', None)}" == meta.filename_match]
+                    webui_events.dupes(tracker_name, exact_dupes or dupes_list, source_size=meta.source_size, note="Exact match: this release is already on the site.")
                     try:
                         if tracker_name in ["AITHER", "LST"]:
                             logger.info(f"[yellow]{tracker_name} supports automatic trumping of exact matches, if the file is allowed to be trumped.[/yellow]")
