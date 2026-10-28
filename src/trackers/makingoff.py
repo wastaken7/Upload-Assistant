@@ -1801,7 +1801,7 @@ class MakingOff:
         logger.info(f"{self.tracker}: [yellow]Any subtitles?[/yellow]")
         for k, v in options.items():
             logger.info(f"{self.tracker}:   {k}) {v}")
-        with webui_events.numbered_options(list(options.values())):
+        with webui_events.numbered_options(list(options.values()), hint=f"{self.tracker}: Any Portuguese subtitles?"):
             raw_selection = await prompt_in_thread(cli_ui.ask_string, "Choose: ")
         selection = (raw_selection or "").strip()
         return options.get(selection, "Sem Legenda")

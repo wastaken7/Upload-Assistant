@@ -325,7 +325,13 @@ class ShareIsland(UNIT3D):
             distributor_name = meta.distributor
             distributor_id = None
             if not distributor_name and not meta.unattended:
-                with webui_events.answer_buttons([("", "Skip")]):
+                with webui_events.field_prompt(
+                    "Disc distributor",
+                    {"Disc": meta.is_disc, "Release": meta.name, "Region": region_name, "Distributor": ""},
+                    focus="Distributor",
+                    hint="Optional: the disc's distributor, as listed on the tracker. Leave it blank to skip.",
+                    actions=[("", "Skip")],
+                ):
                     distributor_name = cli_ui.ask_string("ShareIsland: Distributor (optional, Enter to skip): ")
                 distributor_name = distributor_name.strip().upper() if distributor_name else None
 

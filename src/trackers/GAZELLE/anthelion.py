@@ -248,7 +248,8 @@ class Anthelion:
         if ant_type is None:
             if not meta.unattended:
                 ant_type_list = ["Feature Film", "Short Film", "Miniseries", "Other"]
-                choice = await prompt_in_thread(cli_ui.ask_choice, "Select the proper type for ANTHELION", choices=ant_type_list)
+                with webui_events.field_prompt("Release type", {"Tracker": self.tracker, "Release": meta.name or meta.title}):
+                    choice = await prompt_in_thread(cli_ui.ask_choice, "Select the proper type for ANTHELION", choices=ant_type_list)
                 # Map the choice back to the integer
                 type_map = {"Feature Film": 0, "Short Film": 1, "Miniseries": 2, "Other": 3}
                 ant_type = type_map.get(choice, 0)
@@ -313,7 +314,13 @@ class Anthelion:
         if meta.adult_media:
             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
                 logger.info(f"{self.tracker}: [bold red]Adult content detected[/bold red]")
-                if await prompt_in_thread(cli_ui.ask_yes_no, "Are the screenshots safe?", default=False):
+                with webui_events.field_prompt(
+                    "Adult content screenshots",
+                    {"Tracker": self.tracker, "Release": meta.name or meta.title},
+                    hint="Adult content was detected. Confirm whether the screenshots are safe to include.",
+                ):
+                    safe_screens = await prompt_in_thread(cli_ui.ask_yes_no, "Are the screenshots safe?", default=False)
+                if safe_screens:
                     data.update({"screenshots": "\n".join([x["raw_url"] for x in meta.image_list][:4])})
                     if not meta.ant_user_tags:
                         data.update({"flagchangereason": f"Adult with screens uploaded with {meta.ua_name}"})

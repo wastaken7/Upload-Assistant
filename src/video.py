@@ -10,6 +10,7 @@ from typing import Any, cast
 import aiofiles
 import cli_ui
 
+from src import webui_events
 from src.cleanup import cleanup_manager
 from src.console import logger
 from src.exportmi import mi_resolution
@@ -162,7 +163,13 @@ class VideoManager:
                             logger.info(f"[cyan]{tf}")
                         logger.info(f"[bold red]Possible sample file detected in filelist!: [yellow]{f}")
                         try:
-                            if cli_ui.ask_yes_no("Do you want to remove it?", default=True):
+                            with webui_events.field_prompt(
+                                "Sample file detected",
+                                {"Sample file": f, "Files": f"{len(filelist)} files"},
+                                hint="A possible sample file was detected in the file list.",
+                            ):
+                                remove_sample = cli_ui.ask_yes_no("Do you want to remove it?", default=True)
+                            if remove_sample:
                                 filelist.remove(f)
                         except EOFError:
                             logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")
@@ -173,7 +180,13 @@ class VideoManager:
                 if any(tag in file for tag in ["{tmdb-", "{imdb-", "{tvdb-"]):
                     logger.info(f"[bold red]This looks like some *arr renamed file which is not allowed: [yellow]{file}")
                     try:
-                        if cli_ui.ask_yes_no("Do you want to upload with this file?", default=False):
+                        with webui_events.field_prompt(
+                            "Renamed file detected",
+                            {"File": file},
+                            hint="This looks like an *arr renamed file, which is not allowed.",
+                        ):
+                            allow_renamed = cli_ui.ask_yes_no("Do you want to upload with this file?", default=False)
+                        if allow_renamed:
                             pass
                         else:
                             logger.info("[red]Exiting on user request[/red]")
@@ -196,7 +209,13 @@ class VideoManager:
             if any(tag in videoloc for tag in ["{tmdb-", "{imdb-", "{tvdb-"]):
                 logger.info(f"[bold red]This looks like some *arr renamed file which is not allowed: [yellow]{videoloc}")
                 try:
-                    if cli_ui.ask_yes_no("Do you want to upload with this file?", default=False):
+                    with webui_events.field_prompt(
+                        "Renamed file detected",
+                        {"File": videoloc},
+                        hint="This looks like an *arr renamed file, which is not allowed.",
+                    ):
+                        allow_renamed = cli_ui.ask_yes_no("Do you want to upload with this file?", default=False)
+                    if allow_renamed:
                         pass
                     else:
                         logger.info("[red]Exiting on user request[/red]")

@@ -10,6 +10,7 @@ from typing import Any, cast
 import cli_ui
 import langcodes
 
+from src import webui_events
 from src.console import logger
 from src.meta import Meta
 from src.trackers.common import Common
@@ -698,7 +699,16 @@ def dts_core_additional_check(meta: Meta) -> None:
                     logger.info(f"[bold red]DTS audio track #{lossy_idx} appears to be a lossy duplicate of DTS-HD MA track #{hd_idx}.[/bold red]")
                     if not meta.unattended or meta.unattended_confirm:
                         try:
-                            allow = cli_ui.ask_yes_no("Do you want to upload anyway?", default=False)
+                            with webui_events.field_prompt(
+                                "Duplicate DTS track",
+                                {
+                                    "DTS-HD MA track": f"#{hd_idx}",
+                                    "Lossy DTS track": f"#{lossy_idx}",
+                                    "Language": hd_track.get("Language") or "",
+                                },
+                                hint=f"DTS audio track #{lossy_idx} appears to be a lossy duplicate of DTS-HD MA track #{hd_idx}.",
+                            ):
+                                allow = cli_ui.ask_yes_no("Do you want to upload anyway?", default=False)
                         except Exception:
                             allow = False
                         if allow:

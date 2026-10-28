@@ -352,9 +352,22 @@ class SeasonEpisodeManager:
                 else:
                     logger.info("[yellow]Unattended mode: continuing despite unexpected episode numbers (no confirmation).")
             else:
+                pack_summary: dict[str, Any] = {
+                    "Release": meta.name or meta.title,
+                    "Missing episodes": ", ".join(missing_list) if missing_list else None,
+                    "Extra episodes": ", ".join(unexpected_list) if unexpected_list else None,
+                }
                 while files_shown < len(filelist):
                     remaining_files = len(filelist) - files_shown
-                    with webui_events.answer_buttons([("n", f"Show next {batch_size}"), ("a", "Show all"), ("c", "Continue"), ("q", "Quit")]):
+                    with webui_events.field_prompt(
+                        "Season pack check",
+                        {
+                            **pack_summary,
+                            "Files shown": f"{files_shown} of {len(filelist)}",
+                            "File list": "\n".join(f"{i + 1}. {Path(f).name}" for i, f in enumerate(filelist[:files_shown])),
+                        },
+                        actions=[("n", f"Show next {batch_size}"), ("a", "Show all"), ("c", "Continue"), ("q", "Quit")],
+                    ):
                         response = await prompt_in_thread(
                             cli_ui.ask_string,
                             f"{remaining_files} more files: show (n)ext {batch_size}, (a)ll, (c)ontinue to confirmation, or (q)uit? (n/a/c/Q): ",
@@ -377,7 +390,16 @@ class SeasonEpisodeManager:
                     else "Continue with these extra episodes (possible specials or different numbering)? (y/N): "
                 )
                 buttons = [("y", "Incomplete: mark it"), ("n", "Complete: continue"), ("q", "Quit")] if missing_list else [("y", "Continue"), ("n", "Stop")]
-                with webui_events.answer_buttons(buttons):
+                with webui_events.field_prompt(
+                    "Season pack check",
+                    {
+                        **pack_summary,
+                        "Files": f"{len(filelist)} files",
+                        "File list": "\n".join(f"{i + 1}. {Path(f).name}" for i, f in enumerate(filelist[:files_shown])),
+                    },
+                    hint="Season pack may be incomplete or use different episode numbering." if missing_list else "Season pack contains extra episodes not listed by TVDB.",
+                    actions=buttons,
+                ):
                     response = await prompt_in_thread(cli_ui.ask_string, question)
                 response = (response or "").strip().lower()
                 if response in ("y", "yes"):

@@ -782,8 +782,26 @@ class NameManager:
             return "SKIPPED"
         suffix = " (MANDATORY): " if is_mandatory else " (optional, press Enter to skip): "
         prompt = f"{field_name} not found for disc. Please enter it manually{suffix}"
+        is_region = "region" in field_name.lower()
+        focus = "Region" if is_region else "Distributor"
+        summary: dict[str, Any] = {
+            "Disc": meta.is_disc,
+            "Release": meta.name or meta.title,
+            "Region": "" if is_region else meta.region,
+            "Distributor": "" if not is_region else meta.distributor,
+        }
+        hint = ("The disc's region or 3-letter country code (e.g. USA, GBR, FRA, JPN)." if is_region else "The disc's distributor, as listed on the tracker.") + (
+            " Leaving it blank skips trackers that require it." if is_mandatory else " Leave it blank to skip."
+        )
         try:
-            with webui_events.answer_buttons([("", "Skip this tracker" if is_mandatory else "Skip")]):
+            with webui_events.field_prompt(
+                "Disc region" if is_region else "Disc distributor",
+                summary,
+                focus=focus,
+                hint=hint,
+                actions=[("", "Skip this tracker" if is_mandatory else "Skip")],
+                placeholder="e.g. USA, GBR, FRA, JPN" if is_region else "Distributor name",
+            ):
                 value = cli_ui.ask_string(prompt)
             return value.upper() if value else "SKIPPED"
         except EOFError:

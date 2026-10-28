@@ -495,6 +495,7 @@ class TrackerSetup:
                 logger.info(f"[bold red]Failed to parse banned group file for '{tracker}'.")
                 return False
 
+        banned_note = ""
         for tag in banned_group_list:
             if isinstance(tag, list):
                 tag_list = [str(item) for item in cast(list[Any], tag)]
@@ -504,6 +505,7 @@ class TrackerSetup:
                 if group_tags == tag_name.lower():
                     logger.info(f"[bold yellow]{meta.tag[1:]}[/bold yellow][bold red] was found on [bold yellow]{tracker}'s[/bold yellow] list of banned groups.")
                     if len(tag_list) > 1:
+                        banned_note = tag_list[1]
                         logger.info(f"[bold red]NOTE: [bold yellow]{tag_list[1]}")
                     result = True
             else:
@@ -515,8 +517,13 @@ class TrackerSetup:
         if result:
             if not meta.unattended or meta.unattended_confirm:
                 try:
-                    if cli_ui.ask_yes_no(cli_ui.red, "Do you want to continue anyway?", default=False):
-                        return False
+                    with webui_events.field_prompt(
+                        "Banned release group",
+                        {"Tracker": tracker, "Release group": meta.tag[1:], "Note": banned_note},
+                        hint=f"{meta.tag[1:]} was found on {tracker}'s list of banned groups.",
+                    ):
+                        if cli_ui.ask_yes_no(cli_ui.red, "Do you want to continue anyway?", default=False):
+                            return False
                 except EOFError:
                     logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")
                     await cleanup_manager.cleanup()
@@ -1181,7 +1188,18 @@ class TrackerSetup:
                 else:
                     logger.info("  [yellow]The trumping torrent for this report seems to be in modq.....[/yellow]")
             try:
-                upload = cli_ui.ask_yes_no("Do you want to proceed with the upload anyway?", default=False)
+                report_summary: dict[str, Any] = {"Tracker": tracker}
+                for report in trumping_reports:
+                    trumping_names = ", ".join(str(t.get("name", "Unknown")) for t in (report.get("trumping_torrent") or []))
+                    report_summary[f"Report {report.get('id')}"] = (
+                        f"{report.get('title') or ''} (trumped by: {trumping_names})" if trumping_names else str(report.get("title") or "In moderation queue")
+                    )
+                with webui_events.field_prompt(
+                    "Existing trump reports",
+                    report_summary,
+                    hint=f"Found {len(trumping_reports)} existing trumping report(s) on {tracker} for this release.",
+                ):
+                    upload = cli_ui.ask_yes_no("Do you want to proceed with the upload anyway?", default=False)
             except EOFError, KeyboardInterrupt:
                 logger.info("[yellow]Prompt cancelled; treating as 'no' for safety.[/yellow]")
                 upload = False
@@ -1198,7 +1216,12 @@ class TrackerSetup:
         if not meta.tv_pack:
             logger.info(f"[yellow]{tracker} requires comparisons to be provided for trump reports.\nAre the comparison images in the description or are you adding links?")
             try:
-                with webui_events.answer_buttons([("d", "In the description"), ("L", "Paste links"), ("", "Skip trumping")]):
+                with webui_events.field_prompt(
+                    "Trump report comparison",
+                    {"Tracker": tracker, "Release": meta.name or meta.title},
+                    hint=f"{tracker} requires comparisons to be provided for trump reports. Are the comparison images in the description or are you adding links?",
+                    actions=[("d", "In the description"), ("L", "Paste links"), ("", "Skip trumping")],
+                ):
                     where_compare = cli_ui.ask_string("Enter 'd' if in description, 'L' if you want to paste links, or press Enter to skip trumping:", default="")
             except EOFError, KeyboardInterrupt:
                 logger.info("[yellow]Prompt cancelled; skipping trump report creation.[/yellow]")

@@ -1552,7 +1552,18 @@ async def process_all_releases(releases: Sequence[Release], meta: Meta) -> list[
                 if not meta.unattended or (meta.unattended and meta.unattended_confirm):
                     cli_ui.info(f"Single match found: {close_matches[0]['title']} ({close_matches[0]['country']}) with score {best_score:.1f}/100")
                     while True:
-                        user_input = "y" if cli_ui.ask_yes_no("Do you want to use this release?", default=False) else "n"
+                        with webui_events.field_prompt(
+                            "Blu-ray.com match",
+                            {
+                                "Edition": close_matches[0].get("title"),
+                                "Country": close_matches[0].get("country"),
+                                "Publisher": close_matches[0].get("publisher"),
+                                "Score": f"{best_score:.1f}/100",
+                                "URL": close_matches[0].get("url"),
+                            },
+                            hint="Single Blu-ray.com match found, but it is not a perfect score.",
+                        ):
+                            user_input = "y" if cli_ui.ask_yes_no("Do you want to use this release?", default=False) else "n"
                         try:
                             if user_input == "y":
                                 _apply_release_metadata(meta, close_matches[0])
@@ -1599,9 +1610,41 @@ async def process_all_releases(releases: Sequence[Release], meta: Meta) -> list[
                     close_labels = [
                         f"{release['title']} ({release['country']}) · score {next(score for score, r in scored_releases if r == release):.1f}/100" for release in close_matches
                     ]
+                    close_details = [
+                        {
+                            "meta": " · ".join(
+                                f"{name}: {value}"
+                                for name, value in (("Country", release.get("country")), ("Publisher", release.get("publisher")), ("Price", release.get("price")))
+                                if str(value or "").strip()
+                            ),
+                            "link": release.get("url") or "",
+                            "link_label": "Blu-ray.com",
+                            "flag": country_flag_code(release.get("country")),
+                        }
+                        for release in close_matches
+                    ]
+                    close_covers = [
+                        f"https://images.static-bluray.com/movies/covers/{release['release_id']}_medium.jpg"
+                        if "blu-ray.com/movies/" in str(release.get("url") or "") and str(release.get("release_id") or "").isdigit()
+                        else ""
+                        for release in close_matches
+                    ]
+                    close_notes = ["Multiple releases are within 40 points of the best match."]
+                    if any_generic_format:
+                        close_notes.append("Note: Generic BD format found, please confirm the release.")
+                    if any_specs_missing:
+                        close_notes.append("Note: Missing specs in release, please confirm the release.")
+                    printed_logs_hint = ""
                     while True:
                         logger.info("Enter the number of the release to use, 'p' to print logs for a release, or 'n' to skip:")
-                        with webui_events.numbered_options(close_labels, actions=[("p", "Print logs for a release"), ("n", "Skip")]):
+                        close_hint = "\n".join([*close_notes, printed_logs_hint] if printed_logs_hint else close_notes)
+                        with webui_events.numbered_options(
+                            close_labels,
+                            actions=[("p", "Print logs for a release"), ("n", "Skip")],
+                            images=close_covers,
+                            details=close_details,
+                            hint=close_hint,
+                        ):
                             user_input_raw = cli_ui.ask_string("Selection: ")
                         user_input = (user_input_raw or "").strip().lower()
                         if user_input == "n":
@@ -1610,7 +1653,7 @@ async def process_all_releases(releases: Sequence[Release], meta: Meta) -> list[
                             break
                         if user_input == "p":
                             try:
-                                with webui_events.numbered_options(close_labels):
+                                with webui_events.numbered_options(close_labels, images=close_covers, details=close_details):
                                     release_idx_raw = cli_ui.ask_string(f"Enter the release number (1-{len(close_matches)}) to print logs: ")
                                 release_idx = int((release_idx_raw or "").strip())
                                 if 1 <= release_idx <= len(close_matches):
@@ -1620,6 +1663,9 @@ async def process_all_releases(releases: Sequence[Release], meta: Meta) -> list[
                                             logger.info(f"[yellow]Logs for release: {logged_release['title']} ({logged_release['country']})[/yellow]")
                                             for log in release_logs:
                                                 logger.info(log)
+                                            printed_logs_hint = "\n".join(
+                                                [f"Logs for {logged_release['title']} ({logged_release['country']}):", *(webui_events.plain_text(log) for log in release_logs)]
+                                            )
                                             break
                                 else:
                                     logger.info(f"[red]Invalid selection. Please enter a number between 1 and {len(close_matches)}.[/red]")
@@ -1661,13 +1707,27 @@ async def process_all_releases(releases: Sequence[Release], meta: Meta) -> list[
                 if not meta.unattended or (meta.unattended and meta.unattended_confirm):
                     logger.info("[red]This is the probably the best match, but it is not a perfect match.[/red]")
                     logger.info("[yellow]All other releases have a score at least 40 points lower.")
+                    best_logs: list[str] = []
                     for logged_release, release_logs in logs:
                         if logged_release == best_release:
+                            best_logs = [webui_events.plain_text(log) for log in release_logs]
                             logger.info(f"[yellow]Logs for release: {logged_release['title']} ({logged_release['country']})[/yellow]")
                             for log in release_logs:
                                 logger.info(log)
                     while True:
-                        user_input = "y" if cli_ui.ask_yes_no("Do you want to use this release?", default=False) else "n"
+                        with webui_events.field_prompt(
+                            "Blu-ray.com match",
+                            {
+                                "Edition": best_release.get("title"),
+                                "Country": best_release.get("country"),
+                                "Publisher": best_release.get("publisher"),
+                                "Score": f"{best_score:.1f}/100",
+                                "URL": best_release.get("url"),
+                                "Comparison": "\n".join(best_logs),
+                            },
+                            hint="This is probably the best match, but it is not a perfect match. All other releases have a score at least 40 points lower.",
+                        ):
+                            user_input = "y" if cli_ui.ask_yes_no("Do you want to use this release?", default=False) else "n"
                         try:
                             if user_input == "y":
                                 _apply_release_metadata(meta, best_release)

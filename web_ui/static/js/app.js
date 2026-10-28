@@ -9589,7 +9589,7 @@ function AudionutsUAGUI() {
                   <dt className="ua-run-gui-muted min-w-0 break-words text-xs font-semibold sm:pt-0.5">
                     {label}
                   </dt>
-                  <dd className="min-w-0 break-words text-sm">
+                  <dd className="min-w-0 whitespace-pre-line break-words text-sm">
                     {value || (
                       <span className="ua-run-gui-attention-text">Missing</span>
                     )}
@@ -9600,7 +9600,9 @@ function AudionutsUAGUI() {
           </div>
         )}
         {context.hint && (
-          <p className="ua-run-gui-muted text-xs">{context.hint}</p>
+          <p className="ua-run-gui-muted whitespace-pre-line text-xs">
+            {context.hint}
+          </p>
         )}
         {renderRunGuiActionButtons(getRunGuiActions(context), answer, disabled)}
       </>

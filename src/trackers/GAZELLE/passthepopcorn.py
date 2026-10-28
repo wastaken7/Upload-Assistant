@@ -300,7 +300,13 @@ class PassThePopcorn:
                 # Allow user to edit or discard the description
                 logger.info(f"{self.tracker}: [cyan]Do you want to edit, discard or keep the description?[/cyan]")
                 question, buttons = webui_events.letter_prompt([("e", "edit"), ("d", "discard")], "keep it as is")
-                with webui_events.answer_buttons(buttons):
+                with webui_events.field_prompt(
+                    "Tracker description",
+                    {"Tracker": self.tracker, "Description": (desc or "")[:1000]},
+                    focus="Description",
+                    hint="Do you want to edit, discard or keep the description?" if webui_events.editor_available() else "Do you want to discard or keep the description?",
+                    actions=buttons,
+                ):
                     edit_choice = await prompt_in_thread(cli_ui.ask_string, question)
 
                 if (edit_choice or "").lower() == "e" and webui_events.editor_available():
@@ -376,7 +382,8 @@ class PassThePopcorn:
                 choices.append("Skip - Don't use any of these matches")
 
                 try:
-                    selected = await prompt_in_thread(cli_ui.ask_choice, "Select the correct movie:", choices=choices)
+                    with webui_events.field_prompt("Movie group", {"Tracker": self.tracker, "IMDb ID": f"tt{imdb}"}):
+                        selected = await prompt_in_thread(cli_ui.ask_choice, "Select the correct movie:", choices=choices)
                     if selected == "Skip - Don't use any of these matches":
                         logger.info(f"{self.tracker}: [yellow]User chose to skip all matches[/yellow]")
                         return None
@@ -635,7 +642,8 @@ class PassThePopcorn:
                 ptp_type = "Live Performance"
         if ptp_type is None and (meta.mode if meta.mode is not None else "non_cli") == "cli":
             ptp_type_list = ["Feature Film", "Short Film", "Miniseries", "Stand-up Comedy", "Concert", "Movie Collection"]
-            ptp_type = cli_ui.ask_choice("Select the proper type", choices=ptp_type_list)
+            with webui_events.field_prompt("Release type", {"Tracker": self.tracker, "Release": meta.name or meta.title}):
+                ptp_type = cli_ui.ask_choice("Select the proper type", choices=ptp_type_list)
             if ptp_type == "Concert":
                 ptp_type = "Live Performance"
         return ptp_type
@@ -734,7 +742,8 @@ class PassThePopcorn:
             "English Softsubs Exist (Mislabeled)": None,
             "Hardcoded Subs (Non-English)": "OTHER",
         }
-        opts = cli_ui.select_choices("Please select any/all applicable options:", choices=list(trumpable_values.keys())) or []
+        with webui_events.field_prompt("Trumpable options", {"Tracker": self.tracker}):
+            opts = cli_ui.select_choices("Please select any/all applicable options:", choices=list(trumpable_values.keys())) or []
         trumpable_list: list[int] = []
         for opt in opts:
             v = trumpable_values.get(opt)
@@ -1433,7 +1442,13 @@ class PassThePopcorn:
                     if meta.unattended and not meta.unattended_confirm:
                         raise LoginError(f"{self.tracker}: 2FA is required in unattended mode.")  # noqa: F405
                     data["TfaType"] = "normal"
-                    data["TfaCode"] = await prompt_in_thread(cli_ui.ask_string, "2FA Required: Please enter PassThePopcorn 2FA code")
+                    with webui_events.field_prompt(
+                        "Two-factor authentication",
+                        {"Tracker": self.tracker, "2FA code": ""},
+                        focus="2FA code",
+                        hint="Enter your PassThePopcorn 2FA code to log in.",
+                    ):
+                        data["TfaCode"] = await prompt_in_thread(cli_ui.ask_string, "2FA Required: Please enter PassThePopcorn 2FA code")
                     loginresponse = await client.post(f"{self.base_url}/ajax.php?action=login", data=data, headers=headers)
                     await asyncio.sleep(2)
                     resp = loginresponse.json()
@@ -1544,12 +1559,26 @@ class PassThePopcorn:
 
         elif no_audio_found and (not any(x in [3, 50] for x in ptp_subtitles)):
             cli_ui.info("No English subs and no audio tracks found should this be trumpable?")
-            if (not meta.unattended or meta.unattended_confirm) and await prompt_in_thread(cli_ui.ask_yes_no, "Mark trumpable?", default=True):
-                ptp_trumpable, ptp_subtitles = self.get_trumpable(ptp_subtitles)
+            if not meta.unattended or meta.unattended_confirm:
+                with webui_events.field_prompt(
+                    "Trumpable",
+                    {"Tracker": self.tracker, "Release": meta.name or meta.title},
+                    hint="No English subtitles and no audio tracks were found.",
+                ):
+                    mark_trumpable = await prompt_in_thread(cli_ui.ask_yes_no, "Mark trumpable?", default=True)
+                if mark_trumpable:
+                    ptp_trumpable, ptp_subtitles = self.get_trumpable(ptp_subtitles)
         elif not english_audio and (not any(x in [3, 50] for x in ptp_subtitles)):
             cli_ui.info("No English subs and English audio is not the first audio track, should this be trumpable?")
-            if (not meta.unattended or meta.unattended_confirm) and await prompt_in_thread(cli_ui.ask_yes_no, "Mark trumpable?", default=True):
-                ptp_trumpable, ptp_subtitles = self.get_trumpable(ptp_subtitles)
+            if not meta.unattended or meta.unattended_confirm:
+                with webui_events.field_prompt(
+                    "Trumpable",
+                    {"Tracker": self.tracker, "Release": meta.name or meta.title},
+                    hint="No English subtitles and English audio is not the first audio track.",
+                ):
+                    mark_trumpable = await prompt_in_thread(cli_ui.ask_yes_no, "Mark trumpable?", default=True)
+                if mark_trumpable:
+                    ptp_trumpable, ptp_subtitles = self.get_trumpable(ptp_subtitles)
 
         logger.debug(f"{self.tracker}: ptp_trumpable: {ptp_trumpable}")
         logger.debug(f"{self.tracker}: ptp_subtitles: {ptp_subtitles}")
