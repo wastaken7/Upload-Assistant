@@ -6,7 +6,7 @@ from src.console import logger
 from src.meta import Meta
 from src.trackers.common import Common
 from src.trackers.naming import BLU_EDITION_TERMS, VideoNameRules, add_incomplete_pack_marker, build_video_name
-from src.trackers.UNIT3D import UNIT3D
+from src.trackers.UNIT3D import UNIT3D, ParamsList
 
 # Aither keeps editions (Criterion, Remastered, Anniversary...) in the description; cuts stay in the title.
 AITHER_EDITION_TERMS = re.compile(
@@ -87,6 +87,21 @@ class Aither(UNIT3D):
         if reverse:
             return {value: key for key, value in resolution_id.items()}
         return {"resolution_id": resolution_id.get(resolution or meta.resolution, "10")}
+
+    async def get_search_urls(self, meta: Meta, request_params: ParamsList) -> list[tuple[str, ParamsList, bool]]:
+        urls = await super().get_search_urls(meta, request_params)
+        if ("resolutions[]", "42") in request_params:
+            # Older 1440p uploads were filed under 1080p (id 3); search those too.
+            legacy_params: ParamsList = [("resolutions[]", "3") if param == ("resolutions[]", "42") else param for param in request_params]
+            urls.append((self.search_url, legacy_params, False))
+        return urls
+
+    async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
+        dupes = await super().search_existing(meta)
+        if meta.resolution != "1440p":
+            return dupes
+        # The legacy 1080p search also returns real 1080p releases; keep only those named 1440p.
+        return [dupe for dupe in dupes if dupe.get("res") != "1080p" or re.search(r"\b1440p\b", str(dupe.get("name") or ""), re.IGNORECASE)]
 
     async def get_season_number(self, meta: Meta) -> dict[str, str]:
         if (await self.get_category_id(meta))["category_id"] != "2":

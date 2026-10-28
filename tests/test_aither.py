@@ -6,6 +6,7 @@ import pytest
 
 from src.meta import Meta
 from src.sports import detect_sports
+from src.trackers.UNIT3D import UNIT3D, ParamsList
 from src.trackers.UNIT3D.aither import Aither
 
 
@@ -34,6 +35,23 @@ def test_aither_sends_1440p_as_its_own_resolution() -> None:
     assert asyncio.run(aither.get_resolution_id(Meta(resolution="1440p"))) == {"resolution_id": "42"}
     assert asyncio.run(aither.get_resolution_id(Meta(resolution="1080p"))) == {"resolution_id": "3"}
     assert asyncio.run(aither.get_resolution_id(Meta(), reverse=True))["42"] == "1440p"
+
+
+def test_aither_1440p_search_also_checks_legacy_1080p_id(monkeypatch: pytest.MonkeyPatch) -> None:
+    aither = Aither({"DEFAULT": {}, "TRACKERS": {"AITHER": {}}})
+    params: ParamsList = [("tmdbId", "1"), ("resolutions[]", "42"), ("types[]", "3")]
+    urls = asyncio.run(aither.get_search_urls(Meta(resolution="1440p"), params))
+    assert [url_params for _, url_params, _ in urls] == [params, [("tmdbId", "1"), ("resolutions[]", "3"), ("types[]", "3")]]
+    assert asyncio.run(aither.get_search_urls(Meta(resolution="1080p"), [("resolutions[]", "3")])) == [(aither.search_url, [("resolutions[]", "3")], False)]
+
+    results = [
+        {"name": "Imaginary Film 2001 1440p WEB-DL DD 5.1 H.264-GRP", "res": "1440p"},
+        {"name": "Imaginary Film 2001 1440p WEB-DL DD 5.1 H.264-OLD", "res": "1080p"},
+        {"name": "Imaginary Film 2001 1080p WEB-DL DD 5.1 H.264-GRP", "res": "1080p"},
+    ]
+    monkeypatch.setattr(UNIT3D, "search_existing", AsyncMock(return_value=results))
+    assert [dupe["name"] for dupe in asyncio.run(aither.search_existing(Meta(resolution="1440p")))] == [results[0]["name"], results[1]["name"]]
+    assert asyncio.run(aither.search_existing(Meta(resolution="1080p"))) == results
 
 
 def test_aither_exposes_sports_category_mapping() -> None:
