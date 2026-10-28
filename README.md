@@ -335,6 +335,7 @@ uv tool install --force git+https://github.com/wastaken7/Upload-Assistant.git
 | <img src="web_ui/static/img/trackers/digitalcore.png" width="16" height="16" />               | DigitalCore            | DIGITALCORE            | MOVIE, TV, BOOK, GAME, MUSIC |
 | <img src="web_ui/static/img/trackers/dreadvault.png" alt="" width="16" height="16" />         | DreadVault             | DREADVAULT             | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/emuwarez.png" alt="" width="16" height="16" />           | eMuwarez               | EMUWAREZ               | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/exoticaz.png" width="16" height="16" />                  | ExoticaZ               | EXOTICAZ               | XXX                          |
 | <img src="web_ui/static/img/trackers/filelist.png" width="16" height="16" />                  | FileList               | FILELIST               | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/flood.png" width="16" height="16" />                     | Flood                  | FLOOD                  | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/funfile.png" width="16" height="16" />                   | FunFile                | FUNFILE                | MOVIE, TV                    |
