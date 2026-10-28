@@ -27,6 +27,9 @@ AITHER_NAME_RULES = VideoNameRules(
 class Aither(UNIT3D):
     """
     Aither is a Private Torrent Tracker for HD MOVIES / TV
+
+    API spec: https://aither.cc/pages/api
+    Synced with: last edited October 19, 2026.
     """
 
     tracker = "AITHER"
