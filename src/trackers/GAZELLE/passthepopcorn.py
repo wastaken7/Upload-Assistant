@@ -1470,6 +1470,18 @@ class PassThePopcorn:
             logged_in = True
         return logged_in
 
+    async def _prompt_field(self, field: str, meta: Meta, question: str, *, hint: str, actions: list[tuple[str, str]] | None = None, placeholder: str = "") -> str:
+        """Ask for a missing new-group field, shown in the Web UI as a form field."""
+        with webui_events.field_prompt(
+            field,
+            {"Tracker": self.tracker, "Release": meta.name or meta.title, field: ""},
+            focus=field,
+            hint=hint,
+            actions=actions or [],
+            placeholder=placeholder,
+        ):
+            return await prompt_in_thread(cli_ui.ask_string, question, default="") or ""
+
     async def fill_upload_form(self, group_id: int | str | None, meta: Meta) -> tuple[str, dict[str, Any]]:
         resolution, other_resolution = self.get_resolution(meta)
         await self.edit_desc(meta)
@@ -1586,8 +1598,13 @@ class PassThePopcorn:
                 youtube = (
                     ""
                     if meta.unattended
-                    else await prompt_in_thread(
-                        cli_ui.ask_string, "Unable to find youtube trailer, please link one e.g.(https://www.youtube.com/watch?v=dQw4w9WgXcQ)", default=""
+                    else await self._prompt_field(
+                        "Trailer",
+                        meta,
+                        "Unable to find youtube trailer, please link one e.g.(https://www.youtube.com/watch?v=dQw4w9WgXcQ)",
+                        hint="No YouTube trailer was found. Leaving it blank uploads without one.",
+                        actions=[("", "Upload without a trailer")],
+                        placeholder="https://www.youtube.com/watch?v=",
                     )
                 )
                 meta.youtube = youtube
@@ -1602,7 +1619,16 @@ class PassThePopcorn:
                 if meta.unattended and not meta.unattended_confirm:
                     meta.skipping = self.tracker
                     raise UploadError(f"{self.tracker}: Cover is required in unattended mode.")
-                cover_input = await prompt_in_thread(cli_ui.ask_string, "No Cover was found. Please input a link to a cover: \n", default="") or "".strip()
+                cover_input = (
+                    await self._prompt_field(
+                        "Cover",
+                        meta,
+                        "No Cover was found. Please input a link to a cover: \n",
+                        hint="No cover was found. Enter a link to an image ending in .jpg, .jpeg, .png or .webp.",
+                        placeholder="https://",
+                    )
+                    or "".strip()
+                )
                 if not cover_input:
                     continue
                 if not cover_input.lower().endswith((".jpg", ".jpeg", ".png", ".webp")):
@@ -1628,7 +1654,13 @@ class PassThePopcorn:
                     while not new_data["tags"]:
                         logger.info(f"{self.tracker}: [yellow]Unable to match any tags")
                         logger.info(f"{self.tracker}: Valid tags can be found on the PassThePopcorn upload form")
-                        new_data["tags"] = await prompt_in_thread(cli_ui.ask_string, "Please enter at least one tag. Comma separated (action, animation, short):")
+                        new_data["tags"] = await self._prompt_field(
+                            "Tags",
+                            meta,
+                            "Please enter at least one tag. Comma separated (action, animation, short):",
+                            hint="No tags matched. Enter at least one, comma-separated; valid tags are on the PassThePopcorn upload form.",
+                            placeholder="e.g. action, animation, short",
+                        )
                 else:
                     raise UploadError("PassThePopcorn requires at least one valid tag.")
             data.update(new_data)

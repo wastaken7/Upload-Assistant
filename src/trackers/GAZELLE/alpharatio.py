@@ -12,6 +12,7 @@ import cli_ui
 import httpx
 from bs4 import BeautifulSoup
 
+from src import webui_events
 from src.bbcode import BBCODE
 from src.console import logger, prompt_in_thread
 from src.cookie_auth import CookieAuthUploader, CookieValidator
@@ -369,7 +370,14 @@ class AlphaRatio:
                 meta.skipping = f"{self.tracker}"
                 return False
             while cover is None:
-                cover = await prompt_in_thread(cli_ui.ask_string, "No Cover was found. Please input a link to a cover:", default="") or ""
+                with webui_events.field_prompt(
+                    "Cover",
+                    {"Tracker": self.tracker, "Release": meta.name or meta.title, "Cover": ""},
+                    focus="Cover",
+                    hint="No cover was found. Enter a link to an image ending in .jpg, .png or .gif.",
+                    placeholder="https://",
+                ):
+                    cover = await prompt_in_thread(cli_ui.ask_string, "No Cover was found. Please input a link to a cover:", default="") or ""
                 if not re.match(r"https?://.*\.(jpg|png|gif)$", cover):
                     logger.info(f"{self.tracker}: [red]Invalid image link. Please enter a link that ends with .jpg, .png, or .gif.")
                     cover = None

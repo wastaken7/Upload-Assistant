@@ -15,6 +15,7 @@ import httpx
 from bs4 import BeautifulSoup
 
 import bbcode
+from src import webui_events
 from src.cogs.redaction import Redaction
 from src.console import logger, prompt_in_thread
 from src.cookie_auth import CookieValidator
@@ -422,7 +423,17 @@ class AZTrackerBase:
                         return {}
                     logger.info(f"{self.tracker}: No audio language/s found.")
                     logger.info(f"{self.tracker}: You must enter (comma-separated) languages for all audio tracks, eg: English, Spanish: ")
-                    user_input_raw = await prompt_in_thread(cli_ui.ask_string, "Enter languages: ")
+                    with webui_events.field_prompt(
+                        "Audio languages",
+                        {
+                            f"Audio track {position}": track.get("Language") or "No language tag"
+                            for position, track in enumerate((t for t in tracks if t.get("@type") == "Audio"), 1)
+                            if any(track is missing for missing in missing_audio_languages)
+                        },
+                        hint="Comma-separated languages for all audio tracks.",
+                        placeholder="e.g. English, Spanish",
+                    ):
+                        user_input_raw = await prompt_in_thread(cli_ui.ask_string, "Enter languages: ")
                     user_input = (user_input_raw or "").strip()
                     langs = [lang.strip() for lang in user_input.split(",")]
                     for lang in langs:
