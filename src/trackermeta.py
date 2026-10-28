@@ -713,14 +713,14 @@ async def update_metadata_from_tracker(
 
             if imdb or tvdb_id or meta.hdb_description:
                 if not meta.unattended:
-                    logger.info(f"[green]{tracker_name} data found: IMDb ID: {imdb}, TVDb ID: {meta.tvdb_id}, HDBITS Name: {meta.hdb_name}[/green]")
+                    logger.info(f"[green]{tracker_name} data found: IMDb ID: {imdb}, TVDb ID: {tvdb_id}, HDBITS Name: {meta.hdb_name}[/green]")
                     with webui_events.field_prompt(
                         f"{tracker_name} metadata",
                         {
                             "Tracker": tracker_name,
                             "Release": meta.hdb_name,
                             "IMDb ID": f"tt{str(imdb).zfill(7)}" if to_int(imdb) else "",
-                            "TVDb ID": meta.tvdb_id if to_int(meta.tvdb_id) else "",
+                            "TVDb ID": tvdb_id if to_int(tvdb_id) else "",
                         },
                     ):
                         use_hdb_ids = await prompt_user_for_confirmation(f"Do you want to use the ID's found on {tracker_name}?")

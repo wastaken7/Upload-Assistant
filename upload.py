@@ -953,18 +953,19 @@ _MUSIC_FIELD_LABELS = {
 }
 
 
-def _music_field_prompt(meta: Meta, field: str, *, hint: str = "", placeholder: str = "", keep: bool = True) -> contextlib.AbstractContextManager[None]:
+def _music_field_prompt(meta: Meta, field: str, *, hint: str = "", placeholder: str = "", keep: bool = True, conflicts: bool = True) -> contextlib.AbstractContextManager[None]:
     """Show a music metadata question in the Web UI with the release's current values.
 
-    Values the files disagree on are offered as answers, and with ``keep``
-    a blank answer (keep the current value, or skip) is offered as well.
+    With ``conflicts``, values the files disagree on are offered as answers
+    (turn it off for yes/no questions), and with ``keep`` a blank answer
+    (keep the current value, or skip) is offered as well.
     """
     summary: dict[str, Any] = {label: _music_field(meta, name) for name, label in _MUSIC_FIELD_LABELS.items()}
     summary["Artwork"] = summary["Artwork"] or meta.artwork_path
     current = str(_music_field(meta, field) or "")
     actions: list[tuple[str, str]] = [("", f"Keep {current}" if current else "Skip")] if keep else []
-    conflicts = meta.music_release.get("conflicts", {}) if isinstance(meta.music_release, dict) else {}
-    candidates = [str(value) for value in (conflicts.get(field) or [] if isinstance(conflicts, dict) else [])]
+    field_conflicts = meta.music_release.get("conflicts", {}) if conflicts and isinstance(meta.music_release, dict) else {}
+    candidates = [str(value) for value in (field_conflicts.get(field) or [] if isinstance(field_conflicts, dict) else [])]
     if field in {"year", "edition_year"}:
         candidates = [value for value in candidates if re.fullmatch(r"\d{4}", value)]
     offered = [value for value in dict.fromkeys(candidates) if value and value != current]
@@ -1237,6 +1238,7 @@ async def _confirm_music_folder_hints(meta: Meta) -> None:
                     field,
                     hint="Orpheus rule 2.1.19: edition details from the folder name are only sent when confirmed.",
                     keep=False,
+                    conflicts=False,
                 ):
                     confirmed = CLI_UI.ask_yes_no(f"Send {name} '{value}' from the folder name to Orpheus?", default=False)
                 if confirmed:

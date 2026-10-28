@@ -346,6 +346,7 @@ class SeasonEpisodeManager:
             for i, file in enumerate(filelist[:batch_size]):
                 logger.info(f"[cyan]  {i + 1:2d}. {Path(file).name}")
             files_shown = min(batch_size, len(filelist))
+            page_start = 0
             if unattended:
                 if missing_list:
                     logger.info("[yellow]Unattended mode: continuing without confirmation; no INCOMPLETE marker was added.")
@@ -364,7 +365,7 @@ class SeasonEpisodeManager:
                         {
                             **pack_summary,
                             "Files shown": f"{files_shown} of {len(filelist)}",
-                            "File list": "\n".join(f"{i + 1}. {Path(f).name}" for i, f in enumerate(filelist[:files_shown])),
+                            "File list": "\n".join(f"{i}. {Path(f).name}" for i, f in enumerate(filelist[page_start:files_shown], start=page_start + 1)),
                         },
                         actions=[("n", f"Show next {batch_size}"), ("a", "Show all"), ("c", "Continue"), ("q", "Quit")],
                     ):
@@ -377,7 +378,7 @@ class SeasonEpisodeManager:
                         end = min(files_shown + batch_size, len(filelist)) if response == "n" else len(filelist)
                         for i, file in enumerate(filelist[files_shown:end], start=files_shown + 1):
                             logger.info(f"[cyan]  {i:2d}. {Path(file).name}")
-                        files_shown = end
+                        page_start, files_shown = files_shown, end
                     elif response == "c":
                         break
                     else:
@@ -394,8 +395,8 @@ class SeasonEpisodeManager:
                     "Season pack check",
                     {
                         **pack_summary,
-                        "Files": f"{len(filelist)} files",
-                        "File list": "\n".join(f"{i + 1}. {Path(f).name}" for i, f in enumerate(filelist[:files_shown])),
+                        "Files shown": f"{files_shown} of {len(filelist)}",
+                        "File list": "\n".join(f"{i}. {Path(f).name}" for i, f in enumerate(filelist[page_start:files_shown], start=page_start + 1)),
                     },
                     hint="Season pack may be incomplete or use different episode numbering." if missing_list else "Season pack contains extra episodes not listed by TVDB.",
                     actions=buttons,
