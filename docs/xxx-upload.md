@@ -71,6 +71,7 @@ During a WebUI run, **Now Processing** shows the current XXX details and cover. 
 The current XXX upload destinations are:
 
 - **BitPorn (`BITPORN`)**: XXX-only UNIT3D tracker; derives its category from release-name keywords and uploads the cover, banner, and contact sheets directly.
+- **DirtyBytes (`DIRTYBYTES`)**: XXX-only tracker; picks the Scene, Movies, VR180 or Packs category and resolution from the release name and video height, sends studio, performers, keywords and MediaInfo, and attaches the cover and contact sheets directly.
 - **BJShare (`BJSHARE`)**: accepts XXX video uploads and uses the supplied or detected title, year, studio, performers, media details, artwork, and screenshots.
 - **LST (`LST`)**: maps XXX to its adult category using the standard UNIT3D upload fields.
 - **SUIO (`SUIO`)**: accepts XXX Usenet posts and maps HD/UHD and other resolutions to its adult categories.
