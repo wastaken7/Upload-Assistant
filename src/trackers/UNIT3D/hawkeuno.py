@@ -604,10 +604,12 @@ class HawkeUno(UNIT3D):
             # 409 (duplicate) and 422 (attribute mismatch) explain the rejection in the JSON envelope
             try:
                 error_json = e.response.json()
-                details = error_json.get("data") or []
+                details = error_json.get("data") or ""
                 if isinstance(details, list):
                     details = "; ".join(str(detail) for detail in details)
-                msg = f"HTTP {e.response.status_code} - {error_json.get('message', '')} {details}".strip()
+                detail_text = f"{error_json.get('message') or ''} {details}".strip()
+                if detail_text:
+                    msg = f"HTTP {e.response.status_code} - {detail_text}"
             except ValueError, AttributeError:
                 pass
             status_dict["status_message"] = f"data error: {msg}"
