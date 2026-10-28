@@ -12,6 +12,7 @@ from bs4 import BeautifulSoup
 from rich.markup import escape
 from unidecode import unidecode
 
+from src import webui_events
 from src.cogs.redaction import Redaction
 from src.console import logger, prompt_in_thread
 from src.cookie_auth import CookieValidator
@@ -201,7 +202,15 @@ class FileList:
         if meta.unattended is False:
             fl_confirm = await prompt_in_thread(cli_ui.ask_yes_no, "Correct?", default=False)
             if fl_confirm is not True:
-                fl_name_manually = await prompt_in_thread(cli_ui.ask_string, "Please enter a proper name", default="")
+                with webui_events.field_prompt(
+                    f"{self.tracker} name",
+                    {"Current name": fl_name},
+                    focus="Current name",
+                    hint="The name to upload with. Leaving it blank aborts this upload.",
+                    actions=[("", "Abort this upload")],
+                    placeholder=fl_name,
+                ):
+                    fl_name_manually = await prompt_in_thread(cli_ui.ask_string, "Please enter a proper name", default="")
                 if fl_name_manually == "":
                     logger.info(f"{self.tracker}: No proper name given")
                     logger.info(f"{self.tracker}: Aborting...")

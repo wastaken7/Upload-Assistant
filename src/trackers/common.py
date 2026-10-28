@@ -1570,6 +1570,13 @@ class Common:
             meta.skipping = f"{tracker}"
             return ""
 
-        tags_raw = await prompt_in_thread(cli_ui.ask_string, f"Digite os gêneros (no formato do {tracker}): ")
+        with webui_events.field_prompt(
+            "Gêneros",
+            {"Tracker": tracker, "Release": meta.name or meta.title, "Gêneros": ""},
+            focus="Gêneros",
+            hint="Gêneros não encontrados. Separe por vírgula; até 5 são usados.",
+            placeholder="ex.: ação, drama",
+        ):
+            tags_raw = await prompt_in_thread(cli_ui.ask_string, f"Digite os gêneros (no formato do {tracker}): ")
         raw_list = [unidecode(t.strip()).replace(" ", ".") for t in re.split(r"[,;]", tags_raw or "") if t.strip()]
         return ", ".join(raw_list[:5])

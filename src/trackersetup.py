@@ -1210,8 +1210,22 @@ class TrackerSetup:
                 return True
             if where_compare.upper() == "L":
                 try:
-                    reported_screenshots = cli_ui.ask_string("Paste screenshot links for the reported torrent (comma-separated):", default="")
-                    trumping_screenshots = cli_ui.ask_string("Paste screenshot links for the trumping torrent (comma-separated):", default="")
+                    with webui_events.field_prompt(
+                        "Trump report comparison",
+                        {"Tracker": tracker, "Reported torrent": ""},
+                        focus="Reported torrent",
+                        hint="Comma-separated screenshot links. Leaving it blank skips the trump report.",
+                        actions=[("", "Skip trumping")],
+                    ):
+                        reported_screenshots = cli_ui.ask_string("Paste screenshot links for the reported torrent (comma-separated):", default="")
+                    with webui_events.field_prompt(
+                        "Trump report comparison",
+                        {"Tracker": tracker, "Reported torrent": reported_screenshots, "Trumping torrent": ""},
+                        focus="Trumping torrent",
+                        hint="Comma-separated screenshot links. Leaving it blank skips the trump report.",
+                        actions=[("", "Skip trumping")],
+                    ):
+                        trumping_screenshots = cli_ui.ask_string("Paste screenshot links for the trumping torrent (comma-separated):", default="")
                 except EOFError, KeyboardInterrupt:
                     logger.info("[yellow]Prompt cancelled; skipping trump report creation.[/yellow]")
                     return False

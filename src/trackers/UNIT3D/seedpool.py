@@ -5,6 +5,7 @@ from typing import Any, cast
 
 import cli_ui
 
+from src import webui_events
 from src.artwork import is_valid_cover_image
 from src.console import logger, prompt_in_thread
 from src.meta import Meta
@@ -248,7 +249,15 @@ class Seedpool(UNIT3D):
             logger.info(f"{self.tracker}: [bold red]Album genres are required in keywords for the {self.tracker} IRC announce.[/bold red]")
             if meta.unattended and not meta.unattended_confirm:
                 return False
-            user_genres = await prompt_in_thread(cli_ui.ask_string, "Enter the album genres, comma-separated", default="")
+            with webui_events.field_prompt(
+                "Album genres",
+                {"Tracker": self.tracker, "Release": meta.name or meta.title, "Genres": ""},
+                focus="Genres",
+                hint=f"Required for the {self.tracker} IRC announce. Leaving it blank skips this upload.",
+                actions=[("", "Skip this upload")],
+                placeholder="e.g. Rock, Jazz",
+            ):
+                user_genres = await prompt_in_thread(cli_ui.ask_string, "Enter the album genres, comma-separated", default="")
             meta.genres = [genre.strip() for genre in str(user_genres or "").split(",") if genre.strip()]
             if not meta.genres:
                 return False

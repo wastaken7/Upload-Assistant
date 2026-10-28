@@ -10,6 +10,7 @@ import cli_ui
 import httpx
 from rich.markup import escape
 
+from src import webui_events
 from src.cogs.redaction import Redaction
 from src.console import logger, prompt_in_thread
 from src.get_desc import DescriptionBuilder
@@ -204,7 +205,15 @@ class Anthelion:
                 f"{self.tracker}: [yellow]api will accept this upload, but no tag will be added.\nYou must manually add at least one tag from the approved list when uploaded."
             )
             await asyncio.sleep(3)
-            user_tag = await prompt_in_thread(cli_ui.ask_string, "Please enter at least one tag (genre) to use for the upload", default="")
+            with webui_events.field_prompt(
+                "Tag",
+                {"Tracker": self.tracker, "Release": meta.name or meta.title, "Tag": ""},
+                focus="Tag",
+                hint="No genres were found. Enter at least one tag (genre) from the approved list. Leaving it blank uploads without a tag.",
+                actions=[("", "Upload without a tag")],
+                placeholder="e.g. drama",
+            ):
+                user_tag = await prompt_in_thread(cli_ui.ask_string, "Please enter at least one tag (genre) to use for the upload", default="")
             if user_tag:
                 tags.append(user_tag.replace(" ", ".").lower())
                 meta.ant_user_tags = True
