@@ -14,6 +14,7 @@ from src import webui_events
 from src.cogs.redaction import Redaction
 from src.console import logger, prompt_in_thread
 from src.get_desc import DescriptionBuilder
+from src.languages import languages_manager
 from src.mediainfo import strip_report_by_line
 from src.meta import Meta
 from src.torrent_policy import ANTHELION_POLICY
@@ -130,8 +131,15 @@ class Anthelion:
         flags.extend([each for each in ["Directors", "Extended", "Uncut", "Unrated", "IMAX"] if each in edition])
         if "remaster" in edition.lower():
             flags.append("Remastered")
-        # EnglishDub replaced DualAudio on the site
-        if "Dual-Audio" in meta.audio:
+        # EnglishDub replaced DualAudio on the site. Dual-Audio is also emitted for an English
+        # original with a foreign dub, so require a non-English original and English audio.
+        original_language = (meta.original_language or "").lower()
+        if (
+            "Dual-Audio" in meta.audio
+            and original_language
+            and not original_language.startswith("en")
+            and await languages_manager.has_english_language(meta.audio_languages or [])
+        ):
             flags.append("EnglishDub")
         if "Atmos" in meta.audio:
             flags.append("Atmos")
@@ -369,9 +377,9 @@ class Anthelion:
                             meta.tracker_status[self.tracker]["status_message"] = response_data
                             return True
 
-                        # 4xx (except 429) means the upload was refused; resending would not change that.
+                        # 4xx (except 408 and 429) means the upload was refused; resending would not change that.
                         # 409 is a filled slot that Guru+ can trump with the returned trump_key, which needs user confirmation on the site.
-                        if 400 <= response.status_code < 500 and response.status_code != 429:
+                        if 400 <= response.status_code < 500 and response.status_code not in (408, 429):
                             meta.tracker_status[self.tracker]["status_message"] = f"data error: HTTP {response.status_code} - {response.text}"
                             return False
 

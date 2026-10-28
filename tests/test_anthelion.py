@@ -208,10 +208,48 @@ def test_anthelion_flags_use_current_site_names() -> None:
         hdr="",
         distributor="",
         type="ENCODE",
+        original_language="ja",
+        audio_languages=["Japanese", "English"],
     )
     tracker = object.__new__(Anthelion)
 
     assert asyncio.run(tracker.get_flags(meta)) == ["Directors", "Remastered", "EnglishDub", "Atmos"]  # noqa: S101
+
+
+def test_anthelion_english_original_with_foreign_dub_is_not_english_dub() -> None:
+    meta = SimpleNamespace(
+        edition="",
+        audio="Dual-Audio DD 5.1",
+        has_commentary=False,
+        manual_commentary=False,
+        three_d="",
+        hdr="",
+        distributor="",
+        type="ENCODE",
+        original_language="en",
+        audio_languages=["English", "French"],
+    )
+    tracker = object.__new__(Anthelion)
+
+    assert "EnglishDub" not in asyncio.run(tracker.get_flags(meta))  # noqa: S101
+
+
+def test_anthelion_retries_request_timeout_status(tmp_path: Path, monkeypatch) -> None:
+    class RequestTimeout(_Response):
+        status_code = 408
+        text = "Request Timeout"
+
+    _Client.posts = 0
+    _Client.response = RequestTimeout()
+    meta = _meta(tmp_path)
+    monkeypatch.setattr("src.trackers.GAZELLE.anthelion.asyncio.sleep", _instant_sleep)
+
+    assert asyncio.run(_tracker(monkeypatch).upload(meta)) is False  # noqa: S101
+    assert _Client.posts == 3  # noqa: S101
+
+
+async def _instant_sleep(_delay: float, result=None):
+    return result
 
 
 def test_anthelion_duplicate_search_pads_short_imdb_id(monkeypatch) -> None:
