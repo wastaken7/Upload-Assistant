@@ -244,7 +244,10 @@ class InfinityHD(TmdbTvNaming, UNIT3D):
         if "mediainfo" not in meta:
             return False
 
-        original_languages = {lang.lower() for lang in (meta.original_language or []) if isinstance(lang, str) and lang.strip()}
+        # TMDB stores original_language as a single ISO string; iterating it would yield characters.
+        raw_original = meta.original_language
+        raw_list: list[Any] = [raw_original] if isinstance(raw_original, str) else list(raw_original or [])
+        original_languages = {self._get_language_code(lang) for lang in raw_list if isinstance(lang, str) and lang.strip()}
         if not original_languages:
             return False
 
