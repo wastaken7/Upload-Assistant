@@ -150,6 +150,7 @@ const SHOW_AUDIO_TRACKS_KEY = "ua_webui_show_audio_tracks";
 const SHOW_SUBTITLE_TRACKS_KEY = "ua_webui_show_subtitle_tracks";
 const OUTPUT_MODE_KEY = "ua_webui_output_mode";
 const RUN_GUI_RESULTS_COLLAPSED_KEY = "ua_webui_run_gui_results_collapsed";
+const RUN_GUI_COLLAPSED_ITEMS_KEY = "ua_webui_run_gui_collapsed_items";
 const REVIEW_PANELS_IN_MODAL_KEY = "ua_webui_review_panels_in_modal";
 const DEFAULT_LEFT_SIDEBAR_WIDTH = 256;
 const DEFAULT_RIGHT_SIDEBAR_WIDTH = 320;
@@ -472,6 +473,17 @@ const getStoredCollapsedSections = () => {
     );
     return Array.isArray(storedSections)
       ? storedSections.filter((section) => typeof section === "string")
+      : [];
+  } catch (error) {
+    return [];
+  }
+};
+
+const getStoredCollapsedRunGuiItems = () => {
+  try {
+    const stored = JSON.parse(storage.get(RUN_GUI_COLLAPSED_ITEMS_KEY) || "[]");
+    return Array.isArray(stored)
+      ? stored.filter((key) => typeof key === "string")
       : [];
   } catch (error) {
     return [];
@@ -2270,9 +2282,9 @@ function AudionutsUAGUI() {
   const [runGuiResultsCollapsed, setRunGuiResultsCollapsed] = useState(
     () => storage.get(RUN_GUI_RESULTS_COLLAPSED_KEY) === "true",
   );
-  // Queue items folded in Results, as "tabId:index"; cleared when a tab's run resets.
+  // Queue items folded in Results, as "sessionId:index", so they survive reloads.
   const [collapsedRunGuiItems, setCollapsedRunGuiItems] = useState(
-    () => new Set(),
+    () => new Set(getStoredCollapsedRunGuiItems()),
   );
   // Mirrors the active tab's runtime.gui; background tabs update only their runtime.
   const [runGui, setRunGui] = useState(initialRunGuiState);
@@ -2444,6 +2456,13 @@ function AudionutsUAGUI() {
   useEffect(() => {
     storage.set(RUN_GUI_RESULTS_COLLAPSED_KEY, String(runGuiResultsCollapsed));
   }, [runGuiResultsCollapsed]);
+
+  useEffect(() => {
+    storage.set(
+      RUN_GUI_COLLAPSED_ITEMS_KEY,
+      JSON.stringify(Array.from(collapsedRunGuiItems)),
+    );
+  }, [collapsedRunGuiItems]);
 
   // A new question opens at the top of the GUI panel, so its Yes/No buttons
   // are always in the same place even if the panel was scrolled down.
@@ -2839,8 +2858,10 @@ function AudionutsUAGUI() {
     if (!runtime) return;
     runtime.gui = RunGui.createRunGuiState();
     if (tabId === activeTabIdRef.current) setRunGui(runtime.gui);
+    const session = runtime.sessionRecord;
+    if (!session) return;
     setCollapsedRunGuiItems((prev) => {
-      const kept = [...prev].filter((key) => !key.startsWith(`${tabId}:`));
+      const kept = [...prev].filter((key) => !key.startsWith(`${session}:`));
       return kept.length === prev.size ? prev : new Set(kept);
     });
   };
@@ -6232,7 +6253,17 @@ function AudionutsUAGUI() {
         cache: "no-store",
       });
       const data = await response.json();
-      if (response.ok && Array.isArray(data.sessions)) sessions = data.sessions;
+      if (response.ok && Array.isArray(data.sessions)) {
+        sessions = data.sessions;
+        // Forget folded items of sessions the server no longer keeps.
+        const known = new Set(sessions.map((s) => String(s.session_id)));
+        setCollapsedRunGuiItems((prev) => {
+          const kept = [...prev].filter((key) =>
+            known.has(key.slice(0, key.lastIndexOf(":"))),
+          );
+          return kept.length === prev.size ? prev : new Set(kept);
+        });
+      }
       if (Number.isInteger(data.max_running) && data.max_running > 0) {
         setMaxRunningUploads(data.max_running);
       }
@@ -10165,7 +10196,7 @@ function AudionutsUAGUI() {
   /** One queue item as a card: the release is the heading, trackers below it. */
   const renderRunGuiItemCard = (group, view) => {
     const outcome = runGuiItemOutcome(group, view);
-    const collapseKey = `${activeTabId}:${group.index}`;
+    const collapseKey = `${getTabRuntime(activeTabId)?.sessionRecord || activeTabId}:${group.index}`;
     const collapsed = collapsedRunGuiItems.has(collapseKey);
     const toggleCollapsed = () =>
       setCollapsedRunGuiItems((prev) => {
