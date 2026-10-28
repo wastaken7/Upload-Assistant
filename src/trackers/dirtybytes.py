@@ -310,7 +310,8 @@ class DirtyBytes:
         # The tracker generates the .torrent asynchronously; an immediate download can 404.
         for attempt in range(4):
             if await self.common.download_tracker_torrent(meta, self.tracker, headers=headers, downurl=f"{self.api_base_url}/download/{torrent_id}"):
-                break
+                return True
             if attempt < 3:
                 await asyncio.sleep(10 * (attempt + 1))
+        tracker_status["status_message"] = f"Uploaded, but the registered .torrent could not be downloaded. Download it from {self.torrent_url}{torrent_id}/ before seeding."
         return True

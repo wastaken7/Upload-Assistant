@@ -177,6 +177,27 @@ def test_upload_posts_documented_fields(tmp_path: Path, monkeypatch: pytest.Monk
     assert downloads == ["https://dirtybytes.net/api/v1/torrents/download/12"]
 
 
+def test_upload_warns_when_torrent_download_fails(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    meta = _upload_meta(tmp_path)
+    _mock_client(monkeypatch, lambda _request: httpx.Response(200, json={"id": 12, "message": "Upload successful"}))
+    tracker = DirtyBytes(CONFIG)
+    downloads: list[str] = []
+    _prepare_upload(tracker, monkeypatch, tmp_path, downloads)
+
+    async def failed_download(_meta: Meta, _tracker: str, **kwargs: Any) -> None:
+        downloads.append(kwargs["downurl"])
+
+    async def no_sleep(_seconds: float) -> None:
+        return None
+
+    monkeypatch.setattr(tracker.common, "download_tracker_torrent", failed_download)
+    monkeypatch.setattr(dirtybytes_module.asyncio, "sleep", no_sleep)
+
+    assert asyncio.run(tracker.upload(meta)) is True
+    assert len(downloads) == 4
+    assert "https://dirtybytes.net/torrent/12/" in meta.tracker_status["DIRTYBYTES"]["status_message"]
+
+
 def test_upload_reports_duplicate(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     meta = _upload_meta(tmp_path)
     _mock_client(monkeypatch, lambda _request: httpx.Response(409, json={"error": "Duplicate", "torrent_id": 7}))
