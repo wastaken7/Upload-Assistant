@@ -868,7 +868,13 @@ class GreatPosterWall:
                 if not english_name:
                     logger.info(f"{self.tracker}: [red]Director English name cannot be empty.[/red]")
 
-            with webui_events.answer_buttons([("", "Skip")]):
+            with webui_events.field_prompt(
+                "Director",
+                {"Tracker": self.tracker, "IMDb ID": imdb_id, "English name": english_name, "Chinese name": ""},
+                focus="Chinese name",
+                hint="Optional: the director's name in Chinese. Leave it blank to skip.",
+                actions=[("", "Skip")],
+            ):
                 chinese_name_raw = await prompt_in_thread(cli_ui.ask_string, "Enter Director Chinese name (optional, press Enter to skip): ")
             chinese_name = (chinese_name_raw or "").strip()
 

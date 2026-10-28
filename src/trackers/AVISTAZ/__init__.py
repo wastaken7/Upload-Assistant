@@ -130,7 +130,13 @@ class AZTrackerBase:
             if attempt == 0 and not self.media_code:
                 logger.info(f"{self.tracker}: \nThe media [[yellow]IMDB:{imdb_id}[/yellow]] [[blue]TMDB:{tmdb_id}[/blue]] appears to be missing from the site's database.")
                 if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                    if await prompt_in_thread(cli_ui.ask_yes_no, f"{self.tracker}: Do you want to add it to the site database?\n"):
+                    with webui_events.field_prompt(
+                        f"{self.tracker} database",
+                        {"Tracker": self.tracker, "Title": title, "IMDb ID": imdb_id, "TMDb ID": tmdb_id},
+                        hint="This media appears to be missing from the site's database.",
+                    ):
+                        add_to_db = await prompt_in_thread(cli_ui.ask_yes_no, f"{self.tracker}: Do you want to add it to the site database?\n")
+                    if add_to_db:
                         added_successfully = await self.add_media_to_db(meta, title, category, imdb_id, tmdb_id)
                         if not added_successfully:
                             logger.info(f"{self.tracker}: Failed to add media. Aborting.")

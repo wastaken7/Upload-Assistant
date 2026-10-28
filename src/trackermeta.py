@@ -469,7 +469,16 @@ async def update_metadata_from_tracker(
         if to_int(imdb) != 0 or to_int(tmdb) != 0:
             if not meta.unattended:
                 logger.info(f"[green]{tracker_name} data found: IMDb ID: {imdb}, TMDb ID: {tmdb}[/green]")
-                if await prompt_user_for_confirmation(f"Do you want to use the ID's found on {tracker_name}?"):
+                with webui_events.field_prompt(
+                    f"{tracker_name} metadata",
+                    {
+                        "Tracker": tracker_name,
+                        "IMDb ID": f"tt{str(imdb).zfill(7)}" if to_int(imdb) else "",
+                        "TMDb ID": tmdb if to_int(tmdb) else "",
+                    },
+                ):
+                    use_bhd_ids = await prompt_user_for_confirmation(f"Do you want to use the ID's found on {tracker_name}?")
+                if use_bhd_ids:
                     found_match = True
                     meta.imdb_id = to_int(imdb, to_int(meta.imdb_id))
                     meta.tmdb_id = to_int(tmdb, to_int(meta.tmdb_id))
@@ -482,7 +491,15 @@ async def update_metadata_from_tracker(
                         if not meta.skipit:
                             logger.info("[cyan]Do you want to edit, discard or keep the description?[/cyan]")
                             question, buttons = webui_events.letter_prompt([("e", "edit"), ("d", "discard")], "keep it as is")
-                            with webui_events.answer_buttons(buttons):
+                            with webui_events.field_prompt(
+                                "Tracker description",
+                                {"Tracker": tracker_name, "Description": description[:1000]},
+                                focus="Description",
+                                hint="Do you want to edit, discard or keep the description?"
+                                if webui_events.editor_available()
+                                else "Do you want to discard or keep the description?",
+                                actions=buttons,
+                            ):
                                 edit_choice = cli_ui.ask_string(question)
 
                             if (edit_choice or "").lower() == "e" and webui_events.editor_available():
@@ -513,7 +530,13 @@ async def update_metadata_from_tracker(
                                 logger.info(f"Description content:\n{nfo_content[:1000]}...", extra={"markup": False})
                                 logger.info("[cyan]Do you want to discard or keep the description?[/cyan]")
                                 question, buttons = webui_events.letter_prompt([("d", "discard")], "keep it as is")
-                                with webui_events.answer_buttons(buttons):
+                                with webui_events.field_prompt(
+                                    "Tracker description",
+                                    {"Tracker": tracker_name, "Description": nfo_content[:1000]},
+                                    focus="Description",
+                                    hint="Do you want to discard or keep the description?",
+                                    actions=buttons,
+                                ):
                                     edit_choice = cli_ui.ask_string(question)
 
                                 if (edit_choice or "").lower() == "d":
@@ -690,8 +713,18 @@ async def update_metadata_from_tracker(
 
             if imdb or tvdb_id or meta.hdb_description:
                 if not meta.unattended:
-                    logger.info(f"[green]{tracker_name} data found: IMDb ID: {imdb}, TVDb ID: {meta.tvdb_id}, HDBITS Name: {meta.hdb_name}[/green]")
-                    if await prompt_user_for_confirmation(f"Do you want to use the ID's found on {tracker_name}?"):
+                    logger.info(f"[green]{tracker_name} data found: IMDb ID: {imdb}, TVDb ID: {tvdb_id}, HDBITS Name: {meta.hdb_name}[/green]")
+                    with webui_events.field_prompt(
+                        f"{tracker_name} metadata",
+                        {
+                            "Tracker": tracker_name,
+                            "Release": meta.hdb_name,
+                            "IMDb ID": f"tt{str(imdb).zfill(7)}" if to_int(imdb) else "",
+                            "TVDb ID": tvdb_id if to_int(tvdb_id) else "",
+                        },
+                    ):
+                        use_hdb_ids = await prompt_user_for_confirmation(f"Do you want to use the ID's found on {tracker_name}?")
+                    if use_hdb_ids:
                         logger.info(f"[green]{tracker_name} data retained.[/green]")
                         meta.imdb_id = imdb if imdb else meta.imdb_id
                         meta.tvdb_id = tvdb_id if tvdb_id else meta.tvdb_id
@@ -706,7 +739,15 @@ async def update_metadata_from_tracker(
                             logger.info(f"HDBITS Description content:\n{description[:1000]}.....", extra={"markup": False})
                             logger.info("[cyan]Do you want to edit, discard or keep the description?[/cyan]")
                             question, buttons = webui_events.letter_prompt([("e", "edit"), ("d", "discard")], "keep it as is")
-                            with webui_events.answer_buttons(buttons):
+                            with webui_events.field_prompt(
+                                "Tracker description",
+                                {"Tracker": tracker_name, "Description": description[:1000]},
+                                focus="Description",
+                                hint="Do you want to edit, discard or keep the description?"
+                                if webui_events.editor_available()
+                                else "Do you want to discard or keep the description?",
+                                actions=buttons,
+                            ):
                                 edit_choice_raw = cli_ui.ask_string(question)
                             edit_choice = (edit_choice_raw or "").strip().lower()
 
