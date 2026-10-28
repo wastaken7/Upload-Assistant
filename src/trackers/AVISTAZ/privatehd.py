@@ -500,7 +500,9 @@ class PrivateHD(AZTrackerBase):
             language_track = audio_tracks[0].get("language", "") if audio_tracks else ""
             if original_language and language_track:
                 # Filter to only have audio tracks that are in the original language
-                original_language_tracks = [track for track in audio_tracks if track.get("language", "").lower() == original_language.lower()]
+                # MediaInfo may tag regional variants (e.g. "en-US") while TMDB uses the bare code.
+                original_base = original_language.lower().split("-")[0]
+                original_language_tracks = [track for track in audio_tracks if track.get("language", "").lower().split("-")[0] == original_base]
 
                 # Now checks are only done on the original language track list
                 if original_language_tracks:

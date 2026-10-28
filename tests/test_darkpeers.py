@@ -235,6 +235,21 @@ def test_darkpeers_confirmed_folder_check_continues_to_evo_validation():
     assert asyncio.run(adapter.get_additional_checks(meta)) is False
 
 
+def test_darkpeers_video_language_rule_accepts_tmdb_iso_original_language():
+    meta = Meta(
+        category="MOVIE",
+        unattended=True,
+        audio_languages=["Arabic"],
+        subtitle_languages=["English", "German"],
+        original_language="ar",
+        resolution="1080p",
+        screens=3,
+    )
+
+    assert _additional_checks(meta) is True
+    assert DarkPeers._normalise_language("nb") == "norwegian bokmal"
+
+
 def test_darkpeers_book_language_is_unrestricted_but_author_is_required_unattended():
     portuguese = Meta(category="BOOK", unattended=True, author="Autor", publisher="Editora", type="EPUB", isbn="978-0-123456-47-2", book_language="Portuguese")
     no_author = Meta(category="BOOK", unattended=True, publisher="Editora", type="EPUB", isbn="978-0-123456-47-2")
