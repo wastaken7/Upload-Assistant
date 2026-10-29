@@ -394,7 +394,14 @@ class Cinematik(UNIT3D):
         if (not meta.unattended or (meta.unattended and meta.unattended_confirm)) and webui_events.editor_available():
             logger.info(f"{self.tracker}: Current description: {description}", extra={"markup": False})
             logger.info(f"{self.tracker}: [cyan]Do you want to edit or keep the description?[/cyan]")
-            edit_choice = cli_ui.ask_string("Enter 'e' to edit, or press Enter to keep it as is: ")
+            with webui_events.field_prompt(
+                "Tracker description",
+                {"Tracker": self.tracker, "Description": description[:1000]},
+                focus="Description",
+                hint="Do you want to edit or keep the description?",
+                actions=[("", "Keep it as is"), ("e", "Edit")],
+            ):
+                edit_choice = cli_ui.ask_string("Enter 'e' to edit, or press Enter to keep it as is: ")
 
             if (edit_choice or "").lower() == "e":
                 edited_description = cast(str | None, click.edit(description))  # pyrefly: ignore [bad-argument-type]

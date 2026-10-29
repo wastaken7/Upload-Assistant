@@ -13,7 +13,7 @@ def _check(video_encode: str, uhd: str = "") -> tuple[bool, list[str]]:
     tracker = BEYONDHD({"DEFAULT": {}, "TRACKERS": {"BEYONDHD": {}}})
     prompts: list[str] = []
 
-    def confirm(_meta: Meta, message: str) -> bool:
+    async def confirm(_meta: Meta, message: str) -> bool:
         prompts.append(message)
         return False
 
@@ -29,7 +29,7 @@ def _check(video_encode: str, uhd: str = "") -> tuple[bool, list[str]]:
     with (
         patch.object(tracker, "get_name", AsyncMock(return_value="Fictional Movie 2001 1080p BluRay Opus 2.0 x264-Example")),
         patch.object(tracker, "_confirm_or_skip", side_effect=confirm),
-        patch("src.trackers.beyondhd.Common.check_and_confirm_adult_media_upload", return_value=True),
+        patch("src.trackers.beyondhd.Common.check_and_confirm_adult_media_upload", AsyncMock(return_value=True)),
     ):
         result = asyncio.run(tracker.get_additional_checks(meta))
     return result, prompts

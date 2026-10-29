@@ -170,6 +170,9 @@ class CapybaraBR(UNIT3D):
         }
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
+        if meta.manual_name is not None:
+            return {"name": meta.manual_name.strip()}
+
         category = meta.category
         cbr_name = meta.name
         bioma_tag = "[BiOMA]" if "bioma" in (meta.tag or "").lower() and self.tracker == "CAPYBARABR" else ""

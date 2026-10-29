@@ -1,7 +1,11 @@
 # ruff: noqa: S101
 
 import asyncio
+import functools
+import json
 import os
+import random
+import sys
 from pathlib import Path
 from unittest.mock import AsyncMock
 
@@ -20,7 +24,8 @@ async def test_pesto_uses_stable_auth_password_flag(tmp_path: Path, monkeypatch)
     async def fake_check_binary(binary_name, *_args, **_kwargs):
         return binary_name
 
-    async def fake_run_pesto(cmd, cwd=None, env=None):
+    async def fake_run_pesto(cmd, cwd=None, env=None, episode_labels=None):
+        captured["episode_labels"] = episode_labels
         captured["cmd"] = cmd
         captured["cwd"] = cwd
         captured["env"] = env
@@ -55,6 +60,7 @@ async def test_pesto_uses_stable_auth_password_flag(tmp_path: Path, monkeypatch)
     assert isinstance(captured["env"], dict)
     assert Path(captured["config_root"]).parts[-2:] == ("usenet", "pesto-config")
     assert captured["archive_dir_exists"] is True
+    assert captured["episode_labels"] is None
     assert result == tmp_path / "tmp" / "release.mkv" / "release.nzb"
 
 
@@ -152,7 +158,8 @@ async def test_pesto_season_upload_collects_episode_and_optional_pack_nzbs(tmp_p
     async def fake_check_binary(binary_name, *_args, **_kwargs):
         return str(managed_7z) if binary_name == "7z" else binary_name
 
-    async def fake_run_pesto(cmd, cwd=None, env=None):
+    async def fake_run_pesto(cmd, cwd=None, env=None, episode_labels=None):
+        captured["episode_labels"] = episode_labels
         captured["cmd"] = cmd
         captured["cwd"] = cwd
         captured["env"] = env
@@ -227,6 +234,7 @@ async def test_pesto_season_upload_collects_episode_and_optional_pack_nzbs(tmp_p
     assert meta.usenet_pack_nzb_path == (str(output_dir / f"{season_dir.name}.nzb") if include_pack else None)
     assert [Path(path).name for path in meta.usenet_nzb_paths] == expected_names
     assert all(Path(path).is_file() for path in meta.usenet_nzb_paths)
+    assert captured["episode_labels"] == ["Show.S01E01.1080p.WEB-DL-GROUP", "Show.S01E02.1080p.WEB-DL-GROUP"]
 
 
 def test_pesto_season_entries_reject_top_level_sample_video(tmp_path: Path) -> None:
@@ -517,3 +525,187 @@ async def test_episode_screenshots_fail_when_not_all_are_hosted(tmp_path: Path, 
 
     with pytest.raises(RuntimeError, match="2/3 screenshots were captured"):
         await usenetcreate.prepare_usenet_episode_screenshots(meta, {"DEFAULT": {}})
+
+
+FIXTURES = Path(__file__).parent / "fixtures"
+
+
+def test_pesto_natural_cmp_matches_lexical_sort_crate() -> None:
+    expected = (FIXTURES / "pesto_natural_order.txt").read_text(encoding="utf-8").splitlines()
+    shuffled = expected[:]
+    random.Random(828).shuffle(shuffled)
+    assert sorted(shuffled, key=functools.cmp_to_key(usenetcreate.pesto_natural_cmp)) == expected
+
+
+def _season(tmp_path: Path, names: list[str]) -> Path:
+    season_dir = tmp_path / "Show.S01.1080p.WEB-DL-GROUP"
+    season_dir.mkdir()
+    for name in names:
+        (season_dir / name).write_bytes(b"x")
+    return season_dir
+
+
+def test_pesto_season_episode_labels_follow_pesto_order(tmp_path: Path) -> None:
+    season_dir = _season(tmp_path, ["Show.S01E10.mkv", "Show.S01E2.mkv", "show.s01e3.mkv"])
+    entries = usenetcreate.discover_pesto_season_entries(season_dir)
+    assert usenetcreate.pesto_season_episode_labels(season_dir, entries) == ["Show.S01E2", "show.s01e3", "Show.S01E10"]
+
+
+def test_pesto_season_episode_labels_hide_names_when_not_ascii(tmp_path: Path) -> None:
+    season_dir = _season(tmp_path, ["Show.S01E01.mkv", "Shōw.S01E02.mkv"])
+    entries = usenetcreate.discover_pesto_season_entries(season_dir)
+    assert usenetcreate.pesto_season_episode_labels(season_dir, entries) == ["", ""]
+
+
+def test_pesto_season_episode_labels_off_when_pesto_would_post_a_hidden_entry(tmp_path: Path) -> None:
+    season_dir = _season(tmp_path, ["Show.S01E01.mkv", ".hidden.mkv"])
+    entries = usenetcreate.discover_pesto_season_entries(season_dir)
+    assert usenetcreate.pesto_season_episode_labels(season_dir, entries) is None
+
+
+def test_pesto_season_episode_labels_ignore_entries_pesto_excludes(tmp_path: Path) -> None:
+    season_dir = _season(tmp_path, ["Show.S01E01.mkv", "._Show.S01E01.mkv", ".DS_Store", ".notes.txt"])
+    entries = usenetcreate.discover_pesto_season_entries(season_dir)
+    assert usenetcreate.pesto_season_episode_labels(season_dir, entries) == ["Show.S01E01"]
+
+
+def _labels(names: list[str], events: list[dict]) -> list[str]:
+    labeler = usenetcreate.PestoSeasonLabeler(names)
+    return [label for event in events if (label := labeler.on_event(event)) is not None]
+
+
+def test_labeler_names_each_episode_in_order() -> None:
+    events = [{"type": "started"}, {"type": "segment_done"}, {"type": "started"}, {"type": "check_progress"}, {"type": "started"}]
+    assert _labels(["E01", "E02", "E03"], events) == [
+        "Posting to Usenet [1/3] E01",
+        "Posting to Usenet [2/3] E02",
+        "Posting to Usenet [3/3] E03",
+    ]
+
+
+def test_labeler_shows_counts_only_for_unnamed_entries() -> None:
+    assert _labels(["", ""], [{"type": "started"}, {"type": "started"}]) == ["Posting to Usenet [1/2]", "Posting to Usenet [2/2]"]
+
+
+def test_labeler_marks_season_par2_after_its_status() -> None:
+    events = [
+        {"type": "started"},
+        {"type": "status", "text": "Uploading 4 season recovery volume(s)"},
+        {"type": "started"},
+    ]
+    assert _labels(["E01"], events) == ["Posting to Usenet [1/1] E01", "Posting to Usenet [season PAR2]"]
+
+
+def test_labeler_flags_an_unexpected_extra_entry() -> None:
+    assert _labels(["E01"], [{"type": "started"}, {"type": "started"}]) == ["Posting to Usenet [1/1] E01", "Posting to Usenet [2/?]"]
+
+
+def test_labeler_ignores_other_events() -> None:
+    events = [{"type": t} for t in ("segment_done", "par2_encode_started", "par2_encode_progress", "check_progress", "check_done", "finished", "nzb_written")]
+    events.append({"type": "status", "text": "something else"})
+    assert _labels(["E01"], events) == []
+
+
+def test_labeler_on_captured_pesto_stream() -> None:
+    lines = (FIXTURES / "pesto_season_dry_run.jsonl").read_text(encoding="utf-8").splitlines()
+    events = [json.loads(line) for line in lines if line.startswith("{")]
+    names = [f"Show.S01E0{n}.1080p.WEB-DL-GROUP" for n in (1, 2, 3)]
+    labels = _labels(names, events)
+    assert labels == [*_episode_start_labels(names), "Posting to Usenet [season PAR2]"]
+
+
+def _episode_start_labels(names: list[str]) -> list[str]:
+    return [f"Posting to Usenet [{n}/{len(names)}] {name}" for n, name in enumerate(names, start=1)]
+
+
+def _replay_cmd() -> list[str]:
+    script = "import sys; sys.stdout.write(open(sys.argv[1], encoding='utf-8').read())"
+    return [sys.executable, "-c", script, str(FIXTURES / "pesto_season_dry_run.jsonl")]
+
+
+async def _run_and_collect(**kwargs) -> list[dict]:
+    from src.webui_progress import clear_progress_callback, set_progress_callback
+
+    events: list[dict] = []
+    set_progress_callback(events.append)
+    try:
+        await usenetcreate.run_pesto_with_progress(_replay_cmd(), **kwargs)
+    finally:
+        clear_progress_callback()
+    for event in events:
+        event.pop("updated_at", None)
+    return events
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("episode_labels", [None, []])
+async def test_run_pesto_without_labels_matches_previous_events(episode_labels) -> None:
+    lines = (FIXTURES / "pesto_season_dry_run.progress.jsonl").read_text(encoding="utf-8").splitlines()
+    golden = [json.loads(line) for line in lines]
+    assert await _run_and_collect(episode_labels=episode_labels) == golden
+
+
+@pytest.mark.asyncio
+async def test_run_pesto_labels_each_episode_and_resets_progress() -> None:
+    names = [f"Show.S01E0{n}.1080p.WEB-DL-GROUP" for n in (1, 2, 3)]
+    events = await _run_and_collect(episode_labels=names)
+    upload = [e for e in events if e["id"] == "pesto-upload" and e["status"] == "running"]
+    starts = [e for e in upload if e.get("detail") == "Starting"]
+    assert [e["label"] for e in starts] == [*_episode_start_labels(names), "Posting to Usenet [season PAR2]"]
+    second = upload.index(starts[1])
+    assert upload[second - 1]["label"] == starts[0]["label"]
+    assert upload[second + 1]["label"] == starts[1]["label"]
+
+
+@pytest.mark.asyncio
+async def test_run_pesto_survives_a_failing_labeler(monkeypatch) -> None:
+    real_on_event = usenetcreate.PestoSeasonLabeler.on_event
+    labelled = False
+
+    def flaky(self, event):
+        nonlocal labelled
+        if labelled:
+            raise RuntimeError("labeler bug")
+        label = real_on_event(self, event)
+        labelled = label is not None
+        return label
+
+    warnings: list[str] = []
+    monkeypatch.setattr(usenetcreate.PestoSeasonLabeler, "on_event", flaky)
+    monkeypatch.setattr(usenetcreate.logger, "warning", lambda message, *args, **kwargs: warnings.append(str(message)))
+    events = await _run_and_collect(episode_labels=["E01", "E02", "E03"])
+    assert len(warnings) == 1
+    assert "labeler bug" in warnings[0]
+    upload = [e for e in events if e["id"] == "pesto-upload"]
+    first = next(i for i, e in enumerate(upload) if e["label"] == "Posting to Usenet [1/3] E01")
+    assert {e["label"] for e in upload[first + 1 :]} == {"Posting to Usenet"}
+    assert upload[-1]["status"] == "completed"
+
+
+@pytest.mark.asyncio
+async def test_run_pesto_escapes_labels_for_rich_markup(monkeypatch) -> None:
+    from rich.console import Console
+    from rich.progress import Progress
+
+    descriptions: list[str] = []
+    real_add_task, real_update = Progress.add_task, Progress.update
+
+    def add_task(self, description, *args, **kwargs):
+        descriptions.append(description)
+        return real_add_task(self, description, *args, **kwargs)
+
+    def update(self, task_id, *args, description=None, **kwargs):
+        if description is not None:
+            descriptions.append(description)
+        return real_update(self, task_id, *args, description=description, **kwargs)
+
+    monkeypatch.setattr(Progress, "add_task", add_task)
+    monkeypatch.setattr(Progress, "update", update)
+    names = ["[grp] Show.S01E01", "[grp] Show.S01E02", "[grp] Show.S01E03"]
+    events = await _run_and_collect(episode_labels=names)
+
+    rendered = [Console().render_str(description).plain for description in descriptions]
+    assert "Posting to Usenet [season PAR2]" in rendered
+    assert "Posting to Usenet [1/3] [grp] Show.S01E01" in rendered
+    starts = [e["label"] for e in events if e["id"] == "pesto-upload" and e.get("detail") == "Starting"]
+    assert starts == [*_episode_start_labels(names), "Posting to Usenet [season PAR2]"]

@@ -88,3 +88,77 @@ test("unknown identifiers never resolve through Object.prototype", () => {
     "UNKNOWN",
   ]);
 });
+
+/** Run the real bulk-selection handler with isolated selection and argument state. */
+function groupSelection(args, selectedNames, defaults = [], running = false) {
+  const scope = vm.createContext({
+    Set,
+    customArgs: args,
+    selectedTrackers: new Set(selectedNames),
+    defaultTrackers: new Set(defaults),
+    isExecuting: running,
+    updates: 0,
+  });
+  scope.setSelectedTrackers = (next) => {
+    scope.selectedTrackers = next;
+    scope.updates++;
+  };
+  scope.setCustomArgs = (update) => {
+    scope.customArgs = update(scope.customArgs);
+  };
+  for (const name of ["syncTrackersToArgs", "handleTrackerGroupSelection"]) {
+    const node = functions.get(name);
+    vm.runInContext(
+      `var ${name} = ${source.slice(node.start, node.end)}`,
+      scope,
+    );
+  }
+  return scope;
+}
+
+test("group selection changes only its supplied trackers and keeps other command options", () => {
+  const page = groupSelection('--debug --category movie -tk "ATH,ULCX"', [
+    "AITHER",
+    "ULCX",
+  ]);
+  const group = ["AITHER", "BLUTOPIA", "LST"];
+  page.handleTrackerGroupSelection(group, true);
+  assert.deepEqual([...page.selectedTrackers].sort(), [
+    "AITHER",
+    "BLUTOPIA",
+    "LST",
+    "ULCX",
+  ]);
+  assert.deepEqual(selected(page.customArgs), [
+    "AITHER",
+    "BLUTOPIA",
+    "LST",
+    "ULCX",
+  ]);
+  assert.ok(page.customArgs.includes("--debug --category movie"));
+  page.handleTrackerGroupSelection(group, false);
+  assert.deepEqual([...page.selectedTrackers], ["ULCX"]);
+  assert.deepEqual(selected(page.customArgs), ["ULCX"]);
+  assert.ok(page.customArgs.includes("--debug --category movie"));
+});
+
+test("bulk selection returns to defaults and explicitly represents selecting no trackers", () => {
+  const group = ["AITHER", "BLUTOPIA"];
+  const page = groupSelection("--debug -tk ATH", ["AITHER"], group);
+  page.handleTrackerGroupSelection(group, true);
+  assert.equal(page.customArgs, "--debug");
+  assert.deepEqual(selected(page.customArgs, group), group);
+  page.handleTrackerGroupSelection(group, false);
+  assert.equal(page.customArgs, '--debug -tk ""');
+  assert.deepEqual(selected(page.customArgs, group), []);
+});
+
+test("group controls cannot alter the upload selection during a run", () => {
+  const args = "--debug -tk AITHER";
+  const page = groupSelection(args, ["AITHER"], [], true);
+  page.handleTrackerGroupSelection(["AITHER", "BLUTOPIA"], true);
+  page.handleTrackerGroupSelection(["AITHER"], false);
+  assert.equal(page.updates, 0);
+  assert.equal(page.customArgs, args);
+  assert.deepEqual([...page.selectedTrackers], ["AITHER"]);
+});

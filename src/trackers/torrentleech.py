@@ -47,7 +47,7 @@ class TorrentLeech:
         self.session.headers.update({"User-Agent": f"Upload Assistant ({platform.system()} {platform.release()})"})
 
     async def get_additional_checks(self, meta: Meta) -> bool:
-        return self.common.check_and_confirm_adult_media_upload(meta, self.tracker)
+        return await self.common.check_and_confirm_adult_media_upload(meta, self.tracker)
 
     async def login(self, meta: Meta, force: bool = False) -> bool:
         if self.api_upload and not force:
@@ -210,6 +210,9 @@ class TorrentLeech:
         return [image["raw_url"] for image in images if image.get("raw_url")]
 
     async def get_name(self, meta: Meta) -> str:
+        if meta.manual_name is not None:
+            return meta.manual_name.strip()
+
         tl_name = meta.name.replace(meta.aka, "")
         return add_incomplete_pack_marker(re.sub(r"\s{2,}", " ", tl_name), meta, self.tracker)
 

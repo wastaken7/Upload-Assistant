@@ -172,7 +172,7 @@ class Zenith(UNIT3D):
                 logger.info(f"{self.tracker}: [bold red]Author '{meta.author}' is banned on {self.tracker}. Skipping upload...[/bold red]")
                 return False
 
-        return self.common.check_and_confirm_adult_media_upload(meta, self.tracker)
+        return await self.common.check_and_confirm_adult_media_upload(meta, self.tracker)
 
     async def get_search_urls(self, meta: Meta, request_params: ParamsList) -> list[tuple[str, ParamsList, bool]]:
         urls = await super().get_search_urls(meta, request_params)
@@ -184,6 +184,9 @@ class Zenith(UNIT3D):
         return urls
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
+        if meta.manual_name is not None:
+            return {"name": meta.manual_name.strip()}
+
         category = meta.category
         audiobook = meta.audiobook
 

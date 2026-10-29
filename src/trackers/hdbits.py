@@ -208,6 +208,9 @@ class HDBits:
         return tags
 
     async def get_name(self, meta: Meta) -> str:
+        if meta.manual_name is not None:
+            return meta.manual_name.strip()
+
         hdb_name = meta.name
         title = ""
         if meta.title and (hdb_name == meta.title or hdb_name.startswith(f"{meta.title} ")):

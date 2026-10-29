@@ -86,17 +86,22 @@ def test_unlisted_tracker_is_unchanged():
 
 
 @pytest.mark.asyncio
-async def test_iptorrents_post_upload_edit_preserves_marker():
+@pytest.mark.parametrize("overrides, expected", [
+    ({}, "Example.Show.S03.INCOMPLETE.1080p.DSNP.WEB-DL.DDP.5.1.H.264-TESTGROUP"),
+    ({"scene_name": "Example Show S03 1080p-Bluebird", "scene": True}, "Example Show S03 INCOMPLETE 1080p-BB [NO RAR]"),
+    ({"manual_name": "  Custom Show S03 WEBRip-Bluebird  "}, "Custom Show S03 WEBRip-Bluebird"),
+])
+async def test_iptorrents_post_upload_edit_preserves_release_name(overrides, expected):
     tracker = make_tracker("IPTORRENTS")
     await tracker.session.aclose()
     tracker.session = SimpleNamespace(post=AsyncMock(return_value=SimpleNamespace(status_code=302)))
     tracker.generate_description = AsyncMock(return_value="Description")
     tracker.get_is_freeleech = AsyncMock(return_value=False)
-    meta = make_meta(tracker_status={"IPTORRENTS": {"torrent_id": "123"}})
+    meta = make_meta(tracker_status={"IPTORRENTS": {"torrent_id": "123"}}, **overrides)
     data = await tracker.get_data(meta)
-    assert "S03 INCOMPLETE " in data["name"]
+    assert data["name"] == expected
     await tracker.edit_post_upload(meta)
-    assert "S03 INCOMPLETE " in tracker.session.post.call_args.kwargs["data"]["name"]
+    assert tracker.session.post.call_args.kwargs["data"]["name"] == expected
 
 
 @pytest.mark.asyncio

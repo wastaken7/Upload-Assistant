@@ -538,7 +538,23 @@ class QueueManager:
                     if not meta.unattended or (meta.unattended and meta.unattended_confirm):
                         logger.info("[yellow]Do you want to update the queue log, edit, discard, or keep the existing queue?[/yellow]")
                         question, buttons = webui_events.letter_prompt([("u", "update"), ("a", "add specific new files"), ("e", "edit"), ("d", "discard")], "keep it as is")
-                        with webui_events.answer_buttons(buttons):
+                        with webui_events.field_prompt(
+                            "Queue log",
+                            {
+                                "Queue": meta.queue,
+                                "Log file": str(log_file),
+                                "Total items": len(existing_queue),
+                                "Unprocessed": len(queued),
+                                "New files": f"{len(new_files)} ({', '.join(Path(f).name for f in sorted(new_files)[:5])}{'...' if len(new_files) > 5 else ''})"
+                                if new_files
+                                else None,
+                                "Removed files": f"{len(removed_files)} ({', '.join(Path(f).name for f in sorted(removed_files)[:5])}{'...' if len(removed_files) > 5 else ''})"
+                                if removed_files
+                                else None,
+                            },
+                            hint="Queue changes detected. Choose how to handle the existing queue log.",
+                            actions=buttons,
+                        ):
                             edit_choice_raw = cli_ui.ask_string(question)
                         edit_choice = (edit_choice_raw or "").strip().lower()
 
@@ -595,7 +611,17 @@ class QueueManager:
                     if not meta.unattended or (meta.unattended and meta.unattended_confirm):
                         logger.info("[yellow]Do you want to edit, discard, or keep the existing queue?[/yellow]")
                         question, buttons = webui_events.letter_prompt([("e", "edit"), ("d", "discard")], "keep it as is")
-                        with webui_events.answer_buttons(buttons):
+                        with webui_events.field_prompt(
+                            "Queue log",
+                            {
+                                "Queue": meta.queue,
+                                "Log file": str(log_file),
+                                "Total items": len(existing_queue),
+                                "Unprocessed": len(queued),
+                            },
+                            hint="No changes detected in the queue.",
+                            actions=buttons,
+                        ):
                             edit_choice_raw = cli_ui.ask_string(question)
                         edit_choice = (edit_choice_raw or "").strip().lower()
 
@@ -635,7 +661,13 @@ class QueueManager:
                 edit_choice = ""
                 if webui_events.editor_available():
                     logger.info("[cyan]Do you want to edit the initial queue before saving?[/cyan]")
-                    edit_choice_raw = cli_ui.ask_string("Enter 'e' to edit, or press Enter to save as is: ")
+                    with webui_events.field_prompt(
+                        "Queue log",
+                        {"Queue": meta.queue, "Log file": str(log_file), "Total items": len(queue)},
+                        hint="Do you want to edit the initial queue before saving?",
+                        actions=[("", "Save as is"), ("e", "Edit")],
+                    ):
+                        edit_choice_raw = cli_ui.ask_string("Enter 'e' to edit, or press Enter to save as is: ")
                     edit_choice = (edit_choice_raw or "").strip().lower()
 
                 if edit_choice == "e":

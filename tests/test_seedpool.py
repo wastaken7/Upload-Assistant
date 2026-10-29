@@ -134,7 +134,7 @@ def test_seedpool_music_without_genres_skips_unattended(tmp_path):
 
 
 def test_seedpool_music_without_genres_prompts_for_them(tmp_path, monkeypatch):
-    monkeypatch.setattr("src.trackers.UNIT3D.seedpool.cli_ui.ask_string", lambda *_args, **_kwargs: "Ambient, Chillwave")
+    monkeypatch.setattr("src.manual_input.cli_ui.ask_string", lambda *_args, **_kwargs: "Ambient, Chillwave")
     meta = _music_meta(tmp_path)
 
     assert asyncio.run(_tracker().get_additional_checks(meta)) is True
@@ -142,6 +142,6 @@ def test_seedpool_music_without_genres_prompts_for_them(tmp_path, monkeypatch):
 
 
 def test_seedpool_music_without_genres_rejects_empty_prompt(tmp_path, monkeypatch):
-    monkeypatch.setattr("src.trackers.UNIT3D.seedpool.cli_ui.ask_string", lambda *_args, **_kwargs: "")
+    monkeypatch.setattr("src.manual_input.cli_ui.ask_string", lambda *_args, **_kwargs: "")
 
     assert asyncio.run(_tracker().get_additional_checks(_music_meta(tmp_path))) is False

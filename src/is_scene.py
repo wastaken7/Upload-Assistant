@@ -15,6 +15,7 @@ from bs4 import BeautifulSoup
 from bs4.element import AttributeValueList
 from rich.markup import escape
 
+from src import webui_events
 from src.console import logger, prompt_in_thread
 from src.meta import Meta
 from src.stats import record_event_async
@@ -197,11 +198,16 @@ class SceneManager:
         if meta.unattended and not meta.unattended_confirm:
             raise SceneFileMismatchError(f"{message} Run with interactive confirmation to review them.")
         try:
-            approved = await prompt_in_thread(
-                cli_ui.ask_yes_no,
-                f"SRRDB: Continue with '{Path(video).name}' despite the filename or file size differences shown above?",
-                default=False,
-            )
+            with webui_events.field_prompt(
+                "srrDB mismatch",
+                {"Release": release, "Local file": Path(video).name},
+                hint="The local filename or file size differs from the archived srrDB entry.",
+            ):
+                approved = await prompt_in_thread(
+                    cli_ui.ask_yes_no,
+                    f"SRRDB: Continue with '{Path(video).name}' despite the filename or file size differences shown above?",
+                    default=False,
+                )
         except EOFError as e:
             raise SceneFileMismatchError(message) from e
         if not approved:

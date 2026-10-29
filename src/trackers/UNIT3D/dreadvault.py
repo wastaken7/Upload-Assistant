@@ -2,10 +2,9 @@
 import re
 from typing import Any, cast
 
-import cli_ui
-
 from src.console import logger
 from src.languages import languages_manager
+from src.manual_input import confirm_override
 from src.meta import Meta
 from src.trackers.common import Common
 from src.trackers.UNIT3D import UNIT3D
@@ -96,6 +95,9 @@ class DreadVault(UNIT3D):
         self.common = Common(config)
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
+        if meta.manual_name is not None:
+            return {"name": meta.manual_name.strip()}
+
         dreadvault_name: str = meta.name
         resolution: str = meta.resolution if meta.resolution != "OTHER" else ""
         video_encode: str = meta.video_encode
@@ -211,26 +213,16 @@ class DreadVault(UNIT3D):
         # substring per term: the horror signal is often a compound keyword
         searchable = {term.lower() for term in [*combined_genres, *meta.keywords]}
         if not any("horror" in term for term in searchable):
-            if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                logger.info(f"{self.tracker}: [bold red]Only horror content is allowed at {self.tracker}.[/bold red]")
-                if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
-                    pass
-                else:
-                    return False
-            else:
+            logger.info(f"{self.tracker}: [bold red]Only horror content is allowed at {self.tracker}.[/bold red]")
+            if not await confirm_override(meta):
                 return False
 
         genres = ", ".join([*meta.keywords, *combined_genres])
         # only terms that never appear as TMDB keywords on legitimate horror
         adult_keywords = ["xxx", "porn", "adult", "hentai", "softcore"]
         if any(re.search(rf"(^|,\s*){re.escape(keyword)}(\s*,|$)", genres, re.IGNORECASE) for keyword in adult_keywords):
-            if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                logger.info(f"{self.tracker}: [bold red]Porn/xxx is not allowed at {self.tracker}.[/bold red]")
-                if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
-                    pass
-                else:
-                    return False
-            else:
+            logger.info(f"{self.tracker}: [bold red]Porn/xxx is not allowed at {self.tracker}.[/bold red]")
+            if not await confirm_override(meta):
                 return False
 
-        return self.common.check_and_confirm_adult_media_upload(meta, self.tracker)
+        return await self.common.check_and_confirm_adult_media_upload(meta, self.tracker)

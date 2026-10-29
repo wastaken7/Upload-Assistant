@@ -17,6 +17,7 @@ from src import webui_events
 from src.audio import AudioManager
 from src.console import logger
 from src.languages import languages_manager
+from src.manual_input import Question, ask, has_answer
 from src.meta import Meta
 from src.trackers.common import Common
 from src.trackers.UNIT3D import UNIT3D
@@ -93,6 +94,9 @@ class ShareIsland(UNIT3D):
         - Release group tag cleaning and validation
         - DISC region injection
         """
+        if meta.manual_name is not None:
+            return {"name": meta.manual_name.strip()}
+
         if not meta.language_checked:
             await languages_manager.process_desc_language(meta, tracker=self.tracker)
 
@@ -290,20 +294,22 @@ class ShareIsland(UNIT3D):
             region_name = meta.region_overrides.get(self.tracker, meta.region)
 
             # Prompt for region if not in meta
-            if not region_name and (not meta.unattended or meta.unattended_confirm):
-                while True:
-                    with webui_events.field_prompt(
-                        "Disc region",
-                        {"Disc": meta.is_disc, "Release": meta.name, "Region": ""},
-                        focus="Region",
+            if not region_name:
+                region_name = await ask(
+                    meta,
+                    Question(
+                        key="shareisland.region",
+                        kind="text",
+                        prompt="ShareIsland: Region code not found for disc. Please enter it manually (mandatory)",
+                        title="Disc region",
                         hint="Required: the disc's region code, as listed on the tracker.",
                         placeholder="e.g. USA",
-                    ):
-                        region_name = cli_ui.ask_string("ShareIsland: Region code not found for disc. Please enter it manually (mandatory): ")
-                    region_name = region_name.strip().upper() if region_name else None
-                    if region_name:
-                        break
-                    logger.info(f"{self.tracker}: Region code is required.", extra={"markup": False})
+                        summary={"Disc": meta.is_disc, "Release": meta.name, "Region": ""},
+                        focus="Region",
+                        unattended="fail",
+                    ),
+                )
+                region_name = region_name.upper() if region_name else None
 
             # Validate region name was provided
             if not region_name:
@@ -321,10 +327,21 @@ class ShareIsland(UNIT3D):
             # Handle optional distributor
             distributor_name = meta.distributor
             distributor_id = None
-            if not distributor_name and not meta.unattended:
-                with webui_events.answer_buttons([("", "Skip")]):
-                    distributor_name = cli_ui.ask_string("ShareIsland: Distributor (optional, Enter to skip): ")
-                distributor_name = distributor_name.strip().upper() if distributor_name else None
+            if not distributor_name and (not meta.unattended or has_answer(meta, "shareisland.distributor")):
+                distributor_name = await ask(
+                    meta,
+                    Question(
+                        key="shareisland.distributor",
+                        kind="text",
+                        prompt="ShareIsland: Distributor (optional, Enter to skip)",
+                        title="Disc distributor",
+                        hint="Optional: the disc's distributor, as listed on the tracker. Leave it blank to skip.",
+                        summary={"Disc": meta.is_disc, "Release": meta.name, "Region": region_name, "Distributor": ""},
+                        focus="Distributor",
+                        empty_ok=True,
+                    ),
+                )
+                distributor_name = distributor_name.upper() if distributor_name else None
 
             if distributor_name:
                 distributor_id = await self.common.unit3d_distributor_ids(distributor_name, tracker=self.tracker)

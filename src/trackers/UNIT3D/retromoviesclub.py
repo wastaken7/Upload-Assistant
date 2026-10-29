@@ -195,6 +195,9 @@ class RetroMoviesClub(UNIT3D):
         return {"mod_queue_opt_in": await self.get_flag(meta, "modq")}
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
+        if meta.manual_name is not None:
+            return {"name": meta.manual_name.strip()}
+
         name = meta.name or ""
         aka = meta.aka.strip()
         if aka:

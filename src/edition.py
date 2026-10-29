@@ -207,7 +207,11 @@ async def get_edition(video: str, bdinfo: dict[str, Any] | None, filelist: list[
 
                             try:
                                 labels = [f"{ed['name']} ({ed['display_name']}, diff: {ed['difference']:.2f} seconds)" for ed in playlist_matching_editions]
-                                with webui_events.numbered_options(labels, actions=[("e", "Use the playlist edition"), ("", "Use the closest match")]):
+                                with webui_events.numbered_options(
+                                    labels,
+                                    actions=[("e", "Use the playlist edition"), ("", "Use the closest match")],
+                                    hint=f"Playlist {playlist_file} ({formatted_duration}, edition: {playlist_edition or 'none'}) matches multiple IMDb editions.",
+                                ):
                                     choice = (
                                         await prompt_in_thread(
                                             cli_ui.ask_string,

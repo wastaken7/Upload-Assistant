@@ -1,6 +1,8 @@
 # Upload Assistant © 2026 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
 import contextlib
+import fnmatch
+import functools
 import hashlib
 import json
 import os
@@ -17,6 +19,7 @@ import aiofiles
 import aiofiles.os
 import aiofiles.ospath
 import psutil
+from rich.markup import escape
 from rich.progress import BarColumn, TaskID, TaskProgressColumn, TextColumn
 
 from src.console import console, logger, progress_display
@@ -72,6 +75,84 @@ def discover_pesto_season_entries(source_root: Path) -> dict[str, Path]:
     if not entries:
         raise ValueError("Pesto season mode did not find any SxxExx episode entries in the season root")
     return entries
+
+
+PESTO_DEFAULT_EXCLUDES = (".DS_Store", "._*", ".fuse_hidden*", ".Spotlight-V100", ".Trashes", ".fseventsd", "Thumbs.db", "ehthumbs.db", "desktop.ini", "@eaDir")
+
+
+def pesto_natural_cmp(left: str, right: str) -> int:
+    """Compare ASCII names the way Pesto orders season entries (lexical-sort 0.3.1 natural_lexical_cmp)."""
+    a, b = left.lower(), right.lower()
+    i = j = 0
+    while i < len(a) and j < len(b):
+        if "0" <= a[i] <= "9" and "0" <= b[j] <= "9":
+            start_a, start_b = i, j
+            while i < len(a) and j < len(b) and "0" <= a[i] <= "9" and "0" <= b[j] <= "9":
+                i += 1
+                j += 1
+            more_a = i < len(a) and "0" <= a[i] <= "9"
+            more_b = j < len(b) and "0" <= b[j] <= "9"
+            if more_a != more_b:
+                return 1 if more_a else -1
+            number_a, number_b = int(a[start_a:i]), int(b[start_b:j])
+            if number_a != number_b:
+                return -1 if number_a < number_b else 1
+            continue
+        if a[i] != b[j]:
+            if a[i].isalnum() == b[j].isalnum():
+                return -1 if a[i] < b[j] else 1
+            return 1 if a[i].isalnum() else -1
+        i += 1
+        j += 1
+    if i < len(a):
+        return 1
+    if j < len(b):
+        return -1
+    return (left > right) - (left < right)
+
+
+def pesto_season_episode_labels(source_root: Path, entries: dict[str, Path]) -> list[str] | None:
+    """Return episode stems in Pesto's posting order, or None when Pesto would post entries UA skipped."""
+    for entry in source_root.iterdir():
+        if not entry.name.startswith(".") or any(fnmatch.fnmatchcase(entry.name, pattern) for pattern in PESTO_DEFAULT_EXCLUDES):
+            continue
+        if entry.is_dir() or entry.suffix.lower() in VIDEO_EXTENSIONS:
+            return None
+    ordered = sorted(entries.items(), key=functools.cmp_to_key(lambda left, right: pesto_natural_cmp(left[1].name, right[1].name)))
+    if not all(path.name.isascii() for _, path in ordered):
+        return [""] * len(ordered)
+    return [stem for stem, _ in ordered]
+
+
+PESTO_UPLOAD_LABEL = "Posting to Usenet"
+PESTO_SEASON_PAR2_STATUS = re.compile(r"Uploading \d+ season recovery volume\(s\)")
+
+
+class PestoSeasonLabeler:
+    """Turn a ``pesto --season`` JSON event stream into per-episode progress labels."""
+
+    def __init__(self, names: list[str]) -> None:
+        self._names = names
+        self._started = 0
+        self._season_par2 = False
+
+    def on_event(self, event: dict[str, Any]) -> str | None:
+        """Return the new upload label when ``event`` starts another entry, otherwise None."""
+        etype = event.get("type")
+        if etype == "status" and PESTO_SEASON_PAR2_STATUS.fullmatch(str(event.get("text", "")).strip()):
+            self._season_par2 = True
+            return None
+        if etype != "started":
+            return None
+        if self._season_par2:
+            return f"{PESTO_UPLOAD_LABEL} [season PAR2]"
+        self._started += 1
+        total = len(self._names)
+        if self._started > total:
+            logger.debug(f"[yellow]Pesto started entry {self._started}, but UA expected {total}.[/yellow]")
+            return f"{PESTO_UPLOAD_LABEL} [{self._started}/?]"
+        name = self._names[self._started - 1]
+        return f"{PESTO_UPLOAD_LABEL} [{self._started}/{total}] {name}" if name else f"{PESTO_UPLOAD_LABEL} [{self._started}/{total}]"
 
 
 async def build_usenet_indexer_metas(
@@ -715,7 +796,7 @@ def _redact_pesto_command(cmd: list[str]) -> str:
     return _redact_command(cmd, {"-p", "--proxy", "-u", "--username", "--auth-password", "--password", "--nzb-password"})
 
 
-async def run_pesto_with_progress(cmd: list[str], cwd: str | None = None, env: dict[str, str] | None = None) -> None:
+async def run_pesto_with_progress(cmd: list[str], cwd: str | None = None, env: dict[str, str] | None = None, episode_labels: list[str] | None = None) -> None:
     """Execute pesto upload consuming its JSON event stream for progress reporting."""
     redacted_str = _redact_pesto_command(cmd)
 
@@ -723,7 +804,7 @@ async def run_pesto_with_progress(cmd: list[str], cwd: str | None = None, env: d
     logger.debug(f"[cyan]Running command: {redacted_str}{cwd_str}[/cyan]")
 
     try:
-        publish_progress("pesto-upload", "Posting to Usenet", current=0, total=100, detail="Starting pesto upload")
+        publish_progress("pesto-upload", PESTO_UPLOAD_LABEL, current=0, total=100, detail="Starting pesto upload")
         process = await asyncio.create_subprocess_exec(
             *cmd,
             stdout=asyncio.subprocess.PIPE,
@@ -761,6 +842,8 @@ async def run_pesto_with_progress(cmd: list[str], cwd: str | None = None, env: d
         # overwritten line, so they don't stomp on each other visually.
         tasks: dict[str, TaskID] = {}
         check_done_seen = False
+        labeler = PestoSeasonLabeler(episode_labels) if episode_labels else None
+        upload_label = PESTO_UPLOAD_LABEL
         with progress_display(
             TextColumn("[progress.description]{task.description}"),
             BarColumn(),
@@ -779,16 +862,32 @@ async def run_pesto_with_progress(cmd: list[str], cwd: str | None = None, env: d
                 try:
                     event = json.loads(line)
                     etype = event.get("type")
+                    if labeler is not None:
+                        try:
+                            new_label = labeler.on_event(event)
+                        except Exception as e:
+                            logger.warning(f"[yellow]Pesto season progress labels disabled: {e}[/yellow]")
+                            labeler = None
+                            upload_label = PESTO_UPLOAD_LABEL
+                            if "upload" in tasks:
+                                progress.update(tasks["upload"], description=escape(upload_label))
+                        else:
+                            if new_label is not None:
+                                upload_label = new_label
+                                if "upload" not in tasks:
+                                    tasks["upload"] = progress.add_task(escape(upload_label), total=100)
+                                progress.update(tasks["upload"], description=escape(upload_label), completed=0)
+                                publish_progress("pesto-upload", upload_label, current=0, total=100, detail="Starting")
                     if etype == "segment_done":
                         pct = float(event.get("progress_pct", 0))
                         if "upload" not in tasks:
-                            tasks["upload"] = progress.add_task("Posting to Usenet", total=100)
+                            tasks["upload"] = progress.add_task(escape(upload_label), total=100)
                         progress.update(tasks["upload"], completed=pct)
                         check_expected_total = event.get("total_segments", check_expected_total)
                         total_segments = int(event.get("total_segments", 0) or 0)
                         done_segments = int(event.get("segment_done", 0) or 0)
                         detail = f"{done_segments}/{total_segments} segments posted" if total_segments else ""
-                        publish_progress("pesto-upload", "Posting to Usenet", current=pct, total=100, detail=detail)
+                        publish_progress("pesto-upload", upload_label, current=pct, total=100, detail=detail)
                     elif etype == "status":
                         text = event.get("text", "").strip()
                         if text:
@@ -889,7 +988,7 @@ async def run_pesto_with_progress(cmd: list[str], cwd: str | None = None, env: d
         if result == 0:
             if "upload" in tasks:
                 progress.update(tasks["upload"], completed=100)
-                complete_progress("pesto-upload", "Posting to Usenet", current=100, total=100)
+                complete_progress("pesto-upload", upload_label, current=100, total=100)
             if "par2_encode" in tasks:
                 task_data = progress.tasks[tasks["par2_encode"]]
                 complete_progress(
@@ -921,7 +1020,7 @@ async def run_pesto_with_progress(cmd: list[str], cwd: str | None = None, env: d
                 )
         else:
             if "upload" in tasks:
-                publish_progress("pesto-upload", "Posting to Usenet", current=0, total=100, detail=f"Pesto exited with status code {result}", status="failed")
+                publish_progress("pesto-upload", upload_label, current=0, total=100, detail=f"Pesto exited with status code {result}", status="failed")
             if "par2_encode" in tasks:
                 task_data = progress.tasks[tasks["par2_encode"]]
                 publish_progress(
@@ -1277,12 +1376,14 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
     prepared_files = meta.get("usenet_prepared_files", [])
     use_prepared_files = not skip_archive and isinstance(prepared_files, list) and bool(prepared_files) and all(Path(str(file_path)).is_file() for file_path in prepared_files)
 
+    episode_labels: list[str] | None = None
     if pesto_season_upload:
         # Pesto must see the season directory itself so it can treat each
         # top-level entry as an episode. UA's normal whole-release archive
         # would collapse that structure into one upload.
         upload_root = Path(input_path)
         season_entries = discover_pesto_season_entries(upload_root)
+        episode_labels = pesto_season_episode_labels(upload_root, season_entries)
         cleanup_upload_root = False
         upload_files = [upload_root]
         if volume_size and str(volume_size).lower() == "auto":
@@ -1625,7 +1726,12 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
             post_started = time.monotonic()
             try:
                 async with resource_slot("usenet-post", "Usenet posting"):
-                    await run_pesto_with_progress(cmd_pesto, cwd=str(upload_root), env=pesto_env)
+                    await run_pesto_with_progress(
+                        cmd_pesto,
+                        cwd=str(upload_root),
+                        env=pesto_env,
+                        episode_labels=episode_labels,
+                    )
                 nntp_duration_ms = (time.monotonic() - post_started) * 1000
             except Exception:
                 # pesto writes the NZB to --out before it knows the post-check

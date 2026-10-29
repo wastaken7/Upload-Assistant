@@ -333,8 +333,10 @@ uv tool install --force git+https://github.com/wastaken7/Upload-Assistant.git
 | <img src="web_ui/static/img/trackers/darkpeers.png" width="16" height="16" />                 | DarkPeers              | DARKPEERS              | MOVIE, TV, BOOK, GAME, MUSIC |
 | <img src="web_ui/static/img/trackers/desitorrents.png" width="16" height="16" />              | DesiTorrents           | DESITORRENTS           | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/digitalcore.png" width="16" height="16" />               | DigitalCore            | DIGITALCORE            | MOVIE, TV, BOOK, GAME, MUSIC |
+| <img src="web_ui/static/img/trackers/dirtybytes.png" width="16" height="16" />                | DirtyBytes             | DIRTYBYTES             | XXX                          |
 | <img src="web_ui/static/img/trackers/dreadvault.png" alt="" width="16" height="16" />         | DreadVault             | DREADVAULT             | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/emuwarez.png" alt="" width="16" height="16" />           | eMuwarez               | EMUWAREZ               | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/exoticaz.png" width="16" height="16" />                  | ExoticaZ               | EXOTICAZ               | XXX                          |
 | <img src="web_ui/static/img/trackers/filelist.png" width="16" height="16" />                  | FileList               | FILELIST               | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/flood.png" width="16" height="16" />                     | Flood                  | FLOOD                  | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/funfile.png" width="16" height="16" />                   | FunFile                | FUNFILE                | MOVIE, TV                    |
@@ -403,7 +405,7 @@ uv tool install --force git+https://github.com/wastaken7/Upload-Assistant.git
 | <img src="web_ui/static/img/trackers/vultu.png" width="16" height="16" />                     | vultu                  | VULTU                  | MOVIE, TV, GAME              |
 | <img src="web_ui/static/img/trackers/yuscene.png" width="16" height="16" />                   | YUSCENE                | YUSCENE                | MOVIE, TV, BOOK, GAME, MUSIC |
 | <img src="web_ui/static/img/trackers/zenith.png" width="16" height="16" />                    | Zenith                 | ZENITH                 | MOVIE, TV, BOOK, GAME, MUSIC |
-| <img src="web_ui/static/img/trackers/zmpt.png" width="16" height="16" />                      | ZmPT (织梦)             | ZMPT                   | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/zmpt.png" width="16" height="16" />                      | ZmPT (织梦)            | ZMPT                   | MOVIE, TV                    |
 
 </details>
 

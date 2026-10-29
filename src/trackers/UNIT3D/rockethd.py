@@ -3,11 +3,11 @@ import re
 from pathlib import Path
 from typing import Any, cast
 
-import cli_ui
 import pycountry
 
-from src.console import logger, prompt_in_thread
+from src.console import logger
 from src.languages import languages_manager
+from src.manual_input import confirm_override
 from src.meta import Meta
 from src.trackers.common import Common
 from src.trackers.UNIT3D import UNIT3D
@@ -190,6 +190,9 @@ class RocketHD(UNIT3D):
         """
         Rebuild release name from meta components following RocketHD naming rules.
         """
+        if meta.manual_name is not None:
+            return {"name": meta.manual_name.strip()}
+
         if not meta.language_checked:
             await languages_manager.process_desc_language(meta, tracker=self.tracker)
 
@@ -349,26 +352,26 @@ class RocketHD(UNIT3D):
         basename_up = [tok for tok in re.split(r"[\.\s_-]+", str(basename).upper()) if tok]
         if any(x in basename_up for x in prohib_markers):
             logger.info(f"{self.tracker}: [bold red]Uploading MIC, CAM, TS or LD releases, is prohibited[/bold red]")
-            if meta.unattended or not await prompt_in_thread(cli_ui.ask_yes_no, "Do you want to upload anyway?", default=False):
+            if not await confirm_override(meta):
                 return False
 
         # Uploading upscaled releases is prohibited. Exception: The release is from a group on the upscale whitelist
         if "UPSCALE" in basename_up:
             logger.info(f"{self.tracker}: [bold red]Uploading upscaled releases is prohibited, unless the group is is whitelisted {self.base_url}/wikis/17[/bold red]")
-            if meta.unattended or not await prompt_in_thread(cli_ui.ask_yes_no, "Do you want to upload anyway?", default=False):
+            if not await confirm_override(meta):
                 return False
 
         # Uploading SD content is not allowed. Exception: No HD version exists. Check release databases beforehand to ensure an HD version doesn't exist
         if meta.resolution in ["384p", "480p", "480i", "540p", "576p", "576i"]:
             logger.info(f"{self.tracker}: [bold red]Uploading SD releases is not allowed on {self.tracker}, unless no HD version exists.[/bold red]")
             logger.info(f"{self.tracker}: [bold red]Please check release databases beforehand to be sure.[/bold red]")
-            if meta.unattended or not await prompt_in_thread(cli_ui.ask_yes_no, "Do you want to upload anyway?", default=False):
+            if not await confirm_override(meta):
                 return False
 
         # Uploads must contain a German audio track. Exception: The release was requested in its original language.
         if not self._has_german_audio(meta):
             logger.info(f"{self.tracker}: [bold red]Uploads must contain a German audio track, unless the release was requested in its original language.[/bold red]")
-            if meta.unattended or not await prompt_in_thread(cli_ui.ask_yes_no, "Do you want to upload anyway?", default=False):
+            if not await confirm_override(meta):
                 return False
 
         # check for samples, proofs, and images in the upload directory
@@ -378,6 +381,6 @@ class RocketHD(UNIT3D):
             for file in filelist
         ):
             logger.info(f"{self.tracker}: [bold red]Uploads containing samples, proofs, and images are prohibited.[/bold red]")
-            if meta.unattended or not await prompt_in_thread(cli_ui.ask_yes_no, "Do you want to upload anyway?", default=False):
+            if not await confirm_override(meta):
                 return False
         return True

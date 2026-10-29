@@ -1,8 +1,12 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import re
+import unicodedata
 from contextlib import suppress
 from pathlib import Path
 from typing import Any, ClassVar
+
+import langcodes
+from langcodes.tag_parser import LanguageTagError
 
 from src.console import logger
 from src.get_desc import DescriptionBuilder
@@ -234,7 +238,17 @@ class DarkPeers(TmdbTvNaming, UNIT3D):
     def _normalise_language(cls, value: Any) -> str:
         language = re.sub(r"\s+", " ", str(value or "").strip().casefold())
         language = re.sub(r"\s*\([^)]*\)", "", language).strip()
-        return cls._LANGUAGE_ALIASES.get(language, language)
+        if language in cls._LANGUAGE_ALIASES:
+            return cls._LANGUAGE_ALIASES[language]
+        # TMDB stores original_language as an ISO code (e.g. "ar"), while MediaInfo yields names.
+        if re.fullmatch(r"[a-z]{2,3}", language):
+            try:
+                name = str(langcodes.Language.get(language).language_name("en"))
+            except LanguageTagError:
+                name = ""
+            if name and not name.startswith("Unknown"):
+                language = name.casefold()
+        return unicodedata.normalize("NFKD", language).encode("ascii", "ignore").decode()
 
     @classmethod
     def _languages(cls, value: list[str] | str | None) -> set[str]:
@@ -427,6 +441,9 @@ class DarkPeers(TmdbTvNaming, UNIT3D):
         return f"{next(iter(other)).title()} MULTi" if len(other) == 1 and len(audio) == 2 else "SKIPPED"
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
+        if meta.manual_name is not None:
+            return {"name": meta.manual_name.strip()}
+
         if meta.category == "MUSIC":
             return {"name": self._music_name(meta)}
 
