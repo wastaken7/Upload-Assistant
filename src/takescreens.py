@@ -1695,15 +1695,19 @@ def _lone_image_clip(page: Any) -> tuple[Any, float] | None:
     """
     import fitz  # PyMuPDF
 
-    if page.get_text().strip():
+    if page.get_text().strip() or page.first_annot:
         return None
     images = page.get_image_info()
     if len(images) != 1:
         return None
-    clip = fitz.Rect(images[0]["bbox"]) & page.rect
+    # Image and drawing boxes are unrotated page coordinates; get_pixmap clips in rotated ones.
+    bbox = fitz.Rect(images[0]["bbox"])
+    if any(not bbox.contains(drawing["rect"]) for drawing in page.get_drawings()):
+        return None
+    clip = bbox * page.rotation_matrix & page.rect
     if clip.is_empty or clip.get_area() >= page.rect.get_area() / 2:
         return None
-    return clip, min(images[0]["width"] / clip.width, images[0]["height"] / clip.height)
+    return clip, min(images[0]["width"] / bbox.width, images[0]["height"] / bbox.height)
 
 
 def _render_document_page(doc: Any, page_num: int, dest_stem: Path, suffix: str = ".png") -> Path:
