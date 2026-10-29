@@ -91,7 +91,7 @@ def test_search_existing_uses_dupe_preflight(monkeypatch: pytest.MonkeyPatch) ->
             "size": 10,
             "files": [],
             "file_count": 1,
-            "link": "https://dirtybytes.net/torrent/4/",
+            "link": "https://dirtybytes.net/torrent/4",
             "download": "https://dirtybytes.net/api/v1/torrents/download/4",
         }
     ]

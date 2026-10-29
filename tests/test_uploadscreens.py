@@ -145,9 +145,9 @@ def test_upload_screens_skips_sources_hosted_by_a_previous_run(tmp_path: Path) -
     async def fake_upload(args: object) -> dict[str, str]:
         image = str(args[0]) if isinstance(args, list) else ""
         calls.append(image)
-        # Hosts rename uploads, so the URL does not reveal the source file.
+        # Hosts rename uploads, and some do not report the source file either.
         url = f"https://img.example/file-upload{len(calls)}{Path(image).suffix}"
-        return {"status": "success", "img_url": url, "raw_url": url, "web_url": url, "local_file_path": image}
+        return {"status": "success", "img_url": url, "raw_url": url, "web_url": url}
 
     async def exercise() -> None:
         sheet = tmp_path / "sheet.webp"

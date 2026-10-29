@@ -1013,6 +1013,8 @@ async def _upload_screens(
                         running_tasks.discard(future)
 
                         if result.get("status") == "success":
+                            # Not every host branch reports its source, and reruns need it.
+                            result.setdefault("local_file_path", str(task_args[0]))
                             if not using_custom_img_list:
                                 uploaded_image_files = return_dict.setdefault("_uploaded_image_files", set())
                                 if isinstance(uploaded_image_files, set):

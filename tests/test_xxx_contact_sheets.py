@@ -149,6 +149,12 @@ async def test_xxx_single_file_screens_stay_fixed_across_reruns(tmp_path, monkey
     assert meta.screens == 3
     assert len(manifest_files(meta.base_dir, meta.uuid, "main")) == 3
 
+    # Rehosting can still top up frames it has to replace.
+    await takescreens.xxx_contact_sheets([str(video)], meta.uuid, meta.base_dir, meta, extra_screens=2)
+
+    assert requested[-1] == 5
+    assert meta.screens == 5
+
 
 @pytest.mark.asyncio
 async def test_xxx_fallback_cover_uses_a_video_frame(tmp_path, monkeypatch):
