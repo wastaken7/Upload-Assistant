@@ -192,8 +192,8 @@ async def xxx_contact_sheets(paths: list[str], folder_id: str, base_dir: str, me
         sheets = [str(path) for path in registered]
     normal_screens = xxx_single_file_screens()
     if len(video_paths) == 1 and normal_screens:
-        existing_in_group = len(manifest_files(base_dir, folder_id, capture_group))
-        screens_to_request = max(0, normal_screens + existing_in_group)
+        # A fixed target keeps reruns from adding one more frame every time.
+        screens_to_request = len(sheets) + normal_screens
         await screenshots(
             str(video_paths[0]), video_paths[0].name, folder_id, base_dir, meta, screens_to_request, False, cleanup_after_capture=False, capture_group=capture_group
         )
