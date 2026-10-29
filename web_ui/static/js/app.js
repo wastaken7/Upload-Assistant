@@ -717,6 +717,12 @@ const argumentSections = [
       { flag: "--only-if-languages", placeholder: "en,fr" },
       { flag: "--poster", placeholder: "URL_OR_PATH", path: "file" },
       { flag: "--banner", placeholder: "URL_OR_PATH", path: "file" },
+      {
+        flag: "--answer",
+        placeholder: "KEY=VALUE",
+        description:
+          "Answer a question the upload would ask, e.g. game.subcategory=dlc (--answer help lists the keys)",
+      },
     ],
   },
   {

@@ -5,6 +5,7 @@ import io
 import json
 import platform
 import re
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, ClassVar, cast
 from urllib.parse import urlparse
@@ -22,6 +23,7 @@ from src.console import logger, prompt_in_thread
 from src.cookie_auth import CookieValidator
 from src.exceptions import *  # noqa F403
 from src.exceptions import UploadError
+from src.manual_input import Question, ask, choices_from
 from src.mediainfo import MediaInfo
 from src.meta import Meta
 from src.rehostimages import ImageHostPolicy, RehostImagesManager
@@ -32,6 +34,14 @@ from src.torrent_policy import PASSTHEPOPCORN_POLICY
 from src.tracker_images import get_tracker_image_collection
 from src.trackers.common import Common
 from src.uploadscreens import UploadScreensManager
+
+TRUMPABLE_LABELS = {
+    "hc_full": "English Hardcoded Subs (Full)",
+    "hc_forced": "English Hardcoded Subs (Forced)",
+    "no_english_subs": "No English Subs",
+    "softsubs_mislabeled": "English Softsubs Exist (Mislabeled)",
+    "hc_non_english": "Hardcoded Subs (Non-English)",
+}
 
 
 class PassThePopcorn:
@@ -609,7 +619,7 @@ class PassThePopcorn:
 
         return image_url
 
-    def get_type(self, imdb_info: dict[str, Any], meta: Meta) -> str | None:
+    async def get_type(self, imdb_info: dict[str, Any], meta: Meta) -> str | None:
         ptp_type = None
         if imdb_info["type"] is not None:
             imdb_type = imdb_info.get("type", "movie").lower()
@@ -641,9 +651,19 @@ class PassThePopcorn:
             elif "concert" in keywords:
                 ptp_type = "Live Performance"
         if ptp_type is None and (meta.mode if meta.mode is not None else "non_cli") == "cli":
-            ptp_type_list = ["Feature Film", "Short Film", "Miniseries", "Stand-up Comedy", "Concert", "Movie Collection"]
-            with webui_events.field_prompt("Release type", {"Tracker": self.tracker, "Release": meta.name or meta.title}):
-                ptp_type = cli_ui.ask_choice("Select the proper type", choices=ptp_type_list)
+            ptp_type = await ask(
+                meta,
+                Question(
+                    key="passthepopcorn.type",
+                    kind="choice",
+                    prompt="Select the proper type",
+                    title="Release type",
+                    choices=choices_from(["Feature Film", "Short Film", "Miniseries", "Stand-up Comedy", "Concert", "Movie Collection"]),
+                    summary={"Tracker": self.tracker, "Release": meta.name or meta.title},
+                    tracker=self.tracker,
+                    unattended="fail",
+                ),
+            )
             if ptp_type == "Concert":
                 ptp_type = "Live Performance"
         return ptp_type
@@ -734,16 +754,31 @@ class PassThePopcorn:
             sub_langs = [44]  # No Subtitle
         return sub_langs
 
-    def get_trumpable(self, sub_langs: list[int]) -> tuple[list[int] | None, list[int]]:
+    async def get_trumpable(self, meta: Meta, sub_langs: list[int]) -> tuple[list[int] | None, list[int]]:
         trumpable_values = {
-            "English Hardcoded Subs (Full)": 4,
-            "English Hardcoded Subs (Forced)": 50,
-            "No English Subs": 14,
-            "English Softsubs Exist (Mislabeled)": None,
-            "Hardcoded Subs (Non-English)": "OTHER",
+            "hc_full": 4,
+            "hc_forced": 50,
+            "no_english_subs": 14,
+            "softsubs_mislabeled": None,
+            "hc_non_english": "OTHER",
         }
-        with webui_events.field_prompt("Trumpable options", {"Tracker": self.tracker}):
-            opts = cli_ui.select_choices("Please select any/all applicable options:", choices=list(trumpable_values.keys())) or []
+        opts = (
+            await ask(
+                meta,
+                Question(
+                    key="passthepopcorn.trumpable",
+                    kind="multi_choice",
+                    prompt="Please select any/all applicable options:",
+                    title="Trumpable options",
+                    choices=choices_from(TRUMPABLE_LABELS),
+                    summary={"Tracker": self.tracker, "Release": meta.name or meta.title},
+                    tracker=self.tracker,
+                    unattended="fail",
+                    empty_ok=True,
+                ),
+            )
+            or []
+        )
         trumpable_list: list[int] = []
         for opt in opts:
             v = trumpable_values.get(opt)
@@ -765,14 +800,21 @@ class PassThePopcorn:
                 trumpable_list.append(14)
             elif v == "OTHER":
                 trumpable_list.append(15)
-                with webui_events.field_prompt(
-                    "Hardcoded subtitles",
-                    {"Trumpable": ", ".join(opts)},
-                    hint="The language code of the burned-in subtitles. Leave it blank to skip.",
-                    actions=[("", "Skip")],
-                    placeholder="e.g. es",
-                ):
-                    hc_sub_langs = (cli_ui.ask_string("Enter language code for HC Subtitle languages") or "").strip()
+                hc_sub_langs = await ask(
+                    meta,
+                    Question(
+                        key="passthepopcorn.hc_sub_language",
+                        kind="text",
+                        prompt="Enter language code for HC Subtitle languages",
+                        title="Hardcoded subtitles",
+                        hint="The language code of the burned-in subtitles. Leave it blank to skip.",
+                        placeholder="e.g. es",
+                        summary={"Trumpable": ", ".join(TRUMPABLE_LABELS[opt] for opt in opts)},
+                        tracker=self.tracker,
+                        unattended="fail",
+                        empty_ok=True,
+                    ),
+                )
                 if hc_sub_langs:
                     for lang, sub_id in self.sub_lang_map.items():
                         if any(hc_sub_langs == x for x in list(lang)) and sub_id not in sub_langs:
@@ -781,6 +823,24 @@ class PassThePopcorn:
         trumpable_unique = list({*trumpable_list})
         trumpable_result: list[int] | None = trumpable_unique if trumpable_unique else None
         return trumpable_result, sub_langs_result
+
+    async def _ask_mark_trumpable(self, meta: Meta, reason: str) -> bool:
+        return bool(
+            await ask(
+                meta,
+                Question(
+                    key="passthepopcorn.mark_trumpable",
+                    kind="confirm",
+                    prompt="Mark trumpable?",
+                    title="Trumpable",
+                    default=True,
+                    hint=reason,
+                    summary={"Tracker": self.tracker, "Release": meta.name or meta.title},
+                    tracker=self.tracker,
+                    unattended="fail",
+                ),
+            )
+        )
 
     def get_remaster_title(self, meta: Meta) -> str:
         remaster_title: list[str] = []
@@ -1485,17 +1545,10 @@ class PassThePopcorn:
             logged_in = True
         return logged_in
 
-    async def _prompt_field(self, field: str, meta: Meta, question: str, *, hint: str, actions: list[tuple[str, str]] | None = None, placeholder: str = "") -> str:
+    async def _prompt_field(self, meta: Meta, question: Question) -> Any:
         """Ask for a missing new-group field, shown in the Web UI as a form field."""
-        with webui_events.field_prompt(
-            field,
-            {"Tracker": self.tracker, "Release": meta.name or meta.title, field: ""},
-            focus=field,
-            hint=hint,
-            actions=actions or [],
-            placeholder=placeholder,
-        ):
-            return await prompt_in_thread(cli_ui.ask_string, question, default="") or ""
+        summary = {"Tracker": self.tracker, "Release": meta.name or meta.title, question.title: ""}
+        return await ask(meta, replace(question, summary=summary, focus=question.title, tracker=self.tracker))
 
     async def fill_upload_form(self, group_id: int | str | None, meta: Meta) -> tuple[str, dict[str, Any]]:
         resolution, other_resolution = self.get_resolution(meta)
@@ -1543,7 +1596,7 @@ class PassThePopcorn:
 
         ptp_trumpable = None
         if meta.hardcoded_subs:
-            ptp_trumpable, ptp_subtitles = self.get_trumpable(ptp_subtitles)
+            ptp_trumpable, ptp_subtitles = await self.get_trumpable(meta, ptp_subtitles)
             if ptp_trumpable and 50 in ptp_trumpable:
                 ptp_trumpable.remove(50)
                 ptp_trumpable.append(4)
@@ -1559,26 +1612,12 @@ class PassThePopcorn:
 
         elif no_audio_found and (not any(x in [3, 50] for x in ptp_subtitles)):
             cli_ui.info("No English subs and no audio tracks found should this be trumpable?")
-            if not meta.unattended or meta.unattended_confirm:
-                with webui_events.field_prompt(
-                    "Trumpable",
-                    {"Tracker": self.tracker, "Release": meta.name or meta.title},
-                    hint="No English subtitles and no audio tracks were found.",
-                ):
-                    mark_trumpable = await prompt_in_thread(cli_ui.ask_yes_no, "Mark trumpable?", default=True)
-                if mark_trumpable:
-                    ptp_trumpable, ptp_subtitles = self.get_trumpable(ptp_subtitles)
+            if await self._ask_mark_trumpable(meta, "No English subtitles and no audio tracks were found."):
+                ptp_trumpable, ptp_subtitles = await self.get_trumpable(meta, ptp_subtitles)
         elif not english_audio and (not any(x in [3, 50] for x in ptp_subtitles)):
             cli_ui.info("No English subs and English audio is not the first audio track, should this be trumpable?")
-            if not meta.unattended or meta.unattended_confirm:
-                with webui_events.field_prompt(
-                    "Trumpable",
-                    {"Tracker": self.tracker, "Release": meta.name or meta.title},
-                    hint="No English subtitles and English audio is not the first audio track.",
-                ):
-                    mark_trumpable = await prompt_in_thread(cli_ui.ask_yes_no, "Mark trumpable?", default=True)
-                if mark_trumpable:
-                    ptp_trumpable, ptp_subtitles = self.get_trumpable(ptp_subtitles)
+            if await self._ask_mark_trumpable(meta, "No English subtitles and English audio is not the first audio track."):
+                ptp_trumpable, ptp_subtitles = await self.get_trumpable(meta, ptp_subtitles)
 
         logger.debug(f"{self.tracker}: ptp_trumpable: {ptp_trumpable}")
         logger.debug(f"{self.tracker}: ptp_subtitles: {ptp_subtitles}")
@@ -1586,7 +1625,7 @@ class PassThePopcorn:
             "submit": "true",
             "remaster_year": "",
             "remaster_title": self.get_remaster_title(meta),  # Eg.: Hardcoded English
-            "type": self.get_type(meta.imdb_info, meta),
+            "type": await self.get_type(meta.imdb_info, meta),
             "codec": "Other",  # Sending the codec as custom.
             "other_codec": self.get_codec(meta),
             "container": "Other",
@@ -1624,19 +1663,20 @@ class PassThePopcorn:
                 imdb_value = meta.imdb or "0"
                 tinfo = await self.get_torrent_info(imdb_value, meta)
             if meta.youtube is None or "youtube" not in meta.youtube:
-                youtube = (
-                    ""
-                    if meta.unattended
-                    else await self._prompt_field(
-                        "Trailer",
-                        meta,
-                        "Unable to find youtube trailer, please link one e.g.(https://www.youtube.com/watch?v=dQw4w9WgXcQ)",
+                youtube = await self._prompt_field(
+                    meta,
+                    Question(
+                        key="passthepopcorn.trailer",
+                        kind="text",
+                        prompt="Unable to find youtube trailer, please link one e.g.(https://www.youtube.com/watch?v=dQw4w9WgXcQ), or leave empty to upload without one",
+                        title="Trailer",
+                        default="",
                         hint="No YouTube trailer was found. Leaving it blank uploads without one.",
-                        actions=[("", "Upload without a trailer")],
                         placeholder="https://www.youtube.com/watch?v=",
-                    )
+                        unattended="default",
+                    ),
                 )
-                meta.youtube = youtube
+                meta.youtube = youtube or ""
             cover = meta.imdb_info.get("cover")
             if cover is None:
                 cover = meta.artwork_url
@@ -1644,25 +1684,22 @@ class PassThePopcorn:
                 cover = await self.rehost_poster_to_selected_host(meta, cover)
             elif isinstance(cover, str):
                 cover = None
-            while cover is None:
-                if meta.unattended and not meta.unattended_confirm:
-                    meta.skipping = self.tracker
-                    raise UploadError(f"{self.tracker}: Cover is required in unattended mode.")
-                cover_input = (
-                    await self._prompt_field(
-                        "Cover",
-                        meta,
-                        "No Cover was found. Please input a link to a cover: \n",
+            if cover is None:
+                cover_input = await self._prompt_field(
+                    meta,
+                    Question(
+                        key="passthepopcorn.cover",
+                        kind="text",
+                        prompt="No Cover was found. Please input a link to a cover",
+                        title="Cover",
                         hint="No cover was found. Enter a link to an image ending in .jpg, .jpeg, .png or .webp.",
                         placeholder="https://",
-                    )
-                    or "".strip()
+                        validate=lambda link: None if link.lower().endswith((".jpg", ".jpeg", ".png", ".webp")) else "Cover URL must end with .jpg, .jpeg, .png, or .webp",
+                    ),
                 )
                 if not cover_input:
-                    continue
-                if not cover_input.lower().endswith((".jpg", ".jpeg", ".png", ".webp")):
-                    logger.info(f"{self.tracker}: [red]Cover URL must end with .jpg, .jpeg, .png, or .webp")
-                    continue
+                    meta.skipping = self.tracker
+                    raise UploadError(f"{self.tracker}: A cover is required.")
                 cover = await self.rehost_poster_to_selected_host(meta, cover_input)
             new_data = {
                 "title": tinfo.get("title", meta.imdb_info.get("title", meta.title)),
@@ -1676,20 +1713,23 @@ class PassThePopcorn:
                 new_data["year"] = meta.manual_year
             if not new_data["tags"]:
                 if (meta.mode if meta.mode is not None else "non_cli") == "cli":
-                    if meta.unattended and not meta.unattended_confirm:
-                        logger.info(f"{self.tracker}: [yellow]Unattended mode: Unable to match any tags. Skipping {self.tracker} upload.[/yellow]")
-                        meta.skipping = f"{self.tracker}"
-                        raise UploadError(f"{self.tracker}: Unable to match any tags in unattended mode.")
-                    while not new_data["tags"]:
-                        logger.info(f"{self.tracker}: [yellow]Unable to match any tags")
-                        logger.info(f"{self.tracker}: Valid tags can be found on the PassThePopcorn upload form")
-                        new_data["tags"] = await self._prompt_field(
-                            "Tags",
-                            meta,
-                            "Please enter at least one tag. Comma separated (action, animation, short):",
+                    logger.info(f"{self.tracker}: [yellow]Unable to match any tags")
+                    logger.info(f"{self.tracker}: Valid tags can be found on the PassThePopcorn upload form")
+                    tags = await self._prompt_field(
+                        meta,
+                        Question(
+                            key="passthepopcorn.tags",
+                            kind="list",
+                            prompt="Please enter at least one tag. Comma separated (action, animation, short)",
+                            title="Tags",
                             hint="No tags matched. Enter at least one, comma-separated; valid tags are on the PassThePopcorn upload form.",
                             placeholder="e.g. action, animation, short",
-                        )
+                        ),
+                    )
+                    if not tags:
+                        meta.skipping = self.tracker
+                        raise UploadError(f"{self.tracker}: Unable to match any tags.")
+                    new_data["tags"] = ", ".join(tags)
                 else:
                     raise UploadError("PassThePopcorn requires at least one valid tag.")
             data.update(new_data)

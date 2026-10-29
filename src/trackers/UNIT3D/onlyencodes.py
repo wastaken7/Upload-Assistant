@@ -189,7 +189,7 @@ class OnlyEncodes(UNIT3D):
         self.rehost_images_manager = RehostImagesManager(config)
 
     async def get_additional_checks(self, meta: Meta) -> bool:
-        if not self.common.check_and_confirm_adult_media_upload(meta, self.tracker):
+        if not await self.common.check_and_confirm_adult_media_upload(meta, self.tracker):
             return False
 
         if int(meta.screens or 0) < 3:

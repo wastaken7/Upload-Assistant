@@ -326,4 +326,4 @@ class InfinityHD(TmdbTvNaming, UNIT3D):
                     logger.info(f"{self.tracker}: [bold red]requires at least one English audio or subtitle track or an original language audio track.")
                 return False
 
-        return self.common.check_and_confirm_adult_media_upload(meta, self.tracker)
+        return await self.common.check_and_confirm_adult_media_upload(meta, self.tracker)

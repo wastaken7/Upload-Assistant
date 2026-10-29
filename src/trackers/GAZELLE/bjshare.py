@@ -10,7 +10,6 @@ from typing import Any, ClassVar
 from urllib.parse import urlparse
 
 import aiofiles
-import cli_ui
 import httpx
 import langcodes
 import pycountry
@@ -19,12 +18,13 @@ from langcodes.tag_parser import LanguageTagError
 from PIL import Image
 from unidecode import unidecode
 
-from src import webui_events
 from src.book_extractors import normalize_book_title_separators
-from src.console import logger, prompt_in_thread
+from src.console import logger
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder
 from src.languages import languages_manager
+from src.manual_input import Question, ask
+from src.manual_questions import game_platform, game_subcategory
 from src.meta import Meta
 from src.screenshot_manifest import files as manifest_files
 from src.stats import record_event_async
@@ -32,6 +32,10 @@ from src.tmdb import TmdbManager
 from src.trackers.common import Common
 
 Config = dict[str, Any]
+
+
+def _validate_year(year: str) -> str | None:
+    return None if year.isdigit() and len(year) == 4 else "Digite um ano com 4 dígitos, ex.: 2024."
 
 
 class BJShare:
@@ -330,7 +334,7 @@ class BJShare:
             return language_name
         return "Outro"
 
-    def get_game_platform(self, meta: Meta) -> str:
+    async def get_game_platform(self, meta: Meta) -> str:
         """Map meta.platform to BJSHARE platform ID for the Jogos category."""
         platform_map: dict[str, str] = {
             "3DS": "13",
@@ -357,8 +361,8 @@ class BJShare:
             "XSX": "17",
         }
 
-        platform = meta.platform.upper().strip()
-        return platform_map.get(platform, "3")  # Default to PC
+        platform = await game_platform(meta, tracker=self.tracker, supported=platform_map, default="PC")
+        return platform_map.get(platform, "3")
 
     def get_game_language(self, meta: Meta) -> str:
         """Map game languages from IGDB/Steam to BJSHARE idioma field.
@@ -409,9 +413,9 @@ class BJShare:
 
         return "Outro"
 
-    def get_game_subcategory(self, meta: Meta) -> str:
+    async def get_game_subcategory(self, meta: Meta) -> str:
         """Get the game subcategory for BJSHARE."""
-        subcategory = meta.game_subcategory
+        subcategory = await game_subcategory(meta, tracker=self.tracker)
         subcategory_values = {"full_game": "1", "full_game_dlc": "2", "dlc": "3", "update": "4"}
         return subcategory_values.get(subcategory, "1")
 
@@ -574,13 +578,20 @@ class BJShare:
             return meta.manual_name
         if meta.publisher and meta.title:
             return f"{meta.publisher} - {meta.title}"
-        with webui_events.field_prompt(
-            "Título",
-            {"Tracker": self.tracker, "Release": meta.name or meta.title, "Título": ""},
-            focus="Título",
-            hint='Argumento "--name" não fornecido. Digite o título do upload.',
-        ):
-            return await prompt_in_thread(cli_ui.ask_string, f'{self.tracker}: Argumento "--name" não fornecido.\nDigite o título do upload:') or ""
+        title = await ask(
+            meta,
+            Question(
+                key="bjshare.title",
+                kind="text",
+                prompt=f'{self.tracker}: Argumento "--name" não fornecido. Digite o título do upload',
+                title="Título",
+                hint='Argumento "--name" não fornecido. Digite o título do upload.',
+                summary={"Tracker": self.tracker, "Release": meta.name or meta.title, "Título": ""},
+                focus="Título",
+                tracker=self.tracker,
+            ),
+        )
+        return title or ""
 
     def get_titles(self, meta: Meta) -> tuple[str, str]:
         if meta.category == "BOOK":
@@ -817,7 +828,7 @@ class BJShare:
             params = {
                 "searchstr": title,
                 "filter_cat[4]": "1",
-                "plataforma": self.get_game_platform(meta),
+                "plataforma": await self.get_game_platform(meta),
                 "action": "basic",
                 "searchsubmit": "1",
             }
@@ -1466,27 +1477,23 @@ class BJShare:
             return ", ".join(unique_names)
 
         display_name = prompt_labels.get(role, role.capitalize())
-        if meta.unattended and not meta.unattended_confirm:
-            logger.info(f"{self.tracker}: [yellow]Unattended mode: {display_name} não encontrado(s). Pulando upload para {self.tracker}.[/yellow]")
-            meta.skipping = f"{self.tracker}"
-            return "skipped"
-
         suffix = " (apenas uma pessoa)" if role in ("director", "creator") else " (separados por vírgula)"
-        prompt_message = f"{display_name} não encontrado(s).\nPor favor, insira manualmente{suffix}: "
-
-        with webui_events.field_prompt(
-            display_name,
-            {"Tracker": self.tracker, "Release": meta.name or meta.title, display_name: ""},
-            focus=display_name,
-            hint=f"{display_name} não encontrado(s). Insira manualmente{suffix}.",
-        ):
-            user_input_raw = await prompt_in_thread(cli_ui.ask_string, f"{prompt_message}")
-        user_input = (user_input_raw or "").strip()
-        if user_input:
-            entered_names = [name.strip() for name in user_input.split(",")]
-            normalized_input = self._collect_credit_names(entered_names, limit)
-            if normalized_input:
-                return ", ".join(normalized_input)
+        entered_names = await ask(
+            meta,
+            Question(
+                key=f"credits.{role}",
+                kind="list",
+                prompt=f"{self.tracker}: {display_name} não encontrado(s). Por favor, insira manualmente{suffix}",
+                title=display_name,
+                hint=f"{display_name} não encontrado(s). Insira manualmente{suffix}.",
+                summary={"Tracker": self.tracker, "Release": meta.name or meta.title, display_name: ""},
+                focus=display_name,
+                tracker=self.tracker,
+            ),
+        )
+        normalized_input = self._collect_credit_names(entered_names or [], limit)
+        if normalized_input:
+            return ", ".join(normalized_input)
 
         return "skipped"
 
@@ -1628,13 +1635,13 @@ class BJShare:
             data.update(
                 {
                     "title": original_title,
-                    "plataforma": self.get_game_platform(meta),
+                    "plataforma": await self.get_game_platform(meta),
                     "idioma": self.get_game_language(meta),
                     "adulto": self.get_adulto(meta),
                     "release_desc": release_desc,
                     "fichatecnica": await self.build_description(meta),
                     "traileryoutube": meta.youtube,
-                    "subcategoria": self.get_game_subcategory(meta),
+                    "subcategoria": await self.get_game_subcategory(meta),
                 }
             )
 
@@ -1764,14 +1771,21 @@ class BJShare:
             if meta.year is not None:
                 year = str(meta.year)
             else:
-                with webui_events.field_prompt(
-                    "Ano",
-                    {"Tracker": self.tracker, "Release": meta.name or meta.title, "Ano": ""},
-                    focus="Ano",
-                    hint='Argumento "--year" não fornecido. Digite o ano do upload.',
-                    placeholder="ex.: 2024",
-                ):
-                    year = await prompt_in_thread(cli_ui.ask_string, f'{self.tracker}: Argumento "--year" não fornecido.\nDigite o ano do upload:')
+                year = await ask(
+                    meta,
+                    Question(
+                        key="bjshare.year",
+                        kind="text",
+                        prompt=f'{self.tracker}: Argumento "--year" não fornecido. Digite o ano do upload',
+                        title="Ano",
+                        hint='Argumento "--year" não fornecido. Digite o ano do upload.',
+                        placeholder="ex.: 2024",
+                        summary={"Tracker": self.tracker, "Release": meta.name or meta.title, "Ano": ""},
+                        focus="Ano",
+                        tracker=self.tracker,
+                        validate=_validate_year,
+                    ),
+                )
 
             data.update(
                 {
@@ -1904,25 +1918,26 @@ class BJShare:
         if isinstance(overview, str) and overview.strip():
             return overview
 
-        if meta and meta.unattended and not meta.unattended_confirm:
-            logger.info(f"{self.tracker}: [yellow]Sinopse não encontrada em modo unattended. Pulando upload para {self.tracker}.[/yellow]")
-            meta.skipping = f"{self.tracker}"
-            return ""
+        if meta is None:
+            return "N/A"
 
         logger.info(f"{self.tracker}: [bold red]Sinopse não encontrada no TMDb. Por favor, insira manualmente.[/bold red]")
-        with webui_events.field_prompt(
-            "Sinopse",
-            {"Tracker": self.tracker, "Release": meta.name or meta.title if meta else "", "Sinopse": ""},
-            focus="Sinopse",
-            hint="Sinopse não encontrada no TMDb. Deixe em branco para enviar como N/A.",
-            actions=[("", "Enviar como N/A")],
-            placeholder="Digite a sinopse",
-        ):
-            user_input_raw = await prompt_in_thread(cli_ui.ask_string, f"{self.tracker}: Digite a sinopse: ")
-        user_input = (user_input_raw or "").strip()
-        if user_input:
-            return user_input
-        return "N/A"
+        synopsis = await ask(
+            meta,
+            Question(
+                key="bjshare.synopsis",
+                kind="text",
+                prompt=f"{self.tracker}: Digite a sinopse (deixe em branco para enviar como N/A)",
+                title="Sinopse",
+                default="N/A",
+                hint="Sinopse não encontrada no TMDb. Deixe em branco para enviar como N/A.",
+                placeholder="Digite a sinopse",
+                summary={"Tracker": self.tracker, "Release": meta.name or meta.title, "Sinopse": ""},
+                focus="Sinopse",
+                tracker=self.tracker,
+            ),
+        )
+        return synopsis or ""
 
     def check_data(self, meta: Meta, data: dict[str, Any]) -> str:
         category = meta.category

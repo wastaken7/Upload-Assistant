@@ -1,11 +1,9 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 from typing import Any, cast
 
-import cli_ui
-
-from src import webui_events
 from src.console import logger
 from src.languages import languages_manager
+from src.manual_input import Question, ask, choices_from, confirm_override
 from src.meta import Meta
 from src.trackers.common import Common
 from src.trackers.UNIT3D import UNIT3D
@@ -40,23 +38,29 @@ class Torrenteros(UNIT3D):
         if meta.manual_name is not None:
             return {"name": meta.manual_name.strip()}
 
-        name = self.ttr_name or self.build_name(meta)
+        name = self.ttr_name or await self.build_name(meta)
 
         return {"name": name}
 
-    def build_name(self, meta: Meta) -> str:
+    async def build_name(self, meta: Meta) -> str:
         name = meta.name_notag
 
-        def ask_spanish_type(kind: str) -> str:
-            logger.info(f"{self.tracker}: [green]Found Spanish {kind} track.[/green] [yellow]Is it Castellano or Latino?[/yellow]")
-            logger.info(f"{self.tracker}: 1 = Castellano")
-            logger.info(f"{self.tracker}: 2 = Latino")
-            logger.info(f"{self.tracker}: 3 = Castellano Latino")
-            with webui_events.numbered_options(
-                ["Castellano", "Latino", "Castellano Latino"],
-                hint=f"{self.tracker}: Found Spanish {kind} track. Is it Castellano or Latino?",
-            ):
-                return str(cli_ui.ask_string("Enter choice (1-3): "))
+        async def ask_spanish_type(kind: str) -> str:
+            variant = await ask(
+                meta,
+                Question(
+                    key="torrenteros.spanish_variant",
+                    kind="choice",
+                    prompt=f"{self.tracker}: Found Spanish {kind} track. Is it Castellano or Latino?",
+                    title="Spanish variant",
+                    choices=choices_from(["Castellano", "Latino", "Castellano Latino"]),
+                    default="Castellano",
+                    summary={"Tracker": self.tracker, "Release": meta.name, "Track": kind},
+                    tracker=self.tracker,
+                    unattended="default",
+                ),
+            )
+            return str(variant or "Castellano")
 
         def get_spanish_type(lang_code: str) -> str | None:
             if not lang_code:
@@ -71,25 +75,11 @@ class Torrenteros(UNIT3D):
         if meta.is_disc == "BDMV":
             spanish_audio = "Spanish" in (meta.audio_languages or [])
             spanish_subtitle = "Spanish" in (meta.subtitle_languages or [])
-            unattended = meta.unattended
-            confirm = meta.unattended_confirm
-
             if spanish_audio:
-                if unattended or confirm:
-                    suffix = "Castellano"
-                else:
-                    user_choice = ask_spanish_type("audio")
-                    suffix = {"1": "Castellano", "2": "Latino", "3": "Castellano Latino"}.get(user_choice, "Castellano")
-                name += f" {suffix}"
+                name += f" {await ask_spanish_type('audio')}"
 
             elif spanish_subtitle:
-                if unattended or confirm:
-                    suffix = "Castellano Subs"
-                else:
-                    user_choice = ask_spanish_type("subtitle")
-                    suffix = {"1": "Castellano Subs", "2": "Latino Subs", "3": "Castellano Latino Subs"}.get(user_choice, "Castellano Subs")
-
-                name += f" {suffix}"
+                name += f" {await ask_spanish_type('subtitle')} Subs"
 
         else:
             tracks = cast(
@@ -145,12 +135,8 @@ class Torrenteros(UNIT3D):
             if "Spanish" not in (meta.subtitle_languages or []):
                 logger.info(f"{self.tracker}: [bold red]requires at least one Spanish audio or subtitle track.")
                 return False
-            if meta.unattended:
-                if not meta.unattended_confirm:
-                    return False
-            else:
-                logger.info(f"{self.tracker}: [yellow]No Spanish audio track found, but Spanish subtitles are present.[/yellow]")
-                if not cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
-                    return False
+            logger.info(f"{self.tracker}: [yellow]No Spanish audio track found, but Spanish subtitles are present.[/yellow]")
+            if not await confirm_override(meta):
+                return False
 
         return True

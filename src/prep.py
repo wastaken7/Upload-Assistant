@@ -8,6 +8,7 @@ from typing import Any, cast
 from src.artwork import prepare_artwork
 from src.bluray_com import reset_release_subheader_cache
 from src.content_duration import populate_content_duration
+from src.manual_input import load_saved_answers
 from src.meta import Meta
 from src.meta_file import write_meta_file
 from src.metadata_cache import set_run_disabled
@@ -171,6 +172,7 @@ class Prep:
 
         # 1. Init metadata settings
         use_sonarr, use_radarr, client, skip_tracker_descriptions, hash_ids, tracker_ids = prep_helpers.init_meta(self, meta, mode)
+        await load_saved_answers(meta)
         await self._publish_initial_webui_snapshot(meta)
 
         # 2. Disc and Category Detection

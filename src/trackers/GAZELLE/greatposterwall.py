@@ -6,16 +6,15 @@ from typing import Any, ClassVar, cast
 from urllib.parse import urlparse
 
 import aiofiles
-import cli_ui
 import httpx
 from bs4 import BeautifulSoup
 from rich.markup import escape
 
-from src import webui_events
 from src.cogs.redaction import Redaction
-from src.console import logger, prompt_in_thread
+from src.console import logger
 from src.get_desc import DescriptionBuilder
 from src.languages import languages_manager
+from src.manual_input import Question, ask
 from src.meta import Meta
 from src.rehostimages import RehostImagesManager
 from src.slot_rules.registry import slot_rules_apply
@@ -349,19 +348,21 @@ class GreatPosterWall:
                 tags = ", ".join(unicodedata.normalize("NFKD", name).encode("ASCII", "ignore").decode("utf-8").replace(" ", ".").lower() for name in genre_names)
 
         if not tags:
-            if meta.unattended and not meta.unattended_confirm:
-                logger.info(f"{self.tracker}: [yellow]Unattended mode: Enter genres not available. Skipping {self.tracker} upload.[/yellow]")
-                meta.skipping = f"{self.tracker}"
-                return ""
-            with webui_events.field_prompt(
-                "Genres",
-                {"Tracker": self.tracker, "Release": meta.name or meta.title, "Genres": ""},
-                focus="Genres",
-                hint=f"No genres were found. Comma-separated, in {self.tracker} format.",
-                placeholder="e.g. action, drama",
-            ):
-                tags_raw = await prompt_in_thread(cli_ui.ask_string, f"Enter the genres (in {self.tracker} format): ")
-            tags = (tags_raw or "").strip()
+            genres = await ask(
+                meta,
+                Question(
+                    key="greatposterwall.genres",
+                    kind="list",
+                    prompt=f"{self.tracker}: Enter the genres (in {self.tracker} format)",
+                    title="Genres",
+                    hint=f"No genres were found. Comma-separated, in {self.tracker} format.",
+                    placeholder="e.g. action, drama",
+                    summary={"Tracker": self.tracker, "Release": meta.name or meta.title, "Genres": ""},
+                    focus="Genres",
+                    tracker=self.tracker,
+                ),
+            )
+            tags = ", ".join(genres or [])
 
         return tags
 
@@ -835,48 +836,57 @@ class GreatPosterWall:
             english_name = first_director_name
             chinese_name = ""
         else:
-            if meta.unattended and not meta.unattended_confirm:
-                logger.info(f"{self.tracker}: [yellow]Unattended mode: Director details required for movie missing in database. Skipping {self.tracker} upload.[/yellow]")
-                meta.skipping = f"{self.tracker}"
-                return {}
             logger.info(f"{self.tracker}: This movie is not registered in the {self.tracker} database, please enter the details of 1 director")
 
-            imdb_id = ""
-            while not re.match(r"^nm\d+$", imdb_id):
-                with webui_events.field_prompt(
-                    "Director",
-                    {"Tracker": self.tracker, "Release": meta.name or meta.title, "IMDb ID": ""},
-                    focus="IMDb ID",
+            imdb_id = await ask(
+                meta,
+                Question(
+                    key="greatposterwall.director_imdb",
+                    kind="text",
+                    prompt="Enter Director IMDb ID (e.g., nm0000138)",
+                    title="Director",
                     hint=f"This movie is not in the {self.tracker} database; enter one director's IMDb person ID.",
                     placeholder="nm0000138",
-                ):
-                    imdb_id_raw = await prompt_in_thread(cli_ui.ask_string, "Enter Director IMDb ID (e.g., nm0000138): ")
-                imdb_id = (imdb_id_raw or "").strip()
-                if not re.match(r"^nm\d+$", imdb_id):
-                    logger.info(f"{self.tracker}: [red]Invalid IMDb person ID. Format must be like nm0000138.[/red]")
-
-            english_name = ""
-            while not english_name:
-                with webui_events.field_prompt(
-                    "Director",
-                    {"Tracker": self.tracker, "IMDb ID": imdb_id, "English name": ""},
-                    focus="English name",
+                    summary={"Tracker": self.tracker, "Release": meta.name or meta.title, "IMDb ID": ""},
+                    focus="IMDb ID",
+                    tracker=self.tracker,
+                    validate=lambda value: None if re.match(r"^nm\d+$", value) else "Invalid IMDb person ID. Format must be like nm0000138.",
+                ),
+            )
+            if imdb_id is None:
+                meta.skipping = self.tracker
+                return {}
+            english_name = await ask(
+                meta,
+                Question(
+                    key="greatposterwall.director_name",
+                    kind="text",
+                    prompt="Enter Director English name",
+                    title="Director",
                     hint="The director's name in English.",
-                ):
-                    english_name_raw = await prompt_in_thread(cli_ui.ask_string, "Enter Director English name: ")
-                english_name = (english_name_raw or "").strip()
-                if not english_name:
-                    logger.info(f"{self.tracker}: [red]Director English name cannot be empty.[/red]")
-
-            with webui_events.field_prompt(
-                "Director",
-                {"Tracker": self.tracker, "IMDb ID": imdb_id, "English name": english_name, "Chinese name": ""},
-                focus="Chinese name",
-                hint="Optional: the director's name in Chinese. Leave it blank to skip.",
-                actions=[("", "Skip")],
-            ):
-                chinese_name_raw = await prompt_in_thread(cli_ui.ask_string, "Enter Director Chinese name (optional, press Enter to skip): ")
-            chinese_name = (chinese_name_raw or "").strip()
+                    summary={"Tracker": self.tracker, "IMDb ID": imdb_id, "English name": ""},
+                    focus="English name",
+                    tracker=self.tracker,
+                ),
+            )
+            if english_name is None:
+                meta.skipping = self.tracker
+                return {}
+            chinese_name = await ask(
+                meta,
+                Question(
+                    key="greatposterwall.director_chinese_name",
+                    kind="text",
+                    prompt="Enter Director Chinese name (optional, press Enter to skip)",
+                    title="Director",
+                    hint="Optional: the director's name in Chinese. Leave it blank to skip.",
+                    summary={"Tracker": self.tracker, "IMDb ID": imdb_id, "English name": english_name, "Chinese name": ""},
+                    focus="Chinese name",
+                    tracker=self.tracker,
+                    unattended="default",
+                    default="",
+                ),
+            )
 
         artists: list[str] = [english_name]
         artist_ids: list[str] = [imdb_id]

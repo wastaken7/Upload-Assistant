@@ -189,7 +189,7 @@ class RetroFlix:
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         common = Common(config=self.config)
-        if not common.check_and_confirm_adult_media_upload(meta, self.tracker):
+        if not await common.check_and_confirm_adult_media_upload(meta, self.tracker):
             return False
 
         year_value = meta.year

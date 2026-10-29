@@ -5,13 +5,13 @@ from pathlib import Path
 from typing import Any, cast
 
 import aiofiles
-import cli_ui
 import httpx
 from rich.markup import escape
 
 from src.cogs.redaction import Redaction
 from src.console import logger
 from src.description_review import get_base_description
+from src.manual_input import confirm_override
 from src.meta import Meta
 from src.rehostimages import ImageHostPolicy, RehostImagesManager
 from src.tracker_images import get_tracker_image_collection
@@ -381,7 +381,7 @@ class BEYONDHD:
                 "-irobot",
                 "-beyondhd",
             )
-        ) and not self._confirm_or_skip(meta, f"This is an internal {self.tracker} release"):
+        ) and not await self._confirm_or_skip(meta, f"This is an internal {self.tracker} release"):
             return False
 
         if not meta.valid_mi_settings:
@@ -417,7 +417,7 @@ class BEYONDHD:
             ("lfi", meta.type == "WEBDL", "LFi WEB-DLs are banned"),
         )
         for group, applies, reason in conditional_bans:
-            if tag == group and applies and not self._confirm_or_skip(meta, f"{reason} at {self.tracker}"):
+            if tag == group and applies and not await self._confirm_or_skip(meta, f"{reason} at {self.tracker}"):
                 return False
 
         lossless_main_audio = any(codec in str(meta.audio) for codec in ("TrueHD", "DTS-HD MA"))
@@ -437,11 +437,11 @@ class BEYONDHD:
             (meta.sd == 1, "SD is only allowed if there is no retail HD/UHD source available"),
         )
         for violated, message in rule_prompts:
-            if violated and not self._confirm_or_skip(meta, message):
+            if violated and not await self._confirm_or_skip(meta, message):
                 return False
 
         common = Common(config=self.config)
-        return common.check_and_confirm_adult_media_upload(meta, self.tracker)
+        return await common.check_and_confirm_adult_media_upload(meta, self.tracker)
 
     async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
         dupes: list[dict[str, Any]] = []
@@ -496,11 +496,9 @@ class BEYONDHD:
 
         return dupes
 
-    def _confirm_or_skip(self, meta: Meta, message: str) -> bool:
+    async def _confirm_or_skip(self, meta: Meta, message: str) -> bool:
         logger.info(f"{self.tracker}: [bold red]{escape(message)}[/bold red]")
-        if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-            return bool(cli_ui.ask_yes_no("Do you want to upload anyway?", default=False))
-        return False
+        return await confirm_override(meta)
 
     def _is_true(self, value: Any) -> bool:
         """
