@@ -17,7 +17,7 @@ from src import webui_events
 from src.audio import AudioManager
 from src.console import logger
 from src.languages import languages_manager
-from src.manual_input import Question, ask
+from src.manual_input import Question, ask, has_answer
 from src.meta import Meta
 from src.trackers.common import Common
 from src.trackers.UNIT3D import UNIT3D
@@ -327,7 +327,7 @@ class ShareIsland(UNIT3D):
             # Handle optional distributor
             distributor_name = meta.distributor
             distributor_id = None
-            if not distributor_name and not meta.unattended:
+            if not distributor_name and (not meta.unattended or has_answer(meta, "shareisland.distributor")):
                 distributor_name = await ask(
                     meta,
                     Question(

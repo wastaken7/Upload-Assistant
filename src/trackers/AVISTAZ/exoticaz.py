@@ -398,7 +398,7 @@ class ExoticaZ(AZTrackerBase):
             return False
 
         # Tags are required. Attended uploads are asked for them before the upload starts; unattended ones are skipped here.
-        if meta.unattended and not meta.unattended_confirm and not await self.resolve_tags(self.get_tag_words(meta)):
+        if meta.unattended and not meta.unattended_confirm and not has_answer(meta, "xxx.tags") and not await self.resolve_tags(self.get_tag_words(meta)):
             logger.info(f"{self.tracker}: [yellow]Unattended mode: no site tags were found for this release. Skipping {self.tracker} upload.[/yellow]")
             return False
 

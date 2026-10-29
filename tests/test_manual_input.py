@@ -272,3 +272,21 @@ def test_prompt_lock_is_reentrant_for_the_holder() -> None:
             return True
 
     assert asyncio.run(run()) is True
+
+
+def test_confirm_override_treats_closed_stdin_as_no(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def closed(*_args: Any, **_kwargs: Any) -> bool:
+        raise EOFError
+
+    monkeypatch.setattr("src.manual_input.cli_ui.ask_yes_no", closed)
+
+    assert asyncio.run(confirm_override(_meta(tmp_path))) is False
+
+
+def test_invalid_answer_argument_is_a_parser_error(tmp_path: Path) -> None:
+    from src.args import Args
+
+    with pytest.raises(SystemExit):
+        Args({"DEFAULT": {"screens": 1}}).parse([str(tmp_path), "--answer", "fictional.key=1"], Meta())
+    meta, _, _ = Args({"DEFAULT": {"screens": 1}}).parse([str(tmp_path), "--answer", "game.subcategory=dlc"], Meta())
+    assert meta.answers == {"game.subcategory": "dlc"}

@@ -298,6 +298,7 @@ def test_unattended_upload_without_tags_is_skipped_before_upload(tmp_path: Path)
 
     assert asyncio.run(tracker.get_additional_checks(make_meta(tmp_path, keywords=["fictional unknown tag"]))) is False  # noqa: S101
     assert asyncio.run(tracker.get_additional_checks(make_meta(tmp_path, keywords=["blowjob"]))) is True  # noqa: S101
+    assert asyncio.run(tracker.get_additional_checks(make_meta(tmp_path, keywords=[], answers={"xxx.tags": "blowjob"}))) is True  # noqa: S101
 
 
 def fake_prompts(monkeypatch, confirmed: bool, selections: list[list[str] | None]) -> list[str]:

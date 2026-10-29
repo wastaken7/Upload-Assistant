@@ -1316,7 +1316,10 @@ class Args:
                         from src.manual_questions import parse_answer_arg
 
                         for answer_value in value_list:
-                            answer_key, answer = parse_answer_arg(answer_value)
+                            try:
+                                answer_key, answer = parse_answer_arg(answer_value)
+                            except ValueError as error:
+                                parser.error(str(error))
                             meta.answers[answer_key] = answer
                     elif key == "manual_cast":
                         meta.manual_cast = [name.strip() for name in value2.split(",") if name.strip()]

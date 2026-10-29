@@ -312,7 +312,10 @@ async def confirm_override(meta: Meta | None, question: str = "Do you want to up
     if meta is not None and not is_interactive(meta):
         return False
     async with prompt_session():
-        return bool(await prompt_in_thread(cli_ui.ask_yes_no, question, default=default))
+        try:
+            return bool(await prompt_in_thread(cli_ui.ask_yes_no, question, default=default))
+        except EOFError:
+            return False
 
 
 async def load_saved_answers(meta: Meta) -> None:
