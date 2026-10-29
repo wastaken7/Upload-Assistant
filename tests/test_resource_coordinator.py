@@ -186,6 +186,29 @@ def test_own_ticket_key_survives_access_denied(monkeypatch: pytest.MonkeyPatch) 
     assert int(created) > 0
 
 
+def test_concurrent_first_calls_share_one_fallback_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    def slow_deny(pid: int) -> str | None:
+        time.sleep(0.05)
+        raise rc.psutil.AccessDenied(pid)
+
+    monkeypatch.setattr(rc, "_process_key", None)
+    monkeypatch.setattr(rc, "_create_time_key", slow_deny)
+    barrier = threading.Barrier(8)
+    keys: list[str] = []
+
+    def worker() -> None:
+        barrier.wait()
+        keys.append(rc._own_key())
+
+    threads = [threading.Thread(target=worker) for _ in range(8)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    assert len(keys) == 8
+    assert len(set(keys)) == 1
+
+
 @pytest.mark.usefixtures("lock_dir")
 def test_slot_is_usable_when_own_start_time_is_denied(monkeypatch: pytest.MonkeyPatch) -> None:
     def deny(pid: int) -> str | None:
