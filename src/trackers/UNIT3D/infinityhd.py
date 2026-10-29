@@ -4,6 +4,7 @@ from typing import Any, cast
 import pycountry
 
 from src.console import logger
+from src.get_name import build_name_components
 from src.languages import languages_manager
 from src.meta import Meta
 from src.trackers.common import Common
@@ -267,6 +268,7 @@ class InfinityHD(TmdbTvNaming, UNIT3D):
         return False
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
+        """Build the tracker name with AKA before year and existing language labels."""
         if meta.manual_name is not None:
             return {"name": meta.manual_name.strip()}
 
@@ -275,6 +277,21 @@ class InfinityHD(TmdbTvNaming, UNIT3D):
 
         if meta.category == "TV":
             ihd_name = await self._rebuild_tv_name(meta, ihd_name) or " ".join(ihd_name.split())
+
+        components = build_name_components(meta)
+        if components.title and components.alt_title and components.year:
+            # Normalize the exact metadata prefix when TV rebuilding cannot do so.
+            old_prefix = " ".join(f"{components.title} {components.year} {components.alt_title}".split())
+            if (
+                ihd_name == old_prefix
+                or ihd_name.startswith(old_prefix + " ")
+                or (components.tag and ihd_name == old_prefix + components.tag)
+            ):
+                year = components.year
+                if meta.category == "TV" and not await self._tv_title_needs_year(meta):
+                    year = ""
+                new_prefix = " ".join(f"{components.title} {components.alt_title} {year}".split())
+                ihd_name = new_prefix + ihd_name[len(old_prefix):]
 
         if not meta.language_checked:
             await languages_manager.process_desc_language(meta, tracker=self.tracker)
