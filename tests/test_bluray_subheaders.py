@@ -440,9 +440,26 @@ async def test_unattended_search_without_results_does_not_ask(tmp_path, monkeypa
     ([f'[url={URL}]Label[/url]', 'See http://blu-ray.com/movies/Example-Series-Blu-ray/123456 for specs'], URL),
     ([f'[url={URL}]A[/url]', '[url=https://www.blu-ray.com/movies/Example-Series-4K-Blu-ray/999/]B[/url]'], ''),
     (['[url=https://www.blu-ray.com/Example-Series/20915/]Product page[/url]', '', None], ''),
+    # A 4K edition page is kept, as it also lists a combo set's 1080p disc.
+    (['[url=https://www.blu-ray.com/movies/Example-Series-4K-Blu-ray/999/]4K[/url]'], 'https://www.blu-ray.com/movies/Example-Series-4K-Blu-ray/999/'),
 ])
 def test_find_bluray_url_needs_one_linked_edition(texts, expected):
-    assert find_bluray_url(texts) == expected
+    assert find_bluray_url(texts, 'BDMV') == expected
+
+
+DVD_URL = 'https://www.blu-ray.com/dvd/Example-Series-DVD/654321/'
+
+
+@pytest.mark.parametrize('is_disc, texts, expected', [
+    ('BDMV', [f'[url={DVD_URL}]DVD[/url]'], ''),
+    ('DVD', [f'[url={URL}]Blu-ray[/url]'], ''),
+    ('DVD', [f'[url={DVD_URL}]DVD[/url]'], DVD_URL),
+    # Only the edition of this disc's format counts when both are linked.
+    ('BDMV', [f'[url={URL}]Blu-ray[/url] [url={DVD_URL}]DVD[/url]'], URL),
+    ('DVD', [f'[url={URL}]Blu-ray[/url] [url={DVD_URL}]DVD[/url]'], DVD_URL),
+])
+def test_find_bluray_url_matches_disc_format(is_disc, texts, expected):
+    assert find_bluray_url(texts, is_disc) == expected
 
 
 @pytest.mark.asyncio

@@ -177,7 +177,7 @@ Note: if a manual TMDb or IMDb id is present in the incoming `meta` before parsi
 - `-kf`, `--keep-folder`: Keep the folder containing the single file (only when supplying a directory).
 - `-knfo`, `--keep-nfo`: Keep nfo file where applicable for specific tracker/s. With single files, must be used in conjunction with `--keep-folder` above.
 - `-reg`, `--region REGION`: Region for discs.
-- `--bluray-url URL`: Use this Blu-ray.com edition page (e.g. `https://www.blu-ray.com/movies/Title-Blu-ray/123456/`) for a disc instead of searching. Use it when the search does not list your edition, for example a 1080p disc from a 4K combo set. The page sets the region, distributor, link and covers; `--region` and `--distributor` still take precedence. Interactive runs also let you paste a URL from the edition list (`u`) or when the search finds no edition. Without this argument, when a matched tracker release's description links exactly one Blu-ray.com edition, that edition is used instead of searching.
+- `--bluray-url URL`: Use this Blu-ray.com edition page (e.g. `https://www.blu-ray.com/movies/Title-Blu-ray/123456/`) for a disc instead of searching. Use it when the search does not list your edition, for example a 1080p disc from a 4K combo set. The page sets the region, distributor, link and covers; `--region` and `--distributor` still take precedence. Interactive runs also let you paste a URL from the edition list (`u`) or when the search finds no edition. Without this argument, when a matched tracker release's description links exactly one Blu-ray.com edition of the disc's format (DVD or Blu-ray), that edition is used instead of searching.
 
 ## Tracker-specific references (existing torrent ids/links)
 

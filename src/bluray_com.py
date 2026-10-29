@@ -66,15 +66,22 @@ def normalize_bluray_url(value: str) -> str:
 _EDITION_URL_RE = re.compile(r"https?://(?:www\.)?blu-ray\.com/(?:movies|dvd)/[^\s\[\]\"'<>/]+/\d+/?", re.IGNORECASE)
 
 
-def find_bluray_url(texts: Iterable[Any]) -> str:
-    """Return the only Blu-ray.com edition linked in these descriptions, or "" when none or several are."""
+def find_bluray_url(texts: Iterable[Any], is_disc: str) -> str:
+    """Return the only Blu-ray.com edition of this disc type linked in these descriptions, or "".
+
+    DVD editions live under /dvd/ and Blu-ray ones under /movies/. 4K and 3D editions are
+    accepted for any Blu-ray, as a combo set's 1080p disc is listed with its 4K edition.
+    """
+    section = "/dvd/" if is_disc == "DVD" else "/movies/"
     urls: set[str] = set()
     for text in texts:
         for match in _EDITION_URL_RE.finditer(str(text or "")):
             try:
-                urls.add(normalize_bluray_url(match[0]))
+                url = normalize_bluray_url(match[0])
             except ValueError:
                 continue
+            if section in url:
+                urls.add(url)
     return next(iter(urls)) if len(urls) == 1 else ""
 
 

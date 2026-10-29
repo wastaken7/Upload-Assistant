@@ -1521,7 +1521,7 @@ async def finalize_metadata(
         releases = await use_bluray_url(meta, meta.bluray_url)
     elif _should_fetch_bluray_info(meta, get_bluray_info, _should_add_bluray_link(meta, prep_instance.config)):
         # A matched tracker release often links its edition already, which the search may not list.
-        linked_url = find_bluray_url([*meta.tracker_description_raw.values(), meta.description])
+        linked_url = find_bluray_url([*meta.tracker_description_raw.values(), meta.description], meta.is_disc)
         if linked_url:
             logger.info(f"[green]Using the Blu-ray.com edition linked in the tracker description: {linked_url}[/green]")
             releases = await use_bluray_url(meta, linked_url, required=False)
