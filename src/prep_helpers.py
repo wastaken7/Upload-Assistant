@@ -16,7 +16,7 @@ import guessit
 from torf import Torrent
 
 from src import webui_events
-from src.bluray_com import get_bluray_releases, use_bluray_url
+from src.bluray_com import find_bluray_url, get_bluray_releases, use_bluray_url
 from src.book_prep import AUDIOBOOK_EXTENSIONS, BOOK_EXTENSIONS, BOOK_SERVICES
 from src.cleanup import cleanup_manager
 from src.clients import Clients
@@ -1520,7 +1520,13 @@ async def finalize_metadata(
         # An explicit edition needs no IMDb ID or search, and also applies when editing.
         releases = await use_bluray_url(meta, meta.bluray_url)
     elif _should_fetch_bluray_info(meta, get_bluray_info, _should_add_bluray_link(meta, prep_instance.config)):
-        releases = await get_bluray_releases(meta)
+        # A matched tracker release often links its edition already, which the search may not list.
+        linked_url = find_bluray_url([*meta.tracker_description_raw.values(), meta.description], meta.is_disc)
+        if linked_url:
+            logger.info(f"[green]Using the Blu-ray.com edition linked in the tracker description: {linked_url}[/green]")
+            releases = await use_bluray_url(meta, linked_url, required=False)
+        if not releases:
+            releases = await get_bluray_releases(meta)
     if releases and meta.is_disc in ("BDMV", "DVD") and meta.use_bluray_images:
         # and if we getting bluray/dvd images, we'll rehost them
         url_host_mapping = {

@@ -8,6 +8,7 @@ import pytest
 from src.args import Args
 from src.bluray_com import (
     ensure_release_subheader,
+    find_bluray_url,
     get_bluray_releases,
     normalize_bluray_url,
     parse_release_details,
@@ -431,3 +432,56 @@ async def test_unattended_search_without_results_does_not_ask(tmp_path, monkeypa
     monkeypatch.setattr('src.bluray_com.search_bluray', AsyncMock(return_value=None))
     monkeypatch.setattr('src.bluray_com.cli_ui.ask_string', lambda _: pytest.fail('unexpected prompt'))
     assert await get_bluray_releases(Meta(base_dir=str(tmp_path), uuid='test', is_disc='BDMV', unattended=True)) == []
+
+
+@pytest.mark.parametrize('texts, expected', [
+    ([f'[center][url={URL}]Example Studio | 1981 | 159 min[/url][/center]'], URL),
+    # The same edition linked by several trackers, in another URL form.
+    ([f'[url={URL}]Label[/url]', 'See http://blu-ray.com/movies/Example-Series-Blu-ray/123456 for specs'], URL),
+    ([f'[url={URL}]A[/url]', '[url=https://www.blu-ray.com/movies/Example-Series-4K-Blu-ray/999/]B[/url]'], ''),
+    (['[url=https://www.blu-ray.com/Example-Series/20915/]Product page[/url]', '', None], ''),
+    # A 4K edition page is kept, as it also lists a combo set's 1080p disc.
+    (['[url=https://www.blu-ray.com/movies/Example-Series-4K-Blu-ray/999/]4K[/url]'], 'https://www.blu-ray.com/movies/Example-Series-4K-Blu-ray/999/'),
+])
+def test_find_bluray_url_needs_one_linked_edition(texts, expected):
+    assert find_bluray_url(texts, 'BDMV') == expected
+
+
+DVD_URL = 'https://www.blu-ray.com/dvd/Example-Series-DVD/654321/'
+
+
+@pytest.mark.parametrize('is_disc, texts, expected', [
+    ('BDMV', [f'[url={DVD_URL}]DVD[/url]'], ''),
+    ('DVD', [f'[url={URL}]Blu-ray[/url]'], ''),
+    ('DVD', [f'[url={DVD_URL}]DVD[/url]'], DVD_URL),
+    # Only the edition of this disc's format counts when both are linked.
+    ('BDMV', [f'[url={URL}]Blu-ray[/url] [url={DVD_URL}]DVD[/url]'], URL),
+    ('DVD', [f'[url={URL}]Blu-ray[/url] [url={DVD_URL}]DVD[/url]'], DVD_URL),
+])
+def test_find_bluray_url_matches_disc_format(is_disc, texts, expected):
+    assert find_bluray_url(texts, is_disc) == expected
+
+
+@pytest.mark.asyncio
+async def test_imported_link_to_the_same_edition_is_not_repeated(tmp_path, monkeypatch):
+    monkeypatch.setattr('src.bluray_com.fetch_release_details', AsyncMock(return_value=release(subheader=LABEL)))
+    imported = f'[center][url={URL}]{LABEL}[/url][/center]\n\nExample notes from the uploader.'
+    meta = Meta(is_disc='BDMV', release_url=URL, description=imported, base_dir=str(tmp_path), uuid='test')
+    desc = builder()
+    kwargs = {name: False for name, parameter in inspect.signature(desc.general_description_generator).parameters.items() if parameter.default is True}
+    kwargs.update(bluray=True, description=True)
+    output = await desc.general_description_generator(meta, **kwargs)
+    assert output.count(URL) == 1
+    assert 'Example notes from the uploader.' in output
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('required', [True, False])
+async def test_unreadable_found_edition_is_dropped_but_given_one_is_kept(tmp_path, monkeypatch, required):
+    # Exhausted retries return the release unparsed, without a subheader.
+    monkeypatch.setattr('src.bluray_com.fetch_release_details', AsyncMock(side_effect=lambda selected, _: selected))
+    meta = Meta(base_dir=str(tmp_path), uuid='test', is_disc='BDMV', region='USA')
+    releases = await use_bluray_url(meta, URL, required=required)
+    assert bool(releases) is required
+    assert meta.release_url == (URL if required else '')
+    assert meta.region == 'USA'

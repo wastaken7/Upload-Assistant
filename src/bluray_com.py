@@ -3,7 +3,7 @@ import asyncio
 import json
 import random
 import re
-from collections.abc import Mapping, MutableMapping, Sequence
+from collections.abc import Iterable, Mapping, MutableMapping, Sequence
 from contextvars import ContextVar
 from pathlib import Path
 from typing import Any, cast
@@ -61,6 +61,28 @@ def normalize_bluray_url(value: str) -> str:
     if not match:
         raise ValueError("Blu-ray.com URL must be an edition page, e.g. https://www.blu-ray.com/movies/Title-Blu-ray/123456/")
     return f"https://www.blu-ray.com/{match[1]}/{match[2]}/{match[3]}/"
+
+
+_EDITION_URL_RE = re.compile(r"https?://(?:www\.)?blu-ray\.com/(?:movies|dvd)/[^\s\[\]\"'<>/]+/\d+/?", re.IGNORECASE)
+
+
+def find_bluray_url(texts: Iterable[Any], is_disc: str) -> str:
+    """Return the only Blu-ray.com edition of this disc type linked in these descriptions, or "".
+
+    DVD editions live under /dvd/ and Blu-ray ones under /movies/. 4K and 3D editions are
+    accepted for any Blu-ray, as a combo set's 1080p disc is listed with its 4K edition.
+    """
+    section = "/dvd/" if is_disc == "DVD" else "/movies/"
+    urls: set[str] = set()
+    for text in texts:
+        for match in _EDITION_URL_RE.finditer(str(text or "")):
+            try:
+                url = normalize_bluray_url(match[0])
+            except ValueError:
+                continue
+            if section in url:
+                urls.add(url)
+    return next(iter(urls)) if len(urls) == 1 else ""
 
 
 def set_selected_release(meta: Meta, release: Release) -> None:
@@ -388,13 +410,20 @@ def _derive_release_type(meta: Meta) -> tuple[str, bool, bool, bool]:
     return release_type, is_3d, is_4k, is_dvd
 
 
-async def use_bluray_url(meta: Meta, url: str) -> list[Release]:
-    """Use a known Blu-ray.com edition instead of searching for one."""
+async def use_bluray_url(meta: Meta, url: str, *, required: bool = True) -> list[Release]:
+    """Use a known Blu-ray.com edition instead of searching for one.
+
+    An edition that is not ``required`` (found by UA rather than given by the user)
+    is dropped when its page cannot be read, so the caller can search instead.
+    """
     url = normalize_bluray_url(url)
     release_id = url.rstrip("/").rsplit("/", 1)[-1]
     logger.info(f"[blue]Using Blu-ray.com edition: {url}[/blue]")
     release = await fetch_release_details({"url": url, "release_id": release_id, "title": meta.title or "Unknown"}, meta)
     if "subheader" not in release:
+        if not required:
+            logger.info("[yellow]Could not read the linked Blu-ray.com page; searching instead.[/yellow]")
+            return []
         cli_ui.warning("Could not read the Blu-ray.com page; only the link will be used.")
     if not release.get("country"):
         logger.info("[yellow]Blu-ray.com page has no country; region left unchanged.[/yellow]")
