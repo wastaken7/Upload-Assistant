@@ -282,16 +282,12 @@ class InfinityHD(TmdbTvNaming, UNIT3D):
         if components.title and components.alt_title and components.year:
             # Normalize the exact metadata prefix when TV rebuilding cannot do so.
             old_prefix = " ".join(f"{components.title} {components.year} {components.alt_title}".split())
-            if (
-                ihd_name == old_prefix
-                or ihd_name.startswith(old_prefix + " ")
-                or (components.tag and ihd_name == old_prefix + components.tag)
-            ):
+            if ihd_name == old_prefix or ihd_name.startswith(old_prefix + " ") or (components.tag and ihd_name == old_prefix + components.tag):
                 year = components.year
                 if meta.category == "TV" and not await self._tv_title_needs_year(meta):
                     year = ""
                 new_prefix = " ".join(f"{components.title} {components.alt_title} {year}".split())
-                ihd_name = new_prefix + ihd_name[len(old_prefix):]
+                ihd_name = new_prefix + ihd_name[len(old_prefix) :]
 
         if not meta.language_checked:
             await languages_manager.process_desc_language(meta, tracker=self.tracker)

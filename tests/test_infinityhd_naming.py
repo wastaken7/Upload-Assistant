@@ -173,8 +173,8 @@ def test_existing_tv_rebuild_takes_precedence(monkeypatch):
     assert meta.to_dict() == before
 
 
-def test_manual_name_with_attached_configured_tag():
-    """Reorder a manual-name prefix when its configured tag follows directly."""
+def test_manual_name_with_attached_configured_tag_is_verbatim():
+    """Keep a manual name verbatim even when its prefix could be reordered."""
     meta = Meta(title='Title', aka='AKA Alternate', year=2024,
                 category='TV', search_year=2024,
                 manual_name='Title 2024 AKA Alternate-GROUP', tag='-GROUP',
@@ -183,7 +183,7 @@ def test_manual_name_with_attached_configured_tag():
     assert meta.name == 'Title 2024 AKA Alternate-GROUP'
     before = meta.to_dict()
     assert asyncio.run(InfinityHD(CONFIG).get_name(meta)) == {
-        'name': 'Title AKA Alternate 2024-GROUP'}
+        'name': 'Title 2024 AKA Alternate-GROUP'}
     assert meta.to_dict() == before
 
 
