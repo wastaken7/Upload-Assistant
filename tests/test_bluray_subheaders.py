@@ -8,6 +8,7 @@ import pytest
 from src.args import Args
 from src.bluray_com import (
     ensure_release_subheader,
+    find_bluray_url,
     get_bluray_releases,
     normalize_bluray_url,
     parse_release_details,
@@ -431,3 +432,27 @@ async def test_unattended_search_without_results_does_not_ask(tmp_path, monkeypa
     monkeypatch.setattr('src.bluray_com.search_bluray', AsyncMock(return_value=None))
     monkeypatch.setattr('src.bluray_com.cli_ui.ask_string', lambda _: pytest.fail('unexpected prompt'))
     assert await get_bluray_releases(Meta(base_dir=str(tmp_path), uuid='test', is_disc='BDMV', unattended=True)) == []
+
+
+@pytest.mark.parametrize('texts, expected', [
+    ([f'[center][url={URL}]Example Studio | 1981 | 159 min[/url][/center]'], URL),
+    # The same edition linked by several trackers, in another URL form.
+    ([f'[url={URL}]Label[/url]', 'See http://blu-ray.com/movies/Example-Series-Blu-ray/123456 for specs'], URL),
+    ([f'[url={URL}]A[/url]', '[url=https://www.blu-ray.com/movies/Example-Series-4K-Blu-ray/999/]B[/url]'], ''),
+    (['[url=https://www.blu-ray.com/Example-Series/20915/]Product page[/url]', '', None], ''),
+])
+def test_find_bluray_url_needs_one_linked_edition(texts, expected):
+    assert find_bluray_url(texts) == expected
+
+
+@pytest.mark.asyncio
+async def test_imported_link_to_the_same_edition_is_not_repeated(tmp_path, monkeypatch):
+    monkeypatch.setattr('src.bluray_com.fetch_release_details', AsyncMock(return_value=release(subheader=LABEL)))
+    imported = f'[center][url={URL}]{LABEL}[/url][/center]\n\nExample notes from the uploader.'
+    meta = Meta(is_disc='BDMV', release_url=URL, description=imported, base_dir=str(tmp_path), uuid='test')
+    desc = builder()
+    kwargs = {name: False for name, parameter in inspect.signature(desc.general_description_generator).parameters.items() if parameter.default is True}
+    kwargs.update(bluray=True, description=True)
+    output = await desc.general_description_generator(meta, **kwargs)
+    assert output.count(URL) == 1
+    assert 'Example notes from the uploader.' in output

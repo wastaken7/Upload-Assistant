@@ -3,7 +3,7 @@ import asyncio
 import json
 import random
 import re
-from collections.abc import Mapping, MutableMapping, Sequence
+from collections.abc import Iterable, Mapping, MutableMapping, Sequence
 from contextvars import ContextVar
 from pathlib import Path
 from typing import Any, cast
@@ -61,6 +61,21 @@ def normalize_bluray_url(value: str) -> str:
     if not match:
         raise ValueError("Blu-ray.com URL must be an edition page, e.g. https://www.blu-ray.com/movies/Title-Blu-ray/123456/")
     return f"https://www.blu-ray.com/{match[1]}/{match[2]}/{match[3]}/"
+
+
+_EDITION_URL_RE = re.compile(r"https?://(?:www\.)?blu-ray\.com/(?:movies|dvd)/[^\s\[\]\"'<>/]+/\d+/?", re.IGNORECASE)
+
+
+def find_bluray_url(texts: Iterable[Any]) -> str:
+    """Return the only Blu-ray.com edition linked in these descriptions, or "" when none or several are."""
+    urls: set[str] = set()
+    for text in texts:
+        for match in _EDITION_URL_RE.finditer(str(text or "")):
+            try:
+                urls.add(normalize_bluray_url(match[0]))
+            except ValueError:
+                continue
+    return next(iter(urls)) if len(urls) == 1 else ""
 
 
 def set_selected_release(meta: Meta, release: Release) -> None:
