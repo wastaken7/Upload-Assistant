@@ -662,6 +662,7 @@ const argumentSections = [
       { flag: "--edition", placeholder: "TEXT" },
       { flag: "--region", placeholder: "REGION" },
       { flag: "--distributor", placeholder: "NAME" },
+      { flag: "--bluray-url", placeholder: "URL" },
     ],
   },
   {

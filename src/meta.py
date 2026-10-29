@@ -83,6 +83,7 @@ class Meta:
     bluray_cover_urls: dict[str, Any] = field(default_factory=dict)
     bluray_score: int = 100
     bluray_single_score: int = 100
+    bluray_url: str = ""
     book_asin: str | None = None
     book_author: str | None = None
     book_isbn: str | None = None
