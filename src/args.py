@@ -1500,6 +1500,10 @@ class Args:
         if parsed_args.get("archive_password"):
             meta.usenet_archive_password_is_random = str(meta.archive_password).lower() == "random"
 
+        # A hardcoded-subtitle language implies the release has hardcoded subtitles.
+        if meta.hardcoded_subs_language:
+            meta.hardcoded_subs = True
+
         manual_frames_value = meta.manual_frames
         if manual_frames_value is not None:
             try:
