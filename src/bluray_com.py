@@ -403,13 +403,20 @@ def _derive_release_type(meta: Meta) -> tuple[str, bool, bool, bool]:
     return release_type, is_3d, is_4k, is_dvd
 
 
-async def use_bluray_url(meta: Meta, url: str) -> list[Release]:
-    """Use a known Blu-ray.com edition instead of searching for one."""
+async def use_bluray_url(meta: Meta, url: str, *, required: bool = True) -> list[Release]:
+    """Use a known Blu-ray.com edition instead of searching for one.
+
+    An edition that is not ``required`` (found by UA rather than given by the user)
+    is dropped when its page cannot be read, so the caller can search instead.
+    """
     url = normalize_bluray_url(url)
     release_id = url.rstrip("/").rsplit("/", 1)[-1]
     logger.info(f"[blue]Using Blu-ray.com edition: {url}[/blue]")
     release = await fetch_release_details({"url": url, "release_id": release_id, "title": meta.title or "Unknown"}, meta)
     if "subheader" not in release:
+        if not required:
+            logger.info("[yellow]Could not read the linked Blu-ray.com page; searching instead.[/yellow]")
+            return []
         cli_ui.warning("Could not read the Blu-ray.com page; only the link will be used.")
     if not release.get("country"):
         logger.info("[yellow]Blu-ray.com page has no country; region left unchanged.[/yellow]")

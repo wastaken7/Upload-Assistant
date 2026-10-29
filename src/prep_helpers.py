@@ -1524,8 +1524,8 @@ async def finalize_metadata(
         linked_url = find_bluray_url([*meta.tracker_description_raw.values(), meta.description])
         if linked_url:
             logger.info(f"[green]Using the Blu-ray.com edition linked in the tracker description: {linked_url}[/green]")
-            releases = await use_bluray_url(meta, linked_url)
-        else:
+            releases = await use_bluray_url(meta, linked_url, required=False)
+        if not releases:
             releases = await get_bluray_releases(meta)
     if releases and meta.is_disc in ("BDMV", "DVD") and meta.use_bluray_images:
         # and if we getting bluray/dvd images, we'll rehost them

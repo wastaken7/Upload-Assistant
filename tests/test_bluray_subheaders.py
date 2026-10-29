@@ -456,3 +456,15 @@ async def test_imported_link_to_the_same_edition_is_not_repeated(tmp_path, monke
     output = await desc.general_description_generator(meta, **kwargs)
     assert output.count(URL) == 1
     assert 'Example notes from the uploader.' in output
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('required', [True, False])
+async def test_unreadable_found_edition_is_dropped_but_given_one_is_kept(tmp_path, monkeypatch, required):
+    # Exhausted retries return the release unparsed, without a subheader.
+    monkeypatch.setattr('src.bluray_com.fetch_release_details', AsyncMock(side_effect=lambda selected, _: selected))
+    meta = Meta(base_dir=str(tmp_path), uuid='test', is_disc='BDMV', region='USA')
+    releases = await use_bluray_url(meta, URL, required=required)
+    assert bool(releases) is required
+    assert meta.release_url == (URL if required else '')
+    assert meta.region == 'USA'
