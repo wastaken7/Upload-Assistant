@@ -10358,8 +10358,7 @@ function AudionutsUAGUI() {
       context.kind === "dupes"
         ? view.attention.filter(
             (notice) =>
-              notice.item === prompt.item &&
-              notice.tracker === context.tracker,
+              notice.item === prompt.item && notice.tracker === context.tracker,
           )
         : [];
     const missing =

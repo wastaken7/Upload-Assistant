@@ -224,7 +224,7 @@ class DirtyBytes:
                     "size": torrent.get("size"),
                     "files": [],
                     "file_count": torrent.get("numfiles", ""),
-                    "link": f"{self.torrent_url}{torrent_id}/" if torrent_id else None,
+                    "link": f"{self.torrent_url}{torrent_id}" if torrent_id else None,
                     "download": f"{self.api_base_url}/download/{torrent_id}" if torrent_id else None,
                 }
             )

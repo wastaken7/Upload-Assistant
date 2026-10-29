@@ -284,7 +284,7 @@ class DigitalCore:
                         response_data: dict[str, Any] = cast(dict[str, Any], response_json) if isinstance(response_json, dict) else {}
                         if response_data.get("id"):
                             torrent_id = str(response_data["id"])
-                            meta.tracker_status[self.tracker]["torrent_id"] = torrent_id + "/"
+                            meta.tracker_status[self.tracker]["torrent_id"] = torrent_id
                             meta.tracker_status[self.tracker]["status_message"] = response_data.get("message")
                             # the .torrent is generated asynchronously; an immediate download 404s
                             for attempt in range(4):
