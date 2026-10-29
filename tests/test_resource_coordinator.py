@@ -186,7 +186,8 @@ def test_own_ticket_key_survives_access_denied(monkeypatch: pytest.MonkeyPatch) 
     assert int(created) > 0
 
 
-def test_slot_is_usable_when_own_start_time_is_denied(lock_dir: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.usefixtures("lock_dir")
+def test_slot_is_usable_when_own_start_time_is_denied(monkeypatch: pytest.MonkeyPatch) -> None:
     def deny(pid: int) -> str | None:
         raise rc.psutil.AccessDenied(pid)
 
