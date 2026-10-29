@@ -5,6 +5,7 @@ from pathlib import Path
 from unittest.mock import AsyncMock
 
 import httpx
+import pytest
 from PIL import Image
 
 from src.meta import Meta
@@ -260,30 +261,35 @@ def test_missing_tags_are_asked_until_a_site_tag_is_entered(tmp_path: Path, monk
     answers = iter(["fictional unknown tag", "Blowjob"])
     prompts: list[str] = []
 
-    async def fake_prompt(_func, question, *_args, **_kwargs):
+    def fake_ask_string(question, *_args, **_kwargs):
         prompts.append(question)
         return next(answers)
 
-    monkeypatch.setattr("src.trackers.AVISTAZ.exoticaz.prompt_in_thread", fake_prompt)
+    monkeypatch.setattr("src.manual_input.cli_ui.ask_string", fake_ask_string)
     tracker = make_tracker()
     tracker._api_search = AsyncMock(return_value=[])  # type: ignore[method-assign]
     meta = make_meta(tmp_path, keywords=[], unattended=False)
 
     assert asyncio.run(tracker.get_tags(meta)) == ["1905"]  # noqa: S101
     assert len(prompts) == 2  # noqa: S101
+    assert meta.manual_answers["xxx.tags"] == ["Blowjob"]  # noqa: S101
 
 
 def test_empty_tag_answer_cancels_the_upload(tmp_path: Path, monkeypatch) -> None:
-    async def fake_prompt(*_args, **_kwargs):
-        return ""
-
-    monkeypatch.setattr("src.trackers.AVISTAZ.exoticaz.prompt_in_thread", fake_prompt)
+    monkeypatch.setattr("src.manual_input.cli_ui.ask_string", lambda *_args, **_kwargs: "")
     tracker = make_tracker()
     meta = make_meta(tmp_path, keywords=[], unattended=False)
     tags = asyncio.run(tracker.get_tags(meta))
 
     assert tags == []  # noqa: S101
     assert "at least one tag" in tracker.check_data(meta, {"category_id": "1", "tag_ids[]": tags, "resolution_ids[]": ["5"], "media_info": "General"})  # noqa: S101
+
+
+def test_pre_answered_tags_are_not_asked(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr("src.manual_input.cli_ui.ask_string", lambda *_args, **_kwargs: pytest.fail("asked"))
+    meta = make_meta(tmp_path, keywords=[], answers={"xxx.tags": "blowjob"})
+
+    assert asyncio.run(make_tracker().get_tags(meta)) == ["1905"]  # noqa: S101
 
 
 def test_unattended_upload_without_tags_is_skipped_before_upload(tmp_path: Path) -> None:
@@ -294,40 +300,45 @@ def test_unattended_upload_without_tags_is_skipped_before_upload(tmp_path: Path)
     assert asyncio.run(tracker.get_additional_checks(make_meta(tmp_path, keywords=["blowjob"]))) is True  # noqa: S101
 
 
-def fake_prompts(monkeypatch, answers: list[object]) -> list[str]:
-    queue = iter(answers)
+def fake_prompts(monkeypatch, confirmed: bool, selections: list[list[str] | None]) -> list[str]:
+    queue = iter(selections)
     questions: list[str] = []
 
-    async def fake_prompt(_func, question, *_args, **_kwargs):
+    def ask_yes_no(question, *_args, **_kwargs):
+        questions.append(question)
+        return confirmed
+
+    def select_choices(question, *_args, **_kwargs):
         questions.append(question)
         return next(queue)
 
-    monkeypatch.setattr("src.trackers.AVISTAZ.exoticaz.prompt_in_thread", fake_prompt)
+    monkeypatch.setattr("src.manual_input.cli_ui.ask_yes_no", ask_yes_no)
+    monkeypatch.setattr("src.manual_input.cli_ui.select_choices", select_choices)
     return questions
 
 
 def test_confirmed_flags_keep_the_detected_ones(tmp_path: Path, monkeypatch) -> None:
-    questions = fake_prompts(monkeypatch, [True])
+    questions = fake_prompts(monkeypatch, True, [])
 
     assert asyncio.run(make_tracker().confirm_extras(make_meta(tmp_path, unattended=False))) == ["asian"]  # noqa: S101
     assert "Flags detected: Asian" in questions[0]  # noqa: S101
 
 
 def test_rejected_flags_are_asked_again_until_valid(tmp_path: Path, monkeypatch) -> None:
-    questions = fake_prompts(monkeypatch, [False, "asian, fictional", "Gay, Transexual", "Censored, ASIAN"])
+    questions = fake_prompts(monkeypatch, False, [["Gay", "Transexual"], ["Censored", "Asian"]])
 
     assert asyncio.run(make_tracker().confirm_extras(make_meta(tmp_path, unattended=False))) == ["asian", "censored"]  # noqa: S101
-    assert len(questions) == 4  # noqa: S101
+    assert len(questions) == 3  # noqa: S101
 
 
 def test_empty_flag_answer_clears_flags(tmp_path: Path, monkeypatch) -> None:
-    fake_prompts(monkeypatch, [False, ""])
+    fake_prompts(monkeypatch, False, [None])
 
     assert asyncio.run(make_tracker().confirm_extras(make_meta(tmp_path, unattended=False))) == []  # noqa: S101
 
 
 def test_unattended_flags_are_not_asked(tmp_path: Path, monkeypatch) -> None:
-    questions = fake_prompts(monkeypatch, [])
+    questions = fake_prompts(monkeypatch, True, [])
 
     assert asyncio.run(make_tracker().confirm_extras(make_meta(tmp_path))) == ["asian"]  # noqa: S101
     assert questions == []  # noqa: S101

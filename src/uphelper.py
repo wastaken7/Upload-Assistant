@@ -1,7 +1,5 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-import asyncio
 import contextlib
-import contextvars
 import json
 import re
 import sys
@@ -21,12 +19,11 @@ from src.cleanup import cleanup_manager
 from src.cogs.redaction import Redaction
 from src.config_helpers import format_terminal_link
 from src.console import logger, prompt_in_thread
+from src.manual_input import prompt_session
 from src.meta import Meta
 from src.prompt_sound import play_prompt_sound
 from src.slot_rules.models import SlotDecision, Verdict
 from src.trackersetup import tracker_class_map
-
-_dupe_prompt_lock_held = contextvars.ContextVar("dupe_prompt_lock_held", default=False)
 
 DupeEntry = dict[str, Any]
 
@@ -279,13 +276,10 @@ class UploadHelper:
         if not isinstance(self.default_config, dict):
             raise ValueError("'DEFAULT' config section must be a dict")
         self.tracker_class_map = cast(Mapping[str, Any], tracker_class_map)
-        self._prompt_lock = asyncio.Lock()
 
     async def prompt_yes_no(self, question: str, *, default: bool = False) -> bool:
         """Ask one interactive question at a time without blocking the event loop."""
-        if _dupe_prompt_lock_held.get():
-            return await prompt_in_thread(cli_ui.ask_yes_no, question, default=default)
-        async with self._prompt_lock:
+        async with prompt_session():
             return await prompt_in_thread(cli_ui.ask_yes_no, question, default=default)
 
     async def _ask_confirmation(self, question: str) -> tuple[bool, dict[str, Any]]:
@@ -303,7 +297,7 @@ class UploadHelper:
             finally:
                 webui_events.prompt_close(prompt_id)
 
-        async with self._prompt_lock:
+        async with prompt_session():
             return await prompt_in_thread(ask)
 
     async def dupe_check(self, dupes: list[DupeEntry | str], meta: Meta, tracker_name: str, slot_decision: SlotDecision | None = None) -> tuple[bool, Meta]:
@@ -322,13 +316,9 @@ class UploadHelper:
             if not dupes and slot_decision is not None:
                 needs_review = meta.dupe is False and (slot_decision.verdict is Verdict.BLOCK or (slot_decision.verdict is Verdict.REVIEW and bool(slot_decision.conflicts)))
             webui_events.dupe_review_ready(tracker_name, needs_review=bool(interactive and needs_review))
-        async with self._prompt_lock:
-            token = _dupe_prompt_lock_held.set(True)
-            try:
-                with webui_events.prompt_context(kind="dupes", tracker=tracker_name):
-                    return await self._dupe_check(dupes, meta, tracker_name, slot_decision, tracker_class=prepared_tracker)
-            finally:
-                _dupe_prompt_lock_held.reset(token)
+        async with prompt_session():
+            with webui_events.prompt_context(kind="dupes", tracker=tracker_name):
+                return await self._dupe_check(dupes, meta, tracker_name, slot_decision, tracker_class=prepared_tracker)
 
     def _show_slot_decision(self, decision: SlotDecision, meta: Meta) -> None:
         """Print a tracker's slot recommendation as a small, readable box."""

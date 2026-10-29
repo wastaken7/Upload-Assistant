@@ -177,6 +177,7 @@ Common options:
   -ov, --overview            Overview/synopsis override for any category
   --genres                   Comma-separated genre override for any category
   --tracker-id               Tracker torrent ID (example: --tracker-id AITHER=1234)
+  --answer                   Pre-answer a manual question (example: --answer game.subcategory=dlc; --answer help lists keys)
   -serv, --service           Streaming service
   --no-aka                   Remove AKA from title
   -daily, --daily            Air date of a daily type episode (YYYY-MM-DD)
@@ -861,6 +862,12 @@ class Args:
             metavar="TRACKER=ID|URL",
             help="Tracker torrent ID, as TRACKER=ID, TRACKER=URL, or a tracker torrent URL. May be repeated. Example: --tracker-id AITHER=1234",
         )
+        parser.add_argument(
+            "--answer",
+            action="append",
+            metavar="KEY=VALUE",
+            help="Answer a question the upload would ask, as KEY=VALUE. May be repeated. Use --answer help to list the keys.",
+        )
         parser.add_argument("-req", "--search_requests", action="store_true", required=False, help="Search for matching requests on supported trackers", default=None)
         parser.add_argument("-sat", "--skip_auto_torrent", action="store_true", required=False, help="Skip automated qbittorrent client torrent searching", default=None)
         parser.add_argument(
@@ -1211,6 +1218,12 @@ class Args:
         parsed_args: dict[str, Any] = vars(parsed_args_ns)
         # console.print(args)
 
+        if any(str(value).strip().lower() == "help" for value in parsed_args.get("answer") or []):
+            from src.manual_questions import answer_help
+
+            logger.info(answer_help(), extra={"markup": False})
+            sys.exit(0)
+
         # Validation: require either path, site_upload, or webui
         if not parsed_args.get("path") and not parsed_args.get("site_upload") and not parsed_args.get("webui"):
             logger.error("[red]Error: Either a path must be provided, --site-upload must be specified, or --webui must be specified.[/red]")
@@ -1299,6 +1312,12 @@ class Args:
                         for tracker_id_value in value_list:
                             tracker_name, torrent_id = self.parse_tracker_id(tracker_id_value)
                             meta.set_tracker_ids({tracker_name: torrent_id})
+                    elif key == "answer":
+                        from src.manual_questions import parse_answer_arg
+
+                        for answer_value in value_list:
+                            answer_key, answer = parse_answer_arg(answer_value)
+                            meta.answers[answer_key] = answer
                     elif key == "manual_cast":
                         meta.manual_cast = [name.strip() for name in value2.split(",") if name.strip()]
                     elif key == "usenet_episodes_only":

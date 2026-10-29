@@ -3,11 +3,9 @@ import re
 from pathlib import Path
 from typing import Any, cast
 
-import cli_ui
-
-from src import webui_events
 from src.artwork import is_valid_cover_image
-from src.console import logger, prompt_in_thread
+from src.console import logger
+from src.manual_input import Question, ask, confirm_override
 from src.meta import Meta
 from src.trackers.common import Common
 from src.trackers.UNIT3D import UNIT3D
@@ -218,12 +216,7 @@ class Seedpool(UNIT3D):
         resolution = meta.resolution
         if meta.category in {"MOVIE", "TV"} and resolution not in ["8640p", "4320p", "2160p", "1440p", "1080p", "1080i"]:
             logger.info(f"{self.tracker}: [bold red]Only 1080 or higher resolutions allowed at {self.tracker}.[/bold red]")
-            if not meta.unattended or (bool(meta.unattended) and meta.unattended_confirm):
-                if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
-                    pass
-                else:
-                    return False
-            else:
+            if not await confirm_override(meta):
                 return False
 
         disallowed_keywords = {"xxx", "erotic", "porn"}
@@ -235,32 +228,31 @@ class Seedpool(UNIT3D):
         else:
             combined_genres = [str(g) for g in cast(list[Any], combined_genres_val)]
         if any(keyword.lower() in disallowed_keywords for keyword in keywords) or any(genre.lower() in disallowed_genres for genre in combined_genres):
-            if not meta.unattended or (bool(meta.unattended) and meta.unattended_confirm):
-                logger.info(f"{self.tracker}: [bold red]Porn/xxx is not allowed at {self.tracker}.[/bold red]")
-                if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
-                    pass
-                else:
-                    return False
-            else:
+            logger.info(f"{self.tracker}: [bold red]Porn/xxx is not allowed at {self.tracker}.[/bold red]")
+            if not await confirm_override(meta):
                 return False
 
         # Album genres are sent as keywords; the IRC announce bot needs them.
         if meta.category == "MUSIC" and not any(str(genre).strip() for genre in meta.genres):
             logger.info(f"{self.tracker}: [bold red]Album genres are required in keywords for the {self.tracker} IRC announce.[/bold red]")
-            if meta.unattended and not meta.unattended_confirm:
+            genres = await ask(
+                meta,
+                Question(
+                    key="music.genres",
+                    kind="list",
+                    prompt=f"{self.tracker}: Enter the album genres, comma-separated (leave empty to skip this upload)",
+                    title="Album genres",
+                    hint=f"Required for the {self.tracker} IRC announce. Leaving it blank skips this upload.",
+                    placeholder="e.g. Rock, Jazz",
+                    summary={"Tracker": self.tracker, "Release": meta.name or meta.title, "Genres": ""},
+                    focus="Genres",
+                    tracker=self.tracker,
+                    unattended="fail",
+                ),
+            )
+            if not genres:
                 return False
-            with webui_events.field_prompt(
-                "Album genres",
-                {"Tracker": self.tracker, "Release": meta.name or meta.title, "Genres": ""},
-                focus="Genres",
-                hint=f"Required for the {self.tracker} IRC announce. Leaving it blank skips this upload.",
-                actions=[("", "Skip this upload")],
-                placeholder="e.g. Rock, Jazz",
-            ):
-                user_genres = await prompt_in_thread(cli_ui.ask_string, "Enter the album genres, comma-separated", default="")
-            meta.genres = [genre.strip() for genre in str(user_genres or "").split(",") if genre.strip()]
-            if not meta.genres:
-                return False
+            meta.genres = genres
 
         return True
 

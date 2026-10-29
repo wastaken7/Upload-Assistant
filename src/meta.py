@@ -35,6 +35,8 @@ class Meta:
     aka: str = ""
     anime: bool = False
     anon: bool = False
+    # Pre-answers from --answer KEY=VALUE (see src/manual_input.py).
+    answers: dict[str, str] = field(default_factory=dict)
     ant_user_tags: bool | None = None
     archive_password: str | None = None
     args_line_queue: bool | None = None
@@ -283,6 +285,8 @@ class Meta:
     mal_manual: str | int | None = None
     mal: int | None = None
     manga: bool = False
+    # Answers given to src/manual_input.py questions; reloaded from meta.json.
+    manual_answers: dict[str, Any] = field(default_factory=dict)
     manual_category: str | None = None
     manual_commentary: bool = False
     manual_data: str | None = None

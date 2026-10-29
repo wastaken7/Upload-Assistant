@@ -8,15 +8,14 @@ from pathlib import Path
 from typing import Any, cast
 
 import aiofiles
-import cli_ui
 import httpx
 from bs4 import BeautifulSoup
 
-from src import webui_events
 from src.bbcode import BBCODE
-from src.console import logger, prompt_in_thread
+from src.console import logger
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.exceptions import *  # noqa F403
+from src.manual_input import Question, ask
 from src.mediainfo import MediaInfo
 from src.meta import Meta
 from src.trackers.common import Common
@@ -365,22 +364,25 @@ class AlphaRatio:
         imdb_info = cast(dict[str, Any], meta.imdb_info or {})
         cover = meta.artwork_url or imdb_info.get("cover", None)
         if cover is None:
-            if meta.unattended and not meta.unattended_confirm:
-                logger.info(f"{self.tracker}: [yellow]Unattended mode: No cover image found. Skipping {self.tracker} upload.[/yellow]")
-                meta.skipping = f"{self.tracker}"
-                return False
-            while cover is None:
-                with webui_events.field_prompt(
-                    "Cover",
-                    {"Tracker": self.tracker, "Release": meta.name or meta.title, "Cover": ""},
-                    focus="Cover",
+            cover = await ask(
+                meta,
+                Question(
+                    key="alpharatio.cover",
+                    kind="text",
+                    prompt=f"{self.tracker}: No Cover was found. Please input a link to a cover",
+                    title="Cover",
                     hint="No cover was found. Enter a link to an image ending in .jpg, .png or .gif.",
                     placeholder="https://",
-                ):
-                    cover = await prompt_in_thread(cli_ui.ask_string, "No Cover was found. Please input a link to a cover:", default="") or ""
-                if not re.match(r"https?://.*\.(jpg|png|gif)$", cover):
-                    logger.info(f"{self.tracker}: [red]Invalid image link. Please enter a link that ends with .jpg, .png, or .gif.")
-                    cover = None
+                    summary={"Tracker": self.tracker, "Release": meta.name or meta.title, "Cover": ""},
+                    focus="Cover",
+                    tracker=self.tracker,
+                    validate=lambda link: (
+                        None if re.match(r"https?://.*\.(jpg|png|gif)$", link) else "Invalid image link. Please enter a link that ends with .jpg, .png, or .gif."
+                    ),
+                ),
+            )
+            if cover is None:
+                return False
 
         # Tag Compilation
         genres_raw = meta.genres

@@ -9,14 +9,13 @@ from typing import Any
 from urllib.parse import urljoin
 
 import aiofiles
-import cli_ui
 from bs4 import BeautifulSoup
 from PIL import Image
 
-from src import webui_events
 from src.app_paths import CODE_DIR
 from src.cogs.redaction import Redaction
-from src.console import logger, prompt_in_thread
+from src.console import logger
+from src.manual_input import Question, ask, choices_from, confirm_override, has_answer
 from src.meta import Meta
 from src.screenshot_manifest import files as manifest_files
 from src.trackers.AVISTAZ import AZTrackerBase
@@ -68,6 +67,13 @@ IMAGE_EXTENSIONS = frozenset({".png", ".jpg", ".jpeg", ".webp", ".gif"})
 
 def _normalize(value: str) -> str:
     return re.sub(r"[^a-z0-9]", "", value.casefold())
+
+
+def _validate_extras(selected: list[str]) -> str | None:
+    # The site treats Gay, Transexual and straight as a single choice.
+    if "gay" in selected and "transexual" in selected:
+        return "Choose either Gay or Transexual, not both."
+    return None
 
 
 def _tag_key(value: str) -> str:
@@ -141,19 +147,22 @@ class ExoticaZ(AZTrackerBase):
             return ""
         elif len(self._video_files(meta)) <= 1:
             self.category_id = CATEGORY_IDS["Video Clips"]
-        elif not meta.unattended or meta.unattended_confirm:
-            # Several videos may be clips of one title or a themed, siterip or pornstar pack.
-            choices = ["Video Clips", "Video Pack", "Siterip Pack", "Pornstar Pack"]
-            with webui_events.field_prompt(
-                "ExoticaZ category",
-                {"Tracker": self.tracker, "Release": meta.name, "Videos": str(len(self._video_files(meta)))},
-                hint="Video Clips are clips of a single title; packs are themed, single-site or single-performer collections.",
-            ):
-                choice = await prompt_in_thread(cli_ui.ask_choice, f"{self.tracker}: Select the category for this multi-video upload", choices=choices, sort=False)
-            self.category_id = CATEGORY_IDS.get(str(choice), "")
         else:
-            logger.info(f"{self.tracker}: [yellow]Unattended mode: the category of a multi-video upload must be selected manually.[/yellow]")
-            meta.skipping = self.tracker
+            # Several videos may be clips of one title or a themed, siterip or pornstar pack.
+            choice = await ask(
+                meta,
+                Question(
+                    key="exoticaz.category",
+                    kind="choice",
+                    prompt=f"{self.tracker}: Select the category for this multi-video upload",
+                    title="ExoticaZ category",
+                    choices=choices_from(["Video Clips", "Video Pack", "Siterip Pack", "Pornstar Pack"]),
+                    hint="Video Clips are clips of a single title; packs are themed, single-site or single-performer collections.",
+                    summary={"Tracker": self.tracker, "Release": meta.name, "Videos": str(len(self._video_files(meta)))},
+                    tracker=self.tracker,
+                ),
+            )
+            self.category_id = CATEGORY_IDS.get(str(choice), "")
 
         return self.category_id
 
@@ -190,35 +199,46 @@ class ExoticaZ(AZTrackerBase):
     async def confirm_extras(self, meta: Meta) -> list[str]:
         """Let attended uploads review the flags, since keywords rarely reveal them and Asian is mandatory."""
         extras = self.get_extras(meta)
-        if meta.unattended and not meta.unattended_confirm:
-            return extras
-
         detected = ", ".join(EXTRA_LABELS[extra] for extra in extras) or "None"
         context = {"Tracker": self.tracker, "Release": meta.name, **{label: "Yes" if extra in extras else "No" for extra, label in EXTRA_LABELS.items()}}
-        with webui_events.field_prompt(f"{self.tracker} flags", context, hint="Asian torrents must be marked as Asian. Leave Censored unmarked for uncensored videos."):
-            confirmed = await prompt_in_thread(cli_ui.ask_yes_no, f"{self.tracker}: Flags detected: {detected}. Are these correct?", default=True)
-        if confirmed:
-            return extras
+        # A quick yes keeps the detected flags; the list is only shown to change them.
+        if not has_answer(meta, "exoticaz.flags"):
+            confirmed = await ask(
+                meta,
+                Question(
+                    key="exoticaz.flags_detected",
+                    kind="confirm",
+                    prompt=f"{self.tracker}: Flags detected: {detected}. Are these correct?",
+                    title=f"{self.tracker} flags",
+                    default=True,
+                    hint="Asian torrents must be marked as Asian. Leave Censored unmarked for uncensored videos.",
+                    summary=context,
+                    tracker=self.tracker,
+                    unattended="default",
+                ),
+            )
+            if confirmed:
+                return extras
 
-        options = ", ".join(EXTRA_LABELS.values())
-        while True:
-            with webui_events.field_prompt(
-                f"{self.tracker} flags",
-                context,
-                hint=f"Comma-separated flags from: {options}. Leave empty for none.",
-                placeholder="e.g. Asian, Censored",
-            ):
-                user_input = await prompt_in_thread(cli_ui.ask_string, f"{self.tracker}: Enter the flags that apply ({options}), or leave empty for none: ")
-            entered = [part.strip().casefold() for part in str(user_input or "").split(",") if part.strip()]
-            unknown = [value for value in entered if value not in EXTRA_LABELS]
-            selected = [extra for extra in EXTRA_LABELS if extra in entered]
-            if unknown:
-                logger.info(f"{self.tracker}: [yellow]Unknown flag(s): {', '.join(unknown)}. Use: {options}.[/yellow]")
-            elif "gay" in selected and "transexual" in selected:
-                # The site treats Gay, Transexual and straight as a single choice.
-                logger.info(f"{self.tracker}: [yellow]Choose either Gay or Transexual, not both.[/yellow]")
-            else:
-                return selected
+        selected = await ask(
+            meta,
+            Question(
+                key="exoticaz.flags",
+                kind="multi_choice",
+                prompt=f"{self.tracker}: Select the flags that apply, or leave empty for none",
+                title=f"{self.tracker} flags",
+                choices=choices_from(EXTRA_LABELS),
+                hint="Asian torrents must be marked as Asian. Leave Censored unmarked for uncensored videos.",
+                summary=context,
+                tracker=self.tracker,
+                unattended="fail",
+                empty_ok=True,
+                validate=_validate_extras,
+            ),
+        )
+        if selected is None:
+            return extras
+        return [extra for extra in EXTRA_LABELS if extra in selected]
 
     async def _api_search(self, endpoint: str, term: str) -> list[dict[str, Any]]:
         headers = {"Referer": f"{self.base_url}/upload", "X-Requested-With": "XMLHttpRequest", "Accept": "application/json"}
@@ -265,26 +285,34 @@ class ExoticaZ(AZTrackerBase):
 
     async def get_tags(self, meta: Meta) -> list[str]:
         tag_ids = await self.resolve_tags(self.get_tag_words(meta))
-        if tag_ids or (meta.unattended and not meta.unattended_confirm):
+        if tag_ids:
             return tag_ids
 
         # ExoticaZ requires tags, so ask for them before anything is sent to the site.
         logger.info(f"{self.tracker}: [yellow]No site tags were found for this release. ExoticaZ requires at least one tag.[/yellow]")
-        while not tag_ids:
-            with webui_events.field_prompt(
-                f"{self.tracker} tags",
-                {"Tracker": self.tracker, "Release": meta.name, "Keywords": ", ".join(meta.keywords or []) or "None"},
+
+        async def known_tags(words: list[str]) -> str | None:
+            nonlocal tag_ids
+            tag_ids = await self.resolve_tags([word for word in (_tag_key(word) for word in words) if word])
+            return None if tag_ids else f"None of these tags exist on ExoticaZ: {', '.join(words)}"
+
+        words = await ask(
+            meta,
+            Question(
+                key="xxx.tags",
+                kind="list",
+                prompt=f"{self.tracker}: Enter tags separated by commas (leave empty to cancel)",
+                title=f"{self.tracker} tags",
                 hint="Comma-separated tags in English, such as the ones listed at https://exoticaz.to/tags. Leave empty to cancel the upload.",
                 placeholder="e.g. blowjob, big tits",
-            ):
-                user_input = await prompt_in_thread(cli_ui.ask_string, f"{self.tracker}: Enter tags separated by commas (leave empty to cancel): ")
-            words = [word for word in (_tag_key(part) for part in str(user_input or "").split(",")) if word]
-            if not words:
-                logger.info(f"{self.tracker}: No tags entered. The upload was cancelled.")
-                return []
-            tag_ids = await self.resolve_tags(words)
-            if not tag_ids:
-                logger.info(f"{self.tracker}: [yellow]None of these tags exist on ExoticaZ: {', '.join(words)}[/yellow]")
+                summary={"Tracker": self.tracker, "Release": meta.name, "Keywords": ", ".join(meta.keywords or []) or "None"},
+                tracker=self.tracker,
+                validate=known_tags,
+            ),
+        )
+        if not words:
+            logger.info(f"{self.tracker}: No tags were given. The upload was cancelled.")
+            return []
         return tag_ids
 
     async def get_studio_ids(self, meta: Meta) -> list[str]:
@@ -361,10 +389,7 @@ class ExoticaZ(AZTrackerBase):
             warnings = self.rules(meta)
             if warnings:
                 logger.info(f"{self.tracker}: [red]Rule check returned the following warning(s):[/red]\n\n{warnings}")
-                if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                    if not await prompt_in_thread(cli_ui.ask_yes_no, "Do you want to continue anyway?", default=False):
-                        return False
-                else:
+                if not await confirm_override(meta, "Do you want to continue anyway?"):
                     return False
 
         media_info = await self.get_file_info(meta)
