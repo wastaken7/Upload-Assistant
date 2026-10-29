@@ -1,0 +1,83 @@
+{"op":"upsert","id":"pesto-upload","label":"Posting to Usenet","status":"running","group":"external","unit":"percent","current":0.0,"total":100.0,"detail":"Starting pesto upload"}
+{"op":"upsert","id":"pesto-par2-encode","label":"Calculating PAR2 parity","status":"running","group":"external","unit":"steps","current":0.0,"total":5.0}
+{"op":"upsert","id":"pesto-par2-write","label":"Writing PAR2 recovery files","status":"running","group":"external","unit":"steps","current":0.0,"total":1.0}
+{"op":"upsert","id":"pesto-par2-encode","label":"Calculating PAR2 parity","status":"running","group":"external","unit":"steps","current":1.0,"total":5.0,"detail":"1/5 slices"}
+{"op":"upsert","id":"pesto-upload","label":"Posting to Usenet","status":"running","group":"external","unit":"percent","current":24.9,"total":100.0,"detail":"0/5 segments posted"}
+{"op":"upsert","id":"pesto-par2-encode","label":"Calculating PAR2 parity","status":"running","group":"external","unit":"steps","current":2.0,"total":5.0,"detail":"2/5 slices"}
+{"op":"upsert","id":"pesto-upload","label":"Posting to Usenet","status":"running","group":"external","unit":"percent","current":49.9,"total":100.0,"detail":"0/5 segments posted"}
+{"op":"upsert","id":"pesto-par2-encode","label":"Calculating PAR2 parity","status":"running","group":"external","unit":"steps","current":3.0,"total":5.0,"detail":"3/5 slices"}
+{"op":"upsert","id":"pesto-par2-encode","label":"Calculating PAR2 parity","status":"running","group":"external","unit":"steps","current":4.0,"total":5.0,"detail":"4/5 slices"}
+{"op":"upsert","id":"pesto-upload","label":"Posting to Usenet","status":"running","group":"external","unit":"percent","current":50.1,"total":100.0,"detail":"0/5 segments posted"}
+{"op":"upsert","id":"pesto-upload","label":"Posting to Usenet","status":"running","group":"external","unit":"percent","current":75.1,"total":100.0,"detail":"0/5 segments posted"}
+{"op":"upsert","id":"pesto-par2-encode","label":"Calculating PAR2 parity","status":"running","group":"external","unit":"steps","current":5.0,"total":5.0,"detail":"5/5 slices"}
+{"op":"upsert","id":"pesto-upload","label":"Posting to Usenet","status":"running","group":"external","unit":"percent","current":100.0,"total":100.0,"detail":"0/5 segments posted"}
+{"op":"upsert","id":"pesto-upload","label":"Posting to Usenet","status":"running","group":"external","unit":"percent","current":100.0,"total":100.0,"detail":"0/6 segments posted"}
+{"op":"upsert","id":"pesto-par2-write","label":"Writing PAR2 recovery files","status":"running","group":"external","unit":"steps","current":1.0,"total":1.0,"detail":"1/1 slices"}
+{"op":"upsert","id":"pesto-upload","label":"Posting to Usenet","status":"running","group":"external","unit":"percent","current":100.0,"total":100.0,"detail":"0/7 segments posted"}
+{"op":"upsert","id":"pesto-par2-encode","label":"Calculating PAR2 parity","status":"running","group":"external","unit":"steps","current":0.0,"total":5.0}
+{"op":"upsert","id":"pesto-par2-write","label":"Writing PAR2 recovery files","status":"running","group":"external","unit":"steps","current":0.0,"total":1.0}
+{"op":"upsert","id":"pesto-par2-encode","label":"Calculating PAR2 parity","status":"running","group":"external","unit":"steps","current":1.0,"total":5.0,"detail":"1/5 slices"}
+{"op":"upsert","id":"pesto-upload","label":"Posting to Usenet","status":"running","group":"external","unit":"percent","current":24.9,"total":100.0,"detail":"0/5 segments posted"}
+{"op":"upsert","id":"pesto-upload","label":"Posting to Usenet","status":"running","group":"external","unit":"percent","current":49.9,"total":100.0,"detail":"0/5 segments posted"}
+{"op":"upsert","id":"pesto-par2-encode","label":"Calculating PAR2 parity","status":"running","group":"external","unit":"steps","current":2.0,"total":5.0,"detail":"2/5 slices"}
+{"op":"upsert","id":"pesto-par2-encode","label":"Calculating PAR2 parity","status":"running","group":"external","unit":"steps","current":3.0,"total":5.0,"detail":"3/5 slices"}
+{"op":"upsert","id":"pesto-upload","label":"Posting to Usenet","status":"running","group":"external","unit":"percent","current":74.8,"total":100.0,"detail":"0/5 segments posted"}
+{"op":"upsert","id":"pesto-upload","label":"Posting to Usenet","status":"running","group":"external","unit":"percent","current":99.7,"total":100.0,"detail":"0/5 segments posted"}
+{"op":"upsert","id":"pesto-par2-encode","label":"Calculating PAR2 parity","status":"running","group":"external","unit":"steps","current":4.0,"total":5.0,"detail":"4/5 slices"}
+{"op":"upsert","id":"pesto-par2-encode","label":"Calculating PAR2 parity","status":"running","group":"external","unit":"steps","current":5.0,"total":5.0,"detail":"5/5 slices"}
+{"op":"upsert","id":"pesto-upload","label":"Posting to Usenet","status":"running","group":"external","unit":"percent","current":100.0,"total":100.0,"detail":"0/5 segments posted"}
+{"op":"upsert","id":"pesto-upload","label":"Posting to Usenet","status":"running","group":"external","unit":"percent","current":100.0,"total":100.0,"detail":"0/6 segments posted"}
+{"op":"upsert","id":"pesto-par2-write","label":"Writing PAR2 recovery files","status":"running","group":"external","unit":"steps","current":1.0,"total":1.0,"detail":"1/1 slices"}
+{"op":"upsert","id":"pesto-upload","label":"Posting to Usenet","status":"running","group":"external","unit":"percent","current":100.0,"total":100.0,"detail":"0/7 segments posted"}
+{"op":"upsert","id":"pesto-par2-encode","label":"Calculating PAR2 parity","status":"running","group":"external","unit":"steps","current":0.0,"total":5.0}
+{"op":"upsert","id":"pesto-par2-write","label":"Writing PAR2 recovery files","status":"running","group":"external","unit":"steps","current":0.0,"total":1.0}
+{"op":"upsert","id":"pesto-upload","label":"Posting to Usenet","status":"running","group":"external","unit":"percent","current":24.9,"total":100.0,"detail":"0/5 segments posted"}
+{"op":"upsert","id":"pesto-par2-encode","label":"Calculating PAR2 parity","status":"running","group":"external","unit":"steps","current":1.0,"total":5.0,"detail":"1/5 slices"}
+{"op":"upsert","id":"pesto-par2-encode","label":"Calculating PAR2 parity","status":"running","group":"external","unit":"steps","current":2.0,"total":5.0,"detail":"2/5 slices"}
+{"op":"upsert","id":"pesto-upload","label":"Posting to Usenet","status":"running","group":"external","unit":"percent","current":49.9,"total":100.0,"detail":"0/5 segments posted"}
+{"op":"upsert","id":"pesto-par2-encode","label":"Calculating PAR2 parity","status":"running","group":"external","unit":"steps","current":3.0,"total":5.0,"detail":"3/5 slices"}
+{"op":"upsert","id":"pesto-upload","label":"Posting to Usenet","status":"running","group":"external","unit":"percent","current":50.1,"total":100.0,"detail":"0/5 segments posted"}
+{"op":"upsert","id":"pesto-par2-encode","label":"Calculating PAR2 parity","status":"running","group":"external","unit":"steps","current":4.0,"total":5.0,"detail":"4/5 slices"}
+{"op":"upsert","id":"pesto-par2-encode","label":"Calculating PAR2 parity","status":"running","group":"external","unit":"steps","current":5.0,"total":5.0,"detail":"5/5 slices"}
+{"op":"upsert","id":"pesto-upload","label":"Posting to Usenet","status":"running","group":"external","unit":"percent","current":75.1,"total":100.0,"detail":"0/5 segments posted"}
+{"op":"upsert","id":"pesto-upload","label":"Posting to Usenet","status":"running","group":"external","unit":"percent","current":100.0,"total":100.0,"detail":"0/5 segments posted"}
+{"op":"upsert","id":"pesto-par2-write","label":"Writing PAR2 recovery files","status":"running","group":"external","unit":"steps","current":1.0,"total":1.0,"detail":"1/1 slices"}
+{"op":"upsert","id":"pesto-upload","label":"Posting to Usenet","status":"running","group":"external","unit":"percent","current":98.2,"total":100.0,"detail":"0/7 segments posted"}
+{"op":"upsert","id":"pesto-upload","label":"Posting to Usenet","status":"running","group":"external","unit":"percent","current":100.0,"total":100.0,"detail":"0/7 segments posted"}
+{"op":"upsert","id":"pesto-par2-encode","label":"Calculating PAR2 parity","status":"running","group":"external","unit":"steps","current":0.0,"total":15.0}
+{"op":"upsert","id":"pesto-par2-write","label":"Writing PAR2 recovery files","status":"running","group":"external","unit":"steps","current":0.0,"total":1.0}
+{"op":"upsert","id":"pesto-par2-encode","label":"Calculating PAR2 parity","status":"running","group":"external","unit":"steps","current":0.0,"total":15.0,"detail":"0/15 slices"}
+{"op":"upsert","id":"pesto-par2-encode","label":"Calculating PAR2 parity","status":"running","group":"external","unit":"steps","current":1.0,"total":15.0,"detail":"1/15 slices"}
+{"op":"upsert","id":"pesto-par2-encode","label":"Calculating PAR2 parity","status":"running","group":"external","unit":"steps","current":1.0,"total":15.0,"detail":"1/15 slices"}
+{"op":"upsert","id":"pesto-par2-encode","label":"Calculating PAR2 parity","status":"running","group":"external","unit":"steps","current":2.0,"total":15.0,"detail":"2/15 slices"}
+{"op":"upsert","id":"pesto-par2-encode","label":"Calculating PAR2 parity","status":"running","group":"external","unit":"steps","current":2.0,"total":15.0,"detail":"2/15 slices"}
+{"op":"upsert","id":"pesto-par2-encode","label":"Calculating PAR2 parity","status":"running","group":"external","unit":"steps","current":3.0,"total":15.0,"detail":"3/15 slices"}
+{"op":"upsert","id":"pesto-par2-encode","label":"Calculating PAR2 parity","status":"running","group":"external","unit":"steps","current":3.0,"total":15.0,"detail":"3/15 slices"}
+{"op":"upsert","id":"pesto-par2-encode","label":"Calculating PAR2 parity","status":"running","group":"external","unit":"steps","current":4.0,"total":15.0,"detail":"4/15 slices"}
+{"op":"upsert","id":"pesto-par2-encode","label":"Calculating PAR2 parity","status":"running","group":"external","unit":"steps","current":4.0,"total":15.0,"detail":"4/15 slices"}
+{"op":"upsert","id":"pesto-par2-encode","label":"Calculating PAR2 parity","status":"running","group":"external","unit":"steps","current":5.0,"total":15.0,"detail":"5/15 slices"}
+{"op":"upsert","id":"pesto-par2-encode","label":"Calculating PAR2 parity","status":"running","group":"external","unit":"steps","current":5.0,"total":15.0,"detail":"5/15 slices"}
+{"op":"upsert","id":"pesto-par2-encode","label":"Calculating PAR2 parity","status":"running","group":"external","unit":"steps","current":6.0,"total":15.0,"detail":"6/15 slices"}
+{"op":"upsert","id":"pesto-par2-encode","label":"Calculating PAR2 parity","status":"running","group":"external","unit":"steps","current":6.0,"total":15.0,"detail":"6/15 slices"}
+{"op":"upsert","id":"pesto-par2-encode","label":"Calculating PAR2 parity","status":"running","group":"external","unit":"steps","current":7.0,"total":15.0,"detail":"7/15 slices"}
+{"op":"upsert","id":"pesto-par2-encode","label":"Calculating PAR2 parity","status":"running","group":"external","unit":"steps","current":7.0,"total":15.0,"detail":"7/15 slices"}
+{"op":"upsert","id":"pesto-par2-encode","label":"Calculating PAR2 parity","status":"running","group":"external","unit":"steps","current":8.0,"total":15.0,"detail":"8/15 slices"}
+{"op":"upsert","id":"pesto-par2-encode","label":"Calculating PAR2 parity","status":"running","group":"external","unit":"steps","current":8.0,"total":15.0,"detail":"8/15 slices"}
+{"op":"upsert","id":"pesto-par2-encode","label":"Calculating PAR2 parity","status":"running","group":"external","unit":"steps","current":9.0,"total":15.0,"detail":"9/15 slices"}
+{"op":"upsert","id":"pesto-par2-encode","label":"Calculating PAR2 parity","status":"running","group":"external","unit":"steps","current":9.0,"total":15.0,"detail":"9/15 slices"}
+{"op":"upsert","id":"pesto-par2-encode","label":"Calculating PAR2 parity","status":"running","group":"external","unit":"steps","current":10.0,"total":15.0,"detail":"10/15 slices"}
+{"op":"upsert","id":"pesto-par2-encode","label":"Calculating PAR2 parity","status":"running","group":"external","unit":"steps","current":10.0,"total":15.0,"detail":"10/15 slices"}
+{"op":"upsert","id":"pesto-par2-encode","label":"Calculating PAR2 parity","status":"running","group":"external","unit":"steps","current":11.0,"total":15.0,"detail":"11/15 slices"}
+{"op":"upsert","id":"pesto-par2-encode","label":"Calculating PAR2 parity","status":"running","group":"external","unit":"steps","current":11.0,"total":15.0,"detail":"11/15 slices"}
+{"op":"upsert","id":"pesto-par2-encode","label":"Calculating PAR2 parity","status":"running","group":"external","unit":"steps","current":12.0,"total":15.0,"detail":"12/15 slices"}
+{"op":"upsert","id":"pesto-par2-encode","label":"Calculating PAR2 parity","status":"running","group":"external","unit":"steps","current":12.0,"total":15.0,"detail":"12/15 slices"}
+{"op":"upsert","id":"pesto-par2-encode","label":"Calculating PAR2 parity","status":"running","group":"external","unit":"steps","current":13.0,"total":15.0,"detail":"13/15 slices"}
+{"op":"upsert","id":"pesto-par2-encode","label":"Calculating PAR2 parity","status":"running","group":"external","unit":"steps","current":13.0,"total":15.0,"detail":"13/15 slices"}
+{"op":"upsert","id":"pesto-par2-encode","label":"Calculating PAR2 parity","status":"running","group":"external","unit":"steps","current":14.0,"total":15.0,"detail":"14/15 slices"}
+{"op":"upsert","id":"pesto-par2-encode","label":"Calculating PAR2 parity","status":"running","group":"external","unit":"steps","current":14.0,"total":15.0,"detail":"14/15 slices"}
+{"op":"upsert","id":"pesto-par2-encode","label":"Calculating PAR2 parity","status":"running","group":"external","unit":"steps","current":15.0,"total":15.0,"detail":"15/15 slices"}
+{"op":"upsert","id":"pesto-par2-write","label":"Writing PAR2 recovery files","status":"running","group":"external","unit":"steps","current":1.0,"total":1.0,"detail":"1/1 slices"}
+{"op":"upsert","id":"pesto-upload","label":"Posting to Usenet","status":"running","group":"external","unit":"percent","current":100.0,"total":100.0,"detail":"0/1 segments posted"}
+{"op":"upsert","id":"pesto-upload","label":"Posting to Usenet","status":"completed","group":"external","unit":"percent","current":100.0,"total":100.0}
+{"op":"upsert","id":"pesto-par2-encode","label":"Calculating PAR2 parity","status":"completed","group":"external","unit":"steps","current":15.0,"total":15.0,"detail":"15/15 slices"}
+{"op":"upsert","id":"pesto-par2-write","label":"Writing PAR2 recovery files","status":"completed","group":"external","unit":"steps","current":1.0,"total":1.0,"detail":"1/1 slices"}
