@@ -15,7 +15,7 @@ from src.screenshot_manifest import files as manifest_files
 from src.screenshot_manifest import register as register_screenshots
 from src.screenshot_review import add_screenshot, list_screenshots, replace_screenshot
 from src.temp_paths import screenshots_dir
-from src.takescreens import find_ebook_info_page, generate_ebook_screenshots, select_ebook_pages
+from src.takescreens import _render_document_page, find_ebook_info_page, generate_ebook_screenshots, select_ebook_pages
 
 
 def _make_pdf(path: Path, pages: list[str]) -> None:
@@ -82,6 +82,36 @@ def test_pdf_screenshots_include_cover_and_isbn_page(tmp_path: Path) -> None:
     rendered = [fitz.Pixmap(path).tobytes("png") for path in result]
     assert rendered[0] == cover  # noqa: S101
     assert isbn_page in rendered  # noqa: S101
+
+
+def test_small_lone_cover_image_fills_the_screenshot(tmp_path: Path) -> None:
+    cover = fitz.Pixmap(fitz.csRGB, fitz.IRect(0, 0, 1200, 1800), False)
+    cover.set_rect(cover.irect, (200, 30, 30))
+    pdf = tmp_path / "Invented Book.pdf"
+    doc = fitz.open()
+    doc.new_page(width=400, height=600).insert_image(fitz.Rect(170, 0, 230, 90), pixmap=cover)
+    captioned = doc.new_page(width=400, height=600)
+    captioned.insert_image(fitz.Rect(170, 0, 230, 90), pixmap=cover)
+    captioned.insert_text((72, 300), "Caption")
+    illustrated = doc.new_page(width=400, height=600)
+    illustrated.draw_rect(fitz.Rect(20, 120, 380, 580), fill=(0, 0.6, 0))
+    illustrated.insert_image(fitz.Rect(170, 0, 230, 90), pixmap=cover)
+    rotated = doc.new_page(width=400, height=600)
+    rotated.insert_image(fitz.Rect(300, 10, 360, 100), pixmap=cover)
+    rotated.set_rotation(90)
+    doc.save(pdf)
+    doc.close()
+
+    with fitz.open(pdf) as doc:
+        lone = fitz.Pixmap(str(_render_document_page(doc, 0, tmp_path / "lone")))
+        text = fitz.Pixmap(str(_render_document_page(doc, 1, tmp_path / "text")))
+        vector = fitz.Pixmap(str(_render_document_page(doc, 2, tmp_path / "vector")))
+        turned = fitz.Pixmap(str(_render_document_page(doc, 3, tmp_path / "turned")))
+
+    assert abs(lone.width - 800) <= 1 and abs(lone.height - 1200) <= 1  # noqa: S101
+    assert lone.pixel(5, 5) == lone.pixel(lone.width - 5, lone.height - 5) == (200, 30, 30)  # noqa: S101
+    assert (text.width, text.height) == (800, 1200) == (vector.width, vector.height)  # noqa: S101
+    assert turned.pixel(5, 5) == turned.pixel(turned.width - 5, turned.height - 5) == (200, 30, 30)  # noqa: S101
 
 
 def _book_meta(tmp_path: Path, pdf: Path, **kwargs: object) -> Meta:

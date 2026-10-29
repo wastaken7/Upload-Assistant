@@ -1687,11 +1687,41 @@ def _write_comic_page(archive: Any, name: str, dest_stem: Path, force_suffix: st
     return dest_path
 
 
+def _lone_image_clip(page: Any) -> tuple[Any, float] | None:
+    """Return the area and native zoom of the only image on a text-free page when it fills under half of it.
+
+    MuPDF often lays out EPUB cover pages (percentage or viewport heights) as a
+    small image at the top of a blank page.
+    """
+    import fitz  # PyMuPDF
+
+    if page.get_text().strip() or page.first_annot:
+        return None
+    images = page.get_image_info()
+    if len(images) != 1:
+        return None
+    # Image and drawing boxes are unrotated page coordinates; get_pixmap clips in rotated ones.
+    bbox = fitz.Rect(images[0]["bbox"])
+    if any(not bbox.contains(drawing["rect"]) for drawing in page.get_drawings()):
+        return None
+    clip = bbox * page.rotation_matrix & page.rect
+    if clip.is_empty or clip.get_area() >= page.rect.get_area() / 2:
+        return None
+    return clip, min(images[0]["width"] / bbox.width, images[0]["height"] / bbox.height)
+
+
 def _render_document_page(doc: Any, page_num: int, dest_stem: Path, suffix: str = ".png") -> Path:
     import fitz  # PyMuPDF
 
     dest_path = dest_stem.with_name(f"{dest_stem.name}{suffix}")
-    pix = doc[page_num].get_pixmap(matrix=fitz.Matrix(2.0, 2.0))
+    page = doc[page_num]
+    zoom, clip = 2.0, None
+    lone_image = _lone_image_clip(page)
+    if lone_image:
+        clip, native_zoom = lone_image
+        # Fill the normal page render size without upscaling past the image's own resolution.
+        zoom = max(zoom, min(zoom * page.rect.width / clip.width, zoom * page.rect.height / clip.height, native_zoom))
+    pix = page.get_pixmap(matrix=fitz.Matrix(zoom, zoom), clip=clip)
     if suffix == ".png":
         pix.save(dest_path)
     else:
