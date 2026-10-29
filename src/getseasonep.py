@@ -346,15 +346,29 @@ class SeasonEpisodeManager:
             for i, file in enumerate(filelist[:batch_size]):
                 logger.info(f"[cyan]  {i + 1:2d}. {Path(file).name}")
             files_shown = min(batch_size, len(filelist))
+            page_start = 0
             if unattended:
                 if missing_list:
                     logger.info("[yellow]Unattended mode: continuing without confirmation; no INCOMPLETE marker was added.")
                 else:
                     logger.info("[yellow]Unattended mode: continuing despite unexpected episode numbers (no confirmation).")
             else:
+                pack_summary: dict[str, Any] = {
+                    "Release": meta.name or meta.title,
+                    "Missing episodes": ", ".join(missing_list) if missing_list else None,
+                    "Extra episodes": ", ".join(unexpected_list) if unexpected_list else None,
+                }
                 while files_shown < len(filelist):
                     remaining_files = len(filelist) - files_shown
-                    with webui_events.answer_buttons([("n", f"Show next {batch_size}"), ("a", "Show all"), ("c", "Continue"), ("q", "Quit")]):
+                    with webui_events.field_prompt(
+                        "Season pack check",
+                        {
+                            **pack_summary,
+                            "Files shown": f"{files_shown} of {len(filelist)}",
+                            "File list": "\n".join(f"{i}. {Path(f).name}" for i, f in enumerate(filelist[page_start:files_shown], start=page_start + 1)),
+                        },
+                        actions=[("n", f"Show next {batch_size}"), ("a", "Show all"), ("c", "Continue"), ("q", "Quit")],
+                    ):
                         response = await prompt_in_thread(
                             cli_ui.ask_string,
                             f"{remaining_files} more files: show (n)ext {batch_size}, (a)ll, (c)ontinue to confirmation, or (q)uit? (n/a/c/Q): ",
@@ -364,7 +378,7 @@ class SeasonEpisodeManager:
                         end = min(files_shown + batch_size, len(filelist)) if response == "n" else len(filelist)
                         for i, file in enumerate(filelist[files_shown:end], start=files_shown + 1):
                             logger.info(f"[cyan]  {i:2d}. {Path(file).name}")
-                        files_shown = end
+                        page_start, files_shown = files_shown, end
                     elif response == "c":
                         break
                     else:
@@ -377,7 +391,16 @@ class SeasonEpisodeManager:
                     else "Continue with these extra episodes (possible specials or different numbering)? (y/N): "
                 )
                 buttons = [("y", "Incomplete: mark it"), ("n", "Complete: continue"), ("q", "Quit")] if missing_list else [("y", "Continue"), ("n", "Stop")]
-                with webui_events.answer_buttons(buttons):
+                with webui_events.field_prompt(
+                    "Season pack check",
+                    {
+                        **pack_summary,
+                        "Files shown": f"{files_shown} of {len(filelist)}",
+                        "File list": "\n".join(f"{i}. {Path(f).name}" for i, f in enumerate(filelist[page_start:files_shown], start=page_start + 1)),
+                    },
+                    hint="Season pack may be incomplete or use different episode numbering." if missing_list else "Season pack contains extra episodes not listed by TVDB.",
+                    actions=buttons,
+                ):
                     response = await prompt_in_thread(cli_ui.ask_string, question)
                 response = (response or "").strip().lower()
                 if response in ("y", "yes"):

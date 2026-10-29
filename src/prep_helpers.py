@@ -15,6 +15,7 @@ import cli_ui
 import guessit
 from torf import Torrent
 
+from src import webui_events
 from src.bluray_com import get_bluray_releases
 from src.book_prep import AUDIOBOOK_EXTENSIONS, BOOK_EXTENSIONS, BOOK_SERVICES
 from src.cleanup import cleanup_manager
@@ -292,10 +293,15 @@ async def detect_disc_and_category(prep_instance: Any, meta: Meta) -> tuple[str,
 
                 if not unattended or (unattended and unattended_confirm):
                     try:
-                        choice = cli_ui.ask_choice(
-                            "Choose category for audio release:",
-                            choices=["1. Music", "2. Audiobook"],
-                        )
+                        with webui_events.field_prompt(
+                            "Audio category",
+                            {"Path": str(path_to_check), "Evidence": "\n".join(audio_res.evidence or [])},
+                            hint="Could not confidently determine whether this audio release is MUSIC or an AUDIOBOOK.",
+                        ):
+                            choice = cli_ui.ask_choice(
+                                "Choose category for audio release:",
+                                choices=["1. Music", "2. Audiobook"],
+                            )
                     except EOFError, KeyboardInterrupt:
                         logger.error("[bold red]Category selection cancelled or failed.[/bold red]")
                         sys.exit(1)
@@ -736,9 +742,16 @@ async def validate_media(_prep_instance: Any, meta: Meta) -> None:
         upload = False
         if not meta.unattended or (meta.unattended and meta.unattended_confirm):
             try:
-                upload = cli_ui.ask_yes_no(
-                    "Found Conformance errors in mediainfo (possible cause: corrupted file, incomplete download, new codec, etc...), proceed to upload anyway?", default=False
-                )
+                first_file = meta.filelist[0] if meta.filelist else meta.path
+                with webui_events.field_prompt(
+                    "MediaInfo conformance errors",
+                    {"File": str(first_file or "")},
+                    hint="Conformance errors were found in MediaInfo (possible corrupted file, incomplete download, or new codec).",
+                ):
+                    upload = cli_ui.ask_yes_no(
+                        "Found Conformance errors in mediainfo (possible cause: corrupted file, incomplete download, new codec, etc...), proceed to upload anyway?",
+                        default=False,
+                    )
             except EOFError:
                 logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")
                 await cleanup_manager.cleanup()

@@ -353,7 +353,14 @@ class GreatPosterWall:
                 logger.info(f"{self.tracker}: [yellow]Unattended mode: Enter genres not available. Skipping {self.tracker} upload.[/yellow]")
                 meta.skipping = f"{self.tracker}"
                 return ""
-            tags_raw = await prompt_in_thread(cli_ui.ask_string, f"Enter the genres (in {self.tracker} format): ")
+            with webui_events.field_prompt(
+                "Genres",
+                {"Tracker": self.tracker, "Release": meta.name or meta.title, "Genres": ""},
+                focus="Genres",
+                hint=f"No genres were found. Comma-separated, in {self.tracker} format.",
+                placeholder="e.g. action, drama",
+            ):
+                tags_raw = await prompt_in_thread(cli_ui.ask_string, f"Enter the genres (in {self.tracker} format): ")
             tags = (tags_raw or "").strip()
 
         return tags
@@ -836,19 +843,38 @@ class GreatPosterWall:
 
             imdb_id = ""
             while not re.match(r"^nm\d+$", imdb_id):
-                imdb_id_raw = await prompt_in_thread(cli_ui.ask_string, "Enter Director IMDb ID (e.g., nm0000138): ")
+                with webui_events.field_prompt(
+                    "Director",
+                    {"Tracker": self.tracker, "Release": meta.name or meta.title, "IMDb ID": ""},
+                    focus="IMDb ID",
+                    hint=f"This movie is not in the {self.tracker} database; enter one director's IMDb person ID.",
+                    placeholder="nm0000138",
+                ):
+                    imdb_id_raw = await prompt_in_thread(cli_ui.ask_string, "Enter Director IMDb ID (e.g., nm0000138): ")
                 imdb_id = (imdb_id_raw or "").strip()
                 if not re.match(r"^nm\d+$", imdb_id):
                     logger.info(f"{self.tracker}: [red]Invalid IMDb person ID. Format must be like nm0000138.[/red]")
 
             english_name = ""
             while not english_name:
-                english_name_raw = await prompt_in_thread(cli_ui.ask_string, "Enter Director English name: ")
+                with webui_events.field_prompt(
+                    "Director",
+                    {"Tracker": self.tracker, "IMDb ID": imdb_id, "English name": ""},
+                    focus="English name",
+                    hint="The director's name in English.",
+                ):
+                    english_name_raw = await prompt_in_thread(cli_ui.ask_string, "Enter Director English name: ")
                 english_name = (english_name_raw or "").strip()
                 if not english_name:
                     logger.info(f"{self.tracker}: [red]Director English name cannot be empty.[/red]")
 
-            with webui_events.answer_buttons([("", "Skip")]):
+            with webui_events.field_prompt(
+                "Director",
+                {"Tracker": self.tracker, "IMDb ID": imdb_id, "English name": english_name, "Chinese name": ""},
+                focus="Chinese name",
+                hint="Optional: the director's name in Chinese. Leave it blank to skip.",
+                actions=[("", "Skip")],
+            ):
                 chinese_name_raw = await prompt_in_thread(cli_ui.ask_string, "Enter Director Chinese name (optional, press Enter to skip): ")
             chinese_name = (chinese_name_raw or "").strip()
 

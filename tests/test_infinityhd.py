@@ -42,3 +42,11 @@ def test_tv_aka_falls_back_to_imdb_original_title(tracker_cls, original_language
     adapter._tv_title_needs_year = AsyncMock(return_value=False)
 
     assert asyncio.run(adapter.get_name(meta))["name"] == expected
+
+
+@pytest.mark.parametrize(("original_language", "track_language", "expected"), [("ar", "ar", True), ("ko", "en-US", False), ("en", "en-US", True)])
+def test_original_language_check_accepts_tmdb_iso_string(original_language, track_language, expected):
+    tracker = InfinityHD({"DEFAULT": {"tmdb_api": "test-key"}, "TRACKERS": {"INFINITYHD": {}}})
+    meta = Meta(original_language=original_language, mediainfo={"media": {"track": [{"@type": "Audio", "Language": track_language}]}})
+
+    assert tracker.original_language_check(meta) is expected

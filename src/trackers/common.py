@@ -589,7 +589,17 @@ class Common:
 
         if not meta.unattended:
             try:
-                with webui_events.answer_buttons([("y", "Yes"), ("n", "No")]):
+                with webui_events.field_prompt(
+                    f"{tracker_name} metadata",
+                    {
+                        "Filename": filename,
+                        "TMDb ID": tmdb,
+                        "IMDb ID": f"tt{imdb}" if imdb else "",
+                        "TVDb ID": tvdb,
+                        "MAL ID": mal,
+                    },
+                    actions=[("y", "Yes"), ("n", "No")],
+                ):
                     selection = (await prompt_in_thread(cli_ui.ask_string, f"Do you want to use these IDs from {tracker_name}? (Y/n): ", default="") or "").strip().lower()
                 return selection == "" or selection == "y" or selection == "yes"
             except KeyboardInterrupt, EOFError:
@@ -600,7 +610,7 @@ class Common:
     async def prompt_user_for_confirmation(self, message: str, meta: Meta | None = None) -> bool:
         if meta and meta.unattended and not meta.unattended_confirm:
             return False
-        with webui_events.answer_buttons([("y", "Yes"), ("n", "No")]):
+        with webui_events.field_prompt("Confirmation", {"Release": (meta.name or meta.title) if meta else ""}, hint=message, actions=[("y", "Yes"), ("n", "No")]):
             response = (await prompt_in_thread(cli_ui.ask_string, f"{message} (Y/n): ", default="") or "").strip().lower()
         return response == "" or response == "y"
 
@@ -824,7 +834,13 @@ class Common:
                         return tmdb, imdb, tvdb, mal, description, category, infohash, imagelist, file_name
                     logger.info("[cyan]Do you want to edit, discard or keep the description?[/cyan]")
                     question, buttons = webui_events.letter_prompt([("e", "edit"), ("d", "discard")], "keep it as is")
-                    with webui_events.answer_buttons(buttons):
+                    with webui_events.field_prompt(
+                        "Tracker description",
+                        {"Tracker": tracker, "Description": description[:1000]},
+                        focus="Description",
+                        hint="Do you want to edit, discard or keep the description?" if webui_events.editor_available() else "Do you want to discard or keep the description?",
+                        actions=buttons,
+                    ):
                         edit_choice = cli_ui.ask_string(question)
 
                     if (edit_choice or "").lower() == "e" and webui_events.editor_available():
@@ -905,13 +921,29 @@ class Common:
                     except KeyError, IndexError, TypeError:
                         logger.info("[red]Unable to get data from ptgen using IMDb")
                         if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                            params["url"] = await prompt_in_thread(cli_ui.ask_string, "Please enter Douban link:", default="") or ""
+                            with webui_events.field_prompt(
+                                "Douban link",
+                                {"Release": meta.name or meta.title, "IMDb ID": meta.imdb_tt, "Douban link": ""},
+                                focus="Douban link",
+                                hint="Unable to get data from PT-Gen using IMDb. Enter a Douban link, or leave it blank to skip.",
+                                actions=[("", "Skip")],
+                                placeholder="https://movie.douban.com/subject/...",
+                            ):
+                                params["url"] = await prompt_in_thread(cli_ui.ask_string, "Please enter Douban link:", default="") or ""
                         else:
                             params["url"] = ""
                 else:
                     logger.info("[red]No IMDb id was found.")
                     if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                        params["url"] = await prompt_in_thread(cli_ui.ask_string, "Please enter Douban link:", default="") or ""
+                        with webui_events.field_prompt(
+                            "Douban link",
+                            {"Release": meta.name or meta.title, "Douban link": ""},
+                            focus="Douban link",
+                            hint="No IMDb ID was found for PT-Gen. Enter a Douban link, or leave it blank to skip.",
+                            actions=[("", "Skip")],
+                            placeholder="https://movie.douban.com/subject/...",
+                        ):
+                            params["url"] = await prompt_in_thread(cli_ui.ask_string, "Please enter Douban link:", default="") or ""
                     else:
                         params["url"] = ""
 
@@ -1570,6 +1602,13 @@ class Common:
             meta.skipping = f"{tracker}"
             return ""
 
-        tags_raw = await prompt_in_thread(cli_ui.ask_string, f"Digite os gêneros (no formato do {tracker}): ")
+        with webui_events.field_prompt(
+            "Gêneros",
+            {"Tracker": tracker, "Release": meta.name or meta.title, "Gêneros": ""},
+            focus="Gêneros",
+            hint="Gêneros não encontrados. Separe por vírgula; até 5 são usados.",
+            placeholder="ex.: ação, drama",
+        ):
+            tags_raw = await prompt_in_thread(cli_ui.ask_string, f"Digite os gêneros (no formato do {tracker}): ")
         raw_list = [unidecode(t.strip()).replace(" ", ".") for t in re.split(r"[,;]", tags_raw or "") if t.strip()]
         return ", ".join(raw_list[:5])

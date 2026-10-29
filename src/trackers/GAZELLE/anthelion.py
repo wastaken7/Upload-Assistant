@@ -10,9 +10,11 @@ import cli_ui
 import httpx
 from rich.markup import escape
 
+from src import webui_events
 from src.cogs.redaction import Redaction
 from src.console import logger, prompt_in_thread
 from src.get_desc import DescriptionBuilder
+from src.languages import languages_manager
 from src.mediainfo import strip_report_by_line
 from src.meta import Meta
 from src.torrent_policy import ANTHELION_POLICY
@@ -24,6 +26,9 @@ Config = dict[str, Any]
 class Anthelion:
     """
     Anthelion (ANT) is a Private Torrent Tracker for MOVIES
+
+    API spec: https://anthelion.me/wiki.php?action=article&name=api
+    Synced with wiki version r22, last edited 2026-10-25.
     """
 
     auth_type = "other_api"
@@ -122,8 +127,22 @@ class Anthelion:
 
     async def get_flags(self, meta: Meta) -> list[str]:
         flags: list[str] = []
-        flags.extend([each for each in ["Directors", "Extended", "Uncut", "Unrated", "4KRemaster", "IMAX"] if each in meta.edition.replace("'", "")])
-        flags.extend([each.replace("-", "") for each in ["Dual-Audio", "Atmos"] if each in meta.audio])
+        edition = meta.edition.replace("'", "")
+        flags.extend([each for each in ["Directors", "Extended", "Uncut", "Unrated", "IMAX"] if each in edition])
+        if "remaster" in edition.lower():
+            flags.append("Remastered")
+        # EnglishDub replaced DualAudio on the site. Dual-Audio is also emitted for an English
+        # original with a foreign dub, so require a non-English original and English audio.
+        original_language = (meta.original_language or "").lower()
+        if (
+            "Dual-Audio" in meta.audio
+            and original_language
+            and not original_language.startswith("en")
+            and await languages_manager.has_english_language(meta.audio_languages or [])
+        ):
+            flags.append("EnglishDub")
+        if "Atmos" in meta.audio:
+            flags.append("Atmos")
         if meta.has_commentary or meta.manual_commentary:
             flags.append("Commentary")
         if meta.three_d == "3D":
@@ -204,7 +223,15 @@ class Anthelion:
                 f"{self.tracker}: [yellow]api will accept this upload, but no tag will be added.\nYou must manually add at least one tag from the approved list when uploaded."
             )
             await asyncio.sleep(3)
-            user_tag = await prompt_in_thread(cli_ui.ask_string, "Please enter at least one tag (genre) to use for the upload", default="")
+            with webui_events.field_prompt(
+                "Tag",
+                {"Tracker": self.tracker, "Release": meta.name or meta.title, "Tag": ""},
+                focus="Tag",
+                hint="No genres were found. Enter at least one tag (genre) from the approved list. Leaving it blank uploads without a tag.",
+                actions=[("", "Upload without a tag")],
+                placeholder="e.g. drama",
+            ):
+                user_tag = await prompt_in_thread(cli_ui.ask_string, "Please enter at least one tag (genre) to use for the upload", default="")
             if user_tag:
                 tags.append(user_tag.replace(" ", ".").lower())
                 meta.ant_user_tags = True
@@ -212,6 +239,7 @@ class Anthelion:
         return tags
 
     async def get_type(self, meta: Meta) -> int:
+        # The API only accepts 0 (Feature Film) and 1 (Short Film)
         ant_type = None
         imdb_info = meta.imdb_info
         if imdb_info.get("type") is not None:
@@ -220,28 +248,21 @@ class Anthelion:
                 ant_type = 0 if int(imdb_info.get("runtime", "60")) >= 45 or int(imdb_info.get("runtime", "60")) == 0 else 1
             if imdb_type == "short":
                 ant_type = 1
-            elif imdb_type == "tv mini series":
-                ant_type = 2
-            elif imdb_type == "comedy":
-                ant_type = 3
         else:
             keywords = [k.lower() for k in meta.keywords]
             tmdb_type = (meta.tmdb_type if meta.tmdb_type is not None else "movie").lower()
             if tmdb_type == "movie":
                 ant_type = 0 if (meta.runtime if meta.runtime is not None else 60) >= 45 or (meta.runtime if meta.runtime is not None else 60) == 0 else 1
-            if tmdb_type == "miniseries" or "miniseries" in keywords:
-                ant_type = 2
             if "short" in keywords or "short film" in keywords:
                 ant_type = 1
-            elif "stand-up comedy" in keywords:
-                ant_type = 3
 
         if ant_type is None:
             if not meta.unattended:
-                ant_type_list = ["Feature Film", "Short Film", "Miniseries", "Other"]
-                choice = await prompt_in_thread(cli_ui.ask_choice, "Select the proper type for ANTHELION", choices=ant_type_list)
+                ant_type_list = ["Feature Film", "Short Film"]
+                with webui_events.field_prompt("Release type", {"Tracker": self.tracker, "Release": meta.name or meta.title}):
+                    choice = await prompt_in_thread(cli_ui.ask_choice, "Select the proper type for ANTHELION", choices=ant_type_list)
                 # Map the choice back to the integer
-                type_map = {"Feature Film": 0, "Short Film": 1, "Miniseries": 2, "Other": 3}
+                type_map = {"Feature Film": 0, "Short Film": 1}
                 ant_type = type_map.get(choice, 0)
             else:
                 logger.debug(f"{self.tracker}: [bold red]type could not be determined automatically in unattended mode.")
@@ -252,11 +273,6 @@ class Anthelion:
     async def upload(self, meta: Meta) -> bool:
         await self.common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
         flags = await self.get_flags(meta)
-        audioformat = await self.get_audio(meta)
-        if not audioformat:
-            logger.info(f"{self.tracker}: [bold red]upload aborted due to unsupported audio format.")
-            meta.tracker_status[self.tracker]["status_message"] = "data error: upload aborted: unsupported audio format"
-            return False
 
         torrent_file_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}].torrent"
         async with aiofiles.open(torrent_file_path, "rb") as f:
@@ -264,7 +280,6 @@ class Anthelion:
         files = {"file_input": ("torrent.torrent", torrent_bytes, "application/x-bittorrent")}
         data: dict[str, Any] = {
             "type": await self.get_type(meta),
-            "audioformat": audioformat,
             "api_key": str(self.tracker_config.get("api_key", "")).strip(),
             "action": "upload",
             "tmdbid": meta.tmdb,
@@ -276,15 +291,15 @@ class Anthelion:
             async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/BD_SUMMARY_00.txt", encoding="utf-8") as f:
                 bdinfo_output = await f.read()
             data.update({"bdinfo": bdinfo_output})
-            data.update({"container_type": "m2ts"})
+            # audioformat is only needed when there is no MediaInfo; a value that differs from MediaInfo refuses the upload
+            data.update({"audioformat": await self.get_audio(meta)})
         else:
             mi_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/MEDIAINFO_CLEANPATH.txt"
             async with aiofiles.open(mi_path, encoding="utf-8") as f:
                 mediainfo_output = strip_report_by_line(await f.read())
             data.update({"mediainfo": mediainfo_output})
         if meta.scene:
-            # ID of "Scene?" checkbox on upload form is actually "censored"
-            data["censored"] = 1
+            data["scene"] = 1
 
         tags = await self.get_tags(meta)
         if getattr(meta, "skipping", None) == self.tracker:
@@ -293,10 +308,9 @@ class Anthelion:
             data.update({"tags": ",".join(tags)})
 
         release_group = await self.get_release_group(meta)
+        # Without releasegroup the site reads it from the MediaInfo file name or the torrent
         if release_group and release_group not in self.banned_groups:
             data.update({"releasegroup": release_group})
-        else:
-            data.update({"noreleasegroup": 1})
 
         if meta.anon or self.tracker_config.get("anon", False):
             data.update({"anonymous": 1})
@@ -304,7 +318,13 @@ class Anthelion:
         if meta.adult_media:
             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
                 logger.info(f"{self.tracker}: [bold red]Adult content detected[/bold red]")
-                if await prompt_in_thread(cli_ui.ask_yes_no, "Are the screenshots safe?", default=False):
+                with webui_events.field_prompt(
+                    "Adult content screenshots",
+                    {"Tracker": self.tracker, "Release": meta.name or meta.title},
+                    hint="Adult content was detected. Confirm whether the screenshots are safe to include.",
+                ):
+                    safe_screens = await prompt_in_thread(cli_ui.ask_yes_no, "Are the screenshots safe?", default=False)
+                if safe_screens:
                     data.update({"screenshots": "\n".join([x["raw_url"] for x in meta.image_list][:4])})
                     if not meta.ant_user_tags:
                         data.update({"flagchangereason": f"Adult with screens uploaded with {meta.ua_name}"})
@@ -357,7 +377,9 @@ class Anthelion:
                             meta.tracker_status[self.tracker]["status_message"] = response_data
                             return True
 
-                        if response.status_code in [401, 403]:
+                        # 4xx (except 408 and 429) means the upload was refused; resending would not change that.
+                        # 409 is a filled slot that Guru+ can trump with the returned trump_key, which needs user confirmation on the site.
+                        if 400 <= response.status_code < 500 and response.status_code not in (408, 429):
                             meta.tracker_status[self.tracker]["status_message"] = f"data error: HTTP {response.status_code} - {response.text}"
                             return False
 
@@ -465,11 +487,12 @@ class Anthelion:
     async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
         dupes: list[dict[str, Any]] = []
 
-        params = {"t": "search", "o": "json"}
+        # limit defaults to 20 and is capped at 100
+        params = {"action": "search", "t": "movie", "o": "json", "limit": "100"}
         if meta.tmdb:
             params["tmdbid"] = str(meta.tmdb)
         elif meta.imdb_id:
-            params["imdbid"] = str(meta.imdb_id)
+            params["imdbid"] = f"tt{int(meta.imdb_id):07d}"
 
         headers = {
             "X-API-Key": self.api_key,
@@ -543,7 +566,7 @@ class Anthelion:
 
         headers = {"X-API-Key": api_key.strip(), "User-Agent": f"Upload Assistant/2.4 ({platform.system()} {platform.release()})"}
 
-        params: dict[str, Any] = {"t": "search", "filename": filename, "o": "json"}
+        params: dict[str, Any] = {"action": "search", "t": "movie", "filename": filename, "o": "json"}
 
         try:
             async with httpx.AsyncClient(timeout=15.0) as client:

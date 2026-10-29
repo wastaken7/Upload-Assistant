@@ -555,7 +555,8 @@ class UploadHelper:
 
                 trumpable_text = _format_dupe(selected_match)
                 logger.info("[bold red]Trumpable found based on episode matching![/bold red]", extra={"ua_gui": False})
-                webui_events.dupes(tracker_name, [selected_match], source_size=meta.source_size, trumpable=True)
+                match_note = f"No release found with matching tag '{meta.tag}'. Selected release may be from a different group." if user_tag and not tag_matched else None
+                webui_events.dupes(tracker_name, [selected_match], source_size=meta.source_size, trumpable=True, note=match_note)
 
                 if user_tag and not tag_matched:
                     logger.info(f"[yellow]Note: No release found with matching tag '{meta.tag}'. Selected release may be from a different group.[/yellow]")
@@ -603,7 +604,11 @@ class UploadHelper:
             if not meta.were_trumping:
                 if meta.filename_match and meta.file_count_match:
                     logger.info(f"[bold red]Exact match found! - {meta.filename_match}[/bold red]", extra={"ua_gui": False})
-                    webui_events.notice("attention", f"Exact match already on the site: {meta.filename_match}", tracker=tracker_name)
+                    exact_dupes = [entry for entry in dupes_list if isinstance(entry, dict) and f"{entry.get('name')} = {entry.get('link', None)}" == meta.filename_match]
+                    exact_note = "Exact match: this release is already on the site."
+                    if tracker_name in ["AITHER", "LST"]:
+                        exact_note += f" {tracker_name} supports automatic trumping of exact matches, if the file is allowed to be trumped."
+                    webui_events.dupes(tracker_name, exact_dupes or dupes_list, source_size=meta.source_size, note=exact_note)
                     try:
                         if tracker_name in ["AITHER", "LST"]:
                             logger.info(f"[yellow]{tracker_name} supports automatic trumping of exact matches, if the file is allowed to be trumped.[/yellow]")
@@ -755,11 +760,15 @@ class UploadHelper:
             if warnings:
                 logger.info("")
                 logger.info("\n\n".join(warnings))
+                for warning_message in warnings:
+                    webui_events.notice("attention", warning_message, tracker=tracker_name)
 
             if results:
                 logger.info("")
                 logger.info("\n".join(results))
                 logger.info("")
+                for results_message in results:
+                    webui_events.notice("attention", results_message, tracker=tracker_name)
 
     async def get_confirmation(self, meta: Meta) -> bool:
         """Publish resolved release flags and review metadata before continuing."""
@@ -983,10 +992,15 @@ class UploadHelper:
             meta.keep_folder = False
 
         if meta.keep_folder and meta.isdir:
-            kf_confirm = await self.prompt_yes_no(
-                "You specified --keep-folder. Uploading in folders might not be allowed. Proceed?",
-                default=False,
-            )
+            with webui_events.field_prompt(
+                "Folder upload",
+                {"Release": meta.name or meta.title, "Path": meta.path},
+                hint="You specified --keep-folder. Uploading single files in folders might not be allowed.",
+            ):
+                kf_confirm = await self.prompt_yes_no(
+                    "You specified --keep-folder. Uploading in folders might not be allowed. Proceed?",
+                    default=False,
+                )
             if not kf_confirm:
                 logger.info("[bold red]Aborting...[/bold red]")
                 exit()

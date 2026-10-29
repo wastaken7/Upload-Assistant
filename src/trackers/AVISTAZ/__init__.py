@@ -15,6 +15,7 @@ import httpx
 from bs4 import BeautifulSoup
 
 import bbcode
+from src import webui_events
 from src.cogs.redaction import Redaction
 from src.console import logger, prompt_in_thread
 from src.cookie_auth import CookieValidator
@@ -129,7 +130,13 @@ class AZTrackerBase:
             if attempt == 0 and not self.media_code:
                 logger.info(f"{self.tracker}: \nThe media [[yellow]IMDB:{imdb_id}[/yellow]] [[blue]TMDB:{tmdb_id}[/blue]] appears to be missing from the site's database.")
                 if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                    if await prompt_in_thread(cli_ui.ask_yes_no, f"{self.tracker}: Do you want to add it to the site database?\n"):
+                    with webui_events.field_prompt(
+                        f"{self.tracker} database",
+                        {"Tracker": self.tracker, "Title": title, "IMDb ID": imdb_id, "TMDb ID": tmdb_id},
+                        hint="This media appears to be missing from the site's database.",
+                    ):
+                        add_to_db = await prompt_in_thread(cli_ui.ask_yes_no, f"{self.tracker}: Do you want to add it to the site database?\n")
+                    if add_to_db:
                         added_successfully = await self.add_media_to_db(meta, title, category, imdb_id, tmdb_id)
                         if not added_successfully:
                             logger.info(f"{self.tracker}: Failed to add media. Aborting.")
@@ -422,7 +429,17 @@ class AZTrackerBase:
                         return {}
                     logger.info(f"{self.tracker}: No audio language/s found.")
                     logger.info(f"{self.tracker}: You must enter (comma-separated) languages for all audio tracks, eg: English, Spanish: ")
-                    user_input_raw = await prompt_in_thread(cli_ui.ask_string, "Enter languages: ")
+                    with webui_events.field_prompt(
+                        "Audio languages",
+                        {
+                            f"Audio track {position}": track.get("Language") or "No language tag"
+                            for position, track in enumerate((t for t in tracks if t.get("@type") == "Audio"), 1)
+                            if any(track is missing for missing in missing_audio_languages)
+                        },
+                        hint="Comma-separated languages for all audio tracks.",
+                        placeholder="e.g. English, Spanish",
+                    ):
+                        user_input_raw = await prompt_in_thread(cli_ui.ask_string, "Enter languages: ")
                     user_input = (user_input_raw or "").strip()
                     langs = [lang.strip() for lang in user_input.split(",")]
                     for lang in langs:

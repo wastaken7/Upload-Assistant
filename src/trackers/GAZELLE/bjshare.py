@@ -19,6 +19,7 @@ from langcodes.tag_parser import LanguageTagError
 from PIL import Image
 from unidecode import unidecode
 
+from src import webui_events
 from src.book_extractors import normalize_book_title_separators
 from src.console import logger, prompt_in_thread
 from src.cookie_auth import CookieAuthUploader, CookieValidator
@@ -573,7 +574,13 @@ class BJShare:
             return meta.manual_name
         if meta.publisher and meta.title:
             return f"{meta.publisher} - {meta.title}"
-        return await prompt_in_thread(cli_ui.ask_string, f'{self.tracker}: Argumento "--name" não fornecido.\nDigite o título do upload:') or ""
+        with webui_events.field_prompt(
+            "Título",
+            {"Tracker": self.tracker, "Release": meta.name or meta.title, "Título": ""},
+            focus="Título",
+            hint='Argumento "--name" não fornecido. Digite o título do upload.',
+        ):
+            return await prompt_in_thread(cli_ui.ask_string, f'{self.tracker}: Argumento "--name" não fornecido.\nDigite o título do upload:') or ""
 
     def get_titles(self, meta: Meta) -> tuple[str, str]:
         if meta.category == "BOOK":
@@ -1467,7 +1474,13 @@ class BJShare:
         suffix = " (apenas uma pessoa)" if role in ("director", "creator") else " (separados por vírgula)"
         prompt_message = f"{display_name} não encontrado(s).\nPor favor, insira manualmente{suffix}: "
 
-        user_input_raw = await prompt_in_thread(cli_ui.ask_string, f"{prompt_message}")
+        with webui_events.field_prompt(
+            display_name,
+            {"Tracker": self.tracker, "Release": meta.name or meta.title, display_name: ""},
+            focus=display_name,
+            hint=f"{display_name} não encontrado(s). Insira manualmente{suffix}.",
+        ):
+            user_input_raw = await prompt_in_thread(cli_ui.ask_string, f"{prompt_message}")
         user_input = (user_input_raw or "").strip()
         if user_input:
             entered_names = [name.strip() for name in user_input.split(",")]
@@ -1748,6 +1761,17 @@ class BJShare:
         elif category == "XXX":
             width, height = self.get_resolution(meta)
             hours, minutes = self.get_runtime(meta)
+            if meta.year is not None:
+                year = str(meta.year)
+            else:
+                with webui_events.field_prompt(
+                    "Ano",
+                    {"Tracker": self.tracker, "Release": meta.name or meta.title, "Ano": ""},
+                    focus="Ano",
+                    hint='Argumento "--year" não fornecido. Digite o ano do upload.',
+                    placeholder="ex.: 2024",
+                ):
+                    year = await prompt_in_thread(cli_ui.ask_string, f'{self.tracker}: Argumento "--year" não fornecido.\nDigite o ano do upload:')
 
             data.update(
                 {
@@ -1768,9 +1792,7 @@ class BJShare:
                     "resolucaoh": height,
                     "resolucaow": width,
                     "sinopse": "",
-                    "year": str(meta.year)
-                    if meta.year is not None
-                    else await prompt_in_thread(cli_ui.ask_string, f'{self.tracker}: Argumento "--year" não fornecido.\nDigite o ano do upload:'),
+                    "year": year,
                     "title": await self.get_xxx_title(meta),
                 }
             )
@@ -1888,7 +1910,15 @@ class BJShare:
             return ""
 
         logger.info(f"{self.tracker}: [bold red]Sinopse não encontrada no TMDb. Por favor, insira manualmente.[/bold red]")
-        user_input_raw = await prompt_in_thread(cli_ui.ask_string, f"{self.tracker}: Digite a sinopse: ")
+        with webui_events.field_prompt(
+            "Sinopse",
+            {"Tracker": self.tracker, "Release": meta.name or meta.title if meta else "", "Sinopse": ""},
+            focus="Sinopse",
+            hint="Sinopse não encontrada no TMDb. Deixe em branco para enviar como N/A.",
+            actions=[("", "Enviar como N/A")],
+            placeholder="Digite a sinopse",
+        ):
+            user_input_raw = await prompt_in_thread(cli_ui.ask_string, f"{self.tracker}: Digite a sinopse: ")
         user_input = (user_input_raw or "").strip()
         if user_input:
             return user_input

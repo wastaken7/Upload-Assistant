@@ -382,7 +382,14 @@ async def get_tmdb_from_imdb(
     # **User Prompt for Manual TMDb ID Entry**
     if tmdb_id in ("None", "", None, 0, "0") and mode == "cli":
         logger.info("[yellow]Unable to find a matching TMDb entry[/yellow]")
-        tmdb_input = await prompt_in_thread(cli_ui.ask_string, "Please enter TMDb ID (format: tv/12345 or movie/12345): ", default="") or ""
+        with webui_events.field_prompt(
+            "TMDb ID",
+            {"Title": title, "Year": year, "TMDb ID": ""},
+            focus="TMDb ID",
+            hint="No TMDb match was found. Enter the ID as tv/12345 or movie/12345.",
+            placeholder="movie/12345",
+        ):
+            tmdb_input = await prompt_in_thread(cli_ui.ask_string, "Please enter TMDb ID (format: tv/12345 or movie/12345): ", default="") or ""
         category, tmdb_id = _get_parser().parse_tmdb_id(tmdb_input, category)
 
     return category, tmdb_id, original_language, filename_search
@@ -941,7 +948,14 @@ async def get_tmdb_id(
     # No match found, prompt user if in CLI mode
     logger.info("[bold red]Unable to find TMDb match using any search[/bold red]")
     try:
-        tmdb_input = await prompt_in_thread(cli_ui.ask_string, "Please enter TMDb ID in this format: tv/12345 or movie/12345")
+        with webui_events.field_prompt(
+            "TMDb ID",
+            {"Search title": filename, "Year": search_year, "TMDb ID": ""},
+            focus="TMDb ID",
+            hint="No TMDb match was found. Enter the ID as tv/12345 or movie/12345.",
+            placeholder="movie/12345",
+        ):
+            tmdb_input = await prompt_in_thread(cli_ui.ask_string, "Please enter TMDb ID in this format: tv/12345 or movie/12345")
     except EOFError:
         logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")
         await cleanup_manager.cleanup()
