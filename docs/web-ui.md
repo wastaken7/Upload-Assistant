@@ -407,11 +407,13 @@ The database is stored at `data/stats.sqlite3` below the user-state directory. C
 
 Appearance is shared by the Upload, Configuration, sign-in, and recovery interfaces. Choose:
 
-- a color theme: Amethyst, Charcoal, Evergreen, Graphite, Midnight, or Obsidian;
-- Rounded or Square corners; and
+- a color theme: Amber (the default), Amethyst, Charcoal, Evergreen, Graphite, Midnight, or Obsidian;
+- Rounded (the default) or Square corners; and
 - Light or Dark mode.
 
-These preferences are stored in the browser, so another browser or device can use different choices.
+These preferences are stored in the browser, so another browser or device can use different choices. A browser that already saved a theme or corner style keeps it; choose **Amber** and **Rounded** to switch to the current default look.
+
+The interface uses the bundled Inter and JetBrains Mono typefaces, so it looks the same on every system and needs no font downloads.
 
 ### Help & Resources
 
