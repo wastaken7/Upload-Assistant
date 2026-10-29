@@ -70,8 +70,13 @@ def _own_key() -> str:
     global _process_key
     if _process_key is None:
         pid = os.getpid()
+        try:
+            created = _create_time_key(pid)
+        except psutil.AccessDenied:
+            # Some sandboxes (e.g. Android/Termux) deny reading even our own start time.
+            created = None
         # A zero key would make other processes treat this ticket as stale.
-        created = _create_time_key(pid) or f"{round(time.time() * 1_000_000):020d}"
+        created = created or f"{round(time.time() * 1_000_000):020d}"
         _process_key = f"{created}-{pid:010d}"
     return _process_key
 

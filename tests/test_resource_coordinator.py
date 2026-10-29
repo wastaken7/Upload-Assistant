@@ -176,6 +176,38 @@ def test_own_ticket_key_never_falls_back_to_zero(monkeypatch: pytest.MonkeyPatch
     assert int(created) > 0
 
 
+def test_own_ticket_key_survives_access_denied(monkeypatch: pytest.MonkeyPatch) -> None:
+    def deny(pid: int) -> str | None:
+        raise rc.psutil.AccessDenied(pid)
+
+    monkeypatch.setattr(rc, "_process_key", None)
+    monkeypatch.setattr(rc, "_create_time_key", deny)
+    created, _pid = rc._own_key().split("-")
+    assert int(created) > 0
+
+
+def test_slot_is_usable_when_own_start_time_is_denied(lock_dir: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def deny(pid: int) -> str | None:
+        raise rc.psutil.AccessDenied(pid)
+
+    monkeypatch.setattr(rc, "_process_key", None)
+    monkeypatch.setattr(rc, "_create_time_key", deny)
+
+    async def run() -> bool:
+        async with rc.resource_slot("torrent-hash", "test"):
+            return True
+
+    assert asyncio.run(run())
+
+
+def test_ticket_from_other_users_process_stays_live(monkeypatch: pytest.MonkeyPatch) -> None:
+    def deny(pid: int) -> str | None:
+        raise rc.psutil.AccessDenied(pid)
+
+    monkeypatch.setattr(rc, "_create_time_key", deny)
+    assert rc._ticket_is_live(Path(f"{1:020d}-{12345:010d}.ticket"))
+
+
 def test_slot_won_after_cancellation_is_given_back(lock_dir: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     gate = threading.Event()
     real_try_acquire = rc._try_acquire
