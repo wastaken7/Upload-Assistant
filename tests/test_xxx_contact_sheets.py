@@ -126,11 +126,13 @@ async def test_xxx_single_file_screens_stay_fixed_across_reruns(tmp_path, monkey
         output.write_bytes(b"contact sheet")
         return 0, b"", b""
 
-    async def fake_screenshots(_path, _filename, folder_id, base_dir, _meta, num_screens, *_args, capture_group="main", **_kwargs):
-        requested.append(num_screens)
-        existing = manifest_files(base_dir, folder_id, capture_group)
+    async def fake_screenshots(_path, _filename, folder_id, base_dir, _meta, num_screens, force_screenshots, *_args, capture_group="main", **_kwargs):
+        requested.append((num_screens, force_screenshots))
+        existing = len(manifest_files(base_dir, folder_id, capture_group))
+        # A forced capture adds every requested frame; otherwise it tops up to the target.
+        target = existing + num_screens if force_screenshots else num_screens
         frames = []
-        for index in range(len(existing), num_screens):
+        for index in range(existing, target):
             frame = takescreens.screenshots_dir(base_dir, folder_id) / f"frame-{index}.png"
             frame.write_bytes(b"frame")
             frames.append(str(frame))
@@ -145,14 +147,14 @@ async def test_xxx_single_file_screens_stay_fixed_across_reruns(tmp_path, monkey
     for _run in range(3):
         await takescreens.xxx_contact_sheets([str(video)], meta.uuid, meta.base_dir, meta)
 
-    assert requested == [3, 3, 3]
+    assert requested == [(3, False)] * 3
     assert meta.screens == 3
     assert len(manifest_files(meta.base_dir, meta.uuid, "main")) == 3
 
     # Rehosting can still top up frames it has to replace.
     await takescreens.xxx_contact_sheets([str(video)], meta.uuid, meta.base_dir, meta, extra_screens=2)
 
-    assert requested[-1] == 5
+    assert requested[-1] == (2, True)
     assert meta.screens == 5
 
 

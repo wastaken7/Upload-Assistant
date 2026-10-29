@@ -197,11 +197,11 @@ async def xxx_contact_sheets(paths: list[str], folder_id: str, base_dir: str, me
     normal_screens = xxx_single_file_screens()
     if len(video_paths) == 1 and normal_screens:
         # A fixed target keeps reruns from adding one more frame every time.
-        screens_to_request = len(sheets) + normal_screens
-        if extra_screens > 0:
-            screens_to_request = len(manifest_files(base_dir, folder_id, capture_group)) + extra_screens
+        # Replacements are forced so the hosted-image cutoff cannot skip them.
+        force_capture = extra_screens > 0
+        screens_to_request = extra_screens if force_capture else len(sheets) + normal_screens
         await screenshots(
-            str(video_paths[0]), video_paths[0].name, folder_id, base_dir, meta, screens_to_request, False, cleanup_after_capture=False, capture_group=capture_group
+            str(video_paths[0]), video_paths[0].name, folder_id, base_dir, meta, screens_to_request, force_capture, cleanup_after_capture=False, capture_group=capture_group
         )
     meta.screens = len(manifest_files(base_dir, folder_id, capture_group))
     return sheets
