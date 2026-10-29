@@ -398,3 +398,36 @@ async def test_edition_list_accepts_pasted_url(tmp_path, monkeypatch, manual_rel
     meta = Meta(base_dir=str(tmp_path), uuid='test', is_disc='BDMV')
     assert await get_bluray_releases(meta) == [pasted]
     assert (meta.region, meta.bluray_url, meta.release_url) == ('GBR', URL, URL)
+
+
+@pytest.mark.asyncio
+async def test_flags_of_other_editions_are_not_used():
+    other_edition = HTML + '\n<h3>Other editions</h3><img src="https://images.static-bluray.com/flags/SE.png" width="18" height="12" title="Sweden">'
+    parsed = await parse_release_details(other_edition, {'title': 'Example Series', 'url': URL}, Meta())
+    assert parsed['country'] == ''
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('search, links', [(None, []), ('Search results', []), ('Search results', None)])
+@pytest.mark.parametrize('answer', [URL, ''])
+async def test_url_can_be_pasted_when_search_finds_no_edition(tmp_path, monkeypatch, manual_release_selection, search, links, answer):
+    monkeypatch.setattr('src.bluray_com.search_bluray', AsyncMock(return_value=search))
+    if links is None:
+        # The title is listed, but none of its editions match this disc.
+        manual_release_selection.return_value = []
+    else:
+        monkeypatch.setattr('src.bluray_com.extract_bluray_links', lambda _: links)
+    answers = iter(['not a url', answer])
+    monkeypatch.setattr('src.bluray_com.cli_ui.ask_string', lambda _: next(answers))
+    pasted = release(subheader=LABEL)
+    monkeypatch.setattr('src.bluray_com.fetch_release_details', AsyncMock(return_value=pasted))
+    meta = Meta(base_dir=str(tmp_path), uuid='test', is_disc='BDMV')
+    assert await get_bluray_releases(meta) == ([pasted] if answer else [])
+    assert meta.release_url == (URL if answer else '')
+
+
+@pytest.mark.asyncio
+async def test_unattended_search_without_results_does_not_ask(tmp_path, monkeypatch):
+    monkeypatch.setattr('src.bluray_com.search_bluray', AsyncMock(return_value=None))
+    monkeypatch.setattr('src.bluray_com.cli_ui.ask_string', lambda _: pytest.fail('unexpected prompt'))
+    assert await get_bluray_releases(Meta(base_dir=str(tmp_path), uuid='test', is_disc='BDMV', unattended=True)) == []
