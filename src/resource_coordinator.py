@@ -54,6 +54,8 @@ class _Hold:
 
 
 _state_lock = threading.Lock()
+# Separate from _state_lock, which is held while _remove_ticket calls _own_key.
+_process_key_lock = threading.Lock()
 _holds: dict[str, _Hold] = {}
 _waiters: dict[str, int] = {}
 _process_key: str | None = None
@@ -68,12 +70,19 @@ def _create_time_key(pid: int) -> str | None:
 
 def _own_key() -> str:
     global _process_key
-    if _process_key is None:
-        pid = os.getpid()
-        # A zero key would make other processes treat this ticket as stale.
-        created = _create_time_key(pid) or f"{round(time.time() * 1_000_000):020d}"
-        _process_key = f"{created}-{pid:010d}"
-    return _process_key
+    # Worker threads may race here; a fallback key must be computed only once.
+    with _process_key_lock:
+        if _process_key is None:
+            pid = os.getpid()
+            try:
+                created = _create_time_key(pid)
+            except psutil.AccessDenied:
+                # Some sandboxes (e.g. Android/Termux) deny reading even our own start time.
+                created = None
+            # A zero key would make other processes treat this ticket as stale.
+            created = created or f"{round(time.time() * 1_000_000):020d}"
+            _process_key = f"{created}-{pid:010d}"
+        return _process_key
 
 
 def _queue_dir(name: str) -> Path:

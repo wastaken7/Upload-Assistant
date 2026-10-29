@@ -86,14 +86,14 @@ def test_fallback_preserves_disabled_flags_movies_and_exact_boundaries(tmdb, ove
 
 
 @pytest.mark.parametrize('homonym', [False, True])
-def test_real_shared_manual_name_and_attached_tag(tmdb, homonym):
+def test_real_shared_manual_name_is_verbatim(tmdb, homonym):
     tmdb[0]['homonym'] = homonym
     meta = fallback_meta(manual_name='Title 2024 AKA Alternate-GROUP')
     meta.name = asyncio.run(NameManager(CONFIG).get_name(meta))[1]
     assert meta.name == 'Title 2024 AKA Alternate-GROUP'
-    year = ' 2024' if homonym else ''
     assert asyncio.run(InfinityHD(CONFIG).get_name(meta)) == {
-        'name': f'Title AKA Alternate{year}-GROUP'}
+        'name': 'Title 2024 AKA Alternate-GROUP'}
+    assert tmdb[1] == []
 
 
 @pytest.mark.parametrize('homonym', [False, True])
