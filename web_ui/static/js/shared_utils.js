@@ -3,8 +3,8 @@
   const THEME_KEY = "ua_config_theme";
   const COLOR_THEME_KEY = "ua_color_theme";
   const INTERFACE_STYLE_KEY = "ua_interface_style";
-  const DEFAULT_COLOR_THEME = "charcoal";
-  const DEFAULT_INTERFACE_STYLE = "square";
+  const DEFAULT_COLOR_THEME = "amber";
+  const DEFAULT_INTERFACE_STYLE = "rounded";
   const LUCIDE_ICON_BASE = "/static/img/lucide-icons";
   const WEB_UI_ICON_MAP = Object.freeze({
     book: "book-open",
@@ -68,6 +68,12 @@
     });
   }
   const UA_THEMES = Object.freeze([
+    {
+      id: "amber",
+      label: "Amber",
+      description: "Graphite and amber (default)",
+      swatch: ["#16181b", "#f0a43a"],
+    },
     {
       id: "amethyst",
       label: "Amethyst",

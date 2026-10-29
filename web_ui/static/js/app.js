@@ -12312,7 +12312,7 @@ function AudionutsUAGUI() {
                       setReviewPanelOpen("screenshots", !isScreenshotReviewOpen)
                     }
                     aria-pressed={isScreenshotReviewOpen}
-                    className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${isScreenshotReviewOpen ? "ua-accent-action" : isDarkMode ? "bg-gray-700 hover:bg-gray-600 text-gray-100" : "bg-gray-100 hover:bg-gray-200 text-gray-700"}`}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${isScreenshotReviewOpen ? "ua-accent-action" : isDarkMode ? "bg-gray-700 hover:bg-gray-600 text-gray-100" : "bg-gray-100 hover:bg-gray-200 text-gray-700"}`}
                     title="Review generated screenshots"
                   >
                     <ScreenshotsIcon />
@@ -12327,7 +12327,7 @@ function AudionutsUAGUI() {
                     setReviewPanelOpen("description", !isDescriptionReviewOpen)
                   }
                   aria-pressed={isDescriptionReviewOpen}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${isDescriptionReviewOpen ? "ua-accent-action" : isDarkMode ? "bg-gray-700 hover:bg-gray-600 text-gray-100" : "bg-gray-100 hover:bg-gray-200 text-gray-700"}`}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${isDescriptionReviewOpen ? "ua-accent-action" : isDarkMode ? "bg-gray-700 hover:bg-gray-600 text-gray-100" : "bg-gray-100 hover:bg-gray-200 text-gray-700"}`}
                   title="Review and edit the base description"
                 >
                   <DescriptionIcon />
@@ -12339,7 +12339,7 @@ function AudionutsUAGUI() {
                       setReviewPanelOpen("mediainfo", !isMediaInfoOpen)
                     }
                     aria-pressed={isMediaInfoOpen}
-                    className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${isMediaInfoOpen ? "ua-accent-action" : isDarkMode ? "bg-gray-700 hover:bg-gray-600 text-gray-100" : "bg-gray-100 hover:bg-gray-200 text-gray-700"}`}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${isMediaInfoOpen ? "ua-accent-action" : isDarkMode ? "bg-gray-700 hover:bg-gray-600 text-gray-100" : "bg-gray-100 hover:bg-gray-200 text-gray-700"}`}
                     title={`View the ${mediaInfoLabel} report`}
                   >
                     <MediaInfoIcon />
@@ -12353,7 +12353,7 @@ function AudionutsUAGUI() {
                       ? "Cancel scheduled upload"
                       : "Kill process and clear terminal"
                   }
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg transition-colors bg-red-600 hover:bg-red-700 text-white"
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-colors bg-red-600 hover:bg-red-700 text-white"
                   title={
                     activeTabScheduled
                       ? "Cancel scheduled upload"
