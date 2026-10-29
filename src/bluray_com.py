@@ -7,6 +7,7 @@ from collections.abc import Mapping, MutableMapping, Sequence
 from contextvars import ContextVar
 from pathlib import Path
 from typing import Any, cast
+from urllib.parse import urlsplit
 
 import cli_ui
 import httpx
@@ -49,6 +50,19 @@ def _style_specs(style: str | None) -> bool:
     return _style_contains(style, "font-size: 12px")
 
 
+def normalize_bluray_url(value: str) -> str:
+    """Validate a Blu-ray.com edition URL and reduce it to its canonical form."""
+    parsed = urlsplit(str(value or "").strip())
+    if parsed.scheme.lower() not in ("http", "https") or parsed.username or parsed.password or parsed.port:
+        raise ValueError("Blu-ray.com URL must be an HTTP(S) edition URL")
+    if (parsed.hostname or "").removeprefix("www.") != "blu-ray.com":
+        raise ValueError("Blu-ray.com URL must point to blu-ray.com")
+    match = re.fullmatch(r"/(movies|dvd)/([^/]+)/(\d+)/?", parsed.path)
+    if not match:
+        raise ValueError("Blu-ray.com URL must be an edition page, e.g. https://www.blu-ray.com/movies/Title-Blu-ray/123456/")
+    return f"https://www.blu-ray.com/{match[1]}/{match[2]}/{match[3]}/"
+
+
 def set_selected_release(meta: Meta, release: Release) -> None:
     """Keep the display label attached to the release it was parsed from."""
     meta.release_url = str(release.get("url") or "")
@@ -58,12 +72,17 @@ def set_selected_release(meta: Meta, release: Release) -> None:
 
 def _apply_release_metadata(meta: Meta, release: Release) -> None:
     """Refresh values from a prior selection while preserving other sources."""
-    if not meta.region or meta.region == meta.bluray_auto_region:
+    # Fields an edition page did not provide leave the current values alone.
+    if not release.get("country"):
+        pass
+    elif not meta.region or meta.region == meta.bluray_auto_region:
         meta.region = map_country_to_region_code(release["country"]) or ""
         meta.bluray_auto_region = meta.region
     else:
         meta.bluray_auto_region = None
-    if not meta.distributor or meta.distributor == meta.bluray_auto_distributor:
+    if not release.get("publisher"):
+        pass
+    elif not meta.distributor or meta.distributor == meta.bluray_auto_distributor:
         meta.distributor = release["publisher"].upper()
         meta.bluray_auto_distributor = meta.distributor
     else:
@@ -369,6 +388,25 @@ def _derive_release_type(meta: Meta) -> tuple[str, bool, bool, bool]:
     return release_type, is_3d, is_4k, is_dvd
 
 
+async def use_bluray_url(meta: Meta, url: str) -> list[Release]:
+    """Use a known Blu-ray.com edition instead of searching for one."""
+    url = normalize_bluray_url(url)
+    release_id = url.rstrip("/").rsplit("/", 1)[-1]
+    logger.info(f"[blue]Using Blu-ray.com edition: {url}[/blue]")
+    release = await fetch_release_details({"url": url, "release_id": release_id, "title": meta.title or "Unknown"}, meta)
+    if "subheader" not in release:
+        cli_ui.warning("Could not read the Blu-ray.com page; only the link will be used.")
+    if not release.get("country"):
+        logger.info("[yellow]Blu-ray.com page has no country; region left unchanged.[/yellow]")
+    if not release.get("publisher"):
+        logger.info("[yellow]Blu-ray.com page has no studio; distributor left unchanged.[/yellow]")
+    _apply_release_metadata(meta, release)
+    if release.get("cover_images"):
+        meta.bluray_cover_urls = release["cover_images"]
+        await download_cover_images(meta)
+    return [release]
+
+
 async def get_bluray_releases(meta: Meta) -> list[Release]:
     logger.info("[blue]===== Starting blu-ray.com release search =====[/blue]")
     imdb_id_value = meta.imdb_id or 0
@@ -510,7 +548,10 @@ async def get_bluray_releases(meta: Meta) -> list[Release]:
                 f"Blu-ray.com lists {len(matching_releases)} editions of {movie_name}. Pick the one that matches your disc: "
                 "its country sets the region and its publisher sets the distributor of this upload" + (", and its cover images are added." if meta.use_bluray_images else ".")
             )
-            choices_help = "'a' compares every edition with this disc's specs and picks the closest (slower, one lookup per edition). 'n' skips Blu-ray.com."
+            choices_help = (
+                "'a' compares every edition with this disc's specs and picks the closest (slower, one lookup per edition). "
+                "'u' lets you paste the URL of an edition that is not listed. 'n' skips Blu-ray.com."
+            )
             logger.info("")
             logger.info("[green]Which edition is your disc?")
             logger.info("[green]=======================================")
@@ -543,13 +584,35 @@ async def get_bluray_releases(meta: Meta) -> list[Release]:
             while True:
                 try:
                     with webui_events.numbered_options(
-                        labels, actions=[("a", "Compare all editions"), ("n", "Skip Blu-ray.com")], images=covers, details=details, hint=f"{why}\n{choices_help}"
+                        labels,
+                        actions=[("a", "Compare all editions"), ("u", "Enter edition URL"), ("n", "Skip Blu-ray.com")],
+                        images=covers,
+                        details=details,
+                        hint=f"{why}\n{choices_help}",
                     ):
-                        selection_raw = cli_ui.ask_string(f"Your disc's edition (1-{len(matching_releases)}, a = compare all, n = skip): ")
+                        selection_raw = cli_ui.ask_string(f"Your disc's edition (1-{len(matching_releases)}, a = compare all, u = enter URL, n = skip): ")
                     selection = (selection_raw or "").strip().lower()
                     if selection == "a":
                         cli_ui.info("All releases selected")
                         return await process_all_releases(matching_releases, meta)
+                    if selection == "u":
+                        with webui_events.field_prompt(
+                            "Blu-ray.com edition",
+                            {"Movie": movie_name},
+                            hint="Paste the URL of your disc's edition page. Leave it empty to go back to the list.",
+                            actions=[("", "Back to list")],
+                            placeholder="https://www.blu-ray.com/movies/Title-Blu-ray/123456/",
+                        ):
+                            url_raw = cli_ui.ask_string("Blu-ray.com edition URL (empty to go back): ")
+                        if not (url_raw or "").strip():
+                            continue
+                        try:
+                            url = normalize_bluray_url(url_raw or "")
+                        except ValueError as error:
+                            cli_ui.warning(str(error))
+                            continue
+                        meta.bluray_url = url
+                        return await use_bluray_url(meta, url)
                     if selection == "n":
                         cli_ui.info("Skipped - not using Blu-ray.com information")
                         return []
@@ -606,6 +669,14 @@ async def parse_release_details(response_text: str, release: Release, meta: Meta
         soup: Any = BeautifulSoup(response_text, "lxml")
         subheader = soup.select_one("span.subheading.grey")
         release["subheader"] = " ".join(subheader.get_text(" ", strip=True).split()) if subheader else ""
+        # Search listings already provide these; a pasted edition URL relies on the page itself.
+        if not release.get("publisher"):
+            studio = subheader.find("a", class_="grey") if subheader else None
+            release["publisher"] = studio.get_text(" ", strip=True) if studio else ""
+        if not release.get("country"):
+            heading = soup.find("h1")
+            flag = heading.find_next("img", src=re.compile(r"/flags/[A-Z]{2}\.png")) if heading else None
+            release["country"] = str(flag.get("title") or "").strip() if flag else ""
         specs_td: Any = soup.find("td", width="228px", style=_style_specs)
 
         if not specs_td:

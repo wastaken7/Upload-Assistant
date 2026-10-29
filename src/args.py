@@ -15,6 +15,7 @@ import argcomplete
 
 from src.app_paths import DATA_DIR
 from src.audible import normalize_audible_url
+from src.bluray_com import normalize_bluray_url
 
 if TYPE_CHECKING:
     from src.meta import Meta
@@ -992,6 +993,14 @@ class Args:
             dest="keep_nfo",
         )
         parser.add_argument("-reg", "--region", nargs=1, required=False, help="Region for discs")
+        parser.add_argument(
+            "--bluray-url",
+            nargs=1,
+            required=False,
+            help="Blu-ray.com edition URL for discs; skips the Blu-ray.com search",
+            type=normalize_bluray_url,
+            dest="bluray_url",
+        )
         parser.add_argument("-a", "--anon", action="store_true", required=False, help="Upload anonymously")
         parser.add_argument("-st", "--stream", action="store_true", required=False, help="Stream Optimized Upload")
         parser.add_argument("-webdv", "--webdv", action="store_true", required=False, help="Contains a Dolby Vision layer converted using dovi_tool (HYBRID)")
