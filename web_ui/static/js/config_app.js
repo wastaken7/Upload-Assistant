@@ -1333,6 +1333,7 @@ const trackerNameMap = {
   DREADVAULT: "DreadVault",
   DRUNKENSLUG: "DrunkenSlug",
   EMUWAREZ: "eMuwarez",
+  EXOTICAZ: "ExoticaZ",
   FILELIST: "FileList",
   FLOOD: "Flood",
   FUNFILE: "FunFile",
