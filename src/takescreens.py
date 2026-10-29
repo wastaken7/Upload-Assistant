@@ -138,8 +138,12 @@ def _xxx_contact_sheet_animated_stream(video_path: Path, frame_count: int, durat
     return ffmpeg.filter(rows_streams, "vstack", inputs=rows)
 
 
-async def xxx_contact_sheets(paths: list[str], folder_id: str, base_dir: str, meta: Meta, capture_group: str = "main") -> list[str]:
-    """Create one evenly sampled contact sheet for each selected XXX video."""
+async def xxx_contact_sheets(paths: list[str], folder_id: str, base_dir: str, meta: Meta, capture_group: str = "main", extra_screens: int = 0) -> list[str]:
+    """Create one evenly sampled contact sheet for each selected XXX video.
+
+    ``extra_screens`` asks for that many frames beyond the current manifest, for
+    callers that must replace screenshots they cannot use.
+    """
     rows, columns, max_videos = xxx_contact_sheet_settings()
     animated_webp, animation_seconds = xxx_contact_sheet_animation_settings()
     video_paths = [Path(path) for path in paths if Path(path).is_file()][:max_videos]
@@ -192,10 +196,12 @@ async def xxx_contact_sheets(paths: list[str], folder_id: str, base_dir: str, me
         sheets = [str(path) for path in registered]
     normal_screens = xxx_single_file_screens()
     if len(video_paths) == 1 and normal_screens:
-        existing_in_group = len(manifest_files(base_dir, folder_id, capture_group))
-        screens_to_request = max(0, normal_screens + existing_in_group)
+        # A fixed target keeps reruns from adding one more frame every time.
+        # Replacements are forced so the hosted-image cutoff cannot skip them.
+        force_capture = extra_screens > 0
+        screens_to_request = extra_screens if force_capture else len(sheets) + normal_screens
         await screenshots(
-            str(video_paths[0]), video_paths[0].name, folder_id, base_dir, meta, screens_to_request, False, cleanup_after_capture=False, capture_group=capture_group
+            str(video_paths[0]), video_paths[0].name, folder_id, base_dir, meta, screens_to_request, force_capture, cleanup_after_capture=False, capture_group=capture_group
         )
     meta.screens = len(manifest_files(base_dir, folder_id, capture_group))
     return sheets
@@ -2986,8 +2992,8 @@ class TakeScreensManager:
     def xxx_contact_sheet_animation_settings(self) -> tuple[bool, float]:
         return xxx_contact_sheet_animation_settings()
 
-    async def xxx_contact_sheets(self, paths: list[str], folder_id: str, base_dir: str, meta: Meta, capture_group: str = "main") -> list[str]:
-        return await xxx_contact_sheets(paths, folder_id, base_dir, meta, capture_group)
+    async def xxx_contact_sheets(self, paths: list[str], folder_id: str, base_dir: str, meta: Meta, capture_group: str = "main", extra_screens: int = 0) -> list[str]:
+        return await xxx_contact_sheets(paths, folder_id, base_dir, meta, capture_group, extra_screens)
 
     async def xxx_fallback_cover(self, paths: list[str], folder_id: str, base_dir: str, meta: Meta, random_frame: bool = False) -> str | None:
         return await xxx_fallback_cover(paths, folder_id, base_dir, meta, random_frame)
