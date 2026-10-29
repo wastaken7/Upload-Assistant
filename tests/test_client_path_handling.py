@@ -9,6 +9,8 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import bencode
 import pytest
+import qbittorrentapi
+from requests import Request
 from torf import Torrent
 
 from src.clients import Clients
@@ -105,8 +107,9 @@ async def test_torrent_links_reject_existing_different_file(tmp_path):
 @pytest.mark.parametrize("keep_folder", [False, True])
 @pytest.mark.parametrize("linking", [None, "hardlink", "symlink"])
 @pytest.mark.parametrize("use_proxy", [False, True])
+@pytest.mark.parametrize("cross", [False, True])
 @pytest.mark.parametrize("content_layout", ["Original", "NoSubfolder"])
-async def test_qbittorrent_destination_matches_torrent_layout(tmp_path, layout, file_input, keep_folder, linking, use_proxy, content_layout):
+async def test_qbittorrent_destination_matches_torrent_layout(tmp_path, layout, file_input, keep_folder, linking, use_proxy, cross, content_layout):
     release = tmp_path / "Fictional.Movie.2025-GROUP"
     release.mkdir()
     video = release / "fictional.mkv"
@@ -152,9 +155,20 @@ async def test_qbittorrent_destination_matches_torrent_layout(tmp_path, layout, 
             meta.filelist,
             meta,
             "EXAMPLE",
+            cross=cross,
         )
 
     add.assert_awaited_once()
+    if use_proxy:
+        payload = add.call_args.args[3]
+        assert payload["seedMode"] == "true"
+        assert payload["skip_checking"] == "true"
+        assert payload["paused"] == str(cross).lower()
+    else:
+        payload = add.call_args.args[2]
+        assert payload["seedMode"] == "true"
+        assert payload["is_skip_checking"] is True
+        assert payload["is_stopped"] is cross
     save_path = Path(add.call_args.args[3]["savepath"] if use_proxy else add.call_args.args[2]["save_path"])
     expected = tmp_path / "links" / "EXAMPLE" if linking else release if layout == "singlefile" else tmp_path
     link_base = tmp_path / "links" / "EXAMPLE"
@@ -165,7 +179,10 @@ async def test_qbittorrent_destination_matches_torrent_layout(tmp_path, layout, 
         assert link.await_count == len(torrent.files)
         for file in torrent.files:
             source = release / Path(str(file)).relative_to(torrent.name) if layout != "singlefile" else video
-            link.assert_any_await(src=str(source), dst=link_base / str(file), use_hardlink=False)
+            if cross:
+                link.assert_any_await(str(source), str(link_base / str(file)), use_hardlink=False)
+            else:
+                link.assert_any_await(src=str(source), dst=link_base / str(file), use_hardlink=False)
     else:
         # The actual file layout must be usable by the client, including subtitles.
         for file in torrent.files:
@@ -175,6 +192,22 @@ async def test_qbittorrent_destination_matches_torrent_layout(tmp_path, layout, 
             assert destination.read_bytes() == source.read_bytes()
         if linking:
             assert not (link_base / release.name / unrelated.name).exists()
+
+
+def test_qbittorrent_api_serializes_seed_mode_with_legacy_skip_checking() -> None:
+    client = qbittorrentapi.Client(host="http://qbit.invalid")
+    response = Mock()
+    response.json.return_value = {}
+    with patch.object(client, "app_web_api_version", return_value="2.16.0"), patch.object(client, "_post", return_value=response) as post:
+        client.torrents_add(torrent_files=b"torrent", is_skip_checking=True, seedMode="true")
+
+    request = post.call_args.kwargs
+    _, data, files = client._format_payload("post", None, request["data"], request["files"], seedMode=request["seedMode"])
+    # Exercise the installed library's multipart encoding, including kwargs.
+    prepared = Request("POST", "http://qbit.invalid/api/v2/torrents/add", data=data, files=files).prepare()
+    body = prepared.body.lower()
+    assert b'name="seedmode"\r\n\r\ntrue\r\n' in body
+    assert b'name="skip_checking"\r\n\r\ntrue\r\n' in body
 
 
 def test_qbittorrent_coerce_str_list_parses_stringified_paths() -> None:
