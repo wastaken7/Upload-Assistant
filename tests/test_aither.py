@@ -29,6 +29,13 @@ def test_aither_preserves_regular_categories() -> None:
     assert _category(Meta(category="TV")) == {"category_id": "2"}
 
 
+def test_aither_sends_1440p_as_its_own_resolution() -> None:
+    aither = Aither({"DEFAULT": {}, "TRACKERS": {"AITHER": {}}})
+    assert asyncio.run(aither.get_resolution_id(Meta(resolution="1440p"))) == {"resolution_id": "42"}
+    assert asyncio.run(aither.get_resolution_id(Meta(resolution="1080p"))) == {"resolution_id": "3"}
+    assert asyncio.run(aither.get_resolution_id(Meta(), reverse=True))["42"] == "1440p"
+
+
 def test_aither_exposes_sports_category_mapping() -> None:
     assert _category(Meta(), mapping_only=True)["SPORTS"] == "9"
     assert _category(Meta(), reverse=True)["9"] == "SPORTS"

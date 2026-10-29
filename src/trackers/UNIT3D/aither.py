@@ -27,6 +27,9 @@ AITHER_NAME_RULES = VideoNameRules(
 class Aither(UNIT3D):
     """
     Aither is a Private Torrent Tracker for HD MOVIES / TV
+
+    API spec: https://aither.cc/pages/api
+    Synced with: last edited October 19, 2026.
     """
 
     tracker = "AITHER"
@@ -63,6 +66,27 @@ class Aither(UNIT3D):
 
         resolved_category = "SPORTS" if meta.is_sports else category or meta.category
         return {"category_id": category_id.get(resolved_category, "0")}
+
+    async def get_resolution_id(self, meta: Meta, resolution: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
+        # Aither has its own 1440p resolution (id 42) instead of grouping it with 1080p.
+        resolution_id = {
+            "8640p": "10",
+            "4320p": "1",
+            "2160p": "2",
+            "1440p": "42",
+            "1080p": "3",
+            "1080i": "4",
+            "720p": "5",
+            "576p": "6",
+            "576i": "7",
+            "480p": "8",
+            "480i": "9",
+        }
+        if mapping_only:
+            return resolution_id
+        if reverse:
+            return {value: key for key, value in resolution_id.items()}
+        return {"resolution_id": resolution_id.get(resolution or meta.resolution, "10")}
 
     async def get_season_number(self, meta: Meta) -> dict[str, str]:
         if (await self.get_category_id(meta))["category_id"] != "2":
@@ -103,7 +127,7 @@ class Aither(UNIT3D):
             data["hdr"] = 1
 
         if await self.get_flag(meta, "refundable") == "1":
-            data["refundable"] = True
+            data["refundable"] = "1"
 
         freeleech_until = meta.get("freeleech_until", 0) or self.tracker_config.get("freeleech_until", 0)
         if freeleech_until:

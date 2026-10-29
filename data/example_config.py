@@ -558,7 +558,7 @@ config: dict[str, Any] = {
         # Available trackers:
         #   1PTBA, AITHER, ALPHARATIO, ANTHELION, ASIANCINEMA, AVISTAZ, BEYONDHD, BITHDTV, BITPORN, BJSHARE, BLUTOPIA,
         #   BRASILTRACKER, BROADCASTHENET, CAPYBARABR, CATHODERAYTUBE, CINEMATIK, CINEMAZ, CURUPIRA, CZTEAM, DARKPEERS, DESITORRENTS,
-        #   DIGITALCORE, DREADVAULT, DRUNKENSLUG, EMUWAREZ, EXOTICAZ, FILELIST, FLOOD, FUNFILE, GREATPOSTERWALL, HAWKEUNO, HDBITS, HDSPACE, HDTORRENTS, HOMIEHELPDESK,
+        #   DIGITALCORE, DIRTYBYTES, DREADVAULT, DRUNKENSLUG, EMUWAREZ, EXOTICAZ, FILELIST, FLOOD, FUNFILE, GREATPOSTERWALL, HAWKEUNO, HDBITS, HDSPACE, HDTORRENTS, HOMIEHELPDESK,
         #   IMMORTALSEED, INFINITYHD, IPTORRENTS, ITATORRENTS, LAJIDUI, LASTDIGITALUNDERGROUND, LATTEAM, LEMONHD, LOCADORA, LONGPT, LST,
         #   LUMINARR, MAKINGOFF, MIDNIGHTSCENE, MTEAM, NEBULANCE, NORDICQUALITY, NZBGEEK, NZBNEST, OLDTOONSWORLD, ONLYENCODES, ORPHEUS, PASSTHEPOPCORN,
         #   PEERGARDEN, POLISHTORRENT, PORTUGAS, PRIVATEHD, PTCAFE, PTERCLUB, PTFANS, PTGTK, PTSKIT, PTZONE, QINGWA, RACING4EVERYONE, RAILGUNPT,
@@ -1222,6 +1222,14 @@ config: dict[str, Any] = {
             "bluray_image_size": "",
             "add_audio_spectrogram": True,
             "inject_delay": 0,
+        },
+        "DIRTYBYTES": {
+            "cli_alias": "DB",
+            # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
+            "link_dir_name": "",
+            # Generate your API key at Settings -> API key
+            "api_key": "",
+            "anon": True,
         },
         "DREADVAULT": {
             "cli_alias": "DVL",

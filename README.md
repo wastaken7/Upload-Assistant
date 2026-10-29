@@ -333,6 +333,7 @@ uv tool install --force git+https://github.com/wastaken7/Upload-Assistant.git
 | <img src="web_ui/static/img/trackers/darkpeers.png" width="16" height="16" />                 | DarkPeers              | DARKPEERS              | MOVIE, TV, BOOK, GAME, MUSIC |
 | <img src="web_ui/static/img/trackers/desitorrents.png" width="16" height="16" />              | DesiTorrents           | DESITORRENTS           | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/digitalcore.png" width="16" height="16" />               | DigitalCore            | DIGITALCORE            | MOVIE, TV, BOOK, GAME, MUSIC |
+| <img src="web_ui/static/img/trackers/dirtybytes.png" width="16" height="16" />                | DirtyBytes             | DIRTYBYTES             | XXX                          |
 | <img src="web_ui/static/img/trackers/dreadvault.png" alt="" width="16" height="16" />         | DreadVault             | DREADVAULT             | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/emuwarez.png" alt="" width="16" height="16" />           | eMuwarez               | EMUWAREZ               | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/exoticaz.png" width="16" height="16" />                  | ExoticaZ               | EXOTICAZ               | XXX                          |

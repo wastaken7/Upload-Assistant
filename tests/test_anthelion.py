@@ -155,4 +155,133 @@ def test_anthelion_duplicate_search_uses_discovered_imdb_id(monkeypatch) -> None
     meta = Meta(tmdb=None, imdb_id=7654321, imdb="stale", resolution="1080p")
 
     assert asyncio.run(tracker.search_existing(meta)) == []  # noqa: S101
-    assert SearchClient.params["imdbid"] == "7654321"  # noqa: S101
+    assert SearchClient.params["imdbid"] == "tt7654321"  # noqa: S101
+
+
+def test_anthelion_does_not_retry_refused_upload(tmp_path: Path, monkeypatch) -> None:
+    class SlotFilled(_Response):
+        status_code = 409
+        text = '{"error": "slot is already filled", "trump_key": "key"}'
+
+    _Client.posts = 0
+    _Client.response = SlotFilled()
+    meta = _meta(tmp_path)
+
+    assert asyncio.run(_tracker(monkeypatch).upload(meta)) is False  # noqa: S101
+    assert _Client.posts == 1  # noqa: S101
+    assert "HTTP 409" in meta.tracker_status["ANTHELION"]["status_message"]  # noqa: S101
+
+
+def test_anthelion_upload_payload_matches_api_spec(tmp_path: Path, monkeypatch) -> None:
+    class Success(_Response):
+        status_code = 201
+
+        def json(self):
+            return {"status": "success"}
+
+    sent: dict = {}
+
+    async def capture_post(_self, **kwargs):
+        sent.update(kwargs["data"])
+        return Success()
+
+    _Client.response = Success()
+    tracker = _tracker(monkeypatch)
+    monkeypatch.setattr(_Client, "post", capture_post)
+    meta = _meta(tmp_path)
+    meta.scene = True
+
+    assert asyncio.run(tracker.upload(meta)) is True  # noqa: S101
+    assert sent["scene"] == 1  # noqa: S101
+    assert "censored" not in sent  # noqa: S101
+    assert "audioformat" not in sent  # noqa: S101
+    assert "noreleasegroup" not in sent  # noqa: S101
+
+
+def test_anthelion_flags_use_current_site_names() -> None:
+    meta = SimpleNamespace(
+        edition="4K Remaster Director's",
+        audio="Dual-Audio DD+ 7.1 Atmos",
+        has_commentary=False,
+        manual_commentary=False,
+        three_d="",
+        hdr="",
+        distributor="",
+        type="ENCODE",
+        original_language="ja",
+        audio_languages=["Japanese", "English"],
+    )
+    tracker = object.__new__(Anthelion)
+
+    assert asyncio.run(tracker.get_flags(meta)) == ["Directors", "Remastered", "EnglishDub", "Atmos"]  # noqa: S101
+
+
+def test_anthelion_english_original_with_foreign_dub_is_not_english_dub() -> None:
+    meta = SimpleNamespace(
+        edition="",
+        audio="Dual-Audio DD 5.1",
+        has_commentary=False,
+        manual_commentary=False,
+        three_d="",
+        hdr="",
+        distributor="",
+        type="ENCODE",
+        original_language="en",
+        audio_languages=["English", "French"],
+    )
+    tracker = object.__new__(Anthelion)
+
+    assert "EnglishDub" not in asyncio.run(tracker.get_flags(meta))  # noqa: S101
+
+
+def test_anthelion_retries_request_timeout_status(tmp_path: Path, monkeypatch) -> None:
+    class RequestTimeout(_Response):
+        status_code = 408
+        text = "Request Timeout"
+
+    _Client.posts = 0
+    _Client.response = RequestTimeout()
+    meta = _meta(tmp_path)
+    monkeypatch.setattr("src.trackers.GAZELLE.anthelion.asyncio.sleep", _instant_sleep)
+
+    assert asyncio.run(_tracker(monkeypatch).upload(meta)) is False  # noqa: S101
+    assert _Client.posts == 3  # noqa: S101
+
+
+async def _instant_sleep(_delay: float, result=None):
+    return result
+
+
+def test_anthelion_duplicate_search_pads_short_imdb_id(monkeypatch) -> None:
+    class SearchResponse:
+        @staticmethod
+        def raise_for_status() -> None:
+            return None
+
+        @staticmethod
+        def json():
+            return {"item": []}
+
+    class SearchClient:
+        params = None
+
+        def __init__(self, **_kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_args):
+            return None
+
+        async def get(self, **kwargs):
+            type(self).params = kwargs["params"]
+            return SearchResponse()
+
+    monkeypatch.setattr("src.trackers.GAZELLE.anthelion.httpx.AsyncClient", SearchClient)
+    tracker = Anthelion({"TRACKERS": {"ANTHELION": {"api_key": "secret"}}})
+    meta = Meta(tmdb=None, imdb_id=12345, resolution="1080p")
+
+    assert asyncio.run(tracker.search_existing(meta)) == []  # noqa: S101
+    assert SearchClient.params["imdbid"] == "tt0012345"  # noqa: S101
+    assert SearchClient.params["limit"] == "100"  # noqa: S101

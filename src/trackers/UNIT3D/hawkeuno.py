@@ -1,6 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import re
-from typing import Any
+from typing import Any, ClassVar
 
 import aiofiles
 import httpx
@@ -8,6 +8,7 @@ from rich.markup import escape
 
 from src.cogs.redaction import Redaction
 from src.console import logger
+from src.distributors import distributor_id
 from src.get_desc import DescriptionBuilder
 from src.languages import languages_manager
 from src.meta import Meta
@@ -102,6 +103,108 @@ class HawkeUno(UNIT3D):
     requests_url = f"{base_url}/api/requests/filter"
     tracker_urls = ("https://hawke.uno",)
     supported_categories = ("TV", "MOVIE")
+
+    # Attribute IDs from https://hawke.uno/api-docs?section=attributes
+    video_codec_ids: ClassVar[dict[str, int]] = {"x265": 1, "x264": 2, "H265": 3, "H264": 4, "HEVC": 5, "AVC": 6, "VC-1": 7, "MPEG-2": 8, "AV1": 9}
+    video_format_ids: ClassVar[dict[str, int]] = {"DV HDR10+": 1, "DV HDR": 2, "DV": 3, "HDR10+": 4, "HDR": 5, "PQ10": 6, "HLG": 7, "SDR": 8}
+    audio_format_ids: ClassVar[dict[str, int]] = {
+        "TrueHD Atmos": 1,
+        "TrueHD": 2,
+        "DTS-HD MA Auro3D": 3,
+        "DTS-HD MA": 4,
+        "DTS-HD HRA": 5,
+        "DTS:X": 6,
+        "DTS": 7,
+        "DDP Atmos": 8,
+        "DDP": 9,
+        "DD": 10,
+        "AAC": 11,
+        "FLAC": 12,
+        "LPCM": 13,
+        "MP3": 14,
+        "MP2": 15,
+        "VORBIS": 16,
+        "OPUS": 17,
+        "NONE": 18,
+    }
+    audio_channel_ids: ClassVar[dict[str, int]] = {
+        "13.1": 1,
+        "12.1": 2,
+        "11.1": 3,
+        "10.1": 4,
+        "9.1": 5,
+        "7.1": 6,
+        "6.1": 7,
+        "5.1": 8,
+        "5.0": 9,
+        "4.0": 10,
+        "2.1": 11,
+        "2.0": 12,
+        "1.0": 13,
+    }
+    source_type_ids: ClassVar[dict[str, int]] = {
+        "UHD BluRay": 1,
+        "UHD BluRay Hybrid": 2,
+        "BluRay": 3,
+        "BluRay Hybrid": 4,
+        "HD-DVD": 5,
+        "HD-DVD Hybrid": 6,
+        "DVD9": 7,
+        "DVD5": 8,
+        "WEB-DL": 9,
+        "WEB-DL Hybrid": 10,
+        "HDTV": 11,
+        "SDTV": 12,
+        "DVD": 13,
+    }
+    edition_ids: ClassVar[dict[str, int]] = {
+        "IMAX": 1,
+        "OPEN MATTE": 2,
+        "Extended": 3,
+        "Ultimate": 4,
+        "Directors Cut": 5,
+        "Theatrical": 6,
+        "Anniversary": 7,
+        "Special": 8,
+        "Limited": 9,
+        "Collectors": 10,
+        "Unrated": 11,
+        "Uncut": 12,
+        "Criterion": 13,
+        "Final Cut": 14,
+        "Redux": 15,
+        "Restored": 16,
+        "3D": 17,
+        "Assembly": 18,
+        "Remastered": 19,
+        "4K Remaster": 20,
+        "Superbit": 21,
+        "Black and White": 22,
+    }
+    release_tags = (
+        "REPACK",
+        "REPACK2",
+        "REPACK3",
+        "REPACK4",
+        "REPACK5",
+        "REPACK6",
+        "REPACK7",
+        "REPACK8",
+        "REPACK9",
+        "PROPER",
+        "PROPER2",
+        "PROPER3",
+        "PROPER4",
+        "PROPER5",
+        "INCOMPLETE",
+        "DUBBED",
+        "SUBBED",
+    )
+    regions = (
+        "PAL", "NTSC", "RA", "RB", "RC", "RF", "USA", "GBR", "DEU", "FRA", "ITA", "ESP", "JPN", "KOR", "CHN",
+        "HKG", "TWN", "AUS", "CAN", "NLD", "SWE", "NOR", "DNK", "POL", "RUS", "BRA", "MEX", "IND", "GER",
+    )  # fmt: skip
+    sd_resolutions = ("576p", "576i", "540p", "540i", "480p", "480i")
 
     def __init__(self, config: dict[str, Any]) -> None:
         super().__init__(config, "HAWKEUNO")
@@ -250,6 +353,148 @@ class HawkeUno(UNIT3D):
         resolved_id = type_id.get(meta_type, "0")
         return {"type_id": resolved_id}
 
+    def get_video_codec(self, meta: Meta) -> str:
+        encode = (meta.video_encode or "").split()
+        codec = encode[-1].replace(".", "") if encode else ""
+        if codec in self.video_codec_ids:
+            return codec
+        return meta.video_codec if meta.video_codec in self.video_codec_ids else ""
+
+    def get_video_format(self, meta: Meta) -> str:
+        hdr = (meta.hdr or "").split()
+        dv = "DV" in hdr
+        if "HDR10+" in hdr:
+            return "DV HDR10+" if dv else "HDR10+"
+        if "HDR" in hdr:
+            return "DV HDR" if dv else "HDR"
+        if dv:
+            return "DV"
+        if "HLG" in hdr:
+            return "HLG"
+        if "PQ10" in hdr:
+            return "PQ10"
+        return "SDR"
+
+    def get_audio_format(self, meta: Meta) -> str:
+        audio = meta.audio or ""
+        atmos = "Atmos" in audio
+        patterns = (
+            (r"\bTrueHD\b", "TrueHD Atmos" if atmos else "TrueHD"),
+            (r"DTS:X", "DTS:X"),
+            (r"DTS-HD MA", "DTS-HD MA Auro3D" if "Auro3D" in audio else "DTS-HD MA"),
+            (r"DTS-HD HRA", "DTS-HD HRA"),
+            (r"(?<!\S)DTS(?:-ES)?(?!\S)", "DTS"),
+            (r"(?<!\S)(?:DD\+|DDP)(?!\S)", "DDP Atmos" if atmos else "DDP"),
+            (r"(?<!\S)DD(?!\S)", "DD"),
+            (r"(?<!\S)AAC(?!\S)", "AAC"),
+            (r"(?<!\S)FLAC(?!\S)", "FLAC"),
+            (r"(?<!\S)L?PCM(?!\S)", "LPCM"),
+            (r"(?<!\S)MP3(?!\S)", "MP3"),
+            (r"(?<!\S)MP2(?!\S)", "MP2"),
+            (r"(?<!\S)VORBIS(?!\S)", "VORBIS"),
+            (r"(?<!\S)OPUS(?!\S)", "OPUS"),
+        )
+        for pattern, audio_format in patterns:
+            if re.search(pattern, audio, flags=re.IGNORECASE):
+                return audio_format
+        return ""
+
+    def get_audio_channels(self, meta: Meta) -> str:
+        # HUNO names only the base layer, so Atmos heights (7.1.4) are dropped
+        return ".".join(str(meta.channels or "").split(".")[:2])
+
+    def get_source_type(self, meta: Meta) -> str:
+        source = str(meta.source or "").upper().replace(" ", "").replace("-", "")
+        hybrid = " Hybrid" if meta.webdv else ""
+        if meta.type in ("WEBDL", "WEBRIP") or source == "WEB":
+            return f"WEB-DL{hybrid}"
+        if "HDTV" in source or source == "TV":
+            return "SDTV" if meta.resolution in self.sd_resolutions else "HDTV"
+        if "HDDVD" in source or meta.is_disc == "HDDVD":
+            return f"HD-DVD{hybrid}"
+        if meta.is_disc == "DVD":
+            return meta.dvd_size if meta.dvd_size in ("DVD9", "DVD5") else "DVD"
+        if "DVD" in source or source in ("PAL", "NTSC"):
+            return "DVD"
+        if "BLURAY" in source or meta.is_disc == "BDMV":
+            return f"{'UHD BluRay' if meta.uhd else 'BluRay'}{hybrid}"
+        return ""
+
+    def get_media_language(self, meta: Meta) -> str:
+        if meta.silent:
+            return "No Language"
+        languages = [lang for lang in meta.audio_languages or [] if lang]
+        if len(languages) >= 3:
+            return "MULTI"
+        if len(languages) == 2:
+            return "DUAL"
+        return languages[0] if languages else ""
+
+    def get_edition(self, meta: Meta) -> str:
+        edition = re.sub(r"[^a-z0-9+ ]", "", (meta.edition or "").lower())
+        for name in self.edition_ids:
+            if re.search(rf"(?<!\S){re.escape(name.lower())}(?!\S)", edition):
+                return name
+        return ""
+
+    def get_release_tag(self, meta: Meta) -> str:
+        repack = (meta.repack or "").strip().upper()
+        if repack in self.release_tags:
+            return repack
+        if meta.tv_pack and meta.season_pack_incomplete:
+            return "INCOMPLETE"
+        if re.search(r"\bDubbed\b", meta.audio or ""):
+            return "DUBBED"
+        return ""
+
+    def get_region(self, meta: Meta) -> str:
+        region = (meta.region or "").strip().upper()
+        if region in self.regions:
+            return region
+        system = str(meta.source or "").split()[0].upper() if meta.source else ""
+        return system if system in ("PAL", "NTSC") else ""
+
+    async def get_attributes(self, meta: Meta) -> dict[str, Any]:
+        """Explicit attribute overrides, so HUNO does not rely on its filename auto-detection."""
+        attributes: dict[str, Any] = {
+            "resolution": (await self.get_resolution_id(meta))["resolution_id"],
+            "video_format": self.video_format_ids[self.get_video_format(meta)],
+            "release_group": str(meta.tag or "").strip().lstrip("-") or "NoGRP",
+        }
+
+        lookups = (
+            ("video_codec", self.get_video_codec(meta), self.video_codec_ids),
+            ("audio_format", self.get_audio_format(meta), self.audio_format_ids),
+            ("audio_channels", self.get_audio_channels(meta), self.audio_channel_ids),
+            ("source_type", self.get_source_type(meta), self.source_type_ids),
+            ("edition", self.get_edition(meta), self.edition_ids),
+        )
+        for field_name, value, ids in lookups:
+            if value in ids:
+                attributes[field_name] = ids[value]
+
+        if meta.type in ("WEBDL", "WEBRIP") or meta.service:
+            attributes["streaming_service"] = meta.service or "NADA"
+
+        media_language = self.get_media_language(meta)
+        if media_language:
+            attributes["media_language"] = media_language
+
+        release_tag = self.get_release_tag(meta)
+        if release_tag:
+            attributes["release_tag"] = release_tag
+
+        if meta.is_disc:
+            region = self.get_region(meta)
+            if region:
+                attributes["region"] = region
+        if meta.is_disc or meta.type == "REMUX":
+            distributor = distributor_id(meta.distributor, self.tracker)
+            if distributor:
+                attributes["distributor"] = distributor
+
+        return attributes
+
     async def get_data(self, meta: Meta) -> dict[str, Any]:
         await self.get_description(meta)
 
@@ -258,8 +503,9 @@ class HawkeUno(UNIT3D):
             "type_id": (await self.get_type_id(meta))["type_id"],
             "tmdb": meta.tmdb,
             "anonymous": int(bool(meta.anon) or self.tracker_config.get("anon", False)),
-            "imdb": meta.imdb_id,
         }
+        if meta.imdb_id:
+            data["imdb"] = meta.imdb_id
 
         internal = await self.get_internal(meta)
         if internal == 1:
@@ -268,17 +514,7 @@ class HawkeUno(UNIT3D):
         if meta.manual_name is not None or (meta.tv_pack and meta.season_pack_incomplete):
             data.update(await self.get_name(meta))
 
-        data["edition"] = meta.edition
-        if meta.repack:
-            data["release_tag"] = meta.repack
-
-        if meta.is_disc:
-            region = meta.region
-            distributor = meta.distributor
-            if region:
-                data["region"] = region
-            if distributor:
-                data["distributor"] = distributor
+        data.update(await self.get_attributes(meta))
 
         if meta.category == "TV":
             season_int = meta.season_int
@@ -288,13 +524,13 @@ class HawkeUno(UNIT3D):
 
             if season_int:
                 data["season_number"] = season_int
-            if episode_int:
+            if episode_int and not meta.tv_pack:
                 data["episode_number"] = episode_int
             if tvdb:
                 data["tvdb"] = tvdb
             if mal_id:
                 data["mal"] = mal_id
-            data["season_pack"] = meta.tv_pack
+            data["season_pack"] = int(bool(meta.tv_pack))
 
         return data
 
@@ -365,6 +601,17 @@ class HawkeUno(UNIT3D):
 
         except httpx.HTTPStatusError as e:
             msg = f"HTTP {e.response.status_code} - {e.response.text}"
+            # 409 (duplicate) and 422 (attribute mismatch) explain the rejection in the JSON envelope
+            try:
+                error_json = e.response.json()
+                details = error_json.get("data") or ""
+                if isinstance(details, list):
+                    details = "; ".join(str(detail) for detail in details)
+                detail_text = f"{error_json.get('message') or ''} {details}".strip()
+                if detail_text:
+                    msg = f"HTTP {e.response.status_code} - {detail_text}"
+            except ValueError, AttributeError:
+                pass
             status_dict["status_message"] = f"data error: {msg}"
             logger.info(f"{self.tracker}: [bold red]Upload error: {escape(str(msg))}[/bold red]")
             return False
