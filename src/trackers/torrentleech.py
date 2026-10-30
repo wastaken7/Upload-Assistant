@@ -47,7 +47,7 @@ class TorrentLeech:
         self.session.headers.update({"User-Agent": f"Upload Assistant ({platform.system()} {platform.release()})"})
 
     async def get_additional_checks(self, meta: Meta) -> bool:
-        return self.common.check_and_confirm_adult_media_upload(meta, self.tracker)
+        return await self.common.check_and_confirm_adult_media_upload(meta, self.tracker)
 
     async def login(self, meta: Meta, force: bool = False) -> bool:
         if self.api_upload and not force:

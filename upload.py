@@ -682,10 +682,11 @@ async def _prompt_game_meta(meta: Meta) -> None:
                 if meta.platform.upper() == "PSP":
                     system_choices = ["FREE", "NTSC", "PAL", "Skip"]
                 try:
-                    choice = CLI_UI.ask_choice(
-                        "BJSHARE: Select game system (TV standard):",
-                        choices=system_choices,
-                    )
+                    with _game_field_prompt(meta, "System", skip=False):
+                        choice = CLI_UI.ask_choice(
+                            "BJSHARE: Select game system (TV standard):",
+                            choices=system_choices,
+                        )
                     if choice != "Skip":
                         meta.game_system = choice
                 except EOFError:
@@ -694,10 +695,11 @@ async def _prompt_game_meta(meta: Meta) -> None:
             if needs_game_region and not meta.game_region:
                 region_choices = ["USA", "EUR", "JPN", "Skip"]
                 try:
-                    choice = CLI_UI.ask_choice(
-                        "BJSHARE: Select game region:",
-                        choices=region_choices,
-                    )
+                    with _game_field_prompt(meta, "Region", skip=False):
+                        choice = CLI_UI.ask_choice(
+                            "BJSHARE: Select game region:",
+                            choices=region_choices,
+                        )
                     if choice != "Skip":
                         meta.game_region = choice
                 except EOFError:
@@ -710,10 +712,11 @@ async def _prompt_game_meta(meta: Meta) -> None:
 
                 if meta.container.upper() not in container_choices:
                     try:
-                        choice = CLI_UI.ask_choice(
-                            "BJSHARE: Select container format ('Destravamento'):",
-                            choices=container_choices,
-                        )
+                        with _game_field_prompt(meta, "Container", skip=False):
+                            choice = CLI_UI.ask_choice(
+                                "BJSHARE: Select container format ('Destravamento'):",
+                                choices=container_choices,
+                            )
                         if choice != "Skip":
                             meta.container = choice
                     except EOFError:
@@ -950,18 +953,19 @@ _MUSIC_FIELD_LABELS = {
 }
 
 
-def _music_field_prompt(meta: Meta, field: str, *, hint: str = "", placeholder: str = "", keep: bool = True) -> contextlib.AbstractContextManager[None]:
+def _music_field_prompt(meta: Meta, field: str, *, hint: str = "", placeholder: str = "", keep: bool = True, conflicts: bool = True) -> contextlib.AbstractContextManager[None]:
     """Show a music metadata question in the Web UI with the release's current values.
 
-    Values the files disagree on are offered as answers, and with ``keep``
-    a blank answer (keep the current value, or skip) is offered as well.
+    With ``conflicts``, values the files disagree on are offered as answers
+    (turn it off for yes/no questions), and with ``keep`` a blank answer
+    (keep the current value, or skip) is offered as well.
     """
     summary: dict[str, Any] = {label: _music_field(meta, name) for name, label in _MUSIC_FIELD_LABELS.items()}
     summary["Artwork"] = summary["Artwork"] or meta.artwork_path
     current = str(_music_field(meta, field) or "")
     actions: list[tuple[str, str]] = [("", f"Keep {current}" if current else "Skip")] if keep else []
-    conflicts = meta.music_release.get("conflicts", {}) if isinstance(meta.music_release, dict) else {}
-    candidates = [str(value) for value in (conflicts.get(field) or [] if isinstance(conflicts, dict) else [])]
+    field_conflicts = meta.music_release.get("conflicts", {}) if conflicts and isinstance(meta.music_release, dict) else {}
+    candidates = [str(value) for value in (field_conflicts.get(field) or [] if isinstance(field_conflicts, dict) else [])]
     if field in {"year", "edition_year"}:
         candidates = [value for value in candidates if re.fullmatch(r"\d{4}", value)]
     offered = [value for value in dict.fromkeys(candidates) if value and value != current]
@@ -991,7 +995,15 @@ def _book_field_prompt(meta: Meta, focus: str, *, hint: str = "", placeholder: s
 
 def _game_field_prompt(meta: Meta, focus: str, *, hint: str = "", placeholder: str = "", skip: bool = True) -> contextlib.AbstractContextManager[None]:
     """Show a game metadata question in the Web UI with the game's current values."""
-    summary: dict[str, Any] = {"Title": meta.title, "Year": meta.year, "Platform": meta.platform, "Subcategory": meta.game_subcategory}
+    summary: dict[str, Any] = {
+        "Title": meta.title,
+        "Year": meta.year,
+        "Platform": meta.platform,
+        "Subcategory": meta.game_subcategory,
+        "System": meta.game_system,
+        "Region": meta.game_region,
+        "Container": meta.container,
+    }
     return webui_events.field_prompt("Game", summary, focus=focus, hint=hint, actions=[("", "Skip")] if skip else [], placeholder=placeholder)
 
 
@@ -1220,9 +1232,18 @@ async def _confirm_music_folder_hints(meta: Meta) -> None:
     try:
         for name, value in hints:
             field = _MUSIC_FOLDER_HINT_FIELDS.get(name)
-            if field and CLI_UI.ask_yes_no(f"Send {name} '{value}' from the folder name to Orpheus?", default=False):
-                _set_music_field(meta, field, value)
-                changed = True
+            if field:
+                with _music_field_prompt(
+                    meta,
+                    field,
+                    hint="Orpheus rule 2.1.19: edition details from the folder name are only sent when confirmed.",
+                    keep=False,
+                    conflicts=False,
+                ):
+                    confirmed = CLI_UI.ask_yes_no(f"Send {name} '{value}' from the folder name to Orpheus?", default=False)
+                if confirmed:
+                    _set_music_field(meta, field, value)
+                    changed = True
     except EOFError:
         logger.info("[yellow]Input cancelled — folder-name edition details are not sent.[/yellow]")
         return

@@ -1,5 +1,70 @@
-/* Upload-Assistant visual language: obsidian surfaces, copper actions, gold flow. */
+/* Upload-Assistant visual language: quiet layered surfaces, one accent colour
+   per theme. The default "amber" theme pairs graphite surfaces with amber. */
+
+/* Self-hosted variable fonts (SIL OFL 1.1, licences in ../fonts). */
+@font-face {
+  font-display: swap;
+  font-family: "Inter Variable";
+  font-style: normal;
+  font-weight: 100 900;
+  src: url("../fonts/inter-latin-wght.woff2") format("woff2-variations");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
+    U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-display: swap;
+  font-family: "Inter Variable";
+  font-style: normal;
+  font-weight: 100 900;
+  src: url("../fonts/inter-latin-ext-wght.woff2") format("woff2-variations");
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304,
+    U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB,
+    U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-display: swap;
+  font-family: "JetBrains Mono Variable";
+  font-style: normal;
+  font-weight: 100 800;
+  src: url("../fonts/jetbrains-mono-latin-wght.woff2")
+    format("woff2-variations");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
+    U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-display: swap;
+  font-family: "JetBrains Mono Variable";
+  font-style: normal;
+  font-weight: 100 800;
+  src: url("../fonts/jetbrains-mono-latin-ext-wght.woff2")
+    format("woff2-variations");
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304,
+    U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB,
+    U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
 :root {
+  --ua-font-sans:
+    "Inter Variable", Inter, ui-sans-serif, system-ui, -apple-system,
+    BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --ua-font-mono:
+    "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, SFMono-Regular,
+    Menlo, Consolas, monospace;
+  /* Text and icons drawn on an accent-filled surface. */
+  --ua-on-accent: #ffffff;
+  /* Radii used by the rounded interface style. */
+  --ua-radius-control: 0.625rem;
+  --ua-radius-panel: 0.875rem;
+  --ua-radius-chip: 999px;
   --ua-obsidian: #0c0a09;
   --ua-charcoal: #1c1917;
   --ua-stone: #292524;
@@ -53,6 +118,34 @@ html[data-ua-mode="light"] {
   :root {
     scrollbar-color: auto;
   }
+}
+
+[data-ua-theme="amber"] {
+  --ua-obsidian: #0f1012;
+  --ua-charcoal: #16181b;
+  --ua-stone: #22252a;
+  --ua-copper: #e8962a;
+  --ua-copper-bright: #f0a43a;
+  --ua-gold: #ffc46b;
+  --ua-ink: #eceef0;
+  --ua-muted: #9aa1a9;
+  --ua-border: rgba(154, 161, 169, 0.2);
+  --ua-glow: rgba(240, 164, 58, 0.24);
+  --ua-light-panel-start: #fdf6ec;
+  --ua-light-panel-end: #fffaf3;
+  --ua-atmosphere: rgba(240, 164, 58, 0.05);
+  --ua-card-glow: rgba(0, 0, 0, 0);
+  --ua-on-accent: #1a1206;
+}
+
+/* Amber is too light to read as text on white, so the light mode uses the
+   deeper end of the scale for accent text while fills stay warm. */
+html[data-ua-mode="light"][data-ua-theme="amber"] {
+  --ua-copper: #e08a1e;
+  --ua-copper-bright: #b45309;
+  --ua-gold: #92400e;
+  --ua-muted: #5b6168;
+  --ua-glow: rgba(224, 138, 30, 0.24);
 }
 
 [data-ua-theme="graphite"] {
@@ -148,14 +241,8 @@ body {
 body {
   background-color: var(--ua-obsidian) !important;
   color: var(--ua-ink);
-  font-family:
-    Inter,
-    ui-sans-serif,
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    sans-serif;
+  font-family: var(--ua-font-sans);
+  font-feature-settings: "cv11", "ss01";
 }
 
 /* Give the app the same quiet diagonal depth as the logo card. */
@@ -353,7 +440,7 @@ button:focus-visible {
    palette instead of tying them to a hard-coded utility colour. */
 .ua-accent-action {
   background-color: var(--ua-copper) !important;
-  color: #ffffff !important;
+  color: var(--ua-on-accent) !important;
   transition:
     background-color 150ms ease,
     color 150ms ease;
@@ -382,7 +469,7 @@ button:focus-visible {
 
 .ua-accent-hover:hover:not(:disabled) {
   background-color: var(--ua-copper) !important;
-  color: #ffffff !important;
+  color: var(--ua-on-accent) !important;
 }
 
 .ua-accent-dropzone:hover:not(:disabled) {
@@ -806,6 +893,7 @@ button:focus-visible {
 /* Compatibility translation for remaining older blue utility classes. */
 :where([class~="bg-blue-600"]) {
   background-color: var(--ua-copper) !important;
+  color: var(--ua-on-accent) !important;
 }
 
 :where([class~="hover:bg-blue-700"]):hover {
@@ -864,14 +952,149 @@ button:focus-visible {
   ) !important;
 }
 
+.ua-tracker-selector {
+  --ua-tracker-accent: color-mix(
+    in srgb,
+    var(--ua-copper-bright) 72%,
+    var(--ua-upload-text, var(--ua-ink))
+  );
+  background: var(--ua-upload-surface, var(--ua-charcoal));
+  border-color: var(--ua-upload-border, var(--ua-border));
+  color: var(--ua-upload-text, var(--ua-ink));
+  container-type: inline-size;
+}
+
+.ua-tracker-selector-header {
+  align-items: center;
+  border-bottom: 1px solid var(--ua-upload-border, var(--ua-border));
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: space-between;
+  padding-block-end: 0.75rem;
+}
+
+.ua-tracker-toolbar {
+  align-items: flex-end;
+  border-inline-start: 1px solid var(--ua-upload-border, var(--ua-border));
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  max-width: 100%;
+  padding-inline-start: 0.75rem;
+}
+
+.ua-tracker-toolbar-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.ua-tracker-toolbar-group + .ua-tracker-toolbar-group {
+  border-inline-start: 1px solid var(--ua-upload-border, var(--ua-border));
+  padding-inline-start: 0.75rem;
+}
+
+.ua-tracker-toolbar-caption {
+  color: var(--ua-upload-muted, var(--ua-muted));
+  font-size: 0.5625rem;
+  font-weight: 600;
+  letter-spacing: 0.045em;
+  line-height: 0.75rem;
+  text-transform: uppercase;
+}
+
+.ua-tracker-toolbar-controls,
+.ua-tracker-toolbar-status {
+  align-items: center;
+  display: flex;
+  gap: 0.5rem;
+  white-space: nowrap;
+}
+
+@container (max-width: 48rem) {
+  .ua-tracker-selector-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .ua-tracker-toolbar {
+    border-inline-start: 0;
+    padding-inline-start: 0;
+  }
+}
+
+@container (max-width: 42rem) {
+  .ua-tracker-selector-header {
+    gap: 0.5rem;
+  }
+
+  .ua-tracker-toolbar {
+    align-items: start;
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    justify-content: start;
+    row-gap: 0.5rem;
+    width: 100%;
+  }
+
+  .ua-tracker-toolbar-group + .ua-tracker-toolbar-group {
+    border-inline-start: 0;
+    padding-inline-start: 0;
+  }
+
+  .ua-tracker-toolbar-layout {
+    grid-column: 1 / -1;
+  }
+
+  .ua-tracker-toolbar-controls,
+  .ua-tracker-toolbar-status {
+    flex-wrap: wrap;
+  }
+
+  .ua-tracker-toolbar-status {
+    row-gap: 0.125rem;
+  }
+}
+
+@container (min-width: 31rem) and (max-width: 42rem) {
+  .ua-tracker-toolbar {
+    grid-template-columns: max-content minmax(0, 1fr) max-content;
+  }
+
+  .ua-tracker-toolbar-layout {
+    grid-column: auto;
+  }
+}
+
+@container (max-width: 21rem) {
+  .ua-tracker-toolbar {
+    column-gap: 0.5rem;
+  }
+
+  .ua-tracker-toolbar-controls {
+    gap: 0.25rem;
+  }
+}
+
 .ua-tracker-chip-list {
   align-items: stretch;
   grid-template-columns: repeat(auto-fill, minmax(12.5rem, 1fr));
 }
 
 .ua-tracker-chip {
+  background: var(--ua-upload-surface-raised, var(--ua-stone));
+  border-color: var(--ua-upload-border, var(--ua-border));
+  color: var(--ua-upload-muted, var(--ua-muted));
   justify-content: flex-start;
   width: 100%;
+}
+
+.ua-tracker-chip:hover:not(:disabled) {
+  background: var(--ua-upload-hover, var(--ua-stone));
+  color: var(--ua-upload-text, var(--ua-ink));
 }
 
 .ua-tracker-chip-label {
@@ -882,6 +1105,306 @@ button:focus-visible {
 
 .ua-tracker-chip > .ua-tracker-health-dot {
   margin-left: auto;
+}
+
+.ua-tracker-layout-button,
+.ua-tracker-layout-icon,
+.ua-tracker-pin,
+.ua-tracker-options-trigger,
+.ua-tracker-drag-handle {
+  align-items: center;
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: 0.3rem;
+  justify-content: center;
+  color: var(--ua-upload-text, var(--ua-ink));
+}
+
+.ua-tracker-layout-button {
+  background: var(--ua-upload-surface-raised, var(--ua-stone));
+  border: 1px solid var(--ua-upload-border, var(--ua-border));
+  border-radius: 0.375rem;
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 0.3rem 0.5rem;
+}
+
+.ua-tracker-toolbar-button,
+.ua-tracker-group-selection .ua-tracker-layout-button {
+  box-sizing: border-box;
+  font-size: 0.625rem;
+  height: 1.5625rem;
+  line-height: 0.9375rem;
+  padding: 0 0.5rem;
+  white-space: nowrap;
+}
+
+.ua-tracker-layout-button:hover:not(:disabled),
+.ua-tracker-layout-button[aria-pressed="true"],
+.ua-tracker-layout-icon:hover:not(:disabled),
+.ua-tracker-pin:hover:not(:disabled) {
+  background: var(--ua-upload-hover, var(--ua-stone));
+  color: var(--ua-tracker-accent);
+}
+
+.ua-tracker-options-trigger:hover:not(:disabled),
+.ua-tracker-options-trigger[aria-expanded="true"] {
+  background: var(--ua-upload-hover, var(--ua-stone));
+  color: var(--ua-tracker-accent);
+}
+
+.ua-tracker-filter-indicator {
+  align-items: center;
+  border: 1px solid currentColor;
+  border-radius: 0.1875rem;
+  color: var(--ua-upload-muted, var(--ua-muted));
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 0.75rem;
+  justify-content: center;
+  width: 0.75rem;
+}
+
+.ua-tracker-filter-toggle[aria-pressed="true"] {
+  background: color-mix(
+    in srgb,
+    var(--ua-copper) 12%,
+    var(--ua-upload-surface-raised, var(--ua-stone))
+  );
+  border-color: var(--ua-copper-bright);
+  color: var(--ua-tracker-accent);
+}
+
+.ua-tracker-filter-toggle[aria-pressed="true"] .ua-tracker-filter-indicator {
+  background: var(--ua-copper);
+  border-color: var(--ua-copper);
+  color: var(--ua-on-accent);
+}
+
+.ua-tracker-layout-button:disabled,
+.ua-tracker-organizer button:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.ua-tracker-layout-editor {
+  background: color-mix(
+    in srgb,
+    var(--ua-copper) 4%,
+    var(--ua-upload-surface, var(--ua-charcoal))
+  );
+  border: 1px solid var(--ua-upload-border, var(--ua-border));
+  border-radius: 0.5rem;
+  font-size: 0.7rem;
+  margin-bottom: 0.75rem;
+  padding: 0.65rem;
+}
+
+.ua-tracker-layout-editor > p {
+  color: var(--ua-upload-muted, var(--ua-muted));
+  margin-bottom: 0.5rem;
+}
+
+.ua-tracker-layout-toolbar,
+.ua-tracker-layout-confirm {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.ua-tracker-layout-toolbar > input,
+.ua-tracker-group-name {
+  background: var(--ua-upload-surface-raised, var(--ua-stone));
+  border: 1px solid var(--ua-upload-border, var(--ua-border));
+  border-radius: 0.375rem;
+  color: var(--ua-upload-text, var(--ua-ink));
+  min-width: 0;
+  padding: 0.3rem 0.4rem;
+}
+
+.ua-tracker-layout-toolbar > input {
+  flex: 1 1 10rem;
+  max-width: 20rem;
+}
+
+.ua-tracker-layout-toolbar > input::placeholder {
+  color: var(--ua-upload-muted, var(--ua-muted));
+  opacity: 1;
+}
+
+.ua-tracker-layout-reset {
+  margin-left: auto;
+}
+
+.ua-tracker-layout-confirm {
+  border-top: 1px solid var(--ua-upload-border, var(--ua-border));
+  margin-top: 0.6rem;
+  padding-top: 0.6rem;
+}
+
+.ua-tracker-group {
+  border-radius: 0.375rem;
+}
+
+.ua-tracker-group + .ua-tracker-group {
+  margin-top: 0.8rem;
+}
+
+.ua-tracker-group-heading {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.4rem;
+  min-height: 1.4rem;
+}
+
+.ua-tracker-group-heading h3,
+.ua-tracker-group-name {
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.ua-tracker-group-name {
+  width: clamp(7rem, 25%, 16rem);
+}
+
+.ua-tracker-group-count {
+  color: var(--ua-upload-muted, var(--ua-muted));
+  font-size: 0.6rem;
+}
+
+.ua-tracker-group-actions,
+.ua-tracker-group-selection {
+  align-items: center;
+  display: flex;
+  gap: 0.25rem;
+  margin-left: auto;
+}
+
+.ua-tracker-card {
+  min-width: 0;
+  position: relative;
+}
+
+.ua-tracker-card-main {
+  align-items: stretch;
+  display: flex;
+  min-width: 0;
+}
+
+.ua-tracker-card-main > .ua-tracker-chip {
+  flex: 1;
+  width: auto;
+}
+
+.ua-tracker-organizer[data-editing="true"]
+  .ua-tracker-card-main
+  > .ua-tracker-chip {
+  border-bottom-right-radius: 0;
+  border-top-right-radius: 0;
+}
+
+.ua-tracker-pin {
+  border: 1px solid var(--ua-upload-border, var(--ua-border));
+  border-left: 0;
+  border-radius: 0 0.375rem 0.375rem 0;
+  color: var(--ua-upload-muted, var(--ua-muted));
+  width: 1.65rem;
+}
+
+.ua-tracker-options-trigger {
+  background: var(--ua-upload-surface-raised, var(--ua-stone));
+  border: 1px solid var(--ua-upload-border, var(--ua-border));
+  border-left: 0;
+  color: var(--ua-upload-muted, var(--ua-muted));
+  width: 1.65rem;
+}
+
+.ua-tracker-pin[aria-pressed="true"] {
+  background: color-mix(
+    in srgb,
+    var(--ua-copper) 10%,
+    var(--ua-upload-surface-raised, var(--ua-stone))
+  );
+  color: var(--ua-tracker-accent);
+}
+
+.ua-tracker-drag-handle {
+  color: var(--ua-upload-muted, var(--ua-muted));
+  cursor: grab;
+  padding: 0.15rem;
+}
+
+.ua-tracker-drag-handle:active {
+  cursor: grabbing;
+}
+
+.ua-tracker-layout-icon {
+  border-radius: 0.375rem;
+  height: 1.5rem;
+  width: 1.5rem;
+}
+
+.ua-tracker-options-panel {
+  background: var(--ua-upload-surface-raised, var(--ua-stone));
+  border: 1px solid var(--ua-upload-border, var(--ua-border));
+  border-radius: 0.375rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  inset-inline-end: 0;
+  margin-top: 0.25rem;
+  max-height: 16rem;
+  overflow-y: auto;
+  padding: 0.35rem;
+  position: absolute;
+  top: 100%;
+  width: 100%;
+  z-index: 30;
+}
+
+.ua-tracker-options-panel > button {
+  justify-content: flex-start;
+  min-height: 2rem;
+  overflow-wrap: anywhere;
+  text-align: start;
+}
+
+.ua-tracker-options-heading {
+  color: var(--ua-upload-muted, var(--ua-muted));
+  font-size: 0.65rem;
+  padding: 0.25rem;
+}
+
+.ua-tracker-group-empty {
+  border: 1px dashed var(--ua-upload-border, var(--ua-border));
+  border-radius: 0.375rem;
+  color: var(--ua-upload-muted, var(--ua-muted));
+  font-size: 0.65rem;
+  grid-column: 1 / -1;
+  padding: 0.8rem;
+}
+
+.ua-tracker-group[data-drop-target="true"] {
+  background: color-mix(in srgb, var(--ua-copper) 8%, transparent);
+  outline: 2px dashed var(--ua-copper-bright);
+  outline-offset: 3px;
+}
+
+.ua-tracker-card[data-drop-before="true"]::before {
+  background: var(--ua-copper-bright);
+  bottom: 0;
+  content: "";
+  left: -0.3rem;
+  position: absolute;
+  top: 0;
+  width: 2px;
+}
+
+.ua-tracker-organizer[data-editing="true"] .ua-tracker-chip:disabled {
+  opacity: 1;
 }
 
 @media (max-width: 640px) {
@@ -1307,7 +1830,7 @@ html[data-ua-mode="light"] .ua-auth-page {
   background: var(--ua-copper);
   border: 1px solid color-mix(in srgb, var(--ua-copper-bright) 45%, transparent);
   border-radius: 0.375rem;
-  color: #ffffff;
+  color: var(--ua-on-accent);
   cursor: pointer;
   display: inline-flex;
   font-size: 0.875rem;
@@ -1409,7 +1932,7 @@ a:hover {
 
 ::selection {
   background: var(--ua-copper);
-  color: white;
+  color: var(--ua-on-accent);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1504,15 +2027,11 @@ a:hover {
 .ua-workspace-link[data-active="true"] {
   background: color-mix(
     in srgb,
-    var(--ua-copper) 16%,
+    var(--ua-workspace-active-text) 9%,
     var(--ua-workspace-raised)
   );
-  border-color: color-mix(
-    in srgb,
-    var(--ua-copper-bright) 44%,
-    var(--ua-workspace-border)
-  );
-  color: var(--ua-workspace-active-text);
+  border-color: transparent;
+  color: var(--ua-copper-bright);
   cursor: default;
 }
 
@@ -1628,11 +2147,7 @@ html.ua-upload-document #root {
 }
 
 .ua-upload-panel-header {
-  background: color-mix(
-    in srgb,
-    var(--ua-copper) 6%,
-    var(--ua-upload-surface)
-  ) !important;
+  background: var(--ua-upload-surface-solid) !important;
   border-color: var(--ua-upload-border) !important;
 }
 
@@ -2448,12 +2963,12 @@ html[data-ua-shape="square"] .ua-upload-tab-add {
 
 .ua-update-primary {
   background: var(--ua-copper);
-  color: #fff;
+  color: var(--ua-on-accent);
 }
 
 .ua-update-primary:hover {
   background: var(--ua-copper-bright);
-  color: #fff !important;
+  color: var(--ua-on-accent) !important;
 }
 
 .ua-update-changelog-container {
@@ -2561,7 +3076,7 @@ html[data-ua-shape="square"] .ua-upload-tab-add {
 .ua-changelog-filter.is-active {
   background: var(--ua-copper);
   border-color: var(--ua-copper-bright);
-  color: #fff;
+  color: var(--ua-on-accent);
   opacity: 1;
 }
 
@@ -2743,9 +3258,9 @@ html[data-ua-shape="square"] .ua-upload-tab-add {
 }
 
 .ua-app-rail-button[data-active="true"] {
-  background: color-mix(in srgb, var(--ua-copper) 16%, transparent);
-  border-color: color-mix(in srgb, var(--ua-copper-bright) 44%, transparent);
-  color: inherit;
+  background: color-mix(in srgb, currentColor 9%, transparent);
+  border-color: transparent;
+  color: var(--ua-copper-bright) !important;
 }
 
 .ua-app-rail-button svg {
@@ -2756,17 +3271,18 @@ html[data-ua-shape="square"] .ua-upload-tab-add {
 .ua-app-rail-popover {
   background: var(--ua-charcoal);
   border-color: var(--ua-border);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.35);
   color: var(--ua-ink);
 }
 
 .ua-upload-page .ua-app-rail-popover {
-  background: var(--ua-upload-surface);
+  background: var(--ua-upload-surface-raised);
   border-color: var(--ua-upload-border);
   color: var(--ua-upload-text);
 }
 
 .ua-config-page .ua-app-rail-popover {
-  background: var(--ua-config-surface);
+  background: var(--ua-config-surface-raised);
   border-color: var(--ua-config-border);
   color: var(--ua-config-text);
 }
@@ -2792,7 +3308,7 @@ h2 + .ua-appearance-controls {
 .ua-appearance-swatches {
   display: grid;
   gap: 0.375rem;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(0, 1fr));
 }
 
 .ua-appearance-swatch {
@@ -3620,11 +4136,12 @@ html[data-ua-shape="square"] .ua-appearance-segment {
 .ua-config-nav-button[data-active="true"] {
   background: color-mix(
     in srgb,
-    var(--ua-copper) 17%,
+    var(--ua-config-text) 7%,
     var(--ua-config-surface-raised)
   );
-  border-color: color-mix(in srgb, var(--ua-copper-bright) 42%, transparent);
+  border-color: transparent;
   color: var(--ua-config-text);
+  font-weight: 600;
 }
 
 .ua-config-nav-indicator {
@@ -3636,7 +4153,6 @@ html[data-ua-shape="square"] .ua-appearance-segment {
 
 .ua-config-nav-button[data-active="true"] .ua-config-nav-indicator {
   background: var(--ua-copper-bright);
-  box-shadow: 0 0 12px var(--ua-glow);
 }
 
 .ua-config-icon-button {
@@ -3757,7 +4273,7 @@ select {
 
 .ua-config-save-button {
   background: var(--ua-copper);
-  color: #ffffff;
+  color: var(--ua-on-accent);
   transition:
     background-color 150ms ease,
     transform 150ms ease;
@@ -3842,7 +4358,7 @@ select {
 }
 
 .ua-config-section-heading {
-  background: color-mix(in srgb, var(--ua-copper) 8%, var(--ua-config-surface));
+  background: var(--ua-config-surface);
   border-color: var(--ua-config-border);
   color: var(--ua-config-text);
 }
@@ -3859,7 +4375,7 @@ select {
 .ua-config-accordion[data-open="true"] .ua-config-accordion-trigger {
   background: color-mix(
     in srgb,
-    var(--ua-copper) 10%,
+    var(--ua-config-text) 4%,
     var(--ua-config-surface)
   );
 }
@@ -4359,7 +4875,17 @@ html[data-ua-shape="square"]
     .ua-auth-error,
     .ua-auth-details,
     .ua-auth-code,
-    .ua-auth-submit
+    .ua-auth-submit,
+    .ua-tracker-layout-button,
+    .ua-tracker-layout-icon,
+    .ua-tracker-filter-indicator,
+    .ua-tracker-layout-editor,
+    .ua-tracker-layout-toolbar > input,
+    .ua-tracker-group-name,
+    .ua-tracker-pin,
+    .ua-tracker-options-panel,
+    .ua-tracker-group,
+    .ua-tracker-group-empty
   ) {
   border-radius: 0.125rem !important;
 }
@@ -4396,7 +4922,7 @@ html[data-ua-shape="square"]
 
 .ua-run-gui-mode-option[data-active="true"] {
   background: var(--ua-copper);
-  color: #ffffff;
+  color: var(--ua-on-accent);
 }
 
 .ua-run-gui {
@@ -4737,4 +5263,137 @@ html[data-ua-shape="square"]
 .ua-run-gui-skip {
   color: color-mix(in srgb, #ef4444 70%, var(--ua-upload-text));
   border-color: color-mix(in srgb, #ef4444 40%, var(--ua-upload-border));
+}
+
+/* Visual refresh shared by every palette: one sans and one mono face, rounded
+   geometry with two radii (controls and panels), and an app rail that sits a
+   step darker than the workspace. */
+:where(code, kbd, pre, samp),
+.font-mono,
+#rich-output pre {
+  font-family: var(--ua-font-mono) !important;
+  /* Keep CLI text literal: no "--" or "->" ligatures. */
+  font-variant-ligatures: none;
+}
+
+html[data-ua-shape="rounded"] .rounded-md {
+  border-radius: 0.5rem;
+}
+
+html[data-ua-shape="rounded"] .rounded-lg {
+  border-radius: var(--ua-radius-control);
+}
+
+html[data-ua-shape="rounded"] .rounded-xl {
+  border-radius: var(--ua-radius-panel);
+}
+
+html[data-ua-shape="rounded"]
+  :where(
+    .ua-config-section,
+    .ua-config-accordion,
+    .ua-config-state-panel,
+    .ua-stats-panel,
+    .ua-stats-summary-card,
+    .ua-update-modal
+  ) {
+  border-radius: var(--ua-radius-panel);
+  overflow: hidden;
+}
+
+.ua-upload-page[data-mode="dark"] .ua-app-rail,
+.ua-config-page.ua-mode-dark .ua-app-rail {
+  background: color-mix(in srgb, var(--ua-obsidian) 78%, #000);
+}
+
+.ua-app-rail-button {
+  font-weight: 600;
+}
+
+.ua-app-rail-button[data-active="true"] svg,
+.ua-app-rail-button[data-active="true"] .ua-lucide-icon {
+  color: var(--ua-copper-bright);
+}
+
+.ua-config-save-button,
+.ua-auth-submit {
+  font-weight: 650;
+}
+
+.ua-config-save-button:disabled {
+  opacity: 0.45;
+}
+
+/* Mid greys that the dark surface translation above does not cover. */
+:where([class~="bg-gray-600"]) {
+  background-color: color-mix(
+    in srgb,
+    var(--ua-ink) 14%,
+    var(--ua-stone)
+  ) !important;
+}
+
+:where([class~="hover:bg-gray-600"], [class~="hover:bg-gray-700"]):hover {
+  background-color: color-mix(
+    in srgb,
+    var(--ua-ink) 9%,
+    var(--ua-stone)
+  ) !important;
+}
+
+/* A disabled accent action reads as unavailable, not as a dimmed accent. */
+html[data-ua-mode="dark"]
+  :is(.ua-accent-action, .ua-config-save-button):disabled {
+  background-color: color-mix(
+    in srgb,
+    var(--ua-ink) 9%,
+    var(--ua-stone)
+  ) !important;
+  color: var(--ua-muted) !important;
+  opacity: 1;
+}
+
+html[data-ua-mode="light"]
+  :is(.ua-accent-action, .ua-config-save-button):disabled {
+  background-color: #e7e5e4 !important;
+  color: #78716c !important;
+  opacity: 1;
+}
+
+html[data-ua-shape="rounded"] .ua-auth-card {
+  border-radius: var(--ua-radius-panel);
+  overflow: hidden;
+}
+
+html[data-ua-shape="rounded"]
+  :where(
+    .ua-auth-input,
+    .ua-auth-submit,
+    .ua-auth-notice,
+    .ua-auth-error,
+    .ua-auth-details
+  ) {
+  border-radius: var(--ua-radius-control);
+}
+
+/* Progress fills use the warm fill colour, not the darker light-mode text tone. */
+html[data-ua-mode="light"][data-ua-theme="amber"] .ua-accent-indicator {
+  background-color: var(--ua-copper) !important;
+}
+
+/* Light blue utility panels follow the active palette's light tint. */
+:where([class~="bg-blue-50"]) {
+  background-color: color-mix(
+    in srgb,
+    var(--ua-light-panel-start) 70%,
+    #ffffff
+  ) !important;
+}
+
+:where([class~="border-blue-200"]) {
+  border-color: color-mix(
+    in srgb,
+    var(--ua-copper) 28%,
+    transparent
+  ) !important;
 }

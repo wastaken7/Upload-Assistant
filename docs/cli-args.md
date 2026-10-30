@@ -177,6 +177,7 @@ Note: if a manual TMDb or IMDb id is present in the incoming `meta` before parsi
 - `-kf`, `--keep-folder`: Keep the folder containing the single file (only when supplying a directory).
 - `-knfo`, `--keep-nfo`: Keep nfo file where applicable for specific tracker/s. With single files, must be used in conjunction with `--keep-folder` above.
 - `-reg`, `--region REGION`: Region for discs.
+- `--bluray-url URL`: Use this Blu-ray.com edition page (e.g. `https://www.blu-ray.com/movies/Title-Blu-ray/123456/`) for a disc instead of searching. Use it when the search does not list your edition, for example a 1080p disc from a 4K combo set. The page sets the region, distributor, link and covers; `--region` and `--distributor` still take precedence. Interactive runs also let you paste a URL from the edition list (`u`) or when the search finds no edition. Without this argument, when a matched tracker release's description links exactly one Blu-ray.com edition of the disc's format (DVD or Blu-ray), that edition is used instead of searching.
 
 ## Tracker-specific references (existing torrent ids/links)
 
@@ -218,7 +219,7 @@ Thise will use the specified hash to get tracker ids from qBitTorrent or rTorren
 - `-st`, `--stream`: Stream optimized upload.
 - `-webdv`, `--webdv`: Indicates a Dolby Vision layer converted using `dovi_tool` (HYBRID).
 - `--dynamic-hdr-plot`: Generate and upload Dolby Vision and HDR10+ dynamic metadata plots. Required third-party tools are installed automatically when first used.
-- `-hc`, `--hardcoded-subs`: Contains hardcoded subs.
+- `-hc`, `--hardcoded-subs`: Contains hardcoded subs. Implied by `--hardcoded-subs-language`.
   - Note: stored in `meta` under key `hardcoded-subs` (with a hyphen).
 - `-pr`, `--personalrelease`: Personal release.
 

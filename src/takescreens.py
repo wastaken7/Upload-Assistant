@@ -138,8 +138,12 @@ def _xxx_contact_sheet_animated_stream(video_path: Path, frame_count: int, durat
     return ffmpeg.filter(rows_streams, "vstack", inputs=rows)
 
 
-async def xxx_contact_sheets(paths: list[str], folder_id: str, base_dir: str, meta: Meta, capture_group: str = "main") -> list[str]:
-    """Create one evenly sampled contact sheet for each selected XXX video."""
+async def xxx_contact_sheets(paths: list[str], folder_id: str, base_dir: str, meta: Meta, capture_group: str = "main", extra_screens: int = 0) -> list[str]:
+    """Create one evenly sampled contact sheet for each selected XXX video.
+
+    ``extra_screens`` asks for that many frames beyond the current manifest, for
+    callers that must replace screenshots they cannot use.
+    """
     rows, columns, max_videos = xxx_contact_sheet_settings()
     animated_webp, animation_seconds = xxx_contact_sheet_animation_settings()
     video_paths = [Path(path) for path in paths if Path(path).is_file()][:max_videos]
@@ -192,10 +196,12 @@ async def xxx_contact_sheets(paths: list[str], folder_id: str, base_dir: str, me
         sheets = [str(path) for path in registered]
     normal_screens = xxx_single_file_screens()
     if len(video_paths) == 1 and normal_screens:
-        existing_in_group = len(manifest_files(base_dir, folder_id, capture_group))
-        screens_to_request = max(0, normal_screens + existing_in_group)
+        # A fixed target keeps reruns from adding one more frame every time.
+        # Replacements are forced so the hosted-image cutoff cannot skip them.
+        force_capture = extra_screens > 0
+        screens_to_request = extra_screens if force_capture else len(sheets) + normal_screens
         await screenshots(
-            str(video_paths[0]), video_paths[0].name, folder_id, base_dir, meta, screens_to_request, False, cleanup_after_capture=False, capture_group=capture_group
+            str(video_paths[0]), video_paths[0].name, folder_id, base_dir, meta, screens_to_request, force_capture, cleanup_after_capture=False, capture_group=capture_group
         )
     meta.screens = len(manifest_files(base_dir, folder_id, capture_group))
     return sheets
@@ -1687,11 +1693,41 @@ def _write_comic_page(archive: Any, name: str, dest_stem: Path, force_suffix: st
     return dest_path
 
 
+def _lone_image_clip(page: Any) -> tuple[Any, float] | None:
+    """Return the area and native zoom of the only image on a text-free page when it fills under half of it.
+
+    MuPDF often lays out EPUB cover pages (percentage or viewport heights) as a
+    small image at the top of a blank page.
+    """
+    import fitz  # PyMuPDF
+
+    if page.get_text().strip() or page.first_annot:
+        return None
+    images = page.get_image_info()
+    if len(images) != 1:
+        return None
+    # Image and drawing boxes are unrotated page coordinates; get_pixmap clips in rotated ones.
+    bbox = fitz.Rect(images[0]["bbox"])
+    if any(not bbox.contains(drawing["rect"]) for drawing in page.get_drawings()):
+        return None
+    clip = bbox * page.rotation_matrix & page.rect
+    if clip.is_empty or clip.get_area() >= page.rect.get_area() / 2:
+        return None
+    return clip, min(images[0]["width"] / bbox.width, images[0]["height"] / bbox.height)
+
+
 def _render_document_page(doc: Any, page_num: int, dest_stem: Path, suffix: str = ".png") -> Path:
     import fitz  # PyMuPDF
 
     dest_path = dest_stem.with_name(f"{dest_stem.name}{suffix}")
-    pix = doc[page_num].get_pixmap(matrix=fitz.Matrix(2.0, 2.0))
+    page = doc[page_num]
+    zoom, clip = 2.0, None
+    lone_image = _lone_image_clip(page)
+    if lone_image:
+        clip, native_zoom = lone_image
+        # Fill the normal page render size without upscaling past the image's own resolution.
+        zoom = max(zoom, min(zoom * page.rect.width / clip.width, zoom * page.rect.height / clip.height, native_zoom))
+    pix = page.get_pixmap(matrix=fitz.Matrix(zoom, zoom), clip=clip)
     if suffix == ".png":
         pix.save(dest_path)
     else:
@@ -2956,8 +2992,8 @@ class TakeScreensManager:
     def xxx_contact_sheet_animation_settings(self) -> tuple[bool, float]:
         return xxx_contact_sheet_animation_settings()
 
-    async def xxx_contact_sheets(self, paths: list[str], folder_id: str, base_dir: str, meta: Meta, capture_group: str = "main") -> list[str]:
-        return await xxx_contact_sheets(paths, folder_id, base_dir, meta, capture_group)
+    async def xxx_contact_sheets(self, paths: list[str], folder_id: str, base_dir: str, meta: Meta, capture_group: str = "main", extra_screens: int = 0) -> list[str]:
+        return await xxx_contact_sheets(paths, folder_id, base_dir, meta, capture_group, extra_screens)
 
     async def xxx_fallback_cover(self, paths: list[str], folder_id: str, base_dir: str, meta: Meta, random_frame: bool = False) -> str | None:
         return await xxx_fallback_cover(paths, folder_id, base_dir, meta, random_frame)

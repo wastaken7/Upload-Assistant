@@ -1,18 +1,14 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-import contextlib
 import re
-import sys
 from pathlib import Path
 from typing import Any, cast
 
 import aiofiles
-import cli_ui
 import langcodes
 from langcodes.tag_parser import LanguageTagError
 
-from src import webui_events
-from src.cleanup import cleanup_manager
 from src.console import logger
+from src.manual_input import Question, ask, has_answer, is_interactive
 from src.meta import Meta
 
 
@@ -51,14 +47,20 @@ class LanguagesManager:
         return deduped
 
     @staticmethod
-    def _track_language_prompt(title: str, tracks: list[str], kind: str) -> contextlib.AbstractContextManager[None]:
-        """Show the language question in the Web UI with the tracks that have none."""
-        return webui_events.field_prompt(
-            title,
-            dict.fromkeys(tracks, "No language tag"),
-            hint=f"Comma-separated languages for all {kind} tracks. Leaving it blank skips this upload.",
-            actions=[("", "Skip this upload")],
-            placeholder="e.g. English, Spanish",
+    async def _ask_track_languages(meta: Meta, key: str, title: str, tracks: list[str], kind: str) -> list[str] | None:
+        """Ask for the languages of tracks that have none; an empty answer skips the upload."""
+        return await ask(
+            meta,
+            Question(
+                key=key,
+                kind="list",
+                prompt=f"Enter (comma-separated) languages for all {kind} tracks, eg: English, Spanish",
+                title=title,
+                hint=f"Comma-separated languages for all {kind} tracks. Leaving it blank skips this upload.",
+                placeholder="e.g. English, Spanish",
+                summary=dict.fromkeys(tracks, "No language tag"),
+                unattended="fail",
+            ),
         )
 
     async def parse_blu_ray(self, meta: Meta) -> dict[str, Any]:
@@ -298,21 +300,15 @@ class LanguagesManager:
                                 tracks_without_language.append(track_info)
 
                         if not found_any_language:
-                            if not meta.unattended or (meta.unattended and meta.unattended_confirm):
+                            if is_interactive(meta) or has_answer(meta, "release.audio_languages"):
                                 logger.info("No audio language/s found for the following tracks:")
                                 for track_info in tracks_without_language:
                                     logger.info(f"  - {track_info}")
-                                logger.info("You must enter (comma-separated) languages")
-                                try:
-                                    with self._track_language_prompt("Audio tracks without a language", tracks_without_language, "audio"):
-                                        audio_lang = cli_ui.ask_string("for all audio tracks, eg: English, Spanish:")
-                                except EOFError:
-                                    logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")
-                                    await cleanup_manager.cleanup()
-                                    cleanup_manager.reset_terminal()
-                                    sys.exit(1)
+                                audio_lang = await self._ask_track_languages(
+                                    meta, "release.audio_languages", "Audio tracks without a language", tracks_without_language, "audio"
+                                )
                                 if audio_lang:
-                                    audio_languages.extend([lang.strip() for lang in audio_lang.split(",")])
+                                    audio_languages.extend(audio_lang)
                                     meta.audio_languages = audio_languages
                                     meta.write_audio_languages = True
                                 else:
@@ -345,21 +341,15 @@ class LanguagesManager:
                                     subtitle_languages.append(text_track["language"])
 
                             if tracks_without_language:
-                                if not meta.unattended or (meta.unattended and meta.unattended_confirm):
+                                if is_interactive(meta) or has_answer(meta, "release.subtitle_languages"):
                                     logger.info("No subtitle language/s found for the following tracks:")
                                     for track_info in tracks_without_language:
                                         logger.info(f"  - {track_info}")
-                                    logger.info("You must enter (comma-separated) languages")
-                                    try:
-                                        with self._track_language_prompt("Subtitle tracks without a language", tracks_without_language, "subtitle"):
-                                            subtitle_lang = cli_ui.ask_string("for all subtitle tracks, eg: English, Spanish:")
-                                    except EOFError:
-                                        logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")
-                                        await cleanup_manager.cleanup()
-                                        cleanup_manager.reset_terminal()
-                                        sys.exit(1)
+                                    subtitle_lang = await self._ask_track_languages(
+                                        meta, "release.subtitle_languages", "Subtitle tracks without a language", tracks_without_language, "subtitle"
+                                    )
                                     if subtitle_lang:
-                                        subtitle_languages.extend([lang.strip() for lang in subtitle_lang.split(",")])
+                                        subtitle_languages.extend(subtitle_lang)
                                         meta.subtitle_languages = subtitle_languages
                                         meta.write_subtitle_languages = True
                                     else:
@@ -381,21 +371,20 @@ class LanguagesManager:
                             if meta.hardcoded_subs_language:
                                 meta.subtitle_languages = [meta.hardcoded_subs_language]
                                 meta.write_hc_languages = True
-                            elif not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                                try:
-                                    with webui_events.field_prompt(
-                                        "Hardcoded subtitles",
-                                        {"Release": meta.name or meta.title},
+                            elif is_interactive(meta) or has_answer(meta, "release.hardcoded_sub_language"):
+                                hc_lang = await ask(
+                                    meta,
+                                    Question(
+                                        key="release.hardcoded_sub_language",
+                                        kind="text",
+                                        prompt="What language/s are the hardcoded subtitles?",
+                                        title="Hardcoded subtitles",
                                         hint="The language of the subtitles burned into the video. Leaving it blank skips this upload.",
-                                        actions=[("", "Skip this upload")],
                                         placeholder="e.g. English",
-                                    ):
-                                        hc_lang = cli_ui.ask_string("What language/s are the hardcoded subtitles?")
-                                except EOFError:
-                                    logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")
-                                    await cleanup_manager.cleanup()
-                                    cleanup_manager.reset_terminal()
-                                    sys.exit(1)
+                                        summary={"Release": meta.name or meta.title},
+                                        unattended="fail",
+                                    ),
+                                )
                                 if hc_lang:
                                     meta.subtitle_languages = [hc_lang]
                                     meta.write_hc_languages = True

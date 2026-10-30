@@ -7,6 +7,7 @@ from typing import Any
 
 import cli_ui
 
+from src import webui_events
 from src.console import logger
 from src.meta import Meta
 
@@ -330,7 +331,9 @@ class AvistaZNetworkRouter:
                     continue
             else:
                 prompt = f"{source}: {decision.reason}. Redirect this upload to {destination}?"
-                if not cli_ui.ask_yes_no(prompt, default=True):
+                with webui_events.field_prompt("Tracker routing", {"From": source, "To": destination, "Reason": decision.reason}):
+                    redirect_ok = cli_ui.ask_yes_no(prompt, default=True)
+                if not redirect_ok:
                     source_status["routing_suggested_to"] = destination
                     continue
 

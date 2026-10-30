@@ -169,7 +169,7 @@ def test_aither_additional_data_from_meta():
     meta.double_upload_until = 14
 
     data = asyncio.run(tracker.get_additional_data(meta))
-    assert data.get("refundable") is True
+    assert data.get("refundable") == "1"
     assert data.get("fl_until") == 7
     assert data.get("du_until") == 14
 
@@ -191,7 +191,7 @@ def test_aither_additional_data_from_config():
     meta = Meta()
 
     data = asyncio.run(tracker.get_additional_data(meta))
-    assert data.get("refundable") is True
+    assert data.get("refundable") == "1"
     assert data.get("fl_until") == 5
     assert data.get("du_until") == 10
 
@@ -253,4 +253,3 @@ def test_configvalidator_unit3d_flags():
     assert any("'double_up' must be a boolean" in msg for msg in warning_messages)
     assert any("'freeleech_until' must be a non-negative integer" in msg for msg in warning_messages)
     assert any("'double_upload_until' must be a non-negative integer" in msg for msg in warning_messages)
-

@@ -36,6 +36,31 @@ test("changing mode updates the page even when storage is unavailable", () => {
   }
 });
 
+test("amber and rounded are the defaults, and every theme has a palette", () => {
+  const { context, stored } = fixture();
+  assert.equal(context.window.getUAStoredColorTheme(), "amber");
+  assert.equal(context.window.getUAStoredInterfaceStyle(), "rounded");
+  stored.set("ua_color_theme", "charcoal");
+  stored.set("ua_interface_style", "square");
+  assert.equal(context.window.getUAStoredColorTheme(), "charcoal");
+  assert.equal(context.window.getUAStoredInterfaceStyle(), "square");
+
+  const bootstrap = fs.readFileSync(
+    path.join(__dirname, "../web_ui/templates/_theme_bootstrap.html"),
+    "utf8",
+  );
+  const css = fs.readFileSync(
+    path.join(__dirname, "../web_ui/static/css/theme.css"),
+    "utf8",
+  );
+  for (const { id } of context.window.UAThemes) {
+    assert.ok(bootstrap.includes(`"${id}"`), `${id} missing from bootstrap`);
+    if (id !== "obsidian") {
+      assert.ok(css.includes(`[data-ua-theme="${id}"] {`), `${id} palette`);
+    }
+  }
+});
+
 for (const name of ["app.js", "config_app.js", "stats_app.js"]) {
   test(`${name}: mode changes propagate to the document and saved preference`, () => {
     const source = fs.readFileSync(scriptPath(name), "utf8");

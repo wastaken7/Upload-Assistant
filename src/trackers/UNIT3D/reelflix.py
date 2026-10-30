@@ -33,7 +33,7 @@ class ReelFlix(UNIT3D):
         self.common = Common(config)
 
     async def get_additional_checks(self, meta: Meta) -> bool:
-        return self.common.check_and_confirm_adult_media_upload(meta, self.tracker)
+        return await self.common.check_and_confirm_adult_media_upload(meta, self.tracker)
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
         if meta.manual_name is not None:

@@ -469,7 +469,7 @@ def _context_payload() -> dict[str, Any] | None:
     for name, value in context.items():
         if isinstance(value, Mapping):
             entries = list(cast(Mapping[Any, Any], value).items())[:MAX_LIST_ITEMS]
-            payload[name] = {plain_text(k, 64, markup=False): plain_text(v, 300, markup=False) for k, v in entries}
+            payload[name] = {plain_text(k, 64, markup=False): plain_text(v, MAX_TEXT_LENGTH if name == "summary" else 300, markup=False) for k, v in entries}
         elif isinstance(value, list):
             # Lists keep their order; (answer, label) pairs become two-item lists.
             items = cast(list[Any], value)[:MAX_LIST_ITEMS]
@@ -485,7 +485,7 @@ def _context_payload() -> dict[str, Any] | None:
         elif isinstance(value, bool):
             payload[name] = value
         elif value is not None:
-            payload[name] = plain_text(value, 300, markup=False)
+            payload[name] = plain_text(value, MAX_TEXT_LENGTH if name == "hint" else 300, markup=False)
     return payload
 
 

@@ -15,7 +15,8 @@ import cli_ui
 import guessit
 from torf import Torrent
 
-from src.bluray_com import get_bluray_releases
+from src import webui_events
+from src.bluray_com import find_bluray_url, get_bluray_releases, use_bluray_url
 from src.book_prep import AUDIOBOOK_EXTENSIONS, BOOK_EXTENSIONS, BOOK_SERVICES
 from src.cleanup import cleanup_manager
 from src.clients import Clients
@@ -292,10 +293,15 @@ async def detect_disc_and_category(prep_instance: Any, meta: Meta) -> tuple[str,
 
                 if not unattended or (unattended and unattended_confirm):
                     try:
-                        choice = cli_ui.ask_choice(
-                            "Choose category for audio release:",
-                            choices=["1. Music", "2. Audiobook"],
-                        )
+                        with webui_events.field_prompt(
+                            "Audio category",
+                            {"Path": str(path_to_check), "Evidence": "\n".join(audio_res.evidence or [])},
+                            hint="Could not confidently determine whether this audio release is MUSIC or an AUDIOBOOK.",
+                        ):
+                            choice = cli_ui.ask_choice(
+                                "Choose category for audio release:",
+                                choices=["1. Music", "2. Audiobook"],
+                            )
                     except EOFError, KeyboardInterrupt:
                         logger.error("[bold red]Category selection cancelled or failed.[/bold red]")
                         sys.exit(1)
@@ -736,9 +742,16 @@ async def validate_media(_prep_instance: Any, meta: Meta) -> None:
         upload = False
         if not meta.unattended or (meta.unattended and meta.unattended_confirm):
             try:
-                upload = cli_ui.ask_yes_no(
-                    "Found Conformance errors in mediainfo (possible cause: corrupted file, incomplete download, new codec, etc...), proceed to upload anyway?", default=False
-                )
+                first_file = meta.filelist[0] if meta.filelist else meta.path
+                with webui_events.field_prompt(
+                    "MediaInfo conformance errors",
+                    {"File": str(first_file or "")},
+                    hint="Conformance errors were found in MediaInfo (possible corrupted file, incomplete download, or new codec).",
+                ):
+                    upload = cli_ui.ask_yes_no(
+                        "Found Conformance errors in mediainfo (possible cause: corrupted file, incomplete download, new codec, etc...), proceed to upload anyway?",
+                        default=False,
+                    )
             except EOFError:
                 logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")
                 await cleanup_manager.cleanup()
@@ -909,7 +922,9 @@ def _should_add_bluray_link(meta: Meta, config: dict[str, Any]) -> bool:
 def _should_fetch_bluray_info(meta: Meta, get_bluray_info: bool, add_bluray_link: bool = False) -> bool:
     return bool(
         meta.is_disc in ("BDMV", "DVD")
-        and (add_bluray_link or (get_bluray_info and (not meta.distributor or not meta.region)))
+        # add_bluray_link only widens an enabled lookup; it never enables one on its own.
+        and get_bluray_info
+        and (add_bluray_link or not meta.distributor or not meta.region)
         and meta.imdb_id != 0
         and (add_bluray_link or not meta.edit)
         and not meta.site_check
@@ -1502,26 +1517,35 @@ async def finalize_metadata(
     meta.bluray_score = int(float(prep_instance.config["DEFAULT"].get("bluray_score", 100)))
     meta.bluray_single_score = int(float(prep_instance.config["DEFAULT"].get("bluray_single_score", 100)))
     meta.use_bluray_images = prep_instance.config["DEFAULT"].get("use_bluray_images", False)
-    if _should_fetch_bluray_info(meta, get_bluray_info, _should_add_bluray_link(meta, prep_instance.config)):
-        releases = await get_bluray_releases(meta)
+    releases: list[Any] = []
+    if meta.bluray_url and meta.is_disc in ("BDMV", "DVD") and not meta.site_check:
+        # An explicit edition needs no IMDb ID or search, and also applies when editing.
+        releases = await use_bluray_url(meta, meta.bluray_url)
+    elif _should_fetch_bluray_info(meta, get_bluray_info, _should_add_bluray_link(meta, prep_instance.config)):
+        # A matched tracker release often links its edition already, which the search may not list.
+        linked_url = find_bluray_url([*meta.tracker_description_raw.values(), meta.description], meta.is_disc)
+        if linked_url:
+            logger.info(f"[green]Using the Blu-ray.com edition linked in the tracker description: {linked_url}[/green]")
+            releases = await use_bluray_url(meta, linked_url, required=False)
+        if not releases:
+            releases = await get_bluray_releases(meta)
+    if releases and meta.is_disc in ("BDMV", "DVD") and meta.use_bluray_images:
+        # and if we getting bluray/dvd images, we'll rehost them
+        url_host_mapping = {
+            "ibb.co": "imgbb",
+            "pixhost.to": "pixhost",
+            "imgbox.com": "imgbox",
+            "lostimg.cc": "lostimg",
+        }
 
-        if releases and meta.is_disc in ("BDMV", "DVD") and meta.use_bluray_images:
-            # and if we getting bluray/dvd images, we'll rehost them
-            url_host_mapping = {
-                "ibb.co": "imgbb",
-                "pixhost.to": "pixhost",
-                "imgbox.com": "imgbox",
-                "lostimg.cc": "lostimg",
-            }
-
-            approved_image_hosts = ["imgbox", "imgbb", "pixhost"]
-            await prep_instance.rehost_images_manager.check_hosts(
-                meta,
-                "covers",
-                url_host_mapping=url_host_mapping,
-                img_host_index=1,
-                approved_image_hosts=approved_image_hosts,
-            )
+        approved_image_hosts = ["imgbox", "imgbb", "pixhost"]
+        await prep_instance.rehost_images_manager.check_hosts(
+            meta,
+            "covers",
+            url_host_mapping=url_host_mapping,
+            img_host_index=1,
+            approved_image_hosts=approved_image_hosts,
+        )
 
     # user override check that only sets data after metadata setting
     user_overrides = prep_instance.config["DEFAULT"].get("user_overrides", False)

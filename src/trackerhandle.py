@@ -321,7 +321,12 @@ async def process_trackers(
                 do_manual = True
             else:
                 try:
-                    do_manual = cli_ui.ask_yes_no("Get files for manual upload?", default=True)
+                    with webui_events.field_prompt(
+                        "Manual upload",
+                        {"Release": meta.name or meta.title},
+                        hint="Prepare description and torrent files for manual upload.",
+                    ):
+                        do_manual = cli_ui.ask_yes_no("Get files for manual upload?", default=True)
                 except EOFError:
                     logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")
                     await cleanup_manager.cleanup()

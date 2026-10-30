@@ -12,6 +12,7 @@ from bs4 import BeautifulSoup
 from rich.markup import escape
 from unidecode import unidecode
 
+from src import webui_events
 from src.cogs.redaction import Redaction
 from src.console import logger, prompt_in_thread
 from src.cookie_auth import CookieValidator
@@ -199,9 +200,18 @@ class FileList:
         # Confirm the correct naming order for FILELIST
         cli_ui.info(f"Filelist name: {fl_name}")
         if meta.unattended is False:
-            fl_confirm = await prompt_in_thread(cli_ui.ask_yes_no, "Correct?", default=False)
+            with webui_events.field_prompt(f"{self.tracker} name", {"Current name": fl_name}, focus="Current name"):
+                fl_confirm = await prompt_in_thread(cli_ui.ask_yes_no, "Correct?", default=False)
             if fl_confirm is not True:
-                fl_name_manually = await prompt_in_thread(cli_ui.ask_string, "Please enter a proper name", default="")
+                with webui_events.field_prompt(
+                    f"{self.tracker} name",
+                    {"Current name": fl_name},
+                    focus="Current name",
+                    hint="The name to upload with. Leaving it blank aborts this upload.",
+                    actions=[("", "Abort this upload")],
+                    placeholder=fl_name,
+                ):
+                    fl_name_manually = await prompt_in_thread(cli_ui.ask_string, "Please enter a proper name", default="")
                 if fl_name_manually == "":
                     logger.info(f"{self.tracker}: No proper name given")
                     logger.info(f"{self.tracker}: Aborting...")
@@ -312,7 +322,12 @@ class FileList:
         if vcookie is not True:
             logger.error(f"{self.tracker}: [red]Failed to validate cookies. Please confirm that the site is up and your passkey is valid.")
             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                recreate = await prompt_in_thread(cli_ui.ask_yes_no, "Log in again and create new session?")
+                with webui_events.field_prompt(
+                    f"{self.tracker} session",
+                    {"Tracker": self.tracker},
+                    hint="Failed to validate cookies. Confirm that the site is up and your passkey is valid.",
+                ):
+                    recreate = await prompt_in_thread(cli_ui.ask_yes_no, "Log in again and create new session?")
                 if recreate is True:
                     if Path(cookiefile).exists():
                         Path(cookiefile).unlink()
