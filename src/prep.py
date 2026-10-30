@@ -263,6 +263,8 @@ class Prep:
         # starts consuming the generated files. Any error is logged by the
         # helper; the existing upload-stage capture remains the fallback.
         if early_screenshots_task is not None:
+            if not early_screenshots_task.done():
+                logger.info("[yellow]Waiting for screenshots to finish...[/yellow]")
             early_meta = await early_screenshots_task
             if early_meta is not None:
                 if early_meta.tonemapped:
