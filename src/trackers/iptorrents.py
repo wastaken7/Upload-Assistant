@@ -540,6 +540,9 @@ class IPTorrents:
             "imdb_id": str(meta.tmdb_id),
             "id": torrent_id,
         }
+        # Keep the name and category changed in the Web UI, which the upload already sent.
+        edits = meta.payload_edits.get(self.tracker, {})
+        data.update({key: edits[key] for key in ("name", "type") if key in edits})
 
         edit_url = f"https://iptorrents.com/t/{torrent_id}/edit"
 
