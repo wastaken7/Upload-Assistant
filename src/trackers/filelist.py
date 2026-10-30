@@ -208,8 +208,6 @@ class FileList:
             async with aiofiles.open(mi_path, encoding="utf-8") as mi_file:
                 mi_dump = await mi_file.read()
         data: dict[str, Any] = {"name": fl_name, "type": cat_id, "descr": fl_desc.strip(), "nfo": mi_dump}
-        if preview:
-            del data["descr"], data["nfo"]
 
         imdb_id_value = str(meta.imdb_id if meta.imdb_id is not None else "0")
         if imdb_id_value.isdigit() and int(imdb_id_value) != 0:

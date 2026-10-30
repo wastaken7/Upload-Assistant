@@ -283,8 +283,7 @@ class ImmortalSeed:
 
         return ""
 
-    async def get_data(self, meta: Meta, preview: bool = False) -> dict[str, Any]:
-        _preview = preview  # The message is the overview, known before screenshots.
+    async def get_data(self, meta: Meta) -> dict[str, Any]:
         message = f"{meta.overview}\n\n[youtube]{meta.youtube}[/youtube]"
         cover = await self.get_cover(meta)
         if meta.category in ("BOOK", "MUSIC"):
@@ -357,7 +356,7 @@ class ImmortalSeed:
             "t_link": payload_preview.text("IMDb URL"),
             "anonymous": payload_preview.flag("Anonymous", on="yes", off="no"),
         }
-        return payload_preview.describe(self.tracker, await self.get_data(meta, preview=True), specs, name_key="subject")
+        return payload_preview.describe(self.tracker, await self.get_data(meta), specs, name_key="subject")
 
     async def upload(self, meta: Meta) -> bool:
         cookies = await self.cookie_validator.load_session_cookies(meta, self.tracker)

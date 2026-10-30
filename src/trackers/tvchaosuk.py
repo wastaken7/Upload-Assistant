@@ -553,12 +553,12 @@ class TVChaosUK:
         anon = 0 if meta.anon == 0 and not self.config["TRACKERS"][self.tracker].get("anon", False) else 1
 
         mi_dump = bd_dump = desc = None
-        if not preview and meta.bdinfo:
-            bd_dump = await self.read_file(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/BD_SUMMARY_00.txt")
-        elif not preview:
-            mi_dump = await self.read_file(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/MEDIAINFO.txt")
-
         if not preview:
+            if meta.bdinfo:
+                bd_dump = await self.read_file(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/BD_SUMMARY_00.txt")
+            else:
+                mi_dump = await self.read_file(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/MEDIAINFO.txt")
+
             # build description and capture return instead of reopening file
             descfile_path = Path(meta.base_dir) / "tmp" / meta.uuid / f"[{self.tracker}]DESCRIPTION.txt"
             desc = await self.edit_desc(meta, self.tracker, self.signature, image_list)
@@ -619,12 +619,12 @@ class TVChaosUK:
                     "Resolution",
                     role="resolution",
                     options=[
-                        ("HD1080p", "HD1080p"),
-                        ("HD720p", "HD720p"),
-                        ("SD", "SD"),
-                        ("HD1080p Pack", "HD1080p Pack"),
-                        ("HD720p Pack", "HD720p Pack"),
-                        ("SD Pack", "SD Pack"),
+                        "HD1080p",
+                        "HD720p",
+                        "SD",
+                        "HD1080p Pack",
+                        "HD720p Pack",
+                        "SD Pack",
                     ],
                 ),
                 "tmdb": payload_preview.number("TMDB ID"),

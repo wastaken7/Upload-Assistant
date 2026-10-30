@@ -466,9 +466,6 @@ class PTerClub:
             if not Path(desc_file).exists():
                 await self.edit_desc(meta)
 
-            mi_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/BD_SUMMARY_00.txt" if meta.bdinfo else f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/MEDIAINFO.txt"
-            async with aiofiles.open(mi_path, encoding="utf-8") as mi_dump:
-                _ = await mi_dump.read()
             async with aiofiles.open(desc_file, encoding="utf-8") as desc_handle:
                 pter_desc = await desc_handle.read()
 
@@ -483,8 +480,6 @@ class PTerClub:
             "source_sel": await self.get_type_medium_id(meta),
             "team_sel": await self.get_area_id(meta),
         }
-        if preview:
-            del data["descr"]
         if anon == "yes":
             data["uplver"] = "yes"
         if await self.is_zhongzi(meta) == "yes":

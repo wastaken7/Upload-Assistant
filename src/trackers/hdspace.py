@@ -262,8 +262,6 @@ class HDSpace:
         else:
             data.update({"anonymous": "false"})
 
-        if preview:
-            del data["info"]
         return data
 
     async def get_payload_preview(self, meta: Meta) -> payload_preview.TrackerPreview:

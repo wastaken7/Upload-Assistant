@@ -247,8 +247,6 @@ class DigitalCore:
             "section": "new",
             "unrar": "1",
         }
-        if preview:
-            del data["mediainfo"], data["nfo"]
         return data
 
     async def get_payload_preview(self, meta: Meta) -> payload_preview.TrackerPreview:

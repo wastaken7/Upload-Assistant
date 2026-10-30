@@ -122,8 +122,6 @@ class BEYONDHD:
             # 'double_up' : 0,
             # 'sticky' : 0,
         }
-        if preview:
-            del data["description"]
         # Internal
         if meta.tag and (
             self.config["TRACKERS"][self.tracker].get("internal", False) is True and meta.tag[1:] in self.config["TRACKERS"][self.tracker].get("internal_groups", [])
@@ -152,8 +150,8 @@ class BEYONDHD:
         specs = {
             "name": payload_preview.text("Name"),
             "category_id": payload_preview.choice("Category", {"MOVIE": "1", "TV": "2"}, by_label=True),
-            "type": payload_preview.choice("Type", [(value, value) for value in types], role="release_type"),
-            "source": payload_preview.choice("Source", [(value, value) for value in sources]),
+            "type": payload_preview.choice("Type", types, role="release_type"),
+            "source": payload_preview.choice("Source", sources),
             "imdb_id": payload_preview.number("IMDb ID"),
             "tmdb_id": payload_preview.number("TMDB ID"),
             "anon": payload_preview.flag("Anonymous", on=1, off=0),
@@ -162,10 +160,8 @@ class BEYONDHD:
             "internal": payload_preview.flag("Internal", on=1, off=None),
             "pack": payload_preview.flag("Season pack", on=1, off=None),
             "special": payload_preview.flag("Special", on=1, off=None),
-            "region": payload_preview.choice("Region", [(value, value) for value in self.allowed_regions]),
-            "edition": payload_preview.choice(
-                "Edition", [(value, value) for value in ("Collector", "Director", "Extended", "Limited", "Special", "Theatrical", "Uncut", "Unrated")]
-            ),
+            "region": payload_preview.choice("Region", self.allowed_regions),
+            "edition": payload_preview.choice("Edition", ("Collector", "Director", "Extended", "Limited", "Special", "Theatrical", "Uncut", "Unrated")),
             "custom_edition": payload_preview.text("Custom edition"),
             "tags": payload_preview.readonly("Tags"),
         }

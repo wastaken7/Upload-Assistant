@@ -67,19 +67,19 @@ class Swarmazon:
         mi_dump: str | None = None
         bd_dump: str | None = None
         desc = ""
-        if not preview and meta.bdinfo:
-            async with aiofiles.open(
-                f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/BD_SUMMARY_00.txt",
-                encoding="utf-8",
-            ) as bd_file:
-                bd_dump = await bd_file.read()
-        elif not preview:
-            async with aiofiles.open(
-                f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/MEDIAINFO.txt",
-                encoding="utf-8",
-            ) as mi_file:
-                mi_dump = await mi_file.read()
         if not preview:
+            if meta.bdinfo:
+                async with aiofiles.open(
+                    f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/BD_SUMMARY_00.txt",
+                    encoding="utf-8",
+                ) as bd_file:
+                    bd_dump = await bd_file.read()
+            else:
+                async with aiofiles.open(
+                    f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/MEDIAINFO.txt",
+                    encoding="utf-8",
+                ) as mi_file:
+                    mi_dump = await mi_file.read()
             async with aiofiles.open(
                 f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt",
                 encoding="utf-8",
@@ -101,8 +101,6 @@ class Swarmazon:
             "description": desc,
             "media_info": mi_dump,
         }
-        if preview:
-            del data["description"], data["media_info"]
         return data
 
     async def get_payload_preview(self, meta: Meta) -> payload_preview.TrackerPreview:

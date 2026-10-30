@@ -877,8 +877,6 @@ class BroadcasTheNet:
             "tvdb": "autofilled",
             "origin": origin,
         }
-        if mediainfo is None:
-            del payload["release_desc"]
 
         if self.settings.get("fast_torrent") or self.settings.get("fasttorrent"):
             payload["fasttorrent"] = "on"
@@ -907,33 +905,31 @@ class BroadcasTheNet:
         data = self.get_payload(meta, upload_type, await self.get_name(meta), None)
         specs = {
             "submit": payload_preview.readonly("Submit"),
-            "type": payload_preview.choice("Type", [("Episode", "Episode"), ("Season", "Season")], role="season_episode"),
+            "type": payload_preview.choice("Type", ["Episode", "Season"], role="season_episode"),
             "scenename": payload_preview.text("Name"),
             "format": payload_preview.choice(
                 "Container",
                 [
-                    ("MKV", "MKV"),
-                    ("MP4", "MP4"),
-                    ("AVI", "AVI"),
-                    ("TS", "TS"),
-                    ("M2TS", "M2TS"),
-                    ("M4V", "M4V"),
-                    ("WMV", "WMV"),
-                    ("MPEG", "MPEG"),
-                    ("VOB", "VOB"),
-                    ("Mixed", "Mixed"),
+                    "MKV",
+                    "MP4",
+                    "AVI",
+                    "TS",
+                    "M2TS",
+                    "M4V",
+                    "WMV",
+                    "MPEG",
+                    "VOB",
+                    "Mixed",
                 ],
             ),
-            "bitrate": payload_preview.choice(
-                "Codec", [("H.265", "H.265"), ("x264-Hi10P", "x264-Hi10P"), ("H.264", "H.264"), ("VP9", "VP9"), ("MPEG2", "MPEG2"), ("Mixed", "Mixed")]
-            ),
-            "resolution": payload_preview.choice("Resolution", [("2160p", "2160p"), ("1080p", "1080p"), ("1080i", "1080i"), ("720p", "720p"), ("SD", "SD")]),
+            "bitrate": payload_preview.choice("Codec", ["H.265", "x264-Hi10P", "H.264", "VP9", "MPEG2", "Mixed"]),
+            "resolution": payload_preview.choice("Resolution", ["2160p", "1080p", "1080i", "720p", "SD"]),
             "tvdb": payload_preview.readonly("TVDB"),
-            "origin": payload_preview.choice("Origin", [("Scene", "Scene"), ("P2P", "P2P"), ("None", "None")]),
+            "origin": payload_preview.choice("Origin", ["Scene", "P2P", "None"]),
             "fasttorrent": payload_preview.flag("Fast torrent", on="on", off=None),
             "foreign": payload_preview.flag("Foreign", on="on", off=None),
             "country": payload_preview.text("Country ID"),
-            "media": payload_preview.choice("Source", [("WEB-DL", "WEB-DL"), ("WEBRip", "WEBRip"), ("HDTV", "HDTV"), ("Bluray", "Bluray"), ("BDRip", "BDRip")]),
+            "media": payload_preview.choice("Source", ["WEB-DL", "WEBRip", "HDTV", "Bluray", "BDRip"]),
         }
         deferred = {
             "release_desc": "Read from the MediaInfo report at upload time",
@@ -991,7 +987,7 @@ class BroadcasTheNet:
 
                 if not torrent_id:
                     try:
-                        torrent_id = await self._uploaded_torrent_id(release_name, group_id, meta)
+                        torrent_id = await self._uploaded_torrent_id(str(data.get("scenename") or release_name), group_id, meta)
                         group_id = meta.tracker_status.get(self.tracker, {}).get("group_id") or group_id
                     except UploadError:
                         failure_path = work_dir / f"[{self.tracker}]BTN_upload_failure.html"

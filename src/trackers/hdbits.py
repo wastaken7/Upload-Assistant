@@ -271,9 +271,7 @@ class HDBits:
         ):
             data["origin"] = 1
         # If not BDMV fill mediainfo
-        if preview:
-            del data["descr"], data["techinfo"]
-        elif meta.is_disc != "BDMV":
+        if not preview and meta.is_disc != "BDMV":
             mediainfo_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/MEDIAINFO_CLEANPATH.txt"
             async with aiofiles.open(mediainfo_path, encoding="utf-8") as mediainfo_file:
                 data["techinfo"] = await mediainfo_file.read()

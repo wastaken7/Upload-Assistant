@@ -394,12 +394,8 @@ class Curupira:
                 ],
             ),
             "custom_cover_url": payload_preview.text("Cover URL", max_length=1000),
-            "quality": payload_preview.choice(
-                "Quality", [(value, value) for value in ("8640p", "4320p", "2160p", "1440p", "1080p", "1080i", "720p", "576p", "576i", "540p", "480p", "480i")]
-            ),
-            "source": payload_preview.choice(
-                "Source", [("Full Disc", "Full Disc"), ("BluRay", "BluRay"), ("WEB-DL", "WEB-DL"), ("WEBRip", "WEBRip"), ("HDTV", "HDTV"), ("DVD", "DVD")]
-            ),
+            "quality": payload_preview.choice("Quality", ("8640p", "4320p", "2160p", "1440p", "1080p", "1080i", "720p", "576p", "576i", "540p", "480p", "480i")),
+            "source": payload_preview.choice("Source", ["Full Disc", "BluRay", "WEB-DL", "WEBRip", "HDTV", "DVD"]),
             "audio_langs": payload_preview.readonly("Audio languages"),
             "subs_langs": payload_preview.readonly("Subtitle languages"),
             "tmdb_id": payload_preview.number("TMDB ID"),

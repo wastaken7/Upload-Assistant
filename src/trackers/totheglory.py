@@ -197,8 +197,6 @@ class ToTheGlory:
             "anonymity": anon,
             "nodistr": "no",
         }
-        if preview:
-            del data["descr"]
         if meta.imdb_tt:
             data["imdb_c"] = meta.imdb_tt
         return data

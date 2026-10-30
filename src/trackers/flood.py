@@ -87,8 +87,6 @@ class Flood:
             "media_type": media_type,
             "edition": meta.edition,
         }
-        if preview:
-            del data["description"], data["media_info"]
         return data
 
     async def get_payload_preview(self, meta: Meta) -> payload_preview.TrackerPreview:
@@ -98,7 +96,7 @@ class Flood:
             "imdb_id": payload_preview.number("IMDb ID"),
             "tmdb_id": payload_preview.text("TMDB ID"),
             "anonymous": payload_preview.flag("Anonymous", on="checked", off=""),
-            "media_type": payload_preview.choice("Media type", [(value, value) for value in ("movie", "show_episode", "show_season")], role="category"),
+            "media_type": payload_preview.choice("Media type", ("movie", "show_episode", "show_season"), role="category"),
             "edition": payload_preview.text("Edition"),
         }
         deferred = {"description": payload_preview.DESCRIPTION_NOTE, "media_info": "Read from the MediaInfo/BDInfo report at upload time"}

@@ -255,8 +255,6 @@ class DirtyBytes:
             "firstpic": self.get_firstpic(meta),
         }
         data.update({key: value for key, value in optional.items() if value})
-        if preview:
-            del data["nfo"]
         return data
 
     async def get_payload_preview(self, meta: Meta) -> payload_preview.TrackerPreview:

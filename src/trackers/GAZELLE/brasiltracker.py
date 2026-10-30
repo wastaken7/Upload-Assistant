@@ -942,9 +942,6 @@ class BrasilTracker:
     def get_payload_specs(self, meta: Meta) -> dict[str, payload_preview.Spec]:
         """The upload form's fields: drop-downs offer only the values this tracker sends."""
 
-        def options(label: str, values: Any) -> payload_preview.Spec:
-            return payload_preview.choice(label, [(value, value) for value in dict.fromkeys(values)])
-
         categories = {"0": "Filme", "1": "Série", "5": "Anime", "8": "Jogo", "9": "Revista", "11": "Quadrinho", "12": "E-book", "13": "Esporte", "15": "Audiobook"}
         video_formats = ("AVI", "M2TS", "M4V", "MKV", "MP4", "TS", "VOB", "WMV", "Outro")
         audio_formats = ("ACC", "AC3", "DFF", "MP2", "DSF", "FLAC", "M4A", "M4B", "MP3", "OGG", "WAV", "WMA", "Outro")
@@ -1012,15 +1009,13 @@ class BrasilTracker:
             "title_br": payload_preview.text("Título brasileiro"),
             "type": payload_preview.choice("Categoria", categories.items()),
             "tags": payload_preview.text("Tags", max_length=1000),
-            "format": options("Formato", formats),
-            "bitrate": payload_preview.choice(
-                "Qualidade", [(value, value) for value in (audiobook_bitrates if meta.audiobook else qualities)], role="none" if meta.audiobook else "release_type"
-            ),
-            "audio_c": options("Codec de áudio", audio_codecs),
-            "video_c": options("Codec de vídeo", video_codecs),
-            "audio": options("Áudio", ("Nacional", "Dual Audio", "Dublado", "Legendado", "Outro")),
-            "legenda": options("Legenda em português", ("Sim", "Nao")),
-            "3d": options("3D", ("Sim", "Nao")),
+            "format": payload_preview.choice("Formato", formats),
+            "bitrate": payload_preview.choice("Qualidade", (audiobook_bitrates if meta.audiobook else qualities), role="none" if meta.audiobook else "release_type"),
+            "audio_c": payload_preview.choice("Codec de áudio", audio_codecs),
+            "video_c": payload_preview.choice("Codec de vídeo", video_codecs),
+            "audio": payload_preview.choice("Áudio", ("Nacional", "Dual Audio", "Dublado", "Legendado", "Outro")),
+            "legenda": payload_preview.choice("Legenda em português", ("Sim", "Nao")),
+            "3d": payload_preview.choice("3D", ("Sim", "Nao")),
             "adulto": payload_preview.choice("Adulto", [("0", "Não"), ("1", "Sim")]),
             "diretor": payload_preview.text("Diretor", max_length=1000),
             "banda": payload_preview.text("Autor", max_length=1000),
@@ -1029,7 +1024,7 @@ class BrasilTracker:
             "resolucao_2": payload_preview.number("Altura"),
             "imdb_input": payload_preview.text("IMDb ID"),
             "youtube": payload_preview.text("Trailer", max_length=1000),
-            "versao": options("Versão", ("", "Director's Cut", "Theatrical Cut", "Extended", "Uncut", "Unrated", "IMAX", "Noir", "Remastered")),
+            "versao": payload_preview.choice("Versão", ("", "Director's Cut", "Theatrical Cut", "Extended", "Uncut", "Unrated", "IMAX", "Noir", "Remastered")),
             "tipo": payload_preview.choice("Tipo", [("ep_individual", "Episódio"), ("completa", "Temporada completa")]),
             "temporada": payload_preview.text("Temporada"),
             "temporada_e": payload_preview.text("Temporada do episódio"),
@@ -1037,17 +1032,17 @@ class BrasilTracker:
             "edicao": payload_preview.number("Edição"),
             "paginas": payload_preview.number("Páginas"),
             "mensal": payload_preview.flag("Mensal", on="on", off=None),
-            "mes_resvista": options("Mês", months),
-            "genero_jogo": options("Gênero", game_genres),
-            "plataforma_jogo": options("Plataforma", platforms),
-            "sys_jogo": options("Sistema", ("Windows", "Mac", "Linux", "Android", "Console")),
+            "mes_resvista": payload_preview.choice("Mês", months),
+            "genero_jogo": payload_preview.choice("Gênero", game_genres),
+            "plataforma_jogo": payload_preview.choice("Plataforma", platforms),
+            "sys_jogo": payload_preview.choice("Sistema", ("Windows", "Mac", "Linux", "Android", "Console")),
             "versaoapp": payload_preview.text("Versão do jogo"),
             "scene": payload_preview.flag("Scene", on="on", off=None),
             "anonymous": payload_preview.flag("Anônimo", on="1", off=None),
             "internal": payload_preview.flag("Interno", on=1, off=None),
         }
         if languages:
-            specs["idioma_ori"] = options("Idioma", languages)
+            specs["idioma_ori"] = payload_preview.choice("Idioma", languages)
         if not meta.magazine:
             del specs["mensal"], specs["mes_resvista"]
         return specs
@@ -1064,7 +1059,7 @@ class BrasilTracker:
             "year": str(meta.year) if meta.year is not None else "",
             "title": original_title,
             "type": await self.get_type(meta),
-            "tags": await self.common.get_portuguese_tags(meta, tracker=self.tracker, tmdb_data=self.main_tmdb_data),
+            "tags": await payload_preview.unless_asked(self.common.get_portuguese_tags(meta, tracker=self.tracker, tmdb_data=self.main_tmdb_data)),
         }
 
         if meta.category == "GAME":
@@ -1175,12 +1170,13 @@ class BrasilTracker:
                     }
                 )
         elif meta.category in ("MOVIE", "TV"):
-            has_pt_subtitles, subtitle_ids = await self.get_subtitle(meta)
+            subtitles = await payload_preview.unless_asked(self.get_subtitle(meta))
+            has_pt_subtitles, subtitle_ids = (subtitles, subtitles) if isinstance(subtitles, payload_preview.Later) else subtitles
             resolution_width, resolution_height = await self.get_resolution(meta)
             data.update(
                 {
                     "audio_c": await self.get_audio_codec(meta),
-                    "audio": await self.get_audio(meta),
+                    "audio": await payload_preview.unless_asked(self.get_audio(meta)),
                     "bitrate": await self.get_bitrate(meta),
                     "desc": "",
                     "diretor": await self.get_credits(meta),

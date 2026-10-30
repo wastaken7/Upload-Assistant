@@ -341,3 +341,39 @@ def test_fields_carry_the_role_the_web_ui_warns_about() -> None:
     assert items["tmdb"]["role"] == "external_id"
     # Only editable fields need a role in the Web UI.
     assert "role" not in items["keywords"]
+
+
+@pytest.mark.asyncio
+async def test_a_language_question_refused_in_a_preview_leaves_no_half_found_languages(monkeypatch: pytest.MonkeyPatch) -> None:
+    from src.languages import languages_manager
+
+    async def parsed(meta: Meta) -> dict[str, Any]:
+        return {"audio": [{"language": "English"}], "text": [{"language": "English"}, {"title": "Untagged"}]}
+
+    monkeypatch.setattr(languages_manager, "parsed_mediainfo", parsed)
+    meta = Meta(category="MOVIE", is_disc="", unattended=False)
+
+    with prompts_blocked(), pytest.raises(PromptBlockedError):
+        await languages_manager.process_desc_language(meta, tracker="FAKE")
+
+    # The upload finds the languages again and asks about the untagged track.
+    assert not meta.audio_languages and not meta.subtitle_languages
+    assert not meta.language_checked
+
+
+class StatusWritingTracker(FakeTracker):
+    async def get_payload_preview(self, meta: Meta) -> payload_preview.TrackerPreview:
+        meta.tracker_status["FAKE"]["skip_upload"] = True
+        return describe("FAKE", {"name": "Fictional Film 2001"}, SPECS)
+
+
+@pytest.mark.asyncio
+async def test_a_preview_leaves_the_tracker_status_as_it_found_it() -> None:
+    tracker = StatusWritingTracker({})
+    meta = Meta(category="MOVIE")
+    assert await UploadHelper._payload_preview(tracker, "FAKE", meta) is not None
+    assert meta.tracker_status == {}
+
+    meta.tracker_status["FAKE"] = {"status_message": "kept"}
+    assert await UploadHelper._payload_preview(tracker, "FAKE", meta) is not None
+    assert meta.tracker_status == {"FAKE": {"status_message": "kept"}}

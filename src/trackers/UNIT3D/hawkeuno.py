@@ -514,7 +514,7 @@ class HawkeUno(UNIT3D):
             ("edition", "Edition", self.edition_ids),
         ):
             specs[key] = payload_preview.choice(label, ids, by_label=True)
-        specs["region"] = payload_preview.choice("Region", [(region, region) for region in self.regions])
+        specs["region"] = payload_preview.choice("Region", self.regions)
         return specs
 
     async def get_data(self, meta: Meta, preview: bool = False) -> dict[str, Any]:

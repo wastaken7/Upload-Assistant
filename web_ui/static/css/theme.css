@@ -5132,11 +5132,7 @@ html[data-ua-shape="square"]
   cursor: help;
 }
 
-.ua-run-gui-payload-row .ua-run-gui-payload-warning {
-  color: color-mix(in srgb, var(--ua-run-gui-tone) 80%, var(--ua-upload-text));
-}
-
-.ua-run-gui-payload-row [data-tone="error"] {
+.ua-run-gui-payload-row :is(.ua-run-gui-payload-warning, [data-tone="error"]) {
   color: color-mix(in srgb, var(--ua-run-gui-tone) 80%, var(--ua-upload-text));
 }
 

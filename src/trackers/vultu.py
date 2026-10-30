@@ -236,8 +236,6 @@ class Vultu:
             "anonymous": payload_preview.flag("Anonymous", on="true", off="false"),
         }
         data = await self.get_data(meta, work, preview=True)
-        if not work:
-            del data["work"]
         return payload_preview.describe(self.tracker, data, specs, deferred=deferred)
 
     async def upload(self, meta: Meta) -> bool:

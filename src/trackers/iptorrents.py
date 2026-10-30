@@ -440,8 +440,6 @@ class IPTorrents:
             "descr": "" if preview else await self.generate_description(meta),
             "type": self.get_category_id(meta),
         }
-        if preview:
-            del data["descr"]
 
         if await self.get_is_freeleech(meta):
             data["freeleech"] = "on"

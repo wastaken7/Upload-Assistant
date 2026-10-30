@@ -75,8 +75,6 @@ class RetroFlix:
             "screenshots": screenshots,
             "isAnonymous": self.config["TRACKERS"][self.tracker]["anon"],
         }
-        if preview:
-            del json_data["mediaInfo"], json_data["screenshots"]
         return json_data
 
     async def get_payload_preview(self, meta: Meta) -> payload_preview.TrackerPreview:

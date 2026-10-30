@@ -418,15 +418,10 @@ class NEXUSPHP:
 
     async def get_data(self, meta: Meta, preview: bool = False) -> dict[str, Any]:
         """Build the upload form; a ``preview`` leaves out the description and MediaInfo/BDInfo."""
-
-        async def skipped() -> dict[str, str]:
-            return {}
-
         await self.load_localized_data(meta)
         results = await asyncio.gather(
             self.get_name(meta),
-            skipped() if preview else self.get_description(meta),
-            skipped() if preview else self.get_technical_info(meta),
+            *(() if preview else (self.get_description(meta), self.get_technical_info(meta))),
             self.get_category_data(meta),
             self.get_type_data(meta),
             self.get_codec_data(meta),

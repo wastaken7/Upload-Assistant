@@ -306,8 +306,6 @@ class TorrentLeech:
             "name": await self.get_name(meta),
             "nonscene": "on" if not meta.scene else "off",
         }
-        if preview:
-            del data["description"]
 
         if meta.anime and meta.mal_id != 0:
             data.update({"animeid": f"https://anilist.co/anime/{meta.mal_id}"})
@@ -438,15 +436,13 @@ class TorrentLeech:
             "torrentComment": "0",
             "uploaderComments": "",
             "is_anonymous_upload": "off",
-            "screenshots[]": self.get_screens(meta) if self.tracker_config.get("img_rehost", True) else "",
+            "screenshots[]": self.get_screens(meta) if not preview and self.tracker_config.get("img_rehost", True) else "",
         }
 
         anon = not (meta.anon == 0 and not self.tracker_config.get("anon", False))
         if anon:
             data.update({"is_anonymous_upload": "on"})
 
-        if preview:
-            del data["screenshots[]"]
         return data
 
     async def cookie_upload(self, meta: Meta) -> bool | None:

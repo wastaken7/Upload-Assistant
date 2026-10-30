@@ -57,7 +57,6 @@ class Later(str):
 # better made another way (for example a wrong name is fixed with --imdb, not
 # by retyping it). A tracker's spec sets ``role`` where its key means another thing.
 # A spec sets role="none" where its key's usual role does not apply.
-ROLES = frozenset({"name", "title", "external_id", "category", "release_type", "resolution", "season_episode", "group", "edition", "staff_flag"})
 ROLE_BY_KEY: dict[str, str] = {
     **dict.fromkeys(("name", "title", "filename", "file_name", "subject", "rlsname", "scenename"), "name"),
     **dict.fromkeys(("titulobrasileiro", "title_br"), "title"),
@@ -118,7 +117,7 @@ class Spec:
     off: Any = "0"
     max_length: int = TEXT_LIMIT
     numeric: bool = False
-    # What the field stands for (see ROLES); overrides ROLE_BY_KEY where a key means something else.
+    # What the field stands for; overrides ROLE_BY_KEY where a key means something else.
     role: str = ""
 
 
@@ -139,8 +138,8 @@ def readonly(label: str) -> Spec:
     return Spec(label, "readonly")
 
 
-def choice(label: str, options: Mapping[Any, Any] | Iterable[tuple[Any, Any]], *, by_label: bool = False, role: str = "") -> Spec:
-    """A drop-down from ``(value, label)`` pairs, or a ``{label: value}`` map with ``by_label``.
+def choice(label: str, options: Mapping[Any, Any] | Iterable[Any], *, by_label: bool = False, role: str = "") -> Spec:
+    """A drop-down from values or ``(value, label)`` pairs, or a ``{label: value}`` map with ``by_label``.
 
     Labels that share one value (for example 1080p and 1440p) become one option.
     """
@@ -148,7 +147,7 @@ def choice(label: str, options: Mapping[Any, Any] | Iterable[tuple[Any, Any]], *
         mapping = cast(Mapping[Any, Any], options)
         pairs = [(value, name) for name, value in mapping.items()] if by_label else list(mapping.items())
     else:
-        pairs = list(options)
+        pairs = [item if isinstance(item, tuple) else (item, item) for item in cast(Iterable[Any], options)]
     grouped: dict[str, tuple[Any, list[str]]] = {}
     for value, name in pairs:
         if value is None or isinstance(value, (dict, list)):
@@ -287,17 +286,16 @@ class PayloadField:
             return True, int(value)
         return True, value
 
-    def to_gui(self, choice_refs: dict[str, str], *, with_choices: bool = True) -> dict[str, Any]:
+    def to_gui(self, choice_refs: dict[str, str]) -> dict[str, Any]:
         item: dict[str, Any] = {"key": self.key, "label": webui_events.plain_text(self.label, 100, markup=False), "kind": self.kind}
         if self.kind == "flag":
             item["value"] = self.value == self.on
         elif self.kind == "choice":
             item["value"] = str(self.value)
             item["display"] = webui_events.plain_text(self.display(self.value), SHOWN_TEXT, markup=False)
-            if with_choices:
-                options = [[str(option), webui_events.plain_text(name, 200, markup=False)] for option, name in self.choices]
-                ref_key = json.dumps(options, separators=(",", ":"))
-                item["choices"] = choice_refs.setdefault(ref_key, f"c{len(choice_refs)}")
+            options = [[str(option), webui_events.plain_text(name, 200, markup=False)] for option, name in self.choices]
+            ref_key = json.dumps(options, separators=(",", ":"))
+            item["choices"] = choice_refs.setdefault(ref_key, f"c{len(choice_refs)}")
         elif self.kind == "text":
             item["value"] = webui_events.plain_text(self.value, self.max_length, markup=False)
             item["max"] = self.max_length
@@ -424,7 +422,7 @@ def gui_payloads(previews: Iterable[TrackerPreview]) -> tuple[list[dict[str, Any
         {
             "tracker": preview.tracker,
             "name": webui_events.plain_text(preview.name or "", SHOWN_TEXT, markup=False),
-            "fields": [item.to_gui(refs, with_choices=True) for item in preview.fields],
+            "fields": [item.to_gui(refs) for item in preview.fields],
         }
         for preview in previews
     ]

@@ -1136,9 +1136,7 @@ class GreatPosterWall:
                 "subtitles[]": await self.get_subtitle(meta),
             }
         )
-        if preview:
-            del data["mediainfo[]"], data["release_desc"]
-        elif GreatPosterWall.group_id:
+        if not preview and GreatPosterWall.group_id:
             data["groupid"] = GreatPosterWall.group_id
 
         if await self.get_ch_dubs(meta):

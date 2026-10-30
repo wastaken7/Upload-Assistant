@@ -52,15 +52,13 @@ class BitHDTV:
         # distributor_id = await common.unit3d_distributor_ids(meta.distributor)
 
         desc = mi_dump = bd_dump = None
-        if preview:
-            bd_dump = "" if meta.bdinfo else None
-        elif meta.bdinfo:
-            async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/BD_SUMMARY_00.txt", encoding="utf-8") as bd_file:
-                bd_dump = await bd_file.read()
-        else:
-            async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/MEDIAINFO_CLEANPATH.txt", encoding="utf-8") as mi_file:
-                mi_dump = await mi_file.read()
         if not preview:
+            if meta.bdinfo:
+                async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/BD_SUMMARY_00.txt", encoding="utf-8") as bd_file:
+                    bd_dump = await bd_file.read()
+            else:
+                async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/MEDIAINFO_CLEANPATH.txt", encoding="utf-8") as mi_file:
+                    mi_dump = await mi_file.read()
             async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt", encoding="utf-8") as desc_file:
                 desc = await desc_file.read()
 
@@ -80,13 +78,11 @@ class BitHDTV:
             # 'anon': anon,
             # admins asked to remove short description.
             "sdescr": " ",
-            "descr": media_info if bd_dump is None else "Disc so Check Mediainfo dump ",
+            "descr": media_info if not meta.bdinfo else "Disc so Check Mediainfo dump ",
             "screen": desc,
             "url": f"https://www.tvmaze.com/shows/{meta.tvmaze_id}" if meta.category == "TV" else str(meta.imdb_info.get("imdb_url", "")),
             "format": "json",
         }
-        if preview:
-            del data["mediainfo"], data["screen"]
         return data
 
     async def get_payload_preview(self, meta: Meta) -> payload_preview.TrackerPreview:

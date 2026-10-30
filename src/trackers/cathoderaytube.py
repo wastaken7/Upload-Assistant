@@ -386,7 +386,7 @@ class CathodeRayTube:
         category = self.category_map.get(str(meta.category).upper())
         if not category:
             raise ValueError(f"Unsupported Cathode-Ray category: {meta.category}")
-        data = {
+        return {
             "submit": "true",
             "auth": auth,
             "category": category,
@@ -397,9 +397,6 @@ class CathodeRayTube:
             "desc": "" if preview else await self.generate_description(meta),
             "anonymous": "1" if (meta.anon or self.config.get("TRACKERS", {}).get(self.tracker, {}).get("anon", False)) else "0",
         }
-        if preview:
-            del data["auth"], data["image"], data["desc"]
-        return data
 
     async def get_payload_preview(self, meta: Meta) -> payload_preview.TrackerPreview:
         """The upload form as it is known before screenshots, for the Web UI to show and edit."""

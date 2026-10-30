@@ -2008,10 +2008,6 @@ class MakingOff:
         deferred = {"message": payload_preview.DESCRIPTION_NOTE, "tags": "Taken from the post at upload time"}
         return payload_preview.describe(self.tracker, data, specs, deferred=deferred, name_key="title")
 
-    async def get_topic_title(self, meta: Meta) -> str:
-        """The topic title, with any change made in the Web UI."""
-        return str(payload_preview.apply_payload_edits(meta, self.tracker, {"title": await self.get_name(meta)})["title"])
-
     async def upload(self, meta: Meta) -> bool:
         """
         Upload a release by creating a forum topic with the torrent as attachment.
@@ -2065,8 +2061,9 @@ class MakingOff:
                     return False
                 sub_files = []
 
+        # The topic title, with any change made in the Web UI.
+        topic_title = str(payload_preview.apply_payload_edits(meta, self.tracker, {"title": await self.get_name(meta)})["title"])
         if meta.debug:
-            topic_title = await self.get_topic_title(meta)
             post_body = await self.generate_description(meta)
             topic_tags = self._topic_tags(meta, post_body)
 
@@ -2124,7 +2121,6 @@ class MakingOff:
                 meta["tracker_status"][self.tracker]["status_message"] = "data error: Failed to upload Portuguese subtitle attachment."
                 return False
 
-        topic_title = await self.get_topic_title(meta)
         post_body = await self.generate_description(meta)
         topic_tags = self._topic_tags(meta, post_body)
 

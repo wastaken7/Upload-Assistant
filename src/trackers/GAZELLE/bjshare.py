@@ -1636,9 +1636,6 @@ class BJShare:
     def get_payload_specs(self) -> dict[str, payload_preview.Spec]:
         """The upload form's fields: drop-downs offer only the site's options."""
 
-        def options(label: str, values: Any) -> payload_preview.Spec:
-            return payload_preview.choice(label, [(value, value) for value in dict.fromkeys(values)])
-
         containers = ("MKV", "MP4", "AVI", "VOB", "M2TS", "TS", "AAC", "AC3", "DFF", "DSF", "FLAC", "M4A", "M4B", "MP3", "OGG", "WAV", "WMA", "PDF", "ePub", "Outro")
         qualities = ("BD100", "BD66", "BD50", "BD25", "DVD9", "DVD5", *self.QUALITIES.values(), "Outro")
         languages = sorted({*self.LANGUAGES, "Multilinguagem"})
@@ -1650,7 +1647,7 @@ class BJShare:
         return {
             "submit": payload_preview.readonly("Submit"),
             "type": payload_preview.choice("Categoria", categories.items()),
-            "formato": options("Formato", containers),
+            "formato": payload_preview.choice("Formato", containers),
             "year": payload_preview.number("Ano"),
             "tags": payload_preview.text("Tags", max_length=1000),
             "title": payload_preview.text("Título", role="title"),
@@ -1662,12 +1659,12 @@ class BJShare:
             "pais": payload_preview.text("País", max_length=1000),
             "numtemporadas": payload_preview.number("Temporadas"),
             "datalancamento": payload_preview.text("Lançamento"),
-            "idioma": options("Idioma", languages),
-            "audio": options("Áudio", ("Nacional", "Dual Áudio", "Dublado", "Legendado", "Outro")),
-            "codecaudio": options("Codec de áudio", (*self.AUDIO_CODECS, "Outro")),
-            "codecvideo": options("Codec de vídeo", (*self.VIDEO_CODECS.values(), "Outro")),
-            "qualidade": options("Qualidade", qualities),
-            "tipolegenda": options("Legenda", ("Nenhuma", "Embutida", "Queimada no vídeo")),
+            "idioma": payload_preview.choice("Idioma", languages),
+            "audio": payload_preview.choice("Áudio", ("Nacional", "Dual Áudio", "Dublado", "Legendado", "Outro")),
+            "codecaudio": payload_preview.choice("Codec de áudio", (*self.AUDIO_CODECS, "Outro")),
+            "codecvideo": payload_preview.choice("Codec de vídeo", (*self.VIDEO_CODECS.values(), "Outro")),
+            "qualidade": payload_preview.choice("Qualidade", qualities),
+            "tipolegenda": payload_preview.choice("Legenda", ("Nenhuma", "Embutida", "Queimada no vídeo")),
             "tipo": payload_preview.choice("Tipo", [("episode", "Episódio"), ("season", "Temporada"), ("movie", "Filme")]),
             "adulto": payload_preview.choice("Adulto", [("1", "Sim"), ("2", "Não")]),
             "season": payload_preview.number("Temporada"),
@@ -1683,9 +1680,9 @@ class BJShare:
             "traileryoutube": payload_preview.text("Trailer", max_length=1000),
             "plataforma": payload_preview.choice("Plataforma", [(value, " / ".join(names)) for value, names in platforms.items()]),
             "subcategoria": payload_preview.choice("Subcategoria", [("1", "Jogo completo"), ("2", "Jogo completo + DLC"), ("3", "DLC"), ("4", "Atualização")]),
-            "sistema": options("Sistema", ("Windows", "Mac", "Linux", "Multiplataforma")),
-            "bitrateTypes": options("Bitrate", bitrates),
-            "bitrate": options("Bitrate", bitrates),
+            "sistema": payload_preview.choice("Sistema", ("Windows", "Mac", "Linux", "Multiplataforma")),
+            "bitrateTypes": payload_preview.choice("Bitrate", bitrates),
+            "bitrate": payload_preview.choice("Bitrate", bitrates),
             "anonymous": payload_preview.flag("Anônimo", on="on", off=None),
             "anonymousshowgroup": payload_preview.flag("Mostrar grupo quando anônimo", on="on", off=None),
             "internalrel": payload_preview.flag("Interno", on=1, off=None),

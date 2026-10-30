@@ -535,15 +535,9 @@ class UNIT3D:
 
     async def get_data(self, meta: Meta, preview: bool = False) -> dict[str, str]:
         """Build the upload form; a ``preview`` leaves out the description, MediaInfo and BDInfo."""
-
-        async def skipped() -> dict[str, str]:
-            return {}
-
         results = await asyncio.gather(
             self.get_name(meta),
-            skipped() if preview else self.get_description(meta),
-            skipped() if preview else self.get_mediainfo(meta),
-            skipped() if preview else self.get_bdinfo(meta),
+            *(() if preview else (self.get_description(meta), self.get_mediainfo(meta), self.get_bdinfo(meta))),
             self.get_category_id(meta),
             self.get_type_id(meta),
             self.get_resolution_id(meta),

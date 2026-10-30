@@ -828,7 +828,7 @@ class Orpheus:
             "logfiles[]": "Attached at upload time",
         }
         data = self.build_upload_payload(meta, self._release(meta))
-        return payload_preview.describe(self.tracker, data, specs, deferred=deferred, name_key="title")
+        return payload_preview.describe(self.tracker, data, specs, deferred=deferred, name=await self.get_name(meta))
 
     async def upload(self, meta: Meta) -> bool:
         release = self._release(meta)

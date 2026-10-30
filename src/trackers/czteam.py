@@ -247,8 +247,6 @@ class CZTeam:
             "category": await self.get_category_id(meta),
             "user_descr": None if preview else await self.generate_description(meta),
         }
-        if preview:
-            del data["user_descr"]
         genres = meta.music_genres if str(meta.category).upper() == "MUSIC" else ", ".join(str(genre) for genre in meta.genres)
         optional: dict[str, Any] = {
             "poster": meta.artwork_url if str(meta.artwork_url or "").startswith(("http://", "https://")) else "",
@@ -302,12 +300,10 @@ class CZTeam:
             "tube": payload_preview.text("Trailer URL", max_length=1000),
             "genre": payload_preview.text("Genre"),
             "imdb_id": payload_preview.text("IMDb ID"),
-            "resolution": payload_preview.choice("Resolution", [(value, value) for value in self.resolutions]),
-            "codec": payload_preview.choice("Codec", [(value, value) for value in self.codecs]),
-            "container": payload_preview.choice("Container", [(value, value) for value in self.containers]),
-            "source": payload_preview.choice(
-                "Source", [("BluRay", "BluRay"), ("DVD", "DVD"), ("WEB-DL", "WEB-DL"), ("WEBRip", "WEBRip"), ("HDTV", "HDTV"), ("BDRip", "BDRip"), ("DVDRip", "DVDRip")]
-            ),
+            "resolution": payload_preview.choice("Resolution", self.resolutions),
+            "codec": payload_preview.choice("Codec", self.codecs),
+            "container": payload_preview.choice("Container", self.containers),
+            "source": payload_preview.choice("Source", ["BluRay", "DVD", "WEB-DL", "WEBRip", "HDTV", "BDRip", "DVDRip"]),
         }
         deferred = {"user_descr": payload_preview.DESCRIPTION_NOTE}
         if self.is_video(meta):

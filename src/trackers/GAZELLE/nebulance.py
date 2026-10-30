@@ -126,8 +126,6 @@ class Nebulance:
             "category": await self.get_cat_id(meta),
             "ignoredupes": "1",
         }
-        if mi_dump is None:
-            del data["mediainfo"]
         return data
 
     async def get_payload_preview(self, meta: Meta) -> payload_preview.TrackerPreview:

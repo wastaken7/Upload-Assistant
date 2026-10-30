@@ -481,9 +481,6 @@ class ExoticaZ(AZTrackerBase):
         anon = not (meta.anon == 0 and not self.config["TRACKERS"][self.tracker].get("anon", False))
         if anon:
             data["options"] = "anon_upload"
-        if preview:
-            for key in ("extra[]", "studio_ids[]", "tag_ids[]", "description", "media_info"):
-                del data[key]
         return data
 
     async def get_payload_preview(self, meta: Meta) -> payload_preview.TrackerPreview:

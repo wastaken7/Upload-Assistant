@@ -232,8 +232,6 @@ class HDTorrents:
             "info": None if preview else await self.edit_desc(meta),
             "csrfToken": self.secret_token,
         }
-        if preview:
-            del data["info"]
 
         # 3D
         if "3D" in meta.three_d:
@@ -281,12 +279,13 @@ class HDTorrents:
 
     async def get_payload_preview(self, meta: Meta) -> payload_preview.TrackerPreview:
         """The upload form as it is known before screenshots, for the Web UI to show and edit."""
-        true_false = {"3d": "3D", "HDR10": "HDR10", "HDR10Plus": "HDR10+", "DolbyVision": "Dolby Vision", "season": "Season pack", "anonymous": "Anonymous"}
-        specs = {key: payload_preview.flag(label, on="true", off="false") for key, label in true_false.items()}
-        for key in ("3d", "HDR10", "HDR10Plus", "DolbyVision"):
-            specs[key] = payload_preview.flag(true_false[key], on="true", off=None)
+        specs = {
+            key: payload_preview.flag(label, on="true", off=None) for key, label in {"3d": "3D", "HDR10": "HDR10", "HDR10Plus": "HDR10+", "DolbyVision": "Dolby Vision"}.items()
+        }
         specs.update(
             {
+                "season": payload_preview.flag("Season pack", on="true", off="false"),
+                "anonymous": payload_preview.flag("Anonymous", on="true", off="false"),
                 "filename": payload_preview.text("Name"),
                 "category": payload_preview.choice(
                     "Category",

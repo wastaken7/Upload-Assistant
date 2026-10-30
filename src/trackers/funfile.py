@@ -456,8 +456,6 @@ class FunFile:
             "tags": "",
             "descr": None if preview else await self.generate_description(meta),
         }
-        if preview:
-            del data["descr"]
 
         if meta.anime:
             data.update(

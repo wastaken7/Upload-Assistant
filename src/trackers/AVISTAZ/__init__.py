@@ -1035,8 +1035,6 @@ class AZTrackerBase:
             data.update({"anon_upload": "1"})
 
         if preview:
-            for key in ("_token", "description", "movie_id", "media_info", "tags[]", "screenshots[]"):
-                del data[key]
             return data
         if not meta.debug:
             try:

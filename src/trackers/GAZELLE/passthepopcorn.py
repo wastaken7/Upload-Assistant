@@ -1597,7 +1597,7 @@ class PassThePopcorn:
                     english_audio = False
 
         ptp_trumpable: Any = None
-        if preview and not meta.hardcoded_subs and (no_audio_found or not english_audio) and not any(x in [3, 50] for x in ptp_subtitles):
+        if preview and (meta.hardcoded_subs or ((no_audio_found or not english_audio) and not any(x in [3, 50] for x in ptp_subtitles))):
             # Whether it is trumpable is asked after this question.
             ptp_trumpable = payload_preview.Later("Asked after this question")
         elif meta.hardcoded_subs:
@@ -1644,8 +1644,6 @@ class PassThePopcorn:
             "trumpable[]": ptp_trumpable,
             "AntiCsrfToken": "" if preview else await self.get_anti_csrf_token(meta),
         }
-        if preview:
-            del data["release_desc"], data["AntiCsrfToken"]
         if data["remaster_year"] != "" or data["remaster_title"] != "":
             data["remaster"] = "on"
         if meta.scene is True:
@@ -1772,12 +1770,12 @@ class PassThePopcorn:
                 "Type",
                 role="none",
                 options=[
-                    ("Feature Film", "Feature Film"),
-                    ("Short Film", "Short Film"),
-                    ("Miniseries", "Miniseries"),
-                    ("Stand-up Comedy", "Stand-up Comedy"),
-                    ("Live Performance", "Live Performance"),
-                    ("Movie Collection", "Movie Collection"),
+                    "Feature Film",
+                    "Short Film",
+                    "Miniseries",
+                    "Stand-up Comedy",
+                    "Live Performance",
+                    "Movie Collection",
                 ],
             ),
             "codec": payload_preview.readonly("Codec"),
@@ -1787,15 +1785,15 @@ class PassThePopcorn:
             "resolution": payload_preview.choice(
                 "Resolution",
                 [
-                    ("NTSC", "NTSC"),
-                    ("PAL", "PAL"),
-                    ("480p", "480p"),
-                    ("576p", "576p"),
-                    ("720p", "720p"),
-                    ("1080i", "1080i"),
-                    ("1080p", "1080p"),
-                    ("2160p", "2160p"),
-                    ("Other", "Other"),
+                    "NTSC",
+                    "PAL",
+                    "480p",
+                    "576p",
+                    "720p",
+                    "1080i",
+                    "1080p",
+                    "2160p",
+                    "Other",
                 ],
             ),
             "other_resolution": payload_preview.text("Other resolution"),

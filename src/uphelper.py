@@ -289,9 +289,9 @@ class UploadHelper:
         if build is None:
             return None
         # Some form getters read the tracker's status entry, which the tracker checks create later.
-        added_status = tracker_name not in meta.tracker_status
-        if added_status:
-            meta.tracker_status[tracker_name] = {}
+        # What they write there while previewing is undone; the upload writes it again.
+        status = meta.tracker_status.setdefault(tracker_name, {})
+        saved_status = dict(status) if status else None
         try:
             # A tracker that would ask a question here keeps asking it later, as before.
             with prompts_blocked():
@@ -300,8 +300,12 @@ class UploadHelper:
             logger.debug(f"{tracker_name}: upload data preview unavailable: {e!r}")
             return None
         finally:
-            if added_status and not meta.tracker_status.get(tracker_name):
+            if saved_status is None:
                 meta.tracker_status.pop(tracker_name, None)
+            else:
+                status.clear()
+                status.update(saved_status)
+                meta.tracker_status[tracker_name] = status
         if not isinstance(preview, payload_preview.TrackerPreview):
             return None
         preview.tracker = tracker_name

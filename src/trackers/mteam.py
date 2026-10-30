@@ -531,8 +531,6 @@ class MTeam:
             "mediaInfoAnalysisResult": True,
             # "labelsNew": ""
         }
-        if preview:
-            del data["descr"], data["mediainfo"]
         return data
 
     async def get_payload_preview(self, meta: Meta) -> payload_preview.TrackerPreview:
