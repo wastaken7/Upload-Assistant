@@ -922,7 +922,9 @@ def _should_add_bluray_link(meta: Meta, config: dict[str, Any]) -> bool:
 def _should_fetch_bluray_info(meta: Meta, get_bluray_info: bool, add_bluray_link: bool = False) -> bool:
     return bool(
         meta.is_disc in ("BDMV", "DVD")
-        and (add_bluray_link or (get_bluray_info and (not meta.distributor or not meta.region)))
+        # add_bluray_link only widens an enabled lookup; it never enables one on its own.
+        and get_bluray_info
+        and (add_bluray_link or not meta.distributor or not meta.region)
         and meta.imdb_id != 0
         and (add_bluray_link or not meta.edit)
         and not meta.site_check
