@@ -31,6 +31,7 @@ CLAUDE.md
 custom_hooks
 custom_hooks/
 data/*.json
+!data/exoticaz_tags.json
 data/banned/*.*
 data/cache/*
 data/cache/metadata/*

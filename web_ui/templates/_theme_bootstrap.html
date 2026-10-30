@@ -2,6 +2,7 @@
   (() => {
     const root = document.documentElement;
     const supportedThemes = new Set([
+      "amber",
       "amethyst",
       "charcoal",
       "evergreen",
@@ -14,17 +15,17 @@
       const storedTheme = localStorage.getItem("ua_color_theme");
       root.dataset.uaTheme = supportedThemes.has(storedTheme)
         ? storedTheme
-        : "charcoal";
+        : "amber";
       root.dataset.uaMode =
         localStorage.getItem("ua_config_theme") === "light" ? "light" : "dark";
       root.dataset.uaShape =
-        localStorage.getItem("ua_interface_style") === "rounded"
-          ? "rounded"
-          : "square";
+        localStorage.getItem("ua_interface_style") === "square"
+          ? "square"
+          : "rounded";
     } catch (error) {
-      root.dataset.uaTheme = "charcoal";
+      root.dataset.uaTheme = "amber";
       root.dataset.uaMode = "dark";
-      root.dataset.uaShape = "square";
+      root.dataset.uaShape = "rounded";
     }
   })();
 </script>

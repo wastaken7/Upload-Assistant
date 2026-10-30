@@ -3,8 +3,8 @@
   "short_name": "Upload-Assistant",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#171615",
-  "theme_color": "#171615",
+  "background_color": "#0f1012",
+  "theme_color": "#0f1012",
   "icons": [
     {
       "src": "/static/img/icon-192.png",

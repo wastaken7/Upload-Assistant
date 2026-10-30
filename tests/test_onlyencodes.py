@@ -1,5 +1,6 @@
 # ruff: noqa: S101
 import asyncio
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -73,7 +74,7 @@ def _screens(count: int = 3) -> list[dict[str, str]]:
 @pytest.mark.parametrize("screens", [None, 0, 1, 2])
 def test_onlyencodes_requires_three_screenshots(monkeypatch: pytest.MonkeyPatch, screens: int | None) -> None:
     tracker = OnlyEncodes(_config())
-    monkeypatch.setattr(tracker.common, "check_and_confirm_adult_media_upload", lambda *_args: True)
+    monkeypatch.setattr(tracker.common, "check_and_confirm_adult_media_upload", AsyncMock(return_value=True))
     meta = Meta(screens=screens, is_disc="", audio_languages=["English"])
 
     assert asyncio.run(tracker.get_additional_checks(meta)) is False
@@ -81,7 +82,7 @@ def test_onlyencodes_requires_three_screenshots(monkeypatch: pytest.MonkeyPatch,
 
 def test_onlyencodes_accepts_three_screenshots(monkeypatch: pytest.MonkeyPatch) -> None:
     tracker = OnlyEncodes(_config())
-    monkeypatch.setattr(tracker.common, "check_and_confirm_adult_media_upload", lambda *_args: True)
+    monkeypatch.setattr(tracker.common, "check_and_confirm_adult_media_upload", AsyncMock(return_value=True))
 
     async def language_check(*_args, **_kwargs) -> bool:
         return True

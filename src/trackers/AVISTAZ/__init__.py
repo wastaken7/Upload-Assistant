@@ -15,11 +15,13 @@ import httpx
 from bs4 import BeautifulSoup
 
 import bbcode
+from src import webui_events
 from src.cogs.redaction import Redaction
 from src.console import logger, prompt_in_thread
 from src.cookie_auth import CookieValidator
 from src.get_desc import DescriptionBuilder
 from src.languages import languages_manager
+from src.manual_input import Question, ask, confirm_override
 from src.meta import Meta
 from src.screenshot_manifest import files as manifest_files
 from src.stats import record_event_async
@@ -129,7 +131,13 @@ class AZTrackerBase:
             if attempt == 0 and not self.media_code:
                 logger.info(f"{self.tracker}: \nThe media [[yellow]IMDB:{imdb_id}[/yellow]] [[blue]TMDB:{tmdb_id}[/blue]] appears to be missing from the site's database.")
                 if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                    if await prompt_in_thread(cli_ui.ask_yes_no, f"{self.tracker}: Do you want to add it to the site database?\n"):
+                    with webui_events.field_prompt(
+                        f"{self.tracker} database",
+                        {"Tracker": self.tracker, "Title": title, "IMDb ID": imdb_id, "TMDb ID": tmdb_id},
+                        hint="This media appears to be missing from the site's database.",
+                    ):
+                        add_to_db = await prompt_in_thread(cli_ui.ask_yes_no, f"{self.tracker}: Do you want to add it to the site database?\n")
+                    if add_to_db:
                         added_successfully = await self.add_media_to_db(meta, title, category, imdb_id, tmdb_id)
                         if not added_successfully:
                             logger.info(f"{self.tracker}: Failed to add media. Aborting.")
@@ -203,18 +211,12 @@ class AZTrackerBase:
             warnings = self.rules(meta)
             if warnings:
                 logger.info(f"{self.tracker}: [red]Rule check returned the following warning(s):[/red]\n\n{warnings}")
-                if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                    if not await prompt_in_thread(cli_ui.ask_yes_no, "Do you want to continue anyway?", default=False):
-                        return False
-                else:
+                if not await confirm_override(meta, "Do you want to continue anyway?"):
                     return False
 
         if meta.type not in ["WEBDL"] and self.tracker == "PRIVATEHD" and meta.tag in ["FGT", "EVO"]:
-            if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                logger.info(f"{self.tracker}: [bold red]Group {meta.tag} is only allowed for web-dl[/bold red]")
-                if not await prompt_in_thread(cli_ui.ask_yes_no, "Do you want to upload anyway?", default=False):
-                    return False
-            else:
+            logger.info(f"{self.tracker}: [bold red]Group {meta.tag} is only allowed for web-dl[/bold red]")
+            if not await confirm_override(meta):
                 return False
 
         cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
@@ -416,16 +418,28 @@ class AZTrackerBase:
                             missing_audio_languages.append(track)
 
                 if missing_audio_languages:
-                    if meta.unattended and not meta.unattended_confirm:
-                        logger.info(f"{self.tracker}: [yellow]Unattended mode: Missing audio languages. Skipping {self.tracker} upload.[/yellow]")
-                        meta.skipping = f"{self.tracker}"
-                        return {}
                     logger.info(f"{self.tracker}: No audio language/s found.")
-                    logger.info(f"{self.tracker}: You must enter (comma-separated) languages for all audio tracks, eg: English, Spanish: ")
-                    user_input_raw = await prompt_in_thread(cli_ui.ask_string, "Enter languages: ")
-                    user_input = (user_input_raw or "").strip()
-                    langs = [lang.strip() for lang in user_input.split(",")]
-                    for lang in langs:
+                    langs = await ask(
+                        meta,
+                        Question(
+                            key="avistaz.audio_languages",
+                            kind="list",
+                            prompt=f"{self.tracker}: Enter the languages of all audio tracks, comma-separated (e.g. English, Spanish)",
+                            title="Audio languages",
+                            hint="Comma-separated languages for all audio tracks.",
+                            placeholder="e.g. English, Spanish",
+                            summary={
+                                f"Audio track {position}": track.get("Language") or "No language tag"
+                                for position, track in enumerate((t for t in tracks if t.get("@type") == "Audio"), 1)
+                                if any(track is missing for missing in missing_audio_languages)
+                            },
+                            tracker=self.tracker,
+                            validate=self._validate_languages,
+                        ),
+                    )
+                    if langs is None and meta.skipping == self.tracker:
+                        return {}
+                    for lang in langs or []:
                         target_id = self.lang_map.get(lang.lower())
                         if target_id:
                             audio_ids.add(target_id)
@@ -439,6 +453,10 @@ class AZTrackerBase:
         final_audio_ids = sorted(audio_ids)
 
         return {"subtitles[]": final_subtitle_ids, "languages[]": final_audio_ids}
+
+    def _validate_languages(self, languages: list[str]) -> str | None:
+        unknown = [language for language in languages if not self.lang_map.get(language.lower())]
+        return f"Unknown language(s): {', '.join(unknown)}" if unknown else None
 
     async def img_host(self, _meta: Meta, referer: str, image_bytes: bytes, filename: str) -> str | None:
         upload_url = f"{self.base_url}/ajax/image/upload"

@@ -558,7 +558,7 @@ config: dict[str, Any] = {
         # Available trackers:
         #   1PTBA, AITHER, ALPHARATIO, ANTHELION, ASIANCINEMA, AVISTAZ, BEYONDHD, BITHDTV, BITPORN, BJSHARE, BLUTOPIA,
         #   BRASILTRACKER, BROADCASTHENET, CAPYBARABR, CATHODERAYTUBE, CINEMATIK, CINEMAZ, CURUPIRA, CZTEAM, DARKPEERS, DESITORRENTS,
-        #   DIGITALCORE, DREADVAULT, DRUNKENSLUG, EMUWAREZ, FILELIST, FLOOD, FUNFILE, GREATPOSTERWALL, HAWKEUNO, HDBITS, HDSPACE, HDTORRENTS, HOMIEHELPDESK,
+        #   DIGITALCORE, DIRTYBYTES, DREADVAULT, DRUNKENSLUG, EMUWAREZ, EXOTICAZ, FILELIST, FLOOD, FUNFILE, GREATPOSTERWALL, HAWKEUNO, HDBITS, HDSPACE, HDTORRENTS, HOMIEHELPDESK,
         #   IMMORTALSEED, INFINITYHD, IPTORRENTS, ITATORRENTS, LAJIDUI, LASTDIGITALUNDERGROUND, LATTEAM, LEMONHD, LOCADORA, LONGPT, LST,
         #   LUMINARR, MAKINGOFF, MIDNIGHTSCENE, MTEAM, NEBULANCE, NORDICQUALITY, NZBGEEK, NZBNEST, OLDTOONSWORLD, ONLYENCODES, ORPHEUS, PASSTHEPOPCORN,
         #   PEERGARDEN, POLISHTORRENT, PORTUGAS, PRIVATEHD, PTCAFE, PTERCLUB, PTFANS, PTGTK, PTSKIT, PTZONE, QINGWA, RACING4EVERYONE, RAILGUNPT,
@@ -1223,6 +1223,14 @@ config: dict[str, Any] = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
+        "DIRTYBYTES": {
+            "cli_alias": "DB",
+            # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
+            "link_dir_name": "",
+            # Generate your API key at Settings -> API key
+            "api_key": "",
+            "anon": True,
+        },
         "DREADVAULT": {
             "cli_alias": "DVL",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -1320,6 +1328,24 @@ config: dict[str, Any] = {
             "use_bluray_images": True,
             "bluray_image_size": "",
             "add_audio_spectrogram": True,
+            "inject_delay": 0,
+        },
+        "EXOTICAZ": {
+            "cli_alias": "EXZ",
+            # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
+            "link_dir_name": "",
+            # Cookies required (export from https://exoticaz.to to data/cookies/EXOTICAZ.txt).
+            # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md#how-to-export-cookies
+            # Uploads are published with the torrent file downloaded from the site, which carries your passkey.
+            "anon": True,
+            # If True, the script performs a basic rules compliance check (e.g., file types, size, video sheets).
+            # This does not cover all tracker rules. Set to False to disable.
+            "check_for_rules": True,
+            # ExoticaZ requires a video sheet per video and, for single clips, a full size screenshot.
+            # Set DEFAULT "xxx_single_file_screens" to at least 1 when uploading single clips.
+            # The configurations below override the DEFAULT configuration
+            "custom_description_header": "",
+            "custom_signature": "",
             "inject_delay": 0,
         },
         "FILELIST": {

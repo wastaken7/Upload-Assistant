@@ -915,7 +915,14 @@ class ImdbManager:
         else:
             if not unattended:
                 try:
-                    with webui_events.answer_buttons([("0", "Skip")]):
+                    with webui_events.field_prompt(
+                        "IMDb ID",
+                        {"Search title": filename, "Year": search_year, "Category": category, "IMDb ID": ""},
+                        focus="IMDb ID",
+                        hint="No IMDb match was found. Enter the ID as tt1234567, or 0 to skip.",
+                        actions=[("0", "Skip")],
+                        placeholder="tt1234567",
+                    ):
                         selection = await prompt_in_thread(cli_ui.ask_string, "No results found. Please enter a manual IMDb ID (tt1234567) or 0 to skip: ") or ""
                 except EOFError, KeyboardInterrupt:
                     logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")

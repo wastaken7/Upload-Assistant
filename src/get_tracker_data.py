@@ -243,7 +243,12 @@ class TrackerDataManager:
         if webui:
             logger.info("[cyan]Open the Description panel to edit it before uploading.[/cyan]")
         question, buttons = webui_events.letter_prompt([("e", "edit"), ("d", "discard")], "keep it")
-        with webui_events.answer_buttons(buttons):
+        with webui_events.field_prompt(
+            "Tracker description",
+            {"Tracker": tracker_name, "Description": candidate.description[:1000]},
+            focus="Description",
+            actions=buttons,
+        ):
             choice = await prompt_in_thread(cli_ui.ask_string, "\n" + question)
         choice = (choice or "").strip().lower()
         if choice == "e" and webui_events.editor_available():

@@ -32,6 +32,7 @@ from src.distributors import distributor_name
 from src.exportmi import export_info
 from src.genre_map import AUDIBLE_ENG_GENRE_MAP, AUDIBLE_PTBR_GENRE_MAP, ENG_TO_PTBR_GENRE_MAP
 from src.languages import languages_manager
+from src.manual_input import Question, ask, confirm_override
 from src.meta import Meta
 from src.torrent_manifest import TorrentManifest
 from src.unit3d_catalogs import region_id as resolve_region_id
@@ -589,7 +590,17 @@ class Common:
 
         if not meta.unattended:
             try:
-                with webui_events.answer_buttons([("y", "Yes"), ("n", "No")]):
+                with webui_events.field_prompt(
+                    f"{tracker_name} metadata",
+                    {
+                        "Filename": filename,
+                        "TMDb ID": tmdb,
+                        "IMDb ID": f"tt{imdb}" if imdb else "",
+                        "TVDb ID": tvdb,
+                        "MAL ID": mal,
+                    },
+                    actions=[("y", "Yes"), ("n", "No")],
+                ):
                     selection = (await prompt_in_thread(cli_ui.ask_string, f"Do you want to use these IDs from {tracker_name}? (Y/n): ", default="") or "").strip().lower()
                 return selection == "" or selection == "y" or selection == "yes"
             except KeyboardInterrupt, EOFError:
@@ -598,11 +609,26 @@ class Common:
             return True
 
     async def prompt_user_for_confirmation(self, message: str, meta: Meta | None = None) -> bool:
-        if meta and meta.unattended and not meta.unattended_confirm:
-            return False
-        with webui_events.answer_buttons([("y", "Yes"), ("n", "No")]):
-            response = (await prompt_in_thread(cli_ui.ask_string, f"{message} (Y/n): ", default="") or "").strip().lower()
-        return response == "" or response == "y"
+        with webui_events.field_prompt("Confirmation", {"Release": (meta.name or meta.title) if meta else ""}, hint=message):
+            return await confirm_override(meta, message, default=True)
+
+    async def _ask_douban_link(self, meta: Meta, summary: dict[str, Any], reason: str) -> str:
+        link = await ask(
+            meta,
+            Question(
+                key="douban.url",
+                kind="text",
+                prompt="Please enter Douban link (leave empty to skip)",
+                title="Douban link",
+                hint=f"{reason} Enter a Douban link, or leave it blank to skip.",
+                placeholder="https://movie.douban.com/subject/...",
+                summary={**summary, "Douban link": ""},
+                focus="Douban link",
+                unattended="fail",
+                empty_ok=True,
+            ),
+        )
+        return link or ""
 
     async def _apply_region_distributor(self, meta: Meta, attributes: dict[str, Any], tracker: str = "") -> None:
         region_id = attributes.get("region_id", 0)
@@ -824,7 +850,13 @@ class Common:
                         return tmdb, imdb, tvdb, mal, description, category, infohash, imagelist, file_name
                     logger.info("[cyan]Do you want to edit, discard or keep the description?[/cyan]")
                     question, buttons = webui_events.letter_prompt([("e", "edit"), ("d", "discard")], "keep it as is")
-                    with webui_events.answer_buttons(buttons):
+                    with webui_events.field_prompt(
+                        "Tracker description",
+                        {"Tracker": tracker, "Description": description[:1000]},
+                        focus="Description",
+                        hint="Do you want to edit, discard or keep the description?" if webui_events.editor_available() else "Do you want to discard or keep the description?",
+                        actions=buttons,
+                    ):
                         edit_choice = cli_ui.ask_string(question)
 
                     if (edit_choice or "").lower() == "e" and webui_events.editor_available():
@@ -904,16 +936,12 @@ class Common:
                             raise KeyError("No data in response")
                     except KeyError, IndexError, TypeError:
                         logger.info("[red]Unable to get data from ptgen using IMDb")
-                        if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                            params["url"] = await prompt_in_thread(cli_ui.ask_string, "Please enter Douban link:", default="") or ""
-                        else:
-                            params["url"] = ""
+                        params["url"] = await self._ask_douban_link(
+                            meta, {"Release": meta.name or meta.title, "IMDb ID": meta.imdb_tt}, "Unable to get data from PT-Gen using IMDb."
+                        )
                 else:
                     logger.info("[red]No IMDb id was found.")
-                    if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                        params["url"] = await prompt_in_thread(cli_ui.ask_string, "Please enter Douban link:", default="") or ""
-                    else:
-                        params["url"] = ""
+                    params["url"] = await self._ask_douban_link(meta, {"Release": meta.name or meta.title}, "No IMDb ID was found for PT-Gen.")
 
                 # Fetch with douban URL
                 ptgen_json = await fetch_ptgen(client, url, params)
@@ -1347,7 +1375,7 @@ class Common:
 
         return f"{resolution} @ {video_bitrate} kbps - {audio} @ {audio_bitrate} kbps"
 
-    def check_and_confirm_adult_media_upload(self, meta: Meta, tracker: str) -> bool:
+    async def check_and_confirm_adult_media_upload(self, meta: Meta, tracker: str) -> bool:
         """
         Check if the media is categorized as adult/pornographic and prompt the user for confirmation before uploading to a non-adult tracker.
 
@@ -1356,13 +1384,8 @@ class Common:
         :return: True if the user confirms or if the media is not adult, False otherwise.
         """
         if meta.adult_media:
-            if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                logger.info(f"[bold red]Pornography is not allowed at {tracker}.[/bold red]")
-                if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
-                    pass
-                else:
-                    return False
-            else:
+            logger.info(f"[bold red]Pornography is not allowed at {tracker}.[/bold red]")
+            if not await confirm_override(meta):
                 return False
 
         return True
@@ -1565,11 +1588,19 @@ class Common:
             return ""
 
         # Final fallback: ask user
-        if meta.unattended and not meta.unattended_confirm:
-            logger.info(f"{tracker}: [yellow]Unattended mode: Gêneros não encontrados. Pulando upload para {tracker}.[/yellow]")
-            meta.skipping = f"{tracker}"
-            return ""
-
-        tags_raw = await prompt_in_thread(cli_ui.ask_string, f"Digite os gêneros (no formato do {tracker}): ")
-        raw_list = [unidecode(t.strip()).replace(" ", ".") for t in re.split(r"[,;]", tags_raw or "") if t.strip()]
+        genres = await ask(
+            meta,
+            Question(
+                key="genres.ptbr",
+                kind="list",
+                prompt=f"{tracker}: Digite os gêneros (no formato do {tracker})",
+                title="Gêneros",
+                hint="Gêneros não encontrados. Separe por vírgula; até 5 são usados.",
+                placeholder="ex.: ação, drama",
+                summary={"Tracker": tracker, "Release": meta.name or meta.title, "Gêneros": ""},
+                focus="Gêneros",
+                tracker=tracker,
+            ),
+        )
+        raw_list = [unidecode(t).replace(" ", ".") for t in genres or []]
         return ", ".join(raw_list[:5])

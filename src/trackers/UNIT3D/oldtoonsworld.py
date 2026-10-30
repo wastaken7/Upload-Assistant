@@ -3,10 +3,9 @@ import re
 from dataclasses import replace
 from typing import Any, cast
 
-import cli_ui
-
 from src.console import logger
 from src.get_name import build_name_components
+from src.manual_input import confirm_override
 from src.meta import Meta
 from src.trackers.common import Common
 from src.trackers.naming import BLU_EDITION_TERMS, VideoNameRules, add_incomplete_pack_marker, build_video_name
@@ -126,13 +125,8 @@ class OldToonsWorld(UNIT3D):
             combined_genres = [g.strip() for g in str(combined_genres_value).split(",") if g.strip()]
 
         if not any(genre in combined_genres for genre in ["Animation", "Family"]):
-            if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                logger.info(f"{self.tracker}: [bold red]Genre does not match Animation or Family for OldToonsWorld.")
-                if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
-                    pass
-                else:
-                    return False
-            else:
+            logger.info(f"{self.tracker}: [bold red]Genre does not match Animation or Family for OldToonsWorld.")
+            if not await confirm_override(meta):
                 return False
 
         keywords = ", ".join(meta.keywords)
@@ -140,34 +134,19 @@ class OldToonsWorld(UNIT3D):
         genres = f"{keywords} {combined_genres_text}"
         adult_keywords = ["xxx", "erotic", "porn", "adult", "orgy", "hentai", "adult animation", "softcore"]
         if any(re.search(rf"(^|,\s*){re.escape(keyword)}(\s*,|$)", genres, re.IGNORECASE) for keyword in adult_keywords):
-            if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                logger.info(f"{self.tracker}: [bold red]Adult animation not allowed at OldToonsWorld.")
-                if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
-                    pass
-                else:
-                    return False
-            else:
+            logger.info(f"{self.tracker}: [bold red]Adult animation not allowed at OldToonsWorld.")
+            if not await confirm_override(meta):
                 return False
 
         game_show_keywords = ["reality", "game show", "game-show", "reality tv", "reality television"]
         if any(re.search(rf"(^|,\s*){re.escape(keyword)}(\s*,|$)", genres, re.IGNORECASE) for keyword in game_show_keywords):
-            if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                logger.info(f"{self.tracker}: [bold red]Reality / Game Show content not allowed at OldToonsWorld.")
-                if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
-                    pass
-                else:
-                    return False
-            else:
+            logger.info(f"{self.tracker}: [bold red]Reality / Game Show content not allowed at OldToonsWorld.")
+            if not await confirm_override(meta):
                 return False
 
         if meta.type not in ["WEBDL"] and not meta.is_disc and meta.tag in ["CMRG", "EVO", "TERMiNAL", "ViSION"]:
-            if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                logger.info(f"{self.tracker}: [bold red]Group {meta.tag} is only allowed for raw type content at OldToonsWorld[/bold red]")
-                if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
-                    pass
-                else:
-                    return False
-            else:
+            logger.info(f"{self.tracker}: [bold red]Group {meta.tag} is only allowed for raw type content at OldToonsWorld[/bold red]")
+            if not await confirm_override(meta):
                 return False
 
         return True

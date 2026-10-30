@@ -881,7 +881,7 @@ class QbittorrentClientMixin:
                 return
             qbt_client = potential_qbt_client
 
-        logger.debug("[bold yellow]Adding and rechecking torrent")
+        logger.debug("[bold yellow]Adding torrent in seed mode")
 
         # Apply remote pathing to `tracker_dir` before assigning `save_path`
         if use_symlink or use_hardlink:
@@ -934,6 +934,8 @@ class QbittorrentClientMixin:
                 data = {
                     "savepath": save_path,
                     "autoTMM": str(auto_management).lower(),
+                    # qBittorrent 5.3 renamed skip_checking to seedMode.
+                    "seedMode": str(skip_checking).lower(),
                     "skip_checking": str(skip_checking).lower(),
                     "paused": str(paused_on_add).lower(),
                     "contentLayout": content_layout,
@@ -943,7 +945,7 @@ class QbittorrentClientMixin:
                 if tag:
                     data["tags"] = tag
                 logger.debug(
-                    f"[cyan]POSTing to {Redaction.redact_private_info(qbt_proxy_url)}/api/v2/torrents/add with data: savepath={save_path}, autoTMM={auto_management}, skip_checking={skip_checking}, paused={paused_on_add}, contentLayout={content_layout}, category={qbt_category}, tags={tag}"
+                    f"[cyan]POSTing to {Redaction.redact_private_info(qbt_proxy_url)}/api/v2/torrents/add with data: savepath={save_path}, autoTMM={auto_management}, seedMode={skip_checking}, skip_checking={skip_checking}, paused={paused_on_add}, contentLayout={content_layout}, category={qbt_category}, tags={tag}"
                 )
 
                 await self._add_torrent_via_proxy(qbt_session, qbt_proxy_url, torrent.infohash, data, files)
@@ -954,6 +956,8 @@ class QbittorrentClientMixin:
                     "torrent_files": torrent.dump(),
                     "save_path": save_path,
                     "use_auto_torrent_management": auto_management,
+                    # Pass the new API field through qbittorrent-api's kwargs.
+                    "seedMode": str(skip_checking).lower(),
                     "is_skip_checking": skip_checking,
                     "is_paused": paused_on_add,
                     "is_stopped": paused_on_add,
