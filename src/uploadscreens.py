@@ -895,9 +895,12 @@ async def _upload_screens(
             "web_url": upload["web_url"],
             "tags": image_tags(upload_meta),
         }
+        local_file_path = upload.get("local_file_path")
+        if local_file_path:
+            # Hosts rename uploads, so keep the screenshot name to skip it on a later run.
+            new_image["source_file"] = Path(local_file_path).name
         upload_image_list.append(new_image)
         known_raw_urls.add(raw_url)
-        local_file_path = upload.get("local_file_path")
         if local_file_path:
             upload_meta.image_sizes[raw_url] = Path(local_file_path).stat().st_size
 
@@ -912,6 +915,8 @@ async def _upload_screens(
         existing_images = [img for img in image_list if img.get("img_url") and img.get("web_url")]
         existing_count = len(existing_images)
 
+        hosted_files = {source_file for img in existing_images if (source_file := img.get("source_file"))}
+        image_glob = [file for file in image_glob if Path(file).name not in hosted_files]
         uploaded_image_files = return_dict.get("_uploaded_image_files")
         if isinstance(uploaded_image_files, set):
             image_glob = [file for file in image_glob if str(Path(file).resolve()) not in uploaded_image_files]
@@ -1008,6 +1013,8 @@ async def _upload_screens(
                         running_tasks.discard(future)
 
                         if result.get("status") == "success":
+                            # Not every host branch reports its source, and reruns need it.
+                            result.setdefault("local_file_path", str(task_args[0]))
                             if not using_custom_img_list:
                                 uploaded_image_files = return_dict.setdefault("_uploaded_image_files", set())
                                 if isinstance(uploaded_image_files, set):

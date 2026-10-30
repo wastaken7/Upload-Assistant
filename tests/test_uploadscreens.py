@@ -1,6 +1,7 @@
 # ruff: noqa: S101
 
 import asyncio
+import json
 from itertools import pairwise
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
@@ -136,6 +137,45 @@ def test_upload_screens_does_not_reupload_source_on_fallback(tmp_path: Path) -> 
     asyncio.run(exercise())
     assert Path.cwd() == starting_directory
     assert calls == [str(tmp_path / "image-1.png")]
+
+
+def test_upload_screens_skips_sources_hosted_by_a_previous_run(tmp_path: Path) -> None:
+    calls: list[str] = []
+
+    async def fake_upload(args: object) -> dict[str, str]:
+        image = str(args[0]) if isinstance(args, list) else ""
+        calls.append(image)
+        # Hosts rename uploads, and some do not report the source file either.
+        url = f"https://img.example/file-upload{len(calls)}{Path(image).suffix}"
+        return {"status": "success", "img_url": url, "raw_url": url, "web_url": url}
+
+    async def exercise() -> None:
+        sheet = tmp_path / "sheet.webp"
+        frame = tmp_path / "frame.png"
+        sheet.write_bytes(b"sheet")
+        frame.write_bytes(b"frame")
+        config = {"DEFAULT": {"img_host_1": "ptscreens", "image_upload_delay": 0}, "TRACKERS": {}}
+        meta = Meta({"base_dir": str(tmp_path), "uuid": "test", "imghost": "ptscreens"})
+
+        with (
+            patch("src.uploadscreens.manifest_files", return_value=[sheet]),
+            patch("src.uploadscreens.upload_image_task", new=fake_upload),
+        ):
+            await _upload_screens(config, meta, 1, 1, 0, 1, [], {})
+
+        # A later run reloads the saved image list and needs one more screenshot.
+        rerun_meta = Meta({"base_dir": str(tmp_path), "uuid": "test", "imghost": "ptscreens"})
+        rerun_meta.image_list = json.loads(json.dumps(meta.image_list))
+        with (
+            patch("src.uploadscreens.manifest_files", return_value=[sheet, frame]),
+            patch("src.uploadscreens.upload_image_task", new=fake_upload),
+        ):
+            image_list, _ = await _upload_screens(config, rerun_meta, 2, 1, 0, 2, [], {})
+
+        assert [image["source_file"] for image in image_list] == ["sheet.webp", "frame.png"]
+
+    asyncio.run(exercise())
+    assert calls == [str(tmp_path / "sheet.webp"), str(tmp_path / "frame.png")]
 
 
 def test_upload_screens_accepts_manifest_paths_outside_working_directory(tmp_path: Path) -> None:

@@ -2,10 +2,9 @@
 from dataclasses import replace
 from typing import Any
 
-import cli_ui
-
 from src.console import logger
 from src.get_name import build_name_components
+from src.manual_input import Question, ask, confirm_override
 from src.meta import Meta
 from src.trackers.common import Common
 from src.trackers.naming import BLU_NAME_RULES, build_video_name, with_imdb_title
@@ -144,19 +143,27 @@ class Blutopia(UNIT3D):
         if meta.type in ["ENCODE", "REMUX"] and "HDR" in meta.hdr and "DV" in meta.hdr and (not meta.unattended or (meta.unattended and meta.unattended_confirm)):
             logger.info(f"{self.tracker}: [bold red]Releases using a Dolby Vision layer from a different source have specific description requirements.[/bold red]")
             logger.info(f"{self.tracker}: [bold red]See rule 12.5. You must have a correct pre-formatted description if this release has a derived layer[/bold red]")
-            if not cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
+            if not await confirm_override(meta):
                 return False
-            if cli_ui.ask_yes_no("Is this a derived layer release?", default=False):
+            derived = await ask(
+                meta,
+                Question(
+                    key="blutopia.derived_layer",
+                    kind="confirm",
+                    prompt="Is this a derived layer release?",
+                    title="Derived Dolby Vision layer",
+                    default=False,
+                    hint="See rule 12.5. A derived layer needs a correct pre-formatted description.",
+                    summary={"Tracker": self.tracker, "Release": meta.name, "HDR": meta.hdr},
+                    tracker=self.tracker,
+                ),
+            )
+            if derived:
                 meta.tracker_status[self.tracker]["other"] = True
 
         if meta.type not in ["WEBDL"] and not meta.is_disc and meta.tag in ["AOC", "CMRG", "EVO", "TERMiNAL", "ViSION"]:
-            if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                logger.info(f"{self.tracker}: [bold red]Group {meta.tag} is only allowed for raw type content[/bold red]")
-                if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
-                    pass
-                else:
-                    return False
-            else:
+            logger.info(f"{self.tracker}: [bold red]Group {meta.tag} is only allowed for raw type content[/bold red]")
+            if not await confirm_override(meta):
                 return False
 
         if not meta.valid_mi_settings:

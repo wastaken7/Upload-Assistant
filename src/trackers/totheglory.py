@@ -13,6 +13,7 @@ import httpx
 from bs4 import BeautifulSoup
 from unidecode import unidecode
 
+from src import webui_events
 from src.cogs.redaction import Redaction
 from src.console import logger, prompt_in_thread
 from src.cookie_auth import CookieValidator
@@ -294,7 +295,12 @@ class ToTheGlory:
         if vcookie is not True:
             logger.error(f"{self.tracker}: [red]Failed to validate cookies. Please confirm that the site is up and your passkey is valid.")
             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                recreate = cli_ui.ask_yes_no("Log in again and create new session?")
+                with webui_events.field_prompt(
+                    f"{self.tracker} session",
+                    {"Tracker": self.tracker},
+                    hint="Failed to validate cookies. Confirm that the site is up and your passkey is valid.",
+                ):
+                    recreate = cli_ui.ask_yes_no("Log in again and create new session?")
                 if recreate is True:
                     if Path(cookiefile).exists():
                         Path(cookiefile).unlink()
@@ -330,8 +336,15 @@ class ToTheGlory:
                 if meta and meta.unattended and not meta.unattended_confirm:
                     logger.error(f"{self.tracker}: [red]Unattended mode: 2FA required. Skipping login.[/red]")
                     return
+                with webui_events.field_prompt(
+                    "Two-factor authentication",
+                    {"Tracker": self.tracker, "2FA code": ""},
+                    focus="2FA code",
+                    hint=f"Enter your {self.tracker} 2FA code to log in.",
+                ):
+                    otp_code = await prompt_in_thread(cli_ui.ask_string, f"{self.tracker} 2FA Code:", default="") or ""
                 two_factor_data: dict[str, Any] = {
-                    "otp": await prompt_in_thread(cli_ui.ask_string, f"{self.tracker} 2FA Code:", default="") or "",
+                    "otp": otp_code,
                     "authenticity_token": auth_token,
                     "uid": self.uid,
                 }

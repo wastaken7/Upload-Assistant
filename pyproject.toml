@@ -98,7 +98,7 @@ include = ["bin*", "data*", "src*", "web_ui*"]
 exclude = ["tests", "tmp", "build", "build.*"]
 
 [tool.setuptools.package-data]
-data = ["tags.json", "templates/*.csv", "templates/*.json", "unit3d_catalogs/*.json"]
+data = ["exoticaz_tags.json", "tags.json","templates/*.csv", "templates/*.json", "unit3d_catalogs/*.json"]
 web_ui = ["static/**/*", "templates/*.html"]
 
 [tool.ruff]

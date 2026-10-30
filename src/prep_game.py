@@ -16,6 +16,7 @@ import aiofiles
 import cli_ui
 import httpx
 
+from src import webui_events
 from src.console import logger
 from src.igdb import IGDBAPI
 from src.meta import Meta
@@ -244,7 +245,8 @@ def select_gazelle_candidate(candidates: list[dict[str, Any]], title: str, meta:
     skip_choice = "Skip - Don't use a GazelleGames match"
     choices.append(skip_choice)
     try:
-        choice = cli_ui.ask_choice("Select the correct game from GazelleGames:", choices=choices)
+        with webui_events.field_prompt("Game match", {"Title": title, "Year": meta.year, "Platform": meta.platform}):
+            choice = cli_ui.ask_choice("Select the correct game from GazelleGames:", choices=choices)
     except EOFError, KeyboardInterrupt:
         logger.info("[yellow]GazelleGames selection cancelled.[/yellow]")
         return None
@@ -1059,7 +1061,8 @@ async def gather_game_prep(
             choices.append("Skip - Don't select any match")
 
             try:
-                choice = cli_ui.ask_choice("Select the correct game from IGDB:", choices=choices)
+                with webui_events.field_prompt("Game match", {"Title": meta.title, "Year": meta.year, "Platform": meta.platform}):
+                    choice = cli_ui.ask_choice("Select the correct game from IGDB:", choices=choices)
                 if choice != "Skip - Don't use any of these matches" and choice != "Skip - Don't select any match":
                     idx = choices.index(choice)
                     selected_game = results[idx]
