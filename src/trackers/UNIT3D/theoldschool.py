@@ -1,6 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
-from typing import Any
+from typing import Any, ClassVar
 
 from src.console import logger
 from src.meta import Meta
@@ -13,6 +13,28 @@ class TheOldSchool(UNIT3D):
     """
     The Old School (TOS) is a FRENCH Private Torrent Tracker for MOVIES / TV / GENERAL
     """
+
+    # Options of the ID fields, offered in the Web UI preview (the getters ignore mapping_only).
+    payload_choices: ClassVar[dict[str, tuple[tuple[str, str], ...]]] = {
+        "category_id": (
+            ("1", "MOVIE"),
+            ("2", "TV"),
+            ("8", "TV pack"),
+            ("6", "MOVIE VOSTFR"),
+            ("7", "TV VOSTFR"),
+            ("9", "TV pack VOSTFR"),
+        ),
+        "type_id": (
+            ("1", "DISC"),
+            ("2", "REMUX"),
+            ("3", "ENCODE"),
+            ("4", "WEBDL"),
+            ("5", "WEBRIP"),
+            ("6", "HDTV"),
+            ("7", "DVD"),
+            ("8", "3D"),
+        ),
+    }
 
     tracker = "THEOLDSCHOOL"
     display_name = "The Old School"

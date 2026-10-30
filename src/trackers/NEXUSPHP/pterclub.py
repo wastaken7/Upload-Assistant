@@ -11,6 +11,7 @@ import httpx
 from bs4 import BeautifulSoup
 from unidecode import unidecode
 
+from src import payload_preview
 from src.cogs.redaction import Redaction
 from src.console import logger
 from src.cookie_auth import CookieValidator
@@ -457,24 +458,66 @@ class PTerClub:
     def get_douban_url(meta: Meta) -> str:
         return f"https://movie.douban.com/subject/{meta.douban_id}/" if meta.douban_id else ""
 
+    async def get_data(self, meta: Meta, preview: bool = False) -> dict[str, Any]:
+        """Build the upload form; a ``preview`` leaves out the description."""
+        pter_desc = ""
+        if not preview:
+            desc_file = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt"
+            if not Path(desc_file).exists():
+                await self.edit_desc(meta)
+
+            mi_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/BD_SUMMARY_00.txt" if meta.bdinfo else f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/MEDIAINFO.txt"
+            async with aiofiles.open(mi_path, encoding="utf-8") as mi_dump:
+                _ = await mi_dump.read()
+            async with aiofiles.open(desc_file, encoding="utf-8") as desc_handle:
+                pter_desc = await desc_handle.read()
+
+        anon = "no" if meta.anon == 0 and not self.config["TRACKERS"][self.tracker].get("anon", False) else "yes"
+        data: dict[str, Any] = {
+            "name": await self.get_name(meta),
+            "small_descr": self.get_small_description(meta),
+            "url": self.get_imdb_url(meta),
+            "douban": self.get_douban_url(meta),
+            "descr": pter_desc,
+            "type": await self.get_type_category_id(meta),
+            "source_sel": await self.get_type_medium_id(meta),
+            "team_sel": await self.get_area_id(meta),
+        }
+        if preview:
+            del data["descr"]
+        if anon == "yes":
+            data["uplver"] = "yes"
+        if await self.is_zhongzi(meta) == "yes":
+            data["zhongzi"] = "yes"
+        if meta.personalrelease is True:
+            data["pr"] = "yes"
+        return data
+
+    async def get_payload_preview(self, meta: Meta) -> payload_preview.TrackerPreview:
+        """The upload form as it is known before screenshots, for the Web UI to show and edit."""
+        specs = {
+            "name": payload_preview.text("Name"),
+            "small_descr": payload_preview.text("Subtitle"),
+            "url": payload_preview.text("IMDb URL"),
+            "douban": payload_preview.text("Douban URL"),
+            "type": payload_preview.choice("Category", [("401", "Movie"), ("402", "Documentary"), ("403", "Animation"), ("404", "TV")]),
+            "source_sel": payload_preview.choice(
+                "Medium", [("1", "UHD disc"), ("2", "BD disc"), ("3", "Remux"), ("4", "HDTV"), ("5", "WEB-DL"), ("6", "Encode"), ("7", "DVD")]
+            ),
+            "team_sel": payload_preview.choice(
+                "Region", [(1, "Mainland China"), (2, "Hong Kong"), (3, "Taiwan"), (4, "Western"), (5, "Korea"), (6, "Japan"), (7, "India"), (8, "Other")]
+            ),
+            "uplver": payload_preview.flag("Anonymous", on="yes", off=None),
+            "zhongzi": payload_preview.flag("Chinese subtitles", on="yes", off=None),
+            "pr": payload_preview.flag("Personal release", on="yes", off=None),
+        }
+        return payload_preview.describe(self.tracker, await self.get_data(meta, preview=True), specs, deferred={"descr": payload_preview.DESCRIPTION_NOTE})
+
     async def upload(self, meta: Meta) -> bool:
 
         common = Common(config=self.config)
         await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
-
-        desc_file = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt"
-        if not Path(desc_file).exists():
-            await self.edit_desc(meta)
-
-        anon = "no" if meta.anon == 0 and not self.config["TRACKERS"][self.tracker].get("anon", False) else "yes"
-
-        pter_name = await self.get_name(meta)
-
-        mi_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/BD_SUMMARY_00.txt" if meta.bdinfo else f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/MEDIAINFO.txt"
-        async with aiofiles.open(mi_path, encoding="utf-8") as mi_dump:
-            _ = await mi_dump.read()
-        async with aiofiles.open(desc_file, encoding="utf-8") as desc_handle:
-            pter_desc = await desc_handle.read()
+        data = payload_preview.apply_payload_edits(meta, self.tracker, await self.get_data(meta))
         torrent_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}].torrent"
 
         async with aiofiles.open(torrent_path, "rb") as torrent_file_handle:
@@ -484,23 +527,6 @@ class PTerClub:
         files = {
             "file": (f"{torrent_file_name}.torrent", torrent_bytes, "application/x-bittorent"),
         }
-
-        data: dict[str, Any] = {
-            "name": pter_name,
-            "small_descr": self.get_small_description(meta),
-            "url": self.get_imdb_url(meta),
-            "douban": self.get_douban_url(meta),
-            "descr": pter_desc,
-            "type": await self.get_type_category_id(meta),
-            "source_sel": await self.get_type_medium_id(meta),
-            "team_sel": await self.get_area_id(meta),
-        }
-        if anon == "yes":
-            data["uplver"] = "yes"
-        if await self.is_zhongzi(meta) == "yes":
-            data["zhongzi"] = "yes"
-        if meta.personalrelease is True:
-            data["pr"] = "yes"
 
         url = f"{self.base_url}/takeupload.php"
 

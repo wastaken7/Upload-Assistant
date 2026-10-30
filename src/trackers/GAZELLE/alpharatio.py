@@ -11,6 +11,7 @@ import aiofiles
 import httpx
 from bs4 import BeautifulSoup
 
+from src import payload_preview
 from src.bbcode import BBCODE
 from src.console import logger
 from src.cookie_auth import CookieAuthUploader, CookieValidator
@@ -343,6 +344,68 @@ class AlphaRatio:
 
         return None
 
+    @staticmethod
+    def get_tags(meta: Meta) -> str:
+        # Tag Compilation
+        genres_raw = meta.genres
+        genres = ""
+        if isinstance(genres_raw, list):
+            tags_parts = [str(item).strip() for item in genres_raw if str(item).strip()]
+            genres = ", ".join(tags_parts)
+        elif isinstance(genres_raw, str) and genres_raw.strip():
+            tags_parts: list[str] = []
+            for item in genres_raw.split(","):
+                for subitem in item.split("&"):
+                    stripped = subitem.strip()
+                    if stripped:
+                        tags_parts.append(stripped)
+            genres = ", ".join(tags_parts)
+        genres = re.sub(r"\.{2,}", ".", genres)
+
+        # adding tags
+        tags = ""
+        if meta.imdb_tt:
+            tags += f"{meta.imdb_tt}, "
+        if genres:
+            tags += f"{genres}, "
+        return tags
+
+    async def get_payload_preview(self, meta: Meta) -> payload_preview.TrackerPreview:
+        """The upload form as it is known before screenshots, for the Web UI to show and edit."""
+        imdb_info = cast(dict[str, Any], meta.imdb_info or {})
+        cover = meta.artwork_url or imdb_info.get("cover", None)
+        data: dict[str, Any] = {"submit": "true", "type": await self.get_type(meta), "title": await self.get_name(meta), "tags": self.get_tags(meta)}
+        deferred = {"desc": payload_preview.DESCRIPTION_NOTE}
+        if cover is None:
+            deferred["image"] = "Asked for after this question"
+        else:
+            data["image"] = cover
+        specs = {
+            "submit": payload_preview.readonly("Submit"),
+            "type": payload_preview.choice(
+                "Category",
+                [
+                    ("0", "TV SD"),
+                    ("1", "TV HD"),
+                    ("2", "TV UHD"),
+                    ("4", "TV pack SD"),
+                    ("5", "TV pack HD"),
+                    ("6", "TV pack UHD"),
+                    ("7", "Movie SD"),
+                    ("8", "Movie HD"),
+                    ("9", "Movie UHD"),
+                    ("13", "Movie XXX"),
+                    ("14", "Blu-ray disc / remux"),
+                    ("15", "Anime SD"),
+                    ("16", "Anime HD"),
+                ],
+            ),
+            "title": payload_preview.text("Name"),
+            "tags": payload_preview.text("Tags", max_length=1000),
+            "image": payload_preview.text("Cover URL", max_length=1000),
+        }
+        return payload_preview.describe(self.tracker, data, specs, deferred=deferred, name_key="title")
+
     async def upload(self, meta: Meta) -> bool:
         """Upload torrent to ALPHARATIO using centralized cookie_upload."""
         # Prepare the data for the upload
@@ -384,28 +447,7 @@ class AlphaRatio:
             if cover is None:
                 return False
 
-        # Tag Compilation
-        genres_raw = meta.genres
-        genres = ""
-        if isinstance(genres_raw, list):
-            tags_parts = [str(item).strip() for item in genres_raw if str(item).strip()]
-            genres = ", ".join(tags_parts)
-        elif isinstance(genres_raw, str) and genres_raw.strip():
-            tags_parts: list[str] = []
-            for item in genres_raw.split(","):
-                for subitem in item.split("&"):
-                    stripped = subitem.strip()
-                    if stripped:
-                        tags_parts.append(stripped)
-            genres = ", ".join(tags_parts)
-        genres = re.sub(r"\.{2,}", ".", genres)
-
-        # adding tags
-        tags = ""
-        if meta.imdb_tt:
-            tags += f"{meta.imdb_tt}, "
-        if genres:
-            tags += f"{genres}, "
+        tags = self.get_tags(meta)
 
         # Get auth key
         auth_key = await self.get_auth_key(meta)

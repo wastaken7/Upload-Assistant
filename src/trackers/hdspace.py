@@ -8,6 +8,7 @@ import aiofiles
 import httpx
 from bs4 import BeautifulSoup
 
+from src import payload_preview
 from src.console import logger
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder
@@ -237,13 +238,14 @@ class HDSpace:
             logger.info(f"{self.tracker}: An error occurred while fetching requests: {e}", extra={"markup": False})
             return []
 
-    async def get_data(self, meta: Meta) -> dict[str, Any]:
+    async def get_data(self, meta: Meta, preview: bool = False) -> dict[str, Any]:
+        """Build the upload form; a ``preview`` leaves out the description."""
         data: dict[str, Any] = {
             "category": await self.get_category_id(meta),
             "filename": await self.get_name(meta),
             "genre": ", ".join(meta.genres) if meta.genres else "",
             "imdb": str(meta.imdb),
-            "info": await self.generate_description(meta),
+            "info": None if preview else await self.generate_description(meta),
             "nuk_rea": "",
             "nuk": "false",
             "req": "false",
@@ -260,7 +262,46 @@ class HDSpace:
         else:
             data.update({"anonymous": "false"})
 
+        if preview:
+            del data["info"]
         return data
+
+    async def get_payload_preview(self, meta: Meta) -> payload_preview.TrackerPreview:
+        """The upload form as it is known before screenshots, for the Web UI to show and edit."""
+        specs = {
+            "category": payload_preview.choice(
+                "Category",
+                [
+                    (15, "Blu-ray"),
+                    (40, "Remux"),
+                    (18, "Movie 720p"),
+                    (19, "Movie 1080"),
+                    (46, "Movie 2160p"),
+                    (21, "TV 720p"),
+                    (22, "TV 1080"),
+                    (45, "TV 2160p"),
+                    (24, "Documentary 720p"),
+                    (25, "Documentary 1080"),
+                    (47, "Documentary 2160p"),
+                    (27, "Anime 720p"),
+                    (28, "Anime 1080"),
+                    (48, "Anime 2160p"),
+                    (38, "Other"),
+                ],
+            ),
+            "filename": payload_preview.text("Name"),
+            "genre": payload_preview.text("Genre"),
+            "imdb": payload_preview.number("IMDb ID"),
+            "nuk_rea": payload_preview.text("Nuke reason"),
+            "nuk": payload_preview.flag("Nuked", on="true", off="false"),
+            "req": payload_preview.flag("Request", on="true", off="false"),
+            "submit": payload_preview.readonly("Submit"),
+            "t3d": payload_preview.flag("3D", on="true", off="false"),
+            "youtube_video": payload_preview.text("Trailer URL", max_length=1000),
+            "anonymous": payload_preview.flag("Anonymous", on="true", off="false"),
+        }
+        data = await self.get_data(meta, preview=True)
+        return payload_preview.describe(self.tracker, data, specs, deferred={"info": payload_preview.DESCRIPTION_NOTE}, name_key="filename")
 
     async def get_nfo(self, meta: Meta) -> dict[str, tuple[str, bytes, str]]:
         nfo_dir = Path(meta.base_dir) / "tmp" / meta.uuid

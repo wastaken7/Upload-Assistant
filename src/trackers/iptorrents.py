@@ -7,6 +7,7 @@ import bencodepy
 import httpx
 from bs4 import BeautifulSoup
 
+from src import payload_preview
 from src.console import logger
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder
@@ -432,12 +433,15 @@ class IPTorrents:
             logger.info(f"{self.tracker}: [bold red]Error reading torrent file for size check on {self.tracker}: {e}[/bold red]")
             return False
 
-    async def get_data(self, meta: Meta) -> dict[str, str | int]:
+    async def get_data(self, meta: Meta, preview: bool = False) -> dict[str, str | int]:
+        """Build the upload form; a ``preview`` leaves out the description."""
         data: dict[str, str | int] = {
             "name": await self.get_name(meta),
-            "descr": await self.generate_description(meta),
+            "descr": "" if preview else await self.generate_description(meta),
             "type": self.get_category_id(meta),
         }
+        if preview:
+            del data["descr"]
 
         if await self.get_is_freeleech(meta):
             data["freeleech"] = "on"
@@ -448,6 +452,59 @@ class IPTorrents:
             data.update({"anonymous": "on"})
 
         return data
+
+    async def get_payload_preview(self, meta: Meta) -> payload_preview.TrackerPreview:
+        """The upload form as it is known before screenshots, for the Web UI to show and edit."""
+        specs = {
+            "name": payload_preview.text("Name"),
+            "type": payload_preview.choice(
+                "Category",
+                [
+                    (22, "TV/Web-DL"),
+                    (99, "TV/x265"),
+                    (4, "TV/XviD"),
+                    (78, "TV/480p"),
+                    (65, "TV/Packs"),
+                    (5, "TV/x264"),
+                    (23, "TV/BD"),
+                    (26, "Documentaries"),
+                    (55, "Sports"),
+                    (25, "TV/DVD-Rip"),
+                    (82, "TV/Non-English"),
+                    (83, "TV/Packs/Non-English"),
+                    (24, "TV/DVD-R"),
+                    (48, "Movie/HD/Bluray"),
+                    (20, "Movie/Web-DL"),
+                    (101, "Movie/4K"),
+                    (7, "Movie/XviD"),
+                    (100, "Movie/x265"),
+                    (38, "Movie/Non-English"),
+                    (89, "Movie/BD-R"),
+                    (90, "Movie/BD-Rip"),
+                    (6, "Movie/DVD-R"),
+                    (87, "Movie/3D"),
+                    (54, "Movie/Kids"),
+                    (77, "Movie/480p"),
+                    (96, "Movie/Cam"),
+                    (3, "Music/All codecs"),
+                    (80, "Music/FLAC"),
+                    (47, "Games/Nintendo"),
+                    (43, "Games/PC"),
+                    (71, "Games/PlayStation"),
+                    (50, "Games/Wii"),
+                    (44, "Games/Xbox"),
+                    (35, "Books"),
+                    (102, "Books/Non-English"),
+                    (94, "Comics"),
+                    (64, "Audiobooks"),
+                    (92, "Magazines/Newspapers"),
+                ],
+            ),
+            "freeleech": payload_preview.flag("Freeleech", on="on", off=None),
+            "anonymous": payload_preview.flag("Anonymous", on="on", off=None),
+        }
+        data = await self.get_data(meta, preview=True)
+        return payload_preview.describe(self.tracker, data, specs, deferred={"descr": payload_preview.DESCRIPTION_NOTE})
 
     async def upload(self, meta: Meta) -> bool:
         cookies = await self.cookie_validator.load_session_cookies(meta, self.tracker)

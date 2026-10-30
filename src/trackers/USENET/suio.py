@@ -13,6 +13,7 @@ import aiofiles
 import httpx
 from PIL import Image
 
+from src import payload_preview
 from src.cogs.redaction import Redaction
 from src.console import logger
 from src.meta import Meta
@@ -415,6 +416,61 @@ class Suio:
             "tag": "0",
         }
 
+    async def get_payload_preview(self, meta: Meta) -> payload_preview.TrackerPreview:
+        """The upload form, for the Web UI to show and edit."""
+        specs = {
+            "rlsname": payload_preview.text("Name"),
+            "catid": payload_preview.choice(
+                "Category",
+                [
+                    ("31", "Movies: UHD"),
+                    ("16", "Movies: HD"),
+                    ("15", "Movies: SD"),
+                    ("35", "Movies: Full BR"),
+                    ("17", "Movies: DVD"),
+                    ("movie", "Movies: Auto"),
+                    ("30", "TV: UHD"),
+                    ("20", "TV: HD"),
+                    ("19", "TV: SD"),
+                    ("tv", "TV: Auto"),
+                    ("33", "XXX: UHD"),
+                    ("27", "XXX: HD"),
+                    ("xxx", "XXX: Auto"),
+                    ("12", "Games: PC"),
+                    ("13", "Games: MAC"),
+                    ("14", "Games: Other"),
+                    ("22", "Music: FLAC"),
+                    ("7", "Music: MP3"),
+                    ("3", "Music: Other"),
+                    ("29", "Audiobook"),
+                    ("9", "E-Books"),
+                    ("video", "Video: Auto"),
+                ],
+            ),
+            "upload": payload_preview.readonly("Submit"),
+            "language": payload_preview.choice(
+                "Language",
+                [
+                    ("0", "Auto"),
+                    ("1", "Danish"),
+                    ("2", "Dutch"),
+                    ("3", "Finnish"),
+                    ("4", "French"),
+                    ("5", "German"),
+                    ("6", "Norwegian"),
+                    ("7", "Spanish"),
+                    ("8", "Swedish"),
+                    ("9", "Multi"),
+                    ("10", "Other"),
+                    ("11", "English"),
+                    ("12", "Hebrew"),
+                    ("13", "Portuguese"),
+                ],
+            ),
+            "tag": payload_preview.readonly("Tag"),
+        }
+        return payload_preview.describe(self.tracker, await self._prepare_data(meta), specs, name_key="rlsname")
+
     async def upload(self, meta: Meta) -> bool | None:
         status_map = meta.tracker_status
         if self.tracker not in status_map:
@@ -433,7 +489,7 @@ class Suio:
             status_dict["status_message"] = "data error: NZB file missing or password missing in header"
             return False
 
-        data = await self._prepare_data(meta)
+        data = payload_preview.apply_payload_edits(meta, self.tracker, await self._prepare_data(meta))
         if meta.debug:
             logger.debug(f"{self.tracker}: [cyan]Upload (DEBUG MODE):[/cyan]")
             logger.debug(f"{self.tracker}: User: {username}")

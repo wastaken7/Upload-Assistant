@@ -7,6 +7,7 @@ from typing import Any, ClassVar, cast
 import aiofiles
 import httpx
 
+from src import payload_preview
 from src.cogs.redaction import Redaction
 from src.console import logger
 from src.get_desc import DescriptionBuilder
@@ -239,12 +240,15 @@ class CZTeam:
 
         return meta.basename_no_ext
 
-    async def get_data(self, meta: Meta) -> dict[str, Any]:
+    async def get_data(self, meta: Meta, preview: bool = False) -> dict[str, Any]:
+        """Build the upload form; a ``preview`` leaves out the description and MediaInfo."""
         data: dict[str, Any] = {
             "name": await self.get_name(meta),
             "category": await self.get_category_id(meta),
-            "user_descr": await self.generate_description(meta),
+            "user_descr": None if preview else await self.generate_description(meta),
         }
+        if preview:
+            del data["user_descr"]
         genres = meta.music_genres if str(meta.category).upper() == "MUSIC" else ", ".join(str(genre) for genre in meta.genres)
         optional: dict[str, Any] = {
             "poster": meta.artwork_url if str(meta.artwork_url or "").startswith(("http://", "https://")) else "",
@@ -255,7 +259,7 @@ class CZTeam:
         if self.is_video(meta):
             optional.update(
                 {
-                    "descr": await self.get_mediainfo(meta),
+                    "descr": "" if preview else await self.get_mediainfo(meta),
                     "imdb_id": meta.imdb_tt,
                     "resolution": self.get_resolution(meta),
                     "codec": self.get_codec(meta),
@@ -266,9 +270,53 @@ class CZTeam:
         data.update({key: value for key, value in optional.items() if value})
         return data
 
+    async def get_payload_preview(self, meta: Meta) -> payload_preview.TrackerPreview:
+        """The upload form as it is known before screenshots, for the Web UI to show and edit."""
+        specs = {
+            "name": payload_preview.text("Name"),
+            "category": payload_preview.choice(
+                "Category",
+                [
+                    (1, "XXX"),
+                    (4, "Games/PC ISO"),
+                    (5, "TvEps/HD"),
+                    (6, "Music/Audio"),
+                    (7, "TvEps"),
+                    (12, "Games/Consoles"),
+                    (19, "Movies/XviD"),
+                    (20, "Movies/DVD-R"),
+                    (21, "Games/PC Rips"),
+                    (23, "Anime"),
+                    (25, "Docs"),
+                    (28, "Movies/DVD-RO"),
+                    (29, "Movies/HD"),
+                    (31, "MAC"),
+                    (33, "Movies/HDTV-RO"),
+                    (34, "TvEps/HD-RO"),
+                    (35, "Music/Lossless"),
+                    (36, "Full BluRay-RO"),
+                    (38, "Movies-RO"),
+                ],
+            ),
+            "poster": payload_preview.text("Poster URL", max_length=1000),
+            "tube": payload_preview.text("Trailer URL", max_length=1000),
+            "genre": payload_preview.text("Genre"),
+            "imdb_id": payload_preview.text("IMDb ID"),
+            "resolution": payload_preview.choice("Resolution", [(value, value) for value in self.resolutions]),
+            "codec": payload_preview.choice("Codec", [(value, value) for value in self.codecs]),
+            "container": payload_preview.choice("Container", [(value, value) for value in self.containers]),
+            "source": payload_preview.choice(
+                "Source", [("BluRay", "BluRay"), ("DVD", "DVD"), ("WEB-DL", "WEB-DL"), ("WEBRip", "WEBRip"), ("HDTV", "HDTV"), ("BDRip", "BDRip"), ("DVDRip", "DVDRip")]
+            ),
+        }
+        deferred = {"user_descr": payload_preview.DESCRIPTION_NOTE}
+        if self.is_video(meta):
+            deferred["descr"] = "Read from the MediaInfo report at upload time"
+        return payload_preview.describe(self.tracker, await self.get_data(meta, preview=True), specs, deferred=deferred)
+
     async def upload(self, meta: Meta) -> bool:
         tracker_status = meta.tracker_status.setdefault(self.tracker, {})
-        data = await self.get_data(meta)
+        data = payload_preview.apply_payload_edits(meta, self.tracker, await self.get_data(meta))
 
         if meta.debug:
             logger.info(f"{self.tracker}: Request Data:")

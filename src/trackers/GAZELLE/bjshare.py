@@ -6,7 +6,7 @@ import time
 from datetime import UTC, datetime
 from io import BytesIO
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import Any, ClassVar, cast
 from urllib.parse import urlparse
 
 import aiofiles
@@ -18,6 +18,7 @@ from langcodes.tag_parser import LanguageTagError
 from PIL import Image
 from unidecode import unidecode
 
+from src import payload_preview
 from src.book_extractors import normalize_book_title_separators
 from src.console import logger
 from src.cookie_auth import CookieAuthUploader, CookieValidator
@@ -50,6 +51,147 @@ class BJShare:
     source_flag = "BJ"
     base_url = "https://bj-share.info"
     auth_token = None
+    # Set while building the Web UI preview: nothing is hosted or sent to the site.
+    preview_only = False
+    # Options of the upload form's drop-downs, shared with the Web UI preview.
+    LANGUAGES: ClassVar[frozenset[str]] = frozenset(
+        {
+            "Alemão",
+            "Árabe",
+            "Argelino",
+            "Búlgaro",
+            "Cantonês",
+            "Chinês",
+            "Coreano",
+            "Croata",
+            "Dinamarquês",
+            "Egípcio",
+            "Espanhol",
+            "Estoniano",
+            "Filipino",
+            "Finlandês",
+            "Francês",
+            "Grego",
+            "Hebraico",
+            "Hindi",
+            "Holandês",
+            "Húngaro",
+            "Indonésio",
+            "Inglês",
+            "Islandês",
+            "Italiano",
+            "Japonês",
+            "Macedônio",
+            "Malaio",
+            "Marati",
+            "Nigeriano",
+            "Norueguês",
+            "Persa",
+            "Polaco",
+            "Polonês",
+            "Português",
+            "Português (pt)",
+            "Romeno",
+            "Russo",
+            "Sueco",
+            "Tailandês",
+            "Tamil",
+            "Tcheco",
+            "Telugo",
+            "Turco",
+            "Ucraniano",
+            "Urdu",
+            "Vietnamita",
+            "Zulu",
+            "Outro",
+        }
+    )
+    VIDEO_CODECS: ClassVar[dict[str, str]] = {
+        "x265": "x265",
+        "h.265": "H.265",
+        "x264": "x264",
+        "h.264": "H.264",
+        "av1": "AV1",
+        "divx": "DivX",
+        "h.263": "H.263",
+        "kvcd": "KVCD",
+        "mpeg-1": "MPEG-1",
+        "mpeg-2": "MPEG-2",
+        "realvideo": "RealVideo",
+        "vc-1": "VC-1",
+        "vp6": "VP6",
+        "vp8": "VP8",
+        "vp9": "VP9",
+        "windows media video": "Windows Media Video",
+        "xvid": "XviD",
+        "hevc": "H.265",
+        "avc": "H.264",
+    }
+    QUALITIES: ClassVar[dict[str, str]] = {
+        "webdl": "WEB-DL",
+        "webrip": "WEBRip",
+        "web": "WEB",
+        "remux": "Blu-ray",
+        "encode": "Blu-ray",
+        "bdrip": "BDRip",
+        "brrip": "BRRip",
+        "hdtv": "HDTV",
+        "sdtv": "SDTV",
+        "dvdrip": "DVDRip",
+        "hd-dvd": "HD DVD",
+        "dvdscr": "DVDScr",
+        "hdrip": "HDRip",
+        "hdtc": "HDTC",
+        "pdtv": "PDTV",
+        "tc": "TC",
+        "uhdtv": "UHDTV",
+        "vhsrip": "VHSRip",
+        "tvrip": "TVRip",
+    }
+    PLATFORMS: ClassVar[dict[str, str]] = {
+        "3DS": "13",
+        "MOBILE": "2",
+        "DS": "12",
+        "NDS": "12",
+        "EMULATOR": "1",
+        "PC": "3",
+        "MAC": "3",
+        "LINUX": "3",
+        "PSVITA": "15",
+        "PS1": "4",
+        "PS2": "5",
+        "PS3": "6",
+        "PS4": "7",
+        "PS5": "18",
+        "PSP": "14",
+        "SWITCH": "16",
+        "WII": "8",
+        "WIIU": "9",
+        "XBOX": "17",
+        "XONE": "17",
+        "X360": "10",
+        "XSX": "17",
+    }
+    AUDIO_CODECS: ClassVar[tuple[str, ...]] = (
+        "DTS-X",
+        "E-AC-3 JOC",
+        "TrueHD",
+        "DTS-HD",
+        "LPCM",
+        "PCM",
+        "FLAC",
+        "DTS-ES",
+        "DTS",
+        "E-AC-3",
+        "AC3",
+        "AAC",
+        "Opus",
+        "Vorbis",
+        "MP3",
+        "MP2",
+    )
+    AUDIOBOOK_BITRATES: ClassVar[tuple[int, ...]] = (64, 128, 192, 256, 320)
+
     torrent_url = f"{base_url}/torrents.php?torrentid="
     torrent_download_url = f"{base_url}/torrents.php?action=download&id="
     requests_url = f"{base_url}/requests.php?"
@@ -264,56 +406,6 @@ class BJShare:
         return category_map.get(category, 0)
 
     def get_languages(self) -> str:
-        possible_languages = {
-            "Alemão",
-            "Árabe",
-            "Argelino",
-            "Búlgaro",
-            "Cantonês",
-            "Chinês",
-            "Coreano",
-            "Croata",
-            "Dinamarquês",
-            "Egípcio",
-            "Espanhol",
-            "Estoniano",
-            "Filipino",
-            "Finlandês",
-            "Francês",
-            "Grego",
-            "Hebraico",
-            "Hindi",
-            "Holandês",
-            "Húngaro",
-            "Indonésio",
-            "Inglês",
-            "Islandês",
-            "Italiano",
-            "Japonês",
-            "Macedônio",
-            "Malaio",
-            "Marati",
-            "Nigeriano",
-            "Norueguês",
-            "Persa",
-            "Polaco",
-            "Polonês",
-            "Português",
-            "Português (pt)",
-            "Romeno",
-            "Russo",
-            "Sueco",
-            "Tailandês",
-            "Tamil",
-            "Tcheco",
-            "Telugo",
-            "Turco",
-            "Ucraniano",
-            "Urdu",
-            "Vietnamita",
-            "Zulu",
-            "Outro",
-        }
         lang_code = self.main_tmdb_data.get("original_language")
         origin_countries = self.main_tmdb_data.get("origin_country", [])
 
@@ -330,36 +422,13 @@ class BJShare:
             except LanguageTagError:
                 language_name = lang_code
 
-        if language_name in possible_languages:
+        if language_name in self.LANGUAGES:
             return language_name
         return "Outro"
 
     async def get_game_platform(self, meta: Meta) -> str:
         """Map meta.platform to BJSHARE platform ID for the Jogos category."""
-        platform_map: dict[str, str] = {
-            "3DS": "13",
-            "MOBILE": "2",
-            "DS": "12",
-            "NDS": "12",
-            "EMULATOR": "1",
-            "PC": "3",
-            "MAC": "3",
-            "LINUX": "3",
-            "PSVITA": "15",
-            "PS1": "4",
-            "PS2": "5",
-            "PS3": "6",
-            "PS4": "7",
-            "PS5": "18",
-            "PSP": "14",
-            "SWITCH": "16",
-            "WII": "8",
-            "WIIU": "9",
-            "XBOX": "17",
-            "XONE": "17",
-            "X360": "10",
-            "XSX": "17",
-        }
+        platform_map = self.PLATFORMS
 
         platform = await game_platform(meta, tracker=self.tracker, supported=platform_map, default="PC")
         return platform_map.get(platform, "3")
@@ -495,27 +564,7 @@ class BJShare:
         return width, height
 
     def get_video_codec(self, meta: Meta) -> str:
-        codec_map = {
-            "x265": "x265",
-            "h.265": "H.265",
-            "x264": "x264",
-            "h.264": "H.264",
-            "av1": "AV1",
-            "divx": "DivX",
-            "h.263": "H.263",
-            "kvcd": "KVCD",
-            "mpeg-1": "MPEG-1",
-            "mpeg-2": "MPEG-2",
-            "realvideo": "RealVideo",
-            "vc-1": "VC-1",
-            "vp6": "VP6",
-            "vp8": "VP8",
-            "vp9": "VP9",
-            "windows media video": "Windows Media Video",
-            "xvid": "XviD",
-            "hevc": "H.265",
-            "avc": "H.264",
-        }
+        codec_map = self.VIDEO_CODECS
 
         video_encode = meta.video_encode.lower()
         video_codec = meta.video_codec
@@ -529,7 +578,7 @@ class BJShare:
         return video_codec if video_codec else "Outro"
 
     def get_audio_codec(self, meta: Meta) -> str:
-        priority_order = ["DTS-X", "E-AC-3 JOC", "TrueHD", "DTS-HD", "LPCM", "PCM", "FLAC", "DTS-ES", "DTS", "E-AC-3", "AC3", "AAC", "Opus", "Vorbis", "MP3", "MP2"]
+        priority_order = self.AUDIO_CODECS
 
         codec_map = {
             "DTS-X": ["DTS:X", "DTS-X"],
@@ -670,6 +719,8 @@ class BJShare:
         return "", ""
 
     async def build_description(self, meta: Meta) -> str:
+        if self.preview_only:
+            return payload_preview.Later(payload_preview.DESCRIPTION_NOTE)
         builder = DescriptionBuilder(self.tracker, self.config, "pt-BR")
         meta.episode_tmdb_data = self.episode_tmdb_data
 
@@ -1124,27 +1175,7 @@ class BJShare:
         if not source_type or not isinstance(source_type, str):
             return "Outro"
 
-        keyword_map = {
-            "webdl": "WEB-DL",
-            "webrip": "WEBRip",
-            "web": "WEB",
-            "remux": "Blu-ray",
-            "encode": "Blu-ray",
-            "bdrip": "BDRip",
-            "brrip": "BRRip",
-            "hdtv": "HDTV",
-            "sdtv": "SDTV",
-            "dvdrip": "DVDRip",
-            "hd-dvd": "HD DVD",
-            "dvdscr": "DVDScr",
-            "hdrip": "HDRip",
-            "hdtc": "HDTC",
-            "pdtv": "PDTV",
-            "tc": "TC",
-            "uhdtv": "UHDTV",
-            "vhsrip": "VHSRip",
-            "tvrip": "TVRip",
-        }
+        keyword_map = self.QUALITIES
 
         return keyword_map.get(source_type.lower(), "Outro")
 
@@ -1157,7 +1188,7 @@ class BJShare:
         if avg_bitrate is None:
             return "Outro"
 
-        options = [64, 128, 192, 256, 320]
+        options = self.AUDIOBOOK_BITRATES
 
         # Find option with the minimum absolute difference
         closest_option = min(options, key=lambda opt: abs(opt - avg_bitrate))
@@ -1225,6 +1256,8 @@ class BJShare:
             )
 
     async def get_cover(self, meta: Meta):
+        if self.preview_only:
+            return payload_preview.Later("Hosted at upload time")
         category = meta.category
 
         if category in ("MOVIE", "TV"):
@@ -1266,6 +1299,8 @@ class BJShare:
         return None
 
     async def get_screenshots(self, meta: Meta) -> list[str]:
+        if self.preview_only:
+            return cast(list[str], payload_preview.Later(payload_preview.SCREENSHOTS_NOTE))
         supported_suffixes = {".pjp", ".jfif", ".jpe", ".pjpeg", ".jpeg", ".jpg", ".png", ".gif", ".webp"}
         local_files = [path for path in manifest_files(meta.base_dir, meta.uuid, "main") if path.suffix.casefold() in supported_suffixes]
 
@@ -1589,11 +1624,81 @@ class BJShare:
             logger.info(traceback.format_exc())
             return results
 
+    async def get_payload_preview(self, meta: Meta) -> payload_preview.TrackerPreview:
+        """The upload form as it is known before screenshots, for the Web UI to show and edit."""
+        self.preview_only = True
+        try:
+            data = await self.get_data(meta)
+        finally:
+            self.preview_only = False
+        return payload_preview.describe(self.tracker, data, self.get_payload_specs(), name_key="")
+
+    def get_payload_specs(self) -> dict[str, payload_preview.Spec]:
+        """The upload form's fields: drop-downs offer only the site's options."""
+
+        def options(label: str, values: Any) -> payload_preview.Spec:
+            return payload_preview.choice(label, [(value, value) for value in dict.fromkeys(values)])
+
+        containers = ("MKV", "MP4", "AVI", "VOB", "M2TS", "TS", "AAC", "AC3", "DFF", "DSF", "FLAC", "M4A", "M4B", "MP3", "OGG", "WAV", "WMA", "PDF", "ePub", "Outro")
+        qualities = ("BD100", "BD66", "BD50", "BD25", "DVD9", "DVD5", *self.QUALITIES.values(), "Outro")
+        languages = sorted({*self.LANGUAGES, "Multilinguagem"})
+        bitrates = [str(value) for value in self.AUDIOBOOK_BITRATES] + ["Outro"]
+        categories = {"0": "Filme", "1": "Série", "3": "Jogo", "4": "Mangá", "8": "Revista", "9": "E-book", "10": "Audiobook", "11": "Quadrinho", "13": "Anime", "23": "Jornal"}
+        platforms: dict[str, list[str]] = {}
+        for name, value in self.PLATFORMS.items():
+            platforms.setdefault(value, []).append(name)
+        return {
+            "submit": payload_preview.readonly("Submit"),
+            "type": payload_preview.choice("Categoria", categories.items()),
+            "formato": options("Formato", containers),
+            "year": payload_preview.number("Ano"),
+            "tags": payload_preview.text("Tags", max_length=1000),
+            "title": payload_preview.text("Título", role="title"),
+            "titulobrasileiro": payload_preview.text("Título brasileiro"),
+            "diretor": payload_preview.text("Diretor", max_length=1000),
+            "elenco": payload_preview.text("Elenco", max_length=1000),
+            "diretorserie": payload_preview.text("Diretor da série", max_length=1000),
+            "network": payload_preview.text("Emissora", max_length=1000),
+            "pais": payload_preview.text("País", max_length=1000),
+            "numtemporadas": payload_preview.number("Temporadas"),
+            "datalancamento": payload_preview.text("Lançamento"),
+            "idioma": options("Idioma", languages),
+            "audio": options("Áudio", ("Nacional", "Dual Áudio", "Dublado", "Legendado", "Outro")),
+            "codecaudio": options("Codec de áudio", (*self.AUDIO_CODECS, "Outro")),
+            "codecvideo": options("Codec de vídeo", (*self.VIDEO_CODECS.values(), "Outro")),
+            "qualidade": options("Qualidade", qualities),
+            "tipolegenda": options("Legenda", ("Nenhuma", "Embutida", "Queimada no vídeo")),
+            "tipo": payload_preview.choice("Tipo", [("episode", "Episódio"), ("season", "Temporada"), ("movie", "Filme")]),
+            "adulto": payload_preview.choice("Adulto", [("1", "Sim"), ("2", "Não")]),
+            "season": payload_preview.number("Temporada"),
+            "episode": payload_preview.number("Episódio"),
+            "duracaoHR": payload_preview.number("Duração (horas)"),
+            "duracaoMIN": payload_preview.number("Duração (minutos)"),
+            "resolucaow": payload_preview.number("Largura"),
+            "resolucaoh": payload_preview.number("Altura"),
+            "remaster_title": payload_preview.text("Edição"),
+            "release": payload_preview.text("Release"),
+            "versao": payload_preview.text("Versão"),
+            "imdblink": payload_preview.text("Link do IMDb"),
+            "traileryoutube": payload_preview.text("Trailer", max_length=1000),
+            "plataforma": payload_preview.choice("Plataforma", [(value, " / ".join(names)) for value, names in platforms.items()]),
+            "subcategoria": payload_preview.choice("Subcategoria", [("1", "Jogo completo"), ("2", "Jogo completo + DLC"), ("3", "DLC"), ("4", "Atualização")]),
+            "sistema": options("Sistema", ("Windows", "Mac", "Linux", "Multiplataforma")),
+            "bitrateTypes": options("Bitrate", bitrates),
+            "bitrate": options("Bitrate", bitrates),
+            "anonymous": payload_preview.flag("Anônimo", on="on", off=None),
+            "anonymousshowgroup": payload_preview.flag("Mostrar grupo quando anônimo", on="on", off=None),
+            "internalrel": payload_preview.flag("Interno", on=1, off=None),
+            "repack": payload_preview.flag("Repack", on="on", off=None),
+        }
+
     async def get_data(self, meta: Meta) -> dict[str, Any]:
+        """Build the upload form; while ``preview_only`` is set, nothing is hosted or sent to the site."""
         await self.load_localized_data(meta)  #  keep this line FIRST to ensure localized data is loaded before proceeding
-        cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
-        if cookie_jar:
-            self.session.cookies = cookie_jar
+        if not self.preview_only:
+            cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
+            if cookie_jar:
+                self.session.cookies = cookie_jar
         category = meta.category
         original_title, brazilian_title = self.get_titles(meta)
 
@@ -1604,7 +1709,7 @@ class BJShare:
             "formato": self.get_container(meta),
             "type": str(self.get_type(meta)),
             "year": self.get_year(meta),
-            "tags": await self.common.get_portuguese_tags(meta, tracker=self.tracker, tmdb_data=self.main_tmdb_data),
+            "tags": await payload_preview.unless_asked(self.common.get_portuguese_tags(meta, tracker=self.tracker, tmdb_data=self.main_tmdb_data)),
         }
 
         if category == "BOOK":
@@ -1635,13 +1740,13 @@ class BJShare:
             data.update(
                 {
                     "title": original_title,
-                    "plataforma": await self.get_game_platform(meta),
+                    "plataforma": await payload_preview.unless_asked(self.get_game_platform(meta)),
                     "idioma": self.get_game_language(meta),
                     "adulto": self.get_adulto(meta),
                     "release_desc": release_desc,
                     "fichatecnica": await self.build_description(meta),
                     "traileryoutube": meta.youtube,
-                    "subcategoria": await self.get_game_subcategory(meta),
+                    "subcategoria": await payload_preview.unless_asked(self.get_game_subcategory(meta)),
                 }
             )
 
@@ -1679,7 +1784,7 @@ class BJShare:
 
             data.update(
                 {
-                    "audio": await self.get_audio(meta),
+                    "audio": await payload_preview.unless_asked(self.get_audio(meta)),
                     "codecaudio": self.get_audio_codec(meta),
                     "codecvideo": self.get_video_codec(meta),
                     "duracaoHR": str(hours),
@@ -1693,8 +1798,8 @@ class BJShare:
                     "remaster_title": self.build_remaster_title(meta),
                     "resolucaoh": height,
                     "resolucaow": width,
-                    "sinopse": await self.get_overview(meta),
-                    "tipolegenda": await self.get_subtitle(meta),
+                    "sinopse": await payload_preview.unless_asked(self.get_overview(meta)),
+                    "tipolegenda": await payload_preview.unless_asked(self.get_subtitle(meta)),
                     "title": original_title,
                     "titulobrasileiro": brazilian_title,
                     "traileryoutube": self.get_trailer(meta),
@@ -1706,14 +1811,14 @@ class BJShare:
                 data.update(
                     {
                         "adulto": self.get_adulto(meta),
-                        "diretor": await self.get_credits(meta, "director"),
+                        "diretor": await payload_preview.unless_asked(self.get_credits(meta, "director")),
                     }
                 )
 
             if category == "TV":
                 data.update(
                     {
-                        "diretor": await self.get_credits(meta, "creator"),
+                        "diretor": await payload_preview.unless_asked(self.get_credits(meta, "creator")),
                         "tipo": "episode" if meta.tv_pack == 0 else "season",
                         "season": meta.season_int,
                         "episode": meta.episode_int,
@@ -1726,7 +1831,7 @@ class BJShare:
                     {
                         "validimdb": "yes",
                         "imdbrating": self.get_imdb_rating(meta),
-                        "elenco": await self.get_credits(meta, "cast"),
+                        "elenco": await payload_preview.unless_asked(self.get_credits(meta, "cast")),
                     }
                 )
                 if category == "MOVIE":
@@ -1771,20 +1876,22 @@ class BJShare:
             if meta.year is not None:
                 year = str(meta.year)
             else:
-                year = await ask(
-                    meta,
-                    Question(
-                        key="bjshare.year",
-                        kind="text",
-                        prompt=f'{self.tracker}: Argumento "--year" não fornecido. Digite o ano do upload',
-                        title="Ano",
-                        hint='Argumento "--year" não fornecido. Digite o ano do upload.',
-                        placeholder="ex.: 2024",
-                        summary={"Tracker": self.tracker, "Release": meta.name or meta.title, "Ano": ""},
-                        focus="Ano",
-                        tracker=self.tracker,
-                        validate=_validate_year,
-                    ),
+                year = await payload_preview.unless_asked(
+                    ask(
+                        meta,
+                        Question(
+                            key="bjshare.year",
+                            kind="text",
+                            prompt=f'{self.tracker}: Argumento "--year" não fornecido. Digite o ano do upload',
+                            title="Ano",
+                            hint='Argumento "--year" não fornecido. Digite o ano do upload.',
+                            placeholder="ex.: 2024",
+                            summary={"Tracker": self.tracker, "Release": meta.name or meta.title, "Ano": ""},
+                            focus="Ano",
+                            tracker=self.tracker,
+                            validate=_validate_year,
+                        ),
+                    )
                 )
 
             data.update(
@@ -1797,7 +1904,7 @@ class BJShare:
                     "duracaoHR": str(hours),
                     "duracaoMIN": str(minutes),
                     "duracaotipo": "selectbox",
-                    "elenco": await self.get_credits(meta, "cast"),
+                    "elenco": await payload_preview.unless_asked(self.get_credits(meta, "cast")),
                     "fichatecnica": await self.build_description(meta),
                     "idioma": "Inglês",
                     "qualidade": self.get_bitrate(meta),
@@ -1807,7 +1914,7 @@ class BJShare:
                     "resolucaow": width,
                     "sinopse": "",
                     "year": year,
-                    "title": await self.get_xxx_title(meta),
+                    "title": await payload_preview.unless_asked(self.get_xxx_title(meta)),
                 }
             )
         # Anon

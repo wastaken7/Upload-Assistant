@@ -6,6 +6,7 @@ from typing import Any
 import aiofiles
 import httpx
 
+from src import payload_preview
 from src.console import logger
 from src.meta import Meta
 from src.trackers.common import Common
@@ -152,6 +153,41 @@ class NZBGeek:
             return False
         return not includes_nfo or attributes.get("NFO") == "OK"
 
+    async def get_payload_preview(self, meta: Meta) -> payload_preview.TrackerPreview:
+        """What is submitted with the NZB, for the Web UI to show and edit."""
+        data = {"cat": self.get_category_id(meta)}
+        deferred = {"nzb": "The NZB file created for this release"}
+        return payload_preview.describe(
+            self.tracker,
+            data,
+            {
+                "cat": payload_preview.choice(
+                    "Category",
+                    [
+                        ("2030", "Movies SD"),
+                        ("2040", "Movies HD"),
+                        ("2045", "Movies UHD"),
+                        ("5030", "TV SD"),
+                        ("5040", "TV HD"),
+                        ("5045", "TV UHD"),
+                        ("5070", "Anime"),
+                        ("6040", "XXX HD"),
+                        ("6070", "XXX other"),
+                        ("1035", "Console Switch"),
+                        ("1000", "Console"),
+                        ("4050", "PC games"),
+                        ("3030", "Audiobook"),
+                        ("3040", "Music lossless"),
+                        ("3010", "Music MP3"),
+                        ("7030", "Comics"),
+                        ("7020", "Ebooks"),
+                        ("8010", "Other"),
+                    ],
+                )
+            },
+            deferred=deferred,
+        )
+
     async def upload(self, meta: Meta) -> bool:
         status_dict = meta.tracker_status.setdefault(self.tracker, {})
         nzb_path = meta.nzb_path
@@ -172,7 +208,8 @@ class NZBGeek:
 
         try:
             async with httpx.AsyncClient(timeout=60.0, follow_redirects=True) as client:
-                response = await client.post(self.submit_url, params={"apikey": self.api_key, "cat": self.get_category_id(meta)}, files=files)
+                params = payload_preview.apply_payload_edits(meta, self.tracker, {"cat": self.get_category_id(meta)})
+                response = await client.post(self.submit_url, params={"apikey": self.api_key, **params}, files=files)
             if response.status_code not in (200, 201):
                 status_dict["status_message"] = f"data error: HTTP {response.status_code} - {response.text}"
                 return False

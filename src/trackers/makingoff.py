@@ -19,7 +19,7 @@ import langcodes
 import pycountry
 from bs4 import BeautifulSoup
 
-from src import webui_events
+from src import payload_preview, webui_events
 from src.binaries import configured_binary
 from src.cogs.redaction import Redaction
 from src.config_helpers import format_terminal_link
@@ -2001,6 +2001,17 @@ class MakingOff:
 
         return True
 
+    async def get_payload_preview(self, meta: Meta) -> payload_preview.TrackerPreview:
+        """The forum topic as it is known before screenshots, for the Web UI to show and edit."""
+        data = {"title": await self.get_name(meta), "node_id": await self.get_forum_id(meta), "prefix": self._topic_prefix_category(meta)}
+        specs = {"title": payload_preview.text("Topic title"), "node_id": payload_preview.readonly("Subforum ID"), "prefix": payload_preview.readonly("Topic prefix")}
+        deferred = {"message": payload_preview.DESCRIPTION_NOTE, "tags": "Taken from the post at upload time"}
+        return payload_preview.describe(self.tracker, data, specs, deferred=deferred, name_key="title")
+
+    async def get_topic_title(self, meta: Meta) -> str:
+        """The topic title, with any change made in the Web UI."""
+        return str(payload_preview.apply_payload_edits(meta, self.tracker, {"title": await self.get_name(meta)})["title"])
+
     async def upload(self, meta: Meta) -> bool:
         """
         Upload a release by creating a forum topic with the torrent as attachment.
@@ -2055,7 +2066,7 @@ class MakingOff:
                 sub_files = []
 
         if meta.debug:
-            topic_title = await self.get_name(meta)
+            topic_title = await self.get_topic_title(meta)
             post_body = await self.generate_description(meta)
             topic_tags = self._topic_tags(meta, post_body)
 
@@ -2113,7 +2124,7 @@ class MakingOff:
                 meta["tracker_status"][self.tracker]["status_message"] = "data error: Failed to upload Portuguese subtitle attachment."
                 return False
 
-        topic_title = await self.get_name(meta)
+        topic_title = await self.get_topic_title(meta)
         post_body = await self.generate_description(meta)
         topic_tags = self._topic_tags(meta, post_body)
 

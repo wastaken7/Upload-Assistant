@@ -2885,6 +2885,11 @@ function AudionutsUAGUI() {
     key: null,
     values: {},
   });
+  // Upload data changed on the same prompt, as {tracker: {field: value}}.
+  const [runGuiPayloadEdits, setRunGuiPayloadEdits] = useState({
+    key: null,
+    values: {},
+  });
   const [isSendingInput, setIsSendingInput] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(getStoredTheme);
   const [colorTheme, setColorThemeState] = useState(getStoredColorTheme);
@@ -10226,6 +10231,223 @@ function AudionutsUAGUI() {
     });
   };
 
+  // Each tracker's upload form as it is known now. Simple fields can be
+  // changed; the changes are sent with "yes" and used for that tracker only.
+  const renderRunGuiPayloads = (
+    previews,
+    edits,
+    errors,
+    notice,
+    key,
+    disabled,
+  ) => {
+    const update = (tracker, field, value) =>
+      setRunGuiPayloadEdits({
+        key,
+        values: RunGui.updatePayloadEdits(edits, tracker, field, value),
+      });
+    const renderControl = (tracker, field, value) => {
+      if (field.kind === "flag" && field.editable) {
+        return (
+          <input
+            type="checkbox"
+            checked={value === true}
+            onChange={() => update(tracker, field, value !== true)}
+            disabled={disabled}
+            aria-label={field.label}
+            className="h-4 w-4"
+          />
+        );
+      }
+      if (field.kind === "choice" && field.editable) {
+        return (
+          <select
+            value={value}
+            onChange={(event) => update(tracker, field, event.target.value)}
+            disabled={disabled}
+            aria-label={field.label}
+            className="ua-run-gui-input w-full min-w-0 rounded border px-1.5 py-1 text-sm disabled:opacity-50"
+          >
+            {field.choices.map(([option, label]) => (
+              <option key={option} value={option}>
+                {label === option ? label : `${label} (${option})`}
+              </option>
+            ))}
+          </select>
+        );
+      }
+      if (field.kind === "text") {
+        return (
+          <input
+            type="text"
+            value={value}
+            inputMode={field.numeric ? "numeric" : undefined}
+            maxLength={field.max}
+            onChange={(event) => update(tracker, field, event.target.value)}
+            disabled={disabled}
+            aria-label={field.label}
+            className="ua-run-gui-input w-full min-w-0 rounded border px-1.5 py-1 font-mono text-xs disabled:opacity-50"
+          />
+        );
+      }
+      if (field.kind === "deferred") {
+        return (
+          <span className="ua-run-gui-muted text-xs italic">{field.note}</span>
+        );
+      }
+      return (
+        <span className="ua-run-gui-muted break-all font-mono text-xs">
+          {field.kind === "choice"
+            ? field.display || field.value
+            : field.kind === "flag"
+              ? value
+                ? "on"
+                : "off"
+              : field.value}
+        </span>
+      );
+    };
+    return (
+      <div>
+        {renderRunGuiSectionLabel("Upload data")}
+        <p className="ua-run-gui-muted mt-1 text-xs">
+          Changes apply only to that tracker&apos;s upload form. The .torrent
+          and the other trackers are not changed. Fields marked with a warning
+          sign come from the release&apos;s metadata and are better corrected by
+          answering No.
+        </p>
+        {notice && (
+          <p className="ua-run-gui-muted mt-1 text-xs" data-tone="attention">
+            {notice}
+          </p>
+        )}
+        <div className="mt-1.5 space-y-1.5">
+          {previews.map((preview) => {
+            const changed = edits[preview.tracker] || {};
+            const count = Object.keys(changed).length;
+            const warnings = RunGui.payloadEditWarnings(preview, edits);
+            const warningCount = Object.keys(warnings).length;
+            return (
+              <details
+                key={preview.tracker}
+                className="ua-run-gui-details ua-run-gui-release-name rounded-md px-2.5 py-1.5"
+              >
+                <summary className="cursor-pointer text-sm">
+                  <span className="inline-flex min-w-0 max-w-full items-center gap-2 align-middle">
+                    {renderRunGuiTracker(preview.tracker)}
+                    {preview.name && (
+                      <span className="ua-run-gui-muted min-w-0 truncate font-mono text-xs">
+                        {preview.name}
+                      </span>
+                    )}
+                    {count > 0 && (
+                      <span
+                        className="ua-run-gui-chip shrink-0 rounded-md px-1.5 py-0.5 text-xs"
+                        data-tone="attention"
+                      >
+                        {count} changed
+                      </span>
+                    )}
+                    {warningCount > 0 && (
+                      <span
+                        className="ua-run-gui-chip inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-xs"
+                        data-tone="error"
+                      >
+                        <LucideIcon name="triangle-alert" className="h-3 w-3" />
+                        {warningCount}{" "}
+                        {warningCount === 1 ? "warning" : "warnings"}
+                      </span>
+                    )}
+                  </span>
+                </summary>
+                <dl className="mt-2 space-y-1">
+                  {preview.fields.map((field) => {
+                    const value = RunGui.payloadFieldValue(
+                      field,
+                      edits,
+                      preview.tracker,
+                    );
+                    const isChanged = field.key in changed;
+                    const error = (errors[preview.tracker] || {})[field.key];
+                    const warning = warnings[field.key];
+                    const advice = field.editable
+                      ? RunGui.payloadRoleAdvice(field.role)
+                      : "";
+                    return (
+                      <div
+                        key={field.key}
+                        className="ua-run-gui-payload-row grid min-w-0 items-center gap-x-3 gap-y-0.5 rounded px-1.5 py-1 sm:grid-cols-[11rem_minmax(0,1fr)_auto]"
+                        data-changed={isChanged}
+                      >
+                        <dt
+                          className="flex min-w-0 items-center gap-1 text-xs"
+                          title={field.key}
+                        >
+                          <span className="truncate">{field.label}</span>
+                          {advice && !warning && (
+                            // Shown before any change: these values are better corrected at their source.
+                            <span
+                              className="ua-run-gui-payload-advice shrink-0"
+                              title={advice}
+                              aria-label={advice}
+                            >
+                              <LucideIcon
+                                name="triangle-alert"
+                                className="h-3 w-3"
+                              />
+                            </span>
+                          )}
+                        </dt>
+                        <dd className="min-w-0">
+                          {renderControl(preview.tracker, field, value)}
+                          {error && (
+                            <span
+                              className="mt-0.5 block text-xs"
+                              data-tone="error"
+                            >
+                              {error}
+                            </span>
+                          )}
+                          {warning && !error && (
+                            <span
+                              className="ua-run-gui-payload-warning mt-0.5 flex items-start gap-1 text-xs"
+                              data-tone="attention"
+                              role="note"
+                            >
+                              <LucideIcon
+                                name="triangle-alert"
+                                className="mt-0.5 h-3 w-3 shrink-0"
+                              />
+                              <span>{warning}</span>
+                            </span>
+                          )}
+                        </dd>
+                        <dd>
+                          {isChanged && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                update(preview.tracker, field, field.value)
+                              }
+                              disabled={disabled}
+                              className="ua-run-gui-link text-xs disabled:opacity-50"
+                            >
+                              Reset
+                            </button>
+                          )}
+                        </dd>
+                      </div>
+                    );
+                  })}
+                </dl>
+              </details>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
   /** List only the upload targets inside the final confirmation question. */
   const renderRunGuiDupeClearContext = (context) => {
     const names = splitTrackers(context.clear_trackers);
@@ -10540,9 +10762,19 @@ function AudionutsUAGUI() {
         : [];
     const changedRunOptions =
       runGuiRunOptions.key === selectionKey ? runGuiRunOptions.values : {};
-    const yesAnswer = Object.keys(changedRunOptions).length
-      ? `yes ${JSON.stringify(changedRunOptions)}`
-      : "yes";
+    const payloadPreviews =
+      context.kind === "confirm" ? RunGui.readPayloadPreviews(context) : [];
+    const payloadEdits =
+      runGuiPayloadEdits.key === selectionKey ? runGuiPayloadEdits.values : {};
+    const payloadErrors = RunGui.payloadEditErrors(
+      payloadPreviews,
+      payloadEdits,
+    );
+    const hasPayloadErrors = Object.keys(payloadErrors).length > 0;
+    const yesAnswer = RunGui.buildConfirmAnswer(
+      changedRunOptions,
+      payloadEdits,
+    );
     if (runOptions.length) {
       details = (
         <>
@@ -10550,6 +10782,23 @@ function AudionutsUAGUI() {
           {renderRunGuiRunOptions(
             runOptions,
             changedRunOptions,
+            selectionKey,
+            disabled,
+          )}
+        </>
+      );
+    }
+    if (payloadPreviews.length || context.payload_notice) {
+      details = (
+        <>
+          {details}
+          {renderRunGuiPayloads(
+            payloadPreviews,
+            payloadEdits,
+            payloadErrors,
+            typeof context.payload_notice === "string"
+              ? context.payload_notice
+              : "",
             selectionKey,
             disabled,
           )}
@@ -10614,11 +10863,17 @@ function AudionutsUAGUI() {
               <button
                 type="button"
                 onClick={() => answer(yesAnswer)}
-                disabled={disabled}
+                disabled={disabled || hasPayloadErrors}
                 className="ua-run-gui-answer flex items-center gap-1.5 rounded-lg px-4 py-2 font-medium disabled:opacity-50"
                 data-variant="yes"
                 data-default={prompt?.default === true}
-                title={prompt?.default === true ? "Default answer" : undefined}
+                title={
+                  hasPayloadErrors
+                    ? "Fix the highlighted upload data first"
+                    : prompt?.default === true
+                      ? "Default answer"
+                      : undefined
+                }
               >
                 <LucideIcon name="check" className="h-4 w-4" />
                 Yes

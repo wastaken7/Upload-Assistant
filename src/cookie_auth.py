@@ -13,6 +13,7 @@ import httpx
 from bs4 import BeautifulSoup
 from bs4.element import AttributeValueList
 
+from src import payload_preview
 from src.console import logger
 from src.meta import Meta
 from src.trackers.common import Common
@@ -670,6 +671,7 @@ class CookieAuthUploader:
             files.update(additional_files)
 
         headers = {"User-Agent": f"{meta.ua_name} {(meta.current_version if meta.current_version is not None else 'github.com/wastaken7/Upload-Assistant')}"}
+        data = payload_preview.apply_payload_edits(meta, tracker, data)
 
         if meta.debug:
             self.upload_debug(tracker, data)

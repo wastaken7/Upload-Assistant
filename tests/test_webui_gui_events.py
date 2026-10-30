@@ -117,6 +117,31 @@ def test_oversized_events_are_not_written(gui_env, capsys, monkeypatch) -> None:
     assert capsys.readouterr().out == ""
 
 
+def test_large_events_are_written_in_pieces_a_console_takes_whole(gui_env, monkeypatch) -> None:
+    # An unbuffered Windows console drops the end of a write over 16 KB.
+    writes: list[str] = []
+
+    class Console:
+        def write(self, text: str) -> int:
+            writes.append(text)
+            return len(text)
+
+        def flush(self) -> None:
+            pass
+
+    monkeypatch.setattr(sys, "stdout", Console())
+    previews = [{"tracker": f"FAKE{index}", "fields": [{"key": "name", "value": "x" * 250}]} for index in range(100)]
+
+    with webui_events.prompt_context(kind="confirm", payloads=previews):
+        webui_events.prompt_open("yes_no", "Is this correct?")
+
+    output = "".join(writes)
+    assert len(output) > 16384
+    assert max(len(text) for text in writes) <= webui_events.STDOUT_WRITE_CHUNK
+    [event] = _events(output)
+    assert event["context"]["payloads"] == previews
+
+
 def test_stages_remember_which_one_to_fail(gui_env, capsys) -> None:
     webui_events.stage("screens", "start")
     webui_events.fail_active_stage()

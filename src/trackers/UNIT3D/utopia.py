@@ -1,5 +1,5 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-from typing import Any
+from typing import Any, ClassVar
 
 from src.meta import Meta
 from src.trackers.common import Common
@@ -12,6 +12,29 @@ class Utopia(UNIT3D):
     """
     UTOPIA is a UKRAINIAN Private Tracker for HD MOVIES and TV
     """
+
+    # Options of the ID fields, offered in the Web UI preview (the getters ignore mapping_only).
+    payload_choices: ClassVar[dict[str, tuple[tuple[str, str], ...]]] = {
+        "category_id": (
+            ("1", "MOVIE"),
+            ("2", "TV"),
+        ),
+        "type_id": (
+            ("1", "DISC"),
+            ("2", "REMUX"),
+            ("3", "ENCODE"),
+            ("4", "WEBDL"),
+            ("5", "WEBRIP"),
+            ("6", "HDTV"),
+        ),
+        "resolution_id": (
+            ("1", "4320p"),
+            ("2", "2160p"),
+            ("3", "1080p"),
+            ("4", "1080i"),
+            ("11", "Other"),
+        ),
+    }
 
     tracker = "UTOPIA"
     display_name = "UTOPIA"
