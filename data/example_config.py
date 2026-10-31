@@ -855,6 +855,8 @@ config: dict[str, Any] = {
             # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md#how-to-export-cookies
             # Two-factor authentication (2FA) must be enabled in your profile settings; otherwise, your session cookies will expire fairly quickly.
             "announce_url": "",
+            # "use_for_search": False, set to True to import IDs and descriptions from BJ-Share torrents found in your client's torrent comments
+            "use_for_search": False,
             "anon": True,
             # Set to False if during an anonymous upload you want your release group to be hidden
             "show_group_if_anon": True,

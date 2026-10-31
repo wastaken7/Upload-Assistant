@@ -1369,7 +1369,7 @@ class QbittorrentClientMixin:
 
             if url:
                 # Determine pattern
-                if name == "PASSTHEPOPCORN":
+                if name in ("PASSTHEPOPCORN", "BJSHARE"):
                     pattern = r"torrentid=(\d+)"
                 elif name in ("HDBITS", "BROADCASTHENET"):
                     pattern = r"id=(\d+)"
