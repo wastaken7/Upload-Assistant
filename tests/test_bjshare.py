@@ -311,3 +311,127 @@ def test_get_audio_european_portuguese_is_outro(audio_tags, is_disc, expected):
     )
 
     assert asyncio.run(tracker.get_audio(meta)) == expected  # noqa: S101
+
+
+FRAGMENT_HTML = (
+    '<td colspan="5"><div id="release_10"><blockquote>Lançado por: someone</blockquote></div>'
+    '<div id="files_10" class="hidden"><table class="filelist_table">'
+    '<tr class="colhead_dark"><td>Nome do Arquivo</td><td>Tamanho</td></tr>'
+    "<tr><td>Fictional.Story.2020.m4b</td><td>1 MiB</td></tr>"
+    '<tr><td colspan="2">Total de arquivos: 1</td></tr></table></div>'
+    "<blockquote>Autor: Example Author</blockquote>"
+    "<blockquote class='fullSize'><span class=\"size5\"><strong>Visão Geral</strong></span><br />\n"
+    '<span style="font-style: italic;">A fictional</span> overview with a '
+    '<a href="https://href.li/?https://example.com/page">link</a>.<br \n<br />'
+    '<div style="text-align: right;"><a href="https://href.li/?https://github.com/someone/Upload-Assistant">'
+    '<span class="size1">Compartilhado com Upload-Assistant</span></a></div></blockquote>'
+    "<blockquote>Formato: M4B</blockquote>"
+    '<div class="center"><a class="fancybox-thumbs" href="https://img.example/full.png"><img src="https://img.example/thumb.png" /></a></div></td>'
+)
+
+
+def test_parse_torrent_details_converts_book_description_to_bbcode():
+    cell = BeautifulSoup(FRAGMENT_HTML, "html.parser").find("td")
+
+    description, screenshots, files = BJShare.parse_torrent_details(cell)
+
+    assert description == "[size=5][b]Visão Geral[/b][/size]\n[i]A fictional[/i] overview with a [url=https://example.com/page]link[/url]."  # noqa: S101
+    assert screenshots == [{"img_url": "https://img.example/thumb.png", "raw_url": "https://img.example/full.png", "web_url": "https://img.example/full.png"}]  # noqa: S101
+    assert files == ["Fictional.Story.2020.m4b"]  # noqa: S101
+
+
+def test_parse_torrent_details_prefers_additional_information_block():
+    html = (
+        "<td><blockquote>Sinopse: A fictional synopsis.</blockquote>"
+        "<blockquote>Informações Adicionais: <br><strong>Notes</strong> from the group."
+        "<blockquote>A nested note.</blockquote></blockquote></td>"
+    )
+    cell = BeautifulSoup(html, "html.parser").find("td")
+
+    description, _screenshots, _files = BJShare.parse_torrent_details(cell)
+
+    assert description == "[b]Notes[/b] from the group.[quote]A nested note.[/quote]"  # noqa: S101
+
+
+def test_get_group_external_ids_reads_information_box():
+    html = (
+        '<div class="box"><div class="head"><strong>Informações</strong></div><table>'
+        '<tr><td>Nota IMDB:</td><td><a href="https://href.li/?https://www.imdb.com/title/tt0000123">IMDb</a></td></tr>'
+        '<tr><td>TMDB:</td><td><a href="https://www.themoviedb.org/movie/456">TMDB</a></td></tr></table></div>'
+    )
+
+    assert BJShare.get_group_external_ids(BeautifulSoup(html, "html.parser")) == (123, 456)  # noqa: S101
+
+
+class FakeMetadataResponse:
+    def __init__(self, text="", location=""):
+        self.text = text
+        self.headers = {"location": location} if location else {}
+
+    def raise_for_status(self):
+        pass
+
+
+class FakeMetadataSession:
+    def __init__(self, responses):
+        self.responses = list(responses)
+        self.calls: list[tuple[str, dict[str, str]]] = []
+        self.cookies = None
+
+    async def get(self, url, *, params, follow_redirects=True):
+        _ = follow_redirects
+        self.calls.append((url.rsplit("/", 1)[-1], params))
+        return self.responses.pop(0)
+
+
+class FakeLoadedCookieValidator:
+    async def load_session_cookies(self, _meta, _tracker):
+        return object()
+
+
+def metadata_tracker(responses):
+    tracker = object.__new__(BJShare)
+    tracker.session = FakeMetadataSession(responses)
+    tracker.cookie_validator = FakeLoadedCookieValidator()
+    return tracker
+
+
+def test_get_torrent_metadata_uses_only_redirect_and_fragment_for_books():
+    tracker = metadata_tracker([FakeMetadataResponse(location="torrents.php?id=20&torrentid=10#torrent10"), FakeMetadataResponse(FRAGMENT_HTML)])
+    meta = Meta({"category": "BOOK"})
+
+    tmdb, imdb, _tvdb, _mal, description, _category, _infohash, imagelist, file_name = asyncio.run(tracker.get_torrent_metadata(meta, "10"))
+
+    assert tracker.session.calls == [  # noqa: S101
+        ("torrents.php", {"torrentid": "10"}),
+        ("ajax.php", {"action": "torrent_content", "torrentid": "10", "groupid": "20"}),
+    ]
+    assert (tmdb, imdb) == (0, 0)  # noqa: S101
+    assert description.startswith("[size=5][b]Visão Geral[/b][/size]")  # noqa: S101
+    assert "Upload-Assistant" not in description  # noqa: S101
+    assert imagelist[0]["raw_url"] == "https://img.example/full.png"  # noqa: S101
+    assert file_name == "Fictional.Story.2020.m4b"  # noqa: S101
+
+
+def test_get_torrent_metadata_reads_group_page_for_movies():
+    page = (
+        '<div class="box"><div class="head">Informações</div>'
+        '<a href="https://href.li/?https://www.imdb.com/title/tt0000123">IMDb</a></div>'
+        f'<table><tr id="torrent_10">{FRAGMENT_HTML.replace("<td colspan", "<td data-colspan")}</tr></table>'
+    )
+    tracker = metadata_tracker([FakeMetadataResponse(location="torrents.php?id=20&torrentid=10"), FakeMetadataResponse(page)])
+
+    result = asyncio.run(tracker.get_torrent_metadata(Meta({"category": "MOVIE"}), "10"))
+
+    assert [call[0] for call in tracker.session.calls] == ["torrents.php", "torrents.php"]  # noqa: S101
+    assert result[1] == 123  # noqa: S101
+    assert result[4].startswith("[size=5]")  # noqa: S101
+
+
+def test_get_torrent_metadata_stops_when_redirected_to_login():
+    tracker = metadata_tracker([FakeMetadataResponse(location="login.php")])
+
+    result = asyncio.run(tracker.get_torrent_metadata(Meta({"category": "BOOK"}), "10"))
+
+    assert result == (0, 0, 0, 0, "", None, None, [], None)  # noqa: S101
+    assert len(tracker.session.calls) == 1  # noqa: S101

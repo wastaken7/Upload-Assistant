@@ -30,6 +30,14 @@ def test_uses_orpheus_default_host_without_config_override():
     assert tracker_ids == {"orpheus": "42"}  # noqa: S101
 
 
+def test_uses_bjshare_torrentid_query():
+    client = Clients({"TRACKERS": {}})
+
+    tracker_ids = client._extract_tracker_ids_from_comment("https://bj-share.info/torrents.php?torrentid=12345")
+
+    assert tracker_ids == {"bjshare": "12345"}  # noqa: S101
+
+
 def test_uses_aither_torrent_comment_id():
     client = Clients({"TRACKERS": {}})
 

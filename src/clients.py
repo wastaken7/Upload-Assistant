@@ -109,7 +109,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                 match = re.search(r"/details/(\d+)", path)
                 if match:
                     tracker_ids[tracker_key] = match.group(1)
-            elif matched_tracker == "ORPHEUS":
+            elif matched_tracker in {"ORPHEUS", "BJSHARE"}:
                 torrent_id = _query_id(parsed.query, "torrentid")
                 if torrent_id:
                     tracker_ids[tracker_key] = torrent_id

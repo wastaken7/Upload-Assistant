@@ -13,12 +13,13 @@ import aiofiles
 import httpx
 import langcodes
 import pycountry
-from bs4 import BeautifulSoup, Tag
+from bs4 import BeautifulSoup, NavigableString, Tag
 from langcodes.tag_parser import LanguageTagError
 from PIL import Image
 from unidecode import unidecode
 
 from src import payload_preview
+from src.bbcode import BBCODE
 from src.book_extractors import normalize_book_title_separators
 from src.console import logger
 from src.cookie_auth import CookieAuthUploader, CookieValidator
@@ -37,6 +38,86 @@ Config = dict[str, Any]
 
 def _validate_year(year: str) -> str | None:
     return None if year.isdigit() and len(year) == 4 else "Digite um ano com 4 dígitos, ex.: 2024."
+
+
+_HREF_REDIRECTOR = "https://href.li/?"
+_SPAN_STYLES = (
+    (re.compile(r"font-style:\s*italic", re.IGNORECASE), "i"),
+    (re.compile(r"text-decoration:\s*underline", re.IGNORECASE), "u"),
+    (re.compile(r"text-decoration:\s*line-through", re.IGNORECASE), "s"),
+)
+
+
+def _bbcode_from_html(node: Any) -> str:
+    """Convert BJ-Share's rendered description HTML back to the BBCode it came from."""
+    if isinstance(node, NavigableString):
+        # Gazelle renders every newline as "<br />\n", so source newlines are only layout.
+        return str(node).replace("\r", "").replace("\n", "")
+    if not isinstance(node, Tag):
+        return ""
+
+    name = node.name
+    classes = node.get("class") or []
+    style = str(node.get("style") or "")
+    if name in ("script", "style", "iframe", "input", "textarea"):
+        return ""
+    if name == "br":
+        # A malformed "<br" on the site makes html.parser nest the rest of the block inside it.
+        return "\n" + "".join(_bbcode_from_html(child) for child in node.children)
+    if name == "img":
+        src = str(node.get("src") or "")
+        return f"[img]{src}[/img]" if src.startswith(("http://", "https://")) else ""
+
+    href = str(node.get("href") or "") if name == "a" else ""
+    if name == "a" and href.startswith("javascript"):
+        # The [Mostrar]/[Esconder] toggle of a hidden block.
+        return ""
+
+    inner = "".join(_bbcode_from_html(child) for child in node.children)
+    tags: list[tuple[str, str]] = []
+    if name in ("strong", "b"):
+        tags.append(("b", ""))
+    elif name in ("em", "i"):
+        tags.append(("i", ""))
+    elif name == "u":
+        tags.append(("u", ""))
+    elif name in ("s", "strike", "del"):
+        tags.append(("s", ""))
+    elif name in ("pre", "code"):
+        tags.append(("code", ""))
+    elif name == "blockquote":
+        tags.append(("spoiler" if "spoiler" in classes else "quote", ""))
+    elif name in ("table", "tr", "td"):
+        tags.append((name, ""))
+    elif name in ("ul", "ol"):
+        tags.append(("list", ""))
+    elif name == "li":
+        return f"[*]{inner}\n"
+    elif name == "a":
+        url = href.removeprefix(_HREF_REDIRECTOR)
+        if url.startswith(("http://", "https://")):
+            tags.append(("url", f"={url}"))
+    elif name == "span":
+        for size_class in classes:
+            size_match = re.fullmatch(r"size(\d+)", str(size_class))
+            if size_match:
+                tags.append(("size", f"={size_match.group(1)}"))
+        tags.extend((tag, "") for pattern, tag in _SPAN_STYLES if pattern.search(style))
+        color_match = re.search(r"(?<![-\w])color:\s*([#\w]+)", style, re.IGNORECASE)
+        if color_match:
+            tags.append(("color", f"={color_match.group(1)}"))
+    elif name in ("div", "p"):
+        align_match = re.search(r"text-align:\s*(center|right)", style, re.IGNORECASE)
+        if align_match:
+            tags.append((align_match.group(1).lower(), ""))
+        elif "center" in classes:
+            tags.append(("center", ""))
+        elif inner and not inner.endswith("\n"):
+            inner += "\n"
+
+    for tag, value in reversed(tags):
+        inner = f"[{tag}{value}]{inner}[/{tag}]"
+    return inner
 
 
 class BJShare:
@@ -846,6 +927,138 @@ class BJShare:
                 if len(cells) >= 2 and label.casefold() in unidecode(cells[0].get_text(" ", strip=True)).casefold():
                     return cells[1].get_text(" ", strip=True)
         return ""
+
+    @staticmethod
+    def get_group_external_ids(soup: BeautifulSoup) -> tuple[int, int]:
+        """Return the IMDb and TMDb IDs linked in a group's "Informações" box."""
+        imdb_id = tmdb_id = 0
+        for box in soup.find_all("div", class_="box"):
+            header = box.find("div", class_="head")
+            if not header or "informa" not in unidecode(header.get_text()).lower():
+                continue
+            for link in box.find_all("a", href=True):
+                href = str(link["href"])
+                if not imdb_id and (match := re.search(r"imdb\.com/title/tt(\d+)", href, re.IGNORECASE)):
+                    imdb_id = int(match.group(1))
+                if not tmdb_id and (match := re.search(r"themoviedb\.org/(?:movie|tv)/(\d+)", href, re.IGNORECASE)):
+                    tmdb_id = int(match.group(1))
+        return imdb_id, tmdb_id
+
+    @staticmethod
+    def parse_torrent_details(cell: Tag) -> tuple[str, list[dict[str, str]], list[str]]:
+        """Return the BBCode description, screenshots and file names of one torrent's details cell.
+
+        The free-form description is the "Informações Adicionais" block of video and game uploads,
+        or the full-size block of books.
+        """
+        file_names: list[str] = []
+        file_table = cell.find("table", class_="filelist_table")
+        if file_table:
+            for row in file_table.find_all("tr"):
+                cells = row.find_all("td")
+                if len(cells) == 2 and "colhead_dark" not in (row.get("class") or []):
+                    file_names.append(cells[0].get_text(strip=True))
+
+        screenshots: list[dict[str, str]] = []
+        for link in cell.select("a.fancybox-thumbs[href]"):
+            image = link.find("img")
+            full_url = str(link["href"])
+            thumb_url = str(image.get("src") or full_url) if image else full_url
+            if full_url.startswith(("http://", "https://")):
+                screenshots.append({"img_url": thumb_url, "raw_url": full_url, "web_url": full_url})
+
+        quotes = cell.find_all("blockquote", recursive=False)
+        description_node = next((quote for quote in quotes if quote.get_text(strip=True).startswith("Informações Adicionais")), None)
+        description_node = description_node or next((quote for quote in quotes if "fullSize" in (quote.get("class") or [])), None)
+        description = ""
+        if description_node:
+            # Drop the "Shared with Upload-Assistant" style signatures of other uploads.
+            for link in description_node.find_all("a", href=re.compile(r"github\.com/[^/]+/Upload-Assistant", re.IGNORECASE)):
+                parent = link.parent
+                link.decompose()
+                if isinstance(parent, Tag) and parent is not description_node and not parent.get_text(strip=True):
+                    parent.decompose()
+            description = "".join(_bbcode_from_html(child) for child in description_node.children)
+            description = re.sub(r"^\s*Informações Adicionais:\s*", "", description).strip()
+        return description, screenshots, file_names
+
+    async def get_torrent_metadata(
+        self,
+        meta: Meta,
+        torrent_id: str,
+        skip_tracker_descriptions: bool = False,
+    ) -> tuple[int, int, int, int, str, str | None, str | None, list[dict[str, str]], str | list[str] | None]:
+        """Fetch IDs, description and screenshots of a known torrent with as little traffic as possible.
+
+        BJ-Share disables Gazelle's JSON ``torrent``/``torrentgroup`` actions, so this uses what the
+        site's own pages use: the permalink redirect (an empty 302) gives the group ID, and
+        ``ajax.php?action=torrent_content`` returns only that torrent's details. The group page is
+        loaded only for movies and TV, because their IMDb/TMDb IDs are shown only in its sidebar.
+        The result has the shape of ``Common.unit3d_torrent_info``.
+        """
+        empty: tuple[int, int, int, int, str, str | None, str | None, list[dict[str, str]], str | list[str] | None] = (0, 0, 0, 0, "", None, None, [], None)
+        if not str(torrent_id).isdigit():
+            return empty
+        cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
+        if not cookie_jar:
+            return empty
+        self.session.cookies = cookie_jar
+
+        logger.info(f"Searching for information on [bold cyan]{self.display_name}[/bold cyan] ({self.torrent_url}{torrent_id})")
+        imdb_id = tmdb_id = 0
+        cell: Tag | None = None
+        try:
+            redirect = await self.session.get(f"{self.base_url}/torrents.php", params={"torrentid": torrent_id}, follow_redirects=False)
+            location = redirect.headers.get("location", "")
+            if "login.php" in location:
+                logger.info(f"{self.tracker}: [bold red]Session cookies are invalid or expired.[/bold red]")
+                return empty
+            group_match = re.search(r"[?&]id=(\d+)", location)
+            if not group_match:
+                logger.info(f"{self.tracker}: [yellow]Torrent {torrent_id} was not found.[/yellow]")
+                return empty
+            group_id = group_match.group(1)
+
+            if meta.category in ("MOVIE", "TV"):
+                page = await self.session.get(f"{self.base_url}/torrents.php", params={"id": group_id, "torrentid": torrent_id})
+                page.raise_for_status()
+                soup = BeautifulSoup(page.text, "html.parser")
+                imdb_id, tmdb_id = self.get_group_external_ids(soup)
+                details_row = soup.find("tr", id=f"torrent_{torrent_id}")
+                cell = details_row.find("td") if details_row else None
+                if cell and not cell.find("blockquote", recursive=False):
+                    cell = None
+
+            if cell is None:
+                fragment = await self.session.get(f"{self.base_url}/ajax.php", params={"action": "torrent_content", "torrentid": torrent_id, "groupid": group_id})
+                fragment.raise_for_status()
+                cell = BeautifulSoup(fragment.text, "html.parser").find("td")
+        except httpx.HTTPError as error:
+            logger.info(f"{self.tracker}: [yellow]Could not fetch torrent {torrent_id}: {error}[/yellow]")
+            return empty
+
+        if not isinstance(cell, Tag):
+            return empty
+        raw_description, screenshots, file_names = self.parse_torrent_details(cell)
+        description = ""
+        imagelist: list[dict[str, str]] = []
+        if raw_description:
+            raw_descriptions = getattr(meta, "tracker_description_raw", {}) or {}
+            raw_descriptions[self.tracker] = raw_description
+            meta.tracker_description_raw = raw_descriptions
+            description, imagelist = BBCODE().clean_unit3d_description(raw_description, self.base_url)
+            description = description.strip()
+        known_images = {image["img_url"] for image in imagelist}
+        imagelist = [image for image in screenshots if image["img_url"] not in known_images] + imagelist
+        if skip_tracker_descriptions:
+            description = ""
+            if not meta.keep_images:
+                imagelist = []
+
+        file_name: str | list[str] | None = None
+        if file_names:
+            file_name = file_names[0] if len(file_names) == 1 else file_names[:5]
+        return tmdb_id, imdb_id, 0, 0, description, None, None, imagelist, file_name
 
     async def search_existing(self, meta: Meta) -> list[dict[str, str | list[str]]]:
         dupes: list[dict[str, str | list[str]]] = []
