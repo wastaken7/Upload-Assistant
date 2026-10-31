@@ -7,6 +7,7 @@ from urllib.parse import urlparse, urlunparse
 import aiofiles
 import httpx
 
+from src import payload_preview
 from src.cogs.redaction import Redaction
 from src.console import logger
 from src.get_desc import DescriptionBuilder
@@ -495,16 +496,18 @@ class MTeam:
         logger.info(f"{self.tracker}: Unknown or unsupported audio codec '{codec}', defaulting to AC3.")
         return ac3
 
-    async def fetch_data(self, meta: Meta) -> dict[str, Any]:
+    async def fetch_data(self, meta: Meta, preview: bool = False) -> dict[str, Any]:
         """
         https://test2.m-team.cc/api/swagger-ui/index.html#/種子/createOredit
+
+        A ``preview`` leaves out the description and MediaInfo.
         """
-        return {
+        data: dict[str, Any] = {
             # "torrent": 0,
             # "offer": 0,
             "name": await self.get_name(meta),
             "smallDescr": self.common.get_small_description(meta),
-            "descr": await self.generate_description(meta),
+            "descr": None if preview else await self.generate_description(meta),
             "category": self.get_category_id(meta),
             # "source": 0,
             # "medium": 0,
@@ -524,13 +527,49 @@ class MTeam:
             # "tags": "",
             # "file": "",
             # "nfo": "",
-            "mediainfo": await self.mediainfo(meta),
+            "mediainfo": None if preview else await self.mediainfo(meta),
             "mediaInfoAnalysisResult": True,
             # "labelsNew": ""
         }
+        return data
+
+    async def get_payload_preview(self, meta: Meta) -> payload_preview.TrackerPreview:
+        """The upload form as it is known before screenshots, for the Web UI to show and edit."""
+        specs = {
+            "name": payload_preview.text("Name"),
+            "smallDescr": payload_preview.text("Subtitle"),
+            "category": payload_preview.choice(
+                "Category",
+                [
+                    (401, "Movie/SD"),
+                    (419, "Movie/HD"),
+                    (420, "Movie/DVDiSo"),
+                    (421, "Movie/Blu-Ray"),
+                    (439, "Movie/Remux"),
+                    (403, "TV Series/SD"),
+                    (402, "TV Series/HD"),
+                    (438, "TV Series/BD"),
+                    (435, "TV Series/DVDiSo"),
+                    (405, "Anime"),
+                ],
+            ),
+            "standard": payload_preview.choice("Resolution", [(1, "1080p"), (2, "1080i"), (3, "720p"), (5, "SD"), (6, "4K"), (7, "8K")]),
+            "videoCodec": payload_preview.choice(
+                "Video codec", [(1, "H.264 (x264/AVC)"), (16, "H.265 (x265/HEVC)"), (2, "VC-1"), (4, "MPEG-2"), (3, "XviD"), (19, "AV1"), (21, "VP8/9")]
+            ),
+            "audioCodec": payload_preview.choice(
+                "Audio codec", [(6, "AAC"), (8, "AC3 (DD)"), (3, "DTS"), (11, "DTS-HD MA"), (12, "E-AC3 (DDP)"), (13, "E-AC3 Atmos"), (9, "TrueHD")]
+            ),
+            "imdb": payload_preview.text("IMDb ID"),
+            "douban": payload_preview.text("Douban ID"),
+            "anonymous": payload_preview.flag("Anonymous", on=True, off=False),
+            "mediaInfoAnalysisResult": payload_preview.flag("MediaInfo analysed", on=True, off=False),
+        }
+        deferred = {"descr": payload_preview.DESCRIPTION_NOTE, "mediainfo": "Read from the MediaInfo report at upload time"}
+        return payload_preview.describe(self.tracker, await self.fetch_data(meta, preview=True), specs, deferred=deferred)
 
     async def upload(self, meta: Meta) -> bool:
-        data = await self.fetch_data(meta)
+        data = payload_preview.apply_payload_edits(meta, self.tracker, await self.fetch_data(meta))
         response = None
 
         if not meta.debug:

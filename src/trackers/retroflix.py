@@ -7,6 +7,7 @@ from typing import Any, cast
 import aiofiles
 import httpx
 
+from src import payload_preview
 from src.cogs.redaction import Redaction
 from src.console import logger
 from src.get_desc import DescriptionBuilder
@@ -38,34 +39,24 @@ class RetroFlix:
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
 
-    async def upload(self, meta: Meta) -> bool:
-        """Upload a torrent to RETROFLIX tracker.
+    async def get_data(self, meta: Meta, preview: bool = False) -> dict[str, Any]:
+        """Build the upload form; a ``preview`` leaves out the MediaInfo/BDInfo and screenshots."""
+        mi_dump = bd_dump = None
+        if not preview:
+            await DescriptionBuilder(self.tracker, self.config).general_description_generator(
+                meta,
+                mediainfo=False,
+                nfo=False,
+                signature=self.forum_link,
+            )
+            if meta.bdinfo:
+                async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/BD_SUMMARY_00.txt", encoding="utf-8") as f:
+                    bd_dump = await f.read()
+            else:
+                async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/MEDIAINFO.txt", encoding="utf-8") as f:
+                    mi_dump = await f.read()
 
-        Args:
-            meta: Metadata dictionary containing torrent information (name, mediainfo, screenshots, etc.).
-            disctype: Type of disc (e.g., 'BD', 'DVD').
-
-        Returns:
-            True if upload was successful, False otherwise.
-        """
-        common = Common(config=self.config)
-        await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
-        await DescriptionBuilder(self.tracker, self.config).general_description_generator(
-            meta,
-            mediainfo=False,
-            nfo=False,
-            signature=self.forum_link,
-        )
-        if meta.bdinfo:
-            mi_dump = None
-            async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/BD_SUMMARY_00.txt", encoding="utf-8") as f:
-                bd_dump = await f.read()
-        else:
-            async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/MEDIAINFO.txt", encoding="utf-8") as f:
-                mi_dump = await f.read()
-            bd_dump = None
-
-        screenshots = [image["raw_url"] for image in meta.image_list if image["raw_url"] is not None]
+        screenshots = [] if preview else [image["raw_url"] for image in meta.image_list if image["raw_url"] is not None]
 
         imdb_url_value = meta.imdb_info.get("imdb_url", "")
         imdb_url = str(imdb_url_value) if imdb_url_value else ""
@@ -84,6 +75,36 @@ class RetroFlix:
             "screenshots": screenshots,
             "isAnonymous": self.config["TRACKERS"][self.tracker]["anon"],
         }
+        return json_data
+
+    async def get_payload_preview(self, meta: Meta) -> payload_preview.TrackerPreview:
+        """The upload form as it is known before screenshots, for the Web UI to show and edit."""
+        specs = {
+            "name": payload_preview.text("Name"),
+            "description": payload_preview.readonly("Description"),
+            "nfo": payload_preview.readonly("NFO"),
+            "url": payload_preview.text("IMDb URL"),
+            "descr": payload_preview.readonly("Plot"),
+            "poster": payload_preview.text("Poster URL", max_length=1000),
+            "type": payload_preview.choice("Category", {"MOVIE": "401", "TV": "402"}, by_label=True),
+            "isAnonymous": payload_preview.flag("Anonymous", on=True, off=False),
+        }
+        deferred = {"mediaInfo": "Read from the MediaInfo/BDInfo report at upload time", "screenshots": "Uploaded after this question"}
+        return payload_preview.describe(self.tracker, await self.get_data(meta, preview=True), specs, deferred=deferred)
+
+    async def upload(self, meta: Meta) -> bool:
+        """Upload a torrent to RETROFLIX tracker.
+
+        Args:
+            meta: Metadata dictionary containing torrent information (name, mediainfo, screenshots, etc.).
+            disctype: Type of disc (e.g., 'BD', 'DVD').
+
+        Returns:
+            True if upload was successful, False otherwise.
+        """
+        common = Common(config=self.config)
+        await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
+        json_data = payload_preview.apply_payload_edits(meta, self.tracker, await self.get_data(meta))
 
         async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}].torrent", "rb") as binary_file:
             binary_file_data = await binary_file.read()

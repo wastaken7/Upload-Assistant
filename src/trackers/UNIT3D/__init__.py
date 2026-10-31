@@ -4,11 +4,12 @@ import json
 import platform
 import re
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, ClassVar, cast
 
 import aiofiles
 import httpx
 
+from src import payload_preview, unit3d_catalogs
 from src.api_key_expiry import record_api_key_expiry, warn_api_key_expiry
 from src.artwork import is_valid_image_bytes
 from src.cogs.redaction import Redaction
@@ -32,6 +33,8 @@ class UNIT3D:
     supported_categories: tuple[str, ...] = ("TV", "MOVIE")
     tracker: str = ""
     banned_groups: tuple[str, ...] = ()
+    # Options of ID fields whose getters ignore mapping_only, for the Web UI preview.
+    payload_choices: ClassVar[dict[str, tuple[tuple[str, str], ...]]] = {}
     base_url: str = ""
     pending_url: str = ""
     search_url: str = ""
@@ -530,12 +533,11 @@ class UNIT3D:
         sticky = await self.get_flag(meta, "sticky")
         return {"sticky": sticky}
 
-    async def get_data(self, meta: Meta) -> dict[str, str]:
+    async def get_data(self, meta: Meta, preview: bool = False) -> dict[str, str]:
+        """Build the upload form; a ``preview`` leaves out the description, MediaInfo and BDInfo."""
         results = await asyncio.gather(
             self.get_name(meta),
-            self.get_description(meta),
-            self.get_mediainfo(meta),
-            self.get_bdinfo(meta),
+            *(() if preview else (self.get_description(meta), self.get_mediainfo(meta), self.get_bdinfo(meta))),
             self.get_category_id(meta),
             self.get_type_id(meta),
             self.get_resolution_id(meta),
@@ -574,6 +576,64 @@ class UNIT3D:
             merged["exclusive"] = exclusive_flag
 
         return merged
+
+    async def get_payload_specs(self, meta: Meta) -> dict[str, payload_preview.Spec]:
+        """Labels and edit controls for this tracker's upload form fields."""
+        flags = {
+            "anonymous": "Anonymous",
+            "personal_release": "Personal release",
+            "internal": "Internal",
+            "stream": "Stream optimized",
+            "sd": "SD",
+            "featured": "Featured",
+            "doubleup": "Double upload",
+            "sticky": "Sticky",
+            "exclusive": "Exclusive",
+            "mod_queue_opt_in": "Moderation queue",
+            "draft_queue_opt_in": "Draft",
+            "draft": "Draft",
+        }
+        specs: dict[str, payload_preview.Spec] = {key: payload_preview.flag(label) for key, label in flags.items()}
+        specs.update(
+            {
+                "name": payload_preview.text("Name"),
+                "keywords": payload_preview.text("Keywords"),
+                "tmdb": payload_preview.number("TMDB ID"),
+                "imdb": payload_preview.number("IMDb ID"),
+                "tvdb": payload_preview.number("TVDB ID"),
+                "mal": payload_preview.number("MAL ID"),
+                "igdb": payload_preview.number("IGDB ID"),
+                "season_number": payload_preview.number("Season"),
+                "episode_number": payload_preview.number("Episode"),
+                "free": payload_preview.choice("Freeleech", [(str(percent), f"{percent}%") for percent in (0, 25, 50, 75, 100)]),
+                "description": payload_preview.readonly("Description"),
+                "mediainfo": payload_preview.readonly("MediaInfo"),
+                "bdinfo": payload_preview.readonly("BDInfo"),
+            }
+        )
+        for key, label, getter in (
+            ("category_id", "Category", self.get_category_id),
+            ("type_id", "Type", self.get_type_id),
+            ("resolution_id", "Resolution", self.get_resolution_id),
+        ):
+            spec = await payload_preview.mapping_choice(label, getter, meta, key)
+            if spec is None and key in self.payload_choices:
+                spec = payload_preview.choice(label, self.payload_choices[key])
+            if spec is not None:
+                specs[key] = spec
+        specs["region_id"] = payload_preview.choice("Region", unit3d_catalogs.region_choices(self.tracker))
+        specs["distributor_id"] = payload_preview.choice("Distributor", unit3d_catalogs.distributor_choices(self.tracker))
+        return specs
+
+    async def get_payload_preview(self, meta: Meta) -> payload_preview.TrackerPreview:
+        """The upload form as it is known before screenshots, for the Web UI to show and edit."""
+        data = await self.get_data(meta, preview=True)
+        deferred = {"description": payload_preview.DESCRIPTION_NOTE}
+        if meta.bdinfo:
+            deferred["bdinfo"] = "Read from the BDInfo report at upload time"
+        elif not (meta.category in ["GAME", "BOOK"] and not meta.audiobook):
+            deferred["mediainfo"] = "Read from the MediaInfo report at upload time"
+        return payload_preview.describe(self.tracker, data, await self.get_payload_specs(meta), deferred=deferred)
 
     async def get_image_file(self, image_path: str | Path, max_size: int | None = None) -> tuple[str, bytes, str] | None:
         """Read an image unchanged and return it with a content type verified from its signature."""
@@ -640,7 +700,7 @@ class UNIT3D:
         return files
 
     async def upload(self, meta: Meta) -> bool:
-        data = await self.get_data(meta)
+        data = payload_preview.apply_payload_edits(meta, self.tracker, await self.get_data(meta))
         torrent_file_path = await self.common.get_base_torrent_path(meta, self.tracker, self.tracker_config)
         if torrent_file_path is None:
             raise FileNotFoundError("No selected base torrent is available")

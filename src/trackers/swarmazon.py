@@ -4,6 +4,7 @@ from typing import Any, cast
 import aiofiles
 import httpx
 
+from src import payload_preview
 from src.cogs.redaction import Redaction
 from src.console import console, logger
 from src.meta import Meta
@@ -36,10 +37,10 @@ class Swarmazon:
     async def get_type_id(self, media_type: str) -> str:
         return {"BluRay": "3", "Web": "1", "DVD": "2"}.get(media_type, "0")
 
-    async def upload(self, meta: Meta) -> bool:
-        common = Common(config=self.config)
-        await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
-        await self.edit_desc(meta)
+    async def get_data(self, meta: Meta, preview: bool = False) -> dict[str, Any]:
+        """Build the upload form; a ``preview`` leaves out the description and MediaInfo/BDInfo."""
+        if not preview:
+            await self.edit_desc(meta)
         cat_id = ""
         sub_cat_id = ""
 
@@ -63,33 +64,27 @@ class Swarmazon:
             sub_cat_id = "6" if meta.tv_pack else "5"
             # todo need to do a check for docs and add as subcat
 
-        mi_dump: str | None
-        bd_dump: str | None
-        if meta.bdinfo:
-            mi_dump = None
+        mi_dump: str | None = None
+        bd_dump: str | None = None
+        desc = ""
+        if not preview:
+            if meta.bdinfo:
+                async with aiofiles.open(
+                    f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/BD_SUMMARY_00.txt",
+                    encoding="utf-8",
+                ) as bd_file:
+                    bd_dump = await bd_file.read()
+            else:
+                async with aiofiles.open(
+                    f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/MEDIAINFO.txt",
+                    encoding="utf-8",
+                ) as mi_file:
+                    mi_dump = await mi_file.read()
             async with aiofiles.open(
-                f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/BD_SUMMARY_00.txt",
+                f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt",
                 encoding="utf-8",
-            ) as bd_file:
-                bd_dump = await bd_file.read()
-        else:
-            async with aiofiles.open(
-                f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/MEDIAINFO.txt",
-                encoding="utf-8",
-            ) as mi_file:
-                mi_dump = await mi_file.read()
-            bd_dump = None
-        async with aiofiles.open(
-            f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt",
-            encoding="utf-8",
-        ) as desc_file:
-            desc = await desc_file.read()
-
-        async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}].torrent", "rb") as f:
-            tfile = await f.read()
-
-        # uploading torrent file.
-        files = {"torrent": (f"{meta.name}.torrent", tfile)}
+            ) as desc_file:
+                desc = await desc_file.read()
 
         # adding bd_dump to description if it exits and adding empty string to mediainfo
         if bd_dump:
@@ -106,6 +101,44 @@ class Swarmazon:
             "description": desc,
             "media_info": mi_dump,
         }
+        return data
+
+    async def get_payload_preview(self, meta: Meta) -> payload_preview.TrackerPreview:
+        """The upload form as it is known before screenshots, for the Web UI to show and edit."""
+        specs = {
+            "name": payload_preview.text("Name"),
+            "category_id": payload_preview.choice("Category", [("1", "Movie"), ("2", "TV"), ("7", "Anime")]),
+            "type_id": payload_preview.choice(
+                "Type",
+                [
+                    ("1", "Web"),
+                    ("2", "DVD"),
+                    ("3", "BluRay"),
+                    ("5", "TV episode"),
+                    ("6", "TV pack"),
+                    ("27", "Shounen"),
+                    ("28", "Seinen"),
+                    ("29", "Shoujo"),
+                    ("30", "Josei"),
+                    ("31", "Kodomo"),
+                    ("47", "Mina"),
+                ],
+            ),
+            "media_ref": payload_preview.text("IMDb ID"),
+        }
+        deferred = {"description": payload_preview.DESCRIPTION_NOTE, "media_info": "Read from the MediaInfo report at upload time"}
+        return payload_preview.describe(self.tracker, await self.get_data(meta, preview=True), specs, deferred=deferred)
+
+    async def upload(self, meta: Meta) -> bool:
+        common = Common(config=self.config)
+        await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
+        data = payload_preview.apply_payload_edits(meta, self.tracker, await self.get_data(meta))
+
+        async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}].torrent", "rb") as f:
+            tfile = await f.read()
+
+        # uploading torrent file.
+        files = {"torrent": (f"{meta.name}.torrent", tfile)}
 
         if not meta.debug:
             try:

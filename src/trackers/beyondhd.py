@@ -8,6 +8,7 @@ import aiofiles
 import httpx
 from rich.markup import escape
 
+from src import payload_preview
 from src.cogs.redaction import Redaction
 from src.console import logger
 from src.description_review import get_base_description
@@ -88,37 +89,21 @@ class BEYONDHD:
         api_key = str(self.tracker_config.get("api_key", "")).strip()
         self.requests_url = f"{self.base_url}/api/requests/{api_key}"
 
-    async def upload(self, meta: Meta) -> bool:
-        common = Common(config=self.config)
-        await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
+    async def get_data(self, meta: Meta, preview: bool = False) -> dict[str, Any]:
+        """Build the upload form; a ``preview`` leaves out the description."""
         cat_id = await self.get_cat_id(meta.category)
         source_id = await self.get_source(str(meta.source))
         type_id = await self.get_type(meta)
         draft = await self.get_live(meta)
-        await self.edit_desc(meta)
+        desc = None
+        if not preview:
+            await self.edit_desc(meta)
+            async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt", encoding="utf-8") as f:
+                desc = await f.read()
         tags = await self.get_tags(meta)
         custom, edition = await self.get_edition(meta, tags)
         bhd_name = await self.get_name(meta)
         anon = 0 if meta.anon == 0 and not self.config["TRACKERS"][self.tracker].get("anon", False) else 1
-
-        mi_dump = None
-        if meta.is_disc == "BDMV":
-            async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/BD_SUMMARY_00.txt", encoding="utf-8") as f:
-                mi_dump = await f.read()
-        else:
-            async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/MEDIAINFO.txt", encoding="utf-8") as f:
-                mi_dump = await f.read()
-
-        async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt", encoding="utf-8") as f:
-            desc = await f.read()
-        torrent_file_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}].torrent"
-        async with aiofiles.open(torrent_file_path, "rb") as f:
-            torrent_bytes = await f.read()
-
-        files = {
-            "mediainfo": mi_dump,
-            "file": ("torrent.torrent", torrent_bytes, "application/x-bittorrent"),
-        }
 
         data: dict[str, Any] = {
             "name": bhd_name,
@@ -147,8 +132,7 @@ class BEYONDHD:
             data["pack"] = 1
         if meta.season == "S00":
             data["special"] = 1
-        allowed_regions = ["AUS", "CAN", "CEE", "CHN", "ESP", "EUR", "FRA", "GBR", "GER", "HKG", "ITA", "JPN", "KOR", "NOR", "NLD", "RUS", "TWN", "USA"]
-        if meta.region in allowed_regions:
+        if meta.region in self.allowed_regions:
             data["region"] = meta.region
         if custom is True:
             data["custom_edition"] = edition
@@ -156,6 +140,56 @@ class BEYONDHD:
             data["edition"] = edition
         if len(tags) > 0:
             data["tags"] = ",".join(tags)
+        return data
+
+    async def get_payload_preview(self, meta: Meta) -> payload_preview.TrackerPreview:
+        """The upload form as it is known before screenshots, for the Web UI to show and edit."""
+        types = ["UHD 100", "UHD 66", "UHD 50", "BD 50", "BD 25", "DVD 9", "DVD 5", "UHD Remux", "BD Remux", "DVD Remux"]
+        types += ["2160p", "1080p", "1080i", "720p", "576p", "576i", "540p", "480p", "Other"]
+        sources = ["Blu-ray", "HD-DVD", "WEB", "HDTV", "DVD"]
+        specs = {
+            "name": payload_preview.text("Name"),
+            "category_id": payload_preview.choice("Category", {"MOVIE": "1", "TV": "2"}, by_label=True),
+            "type": payload_preview.choice("Type", types, role="release_type"),
+            "source": payload_preview.choice("Source", sources),
+            "imdb_id": payload_preview.number("IMDb ID"),
+            "tmdb_id": payload_preview.number("TMDB ID"),
+            "anon": payload_preview.flag("Anonymous", on=1, off=0),
+            "sd": payload_preview.flag("SD", on=1, off=0),
+            "live": payload_preview.flag("Live (off sends a draft)", on=1, off=0),
+            "internal": payload_preview.flag("Internal", on=1, off=None),
+            "pack": payload_preview.flag("Season pack", on=1, off=None),
+            "special": payload_preview.flag("Special", on=1, off=None),
+            "region": payload_preview.choice("Region", self.allowed_regions),
+            "edition": payload_preview.choice("Edition", ("Collector", "Director", "Extended", "Limited", "Special", "Theatrical", "Uncut", "Unrated")),
+            "custom_edition": payload_preview.text("Custom edition"),
+            "tags": payload_preview.readonly("Tags"),
+        }
+        data = await self.get_data(meta, preview=True)
+        return payload_preview.describe(self.tracker, data, specs, deferred={"description": payload_preview.DESCRIPTION_NOTE})
+
+    async def upload(self, meta: Meta) -> bool:
+        common = Common(config=self.config)
+        await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
+        data = payload_preview.apply_payload_edits(meta, self.tracker, await self.get_data(meta))
+        bhd_name = data["name"]
+
+        mi_dump = None
+        if meta.is_disc == "BDMV":
+            async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/BD_SUMMARY_00.txt", encoding="utf-8") as f:
+                mi_dump = await f.read()
+        else:
+            async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/MEDIAINFO.txt", encoding="utf-8") as f:
+                mi_dump = await f.read()
+
+        torrent_file_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}].torrent"
+        async with aiofiles.open(torrent_file_path, "rb") as f:
+            torrent_bytes = await f.read()
+
+        files = {
+            "mediainfo": mi_dump,
+            "file": ("torrent.torrent", torrent_bytes, "application/x-bittorrent"),
+        }
         headers = {
             "User-Agent": f"{meta.ua_name} {(meta.current_version if meta.current_version is not None else 'github.com/wastaken7/Upload-Assistant')} ({platform.system()} {platform.release()})"
         }
@@ -210,6 +244,8 @@ class BEYONDHD:
                 return False
         else:
             return False
+
+    allowed_regions = ("AUS", "CAN", "CEE", "CHN", "ESP", "EUR", "FRA", "GBR", "GER", "HKG", "ITA", "JPN", "KOR", "NOR", "NLD", "RUS", "TWN", "USA")
 
     async def get_cat_id(self, category_name: str) -> str:
         return {

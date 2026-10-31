@@ -11,6 +11,7 @@ import httpx
 from rich.markup import escape
 from unidecode import unidecode
 
+from src import payload_preview
 from src.bbcode import BBCODE
 from src.cogs.redaction import Redaction
 from src.console import console, logger
@@ -247,43 +248,21 @@ class HDBits:
                 hdb_name = f"{year} {hdb_name}"
         return f"{title} {hdb_name}".strip()
 
-    async def upload(self, meta: Meta) -> bool | None:
-        common = Common(config=self.config)
-        await self.edit_desc(meta)
-        hdb_name = await self.get_name(meta)
-        cat_id = await self.get_type_category_id(meta)
-        codec_id = await self.get_type_codec_id(meta)
-        medium_id = await self.get_type_medium_id(meta)
-        hdb_tags = await self.get_tags(meta)
-
-        for each in (cat_id, codec_id, medium_id):
-            if each == 0:
-                logger.info(f"{self.tracker}: [bold red]Something didn't map correctly, or this content is not allowed on {self.tracker}")
-                return None
-        if "Dual-Audio" in meta.audio and not (meta.anime or not meta.is_disc):
-            logger.info(f"{self.tracker}: [bold red]Dual-Audio Encodes are not allowed for non-anime and non-disc content")
-            return None
-
-        async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt", encoding="utf-8") as desc_file:
-            hdb_desc = await desc_file.read()
-
-        torrent_file_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}].torrent"
-        await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
-
-        # Proceed with the upload process
-        async with aiofiles.open(torrent_file_path, "rb") as torrent_file:
-            torrent_bytes = await torrent_file.read()
-        torrent_file_name = unidecode(Path(meta.video).name.replace(" ", ".")) if len(meta.filelist) == 1 else unidecode(Path(str(meta.path)).name.replace(" ", "."))
-        files = {"file": (f"{torrent_file_name}.torrent", torrent_bytes, "application/x-bittorrent")}
+    async def get_data(self, meta: Meta, preview: bool = False) -> dict[str, Any]:
+        """Build the upload form; a ``preview`` leaves out the description and MediaInfo."""
+        hdb_desc = ""
+        if not preview:
+            async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt", encoding="utf-8") as desc_file:
+                hdb_desc = await desc_file.read()
         data: dict[str, Any] = {
-            "name": hdb_name,
-            "category": cat_id,
-            "codec": codec_id,
-            "medium": medium_id,
+            "name": await self.get_name(meta),
+            "category": await self.get_type_category_id(meta),
+            "codec": await self.get_type_codec_id(meta),
+            "medium": await self.get_type_medium_id(meta),
             "origin": 0,
             "descr": hdb_desc.rstrip(),
             "techinfo": "",
-            "tags[]": hdb_tags,
+            "tags[]": await self.get_tags(meta),
         }
 
         # Internal
@@ -292,7 +271,7 @@ class HDBits:
         ):
             data["origin"] = 1
         # If not BDMV fill mediainfo
-        if meta.is_disc != "BDMV":
+        if not preview and meta.is_disc != "BDMV":
             mediainfo_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/MEDIAINFO_CLEANPATH.txt"
             async with aiofiles.open(mediainfo_path, encoding="utf-8") as mediainfo_file:
                 data["techinfo"] = await mediainfo_file.read()
@@ -307,6 +286,50 @@ class HDBits:
             data["tvdb_season"] = meta.season_int
             data["tvdb_episode"] = meta.episode_int
         # aniDB
+        return data
+
+    async def get_payload_preview(self, meta: Meta) -> payload_preview.TrackerPreview:
+        """The upload form as it is known before screenshots, for the Web UI to show and edit."""
+        specs = {
+            "name": payload_preview.text("Name"),
+            "category": payload_preview.choice(
+                "Category", [(1, "Movie"), (2, "TV"), (3, "Documentary"), (4, "Music"), (5, "Sport"), (6, "Audio Track"), (7, "XXX"), (8, "Misc/Demo")]
+            ),
+            "codec": payload_preview.choice("Codec", [(1, "H.264"), (2, "MPEG-2"), (3, "VC-1"), (4, "XviD"), (5, "HEVC"), (6, "VP9")]),
+            "medium": payload_preview.choice("Medium", [(1, "Blu-ray / HD DVD"), (3, "Encode"), (4, "Capture"), (5, "Remux"), (6, "WEB-DL")]),
+            "origin": payload_preview.flag("Internal", on=1, off=0),
+            "tags[]": payload_preview.readonly("Tags"),
+            "tvdb": payload_preview.number("TVDB ID"),
+            "imdb": payload_preview.text("IMDb URL"),
+            "tvdb_season": payload_preview.number("Season"),
+            "tvdb_episode": payload_preview.number("Episode"),
+        }
+        deferred = {"descr": payload_preview.DESCRIPTION_NOTE}
+        if meta.is_disc != "BDMV":
+            deferred["techinfo"] = "Read from the MediaInfo report at upload time"
+        return payload_preview.describe(self.tracker, await self.get_data(meta, preview=True), specs, deferred=deferred)
+
+    async def upload(self, meta: Meta) -> bool | None:
+        common = Common(config=self.config)
+        await self.edit_desc(meta)
+        data = payload_preview.apply_payload_edits(meta, self.tracker, await self.get_data(meta))
+
+        for each in (data["category"], data["codec"], data["medium"]):
+            if each == 0:
+                logger.info(f"{self.tracker}: [bold red]Something didn't map correctly, or this content is not allowed on {self.tracker}")
+                return None
+        if "Dual-Audio" in meta.audio and not (meta.anime or not meta.is_disc):
+            logger.info(f"{self.tracker}: [bold red]Dual-Audio Encodes are not allowed for non-anime and non-disc content")
+            return None
+
+        torrent_file_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}].torrent"
+        await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
+
+        # Proceed with the upload process
+        async with aiofiles.open(torrent_file_path, "rb") as torrent_file:
+            torrent_bytes = await torrent_file.read()
+        torrent_file_name = unidecode(Path(meta.video).name.replace(" ", ".")) if len(meta.filelist) == 1 else unidecode(Path(str(meta.path)).name.replace(" ", "."))
+        files = {"file": (f"{torrent_file_name}.torrent", torrent_bytes, "application/x-bittorrent")}
 
         url = f"{self.base_url}/upload/upload"
         # Submit

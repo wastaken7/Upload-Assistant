@@ -5121,6 +5121,21 @@ html[data-ua-shape="square"]
   box-shadow: inset 3px 0 0 var(--ua-run-gui-tone);
 }
 
+/* An upload data field changed on the confirmation prompt. */
+.ua-run-gui-payload-row[data-changed="true"] {
+  background: color-mix(in srgb, var(--ua-copper-bright) 12%, transparent);
+  box-shadow: inset 3px 0 0 var(--ua-copper-bright);
+}
+
+.ua-run-gui-payload-advice {
+  color: var(--ua-upload-muted);
+  cursor: help;
+}
+
+.ua-run-gui-payload-row :is(.ua-run-gui-payload-warning, [data-tone="error"]) {
+  color: color-mix(in srgb, var(--ua-run-gui-tone) 80%, var(--ua-upload-text));
+}
+
 .ua-run-gui-mode-overlay {
   border-radius: 0.6rem;
   box-shadow: 0 4px 14px rgb(0 0 0 / 0.28);

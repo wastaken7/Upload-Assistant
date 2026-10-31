@@ -8,6 +8,7 @@ from typing import Any, ClassVar, cast
 import aiofiles
 import httpx
 
+from src import payload_preview
 from src.artwork import is_valid_image_bytes
 from src.cogs.redaction import Redaction
 from src.console import logger
@@ -230,12 +231,13 @@ class DirtyBytes:
             )
         return dupes
 
-    async def get_data(self, meta: Meta, attach_screenshots: bool) -> dict[str, Any]:
+    async def get_data(self, meta: Meta, attach_screenshots: bool, preview: bool = False) -> dict[str, Any]:
+        """Build the upload form; a ``preview`` leaves out the description and MediaInfo."""
         anon = meta.anon or self.tracker_config.get("anon", False)
         data: dict[str, Any] = {
             "category": self.get_category_id(meta),
             "anonymousUpload": "1" if anon else "0",
-            "nfo": await self.generate_description(meta, attach_screenshots),
+            "nfo": "" if preview else await self.generate_description(meta, attach_screenshots),
             # UA uploads unpacked files; mark scene releases as unpacked from their RARs.
             "unrar": "1" if meta.scene else "0",
         }
@@ -249,16 +251,66 @@ class DirtyBytes:
             "content_tags": ", ".join(tags[:12]),
             "language": ", ".join(dict.fromkeys(languages)),
             "release_year": str(year) if year else "",
-            "mediainfo": await self.get_mediainfo(meta),
+            "mediainfo": "" if preview else await self.get_mediainfo(meta),
             "firstpic": self.get_firstpic(meta),
         }
         data.update({key: value for key, value in optional.items() if value})
         return data
 
+    async def get_payload_preview(self, meta: Meta) -> payload_preview.TrackerPreview:
+        """The upload form as it is known before screenshots, for the Web UI to show and edit."""
+        specs = {
+            "category": payload_preview.choice(
+                "Category",
+                [
+                    (1, "Movie SD"),
+                    (2, "Movie 720p"),
+                    (3, "Movie 1080p"),
+                    (4, "Movie 1440p"),
+                    (5, "Movie 2160p"),
+                    (6, "Movie 4320p"),
+                    (7, "Scene SD"),
+                    (8, "Scene 720p"),
+                    (9, "Scene 1080p"),
+                    (10, "Scene 1440p"),
+                    (11, "Scene 2160p"),
+                    (12, "Scene 4320p"),
+                    (13, "VR movie 1080"),
+                    (14, "VR movie 1440"),
+                    (15, "VR movie 2160"),
+                    (16, "VR movie 2880"),
+                    (27, "VR movie 3456"),
+                    (17, "VR movie 3600"),
+                    (28, "VR movie 3840"),
+                    (18, "VR movie 4320"),
+                    (19, "VR scene 1080"),
+                    (20, "VR scene 1440"),
+                    (21, "VR scene 2160"),
+                    (22, "VR scene 2880"),
+                    (29, "VR scene 3456"),
+                    (23, "VR scene 3600"),
+                    (30, "VR scene 3840"),
+                    (24, "VR scene 4320"),
+                    (26, "Pack"),
+                ],
+            ),
+            "anonymousUpload": payload_preview.flag("Anonymous"),
+            "unrar": payload_preview.flag("Unpacked from RARs"),
+            "studio": payload_preview.text("Studio", max_length=120),
+            "performers": payload_preview.text("Performers", max_length=1000),
+            "content_tags": payload_preview.text("Tags", max_length=1000),
+            "language": payload_preview.text("Language"),
+            "release_year": payload_preview.number("Year"),
+            "firstpic": payload_preview.text("Cover URL", max_length=1000),
+        }
+        deferred = {"nfo": payload_preview.DESCRIPTION_NOTE, "mediainfo": "Read from the MediaInfo report at upload time"}
+        data = await self.get_data(meta, attach_screenshots=False, preview=True)
+        return payload_preview.describe(self.tracker, data, specs, deferred=deferred, name=await self.get_name(meta))
+
     async def upload(self, meta: Meta) -> bool:
         tracker_status = meta.tracker_status.setdefault(self.tracker, {})
         images, attach_screenshots = await self.get_images(meta)
-        data = await self.get_data(meta, attach_screenshots)
+        data = payload_preview.apply_payload_edits(meta, self.tracker, await self.get_data(meta, attach_screenshots))
 
         if meta.debug:
             logger.info(f"{self.tracker}: Request Data:")

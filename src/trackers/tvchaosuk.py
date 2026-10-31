@@ -14,7 +14,7 @@ import httpx
 import requests
 import tmdbsimple as tmdb
 
-from src import webui_events
+from src import payload_preview, webui_events
 from src.bbcode import BBCODE
 from src.cogs.redaction import Redaction
 from src.console import logger
@@ -512,9 +512,8 @@ class TVChaosUK:
 
         return await self.append_country_code(meta, tvc_name)
 
-    async def upload(self, meta: Meta) -> bool | None:
-        common = Common(config=self.config)
-
+    async def get_data(self, meta: Meta, preview: bool = False) -> dict[str, str | int]:
+        """Build the upload form; a ``preview`` leaves out the description and MediaInfo/BDInfo."""
         raw_images = get_tracker_image_collection(meta, self.tracker, "screenshots")
         image_list_seq: list[Any]
         if isinstance(raw_images, list):
@@ -525,8 +524,8 @@ class TVChaosUK:
             image_list_seq = []
         image_list = [cast(dict[str, Any], img) for img in image_list_seq]
 
-        await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
-        await self.get_tmdb_data(meta)
+        if not preview:
+            await self.get_tmdb_data(meta)
 
         # load MediaInfo.json
         try:
@@ -537,7 +536,8 @@ class TVChaosUK:
             mi = {}
 
         cat_id = await self.get_cat_id(meta.genres) if meta.category == "TV" else "44"
-        meta.language_checked = True
+        if not preview:
+            meta.language_checked = True
 
         # Foreign category check based on TMDB original_language only
         original_lang = str(meta.original_language)
@@ -552,42 +552,25 @@ class TVChaosUK:
 
         anon = 0 if meta.anon == 0 and not self.config["TRACKERS"][self.tracker].get("anon", False) else 1
 
-        if meta.bdinfo:
-            mi_dump = None
-            bd_dump = await self.read_file(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/BD_SUMMARY_00.txt")
-        else:
-            mi_dump = await self.read_file(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/MEDIAINFO.txt")
-            bd_dump = None
+        mi_dump = bd_dump = desc = None
+        if not preview:
+            if meta.bdinfo:
+                bd_dump = await self.read_file(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/BD_SUMMARY_00.txt")
+            else:
+                mi_dump = await self.read_file(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/MEDIAINFO.txt")
 
-        # build description and capture return instead of reopening file
-        descfile_path = Path(meta.base_dir) / "tmp" / meta.uuid / f"[{self.tracker}]DESCRIPTION.txt"
-        desc = await self.edit_desc(meta, self.tracker, self.signature, image_list)
+            # build description and capture return instead of reopening file
+            descfile_path = Path(meta.base_dir) / "tmp" / meta.uuid / f"[{self.tracker}]DESCRIPTION.txt"
+            desc = await self.edit_desc(meta, self.tracker, self.signature, image_list)
 
-        if not desc:
-            logger.warning(f"{self.tracker}: [yellow]Warning: tracker-specific description file not found at {descfile_path}")
-            desc = ""
-
-        # Naming logic is handled by get_name
-        tvc_name = await self.get_name(meta)
-
-        upload_to_tvc = True
-        if meta.unattended is False:
-            upload_to_tvc = cli_ui.ask_yes_no(f"Upload to {self.tracker} with the name {tvc_name}?", default=False)
-            if not upload_to_tvc:
-                with webui_events.field_prompt(
-                    f"{self.tracker} name",
-                    {"Current name": tvc_name},
-                    focus="Current name",
-                    hint="The name to upload with. Leaving it blank keeps the current name.",
-                    actions=[("", "Keep the current name")],
-                    placeholder=tvc_name,
-                ):
-                    tvc_name = cli_ui.ask_string("Please enter New Name:") or tvc_name
-                upload_to_tvc = cli_ui.ask_yes_no(f"Upload to {self.tracker} with the name {tvc_name}?", default=False)
+            if not desc:
+                logger.warning(f"{self.tracker}: [yellow]Warning: tracker-specific description file not found at {descfile_path}")
+                desc = ""
 
         data: dict[str, str | int] = {
-            "name": tvc_name,
-            "description": desc,
+            # Naming logic is handled by get_name
+            "name": await self.get_name(meta),
+            "description": desc or "",
             "mediainfo": mi_dump if mi_dump else "",
             "bdinfo": bd_dump if bd_dump else "",
             "category_id": cat_id,
@@ -611,6 +594,74 @@ class TVChaosUK:
         if meta.category == "TV":
             data["season_number"] = meta.season_int if meta.season_int is not None else "0"
             data["episode_number"] = meta.episode_int if meta.episode_int is not None else "0"
+        if preview:
+            del data["description"], data["mediainfo"], data["bdinfo"]
+        return data
+
+    async def get_payload_preview(self, meta: Meta) -> payload_preview.TrackerPreview:
+        """The upload form as it is known before screenshots, for the Web UI to show and edit."""
+        flags = {
+            "anonymous": "Anonymous",
+            "stream": "Stream optimized",
+            "sd": "SD",
+            "personal_release": "Personal release",
+            "internal": "Internal",
+            "featured": "Featured",
+            "doubleup": "Double upload",
+            "sticky": "Sticky",
+        }
+        specs = {key: payload_preview.flag(label, on=1, off=0) for key, label in flags.items()}
+        specs.update(
+            {
+                "name": payload_preview.text("Name"),
+                "category_id": payload_preview.choice("Category", [(value, name) for name, value in self.tv_type_map.items()]),
+                "type": payload_preview.choice(
+                    "Resolution",
+                    role="resolution",
+                    options=[
+                        "HD1080p",
+                        "HD720p",
+                        "SD",
+                        "HD1080p Pack",
+                        "HD720p Pack",
+                        "SD Pack",
+                    ],
+                ),
+                "tmdb": payload_preview.number("TMDB ID"),
+                "imdb": payload_preview.number("IMDb ID"),
+                "tvdb": payload_preview.number("TVDB ID"),
+                "mal": payload_preview.number("MAL ID"),
+                "igdb": payload_preview.number("IGDB ID"),
+                "keywords": payload_preview.text("Keywords", max_length=1000),
+                "free": payload_preview.choice("Freeleech", [(percent, f"{percent}%") for percent in (0, 25, 50, 75, 100)]),
+                "season_number": payload_preview.number("Season"),
+                "episode_number": payload_preview.number("Episode"),
+            }
+        )
+        deferred = {"description": payload_preview.DESCRIPTION_NOTE, "mediainfo": "Read from the MediaInfo/BDInfo report at upload time"}
+        return payload_preview.describe(self.tracker, await self.get_data(meta, preview=True), specs, deferred=deferred)
+
+    async def upload(self, meta: Meta) -> bool | None:
+        common = Common(config=self.config)
+        await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
+        data = payload_preview.apply_payload_edits(meta, self.tracker, await self.get_data(meta))
+        tvc_name = str(data["name"])
+
+        upload_to_tvc = True
+        if meta.unattended is False:
+            upload_to_tvc = cli_ui.ask_yes_no(f"Upload to {self.tracker} with the name {tvc_name}?", default=False)
+            if not upload_to_tvc:
+                with webui_events.field_prompt(
+                    f"{self.tracker} name",
+                    {"Current name": tvc_name},
+                    focus="Current name",
+                    hint="The name to upload with. Leaving it blank keeps the current name.",
+                    actions=[("", "Keep the current name")],
+                    placeholder=tvc_name,
+                ):
+                    tvc_name = cli_ui.ask_string("Please enter New Name:") or tvc_name
+                upload_to_tvc = cli_ui.ask_yes_no(f"Upload to {self.tracker} with the name {tvc_name}?", default=False)
+        data["name"] = tvc_name
 
         if upload_to_tvc is False:
             return None

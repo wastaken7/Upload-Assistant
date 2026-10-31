@@ -8,6 +8,7 @@ import aiofiles
 import httpx
 from bs4 import BeautifulSoup
 
+from src import payload_preview
 from src.console import logger
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder
@@ -444,7 +445,8 @@ class FunFile:
             return {"nfo": (nfo_path.name, nfo_path.open("rb"), "application/octet-stream")}
         return {}
 
-    async def get_data(self, meta: Meta) -> dict[str, Any]:
+    async def get_data(self, meta: Meta, preview: bool = False) -> dict[str, Any]:
+        """Build the upload form; a ``preview`` leaves out the description."""
         languages = await self.languages(meta)
         self.file_information(meta)
 
@@ -452,7 +454,7 @@ class FunFile:
             "MAX_FILE_SIZE": 10000000,
             "type": self.get_type_id(meta),
             "tags": "",
-            "descr": await self.generate_description(meta),
+            "descr": None if preview else await self.generate_description(meta),
         }
 
         if meta.anime:
@@ -495,6 +497,19 @@ class FunFile:
                 )
 
         return data
+
+    async def get_payload_preview(self, meta: Meta) -> payload_preview.TrackerPreview:
+        """The upload form as it is known before screenshots, for the Web UI to show and edit."""
+        specs = {
+            "MAX_FILE_SIZE": payload_preview.readonly("Max file size"),
+            "type": payload_preview.choice("Category", [("19", "Movies"), ("7", "TV"), ("44", "Anime")]),
+            "tags": payload_preview.text("Tags"),
+            "pack": payload_preview.flag("Pack", on=1, off=0),
+            "movie_imdb": payload_preview.text("IMDb URL"),
+            "tv_imdb": payload_preview.text("IMDb URL"),
+        }
+        data = await self.get_data(meta, preview=True)
+        return payload_preview.describe(self.tracker, data, specs, deferred={"descr": payload_preview.DESCRIPTION_NOTE}, name=await self.get_name(meta))
 
     async def upload(self, meta: Meta) -> bool:
         cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)

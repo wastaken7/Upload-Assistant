@@ -16,7 +16,7 @@ import click
 import httpx
 from rich.markup import escape
 
-from src import webui_events
+from src import payload_preview, webui_events
 from src.bbcode import BBCODE
 from src.cogs.redaction import PathAwareEncoder, Redaction
 from src.console import logger, prompt_in_thread
@@ -1550,17 +1550,19 @@ class PassThePopcorn:
         summary = {"Tracker": self.tracker, "Release": meta.name or meta.title, question.title: ""}
         return await ask(meta, replace(question, summary=summary, focus=question.title, tracker=self.tracker))
 
-    async def fill_upload_form(self, group_id: int | str | None, meta: Meta) -> tuple[str, dict[str, Any]]:
+    async def fill_upload_form(self, group_id: int | str | None, meta: Meta, preview: bool = False) -> tuple[str, dict[str, Any]]:
+        """Build the upload form; a ``preview`` asks nothing, sends nothing and stops before the group."""
         resolution, other_resolution = self.get_resolution(meta)
-        await self.edit_desc(meta)
-        file_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt"
         desc = ""
-        try:
-            Path(file_path).stat()  # Ensures the file is accessible
-            async with aiofiles.open(file_path, encoding="utf-8") as f:
-                desc = await f.read()
-        except OSError as e:
-            logger.info(f"{self.tracker}: File error: {e}", extra={"markup": False})
+        if not preview:
+            await self.edit_desc(meta)
+            file_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt"
+            try:
+                Path(file_path).stat()  # Ensures the file is accessible
+                async with aiofiles.open(file_path, encoding="utf-8") as f:
+                    desc = await f.read()
+            except OSError as e:
+                logger.info(f"{self.tracker}: File error: {e}", extra={"markup": False})
         ptp_subtitles = self.get_subtitles(meta)
         no_audio_found = False
         english_audio = False
@@ -1594,8 +1596,11 @@ class PassThePopcorn:
                 else:
                     english_audio = False
 
-        ptp_trumpable = None
-        if meta.hardcoded_subs:
+        ptp_trumpable: Any = None
+        if preview and (meta.hardcoded_subs or ((no_audio_found or not english_audio) and not any(x in [3, 50] for x in ptp_subtitles))):
+            # Whether it is trumpable is asked after this question.
+            ptp_trumpable = payload_preview.Later("Asked after this question")
+        elif meta.hardcoded_subs:
             ptp_trumpable, ptp_subtitles = await self.get_trumpable(meta, ptp_subtitles)
             if ptp_trumpable and 50 in ptp_trumpable:
                 ptp_trumpable.remove(50)
@@ -1637,7 +1642,7 @@ class PassThePopcorn:
             "nfo_text": "",
             "subtitles[]": ptp_subtitles,
             "trumpable[]": ptp_trumpable,
-            "AntiCsrfToken": await self.get_anti_csrf_token(meta),
+            "AntiCsrfToken": "" if preview else await self.get_anti_csrf_token(meta),
         }
         if data["remaster_year"] != "" or data["remaster_title"] != "":
             data["remaster"] = "on"
@@ -1655,6 +1660,8 @@ class PassThePopcorn:
             data["imdb"] = "0"
         else:
             data["imdb"] = str(imdb_id_int).zfill(7)
+        if preview:
+            return "", data
         if group_id is None:  # If need to make new group
             url = f"{self.base_url}/upload.php"
             if data["imdb"] == "0":
@@ -1752,7 +1759,62 @@ class PassThePopcorn:
         # PTP doesn't use a custom releasename in the upload form, so just return the filename
         return meta.name
 
+    async def get_payload_preview(self, meta: Meta) -> payload_preview.TrackerPreview:
+        """The upload form as it is known before screenshots, for the Web UI to show and edit."""
+        _url, data = await self.fill_upload_form(None, meta, preview=True)
+        specs = {
+            "submit": payload_preview.readonly("Submit"),
+            "remaster_year": payload_preview.text("Edition year"),
+            "remaster_title": payload_preview.text("Edition title"),
+            "type": payload_preview.choice(
+                "Type",
+                role="none",
+                options=[
+                    "Feature Film",
+                    "Short Film",
+                    "Miniseries",
+                    "Stand-up Comedy",
+                    "Live Performance",
+                    "Movie Collection",
+                ],
+            ),
+            "codec": payload_preview.readonly("Codec"),
+            "other_codec": payload_preview.text("Codec"),
+            "container": payload_preview.readonly("Container"),
+            "other_container": payload_preview.text("Container"),
+            "resolution": payload_preview.choice(
+                "Resolution",
+                [
+                    "NTSC",
+                    "PAL",
+                    "480p",
+                    "576p",
+                    "720p",
+                    "1080i",
+                    "1080p",
+                    "2160p",
+                    "Other",
+                ],
+            ),
+            "other_resolution": payload_preview.text("Other resolution"),
+            "source": payload_preview.readonly("Source"),
+            "other_source": payload_preview.text("Source"),
+            "nfo_text": payload_preview.readonly("NFO"),
+            "subtitles[]": payload_preview.readonly("Subtitles"),
+            "trumpable[]": payload_preview.readonly("Trumpable"),
+            "remaster": payload_preview.flag("Edition information", on="on", off=None),
+            "scene": payload_preview.flag("Scene", on="on", off=None),
+            "internalrip": payload_preview.flag("Personal rip", on="on", off=None),
+            "imdb": payload_preview.text("IMDb ID"),
+        }
+        deferred = {
+            "release_desc": payload_preview.DESCRIPTION_NOTE,
+            "groupid": "Found on the tracker at upload time; a new group also sends its title, cover and tags",
+        }
+        return payload_preview.describe(self.tracker, data, specs, deferred=deferred)
+
     async def upload(self, meta: Meta, url: str, data: dict[str, Any]) -> bool:
+        data = payload_preview.apply_payload_edits(meta, self.tracker, data)
         common = Common(config=self.config)
         torrent_file_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}].torrent"
         await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)

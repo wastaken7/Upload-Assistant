@@ -8,6 +8,7 @@ import aiofiles
 import bencodepy
 import httpx
 
+from src import payload_preview
 from src.console import logger
 from src.meta import Meta
 from src.trackers.common import Common
@@ -56,31 +57,25 @@ class Flood:
         self.common = Common(config)
         self.api_key = self.config["TRACKERS"].get(self.tracker, {}).get("api_key", "").strip()
 
-    async def upload(self, meta: Meta) -> bool:
-        announce_url = self.config["TRACKERS"].get(self.tracker, {}).get("announce_url", "")
-        await self.common.create_torrent_for_upload(meta, self.tracker, self.source_flag, announce_url=announce_url)
+    async def get_data(self, meta: Meta, preview: bool = False) -> dict[str, Any]:
+        """Build the upload form; a ``preview`` leaves out the description and MediaInfo/BDInfo."""
         media_type = await self.get_media_type(meta)
-        await self.edit_desc(meta)
+        if not preview:
+            await self.edit_desc(meta)
         fld_name = await self.get_name(meta)
         tmdb_id = await self.get_prefixed_tmdb_id(meta)
 
         anon = "checked" if self.config["TRACKERS"].get(self.tracker, {}).get("anon", False) else ""
 
-        mi_file_path = Path(meta.base_dir) / "tmp" / meta.uuid / ("BD_SUMMARY_00.txt" if meta.bdinfo else "MEDIAINFO.txt")
+        mi_dump = desc = None
+        if not preview:
+            mi_file_path = Path(meta.base_dir) / "tmp" / meta.uuid / ("BD_SUMMARY_00.txt" if meta.bdinfo else "MEDIAINFO.txt")
+            async with aiofiles.open(mi_file_path, encoding="utf-8") as f:
+                mi_dump = await f.read()
 
-        async with aiofiles.open(mi_file_path, encoding="utf-8") as f:
-            mi_dump = await f.read()
-
-        desc_file_path = Path(meta.base_dir) / "tmp" / meta.uuid / f"[{self.tracker}]DESCRIPTION.txt"
-        async with aiofiles.open(desc_file_path, encoding="utf-8") as f:
-            desc = await f.read()
-
-        torrent_file = Path(meta.base_dir) / "tmp" / meta.uuid / f"[{self.tracker}].torrent"
-        files: dict[str, bytes] = {}
-        if torrent_file.exists():
-            # We read binary for httpx
-            async with aiofiles.open(torrent_file, "rb") as open_torrent:
-                files["meta_info"] = await open_torrent.read()
+            desc_file_path = Path(meta.base_dir) / "tmp" / meta.uuid / f"[{self.tracker}]DESCRIPTION.txt"
+            async with aiofiles.open(desc_file_path, encoding="utf-8") as f:
+                desc = await f.read()
 
         data: dict[str, Any] = {
             "name": fld_name,
@@ -92,6 +87,32 @@ class Flood:
             "media_type": media_type,
             "edition": meta.edition,
         }
+        return data
+
+    async def get_payload_preview(self, meta: Meta) -> payload_preview.TrackerPreview:
+        """The upload form as it is known before screenshots, for the Web UI to show and edit."""
+        specs = {
+            "name": payload_preview.text("Name"),
+            "imdb_id": payload_preview.number("IMDb ID"),
+            "tmdb_id": payload_preview.text("TMDB ID"),
+            "anonymous": payload_preview.flag("Anonymous", on="checked", off=""),
+            "media_type": payload_preview.choice("Media type", ("movie", "show_episode", "show_season"), role="category"),
+            "edition": payload_preview.text("Edition"),
+        }
+        deferred = {"description": payload_preview.DESCRIPTION_NOTE, "media_info": "Read from the MediaInfo/BDInfo report at upload time"}
+        return payload_preview.describe(self.tracker, await self.get_data(meta, preview=True), specs, deferred=deferred)
+
+    async def upload(self, meta: Meta) -> bool:
+        announce_url = self.config["TRACKERS"].get(self.tracker, {}).get("announce_url", "")
+        await self.common.create_torrent_for_upload(meta, self.tracker, self.source_flag, announce_url=announce_url)
+        data = payload_preview.apply_payload_edits(meta, self.tracker, await self.get_data(meta))
+
+        torrent_file = Path(meta.base_dir) / "tmp" / meta.uuid / f"[{self.tracker}].torrent"
+        files: dict[str, bytes] = {}
+        if torrent_file.exists():
+            # We read binary for httpx
+            async with aiofiles.open(torrent_file, "rb") as open_torrent:
+                files["meta_info"] = await open_torrent.read()
 
         headers = {"User-Agent": f"Upload Assistant/2.2 ({platform.system()} {platform.release()})", "Authorization": f"Bearer {self.api_key}"}
 

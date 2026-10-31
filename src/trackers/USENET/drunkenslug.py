@@ -7,6 +7,7 @@ from typing import Any
 import aiofiles
 import httpx
 
+from src import payload_preview
 from src.console import logger
 from src.meta import Meta
 from src.trackers.common import Common
@@ -125,6 +126,11 @@ class DrunkenSlug:
 
     def _parse_dupes_from_response(self, response_text: str) -> list[dict[str, Any]]:
         return parse_newznab_dupes(response_text)
+
+    async def get_payload_preview(self, meta: Meta) -> payload_preview.TrackerPreview:
+        """Only the NZB file is submitted; there are no fields to change."""
+        _meta = meta
+        return payload_preview.describe(self.tracker, {}, deferred={"nzb": "The NZB file created for this release is the whole submission"})
 
     async def upload(self, meta: Meta) -> bool:
         status_map = meta.tracker_status

@@ -9,6 +9,7 @@ import aiofiles
 import httpx
 from rich.markup import escape
 
+from src import payload_preview
 from src.cogs.redaction import Redaction
 from src.console import logger
 from src.get_desc import DescriptionBuilder
@@ -277,6 +278,36 @@ class Anthelion:
 
         return ant_type
 
+    async def get_payload_preview(self, meta: Meta) -> payload_preview.TrackerPreview:
+        """The upload form as it is known before screenshots, for the Web UI to show and edit."""
+        data: dict[str, Any] = {"type": await self.get_type(meta), "action": "upload", "tmdbid": meta.tmdb, "flags[]": await self.get_flags(meta)}
+        if meta.is_disc == "BDMV":
+            data["audioformat"] = await self.get_audio(meta)
+        if meta.scene:
+            data["scene"] = 1
+        release_group = await self.get_release_group(meta)
+        if release_group and release_group not in self.banned_groups:
+            data["releasegroup"] = release_group
+        if meta.anon or self.tracker_config.get("anon", False):
+            data["anonymous"] = 1
+        specs = {
+            "type": payload_preview.choice("Type", [(0, "Feature Film"), (1, "Short Film")], role="none"),
+            "action": payload_preview.readonly("Action"),
+            "tmdbid": payload_preview.number("TMDB ID"),
+            "flags[]": payload_preview.readonly("Flags"),
+            "audioformat": payload_preview.text("Audio format"),
+            "scene": payload_preview.flag("Scene", on=1, off=None),
+            "releasegroup": payload_preview.text("Release group"),
+            "anonymous": payload_preview.flag("Anonymous", on=1, off=None),
+        }
+        deferred = {
+            "tags": "Chosen in a question after this one when needed",
+            "release_desc": payload_preview.DESCRIPTION_NOTE,
+            "bdinfo" if meta.is_disc == "BDMV" else "mediainfo": "Read from the MediaInfo/BDInfo report at upload time",
+            "screenshots": "Uploaded after this question",
+        }
+        return payload_preview.describe(self.tracker, data, specs, deferred=deferred)
+
     async def upload(self, meta: Meta) -> bool:
         await self.common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
         flags = await self.get_flags(meta)
@@ -350,6 +381,7 @@ class Anthelion:
             data.update({"screenshots": "\n".join([x["raw_url"] for x in meta.image_list][:4])})
             if meta.ant_user_tags:
                 data.update({"flagchangereason": "User prompted to add tags manually"})
+        data = payload_preview.apply_payload_edits(meta, self.tracker, data)
 
         headers = {
             "User-Agent": f"{meta.ua_name} {(meta.current_version if meta.current_version is not None else 'github.com/wastaken7/Upload-Assistant')} ({platform.system()} {platform.release()})"

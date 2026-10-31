@@ -1,6 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import re
-from typing import Any
+from typing import Any, ClassVar
 
 import aiofiles
 
@@ -16,6 +16,35 @@ class Locadora(UNIT3D):
     """
     LOCADORA is a BRAZILIAN Private Torrent Tracker for MOVIES / TV / ANIME
     """
+
+    # Options of the ID fields, offered in the Web UI preview (the getters ignore mapping_only).
+    payload_choices: ClassVar[dict[str, tuple[tuple[str, str], ...]]] = {
+        "category_id": (
+            ("1", "MOVIE"),
+            ("2", "TV"),
+            ("6", "ANIME"),
+        ),
+        "type_id": (
+            ("1", "DISC"),
+            ("2", "REMUX"),
+            ("3", "ENCODE"),
+            ("4", "WEBDL"),
+            ("5", "WEBRIP"),
+            ("6", "HDTV"),
+        ),
+        "resolution_id": (
+            ("1", "4320p"),
+            ("2", "2160p"),
+            ("3", "1080p"),
+            ("4", "1080i"),
+            ("5", "720p"),
+            ("6", "576p"),
+            ("7", "576i"),
+            ("8", "480p"),
+            ("9", "480i"),
+            ("10", "Other"),
+        ),
+    }
 
     tracker = "LOCADORA"
     display_name = "Locadora"

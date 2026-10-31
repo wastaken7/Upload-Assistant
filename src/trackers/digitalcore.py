@@ -6,6 +6,7 @@ from typing import Any, cast
 import aiofiles
 import httpx
 
+from src import payload_preview
 from src.cogs.redaction import Redaction
 from src.console import logger
 from src.get_desc import DescriptionBuilder
@@ -227,10 +228,11 @@ class DigitalCore:
                     return str(raw_url)
         return ""
 
-    async def fetch_data(self, meta: Meta) -> dict[str, Any]:
+    async def fetch_data(self, meta: Meta, preview: bool = False) -> dict[str, Any]:
+        """Build the upload form; a ``preview`` leaves out the description and MediaInfo."""
         anon = "1" if meta.anon or self.config["TRACKERS"][self.tracker].get("anon", False) else "0"
 
-        return {
+        data: dict[str, Any] = {
             "anonymousUpload": anon,
             "category": self.get_category_id(meta),
             "firstpic": await self.get_firstpic(meta),
@@ -238,16 +240,61 @@ class DigitalCore:
             "gameUrl": meta.steam_url or meta.igdb_url,
             "imdbId": meta.imdb_tt,
             "language": meta.book_language,
-            "mediainfo": await self.mediainfo(meta),
-            "nfo": await self.generate_description(meta),
+            "mediainfo": None if preview else await self.mediainfo(meta),
+            "nfo": None if preview else await self.generate_description(meta),
             "p2p": "0",
             "reqid": "0",
             "section": "new",
             "unrar": "1",
         }
+        return data
+
+    async def get_payload_preview(self, meta: Meta) -> payload_preview.TrackerPreview:
+        """The upload form as it is known before screenshots, for the Web UI to show and edit."""
+        specs = {
+            "anonymousUpload": payload_preview.flag("Anonymous"),
+            "category": payload_preview.choice(
+                "Category",
+                [
+                    (1, "Movies/DVDR"),
+                    (2, "Movies/SD"),
+                    (3, "Movies/BluRay"),
+                    (4, "Movies/2160p"),
+                    (5, "Movies/720p"),
+                    (6, "Movies/1080p"),
+                    (38, "Movies/UHD BluRay"),
+                    (8, "TV/720p"),
+                    (9, "TV/1080p"),
+                    (10, "TV/SD"),
+                    (11, "TV/DVDR"),
+                    (12, "TV/Packs"),
+                    (13, "TV/2160p"),
+                    (14, "TV/BluRay"),
+                    (22, "Music/MP3"),
+                    (23, "Music/FLAC"),
+                    (25, "Games/PC"),
+                    (26, "Games/Console"),
+                    (27, "Games/Mac"),
+                    (28, "E-books"),
+                    (44, "Audiobooks"),
+                ],
+            ),
+            "firstpic": payload_preview.text("Cover URL", max_length=1000),
+            "frileech": payload_preview.flag("Freeleech"),
+            "gameUrl": payload_preview.text("Game URL", max_length=1000),
+            "imdbId": payload_preview.text("IMDb ID"),
+            "language": payload_preview.readonly("Language"),
+            "p2p": payload_preview.flag("P2P"),
+            "reqid": payload_preview.number("Request ID"),
+            "section": payload_preview.readonly("Section"),
+            "unrar": payload_preview.flag("Unpacked from RARs"),
+        }
+        deferred = {"mediainfo": "Read from the MediaInfo report at upload time", "nfo": payload_preview.DESCRIPTION_NOTE}
+        data = await self.fetch_data(meta, preview=True)
+        return payload_preview.describe(self.tracker, data, specs, deferred=deferred, name=await self.get_name(meta))
 
     async def upload(self, meta: Meta) -> bool:
-        data = await self.fetch_data(meta)
+        data = payload_preview.apply_payload_edits(meta, self.tracker, await self.fetch_data(meta))
         torrent_title = await self.get_name(meta)
         response = None
 

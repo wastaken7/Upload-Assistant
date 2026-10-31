@@ -7,6 +7,7 @@ from typing import Any, cast
 import aiofiles
 import httpx
 
+from src import payload_preview
 from src.cogs.redaction import Redaction
 from src.console import logger
 from src.meta import Meta
@@ -202,7 +203,8 @@ class Vultu:
 
         return dupes
 
-    async def get_data(self, meta: Meta, work: str) -> dict[str, Any]:
+    async def get_data(self, meta: Meta, work: str, preview: bool = False) -> dict[str, Any]:
+        """Build the upload form; a ``preview`` leaves out the screenshots and MediaInfo."""
         anon = bool(meta.anon) or bool(self.tracker_config.get("anon", False))
         data: dict[str, Any] = {
             "work": work,
@@ -210,11 +212,31 @@ class Vultu:
             "anime": "true" if meta.anime and work.startswith("tmdb:") else "false",
             "anonymous": "true" if anon else "false",
         }
+        if preview:
+            return data
         if screenshots := self._screenshot_urls(meta):
             data["screenshots"] = screenshots
         if mediainfo := await self.get_mediainfo(meta):
             data["mediainfo"] = mediainfo
         return data
+
+    async def get_payload_preview(self, meta: Meta) -> payload_preview.TrackerPreview:
+        """The upload form as it is known before screenshots, for the Web UI to show and edit."""
+        deferred = {"screenshots": "Uploaded after this question", "mediainfo": "Read from the MediaInfo report at upload time"}
+        # Without a TMDB or IGDB ID the work is looked up on Vultu, which only happens at upload time.
+        if str(meta.category).upper() == "GAME" or meta.tmdb or meta.tmdb_id:
+            work = await self.get_work(meta)
+        else:
+            work = ""
+            deferred = {"work": payload_preview.FROM_TRACKER_NOTE, **deferred}
+        specs = {
+            "work": payload_preview.text("Work"),
+            "name": payload_preview.text("Name"),
+            "anime": payload_preview.flag("Anime", on="true", off="false"),
+            "anonymous": payload_preview.flag("Anonymous", on="true", off="false"),
+        }
+        data = await self.get_data(meta, work, preview=True)
+        return payload_preview.describe(self.tracker, data, specs, deferred=deferred)
 
     async def upload(self, meta: Meta) -> bool:
         tracker_status = meta.tracker_status.setdefault(self.tracker, {})
@@ -224,7 +246,7 @@ class Vultu:
             tracker_status["status_message"] = "data error: Could not determine the TMDB/IGDB work required by Vultu."
             return False
 
-        data = await self.get_data(meta, work)
+        data = payload_preview.apply_payload_edits(meta, self.tracker, await self.get_data(meta, work))
         screenshot_count = len(data.get("screenshots", []))
         if str(meta.category).upper() in ("MOVIE", "TV") and screenshot_count < self.min_screenshots:
             tracker_status["status_message"] = f"data error: Vultu requires at least {self.min_screenshots} https screenshot URLs, found {screenshot_count}."

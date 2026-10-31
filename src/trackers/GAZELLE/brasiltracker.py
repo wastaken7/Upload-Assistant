@@ -15,6 +15,7 @@ from bs4 import BeautifulSoup
 from langcodes.tag_parser import LanguageTagError
 from rich.markup import escape
 
+from src import payload_preview
 from src.console import logger
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder, html_to_bbcode
@@ -36,6 +37,8 @@ class BrasilTracker:
     source_flag = "BT"
     base_url = "https://brasiltracker.org"
     auth_token: str | None = None
+    # Set while building the Web UI preview: the description, MediaInfo and screenshots are left out.
+    preview_only = False
     torrent_url = f"{base_url}/torrents.php?id="
     ultimate_lang_map: ClassVar[dict[str, str]] = {}
     supported_categories = ("TV", "MOVIE", "BOOK", "GAME")
@@ -612,6 +615,8 @@ class BrasilTracker:
         return "", ""
 
     async def get_description(self, meta: Meta) -> str:
+        if self.preview_only:
+            return payload_preview.Later(payload_preview.DESCRIPTION_NOTE)
         builder = DescriptionBuilder(self.tracker, self.config, "pt-BR")
         # Set episode_tmdb_data on meta for general_description_generator to pick it up
         meta.episode_tmdb_data = self.episode_tmdb_data
@@ -787,6 +792,8 @@ class BrasilTracker:
         return dupes
 
     async def get_media_info(self, meta: Meta) -> str:
+        if self.preview_only:
+            return payload_preview.Later("Read from the MediaInfo/BDInfo report at upload time")
         info_file_path = ""
         info_file_path = (
             f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/BD_SUMMARY_00.txt"
@@ -878,6 +885,8 @@ class BrasilTracker:
         return keyword_map.get(source_type.lower(), "Outro")
 
     async def get_screens(self, meta: Meta) -> list[str]:
+        if self.preview_only:
+            return cast(list[str], payload_preview.Later(payload_preview.SCREENSHOTS_NOTE))
         menu_images = meta.menu_images
         image_list = meta.image_list
         spectrograms_images = meta.spectrograms_images
@@ -921,7 +930,125 @@ class BrasilTracker:
 
         return "N/A"
 
+    async def get_payload_preview(self, meta: Meta) -> payload_preview.TrackerPreview:
+        """The upload form as it is known before screenshots, for the Web UI to show and edit."""
+        self.preview_only = True
+        try:
+            data = await self.get_data(meta)
+        finally:
+            self.preview_only = False
+        return payload_preview.describe(self.tracker, data, self.get_payload_specs(meta), name_key="")
+
+    def get_payload_specs(self, meta: Meta) -> dict[str, payload_preview.Spec]:
+        """The upload form's fields: drop-downs offer only the values this tracker sends."""
+
+        categories = {"0": "Filme", "1": "Série", "5": "Anime", "8": "Jogo", "9": "Revista", "11": "Quadrinho", "12": "E-book", "13": "Esporte", "15": "Audiobook"}
+        video_formats = ("AVI", "M2TS", "M4V", "MKV", "MP4", "TS", "VOB", "WMV", "Outro")
+        audio_formats = ("ACC", "AC3", "DFF", "MP2", "DSF", "FLAC", "M4A", "M4B", "MP3", "OGG", "WAV", "WMA", "Outro")
+        book_formats = ("CBR", "DOCX", "DOC", "ePUB", "GIF", "IMG", "ISO", "JPG", "MOBI", "NRG", "PDF", "PNG", "AZW3", "ePub", "KFX", "Outro")
+        game_formats = ("APK", "EXE", "ISO", "RAR/ZIP", "BIN", "NRG", "NDF", "Outros")
+        qualities = (
+            "BD100",
+            "BD66",
+            "BD50",
+            "BD25",
+            "DVD9",
+            "DVD5",
+            "Remux",
+            "WEB-DL",
+            "WEBRip",
+            "WEB",
+            "Blu-ray",
+            "BDRip",
+            "BRRip",
+            "HDTV",
+            "SDTV",
+            "DVDRip",
+            "HD-DVD",
+            "TVRip",
+            "Outro",
+        )
+        video_codecs = ("x265", "x265 HDR", "H.265", "H.265 HDR", "x264", "H.264", "VP9", "XviD", "MPEG-2", "VC-1", "Outro")
+        audio_codecs = ("DTS-X", "E-AC-3 JOC", "TrueHD", "DTS-HD", "PCM", "FLAC", "DTS-ES", "DTS", "E-AC-3", "AC3", "AAC", "Opus", "Vorbis", "MP3", "MP2", "Outro")
+        game_languages = ("Alemão", "Espanhol", "Francês", "Inglês", "Japonês", "Português", "Russo", "Multilinguagem")
+        game_genres = (
+            "Ação", "Aventura", "Arcade", "Jogos de Cartas e Tabuleiro", "Corrida", "Esporte", "Estratégia Baseada em Turnos",
+            "RTS - Estratégia em Tempo Real", "Tiro", "Luta", "Moba", "Musical", "Plataforma", "Puzzle", "RPG", "Simulador",
+            "Terror", "Hack and Slash Beat em Up", "Indie", "Point and Click", "Ficção",
+        )  # fmt: skip
+        nin_term = (bytes([110, 105, 110, 116, 101, 110, 100, 111]).decode()).capitalize()
+        platforms = (
+            "PC",
+            "Celular/Tablet",
+            "Emulador",
+            "PS1",
+            "PS2",
+            "PS3",
+            "PS4",
+            "PS Vita",
+            f"{nin_term} Switch",
+            "Wii",
+            "Wii U",
+            "Xbox Clássico",
+            "Xbox 360",
+            "Multiplataforma",
+        )
+        if meta.category == "GAME":
+            formats, languages = game_formats, game_languages
+        elif meta.category == "BOOK":
+            formats = audio_formats if meta.audiobook else book_formats
+            languages = ("Português", "Inglês", "Italiano", "Alemão", "Espanhol", "Japonês", "Outro")
+        else:
+            formats, languages = video_formats, ()
+        audiobook_bitrates = ("Lossless", "96", "128", "192", "256", "320", "Outro")
+        months = ("Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro")
+        specs: dict[str, payload_preview.Spec] = {
+            "submit": payload_preview.readonly("Submit"),
+            "year": payload_preview.number("Ano"),
+            "title": payload_preview.text("Título", role="title"),
+            "title_br": payload_preview.text("Título brasileiro"),
+            "type": payload_preview.choice("Categoria", categories.items()),
+            "tags": payload_preview.text("Tags", max_length=1000),
+            "format": payload_preview.choice("Formato", formats),
+            "bitrate": payload_preview.choice("Qualidade", (audiobook_bitrates if meta.audiobook else qualities), role="none" if meta.audiobook else "release_type"),
+            "audio_c": payload_preview.choice("Codec de áudio", audio_codecs),
+            "video_c": payload_preview.choice("Codec de vídeo", video_codecs),
+            "audio": payload_preview.choice("Áudio", ("Nacional", "Dual Audio", "Dublado", "Legendado", "Outro")),
+            "legenda": payload_preview.choice("Legenda em português", ("Sim", "Nao")),
+            "3d": payload_preview.choice("3D", ("Sim", "Nao")),
+            "adulto": payload_preview.choice("Adulto", [("0", "Não"), ("1", "Sim")]),
+            "diretor": payload_preview.text("Diretor", max_length=1000),
+            "banda": payload_preview.text("Autor", max_length=1000),
+            "duracao": payload_preview.text("Duração"),
+            "resolucao_1": payload_preview.number("Largura"),
+            "resolucao_2": payload_preview.number("Altura"),
+            "imdb_input": payload_preview.text("IMDb ID"),
+            "youtube": payload_preview.text("Trailer", max_length=1000),
+            "versao": payload_preview.choice("Versão", ("", "Director's Cut", "Theatrical Cut", "Extended", "Uncut", "Unrated", "IMAX", "Noir", "Remastered")),
+            "tipo": payload_preview.choice("Tipo", [("ep_individual", "Episódio"), ("completa", "Temporada completa")]),
+            "temporada": payload_preview.text("Temporada"),
+            "temporada_e": payload_preview.text("Temporada do episódio"),
+            "episodio": payload_preview.text("Episódio"),
+            "edicao": payload_preview.number("Edição"),
+            "paginas": payload_preview.number("Páginas"),
+            "mensal": payload_preview.flag("Mensal", on="on", off=None),
+            "mes_resvista": payload_preview.choice("Mês", months),
+            "genero_jogo": payload_preview.choice("Gênero", game_genres),
+            "plataforma_jogo": payload_preview.choice("Plataforma", platforms),
+            "sys_jogo": payload_preview.choice("Sistema", ("Windows", "Mac", "Linux", "Android", "Console")),
+            "versaoapp": payload_preview.text("Versão do jogo"),
+            "scene": payload_preview.flag("Scene", on="on", off=None),
+            "anonymous": payload_preview.flag("Anônimo", on="1", off=None),
+            "internal": payload_preview.flag("Interno", on=1, off=None),
+        }
+        if languages:
+            specs["idioma_ori"] = payload_preview.choice("Idioma", languages)
+        if not meta.magazine:
+            del specs["mensal"], specs["mes_resvista"]
+        return specs
+
     async def get_data(self, meta: Meta) -> dict[str, Any]:
+        """Build the upload form; while ``preview_only`` is set, the description, MediaInfo and screenshots are left out."""
         await self.load_localized_data(meta)  #  keep this line FIRST to ensure localized data is loaded before proceeding
         description = await self.get_description(meta)
         original_title, brazilian_title = self.get_titles(meta)
@@ -932,7 +1059,7 @@ class BrasilTracker:
             "year": str(meta.year) if meta.year is not None else "",
             "title": original_title,
             "type": await self.get_type(meta),
-            "tags": await self.common.get_portuguese_tags(meta, tracker=self.tracker, tmdb_data=self.main_tmdb_data),
+            "tags": await payload_preview.unless_asked(self.common.get_portuguese_tags(meta, tracker=self.tracker, tmdb_data=self.main_tmdb_data)),
         }
 
         if meta.category == "GAME":
@@ -1043,12 +1170,13 @@ class BrasilTracker:
                     }
                 )
         elif meta.category in ("MOVIE", "TV"):
-            has_pt_subtitles, subtitle_ids = await self.get_subtitle(meta)
+            subtitles = await payload_preview.unless_asked(self.get_subtitle(meta))
+            has_pt_subtitles, subtitle_ids = (subtitles, subtitles) if isinstance(subtitles, payload_preview.Later) else subtitles
             resolution_width, resolution_height = await self.get_resolution(meta)
             data.update(
                 {
                     "audio_c": await self.get_audio_codec(meta),
-                    "audio": await self.get_audio(meta),
+                    "audio": await payload_preview.unless_asked(self.get_audio(meta)),
                     "bitrate": await self.get_bitrate(meta),
                     "desc": "",
                     "diretor": await self.get_credits(meta),

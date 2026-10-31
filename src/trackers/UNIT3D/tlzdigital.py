@@ -1,5 +1,5 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-from typing import Any
+from typing import Any, ClassVar
 
 from src.meta import Meta
 from src.trackers.common import Common
@@ -12,6 +12,20 @@ class TheLeachZone(UNIT3D):
     """
     The Leach Zone (TLZ) is a Private Torrent Tracker for MOVIES / TV / GENERAL
     """
+
+    # Options of the ID fields, offered in the Web UI preview (the getters ignore mapping_only).
+    payload_choices: ClassVar[dict[str, tuple[tuple[str, str], ...]]] = {
+        "category_id": (
+            ("1", "MOVIE"),
+            ("2", "TV"),
+        ),
+        "type_id": (
+            ("1", "Film"),
+            ("2", "Pre-release"),
+            ("3", "Episode"),
+            ("4", "Pack"),
+        ),
+    }
 
     tracker = "THELEACHZONE"
     display_name = "The Leach Zone"

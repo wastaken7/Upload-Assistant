@@ -1,7 +1,7 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import re
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, ClassVar, cast
 
 from src.console import logger
 from src.meta import Meta
@@ -15,6 +15,32 @@ class Portugas(UNIT3D):
     """
     Portugas is a PORTUGUESE Private Torrent Tracker for 0DAY / GENERAL
     """
+
+    # Options of the ID fields, offered in the Web UI preview (the getters ignore mapping_only).
+    payload_choices: ClassVar[dict[str, tuple[tuple[str, str], ...]]] = {
+        "type_id": (
+            ("1", "DISC"),
+            ("2", "REMUX"),
+            ("3", "ENCODE"),
+            ("4", "WEBDL"),
+            ("39", "WEBRIP"),
+            ("6", "HDTV"),
+        ),
+        "resolution_id": (
+            ("1", "4320p"),
+            ("2", "2160p"),
+            ("13", "1440p"),
+            ("3", "1080p"),
+            ("4", "1080i"),
+            ("5", "720p"),
+            ("6", "576p"),
+            ("7", "576i"),
+            ("11", "540p"),
+            ("8", "480p"),
+            ("9", "480i"),
+            ("10", "Other"),
+        ),
+    }
 
     tracker = "PORTUGAS"
     display_name = "Portugas"

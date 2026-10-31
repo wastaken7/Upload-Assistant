@@ -5,6 +5,7 @@ from typing import Any
 import aiofiles
 import httpx
 
+from src import payload_preview
 from src.console import logger
 from src.meta import Meta
 from src.trackers.common import Common
@@ -120,6 +121,11 @@ class NzbNest:
                 async with aiofiles.open(path, "rb") as handle:
                     return f"{nzb_path.stem}.nfo", await handle.read(), "text/plain"
         return None
+
+    async def get_payload_preview(self, meta: Meta) -> payload_preview.TrackerPreview:
+        """Only the NZB file is submitted; there are no fields to change."""
+        _meta = meta
+        return payload_preview.describe(self.tracker, {}, deferred={"nzb": "The NZB file created for this release is the whole submission"})
 
     async def upload(self, meta: Meta) -> bool:
         status_dict = meta.tracker_status.setdefault(self.tracker, {})

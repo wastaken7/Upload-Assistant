@@ -1,6 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import re
-from typing import Any, cast
+from typing import Any, ClassVar, cast
 
 import cloudscraper
 
@@ -14,6 +14,19 @@ class Emuwarez(UNIT3D):
     """
     eMuwarez is a SPANISH Private Torrent Tracker for MOVIES / TV / GENERAL
     """
+
+    # Options of the ID fields, offered in the Web UI preview (the getters ignore mapping_only).
+    payload_choices: ClassVar[dict[str, tuple[tuple[str, str], ...]]] = {
+        "type_id": (
+            ("1", "Full Disc"),
+            ("2", "Remux"),
+            ("3", "Encode"),
+            ("4", "WEB-DL"),
+            ("5", "WEBRip"),
+            ("6", "HDTV"),
+            ("7", "SD"),
+        ),
+    }
 
     display_name = "eMuwarez"
     allows_bloated_audio = True
