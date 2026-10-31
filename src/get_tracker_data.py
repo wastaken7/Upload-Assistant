@@ -213,32 +213,45 @@ class TrackerDataManager:
                 meta[key] = value
         meta.matched_tracker = tracker_name
 
+    async def _save_description_draft(self, temp_dir: Path, content: str, *, only_if_missing: bool) -> None:
+        """Store the tracker description as the Web UI's editable draft (the panel edits it; no editor opens there)."""
+        from src.description_review import load_review, save_review
+
+        review = load_review(temp_dir)
+        if only_if_missing and isinstance(review.get("content"), str):
+            return
+        try:
+            version = int(review.get("version", 0) or 0) + 1
+        except TypeError, ValueError:
+            version = 1
+        await asyncio.to_thread(save_review, temp_dir, content, version)
+
     async def _review_explicit_tracker_description(self, meta: Meta, tracker_name: str, candidate: Meta) -> None:
-        """Allow an interactive run to edit the selected tracker description."""
+        """Show the selected tracker description and let an interactive run keep, edit or discard it.
+
+        Local change: upstream (#781) keeps Web UI runs silent here and only fills the
+        Description panel's draft. The user wants to see the description before every
+        upload, so Web UI runs show it and ask too; editing happens in the panel there.
+        """
         if meta.unattended or not candidate.description:
             return
-        if os.environ.get("UA_WEBUI_ACTIVE"):
-            from src.description_review import load_review, save_review
-
-            temp_dir = Path(meta.base_dir) / "tmp" / meta.uuid
-            review = load_review(temp_dir)
-            if not isinstance(review.get("content"), str):
-                try:
-                    version = int(review.get("version", 0) or 0) + 1
-                except TypeError, ValueError:
-                    version = 1
-                await asyncio.to_thread(save_review, temp_dir, candidate.description, version)
-            return
+        webui = bool(os.environ.get("UA_WEBUI_ACTIVE"))
+        temp_dir = Path(meta.base_dir) / "tmp" / meta.uuid
+        if webui:
+            await self._save_description_draft(temp_dir, candidate.description, only_if_missing=True)
         logger.info(f"Selected description from {tracker_name}:\n{candidate.description[:1000]}", extra={"markup": False})
+        if webui:
+            logger.info("[cyan]Open the Description panel to edit it before uploading.[/cyan]")
+        question, buttons = webui_events.letter_prompt([("e", "edit"), ("d", "discard")], "keep it")
         with webui_events.field_prompt(
             "Tracker description",
             {"Tracker": tracker_name, "Description": candidate.description[:1000]},
             focus="Description",
-            actions=[("", "Keep it"), ("e", "Edit"), ("d", "Discard")],
+            actions=buttons,
         ):
-            choice = await prompt_in_thread(cli_ui.ask_string, "\nEnter 'e' to edit, 'd' to discard the description, or press Enter to keep it: ")
+            choice = await prompt_in_thread(cli_ui.ask_string, "\n" + question)
         choice = (choice or "").strip().lower()
-        if choice == "e":
+        if choice == "e" and webui_events.editor_available():
             edited = await asyncio.to_thread(click.edit, candidate.description)
             if edited is not None:
                 candidate.description = str(edited).strip()
@@ -249,6 +262,9 @@ class TrackerDataManager:
             candidate.description = ""
             candidate.saved_description = False
             candidate.description_provenance = {**candidate.description_provenance, "discarded": True}
+            if webui:
+                # Otherwise the saved draft would bring the tracker text back at upload time.
+                await self._save_description_draft(temp_dir, "", only_if_missing=False)
 
     async def get_tracker_timestamps(self, base_dir: str | None = None) -> dict[str, float]:
         """Get tracker timestamps from the log file"""
