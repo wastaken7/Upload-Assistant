@@ -5,6 +5,7 @@ import contextlib
 import os
 import platform
 import re
+import shutil
 import ssl
 import subprocess
 import time
@@ -609,10 +610,14 @@ class QbittorrentClientMixin:
 
                 # **Use `torrent_storage_dir` if available**
                 if torrent_storage_dir:
-                    torrent_file_path = Path(torrent_storage_dir) / f"{torrent_hash}.torrent"
-                    if not Path(torrent_file_path).exists():
-                        logger.info(f"[yellow]Torrent file not found in storage directory: {torrent_file_path}")
+                    stored_torrent_path = Path(torrent_storage_dir) / f"{torrent_hash}.torrent"
+                    if not stored_torrent_path.exists():
+                        logger.info(f"[yellow]Torrent file not found in storage directory: {stored_torrent_path}")
                         continue
+                    # Validation and cleanup must only touch UA's staging copy.
+                    # The client needs its original metadata to resume seeding.
+                    torrent_file_path = Path(extracted_torrent_dir) / f"{torrent_hash}.torrent"
+                    await asyncio.to_thread(shutil.copy2, stored_torrent_path, torrent_file_path)
                 else:
                     # **Fetch from qBittorrent API if no `torrent_storage_dir`**
                     logger.debug(f"[cyan]Exporting .torrent file for {torrent_hash}")
