@@ -12,6 +12,7 @@ import httpx
 from src import payload_preview, unit3d_catalogs
 from src.api_key_expiry import record_api_key_expiry, warn_api_key_expiry
 from src.artwork import is_valid_image_bytes
+from src.bbcode import BBCODE
 from src.cogs.redaction import Redaction
 from src.console import logger
 from src.get_desc import DescriptionBuilder
@@ -43,6 +44,9 @@ class UNIT3D:
     # gets only the upload's type and resolution; slot rules get the whole title
     # through ``meta["<TRACKER>_title_releases"]``.
     search_whole_title: bool = False
+    # UNIT3D stores descriptions in a MySQL TEXT column, which holds 65,535 bytes.
+    # None for sites that widened the column.
+    max_description_bytes: int | None = 65535
 
     def __init__(self, config: dict[str, Any], tracker_name: str):
         self.config = config
@@ -309,6 +313,36 @@ class UNIT3D:
             )
         }
 
+    def fit_description(self, meta: Meta, description: str) -> str:
+        """Drop the MediaInfo of later discs, last disc first, until the description fits the column."""
+        limit = self.max_description_bytes
+        if not limit or len(description.encode("utf-8")) <= limit:
+            return description
+
+        bbcode = BBCODE()
+        dropped = 0
+        for disc in reversed(meta.discs[1:]):
+            found = False
+            for block in DescriptionBuilder.disc_mediainfo_blocks(disc):
+                # Whole spoiler blocks keep the BBCode balanced; match them as the UNIT3D formatting left them.
+                block = bbcode.remove_extra_lines(block)
+                index = description.rfind(block)
+                if index != -1:
+                    description = description[:index] + description[index + len(block) :]
+                    found = True
+            if found:
+                dropped += 1
+                if len(description.encode("utf-8")) <= limit:
+                    break
+
+        description = bbcode.remove_extra_lines(description)
+        size = len(description.encode("utf-8"))
+        if dropped:
+            logger.info(f"{self.tracker}: [yellow]Description exceeded {limit} bytes; removed the MediaInfo of {dropped} later disc(s).[/yellow]")
+        if size > limit:
+            logger.warning(f"{self.tracker}: [yellow]Description is {size} bytes, above the {limit}-byte limit; the upload may be rejected.[/yellow]")
+        return description
+
     async def get_mediainfo(self, meta: Meta) -> dict[str, str]:
         if meta.bdinfo or (meta.category in ["GAME", "BOOK"] and not meta.audiobook):
             mediainfo = ""
@@ -566,6 +600,9 @@ class UNIT3D:
         merged: dict[str, str] = {}
         for r in results:
             merged.update(r)
+
+        if isinstance(merged.get("description"), str):
+            merged["description"] = self.fit_description(meta, merged["description"])
 
         # Handle exclusive flag centrally for all UNIT3D trackers
         # Priority: meta.exclusive > tracker config > default (not set)

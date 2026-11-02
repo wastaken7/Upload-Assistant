@@ -2051,6 +2051,26 @@ class DescriptionBuilder:
                 logger.warning(f"[yellow]Warning: Could not load pack image data: {e!s}[/yellow]")
         return pack_images_data
 
+    @staticmethod
+    def disc_mediainfo_blocks(disc: dict[str, Any]) -> list[str]:
+        """The spoiler blocks that carry a later disc's BDInfo summary or DVD MediaInfo."""
+        if disc["type"] == "BDMV":
+            return [f"[spoiler={disc.get('name', 'BDINFO')}][code]{disc['summary']}[/code][/spoiler]"]
+        if disc["type"] == "DVD":
+            return [
+                f"[spoiler={Path(disc['vob']).name}][code]{disc['vob_mi']}[/code][/spoiler]",
+                f"[spoiler={Path(disc['ifo']).name}][code]{disc['ifo_mi']}[/code][/spoiler]",
+            ]
+        return []
+
+    def _append_disc_mediainfo(self, desc_parts: list[str], disc: dict[str, Any]) -> None:
+        blocks = self.disc_mediainfo_blocks(disc)
+        if not blocks:
+            return
+        if disc["type"] == "DVD":
+            desc_parts.append(f"{disc['name']}:\n")
+        desc_parts.append(" ".join(blocks) + "\n\n")
+
     async def _handle_discs_and_screenshots(
         self,
         meta: Meta,
@@ -2260,12 +2280,7 @@ class DescriptionBuilder:
                         if meta.get(new_images_key):
                             logger.debug(f"[yellow]Found needed image URLs for {new_images_key}")
                             desc_parts.append("[center]")
-                            if each["type"] == "BDMV":
-                                desc_parts.append(f"[spoiler={each.get('name', 'BDINFO')}][code]{each['summary']}[/code][/spoiler]\n\n")
-                            elif each["type"] == "DVD":
-                                desc_parts.append(f"{each['name']}:\n")
-                                desc_parts.append(f"[spoiler={Path(each['vob']).name}][code]{each['vob_mi']}[/code][/spoiler] ")
-                                desc_parts.append(f"[spoiler={Path(each['ifo']).name}][code]{each['ifo_mi']}[/code][/spoiler]\n\n")
+                            self._append_disc_mediainfo(desc_parts, each)
                             desc_parts.append("[/center]\n\n")
                             # Use existing URLs from meta to write to descfile
                             desc_parts.append("[center]")
@@ -2281,12 +2296,7 @@ class DescriptionBuilder:
                             meta.retry_count += 1
                             meta[new_images_key] = []
                             desc_parts.append("[center]")
-                            if each["type"] == "BDMV":
-                                desc_parts.append(f"[spoiler={each.get('name', 'BDINFO')}][code]{each['summary']}[/code][/spoiler]\n\n")
-                            elif each["type"] == "DVD":
-                                desc_parts.append(f"{each['name']}:\n")
-                                desc_parts.append(f"[spoiler={Path(each['vob']).name}][code]{each['vob_mi']}[/code][/spoiler] ")
-                                desc_parts.append(f"[spoiler={Path(each['ifo']).name}][code]{each['ifo_mi']}[/code][/spoiler]\n\n")
+                            self._append_disc_mediainfo(desc_parts, each)
                             desc_parts.append("[/center]\n\n")
                             # Check if new screenshots already exist before running prep.screenshots
                             new_screens = [f.name for f in manifest_files(meta.base_dir, meta.uuid, f"FILE_{i}")]

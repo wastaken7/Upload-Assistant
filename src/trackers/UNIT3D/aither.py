@@ -47,6 +47,8 @@ class Aither(UNIT3D):
     supported_categories = ("TV", "MOVIE")
     tracker_urls = ("https://aither.cc",)
     allowed_bloated_audio_languages = ("en",)
+    # Aither widened the description column and accepts larger descriptions.
+    max_description_bytes = None
 
     def __init__(self, config: dict[str, Any]):
         super().__init__(config, tracker_name="AITHER")
