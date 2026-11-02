@@ -73,6 +73,23 @@ def test_capybarabr_formats_dvdrips_with_resolution_before_audio_and_codec() -> 
     assert name == "Example Movie 2001 480p DVDRip DD2.0 x264-DDFAKE"  # noqa: S101
 
 
+@pytest.mark.parametrize("tracker_class", [CapybaraBR, Samaritano])
+def test_brazilian_trackers_mark_hardcoded_subtitles(tracker_class: type[CapybaraBR] | type[Samaritano]) -> None:
+    meta = Meta(
+        category="MOVIE",
+        name="Example Movie 2020 1080p EXMP WEB-DL DD+ 5.1 H.264-GROUP",
+        title="Example Movie",
+        year=2020,
+        type="WEBDL",
+        tag="-GROUP",
+        hardcoded_subs=True,
+    )
+
+    name = asyncio.run(tracker_class({"TRACKERS": {}}).get_name(meta))["name"]
+
+    assert name == "Example Movie 2020 1080p EXMP WEB-DL HC DDP5.1 H.264-GROUP"  # noqa: S101
+
+
 def _samaritano_config(*, force: bool = True, image_host_api_key: str = "fictional-image-token") -> dict[str, object]:
     return {
         "DEFAULT": {"img_host_1": "imgbb"},
