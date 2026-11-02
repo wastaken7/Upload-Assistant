@@ -1280,6 +1280,14 @@ def xxx_min_successful_uploads(meta: Meta, min_successful_uploads: int) -> int:
     return min(min_successful_uploads, max(1, contact_sheet_count))
 
 
+def skip_unsupported_release(meta: Meta, error: UnsupportedSiteCheckError, stage: str = "prep") -> None:
+    """Mark a release that site check mode cannot handle as skipped, not failed."""
+    logger.info(f"[yellow]Skipping {escape(Path(str(meta.path or '')).name)}: {escape(str(error))}[/yellow]")
+    webui_events.notice("attention", f"Skipped: {error}")
+    webui_events.stage(stage, "skip")
+    meta.skipped_unsupported = True
+
+
 async def process_meta(meta: Meta, base_dir: str) -> bool:
     """Process the metadata for each queued path."""
     if not meta.imghost:
@@ -1303,10 +1311,7 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
     try:
         meta = await prep.gather_prep(meta=meta, mode="cli")
     except UnsupportedSiteCheckError as e:
-        logger.info(f"[yellow]Skipping {escape(Path(str(meta.path or '')).name)}: {escape(str(e))}[/yellow]")
-        webui_events.notice("attention", f"Skipped: {e}")
-        webui_events.stage("prep", "skip")
-        meta.skipped_unsupported = True
+        skip_unsupported_release(meta, e)
         return False
     except Exception as e:
         logger.info(f"Error in gather_prep: {e}")
@@ -1470,7 +1475,12 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
             meta.trackers = [t.strip().upper() for t in meta.trackers if t]
         logger.debug(f"Trackers list during edit process: {meta.trackers}")
         meta.edit = True
-        meta = await prep.gather_prep(meta=meta, mode="cli")
+        try:
+            meta = await prep.gather_prep(meta=meta, mode="cli")
+        except UnsupportedSiteCheckError as e:
+            # The edit can turn on --site-check for a release it cannot handle.
+            skip_unsupported_release(meta, e, stage="confirm")
+            return False
         TrackerSetup(config=config).filter_unsupported_trackers(meta)
         meta.name_notag, meta.name, meta.clean_name, meta.potential_missing = await name_manager.get_name(meta)
         await write_meta_file(meta)
