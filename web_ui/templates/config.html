@@ -114,8 +114,11 @@
     <script src="{{ url_for('static', filename='js/config_release_group_inheritance.js') }}"></script>
     <script src="{{ url_for('static', filename='js/config_tracker_default_overrides.js') }}"></script>
     <script src="{{ url_for('static', filename='js/config_save.js') }}"></script>
+    <!-- Transform JSX only; Babel's default ES5 output takes seconds per load. -->
     <script
       type="text/babel"
+      data-presets="react"
+      data-plugins="transform-strict-mode"
       src="{{ url_for('static', filename='js/config_app.js') }}"
     ></script>
   </body>

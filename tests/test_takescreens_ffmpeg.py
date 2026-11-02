@@ -396,6 +396,55 @@ async def test_dvd_screenshots_uses_complete_title_set_and_ifo_duration(monkeypa
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("chain_durations", [(2700000.0, 2500000.0, 2700000.0, None), (2700000.0, None)])
+async def test_dvd_screenshots_seek_within_longest_program_chain(monkeypatch, tmp_path, chain_durations):
+    disc_path = tmp_path / "VIDEO_TS"
+    disc_path.mkdir()
+    main_set = ["01_0.VOB", "01_1.VOB", "01_2.VOB"]
+    lengths: list[float] = []
+
+    def parse_stub(_path, output=None, **_kwargs):
+        if output == "JSON":
+            return json.dumps({"media": {"track": [{"Duration": 1200.0, "Width": 720, "Height": 480}]}})
+        video = SimpleNamespace(track_type="Video", duration=15000000.0, pixel_aspect_ratio="1", display_aspect_ratio="1.5", width="720", height="480", frame_rate="24")
+        chains = [SimpleNamespace(track_type="Menu", duration=duration) for duration in chain_durations]
+        return SimpleNamespace(tracks=[video, *chains])
+
+    async def valid_times_stub(_times, _num_screens, length, _frame_rate, _meta, **_kwargs):
+        lengths.append(length)
+        return ["100", "1500", "2600"]
+
+    async def capture_stub(task):
+        index, _source, image, *_rest = task
+        Image.effect_noise((720, 480), 20).save(image)
+        return index, image
+
+    matching_title = AsyncMock(return_value=1)
+    monkeypatch.setattr(takescreens.MediaInfo, "parse", parse_stub)
+    monkeypatch.setattr(takescreens, "matching_dvd_title", matching_title)
+    monkeypatch.setattr(takescreens, "valid_ss_time", valid_times_stub)
+    monkeypatch.setattr(takescreens, "capture_dvd_screenshot", capture_stub)
+    monkeypatch.setattr(takescreens, "register_screenshots", lambda *_args: [])
+
+    meta = Meta(
+        base_dir=str(tmp_path),
+        uuid="dvd-episodic-test",
+        screens=2,
+        discs=[{"name": "DVD", "path": str(disc_path), "main_set": main_set}],
+        image_list=[],
+        retake=False,
+        frame_overlay=False,
+        tv_pack=True,
+        debug=False,
+        ffdebug=False,
+    )
+    await takescreens.dvd_screenshots(meta, 0, cleanup_after_capture=False)
+
+    assert lengths == [2700.0]
+    matching_title.assert_awaited_once_with(disc_path, 2700.0)
+
+
+@pytest.mark.asyncio
 async def test_dvd_capture_marks_png_as_single_image(monkeypatch, tmp_path):
     output = tmp_path / "frame.png"
     commands = []

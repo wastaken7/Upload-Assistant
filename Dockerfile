@@ -79,7 +79,6 @@ RUN mkdir -p /Upload-Assistant/bin/dovi_tool /Upload-Assistant/bin/hdr10plus_too
 RUN mkdir -p /state && chmod 1777 /state
 ENV UA_DATA_DIR=/state
 ENV TMPDIR=/state/tmp
-ENV MPLCONFIGDIR=/state/matplotlib
 
 # ── Runtime metadata ─────────────────────────────────────────────────
 # Document the WebUI port (informational only; does not publish the port)

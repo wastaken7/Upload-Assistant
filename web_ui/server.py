@@ -230,6 +230,11 @@ _TRACKER_STATUS_MAX_WORKERS = 8
 _tracker_status_cache: dict[str, dict[str, Any]] = {}
 _tracker_status_cache_lock = threading.Lock()
 _tracker_status_check_lock = threading.Lock()
+# Every tracker list request otherwise waits on a Prowlarr round trip.
+_PROWLARR_REPORT_CACHE_SECONDS = 5 * 60
+_prowlarr_report_cache: dict[tuple[str, str, frozenset[str]], tuple[float, Any]] = {}
+_prowlarr_report_cache_lock = threading.Lock()
+_prowlarr_report_cache_generation = 0
 
 
 def _load_argument_presets() -> list[dict[str, str]]:
@@ -2903,6 +2908,16 @@ def _screenshot_capture_supported(meta_data: Mapping[str, object]) -> bool:
     return not is_disc or is_disc == "BDMV"
 
 
+def _hosted_image_discard_supported(meta_data: Mapping[str, object]) -> bool:
+    """Return whether hosted images may be discarded from the review.
+
+    The upload stage captures fresh video frames (DVDs included) when discards
+    leave the list below the cutoff.  IGDB, music and book images have no such
+    replacement, so they stay as they are.
+    """
+    return _stringify_preview_value(meta_data.get("category")).upper() not in {"GAME", "MUSIC", "BOOK"}
+
+
 def _screenshot_review_meta(temp_dir: Path, meta_data: Mapping[str, object]) -> Mapping[str, object]:
     """Include cached hosted images when a resumed run has not restored them into meta.json yet."""
     result = dict(meta_data)
@@ -3163,6 +3178,42 @@ def _set_security_headers(response: Any) -> Any:  # pyright: ignore[reportUnused
     if request.path.startswith("/api/"):
         # API responses can contain configuration secrets and upload output.
         response.headers.setdefault("Cache-Control", "no-store")
+    return response
+
+
+_VERSIONED_STATIC_MAX_AGE = 365 * 24 * 60 * 60
+_STATIC_IMAGE_MAX_AGE = 24 * 60 * 60
+
+
+@app.url_defaults
+def _version_static_urls(endpoint: str, values: dict[str, Any]) -> None:  # pyright: ignore[reportUnusedFunction]
+    """Tag template asset URLs with the file's mtime so changed files get new URLs."""
+    filename = values.get("filename")
+    if endpoint != "static" or "v" in values or not isinstance(filename, str) or not app.static_folder:
+        return
+    with suppress(OSError):
+        values["v"] = (Path(app.static_folder) / filename).stat().st_mtime_ns
+
+
+@app.after_request
+def _set_static_cache_headers(response: Any) -> Any:  # pyright: ignore[reportUnusedFunction]
+    """Let browsers reuse static assets instead of revalidating each one per page load.
+
+    Versioned URLs change with the file, so they can be cached long-term. Images
+    and fonts referenced by fixed paths (tracker icons, CSS) are cached for a day.
+    """
+    if request.endpoint != "static" or response.status_code not in {200, 304}:
+        return response
+    if request.args.get("v"):
+        max_age = _VERSIONED_STATIC_MAX_AGE
+        response.cache_control.immutable = True
+    elif request.path.startswith(("/static/img/", "/static/fonts/")):
+        max_age = _STATIC_IMAGE_MAX_AGE
+    else:
+        return response
+    response.cache_control.no_cache = None
+    response.cache_control.public = True
+    response.cache_control.max_age = max_age
     return response
 
 
@@ -5561,6 +5612,37 @@ def refresh_tracker_status():
     )
 
 
+def _cached_prowlarr_credentials(base_url: str, api_key: str, supported_trackers: set[str]) -> Any:
+    """Reuse a recent Prowlarr credential report for the same connection.
+
+    Failures are not cached, and changing the URL or API key misses the cache.
+    """
+    from src.prowlarr import fetch_prowlarr_credentials
+
+    # The cached report already holds this process's credentials in memory.
+    key = (base_url, api_key, frozenset(supported_trackers))
+    now = time.monotonic()
+    with _prowlarr_report_cache_lock:
+        cached = _prowlarr_report_cache.get(key)
+        generation = _prowlarr_report_cache_generation
+    if cached and now - cached[0] < _PROWLARR_REPORT_CACHE_SECONDS:
+        return cached[1]
+    report = fetch_prowlarr_credentials(base_url, api_key, supported_trackers)
+    with _prowlarr_report_cache_lock:
+        # A fetch that started before an invalidation must not restore old data.
+        if generation == _prowlarr_report_cache_generation:
+            _prowlarr_report_cache.clear()
+            _prowlarr_report_cache[key] = (now, report)
+    return report
+
+
+def _invalidate_prowlarr_report_cache() -> None:
+    global _prowlarr_report_cache_generation
+    with _prowlarr_report_cache_lock:
+        _prowlarr_report_cache.clear()
+        _prowlarr_report_cache_generation += 1
+
+
 @app.route("/api/trackers")
 @limiter.limit("7200 per hour", key_func=_rate_limit_key_func, override_defaults=True)
 def get_trackers():
@@ -5585,13 +5667,13 @@ def get_trackers():
     example_trackers_raw = example_config.get("TRACKERS", {})
     example_trackers = cast(dict[str, Any], example_trackers_raw) if isinstance(example_trackers_raw, Mapping) else {}
 
-    from src.prowlarr import ProwlarrError, apply_prowlarr_credentials, configured_prowlarr, fetch_prowlarr_credentials
+    from src.prowlarr import ProwlarrError, apply_prowlarr_credentials, configured_prowlarr
 
     prowlarr_sources: set[str] = set()
     prowlarr_cookie_trackers: set[str] = set()
     try:
         if prowlarr_connection := configured_prowlarr(user_config):
-            prowlarr_report = fetch_prowlarr_credentials(
+            prowlarr_report = _cached_prowlarr_credentials(
                 prowlarr_connection[0],
                 prowlarr_connection[1],
                 set(tracker_class_map),
@@ -5616,13 +5698,20 @@ def get_trackers():
 
     cookie_trackers: set[str] = set()
     try:
-        from src.cookie_auth import find_cookie_file
+        from src.cookie_auth import CookieDirectoryScan, find_cookie_file
+
+        cookie_scan = CookieDirectoryScan(STATE_DIR)
     except Exception:
         # Cookie discovery is an additional configuration signal. A missing or
         # unreadable cookies directory should not prevent the selector loading.
         cookie_trackers = set()
     else:
-        cookie_trackers = _configured_cookie_tracker_names(tracker_class_map, user_config, STATE_DIR, find_cookie_file)
+        cookie_trackers = _configured_cookie_tracker_names(
+            tracker_class_map,
+            user_config,
+            STATE_DIR,
+            lambda base_dir, tracker, config: find_cookie_file(base_dir, tracker, config, scan=cookie_scan),
+        )
 
     prowlarr_sources -= cookie_trackers
     cookie_trackers |= prowlarr_cookie_trackers
@@ -5799,6 +5888,9 @@ def config_test_prowlarr():
         return jsonify({"success": False, "error": str(error)}), 400
     except Exception:
         return jsonify({"success": False, "error": "Unable to test the Prowlarr connection"}), 500
+
+    # A manual test is the way to pick up indexer changes before the cache expires.
+    _invalidate_prowlarr_report_cache()
 
     api_key_trackers = sorted(name for name, credential in report.credentials.items() if credential.api_key)
     cookie_trackers = sorted(name for name, credential in report.credentials.items() if credential.cookie)
@@ -6668,7 +6760,7 @@ def browse_search():
             # returning a misleading empty successful search.
             with os.scandir(scope):
                 pass
-        except (ValueError, OSError):
+        except ValueError, OSError:
             return jsonify({"success": False, "error": "Search folder is unavailable or not allowed"}), 400
 
     # Split on common separators
@@ -6803,7 +6895,7 @@ def browse_search():
             if len(items) >= max_results or budget_spent:
                 break
 
-        items.extend(files[:max_results - len(items)])
+        items.extend(files[: max_results - len(items)])
         # Sort the selected folders/files alphabetically within each group.
         items.sort(key=lambda x: (0 if x.get("type") == "folder" else 1, (x.get("name") or "").lower()))
 
@@ -6973,6 +7065,7 @@ def execution_screenshots():
     meta_data = _screenshot_review_meta(temp_dir, meta_data)
     items = list_review_items(temp_dir, meta_data)
     can_capture = _screenshot_capture_supported(meta_data)
+    can_discard = _hosted_image_discard_supported(meta_data)
 
     def image_urls(item: ReviewedScreenshot) -> tuple[str, str]:
         """Return (grid, full-size) URLs; remote hosts expose a lighter ``img_url`` thumbnail."""
@@ -6987,7 +7080,8 @@ def execution_screenshots():
     return jsonify(
         {
             "success": True,
-            "can_add": bool(items) and can_capture,
+            # Additions to hosted images do not need a local frame, even after every hosted image was discarded.
+            "can_add": (bool(items) or bool(meta_data.get("image_list"))) and can_capture,
             "screenshots": [
                 {
                     "id": item.id,
@@ -6998,7 +7092,7 @@ def execution_screenshots():
                     "image_url": urls[0],
                     "full_image_url": urls[1],
                     "can_replace": can_capture and item.source != "addition",
-                    "can_delete": item.source in {"local", "addition"},
+                    "can_delete": item.source in {"local", "addition"} or can_discard,
                 }
                 for item in items
                 for urls in (image_urls(item),)
@@ -7194,6 +7288,8 @@ def mutate_execution_screenshot(screenshot_id: str, action: str):
     meta_data = _screenshot_review_meta(temp_dir, meta_data)
     if action == "replace" and not _screenshot_capture_supported(meta_data):
         return jsonify({"success": False, "error": "Screenshot capture is not supported for this release"}), 400
+    if action == "delete" and re.fullmatch(r"remote-\d+", screenshot_id) and not _hosted_image_discard_supported(meta_data):
+        return jsonify({"success": False, "error": "Hosted images cannot be discarded for this release"}), 400
 
     try:
         from src.screenshot_review import delete_screenshot, replace_screenshot, undo_remote_replacement
