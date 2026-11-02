@@ -30,7 +30,7 @@ from src.mediainfo import MediaInfo
 from src.meta import Meta
 from src.meta_file import write_meta_file
 from src.music.analyzer import RIPPER_LOG_RE, read_rip_log
-from src.pack_images import pack_image_lock
+from src.release_images import release_image_lock
 from src.screenshot_manifest import files as manifest_files
 from src.takescreens import TakeScreensManager
 from src.tracker_images import get_tracker_image_collection, has_tracker_image_collection
@@ -2105,7 +2105,7 @@ class DescriptionBuilder:
     ) -> str:
         # Trackers upload concurrently, but each pack file's images are created
         # once: later trackers wait here and reuse them.
-        async with pack_image_lock(meta):
+        async with release_image_lock(meta):
             return await self._render_discs_and_screenshots(meta, approved_image_hosts, images, multi_screens, include_header)
 
     async def _render_discs_and_screenshots(

@@ -391,13 +391,18 @@ async def process_trackers(
                     logger.info(traceback.format_exc(), extra={"markup": False})
                     return
 
+    # Manual packaging deletes the per-tracker .torrent files, so it runs after
+    # the uploads that read them.
+    upload_trackers = [tracker for tracker in enabled_trackers if tracker.replace(" ", "").upper().strip() != "MANUAL"]
+    manual_trackers = [tracker for tracker in enabled_trackers if tracker not in upload_trackers]
+
     # Packs upload concurrently too: their per-file images are created once
-    # under the release's pack image lock and then shared by every tracker.
+    # under the release image lock and then shared by every tracker.
     # Bandwidth control waits per tracker, so it keeps the trackers in order.
     if not bandwidth_control:
         # Run all tracker tasks concurrently with individual error handling
         tasks: list[tuple[str, asyncio.Task[None]]] = []
-        for tracker in enabled_trackers:
+        for tracker in upload_trackers:
             task = asyncio.create_task(process_single_tracker(tracker))
             tasks.append((tracker, task))
 
@@ -411,8 +416,15 @@ async def process_trackers(
                 logger.debug("".join(traceback.format_exception(type(result), result, result.__traceback__)), extra={"markup": False})
     else:
         # Process each tracker sequentially
-        for tracker in enabled_trackers:
+        for tracker in upload_trackers:
             await process_single_tracker(tracker)
+
+    for tracker in manual_trackers:
+        try:
+            await process_single_tracker(tracker)
+        except Exception as e:
+            logger.info(f"[red]{tracker} encountered an error: {escape(str(e))}[/red]")
+            logger.debug(traceback.format_exc(), extra={"markup": False})
 
     for tracker_name in enabled_trackers:
         normalized = tracker_name.replace(" ", "").upper().strip()

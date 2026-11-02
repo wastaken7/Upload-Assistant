@@ -7,7 +7,8 @@ import pytest
 from src import trackerhandle
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
-from src.pack_images import pack_image_lock
+from src.rehostimages import ImageHostPolicy, check_tracker_image_hosts
+from src.release_images import release_image_lock
 from src.trackers.GAZELLE.passthepopcorn import PassThePopcorn
 from src.trackers.UNIT3D.utopia import Utopia, UtopiaDescriptionBuilder
 
@@ -39,6 +40,9 @@ class _FakeTracker:
         await asyncio.sleep(0.02)
         self.events.append(("end", self.tracker))
         return True
+
+    async def edit_desc(self, _meta):
+        self.events.append(("describe", self.tracker))
 
 
 class _Alpha(_FakeTracker):
@@ -80,8 +84,8 @@ def tracker_stage(monkeypatch):
     return _FakeTracker.events
 
 
-def _run_tracker_stage(meta, *, bandwidth_control=False):
-    meta.trackers = ["ALPHA", "BETA"]
+def _run_tracker_stage(meta, *, bandwidth_control=False, trackers=("ALPHA", "BETA"), api_trackers=("ALPHA", "BETA"), http_trackers=()):
+    meta.trackers = list(trackers)
     meta.tracker_status = {"ALPHA": {"upload": True}, "BETA": {"upload": True}}
     config = {"DEFAULT": {"multiScreens": 2, "smart_image_host_selection": False}, "TRACKERS": {}}
     asyncio.run(
@@ -89,9 +93,9 @@ def _run_tracker_stage(meta, *, bandwidth_control=False):
             meta,
             config,
             _Client(),
-            ["ALPHA", "BETA"],
+            list(api_trackers),
             {"ALPHA": _Alpha, "BETA": _Beta},
-            [],
+            list(http_trackers),
             [],
             bandwidth_control=bandwidth_control,
         )
@@ -122,6 +126,64 @@ def test_bandwidth_control_keeps_tracker_order(tmp_path, tracker_stage):
     _run_tracker_stage(meta, bandwidth_control=True)
 
     assert tracker_stage == [("start", "ALPHA"), ("end", "ALPHA"), ("start", "BETA"), ("end", "BETA")]
+
+
+@pytest.mark.parametrize("bandwidth_control", [False, True])
+def test_manual_packaging_runs_after_the_uploads(tmp_path, tracker_stage, monkeypatch, bandwidth_control):
+    # Packaging deletes the per-tracker .torrent files the uploads read.
+    class _Packager:
+        def __init__(self, config):
+            self.config = config
+
+        async def package(self, _meta):
+            tracker_stage.append(("package", "MANUAL"))
+            return "files"
+
+    monkeypatch.setattr(trackerhandle, "ManualPackageManager", _Packager)
+    meta = _pack_meta(tmp_path, discs=[], unattended=True)
+
+    _run_tracker_stage(meta, bandwidth_control=bandwidth_control, trackers=("MANUAL", "ALPHA", "BETA"), api_trackers=(), http_trackers=("ALPHA", "BETA"))
+
+    assert tracker_stage[-1] == ("package", "MANUAL")
+    assert {("end", "ALPHA"), ("end", "BETA")} <= set(tracker_stage[: tracker_stage.index(("describe", "ALPHA"))])
+
+
+def test_rehost_takes_the_release_image_lock(tmp_path):
+    meta = _pack_meta(tmp_path)
+    held = []
+
+    class _Rehosting:
+        async def check_image_hosts(self, current_meta):
+            held.append(release_image_lock(current_meta).locked())
+
+    asyncio.run(check_tracker_image_hosts(meta, _Rehosting()))
+
+    assert held == [True]
+
+
+def test_trackers_without_host_rules_do_not_wait_for_image_work(tmp_path):
+    meta = _pack_meta(tmp_path)
+
+    class _Plain:
+        tracker = "PLAIN"
+
+    async def check_while_locked():
+        async with release_image_lock(meta):
+            await asyncio.wait_for(check_tracker_image_hosts(meta, _Plain()), timeout=1)
+
+    asyncio.run(check_while_locked())
+
+
+def test_ptp_reuses_only_pack_images_on_hosts_it_accepts(tmp_path):
+    ptp = PassThePopcorn({"DEFAULT": {}, "TRACKERS": {"PASSTHEPOPCORN": {}}})
+    assert isinstance(ptp.image_host_policy, ImageHostPolicy)
+    accepted = {"img_url": "https://img.pixhost.to/a.png", "raw_url": "https://img.pixhost.to/a.png", "web_url": "https://pixhost.to/a"}
+    rejected = {"img_url": "https://other-host.example/b.png", "raw_url": "https://other-host.example/b.png", "web_url": "https://other-host.example/b"}
+    meta = _pack_meta(tmp_path, new_images_file_1=[accepted, rejected], new_images_file_2=[rejected])
+
+    assert ptp._approved_pack_images(meta, "new_images_file_1") == [accepted]
+    assert ptp._approved_pack_images(meta, "new_images_file_2") == []
+    assert ptp._approved_pack_images(meta, "new_images_file_3") == []
 
 
 def test_concurrent_trackers_create_each_pack_file_image_once(tmp_path, monkeypatch):
@@ -165,13 +227,13 @@ def test_concurrent_trackers_create_each_pack_file_image_once(tmp_path, monkeypa
         assert "FILE_2-0.png" in description
 
 
-def test_ptp_description_holds_the_pack_image_lock(tmp_path, monkeypatch):
+def test_ptp_description_holds_the_release_image_lock(tmp_path, monkeypatch):
     meta = _pack_meta(tmp_path)
     ptp = PassThePopcorn({"DEFAULT": {}, "TRACKERS": {"PASSTHEPOPCORN": {}}})
     held = []
 
     async def write_description(_meta):
-        held.append(pack_image_lock(meta).locked())
+        held.append(release_image_lock(meta).locked())
 
     monkeypatch.setattr(ptp, "_write_description", write_description)
 

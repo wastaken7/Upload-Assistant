@@ -2538,29 +2538,6 @@ async def do_the_thing(base_dir: str) -> None:
 
     configure_stats(config)
 
-    from src.prowlarr import ProwlarrError, apply_prowlarr_credentials, configured_prowlarr, fetch_prowlarr_credentials
-
-    # Both are network round trips that do not depend on each other.
-    update_check = asyncio.create_task(update_notification())
-    try:
-        if prowlarr_connection := configured_prowlarr(config):
-            prowlarr_started = time.monotonic()
-            try:
-                report = await asyncio.to_thread(
-                    fetch_prowlarr_credentials,
-                    prowlarr_connection[0],
-                    prowlarr_connection[1],
-                    set(tracker_class_map),
-                )
-                applied = apply_prowlarr_credentials(config, report)
-                await record_event_async("api", service="prowlarr", operation="credential_sync", outcome="success", duration_ms=(time.monotonic() - prowlarr_started) * 1000)
-                logger.debug(f"[green]Prowlarr supplied fallback credentials for {len(applied)} tracker(s).[/green]")
-            except ProwlarrError as exc:
-                await record_event_async("api", service="prowlarr", operation="credential_sync", outcome="error", duration_ms=(time.monotonic() - prowlarr_started) * 1000)
-                logger.warning(f"[yellow]Prowlarr credential fallback unavailable: {exc}[/yellow]")
-    finally:
-        current_version = await update_check
-
     tmp_dir = Path(base_dir) / "tmp"
     if not Path(tmp_dir).exists():
         if os.name != "nt":
@@ -2606,6 +2583,30 @@ async def do_the_thing(base_dir: str) -> None:
             paths.append(str(Path(each).resolve()))
         else:
             break
+
+    from src.prowlarr import ProwlarrError, apply_prowlarr_credentials, configured_prowlarr, fetch_prowlarr_credentials
+
+    # Both are network round trips that do not depend on each other. They run
+    # after stdin is read, so a paste prompt never waits on them.
+    update_check = asyncio.create_task(update_notification())
+    try:
+        if prowlarr_connection := configured_prowlarr(config):
+            prowlarr_started = time.monotonic()
+            try:
+                report = await asyncio.to_thread(
+                    fetch_prowlarr_credentials,
+                    prowlarr_connection[0],
+                    prowlarr_connection[1],
+                    set(tracker_class_map),
+                )
+                applied = apply_prowlarr_credentials(config, report)
+                await record_event_async("api", service="prowlarr", operation="credential_sync", outcome="success", duration_ms=(time.monotonic() - prowlarr_started) * 1000)
+                logger.debug(f"[green]Prowlarr supplied fallback credentials for {len(applied)} tracker(s).[/green]")
+            except ProwlarrError as exc:
+                await record_event_async("api", service="prowlarr", operation="credential_sync", outcome="error", duration_ms=(time.monotonic() - prowlarr_started) * 1000)
+                logger.warning(f"[yellow]Prowlarr credential fallback unavailable: {exc}[/yellow]")
+    finally:
+        current_version = await update_check
 
     meta.ua_name = "Upload-Assistant"
     meta.current_version = current_version
