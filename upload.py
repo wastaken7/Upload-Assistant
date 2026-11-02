@@ -1741,13 +1741,19 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
                 except Exception as e:
                     logger.error(f"[red]Error processing dynamic HDR plots: {e}[/red]")
 
+            # Hosted images discarded in the Web UI leave the list before the
+            # capture cutoff is checked, so fresh frames are captured and hosted.
+            from src.screenshot_review import discard_remote_images
+
+            meta.image_list, reviewed_uploads = discard_remote_images(Path(meta.base_dir) / "tmp" / meta.uuid, cast(list[dict[str, Any]], meta.image_list or []))
+
             # Take Screenshots
             try:
                 # Keep the later upload count in sync with screenshots removed
                 # through the Web UI review while this run awaited confirmation.
                 from src.screenshot_review import target_count
 
-                meta.screens = target_count(Path(meta.base_dir) / "tmp" / meta.uuid, meta.screens)
+                meta.screens = target_count(Path(meta.base_dir) / "tmp" / meta.uuid, meta.screens, allow_empty=meta.category == "BOOK")
                 if meta.category == "MUSIC":
                     logger.debug("[cyan]MUSIC: skipping video screenshots and MediaInfo-dependent image processing.[/cyan]")
                 elif meta.is_disc == "BDMV":
@@ -1875,9 +1881,6 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
             # Remote images can be reviewed in the WebUI.  Replacements and
             # additions remain local until this normal hosting stage, even if
             # the original remote list already satisfies the cutoff.
-            from src.screenshot_review import staged_remote_uploads
-
-            reviewed_uploads = staged_remote_uploads(Path(meta.base_dir) / "tmp" / meta.uuid, cast(list[dict[str, Any]], meta.image_list or []))
             needs_shared_image_host = any(tracker not in {"HDBITS", "PTERCLUB"} or not tracker_class_map[tracker](config=config).rehost_images for tracker in meta.trackers)
             if (len(meta.image_list) < cutoff or reviewed_uploads) and meta.skip_imghost_upload is False and meta.category not in ("GAME", "MUSIC") and needs_shared_image_host:
                 # Validate and (if needed) rehost images to tracker-approved hosts before uploading any new screenshots.
