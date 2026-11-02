@@ -3,6 +3,11 @@
 import asyncio
 import inspect
 import json
+import subprocess
+import sys
+from pathlib import Path
+
+import pytest
 
 from src.description_review import load_review
 from src.get_desc import DescriptionBuilder, gen_desc
@@ -192,3 +197,71 @@ def test_unit3d_omits_scene_nfo_from_description_but_keeps_attachment(tmp_path):
         assert files["nfo"] == ("nfo_file.nfo", nfo_content.encode(), "text/plain")
 
     asyncio.run(run())
+
+
+def test_save_review_refuses_a_stale_version_and_keeps_the_draft(tmp_path):
+    from src.description_review import ReviewConflictError, save_review
+
+    save_review(tmp_path, "first edit", expected_version=0)
+
+    with pytest.raises(ReviewConflictError) as conflict:
+        save_review(tmp_path, "stale edit", expected_version=0)
+
+    assert conflict.value.current_version == 1
+    assert load_review(tmp_path) == {"content": "first edit", "version": 1}
+
+
+def test_seed_review_never_overwrites_an_existing_draft(tmp_path):
+    from src.description_review import save_review, seed_review
+
+    assert seed_review(tmp_path, "tracker text") == {"content": "tracker text", "version": 1}
+    save_review(tmp_path, "my edit", expected_version=1)
+
+    assert seed_review(tmp_path, "tracker text again") is None
+    assert load_review(tmp_path) == {"content": "my edit", "version": 2}
+
+
+def test_discard_review_blocks_a_save_that_was_in_flight(tmp_path):
+    from src.description_review import ReviewConflictError, apply_saved_draft, discard_review, draft, save_review, seed_review
+
+    seed_review(tmp_path, "tracker text")
+    panel_version = draft({}, tmp_path)[1]  # the panel loaded the draft before the user discarded it
+    discard_review(tmp_path, expected_version=panel_version)
+
+    with pytest.raises(ReviewConflictError):
+        save_review(tmp_path, "edited after the fact", expected_version=panel_version)
+
+    assert load_review(tmp_path) == {"content": None, "version": 2}
+    assert draft({"description": "tracker text"}, tmp_path) == ("tracker text", 2)
+    meta = Meta({"base_dir": str(tmp_path.parent), "uuid": tmp_path.name, "description": "my own text"})
+    apply_saved_draft(meta)
+    assert meta.description == "my own text"
+    assert seed_review(tmp_path, "tracker text") is None  # a discard is not "missing"
+
+
+def test_review_lock_is_held_across_processes(tmp_path):
+    from src.description_review import review_lock, save_review
+
+    holder = subprocess.Popen(  # noqa: S603
+        [
+            sys.executable,
+            "-c",
+            "import sys, time; from pathlib import Path; from src.description_review import review_lock\n"
+            "with review_lock(Path(sys.argv[1])):\n"
+            "    print('locked', flush=True)\n"
+            "    time.sleep(5)",
+            str(tmp_path),
+        ],
+        cwd=str(Path(__file__).resolve().parents[1]),
+        stdout=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        assert holder.stdout is not None and holder.stdout.readline().strip() == "locked"
+        with pytest.raises(TimeoutError), review_lock(tmp_path, timeout=0.3):
+            pass
+    finally:
+        holder.kill()
+        holder.wait()
+
+    assert save_review(tmp_path, "free again", expected_version=0) == {"content": "free again", "version": 1}
