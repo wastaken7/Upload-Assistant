@@ -93,8 +93,12 @@ def list_review_items(temp_dir: Path, meta_data: Mapping[str, object]) -> list[R
     if not remote_images:
         return list_screenshots(temp_dir, meta_data)
 
+    discarded = _discarded_urls(review)
     items: list[ReviewedScreenshot] = []
     for index, image in enumerate(remote_images):
+        # IDs stay positional on the unpruned list, so discarded images are skipped rather than removed.
+        if _remote_key(image) in discarded:
+            continue
         item_id = f"remote-{index}"
         local_name = replacements.get(item_id)
         local_path = temp_dir / "screenshots" / local_name if isinstance(local_name, str) else None
@@ -119,13 +123,19 @@ def list_review_items(temp_dir: Path, meta_data: Mapping[str, object]) -> list[R
     return items
 
 
-def target_count(temp_dir: Path, fallback: int) -> int:
-    """Return the user-reviewed screenshot target, if one exists."""
+def target_count(temp_dir: Path, fallback: int, allow_empty: bool = False) -> int:
+    """Return the user-reviewed screenshot target, if one exists.
+
+    Deleting every reviewed frame must not leave a video upload with no
+    screenshots to host, so a zero target falls back to the configured count
+    unless the release may legitimately have none (books).
+    """
     value = _load_review(temp_dir).get("target_count")
     try:
-        return max(0, int(value))
+        count = max(0, int(value))
     except TypeError, ValueError:
         return fallback
+    return count if count > 0 or allow_empty else fallback
 
 
 def image_version(temp_dir: Path, screenshot_id: str, fallback: int) -> int:
@@ -141,8 +151,11 @@ def image_version(temp_dir: Path, screenshot_id: str, fallback: int) -> int:
 
 
 def delete_screenshot(temp_dir: Path, meta_data: Mapping[str, object], screenshot_id: str) -> list[ReviewedScreenshot]:
-    """Delete a local frame or discard a pending remote addition."""
+    """Delete a local frame, or discard a hosted image or pending remote addition."""
     with _lock_for(temp_dir):
+        if re.fullmatch(r"remote-\d+", screenshot_id):
+            _discard_remote_image(temp_dir, meta_data, screenshot_id)
+            return list_review_items(temp_dir, meta_data)
         if screenshot_id.startswith("remote-add-"):
             review = _load_review(temp_dir)
             additions = review.get("remote_additions")
@@ -277,21 +290,46 @@ def undo_remote_replacement(temp_dir: Path, screenshot_id: str) -> None:
         if re.fullmatch(r"remote-\d+", screenshot_id) is None:
             raise ValueError("Only remote replacements can be undone")
         review = _load_review(temp_dir)
-        replacements = review.get("remote_replacements")
-        if not isinstance(replacements, dict):
+        if not _drop_remote_replacement(temp_dir, review, screenshot_id):
             raise FileNotFoundError("No pending replacement found")
-        filename = replacements.pop(screenshot_id, None)
-        if not isinstance(filename, str):
-            raise FileNotFoundError("No pending replacement found")
-        replacement_file = temp_dir / "screenshots" / filename
-        if replacement_file.is_file():
-            replacement_file.unlink()
-        forget_file(temp_dir.parent.parent, temp_dir.name, replacement_file)
-        if replacements:
-            review["remote_replacements"] = replacements
-        else:
-            review.pop("remote_replacements", None)
         _save_review(temp_dir, review)
+
+
+def _drop_remote_replacement(temp_dir: Path, review: dict[str, Any], screenshot_id: str) -> bool:
+    """Remove a pending replacement frame from ``review``; return whether one existed."""
+    replacements = review.get("remote_replacements")
+    if not isinstance(replacements, dict):
+        return False
+    filename = replacements.pop(screenshot_id, None)
+    if not isinstance(filename, str):
+        return False
+    replacement_file = temp_dir / "screenshots" / filename
+    if replacement_file.is_file():
+        replacement_file.unlink()
+    forget_file(temp_dir.parent.parent, temp_dir.name, replacement_file)
+    if replacements:
+        review["remote_replacements"] = replacements
+    else:
+        review.pop("remote_replacements", None)
+    return True
+
+
+def _discard_remote_image(temp_dir: Path, meta_data: Mapping[str, object], screenshot_id: str) -> None:
+    """Drop a hosted image, and any pending replacement for it, from this run."""
+    remote_images = _remote_images(meta_data)
+    index = int(screenshot_id.removeprefix("remote-"))
+    if index >= len(remote_images):
+        raise FileNotFoundError("Screenshot not found")
+    review = _load_review(temp_dir)
+    review["discarded_remote_urls"] = sorted(_discarded_urls(review) | {_remote_key(remote_images[index])})
+    _drop_remote_replacement(temp_dir, review, screenshot_id)
+    for key in ("replacement_times", "generations"):
+        values = review.get(key)
+        if isinstance(values, dict):
+            values.pop(screenshot_id, None)
+            if not values:
+                review.pop(key, None)
+    _save_review(temp_dir, review)
 
 
 async def _capture_fresh_frame(temp_dir: Path, meta_data: Mapping[str, object], target: ReviewedScreenshot) -> float:
@@ -453,6 +491,22 @@ def staged_remote_uploads(temp_dir: Path, image_list: list[dict[str, Any]]) -> l
         return pending
 
 
+def discard_remote_images(temp_dir: Path, image_list: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[tuple[int | None, Path]]]:
+    """Drop hosted images discarded in review and stage the remaining uploads.
+
+    Pending replacements are keyed by their index in the reviewed list, so
+    they are remapped onto the kept images here.  Discards are keyed by URL,
+    which keeps this safe to repeat when a later run reloads the original list.
+    """
+    pending = staged_remote_uploads(temp_dir, image_list)
+    with _lock_for(temp_dir):
+        discarded = _discarded_urls(_load_review(temp_dir))
+    kept = [index for index, image in enumerate(image_list) if not (isinstance(image, Mapping) and _remote_key(image) in discarded)]
+    positions = {index: position for position, index in enumerate(kept)}
+    remapped = [(None if index is None else positions[index], path) for index, path in pending if index is None or index in positions]
+    return [image_list[index] for index in kept], remapped
+
+
 def apply_staged_remote_uploads(
     temp_dir: Path, image_list: list[dict[str, Any]], uploaded: list[dict[str, Any]], pending: list[tuple[int | None, Path]]
 ) -> list[dict[str, Any]]:
@@ -469,14 +523,10 @@ def apply_staged_remote_uploads(
         review = _load_review(temp_dir)
         replacements = review.get("remote_replacements") if isinstance(review.get("remote_replacements"), dict) else {}
         additions = review.get("remote_additions") if isinstance(review.get("remote_additions"), list) else []
-        replacement_indices = {index for index, _path in pending if index is not None}
-        addition_files = {path.name for index, path in pending if index is None}
-        for index in replacement_indices:
-            item_id = f"remote-{index}"
-            expected_file = next(path.name for pending_index, path in pending if pending_index == index)
-            if replacements.get(item_id) == expected_file:
-                replacements.pop(item_id, None)
-        remaining_additions = [value for value in additions if not isinstance(value, dict) or _string(value.get("file")) not in addition_files]
+        # Match by file name: pending indices may have been remapped past discarded images.
+        uploaded_files = {path.name for _index, path in pending}
+        replacements = {item_id: filename for item_id, filename in replacements.items() if filename not in uploaded_files}
+        remaining_additions = [value for value in additions if not isinstance(value, dict) or _string(value.get("file")) not in uploaded_files]
         if replacements:
             review["remote_replacements"] = replacements
         else:
@@ -494,6 +544,15 @@ def _remote_images(meta_data: Mapping[str, object]) -> list[dict[str, Any]]:
     if not isinstance(value, list):
         return []
     return [dict(image) for image in value if isinstance(image, Mapping) and _string(image.get("raw_url") or image.get("img_url"))]
+
+
+def _remote_key(image: Mapping[str, Any]) -> str:
+    return _string(image.get("raw_url")) or _string(image.get("img_url"))
+
+
+def _discarded_urls(review: Mapping[str, Any]) -> set[str]:
+    value = review.get("discarded_remote_urls")
+    return {url for url in value if isinstance(url, str) and url} if isinstance(value, list) else set()
 
 
 def _source_video(meta: Meta) -> str:

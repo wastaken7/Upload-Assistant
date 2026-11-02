@@ -16,6 +16,7 @@ from src.screenshot_review import (
     add_screenshot,
     apply_staged_remote_uploads,
     delete_screenshot,
+    discard_remote_images,
     image_version,
     list_review_items,
     list_screenshots,
@@ -330,3 +331,79 @@ def test_apply_staged_remote_uploads_preserves_later_review_changes(tmp_path: Pa
     apply_staged_remote_uploads(tmp_path, image_list, [{"img_url": "https://new.example/one.jpg", "raw_url": "https://new.example/one.jpg"}], pending)
 
     assert staged_remote_uploads(tmp_path, image_list) == [(1, second)]
+
+
+def _hosted(*names):
+    return [{"img_url": f"https://images.example/{name}-thumb.jpg", "raw_url": f"https://images.example/{name}.jpg"} for name in names]
+
+
+@pytest.mark.parametrize(("allow_empty", "expected"), [(False, 6), (True, 0)])
+def test_deleting_every_main_frame_falls_back_to_configured_target(release_dir, allow_empty, expected):
+    path = _register_images(release_dir, ["only.png"])[0]
+    item = next(item for item in list_screenshots(release_dir, {}) if item.path == path)
+
+    delete_screenshot(release_dir, {}, item.id)
+
+    assert target_count(release_dir, 6, allow_empty=allow_empty) == expected
+
+
+def test_discarding_remote_images_keeps_ids_stable_in_any_order(tmp_path: Path) -> None:
+    meta_data = {"image_list": _hosted("one", "two", "three", "four")}
+
+    delete_screenshot(tmp_path, meta_data, "remote-2")
+    remaining = delete_screenshot(tmp_path, meta_data, "remote-0")
+
+    assert [(item.id, item.remote_image["raw_url"]) for item in remaining] == [
+        ("remote-1", "https://images.example/two.jpg"),
+        ("remote-3", "https://images.example/four.jpg"),
+    ]
+    with pytest.raises(FileNotFoundError):
+        delete_screenshot(tmp_path, meta_data, "remote-9")
+
+
+def test_discarding_replaced_remote_image_drops_pending_replacement(release_dir):
+    replacement = _register_images(release_dir, ["replacement.png"])[0]
+    (release_dir / "screenshot_review.json").write_text(
+        json.dumps({"remote_replacements": {"remote-0": replacement.name}, "generations": {"remote-0": 1}}), encoding="utf-8"
+    )
+    meta_data = {"image_list": _hosted("one", "two")}
+
+    remaining = delete_screenshot(release_dir, meta_data, "remote-0")
+
+    assert [(item.id, item.source) for item in remaining] == [("remote-1", "remote")]
+    assert not replacement.exists()
+    assert staged_remote_uploads(release_dir, meta_data["image_list"]) == []
+    review = json.loads((release_dir / "screenshot_review.json").read_text())
+    assert "remote_replacements" not in review
+    assert "generations" not in review
+
+
+def test_discard_remote_images_remaps_replacements_onto_kept_images(tmp_path: Path) -> None:
+    screenshots = tmp_path / "screenshots"
+    screenshots.mkdir()
+    replacement = screenshots / "review-remote-2.png"
+    addition = screenshots / "review-remote-add-0.png"
+    replacement.write_bytes(b"png")
+    addition.write_bytes(b"png")
+    (tmp_path / "screenshot_review.json").write_text(
+        json.dumps({"remote_replacements": {"remote-2": replacement.name}, "remote_additions": [{"id": "remote-add-0", "file": addition.name}]}),
+        encoding="utf-8",
+    )
+    image_list = _hosted("one", "two", "three")
+    delete_screenshot(tmp_path, {"image_list": image_list}, "remote-0")
+
+    kept, pending = discard_remote_images(tmp_path, image_list)
+
+    assert [image["raw_url"] for image in kept] == ["https://images.example/two.jpg", "https://images.example/three.jpg"]
+    assert pending == [(1, replacement), (None, addition)]
+    # Reloading the original list on a later run prunes the same image again.
+    assert discard_remote_images(tmp_path, image_list) == (kept, pending)
+
+    final = apply_staged_remote_uploads(tmp_path, kept, _hosted("new-three", "new-addition"), pending)
+
+    assert [image["raw_url"] for image in final] == [
+        "https://images.example/two.jpg",
+        "https://images.example/new-three.jpg",
+        "https://images.example/new-addition.jpg",
+    ]
+    assert discard_remote_images(tmp_path, final) == (final, [])
