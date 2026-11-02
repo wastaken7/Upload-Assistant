@@ -226,6 +226,17 @@ class TrackerDataManager:
             version = 1
         await asyncio.to_thread(save_review, temp_dir, content, version)
 
+    async def _discard_description_draft(self, temp_dir: Path) -> None:
+        """Forget the Web UI draft after a discard.
+
+        Removing the file (instead of saving an empty draft) means ``apply_saved_draft``
+        has nothing to apply later, so a ``--description`` or template that ``gen_desc``
+        builds afterwards is not blanked by the description builder's second apply.
+        """
+        from src.description_review import review_path
+
+        await asyncio.to_thread(review_path(temp_dir).unlink, missing_ok=True)
+
     async def _review_explicit_tracker_description(self, meta: Meta, tracker_name: str, candidate: Meta) -> None:
         """Show the selected tracker description and let an interactive run keep, edit or discard it.
 
@@ -235,18 +246,24 @@ class TrackerDataManager:
         """
         if meta.unattended or not candidate.description:
             return
+        from src.description_review import load_review
+
         webui = bool(os.environ.get("UA_WEBUI_ACTIVE"))
         temp_dir = Path(meta.base_dir) / "tmp" / meta.uuid
+        shown = candidate.description
         if webui:
             await self._save_description_draft(temp_dir, candidate.description, only_if_missing=True)
-        logger.info(f"Selected description from {tracker_name}:\n{candidate.description[:1000]}", extra={"markup": False})
-        if webui:
-            logger.info("[cyan]Open the Description panel to edit it before uploading.[/cyan]")
+            # The panel may already hold an edited draft; "keep" uploads that, so show it.
+            saved = load_review(temp_dir).get("content")
+            if isinstance(saved, str):
+                shown = saved
+        logger.info(f"Selected description from {tracker_name}:\n{shown[:1000]}", extra={"markup": False})
         question, buttons = webui_events.letter_prompt([("e", "edit"), ("d", "discard")], "keep it")
         with webui_events.field_prompt(
             "Tracker description",
-            {"Tracker": tracker_name, "Description": candidate.description[:1000]},
+            {"Tracker": tracker_name, "Description": shown[:1000]},
             focus="Description",
+            hint="Open the Description panel to edit it before uploading." if webui else "",
             actions=buttons,
         ):
             choice = await prompt_in_thread(cli_ui.ask_string, "\n" + question)
@@ -264,7 +281,7 @@ class TrackerDataManager:
             candidate.description_provenance = {**candidate.description_provenance, "discarded": True}
             if webui:
                 # Otherwise the saved draft would bring the tracker text back at upload time.
-                await self._save_description_draft(temp_dir, "", only_if_missing=False)
+                await self._discard_description_draft(temp_dir)
 
     async def get_tracker_timestamps(self, base_dir: str | None = None) -> dict[str, float]:
         """Get tracker timestamps from the log file"""

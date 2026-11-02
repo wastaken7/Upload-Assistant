@@ -6,6 +6,7 @@ import pytest
 
 import src.get_tracker_data as tracker_data_module
 import src.trackers.common as common_module
+from src import webui_events
 from src.description_review import draft, load_review, save_review
 from src.get_tracker_data import TrackerDataManager
 from src.meta import Meta
@@ -227,8 +228,82 @@ def test_webui_tracker_description_discard_clears_saved_draft(tmp_path, monkeypa
 
         assert candidate.description == ""
         assert candidate.description_provenance["discarded"] is True
-        assert load_review(tmp_path / "tmp" / "release")["content"] == ""
-        assert draft({"description": "tracker text"}, tmp_path / "tmp" / "release")[0] == ""
+        assert load_review(tmp_path / "tmp" / "release") == {}
+        assert draft({"description": ""}, tmp_path / "tmp" / "release")[0] == ""
+
+    asyncio.run(run())
+
+
+def test_webui_discard_keeps_an_inline_description_through_the_builder(tmp_path, monkeypatch):
+    # The description builder applies the saved draft a second time: an empty draft used to blank --description.
+    from src.description_review import apply_saved_draft
+
+    async def run():
+        manager = TrackerDataManager({"DEFAULT": {}, "TRACKERS": {}})
+        meta = Meta({"base_dir": str(tmp_path), "uuid": "release", "unattended": False, "description_inline": "my own text"})
+        candidate = Meta({"description": "tracker text", "description_provenance": {"source": "AITHER"}})
+        monkeypatch.setenv("UA_WEBUI_ACTIVE", "1")
+        monkeypatch.setattr("src.get_tracker_data.cli_ui.ask_string", lambda _prompt: "d")
+
+        await manager._review_explicit_tracker_description(meta, "AITHER", candidate)
+        meta.description = "my own text"  # what gen_desc builds from --description afterwards
+        apply_saved_draft(meta)
+
+        assert meta.description == "my own text"
+
+    asyncio.run(run())
+
+
+def test_webui_prompt_shows_the_draft_the_panel_already_holds(tmp_path, monkeypatch):
+    async def run():
+        manager = TrackerDataManager({"DEFAULT": {}, "TRACKERS": {}})
+        meta = Meta({"base_dir": str(tmp_path), "uuid": "release", "unattended": False})
+        candidate = Meta({"description": "tracker text", "description_provenance": {"source": "AITHER"}})
+        save_review(tmp_path / "tmp" / "release", "edited in the panel", 3)
+        monkeypatch.setenv("UA_WEBUI_ACTIVE", "1")
+        messages = []
+        prompts = []
+        monkeypatch.setattr("src.get_tracker_data.logger.info", lambda message, **_kwargs: messages.append(str(message)))
+        monkeypatch.setattr("src.get_tracker_data.cli_ui.ask_string", lambda _prompt: "")
+
+        real_field_prompt = webui_events.field_prompt
+
+        def spy(title, summary=None, **kwargs):
+            prompts.append((summary, kwargs))
+            return real_field_prompt(title, summary, **kwargs)
+
+        monkeypatch.setattr("src.get_tracker_data.webui_events.field_prompt", spy)
+
+        await manager._review_explicit_tracker_description(meta, "AITHER", candidate)
+
+        assert load_review(tmp_path / "tmp" / "release")["content"] == "edited in the panel"
+        assert any("edited in the panel" in message for message in messages)
+        assert prompts[0][0]["Description"] == "edited in the panel"
+        assert prompts[0][1]["hint"] == "Open the Description panel to edit it before uploading."
+        assert not any("Open the Description panel" in message for message in messages)
+
+    asyncio.run(run())
+
+
+def test_terminal_prompt_has_no_panel_hint(monkeypatch):
+    async def run():
+        manager = TrackerDataManager({"DEFAULT": {}, "TRACKERS": {}})
+        meta = Meta({"unattended": False})
+        candidate = Meta({"description": "tracker text", "description_provenance": {"source": "AITHER"}})
+        monkeypatch.delenv("UA_WEBUI_ACTIVE", raising=False)
+        prompts = []
+        real_field_prompt = webui_events.field_prompt
+
+        def spy(title, summary=None, **kwargs):
+            prompts.append(kwargs)
+            return real_field_prompt(title, summary, **kwargs)
+
+        monkeypatch.setattr("src.get_tracker_data.webui_events.field_prompt", spy)
+        monkeypatch.setattr("src.get_tracker_data.cli_ui.ask_string", lambda _prompt: "")
+
+        await manager._review_explicit_tracker_description(meta, "AITHER", candidate)
+
+        assert prompts[0]["hint"] == ""
 
     asyncio.run(run())
 
