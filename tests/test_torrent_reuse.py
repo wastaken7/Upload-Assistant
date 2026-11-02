@@ -466,6 +466,7 @@ async def test_reuse_validation_compares_file_structure(tmp_path, mode, torrent_
         is_disc="BDMV" if mode == "disc" else "",
         keep_folder=mode == "keep_folder",
         isdir=True,
+        category="TV",
     )
 
     valid, _ = await Clients({}).is_valid_torrent(meta, str(torrent_path), torrent.infohash, "qbit", {})
@@ -817,5 +818,55 @@ async def test_music_reuse_rejects_audio_only_torrent_for_folder_with_extras(tmp
     meta = Meta(path=str(release), filelist=[str(track)], category="MUSIC", isdir=True, trackers=[])
 
     valid, _ = await Clients({}).is_valid_torrent(meta, str(torrent_path), torrent.infohash, "qbit", {})
+
+    assert not valid  # noqa: S101
+
+
+@pytest.mark.asyncio
+async def test_book_folder_reuse_matches_whole_folder_creation(tmp_path):
+    release = tmp_path / "Fictional Author - Example Collection"
+    release.mkdir()
+    books = [release / "Example Volume One.epub", release / "Example Volume Two.epub"]
+    for book in books:
+        book.write_bytes(b"book data")
+    (release / "Example Collection.nfo").write_bytes(b"nfo data")
+    meta = Meta(
+        base_dir=str(tmp_path),
+        uuid=release.name,
+        path=str(release),
+        filelist=[str(book) for book in books],
+        category="BOOK",
+        isdir=True,
+        mkbrr=False,
+        max_piece_size=1,
+        trackers=[],
+    )
+    (tmp_path / "tmp" / meta.uuid).mkdir(parents=True)
+
+    torrent_path = await TorrentCreator.create_torrent(meta, str(release), "BASE")
+    torrent = Torrent.read(torrent_path)
+    assert len(torrent.files) == 3  # noqa: S101
+
+    valid, _ = await Clients({}).is_valid_torrent(meta, str(torrent_path), torrent.infohash, "qbit", {})
+
+    assert valid  # noqa: S101
+
+
+@pytest.mark.asyncio
+async def test_whole_folder_reuse_rejects_a_missing_release_folder(tmp_path):
+    release = tmp_path / "Fictional Artist - Example Album (2001) [FLAC]"
+    release.mkdir()
+    track = release / "01 - Example Track.flac"
+    track.write_bytes(b"audio data")
+    torrent = Torrent(path=release, piece_size=32768)
+    torrent.generate()
+    torrent_path = tmp_path / "candidate.torrent"
+    torrent.write(torrent_path)
+    infohash = torrent.infohash
+    track.unlink()
+    release.rmdir()
+    meta = Meta(path=str(release), filelist=[str(track)], category="MUSIC", isdir=True, trackers=[])
+
+    valid, _ = await Clients({}).is_valid_torrent(meta, str(torrent_path), infohash, "qbit", {})
 
     assert not valid  # noqa: S101

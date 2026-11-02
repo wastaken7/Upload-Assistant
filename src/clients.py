@@ -665,16 +665,21 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
             logger.info(f"[bold red]Error reading torrent file: {e}")
             return False, torrent_path
 
-        # Music torrents are created from the whole folder (artwork, logs, cues), always keeping its root.
-        is_music_folder = meta.category == "MUSIC" and bool(meta.isdir)
-        keep_root = bool(meta.is_disc or is_music_folder or (meta.keep_folder and meta.isdir))
+        # Matches TorrentCreator.create_torrent: outside MOVIE/TV, a folder release is created from the
+        # whole folder (artwork, logs, cues, NFOs), always keeping its root. Music keeps even one-track folders.
+        is_whole_folder = bool(meta.isdir and not meta.is_disc and meta.category not in ("MOVIE", "TV") and (meta.category == "MUSIC" or len(filelist) > 1 or meta.keep_folder))
+        keep_root = bool(meta.is_disc or is_whole_folder or (meta.keep_folder and meta.isdir))
         root = Path(meta_path) if meta.isdir or meta.is_disc else Path(meta_path).parent
         torrent_name = torrent.metainfo["info"]["name"]
-        if meta.is_disc:
-            filelist = [str(path) for path in Torrent(path=root, exclude_globs=DISC_EXCLUDE_GLOBS).filepaths]
-            candidates = [filelist, [file for file in filelist if Path(file).suffix.casefold() not in SUBTITLE_EXTENSIONS]]
-        elif is_music_folder:
-            candidates = [[str(path) for path in Torrent(path=root).filepaths]]
+        if meta.is_disc or is_whole_folder:
+            exclude_globs = DISC_EXCLUDE_GLOBS if meta.is_disc else ()
+            try:
+                folder_files = await asyncio.to_thread(lambda: [str(path) for path in Torrent(path=root, exclude_globs=exclude_globs).filepaths])
+            except Exception as e:
+                # A missing, empty or unreadable folder cannot match the candidate torrent.
+                logger.info(f"[bold red]Error reading release folder {root}: {e}")
+                return False, torrent_path
+            candidates = [folder_files, [file for file in folder_files if Path(file).suffix.casefold() not in SUBTITLE_EXTENSIONS]] if meta.is_disc else [folder_files]
         else:
             candidates = [filelist]
             if meta.subtitle_files:
