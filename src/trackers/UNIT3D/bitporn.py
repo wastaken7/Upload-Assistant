@@ -203,7 +203,8 @@ class BitPorn(UNIT3D):
         if images:
             placeholders = "".join(f"[upimg{index}]" for index in range(1, len(images) + 1))
             description = f"{description}\n[center]{placeholders}[/center]"
-        return {"description": description}
+        # get_data does not call UNIT3D.get_data, so fit the description here.
+        return {"description": self.fit_description(meta, description)}
 
     async def get_data(self, meta: Meta, preview: bool = False) -> dict[str, str]:
         """Build only the documented BitPorn upload fields."""
