@@ -920,10 +920,14 @@ async def dvd_screenshots(
     height: float = 0.0
     frame_rate: float = 24.0
     ifo_duration = 0.0
+    pgc_durations: list[float] = []
     tracks: list[Any] = []
     tracks.extend(cast(list[Any], getattr(ifo_mi, "tracks", [])))
     for track in tracks:
-        if track.track_type == "Video":
+        if track.track_type == "Menu":
+            with contextlib.suppress(TypeError, ValueError):
+                pgc_durations.append(float(track.duration) / 1000)
+        elif track.track_type == "Video":
             if isinstance(track.duration, str):
                 durations = [float(d) for d in track.duration.split(" / ")]
                 ifo_duration = max(durations) / 1000
@@ -935,6 +939,10 @@ async def dvd_screenshots(
             width = float(track.width)
             height = float(track.height)
             frame_rate = float(track.frame_rate)
+    # MediaInfo reports the sum of every program chain as the IFO video duration, which on
+    # episodic discs far exceeds the video in the VOBs; seek within the longest chain instead.
+    if len(pgc_durations) > 1 and 0 < max(pgc_durations) < ifo_duration:
+        ifo_duration = max(pgc_durations)
     meta.frame_rate = frame_rate
     w_sar, h_sar = screenshot_par_scale_factors(width, height, par, dar, should_scale_dvd_screenshots_for_par())
 
