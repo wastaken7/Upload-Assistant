@@ -138,8 +138,8 @@ async def get_tag(video: str, meta: Meta, season_pack_check: bool = False) -> st
     if tag == "-":
         tag = ""
 
-    # Remove generic "no group" tags
-    if tag and tag[1:].lower() in ["hd.ma.5.1", "untouched"]:
+    # Remove generic "no group" tags and audio-language markers (e.g. "-DUAL")
+    if tag and tag[1:].lower() in ["hd.ma.5.1", "untouched", "dual", "multi"]:
         tag = ""
 
     return tag
