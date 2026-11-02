@@ -176,7 +176,31 @@ def get_tracker_domain(tracker: str, config: dict[str, Any] | None = None) -> st
     return t_lower
 
 
-def find_cookie_file(base_dir: str, tracker: str, config: dict[str, Any] | None = None) -> str:
+class CookieDirectoryScan:
+    """One listing of data/cookies whose file heads are read at most once.
+
+    Looking up every supported tracker re-lists the directory and re-reads each
+    unmatched file per tracker; sharing a scan keeps that to one pass.
+    """
+
+    def __init__(self, base_dir: str | Path) -> None:
+        cookies_dir = Path(base_dir) / "data" / "cookies"
+        self.files: list[Path] = sorted((path for path in cookies_dir.glob("*") if path.is_file()), key=lambda p: p.name) if cookies_dir.exists() else []
+        self._heads: dict[Path, str] = {}
+
+    def head(self, file_path: Path) -> str:
+        """Return the lower-cased first 10 KiB of a cookie file, or "" when unreadable."""
+        if file_path not in self._heads:
+            try:
+                with file_path.open("r", encoding="utf-8", errors="ignore") as f:
+                    self._heads[file_path] = f.read(10240).lower()
+            except Exception as e:
+                logger.error(f"[yellow]Warning: Error reading cookie file: {e}[/yellow]")
+                self._heads[file_path] = ""
+        return self._heads[file_path]
+
+
+def find_cookie_file(base_dir: str, tracker: str, config: dict[str, Any] | None = None, *, scan: CookieDirectoryScan | None = None) -> str:
     """
     Find the cookie file for a tracker.
     First checks if the tracker's config has a custom 'cookie_file' path.
@@ -184,6 +208,8 @@ def find_cookie_file(base_dir: str, tracker: str, config: dict[str, Any] | None 
     - First looks for files whose names contain the tracker name (case insensitive).
     - If not found, looks for text/json files whose contents contain the tracker's domain.
     - If still not found, falls back to the default 'data/cookies/{tracker}.txt' (or json/etc).
+
+    Callers resolving many trackers can pass one ``scan`` of the same base_dir.
     """
     cookies_dir = Path(base_dir) / "data" / "cookies"
     if not cookies_dir.exists():
@@ -204,31 +230,22 @@ def find_cookie_file(base_dir: str, tracker: str, config: dict[str, Any] | None 
 
     # 2. Try to find by filename match in data/cookies/
     if cookies_dir.exists():
-        files: list[Path] = sorted(cookies_dir.glob("*"), key=lambda p: p.name)
+        scan = scan or CookieDirectoryScan(base_dir)
+        files = scan.files
 
         # Check for exact name match (with any extension)
-        matching_files.extend(file_path for file_path in files if file_path.is_file() and file_path.stem.lower() == tracker.lower())
+        matching_files.extend(file_path for file_path in files if file_path.stem.lower() == tracker.lower())
 
         # Check for partial name match (e.g. "my_avistaz_cookies.txt")
         if not matching_files:
-            matching_files.extend(file_path for file_path in files if file_path.is_file() and tracker.lower() in file_path.name.lower())
+            matching_files.extend(file_path for file_path in files if tracker.lower() in file_path.name.lower())
 
         # 3. Try to find by content/domain match
         if not matching_files:
             domain = get_tracker_domain(tracker, config)
             if domain:
-                for file_path in files:
-                    if not file_path.is_file():
-                        continue
-                    # Only search text/json files
-                    if file_path.suffix.lower() in [".txt", ".json"]:
-                        try:
-                            with file_path.open("r", encoding="utf-8", errors="ignore") as f:
-                                head = f.read(10240)
-                                if domain in head.lower():
-                                    matching_files.append(file_path)
-                        except Exception as e:
-                            logger.error(f"[yellow]Warning: Error reading cookie file: {e}[/yellow]")
+                # Only search text/json files
+                matching_files.extend(file_path for file_path in files if file_path.suffix.lower() in [".txt", ".json"] and domain in scan.head(file_path))
 
     if matching_files:
         if len(matching_files) > 1:
