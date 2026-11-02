@@ -208,15 +208,18 @@ def test_manual_archive_leaves_out_torrents_with_tracker_credentials(tmp_path):
         (release / relative).write_bytes(b"x")
     archive = release / "Show.tar"
     archive.write_bytes(b"previous archive")
-    # An archive from an earlier run under another title may predate the filter.
+    # Archives from earlier runs may predate the filter. A title with no ASCII
+    # characters produces ".tar", a name Path.suffix does not recognise.
     (release / "Old.Title.tar").write_bytes(b"older archive")
+    (release / ".tar").write_bytes(b"untitled archive")
+    (release / ".torrent").write_bytes(b"untitled torrent")
 
     _write_archive(str(archive), release, {"Show.S01.torrent"})
 
     with tarfile.open(archive) as tar:
         names = {Path(name).as_posix() for name in tar.getnames()}
     assert {"BASE.torrent", "Show.S01.torrent", "GENERIC_INFO.txt", "screenshots/FILE_1-0.png", "torrents/16777216/0123abcd.torrent"} <= names
-    assert not {"[ALPHA].torrent", "torrents/.client/0123abcd.torrent", "Show.tar", "Old.Title.tar"} & names
+    assert not {"[ALPHA].torrent", "torrents/.client/0123abcd.torrent", "Show.tar", "Old.Title.tar", ".tar", ".torrent"} & names
     # The tracker torrents stay available for the client and for manual adding.
     assert (release / "[ALPHA].torrent").exists()
     assert (release / "torrents/.client/0123abcd.torrent").exists()

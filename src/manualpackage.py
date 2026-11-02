@@ -31,10 +31,12 @@ def _is_shareable(relative: Path, shareable_torrents: set[str]) -> bool:
     if ".client" in relative.parts:
         return False
     if len(relative.parts) == 1:
-        suffix = relative.suffix.casefold()
-        if suffix == ".tar":
+        # Match the name, not Path.suffix: an archive for a title with no
+        # ASCII characters is named ".tar", which has no suffix.
+        name = relative.name.casefold()
+        if name.endswith(".tar"):
             return False
-        if suffix == ".torrent" and not relative.name.startswith(("BASE", "[RAND")) and relative.name not in shareable_torrents:
+        if name.endswith(".torrent") and not relative.name.startswith(("BASE", "[RAND")) and relative.name not in shareable_torrents:
             return False
     return True
 
