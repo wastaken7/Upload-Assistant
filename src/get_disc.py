@@ -10,6 +10,7 @@ import aiofiles
 from bin.get_bdinfo import BDInfoBinaryManager
 from src.console import logger
 from src.discparse import DiscParse
+from src.exceptions import UnsupportedSiteCheckError
 from src.meta import Meta
 
 Disc = dict[str, Any]
@@ -40,8 +41,7 @@ class DiscInfoManager:
 
         if is_disc == "BDMV":
             if meta.site_check:
-                logger.info("BDMV disc checking is not supported in site_check mode, yet.", extra={"markup": False})
-                raise RuntimeError("BDMV disc checking is not supported in site_check mode.")
+                raise UnsupportedSiteCheckError("BDMV disc checking is not supported in site_check mode, yet.")
             # Ensure bdinfo binary is present for BDMV processing
             try:
                 await BDInfoBinaryManager.ensure_bdinfo_binary(meta.base_dir)
