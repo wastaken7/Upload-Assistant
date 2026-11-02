@@ -125,6 +125,84 @@ async def test_prompt_music_meta_requires_artwork_for_seedpool(tmp_path: Path) -
     assert meta.artwork_path == str(cover_file.resolve())
 
 
+def _png_bytes() -> bytes:
+    buffer = BytesIO()
+    Image.new("RGB", (32, 48), "teal").save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+@pytest.mark.asyncio
+async def test_prompt_music_meta_saves_a_cover_url_locally_for_seedpool(tmp_path: Path) -> None:
+    meta = Meta(
+        category="MUSIC",
+        base_dir=str(tmp_path),
+        uuid="music-cover-url",
+        artist="Test Artist",
+        title="Test Album",
+        year=2024,
+        source="CD",
+        trackers=["SEEDPOOL"],
+        music_release={"fields": {"release_type": {"value": "Album"}}},
+    )
+
+    with (
+        patch("upload.CLI_UI.ask_string", return_value="https://images.example/cover.png") as mocked,
+        patch("upload._download_music_cover", return_value=_png_bytes()),
+    ):
+        await _prompt_music_meta(meta)
+
+    # SEEDPOOL checks a local cover before the image host runs.
+    assert mocked.call_count == 1
+    assert meta.artwork_url == "https://images.example/cover.png"
+    assert Path(meta.artwork_path).is_file()
+
+
+@pytest.mark.asyncio
+async def test_prompt_music_meta_downloads_a_known_cover_url_for_seedpool_without_asking(tmp_path: Path) -> None:
+    meta = Meta(
+        category="MUSIC",
+        base_dir=str(tmp_path),
+        uuid="music-known-cover",
+        artist="Test Artist",
+        title="Test Album",
+        year=2024,
+        source="CD",
+        trackers=["SEEDPOOL"],
+        artwork_url="https://images.example/cover.png",
+        music_release={"fields": {"release_type": {"value": "Album"}}},
+    )
+
+    with patch("upload.CLI_UI.ask_string") as mocked, patch("upload._download_music_cover", return_value=_png_bytes()):
+        await _prompt_music_meta(meta)
+
+    mocked.assert_not_called()
+    assert Path(meta.artwork_path).is_file()
+
+
+@pytest.mark.asyncio
+async def test_unattended_music_upload_does_not_warn_about_optional_artwork() -> None:
+    meta = Meta(
+        category="MUSIC",
+        artist="Test Artist",
+        title="Test Album",
+        year=2024,
+        source="CD",
+        trackers=["LST"],
+        unattended=True,
+        music_release={"fields": {"release_type": {"value": "Album"}}},
+    )
+
+    with patch("upload.logger") as logger:
+        await _prompt_music_meta(meta)
+
+    assert not any("will be skipped" in str(call) for call in logger.info.call_args_list)
+    meta.trackers = ["SEEDPOOL"]
+    with patch("upload.logger") as logger:
+        await _prompt_music_meta(meta)
+
+    assert any("artwork" in str(call) and "will be skipped" in str(call) for call in logger.info.call_args_list)
+
+
 @pytest.mark.asyncio
 async def test_generic_artwork_cli_args_normalize_local_images(tmp_path: Path) -> None:
     cover_file = tmp_path / "cli_cover.png"

@@ -741,6 +741,26 @@ async def test_corrections_and_skip_reach_the_callers_metadata(workspace, monkey
 
 
 @pytest.mark.asyncio
+async def test_adding_a_tracker_that_requires_music_artwork_asks_for_it_again(workspace, monkeypatch):
+    def parse(_args, candidate):
+        candidate.trackers = ["LST", "SEEDPOOL"]
+        return candidate, None, None
+
+    upload, meta, prep, state = _confirmation_loop(workspace, monkeypatch, parse=parse)
+    meta.category = "MUSIC"
+    meta.trackers = ["LST"]
+    prep.gather_prep = AsyncMock(side_effect=lambda meta, **_kwargs: meta)
+    prompt_music = AsyncMock()
+    monkeypatch.setattr(upload, "_prompt_music_meta", prompt_music)
+    monkeypatch.setattr(upload, "_confirm_music_folder_hints", AsyncMock())
+    monkeypatch.setattr(upload, "CLI_UI", SimpleNamespace(ask_string=Mock(side_effect=["--trackers LST,SEEDPOOL", "skip"])))
+
+    assert await upload.process_meta(meta, str(state)) is False
+    # Once before the confirmation prompt, then again after the edit added SEEDPOOL without artwork.
+    assert prompt_music.await_count == 2
+
+
+@pytest.mark.asyncio
 async def test_invalid_correction_arguments_reprompt_instead_of_exiting(workspace, monkeypatch):
     def parse(_args, _candidate):
         raise SystemExit(2)
