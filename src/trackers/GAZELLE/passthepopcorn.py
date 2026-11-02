@@ -602,15 +602,17 @@ class PassThePopcorn:
             poster_path = tmp_dir / f"PTP_POSTER{self._poster_extension(image_url, response.headers.get('content-type', ''))}"
             await asyncio.to_thread(poster_path.write_bytes, response.content)
 
-            original_imghost = meta.imghost
-            meta.imghost = selected_host
-            try:
-                uploaded_images, _ = await self.uploadscreens_manager.upload_screens(meta, 1, 1, 0, 1, [str(poster_path)], {})
-            finally:
-                if original_imghost is None:
-                    meta.pop("imghost", None)
-                else:
-                    meta.imghost = original_imghost
+            # The host switch is visible to every tracker sharing this meta.
+            async with release_image_lock(meta):
+                original_imghost = meta.imghost
+                meta.imghost = selected_host
+                try:
+                    uploaded_images, _ = await self.uploadscreens_manager.upload_screens(meta, 1, 1, 0, 1, [str(poster_path)], {})
+                finally:
+                    if original_imghost is None:
+                        meta.pop("imghost", None)
+                    else:
+                        meta.imghost = original_imghost
 
             if uploaded_images:
                 uploaded_url = uploaded_images[0].get("raw_url") or uploaded_images[0].get("img_url")
@@ -939,15 +941,17 @@ class PassThePopcorn:
         menu_images = get_tracker_image_collection(meta, self.tracker, "menu_images")
         return cast(list[dict[str, Any]], [*menu_images, *screenshots])
 
-    def _approved_pack_images(self, meta: Meta, image_key: str) -> list[dict[str, Any]]:
-        """Return the shared pack images that are hosted where PTP accepts them.
+    def _approved_pack_images(self, meta: Meta, image_key: str, required: int) -> list[dict[str, Any]]:
+        """Return the shared pack images to reuse, or nothing when the group must be regenerated.
 
         Another tracker may have hosted the pack images first, under its own
-        image-host rules. Images on hosts PTP does not accept are regenerated.
+        image-host rules. A group is reused only when enough of its images are
+        on hosts PTP accepts.
         """
         images = meta.get(image_key) or []
         mapping = self.image_host_policy.url_host_mapping
-        return [image for image in images if isinstance(image, dict) and _image_host(str(image.get("raw_url", "")), mapping) in self.approved_image_hosts]
+        approved = [image for image in images if isinstance(image, dict) and _image_host(str(image.get("raw_url", "")), mapping) in self.approved_image_hosts]
+        return approved if len(approved) >= required else []
 
     def _description_image_limit(self, meta: Meta, screenshot_limit: int) -> int:
         if not meta.is_disc:
@@ -1109,7 +1113,7 @@ class PassThePopcorn:
                                     {"img_url": str(img.get("img_url", "")), "raw_url": str(img.get("raw_url", "")), "web_url": str(img.get("web_url", ""))}
                                 )
 
-                    if approved_images := self._approved_pack_images(meta, new_images_key):
+                    if approved_images := self._approved_pack_images(meta, new_images_key, multi_screens):
                         desc.write(f"\n[b]{edition}[/b]\n\n")
                         # Use the summary corresponding to the current bdinfo
                         desc.write(f"[mediainfo]{summary}[/mediainfo]\n\n")
@@ -1186,7 +1190,7 @@ class PassThePopcorn:
                                     meta[new_images_key].append(
                                         {"img_url": str(img.get("img_url", "")), "raw_url": str(img.get("raw_url", "")), "web_url": str(img.get("web_url", ""))}
                                     )
-                        if approved_images := self._approved_pack_images(meta, new_images_key):
+                        if approved_images := self._approved_pack_images(meta, new_images_key, multi_screens):
                             for img in approved_images:
                                 raw_url = str(img.get("raw_url", ""))
                                 desc.write(f"[img]{raw_url}[/img]\n")
@@ -1244,7 +1248,7 @@ class PassThePopcorn:
                                 meta[new_images_key] = []
                                 for img in saved_images:
                                     meta[new_images_key].append({"img_url": img.get("img_url", ""), "raw_url": img.get("raw_url", ""), "web_url": img.get("web_url", "")})
-                        if approved_images := self._approved_pack_images(meta, new_images_key):
+                        if approved_images := self._approved_pack_images(meta, new_images_key, multi_screens):
                             for img in approved_images:
                                 raw_url = img["raw_url"]
                                 desc.write(f"[img]{raw_url}[/img]\n")
@@ -1365,7 +1369,7 @@ class PassThePopcorn:
                             meta[new_images_key] = []
                             for img in saved_images:
                                 meta[new_images_key].append({"img_url": img.get("img_url", ""), "raw_url": img.get("raw_url", ""), "web_url": img.get("web_url", "")})
-                    if approved_images := self._approved_pack_images(meta, new_images_key):
+                    if approved_images := self._approved_pack_images(meta, new_images_key, multi_screens):
                         for img in approved_images:
                             raw_url = img["raw_url"]
                             desc.write(f"[img]{raw_url}[/img]\n")

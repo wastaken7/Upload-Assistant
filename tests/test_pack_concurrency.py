@@ -1,6 +1,8 @@
 # ruff: noqa: S101
 
 import asyncio
+import tarfile
+from pathlib import Path
 
 import pytest
 
@@ -179,11 +181,43 @@ def test_ptp_reuses_only_pack_images_on_hosts_it_accepts(tmp_path):
     assert isinstance(ptp.image_host_policy, ImageHostPolicy)
     accepted = {"img_url": "https://img.pixhost.to/a.png", "raw_url": "https://img.pixhost.to/a.png", "web_url": "https://pixhost.to/a"}
     rejected = {"img_url": "https://other-host.example/b.png", "raw_url": "https://other-host.example/b.png", "web_url": "https://other-host.example/b"}
-    meta = _pack_meta(tmp_path, new_images_file_1=[accepted, rejected], new_images_file_2=[rejected])
+    meta = _pack_meta(tmp_path, new_images_file_1=[accepted, rejected], new_images_file_2=[rejected], new_images_file_3=[accepted, accepted])
 
-    assert ptp._approved_pack_images(meta, "new_images_file_1") == [accepted]
-    assert ptp._approved_pack_images(meta, "new_images_file_2") == []
-    assert ptp._approved_pack_images(meta, "new_images_file_3") == []
+    assert ptp._approved_pack_images(meta, "new_images_file_1", 1) == [accepted]
+    # Too few accepted images left: the group is regenerated instead.
+    assert ptp._approved_pack_images(meta, "new_images_file_1", 2) == []
+    assert ptp._approved_pack_images(meta, "new_images_file_2", 1) == []
+    assert ptp._approved_pack_images(meta, "new_images_file_3", 2) == [accepted, accepted]
+    assert ptp._approved_pack_images(meta, "new_images_file_4", 1) == []
+
+
+def test_manual_archive_leaves_out_torrents_with_tracker_credentials(tmp_path):
+    from src.manualpackage import _write_archive
+
+    release = tmp_path / "tmp" / "pack"
+    for relative in (
+        "[ALPHA].torrent",
+        "BASE.torrent",
+        "Show.S01.torrent",
+        "GENERIC_INFO.txt",
+        "screenshots/FILE_1-0.png",
+        "torrents/.client/0123abcd.torrent",
+        "torrents/16777216/0123abcd.torrent",
+    ):
+        (release / relative).parent.mkdir(parents=True, exist_ok=True)
+        (release / relative).write_bytes(b"x")
+    archive = release / "Show.tar"
+    archive.write_bytes(b"previous archive")
+
+    _write_archive(str(archive), release, {"Show.S01.torrent"})
+
+    with tarfile.open(archive) as tar:
+        names = {Path(name).as_posix() for name in tar.getnames()}
+    assert {"BASE.torrent", "Show.S01.torrent", "GENERIC_INFO.txt", "screenshots/FILE_1-0.png", "torrents/16777216/0123abcd.torrent"} <= names
+    assert not {"[ALPHA].torrent", "torrents/.client/0123abcd.torrent", "Show.tar"} & names
+    # The tracker torrents stay available for the client and for manual adding.
+    assert (release / "[ALPHA].torrent").exists()
+    assert (release / "torrents/.client/0123abcd.torrent").exists()
 
 
 def test_concurrent_trackers_create_each_pack_file_image_once(tmp_path, monkeypatch):
