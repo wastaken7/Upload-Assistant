@@ -1597,14 +1597,11 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
                 status_dict = meta.tracker_status.setdefault(tracker, {})
                 status_dict["skip_upload"] = meta.unattended_audio_skip or meta.unattended_subtitle_skip
 
-        await asyncio.sleep(0.2)
         await write_meta_file(meta)
         _publish_webui_preview_target(cast(str, meta.path or ""), meta.uuid or None)
-        await asyncio.sleep(0.2)
 
         try:
             await validate_tracker_logins(meta, trackers)
-            await asyncio.sleep(0.2)
         except Exception as e:
             logger.warning(f"[yellow]Warning: Tracker validation encountered an error: {e}[/yellow]")
 
@@ -2477,7 +2474,7 @@ async def update_notification() -> str:
     if cached_response:
         remote_version, remote_content = cached_response
     else:
-        remote_version, remote_content = get_remote_version(remote_version_url)
+        remote_version, remote_content = await asyncio.to_thread(get_remote_version, remote_version_url)
         if remote_version and remote_content:
             _write_update_notification_cache(remote_version, remote_content)
     if not remote_version:
@@ -2541,26 +2538,6 @@ async def do_the_thing(base_dir: str) -> None:
 
     configure_stats(config)
 
-    from src.prowlarr import ProwlarrError, apply_prowlarr_credentials, configured_prowlarr, fetch_prowlarr_credentials
-
-    if prowlarr_connection := configured_prowlarr(config):
-        prowlarr_started = time.monotonic()
-        try:
-            report = await asyncio.to_thread(
-                fetch_prowlarr_credentials,
-                prowlarr_connection[0],
-                prowlarr_connection[1],
-                set(tracker_class_map),
-            )
-            applied = apply_prowlarr_credentials(config, report)
-            await record_event_async("api", service="prowlarr", operation="credential_sync", outcome="success", duration_ms=(time.monotonic() - prowlarr_started) * 1000)
-            logger.debug(f"[green]Prowlarr supplied fallback credentials for {len(applied)} tracker(s).[/green]")
-        except ProwlarrError as exc:
-            await record_event_async("api", service="prowlarr", operation="credential_sync", outcome="error", duration_ms=(time.monotonic() - prowlarr_started) * 1000)
-            logger.warning(f"[yellow]Prowlarr credential fallback unavailable: {exc}[/yellow]")
-
-    await asyncio.sleep(0.1)  # Ensure it's not racing
-
     tmp_dir = Path(base_dir) / "tmp"
     if not Path(tmp_dir).exists():
         if os.name != "nt":
@@ -2607,8 +2584,32 @@ async def do_the_thing(base_dir: str) -> None:
         else:
             break
 
+    from src.prowlarr import ProwlarrError, apply_prowlarr_credentials, configured_prowlarr, fetch_prowlarr_credentials
+
+    # Both are network round trips that do not depend on each other. They run
+    # after stdin is read, so a paste prompt never waits on them.
+    update_check = asyncio.create_task(update_notification())
+    try:
+        if prowlarr_connection := configured_prowlarr(config):
+            prowlarr_started = time.monotonic()
+            try:
+                report = await asyncio.to_thread(
+                    fetch_prowlarr_credentials,
+                    prowlarr_connection[0],
+                    prowlarr_connection[1],
+                    set(tracker_class_map),
+                )
+                applied = apply_prowlarr_credentials(config, report)
+                await record_event_async("api", service="prowlarr", operation="credential_sync", outcome="success", duration_ms=(time.monotonic() - prowlarr_started) * 1000)
+                logger.debug(f"[green]Prowlarr supplied fallback credentials for {len(applied)} tracker(s).[/green]")
+            except ProwlarrError as exc:
+                await record_event_async("api", service="prowlarr", operation="credential_sync", outcome="error", duration_ms=(time.monotonic() - prowlarr_started) * 1000)
+                logger.warning(f"[yellow]Prowlarr credential fallback unavailable: {exc}[/yellow]")
+    finally:
+        current_version = await update_check
+
     meta.ua_name = "Upload-Assistant"
-    meta.current_version = await update_notification()
+    meta.current_version = current_version
 
     signature = f"Shared with {meta.ua_name}"
     if meta.current_version:

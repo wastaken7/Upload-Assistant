@@ -391,18 +391,18 @@ async def process_trackers(
                     logger.info(traceback.format_exc(), extra={"markup": False})
                     return
 
-    multi_screens = int(config["DEFAULT"].get("multiScreens", 2))
-    discs = meta.discs or []
-    one_disc = True
-    if discs and len(discs) == 1:
-        one_disc = True
-    elif discs and len(discs) > 1:
-        one_disc = False
+    # Manual packaging deletes the per-tracker .torrent files, so it runs after
+    # the uploads that read them.
+    upload_trackers = [tracker for tracker in enabled_trackers if tracker.replace(" ", "").upper().strip() != "MANUAL"]
+    manual_trackers = [tracker for tracker in enabled_trackers if tracker not in upload_trackers]
 
-    if ((not meta.tv_pack and one_disc) or multi_screens == 0) and not bandwidth_control:
+    # Packs upload concurrently too: their per-file images are created once
+    # under the release image lock and then shared by every tracker.
+    # Bandwidth control waits per tracker, so it keeps the trackers in order.
+    if not bandwidth_control:
         # Run all tracker tasks concurrently with individual error handling
         tasks: list[tuple[str, asyncio.Task[None]]] = []
-        for tracker in enabled_trackers:
+        for tracker in upload_trackers:
             task = asyncio.create_task(process_single_tracker(tracker))
             tasks.append((tracker, task))
 
@@ -416,8 +416,15 @@ async def process_trackers(
                 logger.debug("".join(traceback.format_exception(type(result), result, result.__traceback__)), extra={"markup": False})
     else:
         # Process each tracker sequentially
-        for tracker in enabled_trackers:
+        for tracker in upload_trackers:
             await process_single_tracker(tracker)
+
+    for tracker in manual_trackers:
+        try:
+            await process_single_tracker(tracker)
+        except Exception as e:
+            logger.info(f"[red]{tracker} encountered an error: {escape(str(e))}[/red]")
+            logger.debug(traceback.format_exc(), extra={"markup": False})
 
     for tracker_name in enabled_trackers:
         normalized = tracker_name.replace(" ", "").upper().strip()

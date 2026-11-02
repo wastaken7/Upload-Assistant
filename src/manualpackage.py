@@ -3,6 +3,7 @@ import asyncio
 import json
 import re
 import shutil
+import tarfile
 import urllib.parse
 from collections.abc import Mapping
 from pathlib import Path
@@ -17,6 +18,50 @@ from src.meta import Meta
 from src.temp_paths import artwork_dir
 from src.torrent_manifest import TorrentManifest
 from src.uploadscreens import UploadScreensManager
+
+
+def _is_shareable(relative: Path, shareable_torrents: set[str]) -> bool:
+    """Whether a release-folder entry may leave this machine in a manual package.
+
+    Tracker torrents (``[TRACKER].torrent``) and the client's exported torrents
+    (``torrents/.client``) hold passkeys in their announce URLs, and archives
+    from earlier runs may still contain them. They stay in the release folder
+    for the client and manual use, but are never shared.
+    """
+    if ".client" in relative.parts:
+        return False
+    if len(relative.parts) == 1:
+        # Match the name, not Path.suffix: an archive for a title with no
+        # ASCII characters is named ".tar", which has no suffix.
+        name = relative.name.casefold()
+        if name.endswith(".tar"):
+            return False
+        if name.endswith(".torrent") and not relative.name.startswith(("BASE", "[RAND")) and relative.name not in shareable_torrents:
+            return False
+    return True
+
+
+def _write_archive(archive_path: str, release_dir: Path, shareable_torrents: set[str]) -> None:
+    """Archive the shareable files of the release folder."""
+
+    def keep(member: tarfile.TarInfo) -> tarfile.TarInfo | None:
+        return member if _is_shareable(Path(member.name), shareable_torrents) else None
+
+    with tarfile.open(archive_path, "w") as tar:
+        tar.add(release_dir, arcname=".", filter=keep)
+
+
+def _stage_share(share_dir: Path, release_dir: Path, shareable_torrents: set[str], archive_path: str) -> None:
+    """Copy the shareable files and the archive to the folder a Filebrowser link opens."""
+    shutil.rmtree(share_dir, ignore_errors=True)
+    for source in release_dir.rglob("*"):
+        relative = source.relative_to(release_dir)
+        if source.is_file() and _is_shareable(relative, shareable_torrents):
+            target = share_dir / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, target)
+    share_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(archive_path, share_dir / Path(archive_path).name)
 
 
 class ManualPackageManager:
@@ -79,25 +124,27 @@ class ManualPackageManager:
                     await generic.write(f"{each['img_url']}\n")
         title = re.sub(r"[^0-9a-zA-Z\[\\]]+", "", meta.title)
         archive = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/{title}"
-        torrent_files = [f.name for f in (Path(meta.base_dir) / "tmp" / meta.uuid).glob("*.torrent")]
-        if len(torrent_files) > 1:
-            for each in torrent_files:
-                if not each.startswith(("BASE", "[RAND")):
-                    Path(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/{each}").resolve().unlink()
+        release_dir = Path(meta.base_dir) / "tmp" / meta.uuid
+        shareable_torrents: set[str] = set()
         try:
             base_path = TorrentManifest(meta.base_dir, meta.uuid).default_path()
             if base_path is not None:
                 base_torrent = Torrent.read(base_path)
                 manual_name = re.sub(r"[^0-9a-zA-Z\[\]\'\-]+", ".", Path(meta.path or "").name)
                 Torrent.copy(base_torrent).write(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/{manual_name}.torrent", overwrite=True)
+                shareable_torrents.add(f"{manual_name}.torrent")
             manual_tracker_raw = self.tracker_config.get("MANUAL")
             manual_tracker_cfg: dict[str, Any] = cast(dict[str, Any], manual_tracker_raw) if isinstance(manual_tracker_raw, dict) else {}
             manual_filebrowser = manual_tracker_cfg.get("filebrowser")
             filebrowser = manual_filebrowser if isinstance(manual_filebrowser, str) else None
-            shutil.make_archive(archive, "tar", f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}")
+            await asyncio.to_thread(_write_archive, f"{archive}.tar", release_dir, shareable_torrents)
             if filebrowser is not None:
+                # The release folder keeps the tracker torrents, so the link
+                # opens a separate copy holding only the shareable files.
+                share_dir = Path(meta.base_dir) / "tmp" / "manual_packages" / meta.uuid
+                await asyncio.to_thread(_stage_share, share_dir, release_dir, shareable_torrents, f"{archive}.tar")
                 base_url = filebrowser.rstrip("/")
-                path = f"{'/' + 'tmp' + '/'}{meta.uuid}"
+                path = f"{'/' + 'tmp' + '/'}manual_packages/{meta.uuid}"
                 url = base_url + urllib.parse.quote(path, safe="/")
             else:
                 tar_bytes = await asyncio.to_thread(Path(f"{archive}.tar").read_bytes)

@@ -138,3 +138,104 @@ def test_pack_capture_does_not_run_global_cleanup(tmp_path, monkeypatch):
     asyncio.run(builder._handle_discs_and_screenshots(meta, [], meta.image_list, 2))
 
     assert capture_kwargs == [{"cleanup_after_capture": False, "capture_group": "FILE_1"}]
+
+
+@pytest.fixture
+def pipelined_pack(tmp_path, monkeypatch):
+    (tmp_path / "tmp" / "pack").mkdir(parents=True)
+    builder = DescriptionBuilder(
+        "TEST",
+        {"DEFAULT": {"multiScreens": 1, "processLimit": 3, "fileLimit": 3}, "TRACKERS": {"TEST": {}}},
+    )
+    meta = Meta(
+        base_dir=str(tmp_path),
+        uuid="pack",
+        category="TV",
+        filelist=["Show.S01E01.mkv", "Show.S01E02.mkv", "Show.S01E03.mkv"],
+        screens=1,
+        image_list=[_image("first")],
+    )
+    events = []
+    captured = {}
+
+    async def screenshots(_path, group, *_args, **_kwargs):
+        events.append(("capture", group))
+        await asyncio.sleep(0)
+        captured[group] = [tmp_path / f"{group}-0.png"]
+
+    async def upload_screens(_meta, *args, **_kwargs):
+        name = args[4][0]
+        events.append(("upload_start", name))
+        await asyncio.sleep(0.01)
+        events.append(("upload_end", name))
+        return [{"img_url": name, "raw_url": name, "web_url": name}], 1
+
+    async def save_image_links(*_args, **_kwargs):
+        return None
+
+    monkeypatch.setattr(builder.takescreens_manager, "screenshots", screenshots)
+    monkeypatch.setattr(builder.uploadscreens_manager, "upload_screens", upload_screens)
+    monkeypatch.setattr(builder.common, "save_image_links", save_image_links)
+    monkeypatch.setattr("src.get_desc.manifest_files", lambda _base, _uuid, group: captured.get(group, []))
+    monkeypatch.setattr("src.get_desc.MediaInfo.parse", lambda *_args, **_kwargs: "General\nDuration : 42 min\n")
+    return builder, meta, events
+
+
+def test_pack_captures_next_file_while_hosting_current_one(pipelined_pack):
+    builder, meta, events = pipelined_pack
+
+    asyncio.run(builder._handle_discs_and_screenshots(meta, [], meta.image_list, 1))
+
+    assert events.index(("capture", "FILE_2")) < events.index(("upload_end", "FILE_1-0.png"))
+    assert [event for event in events if event[0] == "capture"] == [("capture", "FILE_1"), ("capture", "FILE_2")]
+    assert meta.new_images_file_1 == [{"img_url": "FILE_1-0.png", "raw_url": "FILE_1-0.png", "web_url": "FILE_1-0.png"}]
+    assert meta.new_images_file_2 == [{"img_url": "FILE_2-0.png", "raw_url": "FILE_2-0.png", "web_url": "FILE_2-0.png"}]
+
+
+def test_pack_hosting_error_lets_pending_capture_finish(pipelined_pack, monkeypatch):
+    builder, meta, events = pipelined_pack
+
+    async def failing_upload(_meta, *args, **_kwargs):
+        events.append(("upload_start", args[4][0]))
+        raise RuntimeError("host down")
+
+    monkeypatch.setattr(builder.uploadscreens_manager, "upload_screens", failing_upload)
+
+    with pytest.raises(RuntimeError, match="host down"):
+        asyncio.run(builder._handle_discs_and_screenshots(meta, [], meta.image_list, 1))
+
+    # Cancelling a capture mid-way exits the process, so it must complete instead.
+    assert ("capture", "FILE_2") in events
+
+
+def test_pack_files_reuse_saved_images_without_capturing(pipelined_pack):
+    builder, meta, events = pipelined_pack
+    meta.new_images_file_1 = [_image("saved")]
+
+    asyncio.run(builder._handle_discs_and_screenshots(meta, [], meta.image_list, 1))
+
+    assert [event for event in events if event[0] == "capture"] == [("capture", "FILE_2")]
+    assert meta.new_images_file_1 == [_image("saved")]
+
+
+def test_pack_file_mediainfo_is_parsed_once_per_file_version(tmp_path, monkeypatch):
+    from src import get_desc
+
+    video = tmp_path / "Show.S01E02.mkv"
+    video.write_bytes(b"x")
+    calls = []
+
+    def parse(path, **_kwargs):
+        calls.append(path)
+        return f"General\nComplete name : {path}\n"
+
+    monkeypatch.setattr("src.get_desc.MediaInfo.parse", parse)
+    monkeypatch.setattr(get_desc, "_pack_mediainfo_cache", {})
+
+    first = asyncio.run(get_desc._pack_file_mediainfo(str(video)))
+    second = asyncio.run(get_desc._pack_file_mediainfo(str(video)))
+    video.write_bytes(b"xy")
+    asyncio.run(get_desc._pack_file_mediainfo(str(video)))
+
+    assert first == second
+    assert calls == [str(video), str(video)]
