@@ -728,6 +728,9 @@ async def _prompt_game_meta(meta: Meta) -> None:
 
 
 MUSIC_REQUIRED_FIELDS = ("artist", "album", "year", "media", "release_type")
+# Trackers whose music uploads are refused without cover artwork. Others
+# (Orpheus, LST, ...) accept a release without it, so the prompt can be skipped.
+MUSIC_ARTWORK_REQUIRED_TRACKERS = frozenset({"SEEDPOOL"})
 MUSIC_MEDIA_CHOICES = ("CD", "WEB", "Vinyl", "DVD", "BD", "Soundboard", "SACD", "DAT", "Cassette")
 MUSIC_RELEASE_TYPE_CHOICES = (
     "Album",
@@ -869,6 +872,22 @@ def _music_cover_allowed_hosts(trackers: Iterable[Any]) -> list[str] | None:
     return sorted(approved_hosts) if approved_hosts is not None else None
 
 
+async def _save_music_cover_url(meta: Meta) -> bool:
+    """Download meta.artwork_url to a local cover file and point meta.artwork_path at it."""
+    content = await asyncio.to_thread(_download_music_cover, meta.artwork_url)
+    if content is None:
+        return False
+    artwork_path = artwork_dir(meta.base_dir, str(meta.uuid)) / "music_cover.jpg"
+    try:
+        artwork_path.parent.mkdir(parents=True, exist_ok=True)
+        await asyncio.to_thread(artwork_path.write_bytes, content)
+    except OSError as error:
+        logger.warning(f"[yellow]MUSIC: could not save downloaded artwork: {error}[/yellow]")
+        return False
+    meta.artwork_path = str(artwork_path)
+    return True
+
+
 async def _host_music_cover(meta: Meta, uploadscreens_manager: UploadScreensManager, allowed_hosts: list[str] | None = None) -> None:
     """Host MUSIC artwork and publish it through the shared artwork API."""
     if meta.debug:
@@ -892,20 +911,9 @@ async def _host_music_cover(meta: Meta, uploadscreens_manager: UploadScreensMana
     except (OSError, ValueError, TypeError) as error:
         logger.debug(f"[yellow]MUSIC: ignored unusable artwork cache: {error}[/yellow]")
 
+    if not Path(str(meta.artwork_path or "")).is_file() and _is_http_url(meta.artwork_url) and not await _save_music_cover_url(meta):
+        return
     artwork_path = Path(str(meta.artwork_path or ""))
-    if not artwork_path.is_file() and _is_http_url(meta.artwork_url):
-        artwork_path = artwork_dir(meta.base_dir, str(meta.uuid)) / "music_cover.jpg"
-        content = await asyncio.to_thread(_download_music_cover, meta.artwork_url)
-        if content is None:
-            return
-
-        try:
-            artwork_path.parent.mkdir(parents=True, exist_ok=True)
-            await asyncio.to_thread(artwork_path.write_bytes, content)
-            meta.artwork_path = str(artwork_path)
-        except OSError as error:
-            logger.warning(f"[yellow]MUSIC: could not save downloaded artwork for image hosting: {error}[/yellow]")
-            return
     if not is_valid_cover_image(artwork_path):
         logger.warning("[yellow]MUSIC: local artwork is not a valid supported image.[/yellow]")
         return
@@ -1008,6 +1016,10 @@ def _game_field_prompt(meta: Meta, focus: str, *, hint: str = "", placeholder: s
     return webui_events.field_prompt("Game", summary, focus=focus, hint=hint, actions=[("", "Skip")] if skip else [], placeholder=placeholder)
 
 
+def _music_artwork_required(meta: Meta) -> bool:
+    return any(str(tracker).upper() in MUSIC_ARTWORK_REQUIRED_TRACKERS for tracker in meta.trackers)
+
+
 async def _prompt_music_meta(meta: Meta) -> None:
     """Ask for minimum Orpheus music metadata, never technical stream fields."""
     required = list(MUSIC_REQUIRED_FIELDS)
@@ -1016,7 +1028,16 @@ async def _prompt_music_meta(meta: Meta) -> None:
         for field in required
         if (field == "cover_url" and not _is_http_url(_music_field(meta, field))) or (field != "cover_url" and not str(_music_field(meta, field) or "").strip())
     ]
-    has_artwork = bool(is_valid_cover_image(meta.artwork_path) or (_is_http_url(meta.artwork_url) or _is_http_url(_music_field(meta, "cover_url"))))
+    artwork_required = _music_artwork_required(meta)
+    if artwork_required and not is_valid_cover_image(meta.artwork_path):
+        # Trackers that require artwork check a local cover before the image host runs, so fetch a known URL now.
+        cover_url = meta.artwork_url if _is_http_url(meta.artwork_url) else _music_field(meta, "cover_url")
+        if _is_http_url(cover_url):
+            meta.artwork_url = str(cover_url)
+            await _save_music_cover_url(meta)
+        has_artwork = is_valid_cover_image(meta.artwork_path)
+    else:
+        has_artwork = bool(is_valid_cover_image(meta.artwork_path) or (_is_http_url(meta.artwork_url) or _is_http_url(_music_field(meta, "cover_url"))))
     if not has_artwork and "artwork" not in missing:
         missing.append("artwork")
 
@@ -1034,9 +1055,12 @@ async def _prompt_music_meta(meta: Meta) -> None:
     if not fields_to_prompt:
         return
     if meta.unattended:
-        logger.info(
-            f"[yellow]MUSIC upload: metadata requiring confirmation: {', '.join(fields_to_prompt)}. The tracker upload will be skipped until required values are supplied.[/yellow]"
-        )
+        # Optional artwork does not hold the upload back.
+        blocking = [field for field in fields_to_prompt if field != "artwork" or artwork_required]
+        if blocking:
+            logger.info(
+                f"[yellow]MUSIC upload: metadata requiring confirmation: {', '.join(blocking)}. The tracker upload will be skipped until required values are supplied.[/yellow]"
+            )
         return
 
     logger.info("\n[bold yellow]MUSIC metadata required or requiring confirmation:[/bold yellow]")
@@ -1079,16 +1103,24 @@ async def _prompt_music_meta(meta: Meta) -> None:
                     changed = True
             elif field in ("artwork", "cover_url"):
                 while True:
+                    hint = "Artwork is required" if artwork_required else "Artwork is optional for the selected trackers"
                     with _music_field_prompt(
-                        meta, "cover_url", hint="Artwork is required: a local image path or a public image URL.", placeholder="Image path or https:// URL", keep=False
+                        meta, "cover_url", hint=f"{hint}: a local image path or a public image URL.", placeholder="Image path or https:// URL", keep=not artwork_required
                     ):
-                        value = (CLI_UI.ask_string("Enter path to cover artwork image (or public image URL) for MUSIC: ") or "").strip()
+                        skip_note = "" if artwork_required else " (leave blank to skip)"
+                        value = (CLI_UI.ask_string(f"Enter path to cover artwork image (or public image URL) for MUSIC{skip_note}: ") or "").strip()
+                    if not value and not artwork_required:
+                        break
                     if not value:
-                        logger.info("[red]Artwork is required for MUSIC uploads. Please enter a valid file path or image URL.[/red]")
+                        required_by = ", ".join(sorted({str(tracker).upper() for tracker in meta.trackers} & MUSIC_ARTWORK_REQUIRED_TRACKERS))
+                        logger.info(f"[red]Artwork is required for MUSIC uploads to {required_by}. Please enter a valid file path or image URL.[/red]")
                         continue
                     if _is_http_url(value):
-                        _set_music_field(meta, "cover_url", value)
                         meta.artwork_url = value
+                        if artwork_required and not (await _save_music_cover_url(meta) and is_valid_cover_image(meta.artwork_path)):
+                            logger.info("[red]Could not download a valid image from that URL. Please try another file path or image URL.[/red]")
+                            continue
+                        _set_music_field(meta, "cover_url", value)
                         changed = True
                         break
                     path_obj = Path(value).expanduser()
@@ -1482,6 +1514,9 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
             skip_unsupported_release(meta, e, stage="confirm")
             return False
         TrackerSetup(config=config).filter_unsupported_trackers(meta)
+        if meta.category == "MUSIC" and _music_artwork_required(meta) and not is_valid_cover_image(meta.artwork_path):
+            # The edit can add a tracker that requires the artwork skipped earlier.
+            await _prompt_music_meta(meta)
         meta.name_notag, meta.name, meta.clean_name, meta.potential_missing = await name_manager.get_name(meta)
         await write_meta_file(meta)
         _publish_webui_preview_target(cast(str, meta.path or ""), meta.uuid or None)
