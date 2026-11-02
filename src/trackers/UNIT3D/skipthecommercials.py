@@ -1,6 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import re
-from typing import Any
+from typing import Any, ClassVar
 
 from src.console import logger
 from src.get_desc import DescriptionBuilder
@@ -18,6 +18,22 @@ class SkipTheCommercials(UNIT3D):
     SkipTheCommercials (STC) is a Private Torrent Tracker for TV and
     documentary movies.
     """
+
+    # Options of the ID fields, offered in the Web UI preview (the getters ignore mapping_only).
+    payload_choices: ClassVar[dict[str, tuple[tuple[str, str], ...]]] = {
+        "type_id": (
+            ("1", "DISC"),
+            ("2", "REMUX"),
+            ("3", "ENCODE"),
+            ("4", "WEBDL"),
+            ("5", "WEBRIP"),
+            ("6", "HDTV"),
+            ("13", "WEB pack"),
+            ("14", "SD WEB pack"),
+            ("17", "SD pack"),
+            ("18", "HD pack"),
+        ),
+    }
 
     tracker = "SKIPTHECOMMERCIALS"
     display_name = "SkipTheCommercials"

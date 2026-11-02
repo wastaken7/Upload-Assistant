@@ -1,5 +1,5 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-from typing import Any, cast
+from typing import Any, ClassVar, cast
 
 import httpx
 
@@ -14,6 +14,17 @@ class Racing4Everyone(UNIT3D):
     """
     RACING4EVERYONE (R4E) is a Private Torrent Tracker for RACING
     """
+
+    # Options of the ID fields, offered in the Web UI preview (the getters ignore mapping_only).
+    payload_choices: ClassVar[dict[str, tuple[tuple[str, str], ...]]] = {
+        "category_id": (
+            ("70", "Motorsports Movie"),
+            ("66", "Documentary"),
+            ("79", "TV Series"),
+            ("2", "TV Documentary"),
+            ("24", "Other"),
+        ),
+    }
 
     tracker = "RACING4EVERYONE"
     display_name = "Racing4Everyone"

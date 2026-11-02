@@ -28,6 +28,8 @@ const declarations = new Map(
     .map((n) => [n.id.name, n.init]),
 );
 const context = vm.createContext({
+  fileBrowserFolderOnlyRef: { current: false },
+  fileBrowserFolderRef: { current: "" },
   console,
   Set,
   Map,

@@ -418,6 +418,8 @@ class Meta:
     regex_year: str = ""
     region: str = ""
     region_overrides: dict[str, str] = field(default_factory=dict)
+    # Upload form fields changed per tracker in the Web UI; None leaves a field out.
+    payload_edits: dict[str, dict[str, Any]] = field(default_factory=dict)
     refundable: bool = False
     rehash: bool = False
     rehosted_artwork_url: str | None = None

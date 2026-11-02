@@ -9,6 +9,7 @@ import aiofiles
 import httpx
 from rich.markup import escape
 
+from src import payload_preview
 from src.cogs.redaction import Redaction
 from src.console import console, logger
 from src.get_desc import DescriptionBuilder, html_to_bbcode
@@ -268,22 +269,26 @@ class SpeedApp:
 
         return re.sub(r"\[.+?\]", "", requirements)
 
-    async def fetch_data(self, meta: Meta) -> dict[str, Any]:
+    async def fetch_data(self, meta: Meta, preview: bool = False) -> dict[str, Any]:
+        """Build the upload form; a ``preview`` leaves out the description, screenshots, files and reports."""
         data: dict[str, Any] = {
             "coverPhotoUrl": meta.backdrop,
             "description": str(meta.genres),
             "name": await self.get_name(meta),
-            "nfo": await self.get_nfo(meta),
+            "nfo": None if preview else await self.get_nfo(meta),
             "poster": meta.artwork_url,
-            "technicalDetails": await self.edit_desc(meta),
-            "screenshots": await self.get_screenshots(meta),
+            "technicalDetails": None if preview else await self.edit_desc(meta),
+            "screenshots": None if preview else await self.get_screenshots(meta),
             "type": await self.get_cat_id(meta),
         }
+        if preview:
+            del data["nfo"], data["technicalDetails"], data["screenshots"]
         if meta.category in ("MOVIE", "TV"):
-            media_info, bd_info = await self.get_file_info(meta)
+            media_info, bd_info = (None, None) if preview else await self.get_file_info(meta)
             data["plot"] = (meta.overview_meta or meta.overview,)
-            data["bdInfo"] = bd_info
-            data["media_info"] = media_info
+            if not preview:
+                data["bdInfo"] = bd_info
+                data["media_info"] = media_info
             data["url"] = str(cast(dict[str, Any], meta.imdb_info).get("imdb_url", ""))
 
         elif meta.category == "GAME" and meta.console_game is False:
@@ -291,6 +296,8 @@ class SpeedApp:
             if requirements:
                 data["systemRequirements"] = requirements
 
+        if preview:
+            return data
         tracker_config = self.config.get("TRACKERS", {}).get(self.tracker, {})
         torrent_path = await self.common.get_base_torrent_path(meta, self.tracker, tracker_config)
         if torrent_path is None:
@@ -303,6 +310,58 @@ class SpeedApp:
 
         return data
 
+    async def get_payload_preview(self, meta: Meta) -> payload_preview.TrackerPreview:
+        """The upload form as it is known before screenshots, for the Web UI to show and edit."""
+        specs = {
+            "coverPhotoUrl": payload_preview.text("Backdrop URL", max_length=1000),
+            "description": payload_preview.text("Genres", max_length=1000),
+            "name": payload_preview.text("Name"),
+            "poster": payload_preview.text("Poster URL", max_length=1000),
+            "type": payload_preview.choice(
+                "Category",
+                [
+                    (3, "Anime"),
+                    (5, "Music"),
+                    (6, "Books"),
+                    (8, "Movies HD"),
+                    (9, "Documentary"),
+                    (10, "Movies SD"),
+                    (11, "Games PC"),
+                    (17, "Movies BluRay"),
+                    (24, "Movies BluRay RO"),
+                    (29, "Movies HD RO"),
+                    (35, "Movies SD RO"),
+                    (41, "TV packs"),
+                    (43, "TV HD"),
+                    (44, "TV HD RO"),
+                    (45, "TV SD"),
+                    (46, "TV SD RO"),
+                    (52, "Games console"),
+                    (57, "Movies 4K RO"),
+                    (59, "Romanian movies"),
+                    (60, "Romanian TV"),
+                    (61, "Movies 4K"),
+                    (63, "Documentary RO"),
+                    (66, "TV packs RO"),
+                ],
+            ),
+            "url": payload_preview.text("IMDb URL"),
+            "plot": payload_preview.readonly("Plot"),
+            "systemRequirements": payload_preview.readonly("System requirements"),
+            "channel": payload_preview.number("Channel ID"),
+        }
+        deferred = {"technicalDetails": payload_preview.DESCRIPTION_NOTE, "screenshots": "Uploaded after this question"}
+        if meta.category in ("MOVIE", "TV"):
+            deferred["media_info"] = "Read from the MediaInfo/BDInfo report at upload time"
+        data = await self.fetch_data(meta, preview=True)
+        # A channel given by name is looked up on the site, which only happens at upload time.
+        channel = meta.spd_channel or self.config["TRACKERS"][self.tracker].get("channel", "")
+        if not channel or isinstance(channel, int) or str(channel).isdigit():
+            data["channel"] = str(await self.search_channel(meta))
+        else:
+            deferred["channel"] = payload_preview.FROM_TRACKER_NOTE
+        return payload_preview.describe(self.tracker, data, specs, deferred=deferred)
+
     async def upload(self, meta: Meta) -> bool | None:
         data = await self.fetch_data(meta)
         tracker_status = meta.tracker_status
@@ -314,6 +373,7 @@ class SpeedApp:
             return None
         channel = str(channel)
         data["channel"] = channel
+        data = payload_preview.apply_payload_edits(meta, self.tracker, data)
 
         torrent_id = ""
 

@@ -10,6 +10,7 @@ import httpx
 from bs4 import BeautifulSoup
 from rich.markup import escape
 
+from src import payload_preview
 from src.cogs.redaction import Redaction
 from src.console import logger
 from src.get_desc import DescriptionBuilder
@@ -1097,16 +1098,18 @@ class GreatPosterWall:
             return resolution.lower()
         return "Other"
 
-    async def fetch_data(self, meta: Meta) -> dict[str, Any]:
+    async def fetch_data(self, meta: Meta, preview: bool = False) -> dict[str, Any]:
+        """Build the upload form; a ``preview`` skips the group lookup, the description and MediaInfo."""
         await self.load_localized_data(meta)  #  keep this line FIRST to ensure localized data is loaded before proceeding
-        await self.get_groupid(meta)
+        if not preview:
+            await self.get_groupid(meta)
         remaster_title = self.get_remaster_title(meta)
         codec = self.get_codec(meta)
         container = self.get_container(meta)
 
         data: dict[str, Any] = {}
 
-        if not GreatPosterWall.group_id:
+        if not preview and not GreatPosterWall.group_id:
             data.update(await self.get_additional_data(meta))
 
         data.update(
@@ -1115,11 +1118,11 @@ class GreatPosterWall:
                 "codec": codec,
                 "container_other": meta.container if container == "Other" else "",
                 "container": container,
-                "mediainfo[]": await self.get_media_info(meta),
+                "mediainfo[]": None if preview else await self.get_media_info(meta),
                 "movie_edition_information": "on" if remaster_title else "",
                 "processing_other": self.get_processing_other(meta) if meta.type == "DISC" else "",
                 "processing": self.get_processing(meta),
-                "release_desc": await self.get_release_desc(meta),
+                "release_desc": None if preview else await self.get_release_desc(meta),
                 "remaster_custom_title": "",
                 "remaster_title": remaster_title,
                 "remaster_year": "",
@@ -1133,7 +1136,7 @@ class GreatPosterWall:
                 "subtitles[]": await self.get_subtitle(meta),
             }
         )
-        if GreatPosterWall.group_id:
+        if not preview and GreatPosterWall.group_id:
             data["groupid"] = GreatPosterWall.group_id
 
         if await self.get_ch_dubs(meta):
@@ -1161,11 +1164,43 @@ class GreatPosterWall:
 
         return data
 
+    async def get_payload_preview(self, meta: Meta) -> payload_preview.TrackerPreview:
+        """The upload form as it is known before screenshots, for the Web UI to show and edit."""
+        checkboxes = {
+            "movie_edition_information": "Edition information",
+            "chinese_dubbed": "Chinese dub",
+            "special_effects_subtitles": "Special effects subtitles",
+            "scene": "Scene",
+            "buy": "Bought disc",
+            "diy": "DIY",
+            "jinzhuan": "Exclusive",
+            "dolby_atmos": "Dolby Atmos",
+            "dts_x": "DTS:X",
+            "audio_51": "5.1 audio",
+            "audio_71": "7.1 audio",
+        }
+        specs = {key: payload_preview.flag(label, on="on", off=None) for key, label in checkboxes.items()}
+        specs["movie_edition_information"] = payload_preview.flag("Edition information", on="on", off="")
+        specs.update(
+            {
+                "subtitle_type": payload_preview.choice("Subtitles", [("1", "Softcoded"), ("2", "Hardcoded"), ("3", "None")]),
+                "subtitles[]": payload_preview.readonly("Subtitle languages"),
+                "submit": payload_preview.readonly("Submit"),
+            }
+        )
+        deferred = {
+            "groupid": "Found on the tracker at upload time; a new group also sends its title, poster and tags",
+            "release_desc": payload_preview.DESCRIPTION_NOTE,
+            "mediainfo[]": "Read from the MediaInfo/BDInfo report at upload time",
+        }
+        data = await self.fetch_data(meta, preview=True)
+        return payload_preview.describe(self.tracker, data, specs, deferred=deferred)
+
     async def upload(self, meta: Meta) -> bool:
         if getattr(meta, "skipping", None) == self.tracker:
             return False
         await self.common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
-        data = await self.fetch_data(meta)
+        data = payload_preview.apply_payload_edits(meta, self.tracker, await self.fetch_data(meta))
         if getattr(meta, "skipping", None) == self.tracker:
             return False
 

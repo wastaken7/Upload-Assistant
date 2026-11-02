@@ -6,6 +6,7 @@ import aiofiles
 import httpx
 from rich.markup import escape
 
+from src import payload_preview
 from src.cogs.redaction import Redaction
 from src.console import logger
 from src.distributors import distributor_id
@@ -495,8 +496,30 @@ class HawkeUno(UNIT3D):
 
         return attributes
 
-    async def get_data(self, meta: Meta) -> dict[str, Any]:
-        await self.get_description(meta)
+    async def get_payload_specs(self, meta: Meta) -> dict[str, payload_preview.Spec]:
+        specs = await super().get_payload_specs(meta)
+        specs["category_id"] = payload_preview.choice("Category", {"MOVIE": 1, "TV": 2}, by_label=True)
+        specs["anonymous"] = payload_preview.flag("Anonymous", on=1, off=0)
+        specs["internal"] = payload_preview.flag("Internal", on=1, off=None)
+        specs["season_pack"] = payload_preview.flag("Season pack", on=1, off=0)
+        specs["release_group"] = payload_preview.text("Release group")
+        if "resolution_id" in specs:
+            specs["resolution"] = specs["resolution_id"]
+        for key, label, ids in (
+            ("video_format", "Video format", self.video_format_ids),
+            ("video_codec", "Video codec", self.video_codec_ids),
+            ("audio_format", "Audio format", self.audio_format_ids),
+            ("audio_channels", "Audio channels", self.audio_channel_ids),
+            ("source_type", "Source type", self.source_type_ids),
+            ("edition", "Edition", self.edition_ids),
+        ):
+            specs[key] = payload_preview.choice(label, ids, by_label=True)
+        specs["region"] = payload_preview.choice("Region", self.regions)
+        return specs
+
+    async def get_data(self, meta: Meta, preview: bool = False) -> dict[str, Any]:
+        if not preview:
+            await self.get_description(meta)
 
         data: dict[str, Any] = {
             "category_id": 1 if meta.category == "MOVIE" else 2,
@@ -562,7 +585,7 @@ class HawkeUno(UNIT3D):
         return files
 
     async def upload(self, meta: Meta) -> bool:
-        data = await self.get_data(meta)
+        data = payload_preview.apply_payload_edits(meta, self.tracker, await self.get_data(meta))
 
         # Initialize tracker status
         meta.tracker_status.setdefault(self.tracker, {})

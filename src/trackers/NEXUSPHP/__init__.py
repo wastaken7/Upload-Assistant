@@ -7,6 +7,7 @@ import aiofiles
 import httpx
 from bs4 import BeautifulSoup
 
+from src import payload_preview
 from src.console import logger
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder
@@ -28,6 +29,17 @@ class NEXUSPHP:
     torrent_url: str = ""
     upload_url: str = ""
     search_type_parameter: str = "medium"
+    # The getter behind each drop-down of the upload form, for the Web UI preview.
+    payload_option_getters: ClassVar[dict[str, tuple[str, str, str]]] = {
+        "type": ("Category", "get_category", "category"),
+        "medium_sel[4]": ("Medium", "get_type", "release_type"),
+        "codec_sel[4]": ("Codec", "get_codec", "none"),
+        "standard_sel[4]": ("Resolution", "get_resolution", "resolution"),
+        "team_sel[4]": ("Team", "get_group_tag", "group"),
+        "audiocodec_sel[4]": ("Audio codec", "get_audio_codec", "none"),
+        "source_sel[4]": ("Region", "get_region", "none"),
+        "processing_sel[4]": ("Container", "get_container", "none"),
+    }
     tmdb_localization_requirements: ClassVar = {
         "zh-cn": {
             "main": "credits",
@@ -404,12 +416,12 @@ class NEXUSPHP:
         container = self.get_container(meta)
         return {"processing_sel[4]": container} if container else {}
 
-    async def get_data(self, meta: Meta) -> dict[str, Any]:
+    async def get_data(self, meta: Meta, preview: bool = False) -> dict[str, Any]:
+        """Build the upload form; a ``preview`` leaves out the description and MediaInfo/BDInfo."""
         await self.load_localized_data(meta)
         results = await asyncio.gather(
             self.get_name(meta),
-            self.get_description(meta),
-            self.get_technical_info(meta),
+            *(() if preview else (self.get_description(meta), self.get_technical_info(meta))),
             self.get_category_data(meta),
             self.get_type_data(meta),
             self.get_codec_data(meta),
@@ -433,6 +445,31 @@ class NEXUSPHP:
         for result in results:
             data.update(result)
         return data
+
+    def get_payload_specs(self, meta: Meta) -> dict[str, payload_preview.Spec]:
+        """Labels for the upload form; a drop-down offers the option IDs its getter can return."""
+        _meta = meta
+        specs = {
+            "name": payload_preview.text("Name"),
+            "small_descr": payload_preview.text("Subtitle"),
+            "tags[4][]": payload_preview.readonly("Tags"),
+            "uplver": payload_preview.flag("Anonymous", on="yes", off=None),
+            "url": payload_preview.text("IMDb URL"),
+            "pt_gen": payload_preview.text("Douban URL"),
+            "color": payload_preview.readonly("Subtitle colour"),
+            "font": payload_preview.readonly("Subtitle font"),
+            "size": payload_preview.readonly("Subtitle size"),
+        }
+        for key, (label, getter_name, role) in self.payload_option_getters.items():
+            options = payload_preview.code_options(getattr(type(self), getter_name))
+            specs[key] = payload_preview.choice(label, options, role=role) if options else payload_preview.readonly(label)
+        return specs
+
+    async def get_payload_preview(self, meta: Meta) -> payload_preview.TrackerPreview:
+        """The upload form as it is known before screenshots, for the Web UI to show and edit."""
+        data = await self.get_data(meta, preview=True)
+        deferred = {"descr": payload_preview.DESCRIPTION_NOTE, "technical_info": "Read from the MediaInfo/BDInfo report at upload time"}
+        return payload_preview.describe(self.tracker, data, self.get_payload_specs(meta), deferred={key: note for key, note in deferred.items() if key not in data})
 
     async def upload(self, meta: Meta) -> bool:
         cookies = await self.cookie_validator.load_session_cookies(meta, self.tracker)

@@ -10,7 +10,7 @@ from src.description_review import draft, load_review, save_review
 from src.get_tracker_data import TrackerDataManager
 from src.meta import Meta
 from src.tracker_descriptions import DescriptionCandidate, TrackerDescriptionMode, add_candidate, description_fingerprint, resolve_description_mode, score_release_name
-from src.trackermeta import update_meta_with_unit3d_data
+from src.trackermeta import update_meta_with_unit3d_data, update_metadata_from_tracker
 from src.trackers.common import Common
 
 
@@ -91,6 +91,23 @@ def test_unit3d_candidate_keeps_description_in_memory(tmp_path):
         assert await update_meta_with_unit3d_data(meta, result, "AITHER")
         assert meta.description == "clean"
         assert not (tmp_path / "tmp" / "candidate" / "DESCRIPTION.txt").exists()
+
+    asyncio.run(run())
+
+
+def test_bjshare_description_without_ids_is_a_match(tmp_path):
+    class FakeBJShare:
+        async def get_torrent_metadata(self, _meta, torrent_id, skip_tracker_descriptions=False):
+            assert torrent_id == "10"
+            assert not skip_tracker_descriptions
+            return 0, 0, 0, 0, "A fictional overview.", None, None, [], "Fictional.Story.m4b"
+
+    async def run():
+        meta = Meta({"base_dir": str(tmp_path), "uuid": "book", "category": "BOOK", "tracker_description_mode": "text", "persist_description": False})
+        meta, match = await update_metadata_from_tracker("BJSHARE", FakeBJShare(), meta, "Fictional.Story.m4b", "Fictional.Story.m4b", torrent_id="10")
+        assert match
+        assert meta.description == "A fictional overview."
+        assert not meta.imdb_id
 
     asyncio.run(run())
 

@@ -22,6 +22,13 @@ const {
   markRunGuiPromptAnswered,
   selectRunGuiView,
   getDebugRunRows,
+  readPayloadPreviews,
+  payloadFieldValue,
+  updatePayloadEdits,
+  payloadEditErrors,
+  payloadRoleAdvice,
+  payloadEditWarnings,
+  buildConfirmAnswer,
 } = loadRunGui();
 
 const plain = (value) => JSON.parse(JSON.stringify(value));
@@ -794,4 +801,219 @@ test("queue item covers stay with their item and reject unsafe sources", () => {
     "/api/execution_item_cover?session_id=s&item=2&v=1",
     "",
   ]);
+});
+
+const payloadContext = {
+  kind: "confirm",
+  payloads: [
+    {
+      tracker: "FAKE",
+      name: "Fictional Film 2001",
+      fields: [
+        {
+          key: "name",
+          label: "Name",
+          kind: "text",
+          value: "Fictional Film 2001",
+          max: 30,
+        },
+        {
+          key: "tmdb",
+          label: "TMDB ID",
+          kind: "text",
+          value: "4321",
+          max: 20,
+          numeric: true,
+        },
+        {
+          key: "type_id",
+          label: "Type",
+          kind: "choice",
+          value: "4",
+          display: "WEBDL (4)",
+          choices: "c0",
+        },
+        {
+          key: "region_id",
+          label: "Region",
+          kind: "choice",
+          value: "7",
+          display: "GBR (7)",
+        },
+        { key: "anonymous", label: "Anonymous", kind: "flag", value: false },
+        {
+          key: "description",
+          label: "Description",
+          kind: "deferred",
+          note: "Built later",
+        },
+        { key: "bogus", label: "Bogus", kind: "script", value: "x" },
+      ],
+    },
+    { name: "missing tracker" },
+  ],
+  payload_choices: [
+    {
+      id: "c0",
+      choices: [
+        ["2", "REMUX"],
+        ["4", "WEBDL"],
+      ],
+    },
+  ],
+};
+
+test("upload data previews resolve shared drop-down lists", () => {
+  const [preview, ...rest] = readPayloadPreviews(payloadContext);
+  assert.equal(rest.length, 0);
+  const byKey = Object.fromEntries(
+    preview.fields.map((field) => [field.key, field]),
+  );
+  assert.deepEqual(Object.keys(byKey), [
+    "name",
+    "tmdb",
+    "type_id",
+    "region_id",
+    "anonymous",
+    "description",
+  ]);
+  assert.deepEqual(plain(byKey.type_id.choices), [
+    ["2", "REMUX"],
+    ["4", "WEBDL"],
+  ]);
+  assert.equal(byKey.type_id.editable, true);
+  // A drop-down sent without its list is shown but not editable.
+  assert.equal(byKey.region_id.editable, false);
+  assert.equal(byKey.description.editable, false);
+  assert.equal(byKey.anonymous.value, false);
+});
+
+test("upload data edits keep only changed values and report invalid ones", () => {
+  const [preview] = readPayloadPreviews(payloadContext);
+  const byKey = Object.fromEntries(
+    preview.fields.map((field) => [field.key, field]),
+  );
+  let edits = updatePayloadEdits({}, "FAKE", byKey.type_id, "2");
+  edits = updatePayloadEdits(edits, "FAKE", byKey.anonymous, true);
+  edits = updatePayloadEdits(edits, "FAKE", byKey.tmdb, "12a");
+  assert.equal(payloadFieldValue(byKey.type_id, edits, "FAKE"), "2");
+  assert.deepEqual(plain(payloadEditErrors([preview], edits)), {
+    FAKE: { tmdb: "Numbers only" },
+  });
+
+  edits = updatePayloadEdits(edits, "FAKE", byKey.tmdb, "4321");
+  edits = updatePayloadEdits(edits, "FAKE", byKey.name, "  ");
+  assert.deepEqual(plain(payloadEditErrors([preview], edits)), {
+    FAKE: { name: "Cannot be empty" },
+  });
+  edits = updatePayloadEdits(edits, "FAKE", byKey.name, "x".repeat(31));
+  assert.deepEqual(plain(payloadEditErrors([preview], edits)), {
+    FAKE: { name: "At most 30 characters" },
+  });
+  edits = updatePayloadEdits(edits, "FAKE", byKey.name, "Fictional Film 2001");
+  assert.deepEqual(plain(edits), { FAKE: { type_id: "2", anonymous: true } });
+
+  edits = updatePayloadEdits(edits, "FAKE", byKey.type_id, "4");
+  edits = updatePayloadEdits(edits, "FAKE", byKey.anonymous, false);
+  assert.deepEqual(plain(edits), {});
+});
+
+test("the confirm answer carries run options and upload data edits", () => {
+  assert.equal(buildConfirmAnswer({}, {}), "yes");
+  assert.equal(buildConfirmAnswer({ anon: true }, {}), 'yes {"anon":true}');
+  assert.equal(
+    buildConfirmAnswer({ anon: true }, { FAKE: { type_id: "2" } }),
+    'yes {"anon":true,"payload_edits":{"FAKE":{"type_id":"2"}}}',
+  );
+});
+
+const warningPreview = () =>
+  readPayloadPreviews({
+    kind: "confirm",
+    payloads: [
+      {
+        tracker: "FAKE",
+        fields: [
+          {
+            key: "name",
+            label: "Name",
+            kind: "text",
+            value: "Fictional Film 2001 1080p WEB-DL-NOGRP",
+            max: 255,
+            role: "name",
+          },
+          {
+            key: "tmdb",
+            label: "TMDB ID",
+            kind: "text",
+            value: "4321",
+            max: 20,
+            numeric: true,
+            role: "external_id",
+          },
+          {
+            key: "resolution_id",
+            label: "Resolution",
+            kind: "choice",
+            value: "3",
+            display: "1080p / 1440p (3)",
+            choices: "r",
+            role: "resolution",
+          },
+          { key: "anonymous", label: "Anonymous", kind: "flag", value: false },
+          {
+            key: "featured",
+            label: "Featured",
+            kind: "flag",
+            value: false,
+            role: "staff_flag",
+          },
+        ],
+      },
+    ],
+    payload_choices: [
+      {
+        id: "r",
+        choices: [
+          ["2", "2160p"],
+          ["3", "1080p / 1440p"],
+        ],
+      },
+    ],
+  })[0];
+
+test("changing metadata-made fields warns with the correction to use instead", () => {
+  const preview = warningPreview();
+  const edits = {
+    FAKE: { tmdb: "9999", resolution_id: "2", anonymous: true, featured: true },
+  };
+  const warnings = plain(payloadEditWarnings(preview, edits));
+  assert.deepEqual(Object.keys(warnings).sort(), [
+    "featured",
+    "resolution_id",
+    "tmdb",
+  ]);
+  assert.match(warnings.tmdb, /--tmdb/);
+  assert.match(warnings.tmdb, /The name was not changed/);
+  assert.match(warnings.resolution_id, /--resolution/);
+  assert.match(warnings.resolution_id, /The name still says "1080p"/);
+  assert.match(warnings.featured, /staff/);
+  assert.equal(payloadRoleAdvice("name").includes("--imdb"), true);
+  assert.equal(payloadRoleAdvice(""), "");
+});
+
+test("a changed name or a cleared staff option drops the cross-field warnings", () => {
+  const preview = warningPreview();
+  const warnings = plain(
+    payloadEditWarnings(preview, {
+      FAKE: {
+        name: "Fictional Film 2001 2160p WEB-DL-NOGRP",
+        resolution_id: "2",
+        featured: false,
+      },
+    }),
+  );
+  assert.deepEqual(Object.keys(warnings).sort(), ["name", "resolution_id"]);
+  assert.doesNotMatch(warnings.resolution_id, /The name/);
+  assert.match(warnings.name, /answer No/);
 });

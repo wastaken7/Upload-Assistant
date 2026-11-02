@@ -205,14 +205,12 @@ class BitPorn(UNIT3D):
             description = f"{description}\n[center]{placeholders}[/center]"
         return {"description": description}
 
-    async def get_data(self, meta: Meta) -> dict[str, str]:
+    async def get_data(self, meta: Meta, preview: bool = False) -> dict[str, str]:
         """Build only the documented BitPorn upload fields."""
         data: dict[str, str] = {}
         for getter in (
             self.get_name,
-            self.get_description,
-            self.get_mediainfo,
-            self.get_bdinfo,
+            *(() if preview else (self.get_description, self.get_mediainfo, self.get_bdinfo)),
             self.get_category_id,
             self.get_type_id,
             self.get_resolution_id,
@@ -221,6 +219,8 @@ class BitPorn(UNIT3D):
         ):
             data.update(await getter(meta))
 
+        if preview:
+            return data
         for index, _ in enumerate(await self._description_image_files(meta), start=1):
             data[f"description_image_widths[{index}]"] = "450"
         return data

@@ -7,6 +7,7 @@ import aiofiles
 import httpx
 from bs4 import BeautifulSoup
 
+from src import payload_preview
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
@@ -306,6 +307,56 @@ class ImmortalSeed:
         data.update({"anonymous": "yes" if anon else "no"})
 
         return data
+
+    async def get_payload_preview(self, meta: Meta) -> payload_preview.TrackerPreview:
+        """The upload form as it is known before screenshots, for the Web UI to show and edit."""
+        specs = {
+            "UseNFOasDescr": payload_preview.flag("Use NFO as description", on="yes", off="no"),
+            "message": payload_preview.readonly("Description"),
+            "category": payload_preview.choice(
+                "Category",
+                [
+                    (32, "Anime"),
+                    (31, "Childrens/Cartoons"),
+                    (54, "Documentary HD"),
+                    (53, "Documentary SD"),
+                    (59, "Movies 4K"),
+                    (60, "Movies 4K non-English"),
+                    (16, "Movies HD"),
+                    (18, "Movies HD non-English"),
+                    (17, "Movies low def"),
+                    (34, "Movies low def non-English"),
+                    (14, "Movies SD"),
+                    (33, "Movies SD non-English"),
+                    (47, "TV 480p"),
+                    (64, "TV 4K"),
+                    (8, "TV HD"),
+                    (48, "TV SD x264"),
+                    (9, "TV SD XviD"),
+                    (63, "TV season packs 4K"),
+                    (4, "TV season packs HD"),
+                    (6, "TV season packs SD"),
+                    (35, "Audiobooks"),
+                    (41, "Comics"),
+                    (22, "Ebooks"),
+                    (46, "Magazines"),
+                    (37, "Music FLAC"),
+                    (36, "Music MP3"),
+                    (39, "Music other"),
+                    (61, "Games Nintendo"),
+                    (26, "Games PC"),
+                    (28, "Games PlayStation"),
+                    (29, "Games Xbox"),
+                ],
+            ),
+            "subject": payload_preview.text("Name"),
+            "nothingtopost": payload_preview.readonly("Nothing to post"),
+            "t_image_url": payload_preview.text("Cover URL", max_length=1000),
+            "submit": payload_preview.readonly("Submit"),
+            "t_link": payload_preview.text("IMDb URL"),
+            "anonymous": payload_preview.flag("Anonymous", on="yes", off="no"),
+        }
+        return payload_preview.describe(self.tracker, await self.get_data(meta), specs, name_key="subject")
 
     async def upload(self, meta: Meta) -> bool:
         cookies = await self.cookie_validator.load_session_cookies(meta, self.tracker)

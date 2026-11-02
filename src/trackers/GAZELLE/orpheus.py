@@ -13,6 +13,7 @@ import bencodepy
 import httpx
 from rich.markup import escape
 
+from src import payload_preview
 from src.console import logger
 from src.meta import Meta
 from src.music.models import MusicRelease
@@ -805,6 +806,30 @@ class Orpheus:
         release = self._release(meta)
         return f"{release.get('artist', '')} - {release.get('album', '')} [{release.get('year', '')!s}]".strip(" -")
 
+    async def get_payload_preview(self, meta: Meta) -> payload_preview.TrackerPreview:
+        """The upload form as it is known before the tracker checks, for the Web UI to show and edit."""
+        specs = {
+            "album_desc": payload_preview.readonly("Album description"),
+            "artists[]": payload_preview.readonly("Artists"),
+            "importance[]": payload_preview.readonly("Artist roles"),
+            "release_desc": payload_preview.readonly("Release description"),
+            "releasetype": payload_preview.choice("Release type", self.release_types, by_label=True),
+            "submit": payload_preview.readonly("Submit"),
+            "type": payload_preview.readonly("Type"),
+            "vbr": payload_preview.flag("VBR", on=1, off=0),
+            "image": payload_preview.text("Cover URL"),
+            "unknown": payload_preview.flag("Unknown release", on=1, off=None),
+            "scene": payload_preview.flag("Scene", on=1, off=None),
+            "vanity_house": payload_preview.flag("Vanity House", on=1, off=None),
+        }
+        deferred = {
+            "groupid": "Found on the tracker at upload time",
+            "requestid": "Matched to a request on the tracker at upload time",
+            "logfiles[]": "Attached at upload time",
+        }
+        data = self.build_upload_payload(meta, self._release(meta))
+        return payload_preview.describe(self.tracker, data, specs, deferred=deferred, name=await self.get_name(meta))
+
     async def upload(self, meta: Meta) -> bool:
         release = self._release(meta)
         if not await self.get_additional_checks(meta):
@@ -837,6 +862,7 @@ class Orpheus:
                 data["requestid"] = request_id
             if group_id:
                 data["groupid"] = group_id
+            data = payload_preview.apply_payload_edits(meta, self.tracker, data)
             debug_payload: dict[str, Any] = {
                 **data,
                 "file_input": "<not-created in debug mode>",
@@ -861,6 +887,7 @@ class Orpheus:
             data["requestid"] = request_id
         if group_id:
             data["groupid"] = group_id
+        data = payload_preview.apply_payload_edits(meta, self.tracker, data)
         payload = await self._post_upload(meta, data, torrent_path, release)
         if payload is None:
             return False
