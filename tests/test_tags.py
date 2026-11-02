@@ -21,6 +21,20 @@ async def test_technical_hyphens_are_not_release_group_separators(filename):
     assert tag == ""
 
 
+@pytest.mark.parametrize(
+    "filename",
+    [
+        "Example.Movie.2017.2160p.HDR.WEB.h265-DUAL.mkv",
+        "Example.Movie.2017.1080p.WEB.h264-MULTI.mkv",
+    ],
+)
+@pytest.mark.asyncio
+async def test_audio_language_markers_are_not_release_groups(filename):
+    tag = await get_tag(filename, Meta(category="MOVIE", uuid=filename))
+
+    assert tag == ""
+
+
 @pytest.mark.asyncio
 async def test_dts_hd_audio_is_not_treated_as_a_release_group():
     filename = "Example Movie 2005 1080p BluRay REMUX AVC DTS-HD MA 5.1.mkv"
