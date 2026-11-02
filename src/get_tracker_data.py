@@ -213,30 +213,6 @@ class TrackerDataManager:
                 meta[key] = value
         meta.matched_tracker = tracker_name
 
-    async def _save_description_draft(self, temp_dir: Path, content: str, *, only_if_missing: bool) -> None:
-        """Store the tracker description as the Web UI's editable draft (the panel edits it; no editor opens there)."""
-        from src.description_review import load_review, save_review
-
-        review = load_review(temp_dir)
-        if only_if_missing and isinstance(review.get("content"), str):
-            return
-        try:
-            version = int(review.get("version", 0) or 0) + 1
-        except TypeError, ValueError:
-            version = 1
-        await asyncio.to_thread(save_review, temp_dir, content, version)
-
-    async def _discard_description_draft(self, temp_dir: Path) -> None:
-        """Forget the Web UI draft after a discard.
-
-        Removing the file (instead of saving an empty draft) means ``apply_saved_draft``
-        has nothing to apply later, so a ``--description`` or template that ``gen_desc``
-        builds afterwards is not blanked by the description builder's second apply.
-        """
-        from src.description_review import review_path
-
-        await asyncio.to_thread(review_path(temp_dir).unlink, missing_ok=True)
-
     async def _review_explicit_tracker_description(self, meta: Meta, tracker_name: str, candidate: Meta) -> None:
         """Show the selected tracker description and let an interactive run keep, edit or discard it.
 
@@ -246,13 +222,14 @@ class TrackerDataManager:
         """
         if meta.unattended or not candidate.description:
             return
-        from src.description_review import load_review
+        from src.description_review import load_review, seed_review
 
         webui = bool(os.environ.get("UA_WEBUI_ACTIVE"))
         temp_dir = Path(meta.base_dir) / "tmp" / meta.uuid
         shown = candidate.description
         if webui:
-            await self._save_description_draft(temp_dir, candidate.description, only_if_missing=True)
+            # Locked check-and-write: a Description panel save landing in between keeps its text.
+            await asyncio.to_thread(seed_review, temp_dir, candidate.description)
             # The panel may already hold an edited draft; "keep" uploads that, so show it.
             saved = load_review(temp_dir).get("content")
             if isinstance(saved, str):
@@ -280,8 +257,11 @@ class TrackerDataManager:
             candidate.saved_description = False
             candidate.description_provenance = {**candidate.description_provenance, "discarded": True}
             if webui:
-                # Otherwise the saved draft would bring the tracker text back at upload time.
-                await self._discard_description_draft(temp_dir)
+                # A tombstone, not an empty draft: apply_saved_draft then leaves a --description or
+                # template alone, and a panel save still in flight fails its version check.
+                from src.description_review import discard_review
+
+                await asyncio.to_thread(discard_review, temp_dir)
 
     async def get_tracker_timestamps(self, base_dir: str | None = None) -> dict[str, float]:
         """Get tracker timestamps from the log file"""

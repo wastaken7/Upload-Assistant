@@ -228,7 +228,7 @@ def test_webui_tracker_description_discard_clears_saved_draft(tmp_path, monkeypa
 
         assert candidate.description == ""
         assert candidate.description_provenance["discarded"] is True
-        assert load_review(tmp_path / "tmp" / "release") == {}
+        assert load_review(tmp_path / "tmp" / "release").get("content") is None  # tombstone, nothing to apply
         assert draft({"description": ""}, tmp_path / "tmp" / "release")[0] == ""
 
     asyncio.run(run())

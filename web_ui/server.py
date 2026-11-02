@@ -24,7 +24,6 @@ import sys
 import threading
 import traceback
 import urllib.parse
-import weakref
 from contextlib import suppress
 from datetime import datetime, timedelta, UTC
 from functools import wraps
@@ -223,8 +222,6 @@ ARGUMENT_PRESETS_PATH = DATA_DIR / "argument_presets.json"
 LEGACY_ARGUMENT_PRESETS_PATH = CODE_DIR / "data" / "argument_presets.json"
 MAX_ARGUMENT_PRESETS = 50
 _argument_presets_lock = threading.Lock()
-_description_review_locks: weakref.WeakValueDictionary[str, threading.Lock] = weakref.WeakValueDictionary()
-_description_review_locks_lock = threading.Lock()
 _TRACKER_STATUS_CACHE_SECONDS = 15 * 60
 _TRACKER_STATUS_MAX_WORKERS = 8
 _tracker_status_cache: dict[str, dict[str, Any]] = {}
@@ -2878,13 +2875,6 @@ def _resolve_execution_description_review(session_id: str) -> tuple[Path, Path, 
     if temp_dir is None:
         return None
     return temp_dir, meta_file, dict(meta_data)
-
-
-def _description_review_lock(temp_dir: Path) -> threading.Lock:
-    """Return the process-local mutation lock for one execution's description."""
-    key = str(temp_dir.resolve())
-    with _description_review_locks_lock:
-        return _description_review_locks.setdefault(key, threading.Lock())
 
 
 def _screenshot_capture_supported(meta_data: Mapping[str, object]) -> bool:
@@ -7162,27 +7152,22 @@ def save_execution_description():
     if resolved is None:
         return jsonify({"success": False, "error": "Description is not available yet"}), 404
 
-    from src.description_review import draft, save_review
+    from src.description_review import ReviewConflictError, save_review
 
     requested_version = payload.get("version")
     if not isinstance(requested_version, int):
         return jsonify({"success": False, "error": "Description version is required"}), 400
 
     temp_dir, _meta_file, _meta_data = resolved
-    with _description_review_lock(temp_dir):
-        # Reload while holding the release-specific lock so the version check and
-        # write form one compare-and-swap operation across browser tabs.
-        locked_resolved = _resolve_execution_description_review(session_id)
-        if locked_resolved is None:
-            return jsonify({"success": False, "error": "Description is not available yet"}), 404
-        temp_dir, _meta_file, meta_data = locked_resolved
-        _current_content, current_version = draft(meta_data, temp_dir)
-        if requested_version != current_version:
-            return jsonify({"success": False, "error": "Description changed in another browser tab", "version": current_version}), 409
-
-        next_version = current_version + 1
-        save_review(temp_dir, content, next_version)
-    return jsonify({"success": True, "content": content, "version": next_version})
+    try:
+        # save_review holds the execution's file lock while it checks the version and
+        # writes, so the compare-and-swap also covers the upload process's own writes.
+        saved = save_review(temp_dir, content, expected_version=requested_version)
+    except ReviewConflictError as conflict:
+        return jsonify({"success": False, "error": "Description changed in another browser tab", "version": conflict.current_version}), 409
+    except TimeoutError:
+        return jsonify({"success": False, "error": "Description is being updated, try again"}), 503
+    return jsonify({"success": True, "content": content, "version": saved["version"]})
 
 
 @app.route("/api/execution_description/reset", methods=["POST"])
@@ -7201,25 +7186,20 @@ def reset_execution_description():
     if not isinstance(requested_version, int):
         return jsonify({"success": False, "error": "Description version is required"}), 400
 
-    from src.description_review import draft, save_review, source_items
+    from src.description_review import ReviewConflictError, save_review, source_items
 
-    temp_dir, _meta_file, _meta_data = resolved
-    with _description_review_lock(temp_dir):
-        locked_resolved = _resolve_execution_description_review(session_id)
-        if locked_resolved is None:
-            return jsonify({"success": False, "error": "Description is not available yet"}), 404
-        temp_dir, _meta_file, meta_data = locked_resolved
-        source = next((item for item in source_items(meta_data) if item["key"] == source_key), None)
-        if source is None:
-            return jsonify({"success": False, "error": "Description source was not found"}), 404
-        content = source["content"]
-        _current_content, current_version = draft(meta_data, temp_dir)
-        if requested_version != current_version:
-            return jsonify({"success": False, "error": "Description changed in another browser tab", "version": current_version}), 409
-
-        next_version = current_version + 1
-        save_review(temp_dir, content, next_version)
-    return jsonify({"success": True, "content": content, "version": next_version})
+    temp_dir, _meta_file, meta_data = resolved
+    source = next((item for item in source_items(meta_data) if item["key"] == source_key), None)
+    if source is None:
+        return jsonify({"success": False, "error": "Description source was not found"}), 404
+    content = source["content"]
+    try:
+        saved = save_review(temp_dir, content, expected_version=requested_version)
+    except ReviewConflictError as conflict:
+        return jsonify({"success": False, "error": "Description changed in another browser tab", "version": conflict.current_version}), 409
+    except TimeoutError:
+        return jsonify({"success": False, "error": "Description is being updated, try again"}), 503
+    return jsonify({"success": True, "content": content, "version": saved["version"]})
 
 
 @app.route("/api/execution_screenshots/<screenshot_id>/image")
