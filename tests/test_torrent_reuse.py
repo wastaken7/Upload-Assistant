@@ -762,3 +762,60 @@ async def test_metadata_lookup_uses_reuse_source_client(monkeypatch):
     await clients.get_ptp_from_hash(Meta({}), pathed=True, client_name="source")
 
     assert called_with is source_client  # noqa: S101
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("extras", [[], ["cover.jpg", "Fictional Artist - Example Album.log", "Fictional Artist - Example Album.cue"]])
+@pytest.mark.parametrize("track_count", [1, 2])
+async def test_music_reuse_matches_whole_folder_creation(tmp_path, extras, track_count):
+    release = tmp_path / "Fictional Artist - Example Album (2001) [FLAC]"
+    release.mkdir()
+    tracks = [release / f"{number:02d} - Example Track.flac" for number in range(1, track_count + 1)]
+    for track in tracks:
+        track.write_bytes(b"audio data")
+    for name in extras:
+        (release / name).write_bytes(b"extra data")
+    meta = Meta(
+        base_dir=str(tmp_path),
+        uuid=release.name,
+        path=str(release),
+        filelist=[str(track) for track in tracks],
+        category="MUSIC",
+        isdir=True,
+        mkbrr=False,
+        max_piece_size=1,
+        trackers=[],
+    )
+    (tmp_path / "tmp" / meta.uuid).mkdir(parents=True)
+
+    torrent_path = await TorrentCreator.create_torrent(meta, str(release), "BASE")
+    torrent = Torrent.read(torrent_path)
+    assert len(torrent.files) == track_count + len(extras)
+    clients = Clients({})
+
+    valid, _ = await clients.is_valid_torrent(meta, str(torrent_path), torrent.infohash, "qbit", {})
+
+    assert valid  # noqa: S101
+
+    (release / "folder.jpg").write_bytes(b"new artwork")
+    valid, _ = await clients.is_valid_torrent(meta, str(torrent_path), torrent.infohash, "qbit", {})
+
+    assert not valid  # noqa: S101
+
+
+@pytest.mark.asyncio
+async def test_music_reuse_rejects_audio_only_torrent_for_folder_with_extras(tmp_path):
+    release = tmp_path / "Fictional Artist - Example Album (2001) [FLAC]"
+    release.mkdir()
+    track = release / "01 - Example Track.flac"
+    track.write_bytes(b"audio data")
+    torrent = Torrent(path=release, piece_size=32768)
+    torrent.generate()
+    torrent_path = tmp_path / "candidate.torrent"
+    torrent.write(torrent_path)
+    (release / "cover.jpg").write_bytes(b"artwork")
+    meta = Meta(path=str(release), filelist=[str(track)], category="MUSIC", isdir=True, trackers=[])
+
+    valid, _ = await Clients({}).is_valid_torrent(meta, str(torrent_path), torrent.infohash, "qbit", {})
+
+    assert not valid  # noqa: S101

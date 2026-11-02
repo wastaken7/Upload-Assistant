@@ -665,12 +665,16 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
             logger.info(f"[bold red]Error reading torrent file: {e}")
             return False, torrent_path
 
-        keep_root = bool(meta.is_disc or (meta.keep_folder and meta.isdir))
+        # Music torrents are created from the whole folder (artwork, logs, cues), always keeping its root.
+        is_music_folder = meta.category == "MUSIC" and bool(meta.isdir)
+        keep_root = bool(meta.is_disc or is_music_folder or (meta.keep_folder and meta.isdir))
         root = Path(meta_path) if meta.isdir or meta.is_disc else Path(meta_path).parent
         torrent_name = torrent.metainfo["info"]["name"]
         if meta.is_disc:
             filelist = [str(path) for path in Torrent(path=root, exclude_globs=DISC_EXCLUDE_GLOBS).filepaths]
             candidates = [filelist, [file for file in filelist if Path(file).suffix.casefold() not in SUBTITLE_EXTENSIONS]]
+        elif is_music_folder:
+            candidates = [[str(path) for path in Torrent(path=root).filepaths]]
         else:
             candidates = [filelist]
             if meta.subtitle_files:
