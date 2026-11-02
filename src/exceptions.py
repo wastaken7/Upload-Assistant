@@ -44,3 +44,7 @@ class ManualDateError(Exception):
 
 class NoAudioMediaError(Exception):
     pass
+
+
+class UnsupportedSiteCheckError(Exception):
+    """The release cannot be checked in site_check mode, so it is skipped."""

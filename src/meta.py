@@ -493,6 +493,8 @@ class Meta:
     skipit: bool = False
     # The user chose to skip this release at the confirmation prompt.
     skipped_by_user: bool = False
+    # Site check mode cannot handle this release yet (for example, a BDMV disc).
+    skipped_unsupported: bool = False
     skipping: str | None = None
     sorted_filelist: bool = False
     source_size: int = 0

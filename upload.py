@@ -105,6 +105,7 @@ from src.dupe_checking import DupeChecker
 from src.dynamic_hdr_plot import dynamic_hdr_plot_enabled, process_dynamic_hdr_plots
 from src.early_tasks import cancel_and_drain_early_artifact_tasks, get_early_artifact_tasks, release_early_artifact_progress, start_early_artifact_tasks
 from src.early_tasks import is_usenet_only as _is_usenet_only
+from src.exceptions import UnsupportedSiteCheckError
 from src.get_desc import gen_desc
 from src.get_name import NameManager
 from src.get_tracker_data import TrackerDataManager
@@ -1301,6 +1302,12 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
     webui_events.stage("prep", "start")
     try:
         meta = await prep.gather_prep(meta=meta, mode="cli")
+    except UnsupportedSiteCheckError as e:
+        logger.info(f"[yellow]Skipping {escape(Path(str(meta.path or '')).name)}: {escape(str(e))}[/yellow]")
+        webui_events.notice("attention", f"Skipped: {e}")
+        webui_events.stage("prep", "skip")
+        meta.skipped_unsupported = True
+        return False
     except Exception as e:
         logger.info(f"Error in gather_prep: {e}")
         logger.info(traceback.format_exc())
@@ -2856,9 +2863,10 @@ async def do_the_thing(base_dir: str) -> None:
             finally:
                 await cancel_and_drain_early_artifact_tasks(meta.uuid)
             if not meta_success:
-                # A skip is the user's choice, not a failure: no red stage, no error.
-                outcome = "no_upload" if meta.skipped_by_user else "error"
-                if not meta.skipped_by_user:
+                # A skip by the user or for an unsupported release is not a failure: no red stage, no error.
+                skipped = meta.skipped_by_user or meta.skipped_unsupported
+                outcome = "no_upload" if skipped else "error"
+                if not skipped:
                     webui_events.fail_active_stage()
                 set_stats_context(debug=bool(meta.debug), category=str(meta.category or ""))
                 await record_event_async("item", operation="completed", outcome=outcome)
@@ -2867,7 +2875,8 @@ async def do_the_thing(base_dir: str) -> None:
                     processed_files_count += 1
                     skipped_files_count += 1
                     logger.info(f"[cyan]Processed {processed_files_count}/{total_files} files with {skipped_files_count} skipped uploading.\n\n")
-                    if log_file and (not meta.debug or "debug" in Path(log_file).name):
+                    # Unsupported releases stay unprocessed so a later version can check them.
+                    if log_file and not meta.skipped_unsupported and (not meta.debug or "debug" in Path(log_file).name):
                         if meta.site_upload_queue:
                             await QueueManager.save_processed_path(log_file, current_item_path)
                         else:
