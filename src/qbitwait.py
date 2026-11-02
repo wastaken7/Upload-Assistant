@@ -10,6 +10,7 @@ import qbittorrentapi
 
 from src.console import console, logger
 from src.meta import Meta
+from src.torrent_clients.qbittorrent import has_direct_qbit_auth, qui_request
 from src.webui_progress import complete_progress, has_progress_callback, publish_progress
 
 
@@ -22,7 +23,7 @@ class Wait:
         self.qbt_client: qbittorrentapi.Client | None = None
         self.qbt_client = self._connect_qbittorrent()
 
-    def _connect_qbittorrent(self, *, use_proxy: bool = True) -> qbittorrentapi.Client | None:
+    def _client_config(self) -> dict[str, Any]:
         config_map = self.config
         default_section = cast(dict[str, Any], config_map.get("DEFAULT", {}))
         clients_section = cast(dict[str, Any], config_map.get("TORRENT_CLIENTS", {}))
@@ -34,7 +35,10 @@ class Wait:
         client_obj = clients_section.get(default_torrent_client)
         if not isinstance(client_obj, dict):
             raise ValueError(f"No torrent client configuration for '{default_torrent_client}'")
-        client = cast(dict[str, Any], client_obj)
+        return cast(dict[str, Any], client_obj)
+
+    def _connect_qbittorrent(self, *, use_proxy: bool = True) -> qbittorrentapi.Client | None:
+        client = self._client_config()
 
         proxy_value = client.get("qui_proxy_url")
         self.proxy_url = proxy_value if isinstance(proxy_value, str) and proxy_value else None
@@ -45,7 +49,28 @@ class Wait:
             # Use qui proxy URL format
             self.qbt_proxy_url = self.proxy_url.rstrip("/")
             return None  # No traditional client needed for proxy
-        # Use traditional qbittorrent API client
+        return self._login_direct(client)
+
+    async def _fall_back_from_qui(self, operation: str, failure: str) -> bool:
+        """Switch from qui to the WebUI credentials after qui failed; True when that worked."""
+        client = self._client_config()
+        if not has_direct_qbit_auth(client):
+            logger.info(f"[bold red]qui proxy failed to {operation} ({failure}), and no qBittorrent WebUI credentials are configured to fall back to.")
+            return False
+
+        logger.info(f"[yellow]qui proxy failed to {operation} ({failure}); falling back to the qBittorrent WebUI credentials.[/yellow]")
+        try:
+            qbt_client = await asyncio.to_thread(self._login_direct, client)
+        except Exception as e:
+            logger.info(f"[bold red]qBittorrent WebUI fallback failed: {e}")
+            return False
+        # The session stays assigned so the caller's cleanup still closes it.
+        self.proxy_url = None
+        self.qbt_client = qbt_client
+        return True
+
+    @staticmethod
+    def _login_direct(client: dict[str, Any]) -> qbittorrentapi.Client:
         required_keys = ["qbit_url", "qbit_port", "qbit_api_key"] if client.get("qbit_api_key") else ["qbit_url", "qbit_port", "qbit_user", "qbit_pass"]
 
         missing_keys = [key for key in required_keys if key not in client]
@@ -110,12 +135,16 @@ class Wait:
                 if self.proxy_url:
                     if self.qbt_session is None:
                         raise RuntimeError("qbt_session is not initialized")
-                    response = await self.qbt_session.get(f"{self.qbt_proxy_url}/api/v2/torrents/info", params={"hashes": infohash})
-                    if response.status_code == 200:
-                        torrents_data = cast(list[dict[str, Any]], response.json())
+                    result = await qui_request(self.qbt_session.get(f"{self.qbt_proxy_url}/api/v2/torrents/info", params={"hashes": infohash}))
+                    if isinstance(result, str):
+                        if await self._fall_back_from_qui("check torrent completion", result):
+                            continue
+                        break
+                    if result.status_code == 200:
+                        torrents_data = cast(list[dict[str, Any]], result.json())
                         target_torrent = torrents_data[0] if torrents_data else None
                     else:
-                        logger.info(f"[ERROR] Failed to get torrent info via proxy: {response.status_code}", extra={"markup": False})
+                        logger.info(f"[ERROR] Failed to get torrent info via proxy: {result.status_code}", extra={"markup": False})
                         break
                 else:
                     if self.qbt_client is None:
@@ -286,11 +315,14 @@ class Wait:
                 if self.qbt_proxy_url is None:
                     logger.info("[bold red]Proxy URL is not configured correctly")
                     return False
-                response = await self.qbt_session.post(f"{self.qbt_proxy_url}/api/v2/torrents/recheck", data={"hashes": torrent_hash})
-                if response.status_code != 200:
-                    logger.info(f"[bold red]Failed to recheck torrent via proxy: {response.status_code}")
+                result = await qui_request(self.qbt_session.post(f"{self.qbt_proxy_url}/api/v2/torrents/recheck", data={"hashes": torrent_hash}))
+                if isinstance(result, str):
+                    if not await self._fall_back_from_qui("recheck the torrent", result):
+                        return False
+                elif result.status_code != 200:
+                    logger.info(f"[bold red]Failed to recheck torrent via proxy: {result.status_code}")
                     return False
-            else:
+            if not self.proxy_url:
                 if self.qbt_client is None:
                     logger.info("[bold red]qbt_client is not initialized")
                     return False
@@ -310,9 +342,13 @@ class Wait:
                     if self.qbt_proxy_url is None:
                         logger.info("[bold red]Proxy URL is not configured correctly")
                         return False
-                    response = await self.qbt_session.get(f"{self.qbt_proxy_url}/api/v2/torrents/info", params={"hashes": torrent_hash})
-                    if response.status_code == 200:
-                        torrents_data = cast(list[dict[str, Any]], response.json())
+                    result = await qui_request(self.qbt_session.get(f"{self.qbt_proxy_url}/api/v2/torrents/info", params={"hashes": torrent_hash}))
+                    if isinstance(result, str):
+                        if await self._fall_back_from_qui("check the recheck progress", result):
+                            continue
+                        return False
+                    if result.status_code == 200:
+                        torrents_data = cast(list[dict[str, Any]], result.json())
                         if torrents_data:
                             torrent = torrents_data[0]
                             state = torrent.get("state")
@@ -325,7 +361,7 @@ class Wait:
                         else:
                             raise Exception("No torrents found in response")
                     else:
-                        logger.info(f"[bold red]Failed to get torrent info via proxy: {response.status_code}")
+                        logger.info(f"[bold red]Failed to get torrent info via proxy: {result.status_code}")
                         return False
                 else:
                     if self.qbt_client is None:
@@ -357,6 +393,8 @@ class Wait:
                 await asyncio.sleep(check_interval)
 
             # Get final torrent info
+            final_state: Any = "unknown"
+            final_progress: Any = 0
             if self.proxy_url:
                 if self.qbt_session is None:
                     logger.info("[bold red]qbt_session is not initialized")
@@ -364,9 +402,12 @@ class Wait:
                 if self.qbt_proxy_url is None:
                     logger.info("[bold red]Proxy URL is not configured correctly")
                     return False
-                response = await self.qbt_session.get(f"{self.qbt_proxy_url}/api/v2/torrents/info", params={"hashes": torrent_hash})
-                if response.status_code == 200:
-                    torrents_data = cast(list[dict[str, Any]], response.json())
+                result = await qui_request(self.qbt_session.get(f"{self.qbt_proxy_url}/api/v2/torrents/info", params={"hashes": torrent_hash}))
+                if isinstance(result, str):
+                    if not await self._fall_back_from_qui("get the final torrent info", result):
+                        return False
+                elif result.status_code == 200:
+                    torrents_data = cast(list[dict[str, Any]], result.json())
                     if torrents_data:
                         torrent = torrents_data[0]
                         final_state = torrent.get("state")
@@ -374,9 +415,9 @@ class Wait:
                     else:
                         raise Exception("No torrents found in response")
                 else:
-                    logger.info(f"[bold red]Failed to get final torrent info via proxy: {response.status_code}")
+                    logger.info(f"[bold red]Failed to get final torrent info via proxy: {result.status_code}")
                     return False
-            else:
+            if not self.proxy_url:
                 if self.qbt_client is None:
                     logger.info("[bold red]qbt_client is not initialized")
                     return False
