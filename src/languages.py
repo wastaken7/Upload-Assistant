@@ -1,4 +1,5 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+import copy
 import re
 from pathlib import Path
 from typing import Any, cast
@@ -7,9 +8,24 @@ import aiofiles
 import langcodes
 from langcodes.tag_parser import LanguageTagError
 
-from src.console import logger
+from src.console import PromptBlockedError, logger
 from src.manual_input import Question, ask, has_answer, is_interactive
 from src.meta import Meta
+
+# What process_desc_language fills in on meta.
+LANGUAGE_FIELDS = (
+    "audio_languages",
+    "subtitle_languages",
+    "language_checked",
+    "hardcoded_subs",
+    "no_subs",
+    "unattended_audio_skip",
+    "unattended_subtitle_skip",
+    "bluray_audio_skip",
+    "write_audio_languages",
+    "write_subtitle_languages",
+    "write_hc_languages",
+)
 
 
 class LanguagesManager:
@@ -216,6 +232,17 @@ class LanguagesManager:
         return parsed_data
 
     async def process_desc_language(self, meta: Meta, tracker: str = "") -> None:
+        saved = {key: copy.copy(getattr(meta, key)) for key in LANGUAGE_FIELDS}
+        try:
+            await self._process_desc_language(meta, tracker)
+        except PromptBlockedError:
+            # A Web UI preview refused a question part way through: leave no
+            # half-found languages behind, so the upload asks it again.
+            for key, value in saved.items():
+                setattr(meta, key, value)
+            raise
+
+    async def _process_desc_language(self, meta: Meta, tracker: str) -> None:
         if not meta.hardcoded_subs and self._has_hardcoded_subtitle_marker(meta):
             meta.hardcoded_subs = True
             logger.info("[cyan]Detected hardcoded subtitles from the filename.[/cyan]")

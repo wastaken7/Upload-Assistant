@@ -166,3 +166,15 @@ def region_name(id_value: int | str | None, tracker: str = "") -> str:
     except ValueError, TypeError:
         return ""
     return reverse.get(value, "")
+
+
+def distributor_choices(tracker: str = "") -> list[tuple[str, str]]:
+    """``(id, name)`` pairs of a tracker's distributors, sorted by name."""
+    _, reverse = _load_distributor_maps(tracker.strip().lower() or "default")
+    return sorted(((str(id_value), label) for id_value, label in reverse.items()), key=lambda item: item[1])
+
+
+def region_choices(tracker: str = "") -> list[tuple[str, str]]:
+    """``(id, code)`` pairs of a tracker's regions, sorted by code."""
+    _, reverse = _load_region_maps(tracker.strip().lower() or "default")
+    return sorted(((str(id_value), code) for id_value, code in reverse.items()), key=lambda item: item[1])

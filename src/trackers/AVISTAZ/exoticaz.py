@@ -12,6 +12,7 @@ import aiofiles
 from bs4 import BeautifulSoup
 from PIL import Image
 
+from src import payload_preview
 from src.app_paths import CODE_DIR
 from src.cogs.redaction import Redaction
 from src.console import logger
@@ -462,23 +463,45 @@ class ExoticaZ(AZTrackerBase):
         self.az_class.secret_token = token
         return token
 
-    async def fetch_data(self, meta: Meta) -> dict[str, Any]:
+    async def fetch_data(self, meta: Meta, preview: bool = False) -> dict[str, Any]:
+        """Build the upload form; a ``preview`` asks nothing, sends no request and leaves out the description and reports."""
         category_id = await self.get_category_id(meta)
         data: dict[str, Any] = {
             "file_name": await self.get_name(meta),
             "category_id": category_id,
-            "extra[]": await self.confirm_extras(meta),
+            "extra[]": None if preview else await self.confirm_extras(meta),
             "resolution_ids[]": self.get_resolution_ids(meta),
             "performer_ids[]": [],
-            "studio_ids[]": await self.get_studio_ids(meta),
-            "tag_ids[]": await self.get_tags(meta),
-            "description": await self.edit_desc(meta),
-            "media_info": await self.get_file_info(meta),
+            # Studio and tag IDs are looked up on the site.
+            "studio_ids[]": None if preview else await self.get_studio_ids(meta),
+            "tag_ids[]": None if preview else await self.get_tags(meta),
+            "description": None if preview else await self.edit_desc(meta),
+            "media_info": None if preview else await self.get_file_info(meta),
         }
         anon = not (meta.anon == 0 and not self.config["TRACKERS"][self.tracker].get("anon", False))
         if anon:
             data["options"] = "anon_upload"
         return data
+
+    async def get_payload_preview(self, meta: Meta) -> payload_preview.TrackerPreview:
+        """The upload form as it is known before screenshots, for the Web UI to show and edit."""
+        specs = {
+            "file_name": payload_preview.text("Name"),
+            "category_id": payload_preview.choice(
+                "Category", [("1", "Video Clips"), ("2", "Video Pack"), ("3", "Siterip Pack"), ("4", "Pornstar Pack"), ("5", "DVD"), ("6", "BluRay")]
+            ),
+            "resolution_ids[]": payload_preview.readonly("Resolutions"),
+            "performer_ids[]": payload_preview.readonly("Performers"),
+            "options": payload_preview.flag("Anonymous", on="anon_upload", off=None),
+        }
+        deferred = {
+            "extra[]": "Confirmed in a question after this one",
+            "studio_ids[]": "Looked up on the tracker at upload time",
+            "tag_ids[]": "Looked up on the tracker at upload time",
+            "description": payload_preview.DESCRIPTION_NOTE,
+            "media_info": "Read from the MediaInfo/BDInfo report at upload time",
+        }
+        return payload_preview.describe(self.tracker, await self.fetch_data(meta, preview=True), specs, deferred=deferred, name_key="file_name")
 
     def check_data(self, meta: Meta, data: dict[str, Any]) -> str:
         meta = meta
@@ -586,6 +609,7 @@ class ExoticaZ(AZTrackerBase):
         data = await self.fetch_data(meta)
         if getattr(meta, "skipping", None) == self.tracker:
             return False
+        data = payload_preview.apply_payload_edits(meta, self.tracker, data)
         if issue := self.check_data(meta, data):
             meta.tracker_status[self.tracker]["status_message"] = f"data error - {issue}"
             return False

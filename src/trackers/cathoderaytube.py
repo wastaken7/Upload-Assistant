@@ -11,6 +11,7 @@ import aiofiles
 import httpx
 from bs4 import BeautifulSoup
 
+from src import payload_preview
 from src.console import logger
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder
@@ -365,7 +366,7 @@ class CathodeRayTube:
             if media_info:
                 sections.append(f"[details]\n[mediainfo]\n{media_info}\n[/mediainfo]\n[/details]")
 
-        sections.append(f"\n[align=right][url=https://github.com/wastaken7/Upload-Assistant][size=1]{meta.ua_signature}[/size][/url][/align]")
+        sections.append(f"\n[align=right][url=https://github.com/wastaken7/Upload-Assistant][size=0]{meta.ua_signature}[/size][/url][/align]")
 
         description_str: str = "\n".join(part for part in sections if part.strip())
 
@@ -377,8 +378,11 @@ class CathodeRayTube:
 
         return description_str
 
-    async def get_upload_data(self, meta: Meta, auth: str) -> dict[str, str]:
-        """Build CRT form fields, including its category-specific description template."""
+    async def get_upload_data(self, meta: Meta, auth: str, preview: bool = False) -> dict[str, str]:
+        """Build CRT form fields, including its category-specific description template.
+
+        A ``preview`` leaves out the cover, which is hosted at upload time, and the description.
+        """
         category = self.category_map.get(str(meta.category).upper())
         if not category:
             raise ValueError(f"Unsupported Cathode-Ray category: {meta.category}")
@@ -389,10 +393,23 @@ class CathodeRayTube:
             "MAX_FILE_SIZE": "2097152",
             "title": await self.get_name(meta),
             "taglist": self.get_tags(meta),
-            "image": self.get_cover(meta),
-            "desc": await self.generate_description(meta),
+            "image": "" if preview else self.get_cover(meta),
+            "desc": "" if preview else await self.generate_description(meta),
             "anonymous": "1" if (meta.anon or self.config.get("TRACKERS", {}).get(self.tracker, {}).get("anon", False)) else "0",
         }
+
+    async def get_payload_preview(self, meta: Meta) -> payload_preview.TrackerPreview:
+        """The upload form as it is known before screenshots, for the Web UI to show and edit."""
+        specs = {
+            "submit": payload_preview.readonly("Submit"),
+            "category": payload_preview.choice("Category", [(value, key) for key, value in self.category_map.items()]),
+            "MAX_FILE_SIZE": payload_preview.readonly("Max file size"),
+            "title": payload_preview.text("Name"),
+            "taglist": payload_preview.text("Tags", max_length=1000),
+            "anonymous": payload_preview.flag("Anonymous"),
+        }
+        deferred = {"image": "Hosted at upload time", "desc": payload_preview.DESCRIPTION_NOTE}
+        return payload_preview.describe(self.tracker, await self.get_upload_data(meta, "", preview=True), specs, deferred=deferred, name_key="title")
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         """Enforce Cathode-Ray.Tube upload rules and guidelines."""

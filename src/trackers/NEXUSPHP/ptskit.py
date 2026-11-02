@@ -82,11 +82,11 @@ class Ptskit(NEXUSPHP):
 
         return found_items
 
-    async def get_data(self, meta: Meta) -> dict[str, Any]:
+    async def get_data(self, meta: Meta, preview: bool = False) -> dict[str, Any]:
         data: dict[str, Any] = {
             "name": (await self.get_name(meta))["name"],
             "url": str(meta.imdb_info.get("imdb_url", "")),
-            "descr": await self.generate_description(meta),
+            **({} if preview else {"descr": await self.generate_description(meta)}),
             "type": self.get_type(meta),
         }
 

@@ -270,7 +270,8 @@ class CapybaraBR(UNIT3D):
                             audio_tag = ""
 
                 if audio_tag:
-                    if "-" in cbr_name:
+                    # Without a group tag the last hyphen may belong to the name itself (e.g. WEB-DL)
+                    if meta.tag and "-" in cbr_name:
                         parts = cbr_name.rsplit("-", 1)
 
                         match = None

@@ -884,6 +884,10 @@ SUPPORTED_DESC_EXTS = {".txt", ".nfo", ".md"}
 # Regex for splitting filenames on common separators (dots, dashes, underscores, spaces)
 _BROWSE_SEARCH_SEP_RE = re.compile(r"[\s.\-_]+")
 
+# Once search results are full, keep walking at most this many directories for
+# matching folders that may displace files, instead of walking the whole tree.
+_BROWSE_SEARCH_FOLDER_SCAN_DIRS = 500
+
 # Lock protecting the active execution registry.
 active_processes_lock = threading.Lock()
 # Each WebUI tab holds one SSE stream; browsers allow ~6 connections per host.
@@ -6642,6 +6646,31 @@ def browse_search():
     if not roots:
         return jsonify({"success": False, "error": "Browsing is not configured"}), 400
 
+    # A supplied scope must never silently fall back to all configured roots.
+    if "path" in request.args:
+        if len(request.args.getlist("path")) != 1 or not request.args["path"].strip():
+            return jsonify({"success": False, "error": "Select a folder to search"}), 400
+        try:
+            # The tree only hands out absolute paths; never join a relative
+            # scope onto a default root.
+            if not Path(request.args["path"]).is_absolute():
+                raise ValueError("Search scope must be absolute")
+            # Keep the selected path inside the configured roots before
+            # resolving links. Its target may live in a different allowed root.
+            lexical_scope = Path(os.path.abspath(request.args["path"]))  # noqa: PTH100
+            if not any(lexical_scope.is_relative_to(root) for root in roots):
+                raise ValueError("Scope is outside browse roots")
+            # Validate the target with the shared resolver, without changing
+            # the stricter lexical-root policy used by other browse/upload APIs.
+            scope = Path(_resolve_browse_path(str(lexical_scope.resolve())))
+            roots = [str(scope)]
+            # Surface an unavailable/unreadable explicit selection instead of
+            # returning a misleading empty successful search.
+            with os.scandir(scope):
+                pass
+        except (ValueError, OSError):
+            return jsonify({"success": False, "error": "Search folder is unavailable or not allowed"}), 400
+
     # Split on common separators
     query_tokens = [t for t in _BROWSE_SEARCH_SEP_RE.split(query.lower()) if t]
     if not query_tokens:
@@ -6664,6 +6693,12 @@ def browse_search():
         return True
 
     items: list[BrowseItem] = []
+    files: list[BrowseItem] = []
+    seen: set[str] = set()
+    # Directories walked after the result list filled up; folders found
+    # there may still displace files, but only within a bounded budget.
+    dirs_after_full = 0
+    budget_spent = False
 
     try:
         for root in roots:
@@ -6671,12 +6706,19 @@ def browse_search():
             if not Path(root_abs).is_dir():
                 continue
             try:
-                for dirpath, dirnames, filenames in os.walk(root_abs):
+                for dirpath, dirnames, filenames in os.walk(root_abs, followlinks=False):
+                    if len(items) + len(files) >= max_results:
+                        dirs_after_full += 1
+
                     # Prune system/hidden directories before os.walk enters them.
-                    dirnames[:] = [d for d in dirnames if not _is_hidden_browse_entry(Path(dirpath) / d)]
+                    visible = [d for d in dirnames if not _is_hidden_browse_entry(Path(dirpath) / d)]
+                    # os.walk never descends symlinks; prune Windows junctions
+                    # too so every walked folder lives under the root. Linked
+                    # folders still match below, as the tree lists them.
+                    dirnames[:] = [d for d in visible if not (Path(dirpath) / d).is_junction()]
 
                     # Check dirs
-                    for dirname in dirnames:
+                    for dirname in visible:
                         if name_matches(dirname):
                             full_path = Path(dirpath) / dirname
                             try:
@@ -6690,6 +6732,9 @@ def browse_search():
                             except Exception:
                                 mtime = 0.0
                                 size = 0
+                            if str(full_path) in seen:
+                                continue
+                            seen.add(str(full_path))
                             items.append(
                                 {
                                     "name": dirname,
@@ -6706,8 +6751,11 @@ def browse_search():
                     if len(items) >= max_results:
                         break
 
-                    # Check files
+                    # Keep only bounded provisional files; later folders take
+                    # their places before the response is truncated.
                     for filename in filenames:
+                        if len(files) >= max_results:
+                            break
                         if not name_matches(filename):
                             continue
                         if _is_hidden_browse_entry(Path(dirpath) / filename):
@@ -6728,7 +6776,10 @@ def browse_search():
                         except Exception:
                             mtime = 0.0
                             size = 0
-                        items.append(
+                        if str(full_path) in seen:
+                            continue
+                        seen.add(str(full_path))
+                        files.append(
                             {
                                 "name": filename,
                                 "path": str(full_path),
@@ -6738,10 +6789,10 @@ def browse_search():
                                 "size": size,
                             }
                         )
-                        if len(items) >= max_results:
-                            break
-
-                    if len(items) >= max_results:
+                    # os.walk scans before yielding; stop here rather than
+                    # asking it to enumerate the first over-budget directory.
+                    if len(items) + len(files) >= max_results and dirs_after_full >= _BROWSE_SEARCH_FOLDER_SCAN_DIRS:
+                        budget_spent = True
                         break
             except PermissionError:
                 continue
@@ -6749,10 +6800,11 @@ def browse_search():
                 console.print(f"Error searching in {root}: {e}", markup=False)
                 continue
 
-            if len(items) >= max_results:
+            if len(items) >= max_results or budget_spent:
                 break
 
-        # Sort by folders first and then alphabetically
+        items.extend(files[:max_results - len(items)])
+        # Sort the selected folders/files alphabetically within each group.
         items.sort(key=lambda x: (0 if x.get("type") == "folder" else 1, (x.get("name") or "").lower()))
 
         return jsonify({"success": True, "items": items, "query": query, "count": len(items), "truncated": len(items) >= max_results})

@@ -585,9 +585,243 @@
     };
   };
 
+  // Upload data previews on the "Is this correct?" prompt. Each tracker's
+  // form lists its fields; drop-down lists are shared in a table, by id.
+  const PAYLOAD_KINDS = new Set([
+    "text",
+    "choice",
+    "flag",
+    "readonly",
+    "deferred",
+  ]);
+
+  const readPayloadPreviews = (context) => {
+    const source = context && typeof context === "object" ? context : {};
+    const tables = {};
+    for (const table of Array.isArray(source.payload_choices)
+      ? source.payload_choices
+      : []) {
+      if (
+        table &&
+        typeof table.id === "string" &&
+        Array.isArray(table.choices)
+      ) {
+        tables[table.id] = table.choices
+          .filter((pair) => Array.isArray(pair) && pair.length === 2)
+          .map(([value, label]) => [String(value), String(label)]);
+      }
+    }
+    return (Array.isArray(source.payloads) ? source.payloads : [])
+      .filter((preview) => preview && typeof preview.tracker === "string")
+      .map((preview) => ({
+        tracker: preview.tracker,
+        name: text(preview.name),
+        fields: (Array.isArray(preview.fields) ? preview.fields : [])
+          .filter(
+            (field) =>
+              field &&
+              typeof field.key === "string" &&
+              PAYLOAD_KINDS.has(field.kind),
+          )
+          .map((field) => {
+            const choices = tables[field.choices] || [];
+            // A drop-down whose list was too long to send is shown, not edited.
+            const editable =
+              field.kind === "text" ||
+              field.kind === "flag" ||
+              (field.kind === "choice" && choices.length > 0);
+            return {
+              key: field.key,
+              label: text(field.label) || field.key,
+              kind: field.kind,
+              value:
+                field.kind === "flag"
+                  ? field.value === true
+                  : text(field.value),
+              display: text(field.display),
+              choices,
+              max: Number.isInteger(field.max) ? field.max : 255,
+              numeric: field.numeric === true,
+              note: text(field.note),
+              role: text(field.role),
+              editable,
+            };
+          }),
+      }));
+  };
+
+  /** The value shown for a field: the edited one, or what the run reported. */
+  const payloadFieldValue = (field, edits, tracker) => {
+    const changed = edits && edits[tracker];
+    return changed && field.key in changed ? changed[field.key] : field.value;
+  };
+
+  /** Edits with one field set; a value equal to the original is dropped. */
+  const updatePayloadEdits = (edits, tracker, field, value) => {
+    const next = { ...(edits || {}) };
+    const forTracker = { ...(next[tracker] || {}) };
+    if (value === field.value) delete forTracker[field.key];
+    else forTracker[field.key] = value;
+    if (Object.keys(forTracker).length) next[tracker] = forTracker;
+    else delete next[tracker];
+    return next;
+  };
+
+  /** Why an edited value would be refused by the run, or "" when it is fine. */
+  const payloadFieldError = (field, value) => {
+    if (field.kind === "flag")
+      return typeof value === "boolean" ? "" : "Invalid value";
+    if (field.kind === "choice") {
+      return field.choices.some(([option]) => option === value)
+        ? ""
+        : "Pick a value from the list";
+    }
+    if (field.kind !== "text" || typeof value !== "string") return "";
+    const trimmed = value.trim();
+    if (/[\r\n]/.test(value)) return "Use a single line";
+    if (trimmed.length > field.max) return `At most ${field.max} characters`;
+    if (!trimmed && field.value.trim()) return "Cannot be empty";
+    if (field.numeric && trimmed && !/^[0-9]+$/.test(trimmed))
+      return "Numbers only";
+    return "";
+  };
+
+  /** Edits that the run would refuse, as ``{tracker: {key: message}}``. */
+  const payloadEditErrors = (previews, edits) => {
+    const errors = {};
+    for (const preview of previews) {
+      const changed = (edits || {})[preview.tracker] || {};
+      for (const field of preview.fields) {
+        if (!(field.key in changed)) continue;
+        const message = payloadFieldError(field, changed[field.key]);
+        if (message) {
+          errors[preview.tracker] = {
+            ...(errors[preview.tracker] || {}),
+            [field.key]: message,
+          };
+        }
+      }
+    }
+    return errors;
+  };
+
+  // Fields whose value comes from the release's metadata: changing them here
+  // fixes only this tracker's form, so the advice names the correction that
+  // fixes it everywhere (the name, the description and the dupe check too).
+  const PAYLOAD_ROLE_ADVICE = Object.freeze({
+    name: "Retyping the name changes only this form. If part of it is wrong (title, year, edition, group, source), answer No and correct that part (for example --imdb, --tmdb, --year, --edition or --tag).",
+    title:
+      "This title comes from IMDb/TMDB. If it is the wrong work, answer No and correct it with --imdb or --tmdb.",
+    external_id:
+      "The name, description, artwork and dupe check were made for the current ID. If it is wrong, answer No and correct it with --tmdb, --imdb, --tvdb, --mal or --tvmaze.",
+    category:
+      "The name, IDs and description were made for this category. If it is wrong, answer No and correct it with --category.",
+    release_type:
+      "If the type or source is wrong, answer No and correct it with --type or --source; the name and the dupe check use it.",
+    resolution:
+      "If the resolution is wrong, answer No and correct it with --resolution; the name and the dupe check use it.",
+    season_episode:
+      "If the season or episode is wrong, answer No and correct it with --season or --episode; the name uses it.",
+    group:
+      "If the group is wrong, answer No and correct it with --tag; the name uses it.",
+    edition:
+      "If the edition is wrong, answer No and correct it with --edition; the name uses it.",
+    staff_flag:
+      "Usually only staff or approved internal groups may set this; the tracker may reject the upload.",
+  });
+  // Roles whose value appears in the release name.
+  const NAME_PART_ROLES = new Set([
+    "release_type",
+    "resolution",
+    "season_episode",
+    "group",
+    "edition",
+  ]);
+  // Roles the name and description are built from as a whole.
+  const NAME_SOURCE_ROLES = new Set(["external_id", "category", "title"]);
+
+  /** The advice shown next to a field before it is changed, or "". */
+  const payloadRoleAdvice = (role) => PAYLOAD_ROLE_ADVICE[role] || "";
+
+  /** How a field's original value reads, to look for it in the name. */
+  const payloadOriginalLabel = (field) => {
+    if (field.kind !== "choice") return String(field.value || "");
+    const match = field.choices.find(([option]) => option === field.value);
+    const label = field.display || (match ? match[1] : field.value);
+    return String(label)
+      .replace(/\s*\([^)]*\)$/, "")
+      .split(" / ")[0];
+  };
+
+  /** The part of the original value worth finding in the name ("1080p" in "1080p / 1440p"). */
+  const payloadNameToken = (field) => {
+    const label = payloadOriginalLabel(field).trim();
+    if (field.role === "resolution") {
+      const resolution = label.match(/\b\d{3,4}[pi]\b/i);
+      return resolution ? resolution[0] : "";
+    }
+    return label.length >= 2 && !/^\d+$/.test(label) ? label : "";
+  };
+
+  /**
+   * Warnings for one tracker's changed fields, as ``{key: message}``.
+   *
+   * Changing what the name is made of while leaving the name as it is makes
+   * the form disagree with itself, so those warnings say so.
+   */
+  const payloadEditWarnings = (preview, edits) => {
+    const changed = (edits || {})[preview.tracker] || {};
+    const nameField = preview.fields.find(
+      (field) => field.role === "name" && field.kind === "text",
+    );
+    const nameKept = Boolean(nameField) && !(nameField.key in changed);
+    const name = nameField ? String(nameField.value).toLowerCase() : "";
+    const warnings = {};
+    for (const field of preview.fields) {
+      if (!(field.key in changed) || !PAYLOAD_ROLE_ADVICE[field.role]) continue;
+      const value = changed[field.key];
+      // Clearing a staff option is always allowed.
+      if (
+        field.role === "staff_flag" &&
+        (value === false || value === "0" || value === "")
+      ) {
+        continue;
+      }
+      let message = PAYLOAD_ROLE_ADVICE[field.role];
+      if (nameKept && NAME_PART_ROLES.has(field.role)) {
+        const token = payloadNameToken(field);
+        message +=
+          token && name.includes(token.toLowerCase())
+            ? ` The name still says "${token}".`
+            : " The name was not changed.";
+      } else if (nameKept && NAME_SOURCE_ROLES.has(field.role)) {
+        message +=
+          " The name was not changed and still describes the previous one.";
+      }
+      warnings[field.key] = message;
+    }
+    return warnings;
+  };
+
+  /** The "yes" answer, carrying changed run options and upload data. */
+  const buildConfirmAnswer = (runOptionValues, payloadEdits) => {
+    const values = { ...(runOptionValues || {}) };
+    if (payloadEdits && Object.keys(payloadEdits).length) {
+      values.payload_edits = payloadEdits;
+    }
+    return Object.keys(values).length ? `yes ${JSON.stringify(values)}` : "yes";
+  };
+
   const api = {
     RUN_GUI_STAGES,
     createRunGuiState,
+    readPayloadPreviews,
+    payloadFieldValue,
+    updatePayloadEdits,
+    payloadEditErrors,
+    payloadRoleAdvice,
+    payloadEditWarnings,
+    buildConfirmAnswer,
     reduceRunGuiEvent,
     markRunGuiPromptAnswered,
     selectRunGuiView,

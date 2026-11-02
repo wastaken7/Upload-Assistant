@@ -256,9 +256,9 @@ class PeerGarden(UNIT3D):
             "mod_queue_opt_in": await self.get_flag(meta, "modq"),
         }
 
-    async def get_data(self, meta: Meta) -> dict[str, Any]:
+    async def get_data(self, meta: Meta, preview: bool = False) -> dict[str, Any]:
         """Build PeerGarden-specific upload payload, filtering out prohibited fields."""
-        data = await super().get_data(meta)
+        data = await super().get_data(meta, preview)
 
         # Pop prohibited administrative flags
         for field in ("free", "featured", "doubleup", "sticky"):

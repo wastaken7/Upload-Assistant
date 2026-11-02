@@ -90,7 +90,7 @@ def test_maps_categories_and_builds_description():
         "title": "Example Movie (2010)",
         "taglist": "movies, 2010, 2010s, drama, mystery, 1080p, bluray, remux, h.264, ac3, 5.1, english.audio, english.sub",
         "image": "",
-        "desc": "[info]\nhttps://www.imdb.com/title/tt1234567/\nhttps://www.themoviedb.org/movie/123\n[/info]\n\n[align=right][url=https://github.com/wastaken7/Upload-Assistant][size=1]Upload-Assistant[/size][/url][/align]",
+        "desc": "[info]\nhttps://www.imdb.com/title/tt1234567/\nhttps://www.themoviedb.org/movie/123\n[/info]\n\n[align=right][url=https://github.com/wastaken7/Upload-Assistant][size=0]Upload-Assistant[/size][/url][/align]",
         "anonymous": "1",
     }
     assert asyncio.run(site.get_upload_data(meta(category="TV"), "csrf"))["category"] == "2"  # noqa: S101
@@ -200,14 +200,14 @@ def test_renders_crt_category_description_templates():
         "[notes]\nRelease-specific note.\n[/notes]\n"
         "[screens]\nhttps://iili.io/1.png https://iili.io/2.png https://iili.io/3.png\n[/screens]\n"
         "[details]\n[mediainfo]\nDisc Title: EXAMPLE\n[/mediainfo]\n[/details]\n\n"
-        "[align=right][url=https://github.com/wastaken7/Upload-Assistant][size=1]Upload-Assistant[/size][/url][/align]"
+        "[align=right][url=https://github.com/wastaken7/Upload-Assistant][size=0]Upload-Assistant[/size][/url][/align]"
     )
     game = meta(
         category="GAME", imdb_tt="", tmdb=None, tmdb_id=None, steam_url="https://store.steampowered.com/app/1", release_url="https://example.com/game", overview="Game plot"
     )
     assert asyncio.run(site.generate_description(game)) == (  # noqa: S101
         "[info]\nhttps://store.steampowered.com/app/1\n[/info]\n[plot]\nGame plot\n[/plot]\n\n"
-        "[align=right][url=https://github.com/wastaken7/Upload-Assistant][size=1]Upload-Assistant[/size][/url][/align]"
+        "[align=right][url=https://github.com/wastaken7/Upload-Assistant][size=0]Upload-Assistant[/size][/url][/align]"
     )
 
 

@@ -616,6 +616,20 @@ async def update_metadata_from_tracker(
             logger.debug(f"[yellow]{tracker_name} returned invalid IDs (both 0)[/yellow]")
             found_match = False
 
+    elif tracker_name == "BJSHARE":
+        # BJ-Share has no metadata API, so it is only queried for an exact torrent ID.
+        resolved_torrent_id = torrent_id or meta.get_tracker_id(tracker_name)
+        if resolved_torrent_id:
+            tracker_data = cast(
+                Sequence[Any],
+                await tracker_instance.get_torrent_metadata(meta, resolved_torrent_id, skip_tracker_descriptions=skip_tracker_descriptions),
+            )
+            tmdb, imdb, _tvdb, _mal, desc, _category, _infohash, imagelist, *_rest = tracker_data
+            if tmdb or imdb or desc or imagelist:
+                found_match = await update_meta_with_unit3d_data(meta, tracker_data, tracker_name, skip_tracker_descriptions)
+            else:
+                logger.debug(f"[yellow]No valid data found on {tracker_name}[/yellow]")
+
     elif tracker_name in api_trackers:
         resolved_torrent_id = torrent_id or meta.get_tracker_id(tracker_name)
         if resolved_torrent_id:

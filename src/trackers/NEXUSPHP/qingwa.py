@@ -1,6 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import re
-from typing import Any
+from typing import Any, ClassVar
 
 from src.meta import Meta
 from src.trackers.NEXUSPHP import NEXUSPHP
@@ -14,6 +14,11 @@ class QingWa(NEXUSPHP):
     tracker_urls = (base_url,)
     allows_bloated_audio = True
     search_type_parameter = "source"
+    # QingWa sends the medium as source_sel[4] and has no region selector (see get_type_data).
+    payload_option_getters: ClassVar[dict[str, tuple[str, str, str]]] = {
+        **{key: value for key, value in NEXUSPHP.payload_option_getters.items() if key not in ("medium_sel[4]", "source_sel[4]")},
+        "source_sel[4]": ("Medium", "get_type", "release_type"),
+    }
 
     def __init__(self, config: dict[str, Any]) -> None:
         super().__init__(config, "QINGWA")
@@ -129,8 +134,8 @@ class QingWa(NEXUSPHP):
         tag = meta.tag or ""
         return {"name": name + (tag if tag.startswith("-") or not tag else f"-{tag}")}
 
-    async def get_data(self, meta: Meta) -> dict[str, Any]:
-        data = await super().get_data(meta)
+    async def get_data(self, meta: Meta, preview: bool = False) -> dict[str, Any]:
+        data = await super().get_data(meta, preview)
         localized = getattr(self, "tmdb_data", {})
         candidates = [localized.get("title"), localized.get("name"), meta.aka, meta.original_title]
         names: list[str] = []

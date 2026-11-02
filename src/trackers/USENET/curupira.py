@@ -9,6 +9,7 @@ import aiofiles
 import httpx
 import langcodes
 
+from src import payload_preview
 from src.cogs.redaction import Redaction
 from src.console import logger
 from src.meta import Meta
@@ -369,8 +370,47 @@ class Curupira:
 
         return urls[:6]
 
-    async def _prepare_data(self, meta: Meta) -> dict[str, Any]:
-        screenshot_urls = await self.get_screens(meta)
+    async def get_payload_preview(self, meta: Meta) -> payload_preview.TrackerPreview:
+        """The upload form as it is known before screenshots, for the Web UI to show and edit."""
+        specs = {
+            "name": payload_preview.text("Name"),
+            "category_id": payload_preview.choice(
+                "Category",
+                [
+                    ("2030", "Movies SD"),
+                    ("2040", "Movies HD"),
+                    ("2045", "Movies UHD"),
+                    ("5030", "TV SD"),
+                    ("5040", "TV HD"),
+                    ("5045", "TV UHD"),
+                    ("5060", "Sports"),
+                    ("5070", "Anime"),
+                    ("3030", "Audiobooks"),
+                    ("7020", "Ebooks"),
+                    ("4050", "Games"),
+                    ("3000", "Music"),
+                    ("5000", "TV"),
+                    ("2000", "Movies"),
+                ],
+            ),
+            "custom_cover_url": payload_preview.text("Cover URL", max_length=1000),
+            "quality": payload_preview.choice("Quality", ("8640p", "4320p", "2160p", "1440p", "1080p", "1080i", "720p", "576p", "576i", "540p", "480p", "480i")),
+            "source": payload_preview.choice("Source", ["Full Disc", "BluRay", "WEB-DL", "WEBRip", "HDTV", "DVD"]),
+            "audio_langs": payload_preview.readonly("Audio languages"),
+            "subs_langs": payload_preview.readonly("Subtitle languages"),
+            "tmdb_id": payload_preview.number("TMDB ID"),
+            "tmdb_type": payload_preview.readonly("TMDB type"),
+            "mal_id": payload_preview.number("MAL ID"),
+            "anonymous": payload_preview.flag("Anonymous", on="true", off=None),
+        }
+        deferred = {"screenshot_urls": payload_preview.SCREENSHOTS_NOTE}
+        if meta.category in ("TV", "MOVIE") or meta.audiobook:
+            deferred["mediainfo_text"] = "Read from the MediaInfo report at upload time"
+        return payload_preview.describe(self.tracker, await self._prepare_data(meta, preview=True), specs, deferred=deferred)
+
+    async def _prepare_data(self, meta: Meta, preview: bool = False) -> dict[str, Any]:
+        """Build the upload form; a ``preview`` leaves out the screenshots and MediaInfo."""
+        screenshot_urls = [] if preview else await self.get_screens(meta)
         data = {
             "name": await self.get_name(meta),
             "category_id": self.get_category_id(meta),
@@ -383,7 +423,7 @@ class Curupira:
                 data["custom_cover_url"] = cover_url
 
         # MediaInfo text (optional)
-        if meta.category in ("TV", "MOVIE") or meta.audiobook:
+        if not preview and (meta.category in ("TV", "MOVIE") or meta.audiobook):
             data["mediainfo_text"] = await self.get_media_info(meta)
 
         # Quality (optional)
@@ -457,7 +497,7 @@ class Curupira:
             status_dict["status_message"] = "data error: NZB file not found"
             return False
 
-        data = await self._prepare_data(meta)
+        data = payload_preview.apply_payload_edits(meta, self.tracker, await self._prepare_data(meta))
 
         if meta.debug:
             logger.debug(f"{self.tracker}: [cyan]Upload (DEBUG MODE):[/cyan]")

@@ -12,7 +12,7 @@ from bs4 import BeautifulSoup
 from rich.markup import escape
 from unidecode import unidecode
 
-from src import webui_events
+from src import payload_preview, webui_events
 from src.cogs.redaction import Redaction
 from src.console import logger, prompt_in_thread
 from src.cookie_auth import CookieValidator
@@ -189,13 +189,80 @@ class FileList:
                 logger.error(f"{self.tracker}: [yellow]Warning: Error parsing cookie file: {e}[/yellow]")
             return {}
 
-    async def upload(self, meta: Meta) -> bool:
-        common = Common(config=self.config)
-        await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
-        await self.edit_desc(meta)
+    async def get_data(self, meta: Meta, preview: bool = False) -> dict[str, Any]:
+        """Build the upload form; a ``preview`` leaves out the description and MediaInfo/BDInfo."""
+        if not preview:
+            await self.edit_desc(meta)
         fl_name = await self.get_name(meta)
         cat_id = await self.get_category_id(meta)
         has_ro_audio, _has_ro_sub = await self.get_ro_tracks(meta)
+
+        fl_desc = mi_dump = ""
+        if not preview:
+            desc_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt"
+            async with aiofiles.open(desc_path, newline="", encoding="utf-8") as desc_file:
+                fl_desc = await desc_file.read()
+            mi_path = (
+                f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/BD_SUMMARY_00.txt" if meta.bdinfo else f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/MEDIAINFO_CLEANPATH.txt"
+            )
+            async with aiofiles.open(mi_path, encoding="utf-8") as mi_file:
+                mi_dump = await mi_file.read()
+        data: dict[str, Any] = {"name": fl_name, "type": cat_id, "descr": fl_desc.strip(), "nfo": mi_dump}
+
+        imdb_id_value = str(meta.imdb_id if meta.imdb_id is not None else "0")
+        if imdb_id_value.isdigit() and int(imdb_id_value) != 0:
+            data["imdbid"] = meta.imdb
+            imdb_info = meta.imdb_info
+            imdb_info_dict = imdb_info if isinstance(imdb_info, dict) else {}
+            data["description"] = imdb_info_dict.get("genres", "")
+        if self.uploader_name not in ("", None) and not self._is_true(self.config["TRACKERS"][self.tracker].get("anon", "False")):
+            data["epenis"] = self.uploader_name
+        if has_ro_audio:
+            data["materialro"] = "on"
+        if meta.is_disc == "BDMV" or meta.type == "REMUX":
+            data["freeleech"] = "on"
+        if int(meta.tv_pack if meta.tv_pack is not None else "0") != 0:
+            data["freeleech"] = "on"
+        if int(meta.freeleech if meta.freeleech is not None else "0") != 0:
+            data["freeleech"] = "on"
+        return data
+
+    async def get_payload_preview(self, meta: Meta) -> payload_preview.TrackerPreview:
+        """The upload form as it is known before screenshots, for the Web UI to show and edit."""
+        specs = {
+            "name": payload_preview.text("Name"),
+            "type": payload_preview.choice(
+                "Category",
+                [
+                    (1, "Movie SD"),
+                    (2, "DVD"),
+                    (3, "DVD + RO"),
+                    (4, "Movie HD"),
+                    (6, "4K Movie"),
+                    (19, "Movie + RO"),
+                    (20, "BluRay"),
+                    (21, "TV HD"),
+                    (23, "TV SD"),
+                    (24, "Anime"),
+                    (26, "4K Movie BluRay"),
+                    (27, "TV 4K"),
+                ],
+            ),
+            "imdbid": payload_preview.text("IMDb ID"),
+            "description": payload_preview.text("Genres"),
+            "materialro": payload_preview.flag("Romanian audio", on="on", off=None),
+            "freeleech": payload_preview.flag("Freeleech", on="on", off=None),
+        }
+        deferred = {"descr": payload_preview.DESCRIPTION_NOTE, "nfo": "Read from the MediaInfo/BDInfo report at upload time"}
+        # The uploader name shown on the site is the account's own name.
+        data = await self.get_data(meta, preview=True)
+        return payload_preview.describe(self.tracker, data, specs, deferred=deferred, secret_fields=("epenis",))
+
+    async def upload(self, meta: Meta) -> bool:
+        common = Common(config=self.config)
+        await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
+        data = payload_preview.apply_payload_edits(meta, self.tracker, await self.get_data(meta))
+        fl_name = str(data["name"])
 
         # Confirm the correct naming order for FILELIST
         cli_ui.info(f"Filelist name: {fl_name}")
@@ -217,43 +284,18 @@ class FileList:
                     logger.info(f"{self.tracker}: Aborting...")
                     return False
                 fl_name = fl_name_manually
+                data["name"] = fl_name
 
         # Torrent File Naming
         # Note: Don't Edit .torrent filename after creation, SubsPlease anime releases (because of their weird naming) are an exception
         torrent_file_name = str(fl_name) if meta.anime is True and meta.tag == "-SubsPlease" else meta.basename_no_ext
 
         # Download new .torrent from site
-        desc_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt"
-        async with aiofiles.open(desc_path, newline="", encoding="utf-8") as desc_file:
-            fl_desc = await desc_file.read()
         torrent_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}].torrent"
-        mi_path = (
-            f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/BD_SUMMARY_00.txt" if meta.bdinfo else f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/MEDIAINFO_CLEANPATH.txt"
-        )
-        async with aiofiles.open(mi_path, encoding="utf-8") as mi_file:
-            mi_dump = await mi_file.read()
         async with aiofiles.open(torrent_path, "rb") as torrent_file:
             torrent_bytes = await torrent_file.read()
         torrent_file_name = unidecode(torrent_file_name)
         files = {"file": (f"{torrent_file_name}.torrent", torrent_bytes, "application/x-bittorent")}
-        data = {"name": fl_name, "type": cat_id, "descr": fl_desc.strip(), "nfo": mi_dump}
-
-        imdb_id_value = str(meta.imdb_id if meta.imdb_id is not None else "0")
-        if imdb_id_value.isdigit() and int(imdb_id_value) != 0:
-            data["imdbid"] = meta.imdb
-            imdb_info = meta.imdb_info
-            imdb_info_dict = imdb_info if isinstance(imdb_info, dict) else {}
-            data["description"] = imdb_info_dict.get("genres", "")
-        if self.uploader_name not in ("", None) and not self._is_true(self.config["TRACKERS"][self.tracker].get("anon", "False")):
-            data["epenis"] = self.uploader_name
-        if has_ro_audio:
-            data["materialro"] = "on"
-        if meta.is_disc == "BDMV" or meta.type == "REMUX":
-            data["freeleech"] = "on"
-        if int(meta.tv_pack if meta.tv_pack is not None else "0") != 0:
-            data["freeleech"] = "on"
-        if int(meta.freeleech if meta.freeleech is not None else "0") != 0:
-            data["freeleech"] = "on"
 
         url = f"{self.base_url}/takeupload.php"
         # Submit

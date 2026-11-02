@@ -6,6 +6,7 @@ from typing import Any, cast
 import aiofiles
 import httpx
 
+from src import payload_preview
 from src.cogs.redaction import Redaction
 from src.console import logger
 from src.description_review import get_base_description
@@ -32,10 +33,10 @@ class BitHDTV:
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
 
-    async def upload(self, meta: Meta) -> bool:
-        common = Common(config=self.config)
-        await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
-        await self.edit_desc(meta)
+    async def get_data(self, meta: Meta, preview: bool = False) -> dict[str, Any]:
+        """Build the upload form; a ``preview`` leaves out the description and MediaInfo/BDInfo."""
+        if not preview:
+            await self.edit_desc(meta)
         cat_id = await self.get_cat_id(meta)
         sub_cat_id = ""
         if meta.category == "MOVIE":
@@ -50,16 +51,16 @@ class BitHDTV:
         # region_id = await common.unit3d_region_ids(meta.region)
         # distributor_id = await common.unit3d_distributor_ids(meta.distributor)
 
-        if meta.bdinfo:
-            mi_dump = None
-            async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/BD_SUMMARY_00.txt", encoding="utf-8") as bd_file:
-                bd_dump = await bd_file.read()
-        else:
-            async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/MEDIAINFO_CLEANPATH.txt", encoding="utf-8") as mi_file:
-                mi_dump = await mi_file.read()
-            bd_dump = None
-        async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt", encoding="utf-8") as desc_file:
-            desc = await desc_file.read()
+        desc = mi_dump = bd_dump = None
+        if not preview:
+            if meta.bdinfo:
+                async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/BD_SUMMARY_00.txt", encoding="utf-8") as bd_file:
+                    bd_dump = await bd_file.read()
+            else:
+                async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/MEDIAINFO_CLEANPATH.txt", encoding="utf-8") as mi_file:
+                    mi_dump = await mi_file.read()
+            async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt", encoding="utf-8") as desc_file:
+                desc = await desc_file.read()
 
         media_info = ""
         if meta.is_disc != "BDMV":
@@ -77,11 +78,55 @@ class BitHDTV:
             # 'anon': anon,
             # admins asked to remove short description.
             "sdescr": " ",
-            "descr": media_info if bd_dump is None else "Disc so Check Mediainfo dump ",
+            "descr": media_info if not meta.bdinfo else "Disc so Check Mediainfo dump ",
             "screen": desc,
             "url": f"https://www.tvmaze.com/shows/{meta.tvmaze_id}" if meta.category == "TV" else str(meta.imdb_info.get("imdb_url", "")),
             "format": "json",
         }
+        return data
+
+    async def get_payload_preview(self, meta: Meta) -> payload_preview.TrackerPreview:
+        """The upload form as it is known before screenshots, for the Web UI to show and edit."""
+        specs = {
+            "name": payload_preview.text("Name"),
+            "cat": payload_preview.choice("Category", [("7", "Movie"), ("10", "TV episode"), ("12", "TV pack")]),
+            "subcat": payload_preview.choice(
+                "Subcategory",
+                [
+                    ("1", "Movie encode"),
+                    ("2", "Movie disc / remux"),
+                    ("5", "Movie WEB"),
+                    ("6", "Movie HDTV"),
+                    ("43", "Movie x265 encode"),
+                    ("44", "Movie 3D encode"),
+                    ("45", "Movie 3D remux"),
+                    ("46", "Movie 3D disc"),
+                    ("48", "Movie x265 remux"),
+                    ("7", "TV HDTV"),
+                    ("8", "TV WEB / pack WEBRip"),
+                    ("10", "TV encode"),
+                    ("11", "TV remux"),
+                    ("12", "TV disc"),
+                    ("13", "TV pack HDTV"),
+                    ("14", "TV pack WEB-DL"),
+                    ("16", "TV pack encode"),
+                    ("17", "TV pack remux"),
+                    ("18", "TV pack disc"),
+                ],
+            ),
+            "resolution": payload_preview.choice("Resolution", [("4", "2160p"), ("3", "1080p"), ("2", "1080i"), ("1", "720p"), ("10", "Other")]),
+            "sdescr": payload_preview.readonly("Short description"),
+            "descr": payload_preview.readonly("MediaInfo summary"),
+            "url": payload_preview.text("Info URL"),
+            "format": payload_preview.readonly("Response format"),
+        }
+        deferred = {"mediainfo": "Read from the MediaInfo/BDInfo report at upload time", "screen": payload_preview.DESCRIPTION_NOTE}
+        return payload_preview.describe(self.tracker, await self.get_data(meta, preview=True), specs, deferred=deferred)
+
+    async def upload(self, meta: Meta) -> bool:
+        common = Common(config=self.config)
+        await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
+        data = payload_preview.apply_payload_edits(meta, self.tracker, await self.get_data(meta))
 
         torrent_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}].torrent"
         async with aiofiles.open(torrent_path, "rb") as open_torrent:

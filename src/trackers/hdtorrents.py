@@ -8,6 +8,7 @@ import aiofiles
 import httpx
 from bs4 import BeautifulSoup
 
+from src import payload_preview
 from src.console import logger
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder
@@ -223,11 +224,12 @@ class HDTorrents:
 
         return results
 
-    async def get_data(self, meta: Meta) -> dict[str, Any]:
+    async def get_data(self, meta: Meta, preview: bool = False) -> dict[str, Any]:
+        """Build the upload form; a ``preview`` leaves out the description."""
         data: dict[str, Any] = {
             "filename": await self.get_name(meta),
             "category": await self.get_category_id(meta),
-            "info": await self.edit_desc(meta),
+            "info": None if preview else await self.edit_desc(meta),
             "csrfToken": self.secret_token,
         }
 
@@ -274,6 +276,41 @@ class HDTorrents:
                 nfo_bytes = await nfo_file.read()
             return {"nfos": (nfo_path.name, nfo_bytes, "application/octet-stream")}
         return {}
+
+    async def get_payload_preview(self, meta: Meta) -> payload_preview.TrackerPreview:
+        """The upload form as it is known before screenshots, for the Web UI to show and edit."""
+        specs = {
+            key: payload_preview.flag(label, on="true", off=None) for key, label in {"3d": "3D", "HDR10": "HDR10", "HDR10Plus": "HDR10+", "DolbyVision": "Dolby Vision"}.items()
+        }
+        specs.update(
+            {
+                "season": payload_preview.flag("Season pack", on="true", off="false"),
+                "anonymous": payload_preview.flag("Anonymous", on="true", off="false"),
+                "filename": payload_preview.text("Name"),
+                "category": payload_preview.choice(
+                    "Category",
+                    [
+                        (1, "Movie/Blu-Ray"),
+                        (70, "Movie/UHD/Blu-Ray"),
+                        (2, "Movie/Remux"),
+                        (71, "Movie/UHD/Remux"),
+                        (64, "Movie/2160p"),
+                        (5, "Movie/1080p/i"),
+                        (3, "Movie/720p"),
+                        (59, "TV Show/Blu-ray"),
+                        (72, "TV Show/UHD/Blu-ray"),
+                        (60, "TV Show/Remux"),
+                        (73, "TV Show/UHD/Remux"),
+                        (65, "TV Show/2160p"),
+                        (30, "TV Show/1080p/i"),
+                        (38, "TV Show/720p"),
+                    ],
+                ),
+                "infosite": payload_preview.text("IMDb URL"),
+            }
+        )
+        data = await self.get_data(meta, preview=True)
+        return payload_preview.describe(self.tracker, data, specs, deferred={"info": payload_preview.DESCRIPTION_NOTE}, name_key="filename")
 
     async def upload(self, meta: Meta) -> bool:
         cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)

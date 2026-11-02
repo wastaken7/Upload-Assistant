@@ -111,12 +111,14 @@ A search by file name is also skipped when Sonarr or Radarr already returned IDs
 | UNIT3D trackers      | `api_key`                | TMDb, IMDb, TVDB, MAL |       Yes        |     Yes     |
 | BroadcasTheNet (BTN) | `api_key`                | IMDb, TVDB            |        No        |     No      |
 | Anthelion (ANT)      | `api_key`                | IMDb, TMDb            |        No        |     No      |
+| BJ-Share (BJSHARE)   | Cookies                  | IMDb, TMDb            |       Yes        |     Yes     |
 
 Notes:
 
 - "UNIT3D trackers" covers every tracker that Upload Assistant talks to through the UNIT3D API, such as Aither and Blutopia.
 - BTN is only queried for TV releases.
 - Anthelion is not queried for disc releases. Its example config block has no `use_for_search` line, so add `"use_for_search": True` yourself to enable it.
+- BJ-Share has no metadata API, so it is only queried with a known torrent ID (a `bj-share.info/torrents.php?torrentid=…` link in the torrent comment, or `--tracker-id BJSHARE=…` / the torrent URL), never by file name. Each lookup sends two small requests: the torrent permalink, whose redirect gives the group ID, and the site's own `torrent_content` request for that torrent's details. For movies and TV, the group page is loaded instead of the second request, because the IMDb/TMDb IDs are only shown there. Book and game uploads on BJ-Share have no IMDb/TMDb IDs, so only the description and screenshots are imported.
 - Trackers not listed here are not used as metadata sources, even when their torrent ID appears in a comment.
 
 ## What happens to the imported description

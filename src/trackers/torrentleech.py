@@ -6,6 +6,7 @@ from typing import Any, cast
 import aiofiles
 import httpx
 
+from src import payload_preview
 from src.cogs.redaction import Redaction
 from src.console import logger
 from src.cookie_auth import CookieValidator
@@ -296,19 +297,12 @@ class TorrentLeech:
             return await self.upload_api(meta)
         return await self.cookie_upload(meta)
 
-    async def upload_api(self, meta: Meta) -> bool:
-        torrent_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}].torrent"
-
-        async with aiofiles.open(torrent_path, "rb") as open_torrent:
-            torrent_bytes = await open_torrent.read()
-        files: dict[str, tuple[Any, Any, str]] = {
-            "torrent": (f"{await self.get_name(meta)}.torrent", torrent_bytes, "application/x-bittorrent"),
-        }
-
+    async def get_api_upload_data(self, meta: Meta, preview: bool = False) -> dict[str, Any]:
+        """Build the API upload form; a ``preview`` leaves out the description."""
         data: dict[str, Any] = {
             "announcekey": self.passkey,
             "category": self.get_category(meta),
-            "description": await self.generate_description(meta),
+            "description": None if preview else await self.generate_description(meta),
             "name": await self.get_name(meta),
             "nonscene": "on" if not meta.scene else "off",
         }
@@ -331,6 +325,73 @@ class TorrentLeech:
         anon = not (meta.anon == 0 and not self.tracker_config.get("anon", False))
         if anon:
             data.update({"is_anonymous_upload": "on"})
+        return data
+
+    async def get_payload_preview(self, meta: Meta) -> payload_preview.TrackerPreview:
+        """The upload form as it is known before screenshots, for the Web UI to show and edit."""
+        specs = {
+            "category": payload_preview.choice(
+                "Category",
+                [
+                    (34, "Anime"),
+                    (47, "Movies 4K"),
+                    (13, "Movies BluRay"),
+                    (14, "Movies BluRay rip"),
+                    (29, "Movies documentary"),
+                    (12, "Movies DVD"),
+                    (11, "Movies DVD rip"),
+                    (36, "Movies foreign"),
+                    (43, "Movies HD rip"),
+                    (37, "Movies WEBRip"),
+                    (27, "TV boxsets"),
+                    (26, "TV episodes"),
+                    (32, "TV episodes HD"),
+                    (44, "TV foreign"),
+                    (45, "Ebooks"),
+                    (46, "Comics"),
+                    (17, "Games PC"),
+                    (18, "Games Xbox"),
+                    (19, "Games Xbox 360"),
+                    (20, "Games PS2"),
+                    (21, "Games PS3"),
+                    (22, "Games PSP"),
+                    (28, "Games Wii"),
+                    (30, "Games NDS"),
+                    (39, "Games PS4"),
+                    (40, "Games Xbox One"),
+                    (42, "Games Mac"),
+                    (48, "Games Switch"),
+                    (49, "Games PS5"),
+                    (31, "Music"),
+                ],
+            ),
+            "name": payload_preview.text("Name"),
+            "nonscene": payload_preview.flag("Not scene", on="on", off="off"),
+            "imdb": payload_preview.text("IMDb ID"),
+            "imdbURL": payload_preview.text("IMDb URL"),
+            "tvmazeid": payload_preview.number("TVmaze ID"),
+            "tvMazeURL": payload_preview.text("TVmaze URL"),
+            "animeid": payload_preview.text("AniList URL"),
+            "is_anonymous_upload": payload_preview.flag("Anonymous", on="on", off=None if self.api_upload else "off"),
+        }
+        if self.api_upload:
+            data = await self.get_api_upload_data(meta, preview=True)
+            deferred = {"description": payload_preview.DESCRIPTION_NOTE}
+        else:
+            data = await self.get_cookie_upload_data(meta, preview=True)
+            deferred = {"screenshots[]": "Uploaded after this question"}
+        return payload_preview.describe(self.tracker, data, specs, deferred=deferred)
+
+    async def upload_api(self, meta: Meta) -> bool:
+        torrent_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}].torrent"
+
+        async with aiofiles.open(torrent_path, "rb") as open_torrent:
+            torrent_bytes = await open_torrent.read()
+        files: dict[str, tuple[Any, Any, str]] = {
+            "torrent": (f"{await self.get_name(meta)}.torrent", torrent_bytes, "application/x-bittorrent"),
+        }
+
+        data = payload_preview.apply_payload_edits(meta, self.tracker, await self.get_api_upload_data(meta))
 
         if not meta.debug:
             response = await self.session.post(url=self.api_upload_url, files=files, data=data)
@@ -356,7 +417,8 @@ class TorrentLeech:
             return True  # Debug mode - simulated success
         return False
 
-    async def get_cookie_upload_data(self, meta: Meta) -> dict[str, Any]:
+    async def get_cookie_upload_data(self, meta: Meta, preview: bool = False) -> dict[str, Any]:
+        """Build the site's upload form; a ``preview`` leaves out the screenshots."""
         tvmaze_url = ""
         if meta.category == "TV" and meta.tvmaze_id:
             tvmaze_url = f"https://www.tvmaze.com/shows/{meta.tvmaze_id}"
@@ -374,7 +436,7 @@ class TorrentLeech:
             "torrentComment": "0",
             "uploaderComments": "",
             "is_anonymous_upload": "off",
-            "screenshots[]": self.get_screens(meta) if self.tracker_config.get("img_rehost", True) else "",
+            "screenshots[]": self.get_screens(meta) if not preview and self.tracker_config.get("img_rehost", True) else "",
         }
 
         anon = not (meta.anon == 0 and not self.tracker_config.get("anon", False))
@@ -392,7 +454,7 @@ class TorrentLeech:
             tracker_status[self.tracker]["status_message"] = "data error: Login with cookies failed."
             return None
 
-        data = await self.get_cookie_upload_data(meta)
+        data = payload_preview.apply_payload_edits(meta, self.tracker, await self.get_cookie_upload_data(meta))
 
         if meta.debug:
             logger.debug(f"{self.tracker}: [cyan]Request Data:")

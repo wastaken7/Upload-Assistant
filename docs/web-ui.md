@@ -117,7 +117,11 @@ The File Browser lists only content inside the configured browse roots. Use it t
 
 Normal browsing shows non-hidden files and folders inside the permitted roots so that video, disc, book, game, ISO, and other supported upload types remain available. The separate description-file picker is limited to `.txt`, `.nfo`, and `.md` files.
 
-Listings and searches omit dot-prefixed entries, Windows entries marked Hidden or System, and known system folders such as `$RECYCLE.BIN` and `System Volume Information`. Searches do not descend into those folders.
+Search normally includes every configured location. Enable **Search this folder** beside the search box to search recursively only beneath the folder most recently activated in the existing tree. Upload-selection checkboxes do not change this scope. The option defaults off and is not persisted. Collapse all clears the active search folder. While the option is on, changing mode or moving to another folder cancels pending results while keeping the query text; type again or press Enter to run a fresh search. Turning the option off also cancels pending results. Navigating the tree never clears an all-locations search. Enabling the option without a folder selected prompts you to select one, never scans all locations instead.
+
+Search results prioritize matching folders before filling the remaining places with files (100 by default), even when files are encountered in an earlier location. Once the results are full, search checks at most 500 more folders for matching folders and then stops, so a folder deep in a very large library can be left out in favor of files.
+
+Listings and searches omit dot-prefixed entries, Windows entries marked Hidden or System, and known system folders such as `$RECYCLE.BIN` and `System Volume Information`. Searches do not descend into those folders. Searches list symlinks and Windows junctions whose targets are inside the browse roots, as the tree does, but never descend into them. Searching inside a linked folder searches its target. These portable path checks do not protect against concurrent filesystem replacement; only configure trusted browse locations.
 
 You can also type or paste paths into **Upload paths** on desktop or mobile. Use server paths, one file or folder per line. Enter adds a line; use the execution button to start. One path runs individually, and multiple paths create a WebUI queue. Blank lines and duplicate paths are ignored, surrounding quotes are accepted, and each queue item can have its own arguments. The limit is 1,000 paths per upload.
 

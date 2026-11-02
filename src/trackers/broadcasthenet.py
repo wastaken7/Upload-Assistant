@@ -19,6 +19,7 @@ import aiofiles
 import httpx
 from torf import TorfError, Torrent
 
+from src import payload_preview
 from src.console import logger
 from src.exceptions import UploadError
 from src.mediainfo import strip_report_by_line
@@ -858,6 +859,84 @@ class BroadcasTheNet:
 
         return errors
 
+    def get_payload(self, meta: Meta, upload_type: str, release_name: str, mediainfo: str | None) -> dict[str, Any]:
+        """The fields sent over BTN's autofilled form; without ``mediainfo`` (a preview) it is left out."""
+        container, codec, source, resolution = self._mapping(meta)
+        tag = str(meta.tag or "").lstrip("-")
+        is_no_group = not tag or bool(re.search(r"^(?:nogrp|nogroup|unknown|unk)$", tag, re.I))
+        origin = "Scene" if meta.scene else "None" if is_no_group else "P2P"
+
+        payload: dict[str, Any] = {
+            "submit": "true",
+            "type": upload_type,
+            "scenename": release_name,
+            "format": container,
+            "bitrate": codec,
+            "resolution": resolution,
+            "release_desc": mediainfo,
+            "tvdb": "autofilled",
+            "origin": origin,
+        }
+
+        if self.settings.get("fast_torrent") or self.settings.get("fasttorrent"):
+            payload["fasttorrent"] = "on"
+
+        original_language = str(meta.get("original_language") or getattr(meta, "original_language", "") or "en").lower()
+        if original_language and original_language not in ("en", "eng", "english"):
+            payload["foreign"] = "on"
+            origin_countries: Any = getattr(meta, "origin_country", []) or getattr(meta, "origin_country_code", [])
+            if isinstance(origin_countries, list) and origin_countries:
+                first_country = str(origin_countries[0])
+            elif isinstance(origin_countries, str):
+                first_country = origin_countries
+            else:
+                first_country = ""
+            country_id = self._country_map.get(str(first_country).lower().strip())
+            if country_id:
+                payload["country"] = country_id
+
+        if source != "Unknown":
+            payload["media"] = source
+        return payload
+
+    async def get_payload_preview(self, meta: Meta) -> payload_preview.TrackerPreview:
+        """The upload form as it is known before screenshots, for the Web UI to show and edit."""
+        upload_type = "Season" if int(meta.tv_pack or 0) else "Episode"
+        data = self.get_payload(meta, upload_type, await self.get_name(meta), None)
+        specs = {
+            "submit": payload_preview.readonly("Submit"),
+            "type": payload_preview.choice("Type", ["Episode", "Season"], role="season_episode"),
+            "scenename": payload_preview.text("Name"),
+            "format": payload_preview.choice(
+                "Container",
+                [
+                    "MKV",
+                    "MP4",
+                    "AVI",
+                    "TS",
+                    "M2TS",
+                    "M4V",
+                    "WMV",
+                    "MPEG",
+                    "VOB",
+                    "Mixed",
+                ],
+            ),
+            "bitrate": payload_preview.choice("Codec", ["H.265", "x264-Hi10P", "H.264", "VP9", "MPEG2", "Mixed"]),
+            "resolution": payload_preview.choice("Resolution", ["2160p", "1080p", "1080i", "720p", "SD"]),
+            "tvdb": payload_preview.readonly("TVDB"),
+            "origin": payload_preview.choice("Origin", ["Scene", "P2P", "None"]),
+            "fasttorrent": payload_preview.flag("Fast torrent", on="on", off=None),
+            "foreign": payload_preview.flag("Foreign", on="on", off=None),
+            "country": payload_preview.text("Country ID"),
+            "media": payload_preview.choice("Source", ["WEB-DL", "WEBRip", "HDTV", "Bluray", "BDRip"]),
+        }
+        deferred = {
+            "release_desc": "Read from the MediaInfo report at upload time",
+            "series": "Series, title and air date come from BTN's autofill at upload time",
+        }
+        return payload_preview.describe(self.tracker, data, specs, deferred=deferred, name_key="scenename")
+
     async def upload(self, meta: Meta) -> bool:
         await self.common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
         torrent_path = Path(meta.base_dir) / "tmp" / meta.uuid / f"[{self.tracker}].torrent"
@@ -887,7 +966,6 @@ class BroadcasTheNet:
             mediainfo = strip_report_by_line(await handle.read())
         async with aiofiles.open(torrent_path, "rb") as handle:
             torrent = await handle.read()
-        container, codec, source, resolution = self._mapping(meta)
         try:
             async with httpx.AsyncClient(cookies=cookies, follow_redirects=True, timeout=60.0) as client:
                 autofill = await client.post(self.upload_url, data=autofill_data)
@@ -900,43 +978,8 @@ class BroadcasTheNet:
                         await f.write(autofill.text)
                     raise UploadError(f"BTN autofill mismatch: {'; '.join(autofill_errors)}. See {failure_path}", "red")
 
-                tag = str(meta.tag or "").lstrip("-")
-                is_no_group = not tag or bool(re.search(r"^(?:nogrp|nogroup|unknown|unk)$", tag, re.I))
-                origin = "Scene" if meta.scene else "None" if is_no_group else "P2P"
-
-                payload = {
-                    "submit": "true",
-                    "type": upload_type,
-                    "scenename": release_name,
-                    "format": container,
-                    "bitrate": codec,
-                    "resolution": resolution,
-                    "release_desc": mediainfo,
-                    "tvdb": "autofilled",
-                    "origin": origin,
-                }
-
-                if self.settings.get("fast_torrent") or self.settings.get("fasttorrent"):
-                    payload["fasttorrent"] = "on"
-
-                original_language = str(meta.get("original_language") or getattr(meta, "original_language", "") or "en").lower()
-                if original_language and original_language not in ("en", "eng", "english"):
-                    payload["foreign"] = "on"
-                    origin_countries: Any = getattr(meta, "origin_country", []) or getattr(meta, "origin_country_code", [])
-                    if isinstance(origin_countries, list) and origin_countries:
-                        first_country = str(origin_countries[0])
-                    elif isinstance(origin_countries, str):
-                        first_country = origin_countries
-                    else:
-                        first_country = ""
-                    country_id = self._country_map.get(str(first_country).lower().strip())
-                    if country_id:
-                        payload["country"] = country_id
-
-                if source != "Unknown":
-                    payload["media"] = source
-
-                data.update(payload)
+                data.update(self.get_payload(meta, upload_type, release_name, mediainfo))
+                data = payload_preview.apply_payload_edits(meta, self.tracker, data)
                 data = {key: value for key, value in data.items() if value or key == "release_desc"}
                 response = await client.post(self.upload_url, data=data, files={"file_input": ("upload.torrent", torrent, "application/x-bittorrent")})
                 response.raise_for_status()
@@ -944,7 +987,7 @@ class BroadcasTheNet:
 
                 if not torrent_id:
                     try:
-                        torrent_id = await self._uploaded_torrent_id(release_name, group_id, meta)
+                        torrent_id = await self._uploaded_torrent_id(str(data.get("scenename") or release_name), group_id, meta)
                         group_id = meta.tracker_status.get(self.tracker, {}).get("group_id") or group_id
                     except UploadError:
                         failure_path = work_dir / f"[{self.tracker}]BTN_upload_failure.html"

@@ -166,8 +166,11 @@ Notes:
 - Methods: GET
 - Auth: same Bearer-token or authenticated-session requirements as `/api/browse`
 - Rate limit: 60 per minute; replaces the default hourly and daily quotas
-- Query params: `q` (search text), optional `filter` and `max_results` (default 100, maximum 500)
-- Description: recursively searches the configured browse roots for matching files and folders
+- Query params: `q` (search text), optional `filter`, `max_results` (default 100, maximum 500), and `path` (one absolute folder path beneath a configured browse root)
+- Description: recursively searches all configured browse roots when `path` is omitted, or only the supplied folder and its descendants when present. A linked `path` searches its resolved target when that target is inside a browse root. Empty, repeated, relative, unavailable, or disallowed scope paths return HTTP 400, never an all-roots fallback.
+- Matching folders are preferred over matching files, then each group is sorted alphabetically. Candidates within a group are selected in filesystem encounter order; this is not a globally alphabetical top-N search. Once the result limit is reached, the search scans at most 500 further directories for folders that displace files, then stops.
+- `truncated` retains its existing meaning: the result limit was reached, not proof of an additional match. The caller override up to 500 is unchanged.
+- Searches prune hidden/system directories and never descend into symlinks or Windows junctions. Linked files and folders are still returned, like `/api/browse` lists them, when their resolved targets are inside configured roots. Traversal uses portable pathname-based filesystem APIs, not atomic descriptor-relative no-follow operations. Concurrent filesystem replacement between validation and use is not prevented; browse roots should not be writable by untrusted users.
 - Response: {"items": [...], "success": true, "query": "...", "count": N, "truncated": true|false}
 
 ---

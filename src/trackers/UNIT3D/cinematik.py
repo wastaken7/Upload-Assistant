@@ -3,7 +3,7 @@ import re
 import urllib.error
 import urllib.request
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, ClassVar, cast
 from urllib.parse import urlparse
 
 import aiofiles
@@ -27,6 +27,42 @@ class Cinematik(UNIT3D):
     """
     Cinematik is a Private tracker for full BD and DVD discs of non-mainstream movies, niche cinema and arthouse.
     """
+
+    # Options of the ID fields, offered in the Web UI preview (the getters ignore mapping_only).
+    payload_choices: ClassVar[dict[str, tuple[tuple[str, str], ...]]] = {
+        "category_id": (
+            ("1", "Film"),
+            ("2", "TV"),
+            ("3", "Foreign Film"),
+            ("4", "Foreign TV"),
+            ("5", "Opera & Musical"),
+            ("6", "Asian Film"),
+        ),
+        "type_id": (
+            ("1", "Custom"),
+            ("3", "BD100"),
+            ("4", "BD66"),
+            ("5", "BD50"),
+            ("6", "BD25"),
+            ("7", "NTSC DVD9"),
+            ("8", "NTSC DVD5"),
+            ("9", "PAL DVD9"),
+            ("10", "PAL DVD5"),
+            ("11", "3D"),
+        ),
+        "resolution_id": (
+            ("1", "4320p"),
+            ("2", "2160p"),
+            ("3", "1080p / 1440p"),
+            ("4", "1080i"),
+            ("5", "720p"),
+            ("6", "576p"),
+            ("7", "576i"),
+            ("8", "480p"),
+            ("9", "480i"),
+            ("10", "Other"),
+        ),
+    }
 
     tracker = "CINEMATIK"
     display_name = "Cinematik"
