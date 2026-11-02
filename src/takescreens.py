@@ -941,7 +941,7 @@ async def dvd_screenshots(
             frame_rate = float(track.frame_rate)
     # MediaInfo reports the sum of every program chain as the IFO video duration, which on
     # episodic discs far exceeds the video in the VOBs; seek within the longest chain instead.
-    if len(pgc_durations) > 1 and 0 < max(pgc_durations) < ifo_duration:
+    if pgc_durations and 0 < max(pgc_durations) < ifo_duration:
         ifo_duration = max(pgc_durations)
     meta.frame_rate = frame_rate
     w_sar, h_sar = screenshot_par_scale_factors(width, height, par, dar, should_scale_dvd_screenshots_for_par())

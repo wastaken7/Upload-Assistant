@@ -396,7 +396,8 @@ async def test_dvd_screenshots_uses_complete_title_set_and_ifo_duration(monkeypa
 
 
 @pytest.mark.asyncio
-async def test_dvd_screenshots_seek_within_longest_program_chain(monkeypatch, tmp_path):
+@pytest.mark.parametrize("chain_durations", [(2700000.0, 2500000.0, 2700000.0, None), (2700000.0, None)])
+async def test_dvd_screenshots_seek_within_longest_program_chain(monkeypatch, tmp_path, chain_durations):
     disc_path = tmp_path / "VIDEO_TS"
     disc_path.mkdir()
     main_set = ["01_0.VOB", "01_1.VOB", "01_2.VOB"]
@@ -406,7 +407,7 @@ async def test_dvd_screenshots_seek_within_longest_program_chain(monkeypatch, tm
         if output == "JSON":
             return json.dumps({"media": {"track": [{"Duration": 1200.0, "Width": 720, "Height": 480}]}})
         video = SimpleNamespace(track_type="Video", duration=15000000.0, pixel_aspect_ratio="1", display_aspect_ratio="1.5", width="720", height="480", frame_rate="24")
-        chains = [SimpleNamespace(track_type="Menu", duration=duration) for duration in (2700000.0, 2500000.0, 2700000.0, None)]
+        chains = [SimpleNamespace(track_type="Menu", duration=duration) for duration in chain_durations]
         return SimpleNamespace(tracks=[video, *chains])
 
     async def valid_times_stub(_times, _num_screens, length, _frame_rate, _meta, **_kwargs):
