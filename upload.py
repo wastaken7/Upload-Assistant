@@ -727,6 +727,9 @@ async def _prompt_game_meta(meta: Meta) -> None:
 
 
 MUSIC_REQUIRED_FIELDS = ("artist", "album", "year", "media", "release_type")
+# Trackers whose music uploads are refused without cover artwork. Others
+# (Orpheus, LST, ...) accept a release without it, so the prompt can be skipped.
+MUSIC_ARTWORK_REQUIRED_TRACKERS = frozenset({"SEEDPOOL"})
 MUSIC_MEDIA_CHOICES = ("CD", "WEB", "Vinyl", "DVD", "BD", "Soundboard", "SACD", "DAT", "Cassette")
 MUSIC_RELEASE_TYPE_CHOICES = (
     "Album",
@@ -1016,6 +1019,7 @@ async def _prompt_music_meta(meta: Meta) -> None:
         if (field == "cover_url" and not _is_http_url(_music_field(meta, field))) or (field != "cover_url" and not str(_music_field(meta, field) or "").strip())
     ]
     has_artwork = bool(is_valid_cover_image(meta.artwork_path) or (_is_http_url(meta.artwork_url) or _is_http_url(_music_field(meta, "cover_url"))))
+    artwork_required = any(str(tracker).upper() in MUSIC_ARTWORK_REQUIRED_TRACKERS for tracker in meta.trackers)
     if not has_artwork and "artwork" not in missing:
         missing.append("artwork")
 
@@ -1078,12 +1082,17 @@ async def _prompt_music_meta(meta: Meta) -> None:
                     changed = True
             elif field in ("artwork", "cover_url"):
                 while True:
+                    hint = "Artwork is required" if artwork_required else "Artwork is optional for the selected trackers"
                     with _music_field_prompt(
-                        meta, "cover_url", hint="Artwork is required: a local image path or a public image URL.", placeholder="Image path or https:// URL", keep=False
+                        meta, "cover_url", hint=f"{hint}: a local image path or a public image URL.", placeholder="Image path or https:// URL", keep=not artwork_required
                     ):
-                        value = (CLI_UI.ask_string("Enter path to cover artwork image (or public image URL) for MUSIC: ") or "").strip()
+                        skip_note = "" if artwork_required else " (leave blank to skip)"
+                        value = (CLI_UI.ask_string(f"Enter path to cover artwork image (or public image URL) for MUSIC{skip_note}: ") or "").strip()
+                    if not value and not artwork_required:
+                        break
                     if not value:
-                        logger.info("[red]Artwork is required for MUSIC uploads. Please enter a valid file path or image URL.[/red]")
+                        required_by = ", ".join(sorted({str(tracker).upper() for tracker in meta.trackers} & MUSIC_ARTWORK_REQUIRED_TRACKERS))
+                        logger.info(f"[red]Artwork is required for MUSIC uploads to {required_by}. Please enter a valid file path or image URL.[/red]")
                         continue
                     if _is_http_url(value):
                         _set_music_field(meta, "cover_url", value)

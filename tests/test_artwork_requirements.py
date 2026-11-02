@@ -7,10 +7,10 @@ import pytest
 from PIL import Image
 
 import upload
+from src import webui_events
 from src.args import Args
 from src.artwork import prepare_artwork
 from src.meta import Meta
-from src import webui_events
 from src.trackers.UNIT3D import UNIT3D
 from upload import _prompt_book_meta, _prompt_music_meta
 
@@ -83,6 +83,46 @@ async def test_prompt_music_meta_rejects_invalid_file_before_accepting_cover(tmp
         await _prompt_music_meta(meta)
 
     assert meta.artwork_path == str(valid_file.resolve())
+
+
+@pytest.mark.asyncio
+async def test_prompt_music_meta_lets_artwork_be_skipped_when_no_tracker_requires_it() -> None:
+    meta = Meta(
+        category="MUSIC",
+        artist="Test Artist",
+        title="Test Album",
+        year=2024,
+        source="CD",
+        trackers=["LST"],
+        music_release={"fields": {"release_type": {"value": "Album"}}},
+    )
+    with patch("upload.CLI_UI.ask_string", return_value="") as mocked:
+        await _prompt_music_meta(meta)
+
+    assert mocked.call_count == 1
+    assert meta.artwork_path == ""
+    assert meta.artwork_url == ""
+
+
+@pytest.mark.asyncio
+async def test_prompt_music_meta_requires_artwork_for_seedpool(tmp_path: Path) -> None:
+    cover_file = tmp_path / "album_cover.png"
+    Image.new("RGB", (32, 48), "purple").save(cover_file)
+    meta = Meta(
+        category="MUSIC",
+        artist="Test Artist",
+        title="Test Album",
+        year=2024,
+        source="CD",
+        trackers=["LST", "SEEDPOOL"],
+        music_release={"fields": {"release_type": {"value": "Album"}}},
+    )
+
+    with patch("upload.CLI_UI.ask_string", side_effect=["", str(cover_file)]) as mocked:
+        await _prompt_music_meta(meta)
+
+    assert mocked.call_count == 2
+    assert meta.artwork_path == str(cover_file.resolve())
 
 
 @pytest.mark.asyncio
