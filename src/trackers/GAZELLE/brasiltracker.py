@@ -7,9 +7,9 @@ from pathlib import Path
 from typing import Any, ClassVar, cast
 
 import aiofiles
-import fitz
 import httpx
 import langcodes
+import pymupdf
 import rarfile
 from bs4 import BeautifulSoup
 from langcodes.tag_parser import LanguageTagError
@@ -1332,7 +1332,7 @@ class BrasilTracker:
         ext = Path(file_path).suffix.lower()
         if ext == ".pdf":
             with contextlib.suppress(Exception):
-                doc = fitz.open(file_path)
+                doc = pymupdf.open(file_path)
                 return str(len(doc))
         elif ext in (".cbz", ".cbr"):
             with contextlib.suppress(Exception):

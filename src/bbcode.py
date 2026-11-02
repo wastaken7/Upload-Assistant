@@ -7,20 +7,13 @@ from pathlib import Path
 from typing import Any
 
 from src.console import logger
+from src.css_colors import CSS4_COLORS
 from src.meta import Meta
 
 
 @cache
-def _css4_colors() -> dict[str, str]:
-    # Imported lazily: matplotlib is slow to import and only a few trackers need color conversion.
-    from matplotlib.colors import CSS4_COLORS
-
-    return dict(CSS4_COLORS)
-
-
-@cache
 def _css4_colors_by_hex() -> dict[str, str]:
-    return {color_hex.lower(): color_name for color_name, color_hex in _css4_colors().items()}
+    return {color_hex.lower(): color_name for color_name, color_hex in CSS4_COLORS.items()}
 
 
 _INLINE_OPEN = r"(?:\[(?:b|i|u|small|size=\d+|color=[^\]]*|font=[^\]]*)\]\s*)*"
@@ -692,7 +685,7 @@ class BBCODE:
 
         def convert(match: re.Match[str]) -> str:
             color_name = match.group(1).strip().lower()
-            color_hex = _css4_colors().get(color_name)
+            color_hex = CSS4_COLORS.get(color_name)
             return f"[color={color_hex.lower()}]" if color_hex else match.group(0)
 
         return re.sub(r"\[color=([^\]]+)\]", convert, desc, flags=re.IGNORECASE)
