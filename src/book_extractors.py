@@ -394,6 +394,12 @@ def validate_isbn_checksum(candidate: str) -> str | None:
 
 ISBN_CANDIDATE_RE = re.compile(r"\b(?:ISBN(?:-1[03])?:?\s*)?((?:97[89][- ]?)?\d(?:[- ]?\d){8,11}[- ]?[\dX])\b", re.IGNORECASE)
 COPYRIGHT_PAGE_RE = re.compile(r"copyright|©|all rights reserved|todos os direitos reservados|derechos reservados", re.IGNORECASE)
+# Matched against a whole line, so "Índices para catálogo sistemático" on a copyright page is not a heading.
+CONTENTS_HEADING_RE = re.compile(
+    r"(?:(?:table of )?contents|sum[aá]rio|[ií]ndice(?: geral)?|conte[uú]dos?|contenido|table des mati[eè]res|sommaire|inhalt(?:sverzeichnis)?)\s*:?",
+    re.IGNORECASE,
+)
+TOC_LEADER_RE = re.compile(r"(?:\.\s?){5,}|…{3,}")
 
 
 def _page_search_order(num_pages: int, edge: int = 30) -> list[int]:
@@ -433,6 +439,40 @@ def find_copyright_page(doc: Any, max_pages: int = 30, with_isbn: bool = False) 
         if COPYRIGHT_PAGE_RE.search(text) and (not with_isbn or _first_valid_isbn(text)):
             return page_num
     return None
+
+
+def _normalized(text: str) -> str:
+    return " ".join(text.split()).casefold()
+
+
+def find_contents_page(doc: Any, max_pages: int = 30) -> int | None:
+    """Return the table of contents page of an open PyMuPDF document.
+
+    Tries the outline entry for the contents, then a front or back page headed
+    like one, then a front or back page of dotted leaders.
+    """
+    num_pages = len(doc)
+    with contextlib.suppress(Exception):
+        outline = [(str(title).strip(), page) for _level, title, page, *_ in doc.get_toc()]
+        titles = {_normalized(title) for title, _page in outline if len(title) >= 4 and not CONTENTS_HEADING_RE.fullmatch(title)}
+        for title, page in outline:
+            # Outline pages are 1-based; unresolved targets are -1.
+            if not (CONTENTS_HEADING_RE.fullmatch(title) and 0 < page <= num_pages):
+                continue
+            # Some outlines point at a page without the list, so require it to name other chapters.
+            text = _normalized(_page_text(doc, page - 1))
+            if sum(chapter in text for chapter in titles) >= 2:
+                return page - 1
+    leader_page = None
+    for page_num in _page_search_order(num_pages, max_pages)[: min(num_pages, 2 * max_pages)]:
+        text = _page_text(doc, page_num)
+        # Page numbers or running headers can come before the heading.
+        top_lines = [line.strip() for line in text.splitlines() if line.strip()][:3]
+        if any(CONTENTS_HEADING_RE.fullmatch(line) for line in top_lines):
+            return page_num
+        if leader_page is None and len(TOC_LEADER_RE.findall(text)) >= 5:
+            leader_page = page_num
+    return leader_page
 
 
 def extract_isbn_from_pdf(pdf_path: str) -> str | None:

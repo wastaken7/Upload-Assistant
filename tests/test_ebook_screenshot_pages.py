@@ -1,4 +1,4 @@
-"""Ebook screenshots always include the cover and the ISBN or copyright page."""
+"""Ebook screenshots always include the cover, the ISBN or copyright page and the table of contents."""
 
 import asyncio
 from pathlib import Path
@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, patch
 import fitz
 import pytest
 
-from src.book_extractors import find_copyright_page, find_isbn_page
+from src.book_extractors import find_contents_page, find_copyright_page, find_isbn_page
 from src.meta import Meta
 from src.prep import Prep
 from src.screenshot_manifest import capture_pages
@@ -82,6 +82,49 @@ def test_pdf_screenshots_include_cover_and_isbn_page(tmp_path: Path) -> None:
     rendered = [fitz.Pixmap(path).tobytes("png") for path in result]
     assert rendered[0] == cover  # noqa: S101
     assert isbn_page in rendered  # noqa: S101
+
+
+def test_find_contents_page_from_page_heading(tmp_path: Path) -> None:
+    pdf = tmp_path / "Invented Book.pdf"
+    pages = ["Cover", "Copyright Imaginary Press\nÍndices para catálogo sistemático:\n1. Fiction", "7\nSUMÁRIO\nCapítulo 1 .... 9", "Chapter one\nContents of the box"]
+    pages += ["Story"] * 70 + ["Table of Contents\nChapter one"]
+    _make_pdf(pdf, pages)
+
+    with fitz.open(pdf) as doc:
+        assert find_contents_page(doc) == 2  # noqa: S101
+
+
+def test_find_contents_page_from_outline(tmp_path: Path) -> None:
+    pdf = tmp_path / "Invented Book.pdf"
+    _make_pdf(pdf, ["Cover", "Copyright Imaginary Press", "Prologue\nThe Quiet\nHarbor", "Prologue", "The Quiet Harbor"])
+    with fitz.open(pdf) as doc:
+        doc.set_toc([[1, "What is in this book?", 4], [1, "Contents", 3], [1, "Prologue", 4], [1, "The Quiet Harbor", 5]])
+        assert find_contents_page(doc) == 2  # noqa: S101
+        # An outline entry pointing at a page that lists no chapters is ignored.
+        doc.set_toc([[1, "Contents", 2], [1, "Prologue", 4], [1, "The Quiet Harbor", 5]])
+        assert find_contents_page(doc) is None  # noqa: S101
+
+
+def test_find_contents_page_from_dotted_leaders(tmp_path: Path) -> None:
+    pdf = tmp_path / "Invented Book.pdf"
+    leaders = "\n".join(f"Lesson {i} ............ {i * 4}" for i in range(1, 7))
+    _make_pdf(pdf, ["Cover", "Mid-sentence pause..... then more", leaders, "Lesson 1"])
+
+    with fitz.open(pdf) as doc:
+        assert find_contents_page(doc) == 2  # noqa: S101
+
+
+def test_pdf_screenshots_include_contents_page(tmp_path: Path) -> None:
+    pdf = tmp_path / "Invented Book.pdf"
+    pages = [f"Page {i}" for i in range(40)]
+    pages[3] = "Imaginary Press\nISBN 978-0-306-40615-7"
+    pages[6] = "Contents\nChapter one ..... 9"
+    _make_pdf(pdf, pages)
+    meta = Meta(category="BOOK", base_dir=str(tmp_path), uuid="invented-book", path=str(pdf), screens=4)
+
+    asyncio.run(generate_ebook_screenshots(str(pdf), "Invented Book", meta.uuid, meta.base_dir, meta, num_screens=4, artwork=False))
+
+    assert {0, 3, 6} <= capture_pages(meta.base_dir, meta.uuid, "main")  # noqa: S101
 
 
 def test_small_lone_cover_image_fills_the_screenshot(tmp_path: Path) -> None:
