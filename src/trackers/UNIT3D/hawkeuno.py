@@ -295,6 +295,8 @@ class HawkeUno(UNIT3D):
             approved_image_hosts=self.approved_image_hosts,
             signature=f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=8]{meta.ua_signature}[/size][/url][/right]",
         )
+        # get_data does not call UNIT3D.get_data, so fit the file it uploads here.
+        desc = self.fit_description(meta, desc)
         async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt", "w", encoding="utf-8") as f:
             await f.write(desc)
 

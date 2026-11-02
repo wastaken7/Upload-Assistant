@@ -2903,6 +2903,16 @@ def _screenshot_capture_supported(meta_data: Mapping[str, object]) -> bool:
     return not is_disc or is_disc == "BDMV"
 
 
+def _hosted_image_discard_supported(meta_data: Mapping[str, object]) -> bool:
+    """Return whether hosted images may be discarded from the review.
+
+    The upload stage captures fresh video frames (DVDs included) when discards
+    leave the list below the cutoff.  IGDB, music and book images have no such
+    replacement, so they stay as they are.
+    """
+    return _stringify_preview_value(meta_data.get("category")).upper() not in {"GAME", "MUSIC", "BOOK"}
+
+
 def _screenshot_review_meta(temp_dir: Path, meta_data: Mapping[str, object]) -> Mapping[str, object]:
     """Include cached hosted images when a resumed run has not restored them into meta.json yet."""
     result = dict(meta_data)
@@ -6668,7 +6678,7 @@ def browse_search():
             # returning a misleading empty successful search.
             with os.scandir(scope):
                 pass
-        except (ValueError, OSError):
+        except ValueError, OSError:
             return jsonify({"success": False, "error": "Search folder is unavailable or not allowed"}), 400
 
     # Split on common separators
@@ -6803,7 +6813,7 @@ def browse_search():
             if len(items) >= max_results or budget_spent:
                 break
 
-        items.extend(files[:max_results - len(items)])
+        items.extend(files[: max_results - len(items)])
         # Sort the selected folders/files alphabetically within each group.
         items.sort(key=lambda x: (0 if x.get("type") == "folder" else 1, (x.get("name") or "").lower()))
 
@@ -6973,6 +6983,7 @@ def execution_screenshots():
     meta_data = _screenshot_review_meta(temp_dir, meta_data)
     items = list_review_items(temp_dir, meta_data)
     can_capture = _screenshot_capture_supported(meta_data)
+    can_discard = _hosted_image_discard_supported(meta_data)
 
     def image_urls(item: ReviewedScreenshot) -> tuple[str, str]:
         """Return (grid, full-size) URLs; remote hosts expose a lighter ``img_url`` thumbnail."""
@@ -6987,7 +6998,8 @@ def execution_screenshots():
     return jsonify(
         {
             "success": True,
-            "can_add": bool(items) and can_capture,
+            # Additions to hosted images do not need a local frame, even after every hosted image was discarded.
+            "can_add": (bool(items) or bool(meta_data.get("image_list"))) and can_capture,
             "screenshots": [
                 {
                     "id": item.id,
@@ -6998,7 +7010,7 @@ def execution_screenshots():
                     "image_url": urls[0],
                     "full_image_url": urls[1],
                     "can_replace": can_capture and item.source != "addition",
-                    "can_delete": item.source in {"local", "addition"},
+                    "can_delete": item.source in {"local", "addition"} or can_discard,
                 }
                 for item in items
                 for urls in (image_urls(item),)
@@ -7194,6 +7206,8 @@ def mutate_execution_screenshot(screenshot_id: str, action: str):
     meta_data = _screenshot_review_meta(temp_dir, meta_data)
     if action == "replace" and not _screenshot_capture_supported(meta_data):
         return jsonify({"success": False, "error": "Screenshot capture is not supported for this release"}), 400
+    if action == "delete" and re.fullmatch(r"remote-\d+", screenshot_id) and not _hosted_image_discard_supported(meta_data):
+        return jsonify({"success": False, "error": "Hosted images cannot be discarded for this release"}), 400
 
     try:
         from src.screenshot_review import delete_screenshot, replace_screenshot, undo_remote_replacement

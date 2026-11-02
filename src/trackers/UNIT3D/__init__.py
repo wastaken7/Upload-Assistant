@@ -43,6 +43,9 @@ class UNIT3D:
     # gets only the upload's type and resolution; slot rules get the whole title
     # through ``meta["<TRACKER>_title_releases"]``.
     search_whole_title: bool = False
+    # UNIT3D stores descriptions in a MySQL TEXT column, which holds 65,535 bytes.
+    # None for sites that widened the column.
+    max_description_bytes: int | None = 65535
 
     def __init__(self, config: dict[str, Any], tracker_name: str):
         self.config = config
@@ -309,6 +312,54 @@ class UNIT3D:
             )
         }
 
+    def fit_description(self, meta: Meta, description: str) -> str:
+        """Drop the MediaInfo of later discs, last disc first, until the description fits the column."""
+        limit = self.max_description_bytes
+        if not limit or len(description.encode("utf-8")) <= limit:
+            return description
+
+        builder = DescriptionBuilder(self.tracker, self.config)
+
+        def formatted_blocks(disc: dict[str, Any]) -> list[str]:
+            # Whole spoiler blocks keep the BBCode balanced; match them as the tracker formatting left them.
+            return [builder.tracker_specific_formats(self.tracker, block) for block in DescriptionBuilder.disc_mediainfo_blocks(disc)]
+
+        # Later discs follow the first disc's MediaInfo, so identical MediaInfo never matches the first disc.
+        later_start = 0
+        for block in formatted_blocks(meta.discs[0]) if meta.discs else []:
+            index = description.find(block)
+            if index != -1:
+                later_start = max(later_start, index + len(block))
+
+        dropped = 0
+        for disc in reversed(meta.discs[1:]):
+            found = False
+            for block in formatted_blocks(disc):
+                index = description.rfind(block, later_start)
+                if index == -1:
+                    continue
+                # A BDMV spoiler title is the disc's only label above its screenshots, so keep the name.
+                replacement = str(disc.get("name", "BDINFO")) if disc["type"] == "BDMV" else ""
+                head = description[:index].rstrip(" ")
+                tail = description[index + len(block) :].lstrip(" ")
+                if not replacement:
+                    # Collapse only the blank lines around the cut; the rest of the description keeps its formatting.
+                    newlines = len(head) - len(head.rstrip("\n")) + len(tail) - len(tail.lstrip("\n"))
+                    head, tail = head.rstrip("\n") + "\n" * min(newlines, 2), tail.lstrip("\n")
+                description = head + replacement + tail
+                found = True
+            if found:
+                dropped += 1
+                if len(description.encode("utf-8")) <= limit:
+                    break
+
+        size = len(description.encode("utf-8"))
+        if dropped:
+            logger.info(f"{self.tracker}: [yellow]Description exceeded {limit} bytes; removed the MediaInfo of {dropped} later disc(s).[/yellow]")
+        if size > limit:
+            logger.warning(f"{self.tracker}: [yellow]Description is {size} bytes, above the {limit}-byte limit; the upload may be rejected.[/yellow]")
+        return description
+
     async def get_mediainfo(self, meta: Meta) -> dict[str, str]:
         if meta.bdinfo or (meta.category in ["GAME", "BOOK"] and not meta.audiobook):
             mediainfo = ""
@@ -566,6 +617,9 @@ class UNIT3D:
         merged: dict[str, str] = {}
         for r in results:
             merged.update(r)
+
+        if isinstance(merged.get("description"), str):
+            merged["description"] = self.fit_description(meta, merged["description"])
 
         # Handle exclusive flag centrally for all UNIT3D trackers
         # Priority: meta.exclusive > tracker config > default (not set)

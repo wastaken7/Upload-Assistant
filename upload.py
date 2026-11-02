@@ -105,6 +105,7 @@ from src.dupe_checking import DupeChecker
 from src.dynamic_hdr_plot import dynamic_hdr_plot_enabled, process_dynamic_hdr_plots
 from src.early_tasks import cancel_and_drain_early_artifact_tasks, get_early_artifact_tasks, release_early_artifact_progress, start_early_artifact_tasks
 from src.early_tasks import is_usenet_only as _is_usenet_only
+from src.exceptions import UnsupportedSiteCheckError
 from src.get_desc import gen_desc
 from src.get_name import NameManager
 from src.get_tracker_data import TrackerDataManager
@@ -1311,6 +1312,14 @@ def xxx_min_successful_uploads(meta: Meta, min_successful_uploads: int) -> int:
     return min(min_successful_uploads, max(1, contact_sheet_count))
 
 
+def skip_unsupported_release(meta: Meta, error: UnsupportedSiteCheckError, stage: str = "prep") -> None:
+    """Mark a release that site check mode cannot handle as skipped, not failed."""
+    logger.info(f"[yellow]Skipping {escape(Path(str(meta.path or '')).name)}: {escape(str(error))}[/yellow]")
+    webui_events.notice("attention", f"Skipped: {error}")
+    webui_events.stage(stage, "skip")
+    meta.skipped_unsupported = True
+
+
 async def process_meta(meta: Meta, base_dir: str) -> bool:
     """Process the metadata for each queued path."""
     if not meta.imghost:
@@ -1333,6 +1342,9 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
     webui_events.stage("prep", "start")
     try:
         meta = await prep.gather_prep(meta=meta, mode="cli")
+    except UnsupportedSiteCheckError as e:
+        skip_unsupported_release(meta, e)
+        return False
     except Exception as e:
         logger.info(f"Error in gather_prep: {e}")
         logger.info(traceback.format_exc())
@@ -1495,7 +1507,12 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
             meta.trackers = [t.strip().upper() for t in meta.trackers if t]
         logger.debug(f"Trackers list during edit process: {meta.trackers}")
         meta.edit = True
-        meta = await prep.gather_prep(meta=meta, mode="cli")
+        try:
+            meta = await prep.gather_prep(meta=meta, mode="cli")
+        except UnsupportedSiteCheckError as e:
+            # The edit can turn on --site-check for a release it cannot handle.
+            skip_unsupported_release(meta, e, stage="confirm")
+            return False
         TrackerSetup(config=config).filter_unsupported_trackers(meta)
         if meta.category == "MUSIC" and _music_artwork_required(meta) and not is_valid_cover_image(meta.artwork_path):
             # The edit can add a tracker that requires the artwork skipped earlier.
@@ -1759,13 +1776,19 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
                 except Exception as e:
                     logger.error(f"[red]Error processing dynamic HDR plots: {e}[/red]")
 
+            # Hosted images discarded in the Web UI leave the list before the
+            # capture cutoff is checked, so fresh frames are captured and hosted.
+            from src.screenshot_review import discard_remote_images
+
+            meta.image_list, reviewed_uploads = discard_remote_images(Path(meta.base_dir) / "tmp" / meta.uuid, cast(list[dict[str, Any]], meta.image_list or []))
+
             # Take Screenshots
             try:
                 # Keep the later upload count in sync with screenshots removed
                 # through the Web UI review while this run awaited confirmation.
                 from src.screenshot_review import target_count
 
-                meta.screens = target_count(Path(meta.base_dir) / "tmp" / meta.uuid, meta.screens)
+                meta.screens = target_count(Path(meta.base_dir) / "tmp" / meta.uuid, meta.screens, allow_empty=meta.category == "BOOK")
                 if meta.category == "MUSIC":
                     logger.debug("[cyan]MUSIC: skipping video screenshots and MediaInfo-dependent image processing.[/cyan]")
                 elif meta.is_disc == "BDMV":
@@ -1893,9 +1916,6 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
             # Remote images can be reviewed in the WebUI.  Replacements and
             # additions remain local until this normal hosting stage, even if
             # the original remote list already satisfies the cutoff.
-            from src.screenshot_review import staged_remote_uploads
-
-            reviewed_uploads = staged_remote_uploads(Path(meta.base_dir) / "tmp" / meta.uuid, cast(list[dict[str, Any]], meta.image_list or []))
             needs_shared_image_host = any(tracker not in {"HDBITS", "PTERCLUB"} or not tracker_class_map[tracker](config=config).rehost_images for tracker in meta.trackers)
             if (len(meta.image_list) < cutoff or reviewed_uploads) and meta.skip_imghost_upload is False and meta.category not in ("GAME", "MUSIC") and needs_shared_image_host:
                 # Validate and (if needed) rehost images to tracker-approved hosts before uploading any new screenshots.
@@ -2891,9 +2911,10 @@ async def do_the_thing(base_dir: str) -> None:
             finally:
                 await cancel_and_drain_early_artifact_tasks(meta.uuid)
             if not meta_success:
-                # A skip is the user's choice, not a failure: no red stage, no error.
-                outcome = "no_upload" if meta.skipped_by_user else "error"
-                if not meta.skipped_by_user:
+                # A skip by the user or for an unsupported release is not a failure: no red stage, no error.
+                skipped = meta.skipped_by_user or meta.skipped_unsupported
+                outcome = "no_upload" if skipped else "error"
+                if not skipped:
                     webui_events.fail_active_stage()
                 set_stats_context(debug=bool(meta.debug), category=str(meta.category or ""))
                 await record_event_async("item", operation="completed", outcome=outcome)
@@ -2902,7 +2923,8 @@ async def do_the_thing(base_dir: str) -> None:
                     processed_files_count += 1
                     skipped_files_count += 1
                     logger.info(f"[cyan]Processed {processed_files_count}/{total_files} files with {skipped_files_count} skipped uploading.\n\n")
-                    if log_file and (not meta.debug or "debug" in Path(log_file).name):
+                    # Unsupported releases stay unprocessed so a later version can check them.
+                    if log_file and not meta.skipped_unsupported and (not meta.debug or "debug" in Path(log_file).name):
                         if meta.site_upload_queue:
                             await QueueManager.save_processed_path(log_file, current_item_path)
                         else:

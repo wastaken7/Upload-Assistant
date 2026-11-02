@@ -372,6 +372,8 @@ async def test_queue_skips_item_deleted_after_initial_validation_and_continues(w
         monkeypatch.setattr(stats, name, Mock())
     for name in ("record_event_async", "record_release_profile_async"):
         monkeypatch.setattr(stats, name, AsyncMock())
+    fail_active_stage = Mock()
+    monkeypatch.setattr(upload.webui_events, "fail_active_stage", fail_active_stage)
     logger = Mock()
     monkeypatch.setattr(upload, "logger", logger)
     processed = []
@@ -380,6 +382,8 @@ async def test_queue_skips_item_deleted_after_initial_validation_and_continues(w
         processed.append(meta.path)
         if meta.path == str(first):
             second.unlink()
+        # Site check mode cannot handle the last release, which is a skip rather than a failure.
+        meta.skipped_unsupported = meta.path == str(third)
         return False
 
     monkeypatch.setattr(upload, "process_meta", process)
@@ -387,6 +391,9 @@ async def test_queue_skips_item_deleted_after_initial_validation_and_continues(w
     assert processed == [str(first), str(third)]
     assert [call.args[0] for call in preview.call_args_list] == processed
     assert any("Processed 3/3 files with 3 skipped" in str(call) for call in logger.info.call_args_list)
+    completed = [call.kwargs["outcome"] for call in stats.record_event_async.await_args_list if call.kwargs.get("operation") == "completed"]
+    assert completed == ["error", "no_upload"]
+    fail_active_stage.assert_called_once()
 
 
 def test_subprocess_validates_all_expanded_items_and_cli_is_unchanged(workspace, monkeypatch):
@@ -758,6 +765,26 @@ async def test_adding_a_tracker_that_requires_music_artwork_asks_for_it_again(wo
     assert await upload.process_meta(meta, str(state)) is False
     # Once before the confirmation prompt, then again after the edit added SEEDPOOL without artwork.
     assert prompt_music.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_correction_enabling_unsupported_site_check_skips_the_release(workspace, monkeypatch):
+    from src.exceptions import UnsupportedSiteCheckError
+
+    def parse(_args, candidate):
+        candidate.site_check = True
+        return candidate, None, None
+
+    upload, meta, prep, state = _confirmation_loop(workspace, monkeypatch, parse=parse)
+    prep.gather_prep = AsyncMock(side_effect=[meta, UnsupportedSiteCheckError("BDMV disc checking is not supported in site_check mode, yet.")])
+    monkeypatch.setattr(upload, "CLI_UI", SimpleNamespace(ask_string=Mock(return_value="--site-check")))
+    stage = Mock()
+    monkeypatch.setattr(upload.webui_events, "stage", stage)
+
+    assert await upload.process_meta(meta, str(state)) is False
+    assert meta.skipped_unsupported is True
+    assert meta.skipped_by_user is False
+    stage.assert_called_with("confirm", "skip")
 
 
 @pytest.mark.asyncio

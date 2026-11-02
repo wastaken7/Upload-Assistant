@@ -51,7 +51,7 @@ $$\text{CLI Overrides} > \text{Audible (audiobooks with ASIN)} > \text{MyAnonamo
 ### A. Ebooks (PDF, EPUB, MOBI)
 
 - Uses **PyMuPDF** (`fitz`) to render pages at double resolution (`matrix=Matrix(2.0, 2.0)`) into PNG files.
-- Randomly samples a configured number of pages (e.g., 5) to generate gallery screenshots.
+- Generates the configured number of gallery screenshots (e.g., 5): the cover, then the copyright/ISBN page and the table of contents page when found, and random pages for the rest.
 - Renders page 0 as `POSTER.png` (Cover) and the last page as `POSTER_BANNER.png`.
 
 ### B. Comics & Manga (CBR, CBZ)
