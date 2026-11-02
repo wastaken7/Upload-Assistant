@@ -16,7 +16,7 @@ from src import webui_events
 from src.console import logger
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
-from src.release_images import release_image_lock
+from src.release_locks import release_image_lock
 from src.temp_paths import artwork_dir
 from src.trackers.UNIT3D import UNIT3D
 from src.uploadscreens import UploadScreensManager

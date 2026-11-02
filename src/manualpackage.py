@@ -2,6 +2,7 @@
 import asyncio
 import json
 import re
+import shutil
 import tarfile
 import urllib.parse
 from collections.abc import Mapping
@@ -19,27 +20,46 @@ from src.torrent_manifest import TorrentManifest
 from src.uploadscreens import UploadScreensManager
 
 
-def _write_archive(archive_path: str, release_dir: Path, shareable_torrents: set[str]) -> None:
-    """Archive the release folder without the torrents that carry tracker credentials.
+def _is_shareable(relative: Path, shareable_torrents: set[str]) -> bool:
+    """Whether a release-folder entry may leave this machine in a manual package.
 
     Tracker torrents (``[TRACKER].torrent``) and the client's exported torrents
-    (``torrents/.client``) hold passkeys in their announce URLs, and the archive
-    may be shared publicly. They stay in place for the client and manual use.
+    (``torrents/.client``) hold passkeys in their announce URLs, and archives
+    from earlier runs may still contain them. They stay in the release folder
+    for the client and manual use, but are never shared.
     """
-    archive = Path(archive_path).resolve()
+    if ".client" in relative.parts:
+        return False
+    if len(relative.parts) == 1:
+        suffix = relative.suffix.casefold()
+        if suffix == ".tar":
+            return False
+        if suffix == ".torrent" and not relative.name.startswith(("BASE", "[RAND")) and relative.name not in shareable_torrents:
+            return False
+    return True
+
+
+def _write_archive(archive_path: str, release_dir: Path, shareable_torrents: set[str]) -> None:
+    """Archive the shareable files of the release folder."""
 
     def keep(member: tarfile.TarInfo) -> tarfile.TarInfo | None:
-        relative = Path(member.name)
-        if (release_dir / relative).resolve() == archive or ".client" in relative.parts:
-            return None
-        if relative.suffix.casefold() == ".torrent" and len(relative.parts) == 1:
-            name = relative.name
-            if not name.startswith(("BASE", "[RAND")) and name not in shareable_torrents:
-                return None
-        return member
+        return member if _is_shareable(Path(member.name), shareable_torrents) else None
 
-    with tarfile.open(archive, "w") as tar:
+    with tarfile.open(archive_path, "w") as tar:
         tar.add(release_dir, arcname=".", filter=keep)
+
+
+def _stage_share(share_dir: Path, release_dir: Path, shareable_torrents: set[str], archive_path: str) -> None:
+    """Copy the shareable files and the archive to the folder a Filebrowser link opens."""
+    shutil.rmtree(share_dir, ignore_errors=True)
+    for source in release_dir.rglob("*"):
+        relative = source.relative_to(release_dir)
+        if source.is_file() and _is_shareable(relative, shareable_torrents):
+            target = share_dir / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, target)
+    share_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(archive_path, share_dir / Path(archive_path).name)
 
 
 class ManualPackageManager:
@@ -117,8 +137,12 @@ class ManualPackageManager:
             filebrowser = manual_filebrowser if isinstance(manual_filebrowser, str) else None
             await asyncio.to_thread(_write_archive, f"{archive}.tar", release_dir, shareable_torrents)
             if filebrowser is not None:
+                # The release folder keeps the tracker torrents, so the link
+                # opens a separate copy holding only the shareable files.
+                share_dir = Path(meta.base_dir) / "tmp" / "manual_packages" / meta.uuid
+                await asyncio.to_thread(_stage_share, share_dir, release_dir, shareable_torrents, f"{archive}.tar")
                 base_url = filebrowser.rstrip("/")
-                path = f"{'/' + 'tmp' + '/'}{meta.uuid}"
+                path = f"{'/' + 'tmp' + '/'}manual_packages/{meta.uuid}"
                 url = base_url + urllib.parse.quote(path, safe="/")
             else:
                 tar_bytes = await asyncio.to_thread(Path(f"{archive}.tar").read_bytes)

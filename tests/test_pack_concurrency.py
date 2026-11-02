@@ -10,7 +10,7 @@ from src import trackerhandle
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
 from src.rehostimages import ImageHostPolicy, check_tracker_image_hosts
-from src.release_images import release_image_lock
+from src.release_locks import release_image_lock, release_language_lock
 from src.trackers.GAZELLE.passthepopcorn import PassThePopcorn
 from src.trackers.UNIT3D.utopia import Utopia, UtopiaDescriptionBuilder
 
@@ -208,13 +208,15 @@ def test_manual_archive_leaves_out_torrents_with_tracker_credentials(tmp_path):
         (release / relative).write_bytes(b"x")
     archive = release / "Show.tar"
     archive.write_bytes(b"previous archive")
+    # An archive from an earlier run under another title may predate the filter.
+    (release / "Old.Title.tar").write_bytes(b"older archive")
 
     _write_archive(str(archive), release, {"Show.S01.torrent"})
 
     with tarfile.open(archive) as tar:
         names = {Path(name).as_posix() for name in tar.getnames()}
     assert {"BASE.torrent", "Show.S01.torrent", "GENERIC_INFO.txt", "screenshots/FILE_1-0.png", "torrents/16777216/0123abcd.torrent"} <= names
-    assert not {"[ALPHA].torrent", "torrents/.client/0123abcd.torrent", "Show.tar"} & names
+    assert not {"[ALPHA].torrent", "torrents/.client/0123abcd.torrent", "Show.tar", "Old.Title.tar"} & names
     # The tracker torrents stay available for the client and for manual adding.
     assert (release / "[ALPHA].torrent").exists()
     assert (release / "torrents/.client/0123abcd.torrent").exists()
@@ -303,3 +305,49 @@ def test_utopia_description_leaves_shared_metadata_unchanged(tmp_path, monkeypat
     assert seen == [(original_images, original_pack_images)]
     assert meta.image_list == original_images
     assert meta.new_images_file_1 == original_pack_images
+
+
+def test_filebrowser_share_holds_only_shareable_files(tmp_path):
+    from src.manualpackage import _stage_share, _write_archive
+
+    release = tmp_path / "tmp" / "pack"
+    for relative in ("[ALPHA].torrent", "Show.S01.torrent", "GENERIC_INFO.txt", "screenshots/FILE_1-0.png", "torrents/.client/0123abcd.torrent", "Old.Title.tar"):
+        (release / relative).parent.mkdir(parents=True, exist_ok=True)
+        (release / relative).write_bytes(b"x")
+    share = tmp_path / "tmp" / "manual_packages" / "pack"
+    (share / "stale.txt").parent.mkdir(parents=True)
+    (share / "stale.txt").write_bytes(b"from an earlier run")
+    archive = release / "Show.tar"
+    _write_archive(str(archive), release, {"Show.S01.torrent"})
+
+    _stage_share(share, release, {"Show.S01.torrent"}, str(archive))
+
+    shared = {path.relative_to(share).as_posix() for path in share.rglob("*") if path.is_file()}
+    assert shared == {"Show.S01.torrent", "GENERIC_INFO.txt", "screenshots/FILE_1-0.png", "Show.tar"}
+    assert (release / "[ALPHA].torrent").exists()
+
+
+def test_concurrent_trackers_detect_languages_once(tmp_path, monkeypatch):
+    from src.languages import languages_manager
+
+    meta = _pack_meta(tmp_path, language_checked=False)
+    active = []
+    detections = []
+
+    async def detect(current_meta, tracker):
+        active.append(tracker)
+        assert len(active) == 1
+        await asyncio.sleep(0.01)
+        if not current_meta.language_checked:
+            detections.append(tracker)
+            current_meta.language_checked = True
+        active.remove(tracker)
+
+    monkeypatch.setattr(languages_manager, "_process_desc_language", detect)
+
+    async def describe_both():
+        await asyncio.gather(languages_manager.process_desc_language(meta, "ALPHA"), languages_manager.process_desc_language(meta, "BETA"))
+        return release_language_lock(meta).locked()
+
+    assert asyncio.run(describe_both()) is False
+    assert len(detections) == 1

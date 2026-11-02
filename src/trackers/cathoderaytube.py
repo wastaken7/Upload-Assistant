@@ -18,7 +18,7 @@ from src.get_desc import DescriptionBuilder
 from src.mediainfo import strip_report_by_line
 from src.meta import Meta
 from src.rehostimages import ImageHostPolicy, RehostImagesManager
-from src.release_images import release_image_lock
+from src.release_locks import release_image_lock
 from src.takescreens import download_artwork_from_meta
 from src.temp_paths import artwork_dir
 from src.tracker_images import ImageCollection, get_tracker_image_collection

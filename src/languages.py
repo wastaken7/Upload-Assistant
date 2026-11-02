@@ -11,6 +11,7 @@ from langcodes.tag_parser import LanguageTagError
 from src.console import PromptBlockedError, logger
 from src.manual_input import Question, ask, has_answer, is_interactive
 from src.meta import Meta
+from src.release_locks import release_language_lock
 
 # What process_desc_language fills in on meta.
 LANGUAGE_FIELDS = (
@@ -232,6 +233,12 @@ class LanguagesManager:
         return parsed_data
 
     async def process_desc_language(self, meta: Meta, tracker: str = "") -> None:
+        # Concurrent tracker uploads share meta: the first one detects or asks
+        # for the languages, the others then find meta.language_checked set.
+        async with release_language_lock(meta):
+            await self._process_desc_language_once(meta, tracker)
+
+    async def _process_desc_language_once(self, meta: Meta, tracker: str) -> None:
         saved = {key: copy.copy(getattr(meta, key)) for key in LANGUAGE_FIELDS}
         try:
             await self._process_desc_language(meta, tracker)

@@ -28,7 +28,7 @@ from src.mediainfo import MediaInfo
 from src.meta import Meta
 from src.meta_file import write_meta_file
 from src.rehostimages import ImageHostPolicy, RehostImagesManager, _image_host
-from src.release_images import release_image_lock
+from src.release_locks import release_image_lock
 from src.screenshot_manifest import files as manifest_files
 from src.takescreens import TakeScreensManager
 from src.temp_paths import artwork_dir
