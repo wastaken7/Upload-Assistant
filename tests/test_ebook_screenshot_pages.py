@@ -105,6 +105,42 @@ def test_find_contents_page_from_outline(tmp_path: Path) -> None:
         assert find_contents_page(doc) is None  # noqa: S101
 
 
+def test_find_contents_page_outline_matches_whole_titles(tmp_path: Path) -> None:
+    pdf = tmp_path / "Invented Book.pdf"
+    _make_pdf(pdf, ["Cover", "Part II", "Part I\nPart II", "Part I", "Part II"])
+    with fitz.open(pdf) as doc:
+        # "Part II" on the page alone does not also count as "Part I".
+        doc.set_toc([[1, "Contents", 2], [1, "Part I", 4], [1, "Part II", 5]])
+        assert find_contents_page(doc) is None  # noqa: S101
+        doc.set_toc([[1, "Contents", 3], [1, "Part I", 4], [1, "Part II", 5]])
+        assert find_contents_page(doc) == 2  # noqa: S101
+        # With a single chapter in the outline, naming it is enough.
+        doc.set_toc([[1, "Contents", 3], [1, "Part I", 4]])
+        assert find_contents_page(doc) == 2  # noqa: S101
+
+
+class _TextPage:
+    def __init__(self, text: str) -> None:
+        self.text = text
+
+    def get_text(self) -> str:
+        return self.text
+
+
+class _TextDocument(list[_TextPage]):
+    def get_toc(self) -> list[list[object]]:
+        return []
+
+
+def test_find_contents_page_from_single_ellipsis_leaders() -> None:
+    # The PDF base fonts cannot write an ellipsis, so the pages are plain text.
+    leaders = "\n".join(f"Lesson {i} … {i * 4}" for i in range(1, 7))
+    prose = "\n".join("She paused… then spoke" for _ in range(6))
+    doc = _TextDocument(_TextPage(text) for text in ["Cover", prose, leaders, "Lesson 1"])
+
+    assert find_contents_page(doc) == 2  # noqa: S101
+
+
 def test_find_contents_page_from_dotted_leaders(tmp_path: Path) -> None:
     pdf = tmp_path / "Invented Book.pdf"
     leaders = "\n".join(f"Lesson {i} ............ {i * 4}" for i in range(1, 7))

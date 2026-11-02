@@ -399,7 +399,8 @@ CONTENTS_HEADING_RE = re.compile(
     r"(?:(?:table of )?contents|sum[aá]rio|[ií]ndice(?: geral)?|conte[uú]dos?|contenido|table des mati[eè]res|sommaire|inhalt(?:sverzeichnis)?)\s*:?",
     re.IGNORECASE,
 )
-TOC_LEADER_RE = re.compile(r"(?:\.\s?){5,}|…{3,}")
+# A single ellipsis counts only as the leader before an entry's page number.
+TOC_LEADER_RE = re.compile(r"(?:\.\s?){5,}|…{3,}|…[ \t]*\d+[ \t]*$", re.MULTILINE)
 
 
 def _page_search_order(num_pages: int, edge: int = 30) -> list[int]:
@@ -453,15 +454,17 @@ def find_contents_page(doc: Any, max_pages: int = 30) -> int | None:
     """
     num_pages = len(doc)
     with contextlib.suppress(Exception):
-        outline = [(str(title).strip(), page) for _level, title, page, *_ in doc.get_toc()]
-        titles = {_normalized(title) for title, _page in outline if len(title) >= 4 and not CONTENTS_HEADING_RE.fullmatch(title)}
-        for title, page in outline:
+        outline = [(_normalized(str(title)), page) for _level, title, page, *_ in doc.get_toc()]
+        contents_targets = [page for title, page in outline if CONTENTS_HEADING_RE.fullmatch(title)]
+        titles = {title for title, _page in outline if len(title) >= 4 and not CONTENTS_HEADING_RE.fullmatch(title)}
+        for page in contents_targets if titles else []:
             # Outline pages are 1-based; unresolved targets are -1.
-            if not (CONTENTS_HEADING_RE.fullmatch(title) and 0 < page <= num_pages):
+            if not 0 < page <= num_pages:
                 continue
             # Some outlines point at a page without the list, so require it to name other chapters.
+            # Whole-title matches, so "Part II" on the page does not also count as "Part I".
             text = _normalized(_page_text(doc, page - 1))
-            if sum(chapter in text for chapter in titles) >= 2:
+            if sum(re.search(rf"(?<!\w){re.escape(chapter)}(?!\w)", text) is not None for chapter in titles) >= min(2, len(titles)):
                 return page - 1
     leader_page = None
     for page_num in _page_search_order(num_pages, max_pages)[: min(num_pages, 2 * max_pages)]:

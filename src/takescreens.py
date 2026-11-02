@@ -1875,8 +1875,11 @@ async def generate_ebook_screenshots(
 
                 if capture_pages:
                     info_page = await asyncio.to_thread(find_ebook_info_page, doc) if num_screens > 1 else None
-                    contents_page = await asyncio.to_thread(find_ebook_contents_page, doc) if num_screens > 1 else None
-                    fixed_pages = [page for page in (0, info_page, contents_page) if page is not None]
+                    fixed_pages = list(dict.fromkeys(page for page in (0, info_page) if page is not None))
+                    # Only look for the contents page when a screenshot slot is left for it.
+                    contents_page = await asyncio.to_thread(find_ebook_contents_page, doc) if num_screens > len(fixed_pages) else None
+                    if contents_page is not None:
+                        fixed_pages.append(contents_page)
                     selected_pages = select_ebook_pages(total_pages, num_screens, fixed_pages)
                     for i, page_num in enumerate(selected_pages):
                         scr_path = await process_page(page_num, output_dir / f"{sanitized_filename}-{i}")
