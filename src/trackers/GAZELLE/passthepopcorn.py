@@ -18,7 +18,7 @@ from rich.markup import escape
 
 from src import payload_preview, webui_events
 from src.bbcode import BBCODE
-from src.cogs.redaction import PathAwareEncoder, Redaction
+from src.cogs.redaction import Redaction
 from src.console import logger, prompt_in_thread
 from src.cookie_auth import CookieValidator
 from src.exceptions import *  # noqa F403
@@ -26,6 +26,8 @@ from src.exceptions import UploadError
 from src.manual_input import Question, ask, choices_from
 from src.mediainfo import MediaInfo
 from src.meta import Meta
+from src.meta_file import write_meta_file
+from src.pack_images import pack_image_lock
 from src.rehostimages import ImageHostPolicy, RehostImagesManager
 from src.screenshot_manifest import files as manifest_files
 from src.takescreens import TakeScreensManager
@@ -943,6 +945,11 @@ class PassThePopcorn:
         return screenshot_limit + len(get_tracker_image_collection(meta, self.tracker, "menu_images"))
 
     async def edit_desc(self, meta: Meta) -> None:
+        # Pack images are shared with the trackers uploading at the same time.
+        async with pack_image_lock(meta):
+            await self._write_description(meta)
+
+    async def _write_description(self, meta: Meta) -> None:
         from src.description_review import get_base_description
 
         base = get_base_description(meta)
@@ -1125,9 +1132,7 @@ class PassThePopcorn:
                                 raw_url = str(img.get("raw_url", ""))
                                 desc.write(f"[img]{raw_url}[/img]\n")
 
-                        meta_filename = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/meta.json"
-                        async with aiofiles.open(meta_filename, "w", encoding="utf-8") as f:
-                            await f.write(json.dumps(meta.to_dict(), indent=4, cls=PathAwareEncoder))
+                        await write_meta_file(meta)
 
         # Handle multiple discs case
         elif len(discs) > 1:
@@ -1197,9 +1202,7 @@ class PassThePopcorn:
                                 desc.write(f"[img]{raw_url}[/img]\n")
                             desc.write("\n")
 
-                            meta_filename = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/meta.json"
-                            async with aiofiles.open(meta_filename, "w", encoding="utf-8") as f:
-                                await f.write(json.dumps(meta.to_dict(), indent=4, cls=PathAwareEncoder))
+                            await write_meta_file(meta)
 
                 elif each["type"] == "DVD":
                     if i == 0:
@@ -1259,9 +1262,7 @@ class PassThePopcorn:
                                     desc.write(f"[img]{raw_url}[/img]\n")
                                 desc.write("\n")
 
-                        meta_filename = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/meta.json"
-                        async with aiofiles.open(meta_filename, "w", encoding="utf-8") as f:
-                            await f.write(json.dumps(meta.to_dict(), indent=4, cls=PathAwareEncoder))
+                        await write_meta_file(meta)
 
         # Handle single file case
         elif len(filelist) == 1:
@@ -1383,9 +1384,7 @@ class PassThePopcorn:
                                 desc.write(f"[img]{raw_url}[/img]\n")
                             desc.write("\n")
 
-                    meta_filename = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/meta.json"
-                    async with aiofiles.open(meta_filename, "w", encoding="utf-8") as f:
-                        await f.write(json.dumps(meta.to_dict(), indent=4, cls=PathAwareEncoder))
+                    await write_meta_file(meta)
 
         async with aiofiles.open(
             f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt",

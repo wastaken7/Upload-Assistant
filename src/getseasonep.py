@@ -203,7 +203,8 @@ class SeasonEpisodeManager:
                                     "[bold yellow]There was an error guessing the episode number. Guessing E01. Use [bold green]--episode #[/bold green] to correct if needed"
                                 )
 
-                            await asyncio.sleep(1.5)
+                            if not meta.unattended:
+                                await asyncio.sleep(1.5)
                     else:
                         episode = ""
                         episode_int = 0  # Ensure it's an integer
@@ -278,7 +279,8 @@ class SeasonEpisodeManager:
                                 season = "S01"
                             logger.info(f"[bold yellow]{meta.title} does not exist on thexem, guessing {season}")
                             logger.info(f"[bold yellow]If [green]{season}[/green] is incorrect, use --season to correct")
-                            await asyncio.sleep(3)
+                            if not meta.unattended:
+                                await asyncio.sleep(3)
                 else:
                     logger.info("[yellow]No matching AniList entry found; using standard season and episode parsing[/yellow]")
                     if not romaji and not eng_title:

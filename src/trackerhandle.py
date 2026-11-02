@@ -391,15 +391,10 @@ async def process_trackers(
                     logger.info(traceback.format_exc(), extra={"markup": False})
                     return
 
-    multi_screens = int(config["DEFAULT"].get("multiScreens", 2))
-    discs = meta.discs or []
-    one_disc = True
-    if discs and len(discs) == 1:
-        one_disc = True
-    elif discs and len(discs) > 1:
-        one_disc = False
-
-    if ((not meta.tv_pack and one_disc) or multi_screens == 0) and not bandwidth_control:
+    # Packs upload concurrently too: their per-file images are created once
+    # under the release's pack image lock and then shared by every tracker.
+    # Bandwidth control waits per tracker, so it keeps the trackers in order.
+    if not bandwidth_control:
         # Run all tracker tasks concurrently with individual error handling
         tasks: list[tuple[str, asyncio.Task[None]]] = []
         for tracker in enabled_trackers:
