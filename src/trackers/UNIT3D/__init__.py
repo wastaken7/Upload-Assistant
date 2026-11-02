@@ -12,7 +12,6 @@ import httpx
 from src import payload_preview, unit3d_catalogs
 from src.api_key_expiry import record_api_key_expiry, warn_api_key_expiry
 from src.artwork import is_valid_image_bytes
-from src.bbcode import BBCODE
 from src.cogs.redaction import Redaction
 from src.console import logger
 from src.get_desc import DescriptionBuilder
@@ -319,23 +318,41 @@ class UNIT3D:
         if not limit or len(description.encode("utf-8")) <= limit:
             return description
 
-        bbcode = BBCODE()
+        builder = DescriptionBuilder(self.tracker, self.config)
+
+        def formatted_blocks(disc: dict[str, Any]) -> list[str]:
+            # Whole spoiler blocks keep the BBCode balanced; match them as the tracker formatting left them.
+            return [builder.tracker_specific_formats(self.tracker, block) for block in DescriptionBuilder.disc_mediainfo_blocks(disc)]
+
+        # Later discs follow the first disc's MediaInfo, so identical MediaInfo never matches the first disc.
+        later_start = 0
+        for block in formatted_blocks(meta.discs[0]) if meta.discs else []:
+            index = description.find(block)
+            if index != -1:
+                later_start = max(later_start, index + len(block))
+
         dropped = 0
         for disc in reversed(meta.discs[1:]):
             found = False
-            for block in DescriptionBuilder.disc_mediainfo_blocks(disc):
-                # Whole spoiler blocks keep the BBCode balanced; match them as the UNIT3D formatting left them.
-                block = bbcode.remove_extra_lines(block)
-                index = description.rfind(block)
-                if index != -1:
-                    description = description[:index] + description[index + len(block) :]
-                    found = True
+            for block in formatted_blocks(disc):
+                index = description.rfind(block, later_start)
+                if index == -1:
+                    continue
+                # A BDMV spoiler title is the disc's only label above its screenshots, so keep the name.
+                replacement = str(disc.get("name", "BDINFO")) if disc["type"] == "BDMV" else ""
+                head = description[:index].rstrip(" ")
+                tail = description[index + len(block) :].lstrip(" ")
+                if not replacement:
+                    # Collapse only the blank lines around the cut; the rest of the description keeps its formatting.
+                    newlines = len(head) - len(head.rstrip("\n")) + len(tail) - len(tail.lstrip("\n"))
+                    head, tail = head.rstrip("\n") + "\n" * min(newlines, 2), tail.lstrip("\n")
+                description = head + replacement + tail
+                found = True
             if found:
                 dropped += 1
                 if len(description.encode("utf-8")) <= limit:
                     break
 
-        description = bbcode.remove_extra_lines(description)
         size = len(description.encode("utf-8"))
         if dropped:
             logger.info(f"{self.tracker}: [yellow]Description exceeded {limit} bytes; removed the MediaInfo of {dropped} later disc(s).[/yellow]")
