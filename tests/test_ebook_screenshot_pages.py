@@ -4,7 +4,7 @@ import asyncio
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
-import fitz
+import pymupdf
 import pytest
 
 from src.book_extractors import find_contents_page, find_copyright_page, find_isbn_page
@@ -19,7 +19,7 @@ from src.takescreens import _render_document_page, find_ebook_info_page, generat
 
 
 def _make_pdf(path: Path, pages: list[str]) -> None:
-    doc = fitz.open()
+    doc = pymupdf.open()
     for text in pages:
         doc.new_page().insert_text((72, 72), text)
     doc.save(path)
@@ -43,7 +43,7 @@ def test_find_isbn_page_prefers_front_pages(tmp_path: Path) -> None:
     pages[3] = "Imaginary Press\nISBN 0-306-40615-2"
     _make_pdf(pdf, pages)
 
-    with fitz.open(pdf) as doc:
+    with pymupdf.open(pdf) as doc:
         assert find_isbn_page(doc) == (3, "0306406152")  # noqa: S101
 
 
@@ -51,7 +51,7 @@ def test_find_copyright_page_without_isbn(tmp_path: Path) -> None:
     pdf = tmp_path / "Invented Book.pdf"
     _make_pdf(pdf, ["Cover", "Title", "Copyright 2020 Fictional Author. All rights reserved.", "Chapter one"])
 
-    with fitz.open(pdf) as doc:
+    with pymupdf.open(pdf) as doc:
         assert find_isbn_page(doc) is None  # noqa: S101
         assert find_copyright_page(doc) == 2  # noqa: S101
 
@@ -61,7 +61,7 @@ def test_info_page_prefers_copyright_page_with_isbn(tmp_path: Path) -> None:
     pages = ["Cover", "Back cover blurb\nISBN 978-0-306-40615-7", "Title", "Copyright 2021 Imaginary Press\nISBN 978-0-306-40615-7", "Chapter one"]
     _make_pdf(pdf, pages)
 
-    with fitz.open(pdf) as doc:
+    with pymupdf.open(pdf) as doc:
         assert find_isbn_page(doc) == (1, "9780306406157")  # noqa: S101
         assert find_ebook_info_page(doc) == 3  # noqa: S101
 
@@ -76,10 +76,10 @@ def test_pdf_screenshots_include_cover_and_isbn_page(tmp_path: Path) -> None:
     result = asyncio.run(generate_ebook_screenshots(str(pdf), "Invented Book", meta.uuid, meta.base_dir, meta, num_screens=3))
 
     assert len(result) == 3  # noqa: S101
-    with fitz.open(pdf) as doc:
-        cover = doc[0].get_pixmap(matrix=fitz.Matrix(2.0, 2.0)).tobytes("png")
-        isbn_page = doc[5].get_pixmap(matrix=fitz.Matrix(2.0, 2.0)).tobytes("png")
-    rendered = [fitz.Pixmap(path).tobytes("png") for path in result]
+    with pymupdf.open(pdf) as doc:
+        cover = doc[0].get_pixmap(matrix=pymupdf.Matrix(2.0, 2.0)).tobytes("png")
+        isbn_page = doc[5].get_pixmap(matrix=pymupdf.Matrix(2.0, 2.0)).tobytes("png")
+    rendered = [pymupdf.Pixmap(path).tobytes("png") for path in result]
     assert rendered[0] == cover  # noqa: S101
     assert isbn_page in rendered  # noqa: S101
 
@@ -90,14 +90,14 @@ def test_find_contents_page_from_page_heading(tmp_path: Path) -> None:
     pages += ["Story"] * 70 + ["Table of Contents\nChapter one"]
     _make_pdf(pdf, pages)
 
-    with fitz.open(pdf) as doc:
+    with pymupdf.open(pdf) as doc:
         assert find_contents_page(doc) == 2  # noqa: S101
 
 
 def test_find_contents_page_from_outline(tmp_path: Path) -> None:
     pdf = tmp_path / "Invented Book.pdf"
     _make_pdf(pdf, ["Cover", "Copyright Imaginary Press", "Prologue\nThe Quiet\nHarbor", "Prologue", "The Quiet Harbor"])
-    with fitz.open(pdf) as doc:
+    with pymupdf.open(pdf) as doc:
         doc.set_toc([[1, "What is in this book?", 4], [1, "Contents", 3], [1, "Prologue", 4], [1, "The Quiet Harbor", 5]])
         assert find_contents_page(doc) == 2  # noqa: S101
         # An outline entry pointing at a page that lists no chapters is ignored.
@@ -108,7 +108,7 @@ def test_find_contents_page_from_outline(tmp_path: Path) -> None:
 def test_find_contents_page_outline_matches_whole_titles(tmp_path: Path) -> None:
     pdf = tmp_path / "Invented Book.pdf"
     _make_pdf(pdf, ["Cover", "Part II", "Part I\nPart II", "Part I", "Part II"])
-    with fitz.open(pdf) as doc:
+    with pymupdf.open(pdf) as doc:
         # "Part II" on the page alone does not also count as "Part I".
         doc.set_toc([[1, "Contents", 2], [1, "Part I", 4], [1, "Part II", 5]])
         assert find_contents_page(doc) is None  # noqa: S101
@@ -146,7 +146,7 @@ def test_find_contents_page_from_dotted_leaders(tmp_path: Path) -> None:
     leaders = "\n".join(f"Lesson {i} ............ {i * 4}" for i in range(1, 7))
     _make_pdf(pdf, ["Cover", "Mid-sentence pause..... then more", leaders, "Lesson 1"])
 
-    with fitz.open(pdf) as doc:
+    with pymupdf.open(pdf) as doc:
         assert find_contents_page(doc) == 2  # noqa: S101
 
 
@@ -164,28 +164,28 @@ def test_pdf_screenshots_include_contents_page(tmp_path: Path) -> None:
 
 
 def test_small_lone_cover_image_fills_the_screenshot(tmp_path: Path) -> None:
-    cover = fitz.Pixmap(fitz.csRGB, fitz.IRect(0, 0, 1200, 1800), False)
+    cover = pymupdf.Pixmap(pymupdf.csRGB, pymupdf.IRect(0, 0, 1200, 1800), False)
     cover.set_rect(cover.irect, (200, 30, 30))
     pdf = tmp_path / "Invented Book.pdf"
-    doc = fitz.open()
-    doc.new_page(width=400, height=600).insert_image(fitz.Rect(170, 0, 230, 90), pixmap=cover)
+    doc = pymupdf.open()
+    doc.new_page(width=400, height=600).insert_image(pymupdf.Rect(170, 0, 230, 90), pixmap=cover)
     captioned = doc.new_page(width=400, height=600)
-    captioned.insert_image(fitz.Rect(170, 0, 230, 90), pixmap=cover)
+    captioned.insert_image(pymupdf.Rect(170, 0, 230, 90), pixmap=cover)
     captioned.insert_text((72, 300), "Caption")
     illustrated = doc.new_page(width=400, height=600)
-    illustrated.draw_rect(fitz.Rect(20, 120, 380, 580), fill=(0, 0.6, 0))
-    illustrated.insert_image(fitz.Rect(170, 0, 230, 90), pixmap=cover)
+    illustrated.draw_rect(pymupdf.Rect(20, 120, 380, 580), fill=(0, 0.6, 0))
+    illustrated.insert_image(pymupdf.Rect(170, 0, 230, 90), pixmap=cover)
     rotated = doc.new_page(width=400, height=600)
-    rotated.insert_image(fitz.Rect(300, 10, 360, 100), pixmap=cover)
+    rotated.insert_image(pymupdf.Rect(300, 10, 360, 100), pixmap=cover)
     rotated.set_rotation(90)
     doc.save(pdf)
     doc.close()
 
-    with fitz.open(pdf) as doc:
-        lone = fitz.Pixmap(str(_render_document_page(doc, 0, tmp_path / "lone")))
-        text = fitz.Pixmap(str(_render_document_page(doc, 1, tmp_path / "text")))
-        vector = fitz.Pixmap(str(_render_document_page(doc, 2, tmp_path / "vector")))
-        turned = fitz.Pixmap(str(_render_document_page(doc, 3, tmp_path / "turned")))
+    with pymupdf.open(pdf) as doc:
+        lone = pymupdf.Pixmap(str(_render_document_page(doc, 0, tmp_path / "lone")))
+        text = pymupdf.Pixmap(str(_render_document_page(doc, 1, tmp_path / "text")))
+        vector = pymupdf.Pixmap(str(_render_document_page(doc, 2, tmp_path / "vector")))
+        turned = pymupdf.Pixmap(str(_render_document_page(doc, 3, tmp_path / "turned")))
 
     assert abs(lone.width - 800) <= 1 and abs(lone.height - 1200) <= 1  # noqa: S101
     assert lone.pixel(5, 5) == lone.pixel(lone.width - 5, lone.height - 5) == (200, 30, 30)  # noqa: S101

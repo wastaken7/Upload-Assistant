@@ -479,11 +479,11 @@ def find_contents_page(doc: Any, max_pages: int = 30) -> int | None:
 
 
 def extract_isbn_from_pdf(pdf_path: str) -> str | None:
-    """Search for and extract a valid ISBN from a PDF file using PyMuPDF (fitz)."""
+    """Search for and extract a valid ISBN from a PDF file using PyMuPDF."""
     try:
-        import fitz
+        import pymupdf
     except ImportError:
-        logger.debug("[yellow]Debug: PyMuPDF (fitz) is not installed. Skipping PDF ISBN extraction.[/yellow]")
+        logger.debug("[yellow]Debug: PyMuPDF is not installed. Skipping PDF ISBN extraction.[/yellow]")
         return None
 
     if not Path(pdf_path).is_file():
@@ -492,9 +492,9 @@ def extract_isbn_from_pdf(pdf_path: str) -> str | None:
     try:
         # Disable mupdf display errors to avoid spamming console
         with contextlib.suppress(Exception):
-            fitz.TOOLS.mupdf_display_errors(False)
+            pymupdf.TOOLS.mupdf_display_errors(False)
 
-        with fitz.open(pdf_path) as doc:
+        with pymupdf.open(pdf_path) as doc:
             found = find_isbn_page(doc)
             if found:
                 page_num, isbn = found

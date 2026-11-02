@@ -1469,14 +1469,14 @@ async def extract_document_cover(path: str, dest_path: str) -> Path | None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     if extension == "pdf":
-        import fitz  # PyMuPDF
+        import pymupdf
 
         def _render_pdf_cover() -> Path | None:
-            with fitz.open(path) as doc:
+            with pymupdf.open(path) as doc:
                 if len(doc) == 0:
                     return None
                 page = doc[0]
-                pix = page.get_pixmap(matrix=fitz.Matrix(2.0, 2.0))
+                pix = page.get_pixmap(matrix=pymupdf.Matrix(2.0, 2.0))
                 pix.save(output_path)
                 return output_path
 
@@ -1717,7 +1717,7 @@ def _lone_image_clip(page: Any) -> tuple[Any, float] | None:
     MuPDF often lays out EPUB cover pages (percentage or viewport heights) as a
     small image at the top of a blank page.
     """
-    import fitz  # PyMuPDF
+    import pymupdf
 
     if page.get_text().strip() or page.first_annot:
         return None
@@ -1725,7 +1725,7 @@ def _lone_image_clip(page: Any) -> tuple[Any, float] | None:
     if len(images) != 1:
         return None
     # Image and drawing boxes are unrotated page coordinates; get_pixmap clips in rotated ones.
-    bbox = fitz.Rect(images[0]["bbox"])
+    bbox = pymupdf.Rect(images[0]["bbox"])
     if any(not bbox.contains(drawing["rect"]) for drawing in page.get_drawings()):
         return None
     clip = bbox * page.rotation_matrix & page.rect
@@ -1735,7 +1735,7 @@ def _lone_image_clip(page: Any) -> tuple[Any, float] | None:
 
 
 def _render_document_page(doc: Any, page_num: int, dest_stem: Path, suffix: str = ".png") -> Path:
-    import fitz  # PyMuPDF
+    import pymupdf
 
     dest_path = dest_stem.with_name(f"{dest_stem.name}{suffix}")
     page = doc[page_num]
@@ -1745,7 +1745,7 @@ def _render_document_page(doc: Any, page_num: int, dest_stem: Path, suffix: str 
         clip, native_zoom = lone_image
         # Fill the normal page render size without upscaling past the image's own resolution.
         zoom = max(zoom, min(zoom * page.rect.width / clip.width, zoom * page.rect.height / clip.height, native_zoom))
-    pix = page.get_pixmap(matrix=fitz.Matrix(zoom, zoom), clip=clip)
+    pix = page.get_pixmap(matrix=pymupdf.Matrix(zoom, zoom), clip=clip)
     if suffix == ".png":
         pix.save(dest_path)
     else:
@@ -1755,7 +1755,7 @@ def _render_document_page(doc: Any, page_num: int, dest_stem: Path, suffix: str 
 
 def capture_ebook_page(path: str, dest_stem: Path, exclude_pages: set[int], force_suffix: str | None = None) -> tuple[Path, int]:
     """Write one random page of an ebook/comic that is not in `exclude_pages` (any page once all are used)."""
-    import fitz  # PyMuPDF
+    import pymupdf
 
     if Path(path).suffix.lower() in {".cbz", ".cbr"}:
         opened = _open_comic_archive(path)
@@ -1769,8 +1769,8 @@ def capture_ebook_page(path: str, dest_stem: Path, exclude_pages: set[int], forc
             return _write_comic_page(archive, image_files[page], dest_stem, force_suffix), page
 
     with contextlib.suppress(Exception):
-        fitz.TOOLS.mupdf_display_errors(False)
-    with fitz.open(path) as doc:
+        pymupdf.TOOLS.mupdf_display_errors(False)
+    with pymupdf.open(path) as doc:
         if len(doc) == 0:
             raise ValueError("The book does not have pages")
         page = select_ebook_pages(len(doc), 1, [], exclude_pages)[0]
@@ -1791,10 +1791,10 @@ async def generate_ebook_screenshots(
     Pages already registered (for example by the early background capture and
     then reviewed in the Web UI) are reused unless `meta.retake` is set.
     """
-    import fitz  # PyMuPDF
+    import pymupdf
 
     with contextlib.suppress(Exception):
-        fitz.TOOLS.mupdf_display_errors(False)
+        pymupdf.TOOLS.mupdf_display_errors(False)
 
     output_dir = screenshots_dir(base_dir, folder_id).resolve()
     sanitized_filename = await sanitize_filename(filename)
@@ -1872,7 +1872,7 @@ async def generate_ebook_screenshots(
                 except Exception as e:
                     logger.debug(f"[yellow]Warning: EPUB cover extraction failed: {e}[/yellow]")
 
-            with fitz.open(path) as doc:
+            with pymupdf.open(path) as doc:
                 total_pages = len(doc)
                 if total_pages == 0:
                     logger.info(f"[yellow]{extension.upper()} does not have pages[/yellow]")
