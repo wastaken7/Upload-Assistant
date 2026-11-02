@@ -218,16 +218,11 @@ class TrackerDataManager:
         if meta.unattended or not candidate.description:
             return
         if os.environ.get("UA_WEBUI_ACTIVE"):
-            from src.description_review import load_review, save_review
+            from src.description_review import seed_review
 
+            # Locked check-and-write: a Description panel save landing in between keeps its text.
             temp_dir = Path(meta.base_dir) / "tmp" / meta.uuid
-            review = load_review(temp_dir)
-            if not isinstance(review.get("content"), str):
-                try:
-                    version = int(review.get("version", 0) or 0) + 1
-                except TypeError, ValueError:
-                    version = 1
-                await asyncio.to_thread(save_review, temp_dir, candidate.description, version)
+            await asyncio.to_thread(seed_review, temp_dir, candidate.description)
             return
         logger.info(f"Selected description from {tracker_name}:\n{candidate.description[:1000]}", extra={"markup": False})
         with webui_events.field_prompt(
