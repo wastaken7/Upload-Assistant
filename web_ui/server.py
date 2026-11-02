@@ -234,6 +234,7 @@ _tracker_status_check_lock = threading.Lock()
 _PROWLARR_REPORT_CACHE_SECONDS = 5 * 60
 _prowlarr_report_cache: dict[tuple[str, str, frozenset[str]], tuple[float, Any]] = {}
 _prowlarr_report_cache_lock = threading.Lock()
+_prowlarr_report_cache_generation = 0
 
 
 def _load_argument_presets() -> list[dict[str, str]]:
@@ -3191,7 +3192,7 @@ def _version_static_urls(endpoint: str, values: dict[str, Any]) -> None:  # pyri
     if endpoint != "static" or "v" in values or not isinstance(filename, str) or not app.static_folder:
         return
     with suppress(OSError):
-        values["v"] = int((Path(app.static_folder) / filename).stat().st_mtime)
+        values["v"] = (Path(app.static_folder) / filename).stat().st_mtime_ns
 
 
 @app.after_request
@@ -5618,17 +5619,28 @@ def _cached_prowlarr_credentials(base_url: str, api_key: str, supported_trackers
     """
     from src.prowlarr import fetch_prowlarr_credentials
 
-    key = (base_url, hashlib.sha256(api_key.encode("utf-8")).hexdigest(), frozenset(supported_trackers))
+    # The cached report already holds this process's credentials in memory.
+    key = (base_url, api_key, frozenset(supported_trackers))
     now = time.monotonic()
     with _prowlarr_report_cache_lock:
         cached = _prowlarr_report_cache.get(key)
+        generation = _prowlarr_report_cache_generation
     if cached and now - cached[0] < _PROWLARR_REPORT_CACHE_SECONDS:
         return cached[1]
     report = fetch_prowlarr_credentials(base_url, api_key, supported_trackers)
     with _prowlarr_report_cache_lock:
-        _prowlarr_report_cache.clear()
-        _prowlarr_report_cache[key] = (now, report)
+        # A fetch that started before an invalidation must not restore old data.
+        if generation == _prowlarr_report_cache_generation:
+            _prowlarr_report_cache.clear()
+            _prowlarr_report_cache[key] = (now, report)
     return report
+
+
+def _invalidate_prowlarr_report_cache() -> None:
+    global _prowlarr_report_cache_generation
+    with _prowlarr_report_cache_lock:
+        _prowlarr_report_cache.clear()
+        _prowlarr_report_cache_generation += 1
 
 
 @app.route("/api/trackers")
@@ -5878,8 +5890,7 @@ def config_test_prowlarr():
         return jsonify({"success": False, "error": "Unable to test the Prowlarr connection"}), 500
 
     # A manual test is the way to pick up indexer changes before the cache expires.
-    with _prowlarr_report_cache_lock:
-        _prowlarr_report_cache.clear()
+    _invalidate_prowlarr_report_cache()
 
     api_key_trackers = sorted(name for name, credential in report.credentials.items() if credential.api_key)
     cookie_trackers = sorted(name for name, credential in report.credentials.items() if credential.cookie)

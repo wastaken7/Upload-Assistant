@@ -380,6 +380,31 @@ def test_prowlarr_report_is_reused_for_the_same_connection_only(monkeypatch) -> 
         server._prowlarr_report_cache.clear()
 
 
+def test_prowlarr_fetch_started_before_invalidation_is_not_cached(monkeypatch) -> None:
+    import src.prowlarr as prowlarr
+
+    calls: list[str] = []
+
+    def fetch_then_invalidate(base_url: str, _api_key: str, _supported: set[str]) -> object:
+        calls.append(base_url)
+        if len(calls) == 1:
+            # A manual Prowlarr test completes while this request is in flight.
+            server._invalidate_prowlarr_report_cache()
+        return object()
+
+    monkeypatch.setattr(prowlarr, "fetch_prowlarr_credentials", fetch_then_invalidate)
+    server._invalidate_prowlarr_report_cache()
+
+    stale = server._cached_prowlarr_credentials("http://prowlarr.test", "key", {"AITHER"})
+    fresh = server._cached_prowlarr_credentials("http://prowlarr.test", "key", {"AITHER"})
+
+    assert fresh is not stale
+    assert len(calls) == 2
+    assert server._cached_prowlarr_credentials("http://prowlarr.test", "key", {"AITHER"}) is fresh
+
+    server._invalidate_prowlarr_report_cache()
+
+
 def test_prowlarr_failures_are_not_cached(monkeypatch) -> None:
     import src.prowlarr as prowlarr
 
