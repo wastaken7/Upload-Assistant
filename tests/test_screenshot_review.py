@@ -20,6 +20,7 @@ from src.screenshot_review import (
     image_version,
     list_review_items,
     list_screenshots,
+    replace_screenshot,
     staged_remote_uploads,
     target_count,
     undo_remote_replacement,
@@ -407,3 +408,28 @@ def test_discard_remote_images_remaps_replacements_onto_kept_images(tmp_path: Pa
         "https://images.example/new-addition.jpg",
     ]
     assert discard_remote_images(tmp_path, final) == (final, [])
+
+
+@pytest.mark.parametrize("action", ["add", "replace"])
+def test_bdmv_frames_staged_for_hosted_images_stay_out_of_main_upload(tmp_path: Path, monkeypatch, action) -> None:
+    release_id = "release"
+    release_dir = tmp_path / "tmp" / release_id
+    (release_dir / "screenshots").mkdir(parents=True)
+    meta_data = {"base_dir": str(tmp_path), "uuid": release_id, "is_disc": "BDMV", "bdinfo": {}, "image_list": _hosted("one", "two")}
+
+    async def capture_stub(_meta, prefix, _bdinfo, folder_id, base_dir, *_args):
+        path = Path(base_dir) / "tmp" / folder_id / "screenshots" / f"{prefix}-0.png"
+        path.write_bytes(b"new")
+        return register(base_dir, folder_id, [path], _args[-1])
+
+    monkeypatch.setattr("src.screenshot_review.disc_screenshots", capture_stub)
+    if action == "add":
+        staged = asyncio.run(add_screenshot(release_dir, meta_data))
+    else:
+        staged = asyncio.run(replace_screenshot(release_dir, meta_data, "remote-0"))
+    delete_screenshot(release_dir, meta_data, "remote-1")
+
+    # Only the review upload hosts the staged frame, so the main upload cannot host it twice.
+    assert manifest_files(tmp_path, release_id, "main") == []
+    _kept, pending = discard_remote_images(release_dir, meta_data["image_list"])
+    assert [path for _index, path in pending] == [staged.path]

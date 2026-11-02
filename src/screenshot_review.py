@@ -210,6 +210,7 @@ async def add_screenshot(temp_dir: Path, meta_data: Mapping[str, object], group:
                     review["target_count"] = len(manifest_files(temp_dir.parent.parent, temp_dir.name, "main"))
                     _save_review(temp_dir, review)
                 return captured
+            _unregister_staged_frame(temp_dir, captured.path)
             review = _load_review(temp_dir)
             additions = review.get("remote_additions") if isinstance(review.get("remote_additions"), list) else []
             item_id = f"remote-add-{uuid.uuid4().hex}"
@@ -253,6 +254,7 @@ async def replace_screenshot(temp_dir: Path, meta_data: Mapping[str, object], sc
                 if match is None or int(match.group(1)) >= len(remote_images):
                     raise FileNotFoundError("Screenshot not found")
                 captured = await _capture_disc_review_frame(temp_dir, meta_data, group="main")
+                _unregister_staged_frame(temp_dir, captured.path)
                 review = _load_review(temp_dir)
                 replacements = review.get("remote_replacements") if isinstance(review.get("remote_replacements"), dict) else {}
                 replacements[screenshot_id] = captured.path.name
@@ -293,6 +295,16 @@ def undo_remote_replacement(temp_dir: Path, screenshot_id: str) -> None:
         if not _drop_remote_replacement(temp_dir, review, screenshot_id):
             raise FileNotFoundError("No pending replacement found")
         _save_review(temp_dir, review)
+
+
+def _unregister_staged_frame(temp_dir: Path, path: Path) -> None:
+    """Keep a staged hosted-image frame out of the main screenshots.
+
+    The disc pipeline registers its capture, but a frame staged for a hosted
+    image is uploaded only through the review; left registered, the main
+    upload would also host it when discards leave the list below the cutoff.
+    """
+    forget_file(temp_dir.parent.parent, temp_dir.name, path)
 
 
 def _drop_remote_replacement(temp_dir: Path, review: dict[str, Any], screenshot_id: str) -> bool:
