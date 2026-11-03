@@ -5,9 +5,8 @@ from pathlib import Path
 from typing import Any, cast
 
 import aiofiles
-import langcodes
-from langcodes.tag_parser import LanguageTagError
 
+from src import language_names
 from src.console import PromptBlockedError, logger
 from src.manual_input import Question, ask, has_answer, is_interactive
 from src.meta import Meta
@@ -544,7 +543,7 @@ class LanguagesManager:
         return any("english" in lang.lower() for lang in languages)
 
     def extract_language_from_title(self, title: str | None) -> str | None:
-        """Extract language from title field using langcodes library"""
+        """Extract the first word of the title that names a language"""
         if not title:
             return None
 
@@ -560,11 +559,11 @@ class LanguagesManager:
 
     def _find_language_name(self, word: str) -> str | None:
         try:
-            lang = langcodes.find(word)
-        except LanguageTagError, LookupError:
+            lang = language_names.find(word)
+        except LookupError:
             return None
-        if lang and lang.is_valid():
-            return lang.display_name()
+        if lang.is_valid():
+            return language_names.display_name(lang)
         return None
 
 

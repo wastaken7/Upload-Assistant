@@ -15,7 +15,7 @@ from bs4 import BeautifulSoup
 from langcodes.tag_parser import LanguageTagError
 from rich.markup import escape
 
-from src import payload_preview
+from src import language_names, payload_preview
 from src.console import logger
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder, html_to_bbcode
@@ -429,7 +429,7 @@ class BrasilTracker:
             return None
 
         try:
-            return langcodes.Language.make(lang_code).display_name("pt").capitalize()
+            return language_names.display_name(langcodes.Language.make(lang_code), "pt").capitalize()
 
         except LanguageTagError:
             return lang_code

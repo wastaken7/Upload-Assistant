@@ -16,7 +16,7 @@ from langcodes import Language
 from rich.progress import BarColumn, TaskProgressColumn, TextColumn
 
 from bin.get_playlist import MplsParser
-from src import webui_events
+from src import language_names, webui_events
 from src.binaries import configured_binary
 from src.console import console, logger, progress_display, prompt_in_thread
 from src.mediainfo import MediaInfo
@@ -1048,7 +1048,7 @@ class DiscParse:
                     # Extract the 2-letter language code before the colon
                     langcode_short = langcode.split(":")[0] if ":" in langcode else langcode
                     # Convert the short language code to the full language name
-                    language_name = Language.get(langcode_short).display_name()
+                    language_name = language_names.display_name(Language.get(langcode_short))
 
                     cast(list[dict[str, Any]], title_data["audioTracks"]).append(
                         {
@@ -1065,7 +1065,7 @@ class DiscParse:
                     # Extract the 2-letter language code before the colon
                     langcode_short = langcode.split(":")[0] if ":" in langcode else langcode
                     # Convert the short language code to the full language name
-                    language_name = Language.get(langcode_short).display_name()
+                    language_name = language_names.display_name(Language.get(langcode_short))
 
                     cast(list[dict[str, Any]], title_data["subtitleTracks"]).append(
                         {

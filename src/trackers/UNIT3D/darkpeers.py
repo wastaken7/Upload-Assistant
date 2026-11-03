@@ -8,6 +8,7 @@ from typing import Any, ClassVar
 import langcodes
 from langcodes.tag_parser import LanguageTagError
 
+from src import language_names
 from src.console import logger
 from src.get_desc import DescriptionBuilder
 from src.languages import languages_manager
@@ -243,7 +244,7 @@ class DarkPeers(TmdbTvNaming, UNIT3D):
         # TMDB stores original_language as an ISO code (e.g. "ar"), while MediaInfo yields names.
         if re.fullmatch(r"[a-z]{2,3}", language):
             try:
-                name = str(langcodes.Language.get(language).language_name("en"))
+                name = language_names.language_name(langcodes.Language.get(language), "en")
             except LanguageTagError:
                 name = ""
             if name and not name.startswith("Unknown"):

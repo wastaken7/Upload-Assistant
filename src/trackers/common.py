@@ -23,7 +23,7 @@ from langcodes import tag_parser
 from torf import Torrent
 from unidecode import unidecode
 
-from src import webui_events
+from src import language_names, webui_events
 from src.api_key_expiry import observe_tracker_response
 from src.bbcode import BBCODE
 from src.console import console, logger, prompt_in_thread
@@ -136,8 +136,8 @@ class Common:
                 continue
             try:
                 parsed_lang = langcodes.Language.get(parse_input)
-                display_name = parsed_lang.display_name()
-                language_name = parsed_lang.language_name()
+                display_name = language_names.display_name(parsed_lang)
+                language_name = language_names.language_name(parsed_lang)
                 language_code = parsed_lang.language
                 for value in (display_name, language_name, language_code):
                     if value:
@@ -228,7 +228,7 @@ class Common:
             return ""
         try:
             parsed_lang = langcodes.Language.get(language)
-            display_name = parsed_lang.display_name()
+            display_name = language_names.display_name(parsed_lang)
             return display_name.lower() if display_name else language.lower()
         except tag_parser.LanguageTagError, LookupError, AttributeError, ValueError:
             return language.lower()

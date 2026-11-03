@@ -18,7 +18,7 @@ from langcodes.tag_parser import LanguageTagError
 from PIL import Image
 from unidecode import unidecode
 
-from src import payload_preview
+from src import language_names, payload_preview
 from src.bbcode import BBCODE
 from src.book_extractors import normalize_book_title_separators
 from src.console import logger
@@ -499,7 +499,7 @@ class BJShare:
             language_name = "Português (pt)" if "PT" in origin_countries else "Português"
         else:
             try:
-                language_name = langcodes.Language.make(lang_code).display_name("pt").capitalize()
+                language_name = language_names.display_name(langcodes.Language.make(lang_code), "pt").capitalize()
             except LanguageTagError:
                 language_name = lang_code
 

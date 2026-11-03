@@ -1541,8 +1541,8 @@ class Args:
         Maps ``book_author`` / ``book_title`` to the ``author`` / ``title`` keys
         expected by trackers like CAPYBARABR.  Maps ``book_isbn`` to ``isbn``.
         Resolves the ``book_language`` value via
-        *langcodes* so both a human-readable name and the ISO 639-3 code are stored.
-        Falls back gracefully when *langcodes* is unavailable or the code is unknown.
+        *langcodes* and *language_names* so both a human-readable name and the
+        ISO 639-3 code are stored. Falls back gracefully when the code is unknown.
         """
         book_overview_arg = meta.manual_overview or meta.book_overview or meta.overview
         if book_overview_arg not in (None, "", []):
@@ -1606,10 +1606,12 @@ class Args:
             try:
                 import langcodes
 
+                from src import language_names
+
                 # Try get() first (ISO 639-1/3 codes like "pt", "por")
                 try:
                     lc = langcodes.get(raw_lang.lower())
-                    full_name = lc.display_name("en") or raw_lang.title()
+                    full_name = language_names.display_name(lc, "en") or raw_lang.title()
                     alpha3 = lc.to_alpha3() or ""
                     if full_name and full_name.lower() != raw_lang.lower():
                         meta.book_language = full_name
@@ -1618,8 +1620,8 @@ class Args:
                         raise LookupError("no display name change")
                 except Exception:
                     # Fall back to find() for natural language names ("Portuguese")
-                    lc = langcodes.find(raw_lang)
-                    meta.book_language = lc.display_name("en") or raw_lang.title()
+                    lc = language_names.find(raw_lang)
+                    meta.book_language = language_names.display_name(lc, "en") or raw_lang.title()
                     meta.book_language_iso = lc.to_alpha3() or ""
             except Exception:
                 meta.book_language = raw_lang.title()
