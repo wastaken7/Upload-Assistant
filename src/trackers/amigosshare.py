@@ -5,6 +5,9 @@ import platform
 import re
 import unicodedata
 from collections.abc import Iterable, Mapping
+from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
+from io import BytesIO
 from pathlib import Path
 from typing import Any, cast
 from urllib.parse import unquote, urljoin, urlparse
@@ -13,9 +16,10 @@ import aiofiles
 import httpx
 import langcodes
 from langcodes import tag_parser
+from PIL import Image
 
 from src import language_names, payload_preview
-from src.artwork import is_public_http_url, is_valid_cover_image, is_valid_image_bytes
+from src.artwork import download_public_image, is_valid_cover_image
 from src.cogs.redaction import Redaction
 from src.console import logger
 from src.cookie_auth import CookieValidator
@@ -114,7 +118,7 @@ VIDEO_EXTENSIONS = frozenset({".mkv", ".mp4", ".avi", ".m2ts", ".ts", ".m4v", ".
 SUBTITLE_EXTENSIONS = frozenset({".srt", ".ass"})
 ARCHIVE_EXTENSIONS = frozenset({".rar", ".zip", ".7z", ".tar", ".gz"})
 IMAGE_TYPES = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp"}
-PORTUGUESE = frozenset({"pt", "portuguese", "português", "portugues", "pt-br", "brazilian portuguese"})
+REMOTE_IMAGE_FORMATS = {"PNG": ".png", "JPEG": ".jpg", "WEBP": ".webp"}
 
 
 def normalize_option(value: str) -> str:
@@ -221,6 +225,21 @@ def resolution_from_dimensions(text: str) -> str:
     return "576p" if height > 480 else "480p"
 
 
+def retry_after_seconds(value: str | None, default: float = 5.0, maximum: float = 60.0) -> float:
+    """Seconds to wait from a Retry-After header, which holds either seconds or an HTTP date."""
+    value = str(value or "").strip()
+    if not value:
+        return default
+    try:
+        seconds = float(value)
+    except ValueError:
+        try:
+            seconds = (parsedate_to_datetime(value) - datetime.now(UTC)).total_seconds()
+        except TypeError, ValueError:
+            return default
+    return min(max(seconds, 0.0), maximum)
+
+
 def error_text(body: Any, fallback: str) -> str:
     """Laravel validation errors ({"message", "errors": {field: [..]}}) as one line."""
     if not isinstance(body, dict):
@@ -260,7 +279,6 @@ class AmigosShare:
     minimum_book_size = 1024 * 1024
     minimum_adult_size = 100 * 1024 * 1024
     upload_timeout = 180.0
-    max_detail_lookups = 5
 
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
@@ -369,7 +387,7 @@ class AmigosShare:
         profile = profiles.get(key)
         return cast(Profile, profile) if isinstance(profile, dict) else None
 
-    def get_name(self, meta: Meta, lookup: Mapping[str, Any] | None = None) -> str:
+    async def get_name(self, meta: Meta, lookup: Mapping[str, Any] | None = None) -> str:
         """The post title is the work's name (rule 6), not the release name, which stays in the files."""
         if meta.manual_name is not None:
             return meta.manual_name.strip()
@@ -393,25 +411,25 @@ class AmigosShare:
 
     def get_audio_channels(self, meta: Meta) -> str:
         """Portuguese audio decides the audio type (rule 16.12); without it, Portuguese subtitles mean "Legendado"."""
-        audio = {str(language).casefold() for language in meta.audio_languages or []}
-        has_portuguese = bool(audio & PORTUGUESE)
-        others = audio - PORTUGUESE
-        if has_portuguese:
+        # Names and codes ("Portuguese", "por", "pt-BR") all reduce to one language code.
+        audio = {language_code(str(language)) or str(language).casefold() for language in meta.audio_languages or []}
+        if "pt" in audio:
             if language_code(meta.original_language or "") == "pt":
                 return "Nacional"
+            others = audio - {"pt"}
             if len(others) > 1:
                 return "Multi-Audio"
             return "Dual-Audio" if others else "Dublado"
+        return "Legendado" if self.has_portuguese_subtitles(meta) else "Original"
+
+    def has_portuguese_subtitles(self, meta: Meta) -> bool:
         subtitles = meta.subtitle_languages if isinstance(meta.subtitle_languages, list) else [meta.subtitle_languages or ""]
-        if any(str(language).casefold() in PORTUGUESE for language in subtitles):
-            return "Legendado"
-        return "Original"
+        return any(language_code(str(language)) == "pt" for language in subtitles)
 
     async def get_subtitle(self, meta: Meta, site_value: str | None) -> str:
         if site_value in ("embedded", "separate", "none"):
             return site_value
-        subtitles = meta.subtitle_languages if isinstance(meta.subtitle_languages, list) else [meta.subtitle_languages or ""]
-        if any(str(language).casefold() in PORTUGUESE for language in subtitles):
+        if self.has_portuguese_subtitles(meta):
             return "embedded"
         return "separate" if await self.common.has_portuguese_external_subtitle(meta) else "none"
 
@@ -589,20 +607,17 @@ class AmigosShare:
         if images:
             return images
 
-        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
-            for index, image in enumerate(meta.image_list or []):
-                url = str(image.get("raw_url") or image.get("img_url") or "")
-                if len(images) >= limit or not is_public_http_url(url):
-                    continue
-                try:
-                    response = await client.get(url)
-                except httpx.HTTPError:
-                    continue
-                if response.status_code == 200 and len(response.content) <= max_bytes and is_valid_image_bytes(response.content):
-                    content_type = response.headers.get("Content-Type", "image/jpeg").split(";")[0]
-                    if content_type in IMAGE_TYPES.values():
-                        extension = next(suffix for suffix, kind in IMAGE_TYPES.items() if kind == content_type)
-                        images.append((f"screenshot_{index + 1}{extension}", response.content, content_type))
+        for index, image in enumerate(meta.image_list or []):
+            if len(images) >= limit:
+                break
+            # Checks every redirect target and stops reading at the artwork size limit.
+            content = await download_public_image(str(image.get("raw_url") or image.get("img_url") or ""))
+            if not content:
+                continue
+            with Image.open(BytesIO(content)) as decoded:
+                extension = REMOTE_IMAGE_FORMATS.get(str(decoded.format))
+            if extension:
+                images.append((f"screenshot_{index + 1}{extension}", content, IMAGE_TYPES[extension]))
         return images
 
     async def upload_screenshots(self, images: list[tuple[str, bytes, str]]) -> list[str]:
@@ -613,7 +628,7 @@ class AmigosShare:
                 response = await self.session.post(f"{self.base_url}/torrents/screenshots", files={"image": (name, content, content_type)}, headers=self.ajax_headers())
                 if response.status_code != 429:
                     break
-                await asyncio.sleep(min(float(response.headers.get("Retry-After") or 5), 60))
+                await asyncio.sleep(retry_after_seconds(response.headers.get("Retry-After")))
             try:
                 body: Any = response.json()
             except ValueError:
@@ -688,7 +703,7 @@ class AmigosShare:
         anonymous = bool(meta.anon) or bool(self.tracker_config.get("anon", False))
         data: dict[str, Any] = {
             "category_id": str(await self.get_category_id(meta)),
-            "name": self.get_name(meta, lookup),
+            "name": await self.get_name(meta, lookup),
             "year": str(year or ""),
             "anonymous": "1" if anonymous else "0",
             "description": await self.build_description(meta),
@@ -719,7 +734,7 @@ class AmigosShare:
         category_id = await payload_preview.unless_asked(self.get_category_id(meta))
         data: dict[str, Any] = {
             "category_id": category_id if isinstance(category_id, payload_preview.Later) else str(category_id),
-            "name": payload_preview.Later(payload_preview.FROM_TRACKER_NOTE) if video and meta.manual_name is None else self.get_name(meta),
+            "name": payload_preview.Later(payload_preview.FROM_TRACKER_NOTE) if video and meta.manual_name is None else await self.get_name(meta),
             "year": str(meta.year or ""),
             "anonymous": "1" if anonymous else "0",
         }
@@ -823,10 +838,11 @@ class AmigosShare:
                 break
             await asyncio.sleep(1)
 
-        # Without a resolution the duplicate check would drop the result, so read it from the torrent's files.
+        # Without a resolution the duplicate check would drop a video result, so read it from the torrent's files.
+        # Video searches are by IMDb ID, which keeps the number of results (and of these lookups) small.
         lookups = 0
         for duplicate in duplicates:
-            if duplicate.pop("has_resolution") or lookups >= self.max_detail_lookups:
+            if duplicate.pop("has_resolution") or meta.category not in ("MOVIE", "TV"):
                 continue
             if lookups:
                 await asyncio.sleep(1)

@@ -228,7 +228,7 @@ async def test_generic_poster_url_is_normalized_and_retained(tmp_path: Path) -> 
     Image.new("RGB", (32, 48), "green").save(source)
     meta = Meta(base_dir=str(tmp_path), uuid="url-artwork", explicit_poster="https://images.example/poster.jpg")
 
-    with patch("src.artwork._download_public_image", new=AsyncMock(return_value=source.read_bytes())):
+    with patch("src.artwork.download_public_image", new=AsyncMock(return_value=source.read_bytes())):
         await prepare_artwork(meta)
 
     assert meta.artwork_url == "https://images.example/poster.jpg"

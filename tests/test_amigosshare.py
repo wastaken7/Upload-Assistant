@@ -5,6 +5,7 @@ import runpy
 from io import BytesIO
 from pathlib import Path
 from typing import Any
+from unittest.mock import AsyncMock
 
 import httpx
 import pytest
@@ -142,7 +143,7 @@ def test_site_choices_prefer_imdb_for_language_and_take_the_first_mediainfo_matc
 )
 def test_video_names_follow_the_site_title(tmp_path: Path, values: dict[str, Any], expected: str) -> None:
     meta = _movie_meta(tmp_path, **values)
-    assert AmigosShare(CONFIG).get_name(meta, {"title": "Fictional Film (Original Film)"}) == expected
+    assert asyncio.run(AmigosShare(CONFIG).get_name(meta, {"title": "Fictional Film (Original Film)"})) == expected
 
 
 @pytest.mark.parametrize(
@@ -155,7 +156,7 @@ def test_video_names_follow_the_site_title(tmp_path: Path, values: dict[str, Any
     ],
 )
 def test_other_names_follow_rule_6_4(values: dict[str, Any], expected: str) -> None:
-    assert AmigosShare(CONFIG).get_name(Meta(**values)) == expected
+    assert asyncio.run(AmigosShare(CONFIG).get_name(Meta(**values))) == expected
 
 
 @pytest.mark.parametrize(
@@ -167,6 +168,8 @@ def test_other_names_follow_rule_6_4(values: dict[str, Any], expected: str) -> N
         ({"audio_languages": ["Portuguese"], "original_language": "pt"}, "Nacional"),
         ({"audio_languages": ["English"], "subtitle_languages": ["Portuguese"]}, "Legendado"),
         ({"audio_languages": ["English"], "subtitle_languages": []}, "Original"),
+        ({"audio_languages": ["por", "eng"]}, "Dual-Audio"),
+        ({"audio_languages": ["eng"], "subtitle_languages": ["pt-BR"]}, "Legendado"),
     ],
 )
 def test_audio_type(tmp_path: Path, values: dict[str, Any], expected: str) -> None:
@@ -235,6 +238,44 @@ def test_results_without_resolution_read_the_files_of_the_torrent(tmp_path: Path
     assert dupes[0]["name"] == "Fictional Show - S01 2020 WEB-DL 1080p"
     assert dupes[0]["files"] == ["Fictional.Show.S01E01.1080p.WEB-DL.mkv", "Fictional.Show.S01E02.1080p.WEB-DL.mkv"]
     assert dupes[0]["file_count"] == 8
+
+
+def test_every_result_without_resolution_is_read(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    items = [{"id": index, "name": f"Fictional Film {index}", "size": 1000, "badges": []} for index in range(8)]
+    monkeypatch.setattr(asc_module.asyncio, "sleep", AsyncMock())
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/torrents":
+            return httpx.Response(200, text=_page_html("torrents/index", {"torrents": {"data": items}}))
+        return httpx.Response(200, text=_page_html("torrents/show", {"files": {"data": [{"path": "Fictional.Film.1080p.mkv"}]}}))
+
+    tracker, requests = _tracker(handler)
+    dupes = asyncio.run(tracker.search_existing(_movie_meta(tmp_path)))
+    assert len(requests) == 9
+    assert all(dupe["name"].endswith("1080p") for dupe in dupes)
+
+
+def test_remote_screenshots_use_the_checked_download(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    downloads: list[str] = []
+
+    async def fake_download(url: str) -> bytes | None:
+        downloads.append(url)
+        return _png() if url.endswith("good.png") else None
+
+    monkeypatch.setattr(asc_module, "manifest_files", lambda *_args: [])
+    monkeypatch.setattr(asc_module, "download_public_image", fake_download)
+    meta = Meta(category="GAME", image_list=[{"raw_url": "https://img.example/bad.png"}, {"raw_url": "https://img.example/good.png"}])
+    images = asyncio.run(AmigosShare(CONFIG).get_screenshots(meta, 6))
+    assert downloads == ["https://img.example/bad.png", "https://img.example/good.png"]
+    assert [(name, content_type) for name, _content, content_type in images] == [("screenshot_2.png", "image/png")]
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [(None, 5.0), ("12", 12.0), ("600", 60.0), ("-3", 0.0), ("not a date", 5.0), ("Wed, 21 Oct 2015 07:28:00 GMT", 0.0)],
+)
+def test_retry_after_accepts_seconds_and_http_dates(value: str | None, expected: float) -> None:
+    assert asc_module.retry_after_seconds(value) == expected
 
 
 @pytest.mark.parametrize(("dimensions", "expected"), [("3840 × 1600", "2160p"), ("1920 × 800", "1080p"), ("1280 × 536", "720p"), ("720 × 576", "576p"), ("", "")])

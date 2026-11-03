@@ -108,7 +108,7 @@ def _find_local_artwork_sources(media_path: str) -> dict[str, Path]:
     return {kind: min(matches, key=lambda item: item[0])[1] for kind, matches in candidates.items() if matches}
 
 
-async def _download_public_image(url: str) -> bytes | None:
+async def download_public_image(url: str) -> bytes | None:
     """Download an explicit image without following redirects to private hosts."""
     current_url = url
     try:
@@ -210,9 +210,9 @@ async def prepare_artwork(meta: Meta) -> None:
         if source_path is not None and source_path.is_file():
             source = source_path
         elif value and urlparse(value).scheme in {"http", "https"}:
-            source = await _download_public_image(value)
+            source = await download_public_image(value)
         elif kind == "poster" and is_public_http_url(meta.artwork_url):
-            source = await _download_public_image(meta.artwork_url)
+            source = await download_public_image(meta.artwork_url)
         elif value:
             logger.warning(f"[yellow]{input_name.replace('_', ' ')} must be an existing image file or public HTTP(S) URL; ignoring it.[/yellow]")
             continue
