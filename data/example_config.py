@@ -673,7 +673,7 @@ config: dict[str, Any] = {
             # The torrent is downloaded from the site after the upload; the announce URL (with your passkey) is
             # used for the private torrent that is sent, and is seeded if that download fails.
             "announce_url": "",
-            "anon": False,
+            "anon": True,
             # If True, the script performs a basic rules compliance check (e.g., file types, REMUX dubbing, AV1 encodes).
             # This does not cover all tracker rules. Set to False to disable.
             "check_for_rules": True,
@@ -1392,7 +1392,7 @@ config: dict[str, Any] = {
             "link_dir_name": "",
             "api_key": "",
             "announce_url": "https://flood.st/announce/Custom_Announce_URL",
-            "anon": False,
+            "anon": True,
         },
         "FUNFILE": {
             "cli_alias": "FF",
@@ -2946,7 +2946,7 @@ config: dict[str, Any] = {
             # "use_for_search": False, set to True if you want to use RocketHD for automatic ID searching or description parsing
             "use_for_search": False,
             "api_key": "",
-            "anon": False,
+            "anon": True,
             # Use German title instead of English title, if available
             "use_german_title": False,
         },
@@ -3331,7 +3331,7 @@ config: dict[str, Any] = {
             "use_for_search": False,
             "api_key": "",
             "announce_url": "",
-            "anon": False,
+            "anon": True,
             # Send uploads to the moderation queue for staff review and approval
             "modq": False,
         },
@@ -3653,7 +3653,7 @@ config: dict[str, Any] = {
             # Cookies required (export from https://zmpt.cc/ to data/cookies/ZMPT.txt).
             # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md#how-to-export-cookies
             "announce_url": "",
-            "anon": False,
+            "anon": True,
         },
         "MANUAL": {
             "cli_alias": "MANUAL",
