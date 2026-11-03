@@ -233,8 +233,11 @@ class FileIPlay:
 
     async def generate_description(self, meta: Meta, attach_screenshots: bool) -> str:
         builder = DescriptionBuilder(self.tracker, self.config)
+        # The TMDB logo is left out unless the FILEIPLAY config itself sets add_logo.
+        add_logo = str(self.tracker_config.get("add_logo", "")).strip().lower() in ("true", "1", "yes", "on")
         return await builder.general_description_generator(
             meta,
+            logo=add_logo,
             mediainfo=False,
             screenshots=not attach_screenshots,
             signature=f"[center][url=https://github.com/wastaken7/Upload-Assistant]{meta.ua_signature}[/url][/center]",

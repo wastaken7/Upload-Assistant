@@ -2740,6 +2740,9 @@ class DescriptionBuilder:
             description = bbcode.remove_list(description)
             description = description.strip()
 
+        if tracker == "FILEIPLAY":
+            description = bbcode.remove_img_resize(description)
+
         if tracker == "FUNFILE":
             description = description.replace("[user]", "").replace("[/user]", "")
             description = description.replace("[align=left]", "").replace("[/align]", "")

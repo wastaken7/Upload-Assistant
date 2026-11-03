@@ -391,3 +391,26 @@ def test_additional_checks_require_both_keys() -> None:
     assert asyncio.run(FileIPlay({"TRACKERS": {"FILEIPLAY": {}}}).get_additional_checks(meta)) is False
     assert asyncio.run(FileIPlay({"TRACKERS": {"FILEIPLAY": {"api_key": "test-token"}}}).get_additional_checks(meta)) is False
     assert asyncio.run(FileIPlay(CONFIG).get_additional_checks(meta)) is True
+
+
+@pytest.mark.parametrize(("tracker_config", "expected"), [({}, False), ({"add_logo": False}, False), ({"add_logo": True}, True), ({"add_logo": "true"}, True)])
+def test_description_leaves_out_logo_unless_enabled(monkeypatch: pytest.MonkeyPatch, tracker_config: dict[str, Any], expected: bool) -> None:
+    captured: dict[str, Any] = {}
+
+    async def fake_generator(_self: Any, _meta: Meta, **kwargs: Any) -> str:
+        captured.update(kwargs)
+        return ""
+
+    monkeypatch.setattr(fileiplay_module.DescriptionBuilder, "general_description_generator", fake_generator)
+    config = {"DEFAULT": {"add_logo": True}, "TRACKERS": {"FILEIPLAY": {**CONFIG["TRACKERS"]["FILEIPLAY"], **tracker_config}}}
+
+    asyncio.run(FileIPlay(config).generate_description(Meta(category="MOVIE", name="Fictional Film"), attach_screenshots=False))
+
+    assert captured["logo"] is expected
+
+
+def test_description_drops_image_resizes() -> None:
+    builder = fileiplay_module.DescriptionBuilder("FILEIPLAY", CONFIG)
+    description = "[url=https://img.example/view/1][img=350]https://img.example/1.png[/img][/url]"
+
+    assert builder.tracker_specific_formats("FILEIPLAY", description) == "[url=https://img.example/view/1][img]https://img.example/1.png[/img][/url]"

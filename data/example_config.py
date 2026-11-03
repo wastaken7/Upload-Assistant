@@ -1375,6 +1375,8 @@ config: dict[str, Any] = {
             # and to download the published .torrent, which carries your passkey.
             "torznab_api_key": "",
             "anon": True,
+            # The TMDB logo is left out of FileIPlay descriptions unless this is set to True here.
+            "add_logo": False,
         },
         "FILELIST": {
             "cli_alias": "FL",
