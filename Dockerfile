@@ -1,4 +1,4 @@
-FROM python:3.14
+FROM python:3.15
 
 # ── System dependencies ──────────────────────────────────────────────
 RUN apt-get update && \
