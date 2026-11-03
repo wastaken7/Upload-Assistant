@@ -73,11 +73,13 @@ python upload.py "/path/to/content" --trackers yourtracker
 
 ## Updating
 
-Run the installer again:
+Run the installer again from your checkout, with the same `--ua-dir` you installed with:
 
 ```bash
-./scripts/install-seedbox.sh
+./scripts/install-seedbox.sh --ua-dir "$PWD"
 ```
+
+If you installed into the default `~/tools/ua`, omit `--ua-dir`.
 
 An existing `.venv` on Python 3.14 or newer is kept. To move it to the default Python version, rerun the installer with `--force-update`.
 
