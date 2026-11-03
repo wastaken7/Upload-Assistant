@@ -13,7 +13,7 @@ import aiofiles
 import httpx
 from PIL import Image
 
-from src import payload_preview
+from src import language_names, payload_preview
 from src.cogs.redaction import Redaction
 from src.console import logger
 from src.meta import Meta
@@ -278,7 +278,7 @@ class Suio:
         with contextlib.suppress(Exception):
             import langcodes
 
-            orig_name = langcodes.Language.get(orig_code).display_name().lower()
+            orig_name = language_names.display_name(langcodes.Language.get(orig_code)).lower()
             if orig_name in lang_str or lang_str in orig_name:
                 return True
         # Common code to name mapping fallbacks

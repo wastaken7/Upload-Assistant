@@ -19,6 +19,7 @@ from bs4 import BeautifulSoup, Comment, NavigableString, Tag
 from jinja2 import Template
 from langcodes.tag_parser import LanguageTagError
 
+from src import language_names
 from src.audible import build_audible_author_url, resolve_audible_url
 from src.bbcode import BBCODE
 from src.bluray_com import ensure_release_subheader
@@ -766,7 +767,7 @@ class DescriptionBuilder:
                 return ""
             try:
                 parsed = langcodes.Language.get(language)
-                name = parsed.language_name("en")
+                name = language_names.language_name(parsed, "en")
                 return f"{name} ({parsed.territory})" if parsed.territory else name
             except LanguageTagError:
                 return language
