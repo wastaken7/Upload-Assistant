@@ -1312,6 +1312,7 @@ const trackerDefaultOverrideKeys = new Set([
 const trackerNameMap = {
   AITHER: "Aither",
   ALPHARATIO: "AlphaRatio",
+  AMIGOSSHARE: "Amigos Share Club",
   ANTHELION: "Anthelion",
   ASIANCINEMA: "AsianCinema",
   AVISTAZ: "AvistaZ",

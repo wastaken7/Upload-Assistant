@@ -556,7 +556,7 @@ config: dict[str, Any] = {
         # Note: Description layout settings (like screenshot grids, logos, etc.) can be overridden per-tracker.
         # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/description-builder.md
         # Available trackers:
-        #   1PTBA, AITHER, ALPHARATIO, ANTHELION, ASIANCINEMA, AVISTAZ, BEYONDHD, BITHDTV, BITPORN, BJSHARE, BLUTOPIA,
+        #   1PTBA, AITHER, ALPHARATIO, AMIGOSSHARE, ANTHELION, ASIANCINEMA, AVISTAZ, BEYONDHD, BITHDTV, BITPORN, BJSHARE, BLUTOPIA,
         #   BRASILTRACKER, BROADCASTHENET, CAPYBARABR, CATHODERAYTUBE, CINEMATIK, CINEMAZ, CURUPIRA, CZTEAM, DARKPEERS, DESITORRENTS,
         #   DIGITALCORE, DIRTYBYTES, DREADVAULT, DRUNKENSLUG, EMUWAREZ, EXOTICAZ, FILEIPLAY, FILELIST, FLOOD, FUNFILE, GREATPOSTERWALL, HAWKEUNO, HDBITS, HDSPACE, HDTORRENTS, HOMIEHELPDESK,
         #   IMMORTALSEED, INFINITYHD, IPTORRENTS, ITATORRENTS, LAJIDUI, LASTDIGITALUNDERGROUND, LATTEAM, LEMONHD, LOCADORA, LONGPT, LST,
@@ -662,6 +662,21 @@ config: dict[str, Any] = {
             "username": "",
             "password": "",
             "announce_url": "",
+            "inject_delay": 0,
+        },
+        "AMIGOSSHARE": {
+            "cli_alias": "ASC",
+            # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
+            "link_dir_name": "",
+            # Cookies required (export from https://amigos-share.club to data/cookies/AMIGOSSHARE.txt).
+            # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md#how-to-export-cookies
+            # The torrent is downloaded from the site after the upload; the announce URL (with your passkey) is
+            # used for the private torrent that is sent, and is seeded if that download fails.
+            "announce_url": "",
+            "anon": False,
+            # If True, the script performs a basic rules compliance check (e.g., file types, REMUX dubbing, AV1 encodes).
+            # This does not cover all tracker rules. Set to False to disable.
+            "check_for_rules": True,
             "inject_delay": 0,
         },
         "ANTHELION": {
