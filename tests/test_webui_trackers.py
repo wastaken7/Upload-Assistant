@@ -98,6 +98,17 @@ def test_configured_trackers_require_complete_setup_independently_of_defaults() 
     assert configured == {"BLUTOPIA"}
 
 
+def test_tracker_setup_requires_torznab_key_when_the_tracker_has_one() -> None:
+    example_trackers = {"FILEIPLAY": {"api_key": "", "torznab_api_key": "", "anon": True}}
+    supported_trackers = {"FILEIPLAY": object()}
+
+    partial = server._configured_tracker_names({"FILEIPLAY": {"api_key": "token", "torznab_api_key": ""}}, example_trackers, supported_trackers)
+    complete = server._configured_tracker_names({"FILEIPLAY": {"api_key": "token", "torznab_api_key": "key"}}, example_trackers, supported_trackers)
+
+    assert partial == set()
+    assert complete == {"FILEIPLAY"}
+
+
 def test_tracker_optional_setup_keys_do_not_block_valid_api_credentials() -> None:
     configured = server._configured_tracker_names(
         {
