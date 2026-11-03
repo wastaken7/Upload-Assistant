@@ -82,6 +82,16 @@ UPLOAD_TOOL_SIGNATURES: dict[str, tuple[str, ...]] = {
 }
 
 
+def _quoted(core: str) -> str:
+    """Match core with its inline formatting, and its own quote block when it fills one."""
+    return rf"\[quote\]\s*{_INLINE_OPEN}(?:{core}){_INLINE_CLOSE}\s*\[/quote\]|{_INLINE_OPEN}(?:{core}){_INLINE_CLOSE}"
+
+
+# Notes that the source upload's screenshots were tonemapped. A run that tonemaps
+# adds its own tonemapped_header, so an imported note is only a duplicate.
+TONEMAPPED_NOTES: tuple[str, ...] = (_quoted(r"Foi\s+feito\s+o\s+mapeamento\s+de\s+tonalidade\s+nas\s+screenshots\b[^\[]*?\bcores\s+reais\s+do\s+v[íi]deo\.?"),)
+
+
 # Bold - KEEP
 # Italic - KEEP
 # Underline - KEEP
@@ -630,8 +640,8 @@ class BBCODE:
         return desc, imagelist
 
     def remove_known_boilerplate(self, desc: str) -> str:
-        """Remove release group boilerplate and upload tool signatures."""
-        for patterns in (*RELEASE_GROUP_BOILERPLATE.values(), *UPLOAD_TOOL_SIGNATURES.values()):
+        """Remove release group boilerplate, upload tool signatures and tonemapped notes."""
+        for patterns in (*RELEASE_GROUP_BOILERPLATE.values(), *UPLOAD_TOOL_SIGNATURES.values(), TONEMAPPED_NOTES):
             for pattern in patterns:
                 desc = re.sub(pattern, "", desc, flags=re.IGNORECASE)
         return desc
