@@ -6370,16 +6370,29 @@ def config_test_torrent_client():
         if client_type == "qbit":
             proxy_url = str(client_config.get("qui_proxy_url", "")).strip()
             verify_certificate = bool(client_config.get("VERIFY_WEBUI_CERTIFICATE", True))
+            version: str | None = None
+            proxy_failure = ""
             if proxy_url:
                 httpx = _dynamic_import("httpx")
-                response = httpx.get(
-                    f"{proxy_url.rstrip('/')}/api/v2/app/version",
-                    timeout=10.0,
-                    verify=verify_certificate,
-                )
-                response.raise_for_status()
-                version = str(response.text).strip().strip('"')
-            else:
+                try:
+                    response = httpx.get(
+                        f"{proxy_url.rstrip('/')}/api/v2/app/version",
+                        timeout=10.0,
+                        verify=verify_certificate,
+                    )
+                    response.raise_for_status()
+                    version = str(response.text).strip().strip('"')
+                except httpx.HTTPError as error:
+                    from src.torrent_clients.qbittorrent import has_direct_qbit_auth
+
+                    status_code = getattr(getattr(error, "response", None), "status_code", None)
+                    # The uploader treats HTTP 404 as an answer from qBittorrent and does not fall back.
+                    if status_code == 404 or not has_direct_qbit_auth(client_config):
+                        raise
+                    # Report the same fallback the uploader uses, naming the error type only,
+                    # since httpx messages can contain the proxy key.
+                    proxy_failure = f"HTTP {status_code}" if status_code else type(error).__name__
+            if version is None:
                 qbittorrentapi = _dynamic_import("qbittorrentapi")
                 qbit_kwargs: dict[str, object] = {
                     "host": str(client_config.get("qbit_url", "")),
@@ -6402,6 +6415,8 @@ def config_test_torrent_client():
                     version_value = version_value()
                 version = str(version_value)
             message = f"Connected to qBittorrent {version}" if version else "Connected to qBittorrent"
+            if proxy_failure:
+                message = f"qui proxy failed ({proxy_failure}); {message} through the WebUI credentials fallback"
         elif client_type == "rtorrent":
             httpx = _dynamic_import("httpx")
             xmlrpc_client = _dynamic_import("xmlrpc.client")

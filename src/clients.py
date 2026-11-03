@@ -18,6 +18,7 @@ from src.meta import Meta
 from src.stats import record_event_async
 from src.torrent_clients import DelugeClientMixin, QbittorrentClientMixin, RtorrentClientMixin, TransmissionClientMixin
 from src.torrent_clients.path_utils import coerce_str_list, is_path_under
+from src.torrent_clients.qbittorrent import QbitAccess, qui_request
 from src.torrent_manifest import TorrentManifest
 from src.torrent_policy import HDBITS_POLICY, TorrentStats, generic_reuse_allowed
 from src.torrentcreate import DISC_EXCLUDE_GLOBS, SUBTITLE_EXTENSIONS
@@ -436,6 +437,8 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
         qbt_client: qbittorrentapi.Client | None = None
         proxy_url: str | None = None
         candidates: list[str] = []
+        # Shared by the .torrent exports so a qui failure switches them all to the WebUI credentials.
+        qui_access = QbitAccess(client, str(client.get("qui_proxy_url") or "").rstrip("/"))
 
         # Iterate through pre-specified hashes
         for hash_key in ["torrenthash", "ext_torrenthash"]:
@@ -452,21 +455,23 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                         return None
 
                     try:
-                        proxy_url = client.get("qui_proxy_url")
-                        if proxy_url:
-                            qbt_proxy_url = proxy_url.rstrip("/")
+                        torrent_file_content = None
+                        if qui_access.proxy_url:
                             async with httpx.AsyncClient() as session:
                                 try:
-                                    response = await session.post(f"{qbt_proxy_url}/api/v2/torrents/export", data={"hash": hash_value_str})
-                                    if response.status_code == 200:
-                                        torrent_file_content = response.content
-                                    else:
-                                        logger.error(f"[red]Failed to export torrent via proxy: {response.status_code}")
-                                        continue
+                                    result = await qui_request(session.post(f"{qui_access.proxy_url}/api/v2/torrents/export", data={"hash": hash_value_str}))
                                 except Exception as e:
                                     logger.error(f"[red]Error exporting torrent via proxy: {e}")
                                     continue
-                        else:
+                            if isinstance(result, str):
+                                if not await self._fall_back_from_qui(qui_access, f"export torrent {hash_value_str}", result):
+                                    continue
+                            elif result.status_code == 200:
+                                torrent_file_content = result.content
+                            else:
+                                logger.error(f"[red]Failed to export torrent via proxy: {result.status_code}")
+                                continue
+                        if not qui_access.proxy_url:
                             potential_qbt_client = await self.init_qbittorrent_client(client)
                             if not potential_qbt_client:
                                 continue
@@ -555,21 +560,22 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                         torrent_file_content: bytes | None = None
 
                         try:
-                            proxy_url = client.get("qui_proxy_url")
-                            if proxy_url:
-                                qbt_proxy_url = proxy_url.rstrip("/")
+                            if qui_access.proxy_url:
                                 async with httpx.AsyncClient() as session:
                                     try:
-                                        response = await session.post(f"{qbt_proxy_url}/api/v2/torrents/export", data={"hash": found_hash})
-                                        if response.status_code == 200:
-                                            torrent_file_content = response.content
+                                        result = await qui_request(session.post(f"{qui_access.proxy_url}/api/v2/torrents/export", data={"hash": found_hash}))
+                                        if isinstance(result, str):
+                                            if not await self._fall_back_from_qui(qui_access, f"export torrent {found_hash}", result):
+                                                found_hash = None
+                                        elif result.status_code == 200:
+                                            torrent_file_content = result.content
                                         else:
-                                            logger.error(f"[red]Failed to export torrent via proxy: {response.status_code}")
+                                            logger.error(f"[red]Failed to export torrent via proxy: {result.status_code}")
                                             found_hash = None
                                     except Exception as e:
                                         logger.error(f"[red]Error exporting torrent via proxy: {e}")
                                         found_hash = None
-                            else:
+                            if found_hash and not qui_access.proxy_url:
                                 # Reuse or create qbt_client if needed
                                 if qbt_client is None:
                                     qbt_client = await self.init_qbittorrent_client(client)
