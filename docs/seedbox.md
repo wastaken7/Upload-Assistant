@@ -7,7 +7,7 @@ This guide covers installing Upload Assistant on a Linux box or seedbox where yo
 The bundled installer script:
 
 1. Installs `pyenv` if needed.
-2. Installs Python `3.14.0` by default.
+2. Installs Python `3.15.0` by default. Python 3.14 is still supported.
 3. Uses the current checkout if you pass `--ua-dir`, or clones/updates Upload Assistant in `~/tools/ua` by default.
 4. Creates `.venv`.
 5. Installs the base dependencies from `requirements.txt`.
@@ -30,7 +30,7 @@ If you just want the installer to create or update a separate checkout in `~/too
 
 ```text
 --ua-dir PATH           Installation directory (default: ~/tools/ua)
---python VERSION        Python version for pyenv (default: 3.14.0)
+--python VERSION        Python version for pyenv (default: 3.15.0)
 --skip-pyenv-install    Fail instead of installing pyenv automatically
 --force-update          Recreate .venv and reinstall packages
 -h, --help              Show this help
@@ -73,11 +73,15 @@ python upload.py "/path/to/content" --trackers yourtracker
 
 ## Updating
 
-Run the installer again:
+Run the installer again from your checkout, with the same `--ua-dir` you installed with:
 
 ```bash
-./scripts/install-seedbox.sh
+./scripts/install-seedbox.sh --ua-dir "$PWD"
 ```
+
+If you installed into the default `~/tools/ua`, omit `--ua-dir`.
+
+An existing `.venv` on Python 3.14 or newer is kept. To move it to the default Python version, rerun the installer with `--force-update`.
 
 Or update manually:
 
