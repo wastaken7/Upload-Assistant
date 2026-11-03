@@ -15,6 +15,17 @@ from src.meta import Meta
 MEDIAINFO_SLOW_NOTICE_SECONDS = 5.0
 
 
+def is_unmapped_dvd_track(track: dict[str, Any]) -> bool:
+    """Return True for a DVD IFO stream that no program chain plays.
+
+    Some authoring tools declare all 8 audio and 32 subpicture slots in the
+    IFO. MediaInfo lists every slot but only gives an ID to the streams a
+    program chain enables, so a track without an ID is not on the disc.
+    """
+    track_id = track.get("ID")
+    return not track_id or isinstance(track_id, dict)
+
+
 async def mi_resolution(
     res: str,
     guess: dict[str, Any],
@@ -97,7 +108,7 @@ async def export_info(
     isdir: bool,  # noqa: ARG001 - retained for existing callers
     folder_id: str,
     base_dir: str,
-    is_dvd: bool = False,  # noqa: ARG001 - retained for existing callers
+    is_dvd: bool = False,
 ) -> dict[str, Any]:
     def filter_mediainfo(data: dict[str, Any]) -> dict[str, Any]:
         media = data.get("media")
@@ -123,6 +134,8 @@ async def export_info(
 
         for track in tracks:
             track_type = track.get("@type")
+            if is_dvd and track_type in ("Audio", "Text") and is_unmapped_dvd_track(track):
+                continue
             if track_type == "General":
                 general_track = {
                     "@type": track_type,
