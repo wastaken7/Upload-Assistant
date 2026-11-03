@@ -5233,6 +5233,7 @@ def torrent_clients():
 _TRACKER_CONFIGURATION_KEYS = frozenset(
     {
         "api_key",
+        "torznab_api_key",
         "announce_url",
         "my_announce_url",
         "username",
@@ -5251,6 +5252,7 @@ _TRACKER_CONFIGURATION_KEYS = frozenset(
 _TRACKER_REQUIRED_SETUP_KEYS = (
     "ApiUser",
     "api_key",
+    "torznab_api_key",
     "announce_url",
     "my_announce_url",
     "username",
