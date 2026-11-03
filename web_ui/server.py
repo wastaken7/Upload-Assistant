@@ -6385,11 +6385,12 @@ def config_test_torrent_client():
                 except httpx.HTTPError as error:
                     from src.torrent_clients.qbittorrent import has_direct_qbit_auth
 
-                    if not has_direct_qbit_auth(client_config):
+                    status_code = getattr(getattr(error, "response", None), "status_code", None)
+                    # The uploader treats HTTP 404 as an answer from qBittorrent and does not fall back.
+                    if status_code == 404 or not has_direct_qbit_auth(client_config):
                         raise
                     # Report the same fallback the uploader uses, naming the error type only,
                     # since httpx messages can contain the proxy key.
-                    status_code = getattr(getattr(error, "response", None), "status_code", None)
                     proxy_failure = f"HTTP {status_code}" if status_code else type(error).__name__
             if version is None:
                 qbittorrentapi = _dynamic_import("qbittorrentapi")

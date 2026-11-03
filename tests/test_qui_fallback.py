@@ -138,3 +138,49 @@ def test_wait_falls_back_to_webui_credentials(monkeypatch):
     assert session.calls == 1
     assert waiter.proxy_url is None
     qbit.return_value.torrents_info.assert_called_once_with(hashes="abc123")
+
+
+@pytest.fixture
+def webui_client_test(monkeypatch):
+    import web_ui.server as server
+
+    for guard in ("_is_authenticated", "_verify_csrf_header", "_verify_same_origin", "_is_ip_allowed"):
+        monkeypatch.setattr(server, guard, lambda *args: True)
+    qbit = MagicMock()
+    qbit.return_value.app_version.return_value = "v5.1.0"
+    monkeypatch.setattr("qbittorrentapi.Client", qbit)
+    server.limiter.reset()
+
+    def run(status_code):
+        def fake_get(url, **_kwargs):
+            return httpx.Response(status_code, text='"v5.1.0"', request=httpx.Request("GET", url))
+
+        monkeypatch.setattr(httpx, "get", fake_get)
+        payload = {"name": "qbittorrent", "config": dict(WEBUI_CLIENT, torrent_client="qbit", qui_proxy_url=PROXY_URL)}
+        with server.app.test_request_context("/api/config_test_torrent_client", method="POST", json=payload):
+            result = server.config_test_torrent_client()
+        response, status = result if isinstance(result, tuple) else (result, 200)
+        return response.get_json(), status, qbit
+
+    yield run
+    server.limiter.reset()
+
+
+def test_webui_connection_test_reports_the_webui_fallback(webui_client_test):
+    data, status, qbit = webui_client_test(502)
+
+    assert status == 200
+    assert data["success"] is True
+    assert "qui proxy failed (HTTP 502)" in data["message"]
+    assert "fictionalproxykey123" not in data["message"]
+    qbit.assert_called_once()
+
+
+def test_webui_connection_test_does_not_fall_back_on_404(webui_client_test):
+    # The uploader treats 404 as a qBittorrent answer, so a wrong proxy path must fail the test.
+    data, status, qbit = webui_client_test(404)
+
+    assert status == 400
+    assert data["success"] is False
+    assert "not found" in data["error"]
+    qbit.assert_not_called()
