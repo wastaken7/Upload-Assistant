@@ -203,6 +203,8 @@ def format_description(description: str, base_url: str) -> str:
     description = re.sub(r"\[img(=[^\]]*)?\](.*?)\[/img\]", keep_image, description, flags=re.IGNORECASE | re.DOTALL)
     description = re.sub(r"\[url=[^\]]*\]\s*\[/url\]", "", description, flags=re.IGNORECASE)
     description = re.sub(r"\[h([1-6])\](.*?)\[/h\1\]", lambda m: f"[size={sizes[m.group(1)]}][b]{m.group(2)}[/b][/size]", description, flags=re.IGNORECASE | re.DOTALL)
+    # The site only accepts sizes from 8 to 36.
+    description = re.sub(r"\[size=(\d+)\]", lambda m: f"[size={min(max(int(m.group(1)), 8), 36)}]", description, flags=re.IGNORECASE)
     description = re.sub(r"\[align=center\](.*?)\[/align\]", r"[center]\1[/center]", description, flags=re.IGNORECASE | re.DOTALL)
     description = re.sub(r"\[pre\](.*?)\[/pre\]", r"[code]\1[/code]", description, flags=re.IGNORECASE | re.DOTALL)
     description = re.sub(r"\[/td\]", " ", description, flags=re.IGNORECASE)
@@ -648,7 +650,7 @@ class AmigosShare:
             return (path.name, await cover_file.read(), IMAGE_TYPES[path.suffix.casefold()])
 
     def signature(self, meta: Meta) -> str:
-        return f"[center][url=https://github.com/wastaken7/Upload-Assistant]{meta.ua_signature}[/url][/center]"
+        return f"[center][url=https://github.com/wastaken7/Upload-Assistant][size=13]Compartilhado com {meta.ua_name} {meta.current_version} (fork)[/size][/url][/center]"
 
     async def build_description(self, meta: Meta) -> str:
         """Videos need no description of their own (rule 6.7); other categories need one in Portuguese (6.8)."""

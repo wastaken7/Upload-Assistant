@@ -79,7 +79,8 @@ def _movie_meta(tmp_path: Path, **values: Any) -> Meta:
         "subtitle_languages": ["Portuguese"],
         "original_language": "en",
         "filelist": [str(tmp_path / "Fictional.Film.2001.mkv")],
-        "ua_signature": "Created by Upload Assistant",
+        "ua_name": "Upload Assistant",
+        "current_version": "v1.0",
     }
     defaults.update(values)
     return Meta(**defaults)
@@ -200,6 +201,11 @@ def test_description_keeps_only_site_images_and_supported_tags() -> None:
     assert format_description(description, "https://amigos-share.club") == (
         "[size=22][b]Title[/b][/size]\n[center]Centered[/center]\n\n[img]https://amigos-share.club/storage/torrent-images/a.webp[/img]\ntext\n\n[code]code[/code]"
     )
+
+
+def test_description_sizes_stay_within_site_limits() -> None:
+    description = "[size=2]small[/size] [size=14]body[/size] [SIZE=50]huge[/SIZE]"
+    assert format_description(description, "https://amigos-share.club") == "[size=8]small[/size] [size=14]body[/size] [size=36]huge[/SIZE]"
 
 
 def test_search_existing_turns_badges_into_release_terms(tmp_path: Path) -> None:
@@ -381,7 +387,7 @@ def test_upload_sends_the_form_the_site_expects(tmp_path: Path, monkeypatch: pyt
     assert {"101", "200", "301", "400", "500", "601", "700"} <= attribute_ids
     assert body.count('name="screenshot_paths[]"') == 3
     assert 'name="torrent"; filename="Fictional Film (Original Film).torrent"' in body
-    assert "Created by Upload Assistant" in body
+    assert "Compartilhado com Upload Assistant v1.0 (fork)" in body
     # The IMDb description the site generates is not sent.
     assert "Sinopse" not in body
 
