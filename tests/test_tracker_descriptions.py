@@ -7,7 +7,7 @@ import pytest
 import src.get_tracker_data as tracker_data_module
 import src.trackers.common as common_module
 from src import webui_events
-from src.description_review import draft, load_review, save_review
+from src.description_review import apply_saved_draft, discard_review, draft, load_review, save_review
 from src.get_tracker_data import TrackerDataManager
 from src.meta import Meta
 from src.tracker_descriptions import DescriptionCandidate, TrackerDescriptionMode, add_candidate, description_fingerprint, resolve_description_mode, score_release_name
@@ -177,7 +177,7 @@ def test_unit3d_source_id_does_not_skip_interactive_description_review(monkeypat
 
 
 def test_webui_tracker_description_is_saved_and_shown(tmp_path, monkeypatch):
-    # Local change: Web UI runs show the description and ask like a terminal run, without an editor.
+    # Web UI runs show the description and ask like a terminal run, without an editor.
     async def run():
         manager = TrackerDataManager({"DEFAULT": {}, "TRACKERS": {}})
         meta = Meta({"base_dir": str(tmp_path), "uuid": "release", "unattended": False})
@@ -230,6 +230,30 @@ def test_webui_tracker_description_discard_clears_saved_draft(tmp_path, monkeypa
         assert candidate.description_provenance["discarded"] is True
         assert load_review(tmp_path / "tmp" / "release").get("content") is None  # tombstone, nothing to apply
         assert draft({"description": ""}, tmp_path / "tmp" / "release")[0] == ""
+
+    asyncio.run(run())
+
+
+def test_webui_discard_from_an_earlier_run_does_not_carry_over(tmp_path, monkeypatch):
+    # tmp/<release> is reused between runs, so the previous run's tombstone is still on disk.
+    async def run():
+        manager = TrackerDataManager({"DEFAULT": {}, "TRACKERS": {}})
+        meta = Meta({"base_dir": str(tmp_path), "uuid": "release", "unattended": False})
+        temp_dir = tmp_path / "tmp" / "release"
+        save_review(temp_dir, "old text", 1)
+        discard_review(temp_dir)
+        candidate = Meta({"description": "tracker text", "description_provenance": {"source": "AITHER"}})
+        monkeypatch.setenv("UA_WEBUI_ACTIVE", "1")
+        monkeypatch.setattr("src.get_tracker_data.cli_ui.ask_string", lambda _prompt: "")
+
+        await manager._review_explicit_tracker_description(meta, "AITHER", candidate)
+
+        review = load_review(temp_dir)
+        assert review["content"] == "tracker text"
+        assert review["version"] == 3
+        target = Meta({"base_dir": str(tmp_path), "uuid": "release", "description": "my own text"})
+        apply_saved_draft(target)
+        assert target.description == "tracker text"
 
     asyncio.run(run())
 

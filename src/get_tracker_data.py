@@ -216,18 +216,22 @@ class TrackerDataManager:
     async def _review_explicit_tracker_description(self, meta: Meta, tracker_name: str, candidate: Meta) -> None:
         """Show the selected tracker description and let an interactive run keep, edit or discard it.
 
-        Local change: upstream (#781) keeps Web UI runs silent here and only fills the
-        Description panel's draft. The user wants to see the description before every
-        upload, so Web UI runs show it and ask too; editing happens in the panel there.
+        Web UI runs also fill the Description panel's draft; editing happens in the panel there.
         """
         if meta.unattended or not candidate.description:
             return
-        from src.description_review import load_review, seed_review
+        from src.description_review import ReviewConflictError, load_review, review_version, save_review, seed_review
 
         webui = bool(os.environ.get("UA_WEBUI_ACTIVE"))
         temp_dir = Path(meta.base_dir) / "tmp" / meta.uuid
         shown = candidate.description
         if webui:
+            review = load_review(temp_dir)
+            if "content" in review and review["content"] is None:
+                # A discard from an earlier run of this release (tmp/ is reused); the panel never
+                # writes one. Start this review from the tracker text, unless a panel save wins.
+                with contextlib.suppress(ReviewConflictError):
+                    await asyncio.to_thread(save_review, temp_dir, candidate.description, expected_version=review_version(review))
             # Locked check-and-write: a Description panel save landing in between keeps its text.
             await asyncio.to_thread(seed_review, temp_dir, candidate.description)
             # The panel may already hold an edited draft; "keep" uploads that, so show it.
