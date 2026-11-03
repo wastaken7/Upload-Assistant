@@ -1562,6 +1562,7 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
             "1PTBA",
             "ASIANCINEMA",
             "AITHER",
+            "AMIGOSSHARE",
             "BJSHARE",
             "BRASILTRACKER",
             "CAPYBARABR",
