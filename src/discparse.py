@@ -15,6 +15,7 @@ import defusedxml.ElementTree as ElementTree
 from langcodes import Language
 from rich.progress import BarColumn, TaskProgressColumn, TextColumn
 
+from bin.binary_dependencies import static_release_system
 from bin.get_playlist import MplsParser
 from src import language_names, webui_events
 from src.binaries import configured_binary
@@ -131,6 +132,35 @@ class DiscParse:
                 publish_progress(progress_id, "Scanning Blu-ray", current=current, total=100, detail=f"go-bdinfo exited with status {returncode}", status="failed")
 
         return returncode
+
+    def _bdinfo_command(self, base_dir: str) -> str | None:
+        """Return the BDInfo executable: configured, managed for this host, or on PATH."""
+        if configured := configured_binary("bdinfo_path", self.config):
+            return configured
+
+        system = static_release_system()
+        machine = platform.machine().lower()
+        managed_path = ""
+        if system == "linux":
+            if machine in ("x86_64", "amd64"):
+                folder = "linux/amd64"
+            elif machine in ("arm64", "aarch64"):
+                folder = "linux/arm64"
+            else:
+                folder = "linux/arm"
+            managed_path = f"{base_dir}/bin/bdinfo/{folder}/bdinfo"
+        elif system == "darwin":
+            folder = "macos/arm64" if machine in ("arm64",) else "macos/x86_64"
+            managed_path = f"{base_dir}/bin/bdinfo/{folder}/bdinfo"
+        elif system == "windows":
+            # Windows builds are provided as x64
+            managed_path = f"{base_dir}/bin/bdinfo/windows/x86_64/bdinfo.exe"
+
+        # A failed update can leave a managed file behind that cannot run.
+        if managed_path and Path(managed_path).is_file() and (system == "windows" or os.access(managed_path, os.X_OK)):
+            return managed_path
+
+        return "bdinfo" if shutil.which("bdinfo") else None
 
     """
     Get and parse bdinfo
@@ -317,58 +347,28 @@ class DiscParse:
                         bdinfo_text = playlist_report_path
                     else:
                         try:
-                            bdinfo_executable = None
-                            if configured := configured_binary("bdinfo_path", self.config):
-                                bdinfo_executable = [configured, disc_path, "--playlist", playlist["file"], "--reportfilename", str(playlist_report_path)]
-                            # Prefer the bundled bdinfo binary for the detected OS/arch.
-                            system = platform.system().lower()
-                            machine = platform.machine().lower()
-                            if bdinfo_executable is None and system == "linux":
-                                if machine in ("x86_64", "amd64"):
-                                    folder = "linux/amd64"
-                                elif machine in ("arm64", "aarch64"):
-                                    folder = "linux/arm64"
-                                else:
-                                    folder = "linux/arm"
-                                bdinfo_path = f"{base_dir}/bin/bdinfo/{folder}/bdinfo"
-                                if Path(bdinfo_path).exists():
-                                    bdinfo_executable = [bdinfo_path, disc_path, "--playlist", playlist["file"], "--reportfilename", str(playlist_report_path)]
-                            elif bdinfo_executable is None and system == "darwin":
-                                folder = "macos/arm64" if machine in ("arm64",) else "macos/x86_64"
-                                bdinfo_path = f"{base_dir}/bin/bdinfo/{folder}/bdinfo"
-                                if Path(bdinfo_path).exists():
-                                    bdinfo_executable = [bdinfo_path, disc_path, "--playlist", playlist["file"], "--reportfilename", str(playlist_report_path)]
-                            elif bdinfo_executable is None and system == "windows":
-                                # Windows builds are provided as x64
-                                bdinfo_path = f"{base_dir}/bin/bdinfo/windows/x86_64/bdinfo.exe"
-                                if Path(bdinfo_path).exists():
-                                    bdinfo_executable = [bdinfo_path, disc_path, "--playlist", playlist["file"], "--reportfilename", str(playlist_report_path)]
+                            bdinfo_command = self._bdinfo_command(base_dir)
+                            if bdinfo_command is None:
+                                logger.info(f"[bold red]go-bdinfo not found. Place it under {base_dir}/bin/bdinfo/ or install a system bdinfo binary[/bold red]")
+                                continue
+                            bdinfo_executable = [bdinfo_command, disc_path, "--playlist", playlist["file"], "--reportfilename", str(playlist_report_path)]
+                            returncode = await self._run_bdinfo_with_progress(bdinfo_executable, f"bdinfo-scan-{folder_id}")
 
-                            # Fallback to system-installed commands if bundled binary not present
-                            if bdinfo_executable is None:
-                                if shutil.which("bdinfo"):
-                                    bdinfo_executable = ["bdinfo", disc_path, "--playlist", playlist["file"], "--reportfilename", str(playlist_report_path)]
-                                else:
-                                    logger.info(f"[bold red]go-bdinfo not found. Place it under {base_dir}/bin/bdinfo/ or install a system bdinfo binary[/bold red]")
-                                    continue
+                            if returncode != 0:
+                                logger.info(f"[bold red]BDInfo failed with return code {returncode}[/bold red]")
+                                continue
 
-                            if bdinfo_executable:
-                                returncode = await self._run_bdinfo_with_progress(bdinfo_executable, f"bdinfo-scan-{folder_id}")
-
-                                if returncode != 0:
-                                    logger.info(f"[bold red]BDInfo failed with return code {returncode}[/bold red]")
-                                    continue
-
-                                if playlist_report_path.is_file():
-                                    bdinfo_text = playlist_report_path
-                                else:
-                                    logger.info(f"[bold red]go-bdinfo did not create report {playlist_report_path}[/bold red]")
-                                    continue
+                            if playlist_report_path.is_file():
+                                bdinfo_text = playlist_report_path
+                            else:
+                                logger.info(f"[bold red]go-bdinfo did not create report {playlist_report_path}[/bold red]")
+                                continue
                         except Exception as e:
                             logger.info(f"[bold red]Error scanning playlist {playlist['file']}: {e}")
                             continue
 
-                    # Process the BDInfo report in the while True loop
+                    # Process the BDInfo report once; break leaves early on errors
+                    report_parsed = False
                     while True:
                         try:
                             if not bdinfo_text or not Path(bdinfo_text).is_file():
@@ -403,6 +403,7 @@ class DiscParse:
                             await asyncio.to_thread(Path(extended_summary_file).write_text, ext_bd_summary_cleaned, encoding="utf-8", errors="replace")
 
                             bdinfo = self.parse_bdinfo(bd_summary_cleaned, files[1], path)
+                            report_parsed = True
 
                             # Prompt user for custom edition if conditions are met
                             if len(selected_playlists) > 1:
@@ -457,9 +458,16 @@ class DiscParse:
                                 discs[i][f"bdinfo_{idx}"] = bdinfo
 
                         except Exception:
+                            # go-bdinfo writes the report before it exits, so
+                            # reading it again cannot fix a parse failure.
                             logger.info(traceback.format_exc())
-                            await asyncio.sleep(5)
-                            continue
+                            logger.info(f"[bold red]Could not parse BDInfo report {bdinfo_text}")
+                            if not report_parsed and bdinfo_text:
+                                # Drop the cached report so the next run scans the playlist again.
+                                try:
+                                    Path(bdinfo_text).unlink(missing_ok=True)
+                                except OSError as unlink_error:
+                                    logger.info(f"[bold red]Could not remove BDInfo report {bdinfo_text}: {unlink_error}")
                         break
 
             else:
