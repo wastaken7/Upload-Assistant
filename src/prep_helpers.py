@@ -786,7 +786,8 @@ async def validate_media(_prep_instance: Any, meta: Meta) -> None:
         if not valid_mi:
             logger.info("[red]MediaInfo validation failed. This file does not contain (Unique ID).")
             meta.valid_mi = False
-            await asyncio.sleep(2)
+            if not meta.unattended:
+                await asyncio.sleep(2)
 
     mediainfo_tracks = meta.mediainfo.get("media", {}).get("track") or []
     meta.has_multiple_default_subtitle_tracks = len([track for track in mediainfo_tracks if track["@type"] == "Text" and track["Default"] == "Yes"]) > 1
@@ -1704,7 +1705,8 @@ async def finalize_metadata(
             if not valid_mi_settings:
                 logger.info("[red]MediaInfo validation failed. This file does not contain encode settings.")
                 meta.valid_mi_settings = False
-                await asyncio.sleep(2)
+                if not meta.unattended:
+                    await asyncio.sleep(2)
 
         meta.stream = await prep_instance.stream_optimized(meta.stream)
 

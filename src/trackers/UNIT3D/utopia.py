@@ -1,11 +1,24 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 from typing import Any, ClassVar
 
+from src.get_desc import DescriptionBuilder
 from src.meta import Meta
 from src.trackers.common import Common
 from src.trackers.UNIT3D import UNIT3D
 
 Config = dict[str, Any]
+
+
+class UtopiaDescriptionBuilder(DescriptionBuilder):
+    """Link each image to its full size and display the medium size, as utppm expects.
+
+    The format is applied while rendering, so the shared release metadata that
+    concurrent tracker uploads read is never rewritten.
+    """
+
+    def format_screenshot(self, web_url: str, raw_url: str, img_url: str = "", thumb_size: str | int = "", *, meta: Meta | None = None) -> str:  # noqa: ARG002 - the full image replaces the page link
+        medium_url = img_url or raw_url
+        return super().format_screenshot(raw_url, medium_url, medium_url, thumb_size, meta=meta)
 
 
 class Utopia(UNIT3D):
@@ -108,49 +121,12 @@ class Utopia(UNIT3D):
 
         Expected format: [url=FULL_IMAGE][img]MEDIUM_IMAGE[/img][/url]
         """
-        from src.get_desc import DescriptionBuilder
-
-        # Save original values and transform
-        original_image_list = meta.image_list
-        transformed_image_list: list[dict[str, Any]] = [
-            {
-                "web_url": img.get("raw_url", ""),  # Link goes to full image
-                "raw_url": img.get("img_url", ""),  # Display shows medium image
-                "img_url": img.get("img_url", ""),
-            }
-            for img in original_image_list
-        ]
-
-        # Also transform any new_images_* keys for packed content
-        new_images_keys = [k for k in meta.to_dict() if k.startswith("new_images_")]
-        original_new_images: dict[str, Any] = {}
-        for key in new_images_keys:
-            original_new_images[key] = meta[key]
-            meta[key] = [
-                {
-                    "web_url": img.get("raw_url", ""),
-                    "raw_url": img.get("img_url", ""),
-                    "img_url": img.get("img_url", ""),
-                }
-                for img in meta[key]
-            ]
-
-        # Temporarily replace image_list
-        meta.image_list = transformed_image_list
-
-        try:
-            builder = DescriptionBuilder(self.tracker, self.config)
-            description = await builder.general_description_generator(
-                meta,
-                mediainfo=False,
-                nfo=False,
-            )
-        finally:
-            # Restore original values even if an error occurs
-            meta.image_list = original_image_list
-            for key, value in original_new_images.items():
-                meta[key] = value
-
+        builder = UtopiaDescriptionBuilder(self.tracker, self.config)
+        description = await builder.general_description_generator(
+            meta,
+            mediainfo=False,
+            nfo=False,
+        )
         return {"description": description}
 
     async def get_name(self, meta: Meta) -> dict[str, str]:

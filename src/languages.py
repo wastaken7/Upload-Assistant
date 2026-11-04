@@ -5,12 +5,12 @@ from pathlib import Path
 from typing import Any, cast
 
 import aiofiles
-import langcodes
-from langcodes.tag_parser import LanguageTagError
 
+from src import language_names
 from src.console import PromptBlockedError, logger
 from src.manual_input import Question, ask, has_answer, is_interactive
 from src.meta import Meta
+from src.release_locks import release_language_lock
 
 # What process_desc_language fills in on meta.
 LANGUAGE_FIELDS = (
@@ -182,6 +182,20 @@ class LanguagesManager:
 
         current_section: str | None = None
         current_track: dict[str, str] = {}
+        current_has_id = False
+        # A DVD IFO can list audio and subtitle slots that no program chain
+        # plays. MediaInfo gives those no ID, so they are not real tracks.
+        skip_unmapped = meta.is_disc == "DVD"
+
+        def store_track() -> None:
+            if not current_section or not current_track:
+                return
+            if current_section in ["video", "audio", "text"]:
+                if skip_unmapped and current_section in ["audio", "text"] and not current_has_id:
+                    return
+                parsed_data[current_section].append(current_track)
+            elif current_section == "general":
+                parsed_data["general"] = current_track
 
         lines = mediainfo_content.strip().split("\n")
 
@@ -196,20 +210,18 @@ class LanguagesManager:
 
             section_match = section_header_re.match(line)
             if section_match:
-                if current_section and current_track:
-                    if current_section in ["video", "audio", "text"]:
-                        parsed_data[current_section].append(current_track)
-                    elif current_section == "general":
-                        parsed_data["general"] = current_track
-
+                store_track()
                 current_section = section_match.group(1).lower()
                 current_track = {}
+                current_has_id = False
                 continue
 
             if ":" in line and current_section:
                 key, value = line.split(":", 1)
                 key = key.strip().lower()
                 value = value.strip()
+                if key == "id" and value:
+                    current_has_id = True
 
                 if current_section == "video":
                     if key in ["format", "duration", "bit rate", "encoding settings", "title"]:
@@ -223,15 +235,17 @@ class LanguagesManager:
                 elif current_section == "general":
                     current_track[key.replace(" ", "_")] = value
 
-        if current_section and current_track:
-            if current_section in ["video", "audio", "text"]:
-                parsed_data[current_section].append(current_track)
-            elif current_section == "general":
-                parsed_data["general"] = current_track
+        store_track()
 
         return parsed_data
 
     async def process_desc_language(self, meta: Meta, tracker: str = "") -> None:
+        # Concurrent tracker uploads share meta: the first one detects or asks
+        # for the languages, the others then find meta.language_checked set.
+        async with release_language_lock(meta):
+            await self._process_desc_language_once(meta, tracker)
+
+    async def _process_desc_language_once(self, meta: Meta, tracker: str) -> None:
         saved = {key: copy.copy(getattr(meta, key)) for key in LANGUAGE_FIELDS}
         try:
             await self._process_desc_language(meta, tracker)
@@ -529,7 +543,7 @@ class LanguagesManager:
         return any("english" in lang.lower() for lang in languages)
 
     def extract_language_from_title(self, title: str | None) -> str | None:
-        """Extract language from title field using langcodes library"""
+        """Extract the first word of the title that names a language"""
         if not title:
             return None
 
@@ -545,11 +559,11 @@ class LanguagesManager:
 
     def _find_language_name(self, word: str) -> str | None:
         try:
-            lang = langcodes.find(word)
-        except LanguageTagError, LookupError:
+            lang = language_names.find(word)
+        except LookupError:
             return None
-        if lang and lang.is_valid():
-            return lang.display_name()
+        if lang.is_valid():
+            return language_names.display_name(lang)
         return None
 
 

@@ -72,3 +72,32 @@ def test_remote_images_expose_thumbnail_and_full_size_urls(tmp_path: Path, monke
         (IGDB_IMAGE["img_url"], IGDB_IMAGE["raw_url"]),
         (THUMB_ONLY_IMAGE["img_url"], THUMB_ONLY_IMAGE["img_url"]),
     ]
+
+
+def test_game_igdb_images_cannot_be_discarded(game_review: Path) -> None:
+    with server.app.test_client() as client:
+        listed = client.get("/api/execution_screenshots?session_id=session").get_json()
+        deleted = client.post("/api/execution_screenshots/remote-0/delete", json={"session_id": "session"})
+
+    assert [item["can_delete"] for item in listed["screenshots"]] == [False]
+    assert deleted.status_code == 400
+    assert not (game_review / "screenshot_review.json").exists()
+
+
+@pytest.mark.parametrize("is_disc", ["", "DVD"])
+def test_video_hosted_images_can_be_discarded(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, is_disc: str) -> None:
+    meta = {"uuid": "release", "category": "MOVIE", "is_disc": is_disc, "image_list": [IGDB_IMAGE]}
+    monkeypatch.setattr(server, "_resolve_execution_screenshot_review", lambda _session_id: (tmp_path, meta))
+    monkeypatch.setattr(server, "_webui_auth_ok", lambda: True)
+    monkeypatch.setattr(server, "_verify_csrf_header", lambda: True)
+    monkeypatch.setattr(server, "_verify_same_origin", lambda: True)
+
+    with server.app.test_client() as client:
+        before = client.get("/api/execution_screenshots?session_id=session").get_json()
+        deleted = client.post("/api/execution_screenshots/remote-0/delete", json={"session_id": "session"})
+        after = client.get("/api/execution_screenshots?session_id=session").get_json()
+
+    assert [item["can_delete"] for item in before["screenshots"]] == [True]
+    assert deleted.get_json() == {"success": True}
+    assert after["screenshots"] == []
+    assert after["can_add"] is (is_disc == "")

@@ -19,17 +19,19 @@ from bs4 import BeautifulSoup, Comment, NavigableString, Tag
 from jinja2 import Template
 from langcodes.tag_parser import LanguageTagError
 
+from src import language_names
 from src.audible import build_audible_author_url, resolve_audible_url
 from src.bbcode import BBCODE
 from src.bluray_com import ensure_release_subheader
-from src.cogs.redaction import PathAwareEncoder
 from src.console import logger
 from src.description_languages import COMMON_LABELS, GAME_LABELS, MUSIC_LABELS, get_book_labels, get_labels
 from src.description_review import apply_saved_draft
 from src.languages import languages_manager
 from src.mediainfo import MediaInfo
 from src.meta import Meta
+from src.meta_file import write_meta_file
 from src.music.analyzer import RIPPER_LOG_RE, read_rip_log
+from src.release_locks import release_image_lock
 from src.screenshot_manifest import files as manifest_files
 from src.takescreens import TakeScreensManager
 from src.tracker_images import get_tracker_image_collection, has_tracker_image_collection
@@ -198,6 +200,29 @@ def _format_game_duration(seconds: Any) -> str:
     if hours:
         return f"{hours}h"
     return f"{minutes}m"
+
+
+# Pack descriptions show each file's MediaInfo once per tracker. Keyed by the
+# file's identity, so an edited file is parsed again.
+_pack_mediainfo_cache: dict[tuple[str, int, int], str] = {}
+_PACK_MEDIAINFO_CACHE_LIMIT = 256
+
+
+async def _pack_file_mediainfo(path: str) -> str:
+    """Return a pack file's MediaInfo text without blocking the event loop."""
+    try:
+        stat = Path(path).stat()
+        key: tuple[str, int, int] | None = (path, stat.st_mtime_ns, stat.st_size)
+    except OSError:
+        key = None
+    if key is not None and key in _pack_mediainfo_cache:
+        return _pack_mediainfo_cache[key]
+    mi_dump = str(await asyncio.to_thread(MediaInfo.parse, path, output="STRING", full=False, mediainfo_options={"inform_version": "1"}))
+    if key is not None:
+        if len(_pack_mediainfo_cache) >= _PACK_MEDIAINFO_CACHE_LIMIT:
+            _pack_mediainfo_cache.clear()
+        _pack_mediainfo_cache[key] = mi_dump
+    return mi_dump
 
 
 async def gen_desc(
@@ -742,7 +767,7 @@ class DescriptionBuilder:
                 return ""
             try:
                 parsed = langcodes.Language.get(language)
-                name = parsed.language_name("en")
+                name = language_names.language_name(parsed, "en")
                 return f"{name} ({parsed.territory})" if parsed.territory else name
             except LanguageTagError:
                 return language
@@ -1686,12 +1711,12 @@ class DescriptionBuilder:
         screenshots: bool = True,
         tonemapped_header: bool = True,
         tv_info: bool = True,
-        ua_signature: bool = True,  # ci: ua_signature v4.8
+        ua_signature: bool = True,  # ci: ua_signature v4.9
         user_description: bool = True,
         music: bool = True,
         dynamic_hdr_plot: bool = True,
         approved_image_hosts: list[str] | None = None,
-        signature: str = "",  # ci: ua_signature v4.8
+        signature: str = "",  # ci: ua_signature v4.9
         desc_header: str = "",
     ) -> str:
         apply_saved_draft(meta)
@@ -1983,7 +2008,7 @@ class DescriptionBuilder:
                 await description_file.write(self.tracker_specific_formats(self.tracker, "\n".join(part for part in (description_str, ((signature or (f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=4]{meta.ua_signature}[/size][/url][/right]" if meta.ua_signature else "")) if ua_signature else "")) if part.strip())))  # fmt: off
 
         # fmt: off
-        return self.tracker_specific_formats(self.tracker, "\n".join(part for part in (description_str, ((signature or (f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=4]{meta.ua_signature}[/size][/url][/right]" if meta.ua_signature else "")) if ua_signature else "")) if part.strip()))  # ci: ua_signature v4.8
+        return self.tracker_specific_formats(self.tracker, "\n".join(part for part in (description_str, ((signature or (f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=4]{meta.ua_signature}[/size][/url][/right]" if meta.ua_signature else "")) if ua_signature else "")) if part.strip()))  # ci: ua_signature v4.9
         # fmt: on
 
     async def _check_saved_pack_image_links(self, meta: Meta, approved_image_hosts: list[str]) -> dict[str, Any]:
@@ -2051,7 +2076,40 @@ class DescriptionBuilder:
                 logger.warning(f"[yellow]Warning: Could not load pack image data: {e!s}[/yellow]")
         return pack_images_data
 
+    @staticmethod
+    def disc_mediainfo_blocks(disc: dict[str, Any]) -> list[str]:
+        """The spoiler blocks that carry a later disc's BDInfo summary or DVD MediaInfo."""
+        if disc["type"] == "BDMV":
+            return [f"[spoiler={disc.get('name', 'BDINFO')}][code]{disc['summary']}[/code][/spoiler]"]
+        if disc["type"] == "DVD":
+            return [
+                f"[spoiler={Path(disc['vob']).name}][code]{disc['vob_mi']}[/code][/spoiler]",
+                f"[spoiler={Path(disc['ifo']).name}][code]{disc['ifo_mi']}[/code][/spoiler]",
+            ]
+        return []
+
+    def _append_disc_mediainfo(self, desc_parts: list[str], disc: dict[str, Any]) -> None:
+        blocks = self.disc_mediainfo_blocks(disc)
+        if not blocks:
+            return
+        if disc["type"] == "DVD":
+            desc_parts.append(f"{disc['name']}:\n")
+        desc_parts.append(" ".join(blocks) + "\n\n")
+
     async def _handle_discs_and_screenshots(
+        self,
+        meta: Meta,
+        approved_image_hosts: list[str],
+        images: list[dict[str, str]],
+        multi_screens: int,
+        include_header: bool = True,
+    ) -> str:
+        # Trackers upload concurrently, but each pack file's images are created
+        # once: later trackers wait here and reuse them.
+        async with release_image_lock(meta):
+            return await self._render_discs_and_screenshots(meta, approved_image_hosts, images, multi_screens, include_header)
+
+    async def _render_discs_and_screenshots(
         self,
         meta: Meta,
         approved_image_hosts: list[str],
@@ -2192,9 +2250,7 @@ class DescriptionBuilder:
                                     self._append_screenshot_row_separator(desc_parts, img_index, screens_per_row)
                                 desc_parts.append("[/center]\n\n")
 
-                            meta_filename = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/meta.json"
-                            async with aiofiles.open(meta_filename, "w") as f:
-                                await f.write(json.dumps(meta.to_dict(), indent=4, cls=PathAwareEncoder))
+                            await write_meta_file(meta)
 
         # Handle multiple discs case
         elif len(discs) > 1:
@@ -2260,12 +2316,7 @@ class DescriptionBuilder:
                         if meta.get(new_images_key):
                             logger.debug(f"[yellow]Found needed image URLs for {new_images_key}")
                             desc_parts.append("[center]")
-                            if each["type"] == "BDMV":
-                                desc_parts.append(f"[spoiler={each.get('name', 'BDINFO')}][code]{each['summary']}[/code][/spoiler]\n\n")
-                            elif each["type"] == "DVD":
-                                desc_parts.append(f"{each['name']}:\n")
-                                desc_parts.append(f"[spoiler={Path(each['vob']).name}][code]{each['vob_mi']}[/code][/spoiler] ")
-                                desc_parts.append(f"[spoiler={Path(each['ifo']).name}][code]{each['ifo_mi']}[/code][/spoiler]\n\n")
+                            self._append_disc_mediainfo(desc_parts, each)
                             desc_parts.append("[/center]\n\n")
                             # Use existing URLs from meta to write to descfile
                             desc_parts.append("[center]")
@@ -2281,12 +2332,7 @@ class DescriptionBuilder:
                             meta.retry_count += 1
                             meta[new_images_key] = []
                             desc_parts.append("[center]")
-                            if each["type"] == "BDMV":
-                                desc_parts.append(f"[spoiler={each.get('name', 'BDINFO')}][code]{each['summary']}[/code][/spoiler]\n\n")
-                            elif each["type"] == "DVD":
-                                desc_parts.append(f"{each['name']}:\n")
-                                desc_parts.append(f"[spoiler={Path(each['vob']).name}][code]{each['vob_mi']}[/code][/spoiler] ")
-                                desc_parts.append(f"[spoiler={Path(each['ifo']).name}][code]{each['ifo_mi']}[/code][/spoiler]\n\n")
+                            self._append_disc_mediainfo(desc_parts, each)
                             desc_parts.append("[/center]\n\n")
                             # Check if new screenshots already exist before running prep.screenshots
                             new_screens = [f.name for f in manifest_files(meta.base_dir, meta.uuid, f"FILE_{i}")]
@@ -2327,9 +2373,7 @@ class DescriptionBuilder:
                                 desc_parts.append("[/center]\n\n")
 
                             # Save the updated meta to `meta.json` after upload
-                            meta_filename = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/meta.json"
-                            async with aiofiles.open(meta_filename, "w") as f:
-                                await f.write(json.dumps(meta.to_dict(), indent=4, cls=PathAwareEncoder))
+                            await write_meta_file(meta)
                         logger.info("")
 
         # Handle single file case
@@ -2387,91 +2431,97 @@ class DescriptionBuilder:
             logger.info(f"[cyan]{total_files_to_process} files (processLimit)[/cyan]")
 
         # First Pass: Create and Upload Images for Each File
-        for i, file in enumerate(filelist):
-            if i >= process_limit:
-                # console.print("[yellow]Skipping processing more files as they exceed the process limit.")
-                continue
-            if multi_screens != 0:
+        pack_files = list(enumerate(filelist[:process_limit])) if multi_screens != 0 else []
+        for i, _file in pack_files:
+            new_images_key = f"new_images_file_{i}"
+            # Check for saved images first
+            if i > 0 and pack_images_data and "keys" in pack_images_data and new_images_key in pack_images_data["keys"]:
+                saved_images = pack_images_data["keys"][new_images_key]["images"]
+                if saved_images:
+                    logger.debug(f"[yellow]Using saved images from pack_image_links.json for {new_images_key}")
+
+                    meta[new_images_key] = []
+                    for img in saved_images:
+                        meta[new_images_key].append(
+                            {
+                                "img_url": img.get("img_url", ""),
+                                "raw_url": img.get("raw_url", ""),
+                                "web_url": img.get("web_url", ""),
+                            }
+                        )
+
+        # Files whose images still have to be generated and hosted, in order.
+        pending_files = [(i, file) for i, file in pack_files if i > 0 and not meta.get(f"new_images_file_{i}")]
+
+        async def capture_file_screens(index: int, file_path: str) -> list[str]:
+            group = f"FILE_{index}"
+            if not manifest_files(meta.base_dir, meta.uuid, group):
+                if meta.debug:
+                    logger.info(f"[yellow]No existing screenshots for new_images_file_{index}; generating new ones.")
+                try:
+                    await self.takescreens_manager.screenshots(
+                        file_path,
+                        group,
+                        meta.uuid,
+                        meta.base_dir,
+                        meta,
+                        multi_screens,
+                        True,
+                        cleanup_after_capture=False,
+                        capture_group=group,
+                    )
+                except Exception as e:
+                    logger.info(f"Error during generic screenshot capture: {e}", extra={"markup": False})
+            return [f.name for f in manifest_files(meta.base_dir, meta.uuid, group)]
+
+        # Capture is CPU/disk bound and hosting is network bound, so the next
+        # file is captured while the current file's images are being hosted.
+        next_capture: asyncio.Task[list[str]] | None = asyncio.create_task(capture_file_screens(*pending_files[0])) if pending_files else None
+        try:
+            for i, file in pack_files:
                 if total_files_to_process > 1:
                     processed_count += 1
                     filename = Path(file).name
                     logger.info(f"\rProcessing file {processed_count}/{total_files_to_process}: {filename[:40]}{'...' if len(filename) > 40 else ''}", extra={"markup": False})
-                if i > 0:
-                    new_images_key = f"new_images_file_{i}"
-                    # Check for saved images first
-                    if pack_images_data and "keys" in pack_images_data and new_images_key in pack_images_data["keys"]:
-                        saved_images = pack_images_data["keys"][new_images_key]["images"]
-                        if saved_images:
-                            logger.debug(f"[yellow]Using saved images from pack_image_links.json for {new_images_key}")
+                if not pending_files or pending_files[0][0] != i or next_capture is None:
+                    continue
 
-                            meta[new_images_key] = []
-                            for img in saved_images:
-                                meta[new_images_key].append(
-                                    {
-                                        "img_url": img.get("img_url", ""),
-                                        "raw_url": img.get("raw_url", ""),
-                                        "web_url": img.get("web_url", ""),
-                                    }
-                                )
-                    if new_images_key not in meta or not meta[new_images_key]:
-                        meta[new_images_key] = []
-                        # Proceed with image generation if not already present
-                        new_screens = [f.name for f in manifest_files(meta.base_dir, meta.uuid, f"FILE_{i}")]
+                pending_files.pop(0)
+                new_images_key = f"new_images_file_{i}"
+                meta[new_images_key] = []
+                new_screens = await next_capture
+                next_capture = asyncio.create_task(capture_file_screens(*pending_files[0])) if pending_files else None
 
-                        # If no screenshots exist, create them
-                        if not new_screens:
-                            if meta.debug:
-                                logger.info(f"[yellow]No existing screenshots for {new_images_key}; generating new ones.")
-                            try:
-                                await self.takescreens_manager.screenshots(
-                                    file,
-                                    f"FILE_{i}",
-                                    meta.uuid,
-                                    meta.base_dir,
-                                    meta,
-                                    multi_screens,
-                                    True,
-                                    cleanup_after_capture=False,
-                                    capture_group=f"FILE_{i}",
-                                )
-                                await asyncio.sleep(0.1)
-                            except Exception as e:
-                                logger.info(f"Error during generic screenshot capture: {e}", extra={"markup": False})
-
-                        new_screens = [f.name for f in manifest_files(meta.base_dir, meta.uuid, f"FILE_{i}")]
-
-                        # Upload generated screenshots
-                        if new_screens and not meta.skip_imghost_upload:
-                            uploaded_images, _ = await self.uploadscreens_manager.upload_screens(
-                                meta,
-                                multi_screens,
-                                1,
-                                0,
-                                multi_screens,
-                                new_screens,
-                                {new_images_key: meta[new_images_key]},
-                                allowed_hosts=approved_image_hosts,
-                            )
-                            if uploaded_images and not meta.skip_imghost_upload:
-                                await self.common.save_image_links(meta, new_images_key, uploaded_images)
-                            for img in uploaded_images:
-                                meta[new_images_key].append(
-                                    {
-                                        "img_url": img["img_url"],
-                                        "raw_url": img["raw_url"],
-                                        "web_url": img["web_url"],
-                                    }
-                                )
-
-                            await asyncio.sleep(0.1)
-
-                await asyncio.sleep(0.05)
+                # Upload generated screenshots
+                if new_screens and not meta.skip_imghost_upload:
+                    uploaded_images, _ = await self.uploadscreens_manager.upload_screens(
+                        meta,
+                        multi_screens,
+                        1,
+                        0,
+                        multi_screens,
+                        new_screens,
+                        {new_images_key: meta[new_images_key]},
+                        allowed_hosts=approved_image_hosts,
+                    )
+                    if uploaded_images and not meta.skip_imghost_upload:
+                        await self.common.save_image_links(meta, new_images_key, uploaded_images)
+                    for img in uploaded_images:
+                        meta[new_images_key].append(
+                            {
+                                "img_url": img["img_url"],
+                                "raw_url": img["raw_url"],
+                                "web_url": img["web_url"],
+                            }
+                        )
+        finally:
+            # Let an unfinished capture end on its own: cancelling one mid-way
+            # makes the screenshot capture exit the whole process.
+            if next_capture is not None and not next_capture.done():
+                await asyncio.gather(next_capture, return_exceptions=True)
 
         # Save updated meta
-        meta_filename = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/meta.json"
-        async with aiofiles.open(meta_filename, "w") as f:
-            await f.write(json.dumps(meta.to_dict(), indent=4, cls=PathAwareEncoder))
-        await asyncio.sleep(0.1)
+        await write_meta_file(meta)
 
         # Second Pass: Process MediaInfo and Write Descriptions
         if len(filelist) > 1:
@@ -2490,7 +2540,7 @@ class DescriptionBuilder:
                 # Write filename in BBCode format with MediaInfo in spoiler if not the first file
                 if multi_screens != 0:
                     if i > 0 and char_count < max_char_limit:
-                        mi_dump = MediaInfo.parse(file, output="STRING", full=False, mediainfo_options={"inform_version": "1"})
+                        mi_dump = await _pack_file_mediainfo(file)
                         parsed_mediainfo = self.parser.parse_mediainfo(mi_dump)
                         formatted_bbcode = self.parser.format_bbcode(parsed_mediainfo)
                         desc_parts.append(f"[center][spoiler={filename}]{formatted_bbcode}[/spoiler][/center]\n")
@@ -2689,6 +2739,9 @@ class DescriptionBuilder:
             description = bbcode.convert_named_spoiler_to_normal_spoiler(description)
             description = bbcode.remove_list(description)
             description = description.strip()
+
+        if tracker == "FILEIPLAY":
+            description = bbcode.remove_img_resize(description)
 
         if tracker == "FUNFILE":
             description = description.replace("[user]", "").replace("[/user]", "")

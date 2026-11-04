@@ -214,31 +214,42 @@ class TrackerDataManager:
         meta.matched_tracker = tracker_name
 
     async def _review_explicit_tracker_description(self, meta: Meta, tracker_name: str, candidate: Meta) -> None:
-        """Allow an interactive run to edit the selected tracker description."""
+        """Show the selected tracker description and let an interactive run keep, edit or discard it.
+
+        Web UI runs also fill the Description panel's draft; editing happens in the panel there.
+        """
         if meta.unattended or not candidate.description:
             return
-        if os.environ.get("UA_WEBUI_ACTIVE"):
-            from src.description_review import load_review, save_review
+        from src.description_review import ReviewConflictError, load_review, review_version, save_review, seed_review
 
-            temp_dir = Path(meta.base_dir) / "tmp" / meta.uuid
+        webui = bool(os.environ.get("UA_WEBUI_ACTIVE"))
+        temp_dir = Path(meta.base_dir) / "tmp" / meta.uuid
+        shown = candidate.description
+        if webui:
             review = load_review(temp_dir)
-            if not isinstance(review.get("content"), str):
-                try:
-                    version = int(review.get("version", 0) or 0) + 1
-                except TypeError, ValueError:
-                    version = 1
-                await asyncio.to_thread(save_review, temp_dir, candidate.description, version)
-            return
-        logger.info(f"Selected description from {tracker_name}:\n{candidate.description[:1000]}", extra={"markup": False})
+            if "content" in review and review["content"] is None:
+                # A discard from an earlier run of this release (tmp/ is reused); the panel never
+                # writes one. Start this review from the tracker text, unless a panel save wins.
+                with contextlib.suppress(ReviewConflictError):
+                    await asyncio.to_thread(save_review, temp_dir, candidate.description, expected_version=review_version(review))
+            # Locked check-and-write: a Description panel save landing in between keeps its text.
+            await asyncio.to_thread(seed_review, temp_dir, candidate.description)
+            # The panel may already hold an edited draft; "keep" uploads that, so show it.
+            saved = load_review(temp_dir).get("content")
+            if isinstance(saved, str):
+                shown = saved
+        logger.info(f"Selected description from {tracker_name}:\n{shown[:1000]}", extra={"markup": False})
+        question, buttons = webui_events.letter_prompt([("e", "edit"), ("d", "discard")], "keep it")
         with webui_events.field_prompt(
             "Tracker description",
-            {"Tracker": tracker_name, "Description": candidate.description[:1000]},
+            {"Tracker": tracker_name, "Description": shown[:1000]},
             focus="Description",
-            actions=[("", "Keep it"), ("e", "Edit"), ("d", "Discard")],
+            hint="Open the Description panel to edit it before uploading." if webui else "",
+            actions=buttons,
         ):
-            choice = await prompt_in_thread(cli_ui.ask_string, "\nEnter 'e' to edit, 'd' to discard the description, or press Enter to keep it: ")
+            choice = await prompt_in_thread(cli_ui.ask_string, "\n" + question)
         choice = (choice or "").strip().lower()
-        if choice == "e":
+        if choice == "e" and webui_events.editor_available():
             edited = await asyncio.to_thread(click.edit, candidate.description)
             if edited is not None:
                 candidate.description = str(edited).strip()
@@ -249,6 +260,12 @@ class TrackerDataManager:
             candidate.description = ""
             candidate.saved_description = False
             candidate.description_provenance = {**candidate.description_provenance, "discarded": True}
+            if webui:
+                # A tombstone, not an empty draft: apply_saved_draft then leaves a --description or
+                # template alone, and a panel save still in flight fails its version check.
+                from src.description_review import discard_review
+
+                await asyncio.to_thread(discard_review, temp_dir)
 
     async def get_tracker_timestamps(self, base_dir: str | None = None) -> dict[str, float]:
         """Get tracker timestamps from the log file"""

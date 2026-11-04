@@ -1,6 +1,7 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import itertools
 import os
+import shutil
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Any, cast
@@ -8,8 +9,10 @@ from typing import Any, cast
 import aiofiles
 
 from bin.get_bdinfo import BDInfoBinaryManager
+from src.binaries import configured_binary
 from src.console import logger
 from src.discparse import DiscParse
+from src.exceptions import UnsupportedSiteCheckError
 from src.meta import Meta
 
 Disc = dict[str, Any]
@@ -40,19 +43,15 @@ class DiscInfoManager:
 
         if is_disc == "BDMV":
             if meta.site_check:
-                logger.info("BDMV disc checking is not supported in site_check mode, yet.", extra={"markup": False})
-                raise RuntimeError("BDMV disc checking is not supported in site_check mode.")
-            # Ensure bdinfo binary is present for BDMV processing
-            try:
-                await BDInfoBinaryManager.ensure_bdinfo_binary(meta.base_dir)
-            except Exception as e:
-                logger.error(f"[red]Failed to ensure bdinfo binary: {e}[/red]", extra={"markup": False})
-                raise
+                raise UnsupportedSiteCheckError("BDMV disc checking is not supported in site_check mode, yet.")
+            await self._ensure_bdinfo(meta)
 
             if meta.edit is False:
                 discs, bdinfo = await self._parser.get_bdinfo(meta, discs, meta.uuid, meta.base_dir, meta.discs)
             else:
                 discs, bdinfo = await self._parser.get_bdinfo(meta, meta.discs, meta.uuid, meta.base_dir, meta.discs)
+            if not isinstance(bdinfo, dict):
+                raise RuntimeError("BDInfo did not produce a report for this Blu-ray disc. Check the BDInfo messages above, or set bdinfo_path in the config.")
         elif is_disc == "DVD":
             discs = cast(list[Disc], await cast(Any, self._parser).get_dvdinfo(discs))
         elif is_disc == "HDDVD":
@@ -67,6 +66,19 @@ class DiscInfoManager:
 
         discs = sorted(discs, key=lambda d: d["name"])
         return is_disc, videoloc, bdinfo, discs
+
+    async def _ensure_bdinfo(self, meta: Meta) -> None:
+        """Make a BDInfo executable available before scanning a BDMV disc."""
+        if configured_binary("bdinfo_path", self._parser.config):
+            return
+        try:
+            await BDInfoBinaryManager.ensure_bdinfo_binary(meta.base_dir)
+        except Exception as e:
+            if shutil.which("bdinfo"):
+                logger.warning(f"Failed to download bdinfo binary ({e}); using the bdinfo found on PATH.", extra={"markup": False})
+                return
+            logger.error(f"[red]Failed to ensure bdinfo binary: {e}[/red]", extra={"markup": False})
+            raise
 
     async def get_dvd_size(self, discs: Iterable[Disc], manual_dvds: str | None) -> str:
         sizes = [str(each["size"]) for each in discs]

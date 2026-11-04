@@ -315,6 +315,7 @@ uv tool install --force git+https://github.com/wastaken7/Upload-Assistant.git
 | <img src="web_ui/static/img/trackers/1ptba.png" width="16" height="16" />                     | 1PTBA                  | 1PTBA                  | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/aither.png" width="16" height="16" />                    | Aither                 | AITHER                 | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/alpharatio.png" alt="" width="16" height="16" />         | AlphaRatio             | ALPHARATIO             | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/amigosshare.png" alt="" width="16" height="16" />        | Amigos Share Club      | AMIGOSSHARE            | MOVIE, TV, BOOK, GAME, XXX   |
 | <img src="web_ui/static/img/trackers/anthelion.png" width="16" height="16" />                 | Anthelion              | ANTHELION              | MOVIE                        |
 | <img src="web_ui/static/img/trackers/asiancinema.png" width="16" height="16" />               | AsianCinema            | ASIANCINEMA            | MOVIE, TV, MUSIC             |
 | <img src="web_ui/static/img/trackers/avistaz.png" width="16" height="16" />                   | AvistaZ                | AVISTAZ                | MOVIE, TV                    |
@@ -337,6 +338,7 @@ uv tool install --force git+https://github.com/wastaken7/Upload-Assistant.git
 | <img src="web_ui/static/img/trackers/dreadvault.png" alt="" width="16" height="16" />         | DreadVault             | DREADVAULT             | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/emuwarez.png" alt="" width="16" height="16" />           | eMuwarez               | EMUWAREZ               | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/exoticaz.png" width="16" height="16" />                  | ExoticaZ               | EXOTICAZ               | XXX                          |
+| <img src="web_ui/static/img/trackers/fileiplay.png" width="16" height="16" />                 | FileIPlay              | FILEIPLAY              | MOVIE, TV, GAME, MUSIC, XXX  |
 | <img src="web_ui/static/img/trackers/filelist.png" width="16" height="16" />                  | FileList               | FILELIST               | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/flood.png" width="16" height="16" />                     | Flood                  | FLOOD                  | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/funfile.png" width="16" height="16" />                   | FunFile                | FUNFILE                | MOVIE, TV                    |
@@ -429,7 +431,7 @@ This branch introduces new media categories and automation features not present 
 
 - **Ebook & Audiobook (`BOOK` Category)**:
   - **Automatic Type Detection**: Classifies uploads into Ebooks (PDF, EPUB, MOBI), Comics/Manga (CBR, CBZ), Newspapers, or Audiobooks.
-  - **Local Metadata Extraction**: Reads metadata from OPF files in EPUB/MOBI, `ComicInfo.xml` in CBR/CBZ, parses tags via Mutagen for audiobooks, and uses PyMuPDF (`fitz`) with checksum-validated regex to extract ISBNs from PDFs.
+  - **Local Metadata Extraction**: Reads metadata from OPF files in EPUB/MOBI, `ComicInfo.xml` in CBR/CBZ, parses tags via Mutagen for audiobooks, and uses PyMuPDF with checksum-validated regex to extract ISBNs from PDFs.
   - **API Integrations**: Queries **MyAnonamouse (MAM) API**, **Google Books API**, and **OpenLibrary API** for automated metadata lookup.
   - **Artwork & Screenshot Generation**: Renders gallery screenshots from PDF/EPUB pages, extracts cover artwork, and auto-generates `POSTER.png`.
   - **Smart Duplicate Checking**: Custom rules distinguishing formats (e.g., EPUB vs PDF) and audiobooks vs ebooks, with tracker-specific overrides.

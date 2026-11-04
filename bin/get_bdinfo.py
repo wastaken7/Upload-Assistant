@@ -11,7 +11,7 @@ from pathlib import Path
 import aiofiles
 import httpx
 
-from bin.binary_dependencies import DEPENDENCY_VERSIONS
+from bin.binary_dependencies import DEPENDENCY_VERSIONS, static_release_system
 from bin.download_integrity import verify_downloaded_asset
 
 try:
@@ -37,7 +37,7 @@ class BDInfoBinaryManager:
 
     @staticmethod
     async def ensure_bdinfo_binary(base_dir: str | Path, version: str = DEPENDENCY_VERSIONS["bdinfo"]) -> str:
-        system = platform.system().lower()
+        system = static_release_system()
         machine = platform.machine().lower()
         logger.debug(f"[blue]Detected system: {system}, architecture: {machine}[/blue]")
 

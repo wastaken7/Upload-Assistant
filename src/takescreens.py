@@ -9,6 +9,7 @@ import random
 import re
 import secrets
 import sys
+import tempfile
 import time
 import traceback
 import urllib.parse
@@ -40,7 +41,7 @@ from src.screenshot_manifest import forget_file as forget_screenshot_file
 from src.screenshot_manifest import register as register_screenshots
 from src.screenshot_overlays import overlay_filters, overlay_fontfile, overlay_options
 from src.stats import record_event_async
-from src.temp_paths import artwork_dir, screenshots_dir
+from src.temp_paths import artwork_dir, release_temp_dir, screenshots_dir
 from src.webui_progress import complete_progress, publish_progress
 
 default_config: dict[str, Any] = {}
@@ -126,16 +127,58 @@ def _xxx_contact_sheet_static_stream(video_path: Path, frame_count: int, duratio
     return stream.filter("fps", fps=f"{frame_count}/{duration:.6f}").filter("scale", 320, -2).filter("tile", layout=f"{columns}x{rows}", margin=2, padding=2)
 
 
-def _xxx_contact_sheet_animated_stream(video_path: Path, frame_count: int, duration: float, columns: int, rows: int, animation_seconds: float, fontfile: str | None) -> Any:
+def _xxx_contact_sheet_animated_tile(video_path: Path, start_time: float, animation_seconds: float, fontfile: str | None) -> Any:
+    stream = ffmpeg.input(str(video_path), ss=start_time, t=animation_seconds).filter("fps", fps=8).filter("scale", 320, -2)
+    return _xxx_contact_sheet_timestamp_filter(stream, _format_contact_sheet_timestamp(start_time), fontfile).filter("setpts", "PTS-STARTPTS")
+
+
+async def _render_xxx_animated_contact_sheet(
+    video_path: Path,
+    output_path: Path,
+    work_root: Path,
+    frame_count: int,
+    duration: float,
+    columns: int,
+    rows: int,
+    animation_seconds: float,
+    fontfile: str | None,
+    include_title: bool,
+    loglevel: str,
+) -> tuple[int | None, bytes]:
+    """Render an animated sheet one tile at a time, then stack the small clips.
+
+    Decoding every tile in one ffmpeg process keeps one full decoder per tile
+    in memory at once (gigabytes for 4K HEVC). Rendering tiles in sequence
+    holds a single decoder; the final stack only reads 320px clips.
+    """
     max_start = max(0.0, duration - animation_seconds)
-    streams = []
-    for index in range(frame_count):
-        start_time = max_start * index / max(frame_count - 1, 1)
-        stream = ffmpeg.input(str(video_path), ss=start_time, t=animation_seconds).filter("fps", fps=8).filter("scale", 320, -2)
-        stream = _xxx_contact_sheet_timestamp_filter(stream, _format_contact_sheet_timestamp(start_time), fontfile).filter("setpts", "PTS-STARTPTS")
-        streams.append(stream)
-    rows_streams = [ffmpeg.filter(streams[row * columns : (row + 1) * columns], "hstack", inputs=columns) for row in range(rows)]
-    return ffmpeg.filter(rows_streams, "vstack", inputs=rows)
+    work_root.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="xxx-tiles-", dir=work_root, ignore_cleanup_errors=True) as work_dir:
+        tiles: list[Path] = []
+        for index in range(frame_count):
+            start_time = max_start * index / max(frame_count - 1, 1)
+            tile_path = Path(work_dir) / f"tile-{index:03d}.mkv"
+            tile = _xxx_contact_sheet_animated_tile(video_path, start_time, animation_seconds, fontfile)
+            # Lossless intermediate: the clips are re-encoded once, into WebP.
+            command = ffmpeg.output(tile, str(tile_path), vcodec="ffv1", an=None).global_args("-y", "-loglevel", loglevel)
+            return_code, _stdout, stderr = await run_ffmpeg(command)
+            if return_code != 0 or not tile_path.is_file():
+                # run_ffmpeg writes its report beside the output; keep the
+                # failed tile's report once the tile directory is removed.
+                for report in Path(work_dir).glob("ffmpeg-*.log"):
+                    with contextlib.suppress(OSError):
+                        report.replace(work_root / report.name)
+                return return_code, stderr
+            tiles.append(tile_path)
+
+        inputs = [ffmpeg.input(str(tile_path)) for tile_path in tiles]
+        # hstack/vstack reject a single input, so a one-wide row or one-row sheet skips them.
+        rows_streams = [inputs[row * columns] if columns == 1 else ffmpeg.filter(inputs[row * columns : (row + 1) * columns], "hstack", inputs=columns) for row in range(rows)]
+        sheet = rows_streams[0] if rows == 1 else ffmpeg.filter(rows_streams, "vstack", inputs=rows)
+        stream = _xxx_contact_sheet_title_filter(sheet, video_path.name, include_title, fontfile)
+        command = ffmpeg.output(stream, str(output_path), vcodec="libwebp_anim", loop=0, r=8, t=animation_seconds).global_args("-y", "-loglevel", loglevel)
+        return_code, _stdout, stderr = await run_ffmpeg(command)
+        return return_code, stderr
 
 
 async def xxx_contact_sheets(paths: list[str], folder_id: str, base_dir: str, meta: Meta, capture_group: str = "main", extra_screens: int = 0) -> list[str]:
@@ -175,15 +218,27 @@ async def xxx_contact_sheets(paths: list[str], folder_id: str, base_dir: str, me
                 duration = float(probe["format"]["duration"])
                 if duration <= 0:
                     raise ValueError("duration must be positive")
+                loglevel = "verbose" if meta.ffdebug else "quiet"
+                include_title = len(video_paths) > 1
                 if animated_webp:
-                    stream = _xxx_contact_sheet_animated_stream(video_path, frame_count, duration, columns, rows, animation_seconds, fontfile)
-                    output_options: dict[str, Any] = {"vcodec": "libwebp_anim", "loop": 0, "r": 8, "t": animation_seconds}
+                    return_code, stderr = await _render_xxx_animated_contact_sheet(
+                        video_path,
+                        output_path,
+                        release_temp_dir(base_dir, folder_id),
+                        frame_count,
+                        duration,
+                        columns,
+                        rows,
+                        animation_seconds,
+                        fontfile,
+                        include_title,
+                        loglevel,
+                    )
                 else:
                     stream = _xxx_contact_sheet_static_stream(video_path, frame_count, duration, columns, rows, fontfile)
-                    output_options = {"vframes": 1, "compression_level": ffmpeg_compression}
-                stream = _xxx_contact_sheet_title_filter(stream, video_path.name, len(video_paths) > 1, fontfile)
-                command = ffmpeg.output(stream, str(output_path), **output_options).global_args("-y", "-loglevel", "verbose" if meta.ffdebug else "quiet")
-                return_code, _stdout, stderr = await run_ffmpeg(command)
+                    stream = _xxx_contact_sheet_title_filter(stream, video_path.name, include_title, fontfile)
+                    command = ffmpeg.output(stream, str(output_path), vframes=1, compression_level=ffmpeg_compression).global_args("-y", "-loglevel", loglevel)
+                    return_code, _stdout, stderr = await run_ffmpeg(command)
                 if return_code != 0 or not output_path.is_file():
                     logger.warning(f"[yellow]Unable to create XXX contact sheet for {video_path.name}: {stderr.decode(errors='replace')}[/yellow]")
                     continue
@@ -920,10 +975,14 @@ async def dvd_screenshots(
     height: float = 0.0
     frame_rate: float = 24.0
     ifo_duration = 0.0
+    pgc_durations: list[float] = []
     tracks: list[Any] = []
     tracks.extend(cast(list[Any], getattr(ifo_mi, "tracks", [])))
     for track in tracks:
-        if track.track_type == "Video":
+        if track.track_type == "Menu":
+            with contextlib.suppress(TypeError, ValueError):
+                pgc_durations.append(float(track.duration) / 1000)
+        elif track.track_type == "Video":
             if isinstance(track.duration, str):
                 durations = [float(d) for d in track.duration.split(" / ")]
                 ifo_duration = max(durations) / 1000
@@ -935,6 +994,10 @@ async def dvd_screenshots(
             width = float(track.width)
             height = float(track.height)
             frame_rate = float(track.frame_rate)
+    # MediaInfo reports the sum of every program chain as the IFO video duration, which on
+    # episodic discs far exceeds the video in the VOBs; seek within the longest chain instead.
+    if pgc_durations and 0 < max(pgc_durations) < ifo_duration:
+        ifo_duration = max(pgc_durations)
     meta.frame_rate = frame_rate
     w_sar, h_sar = screenshot_par_scale_factors(width, height, par, dar, should_scale_dvd_screenshots_for_par())
 
@@ -1461,14 +1524,14 @@ async def extract_document_cover(path: str, dest_path: str) -> Path | None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     if extension == "pdf":
-        import fitz  # PyMuPDF
+        import pymupdf
 
         def _render_pdf_cover() -> Path | None:
-            with fitz.open(path) as doc:
+            with pymupdf.open(path) as doc:
                 if len(doc) == 0:
                     return None
                 page = doc[0]
-                pix = page.get_pixmap(matrix=fitz.Matrix(2.0, 2.0))
+                pix = page.get_pixmap(matrix=pymupdf.Matrix(2.0, 2.0))
                 pix.save(output_path)
                 return output_path
 
@@ -1644,6 +1707,16 @@ def find_ebook_info_page(doc: Any) -> int | None:
     return copyright_page
 
 
+def find_ebook_contents_page(doc: Any) -> int | None:
+    """Table of contents page, from the outline, a page heading or dotted leaders."""
+    from src.book_extractors import find_contents_page
+
+    contents_page = find_contents_page(doc)
+    if contents_page is not None:
+        logger.debug(f"[cyan]Using table of contents page {contents_page} as an ebook screenshot[/cyan]")
+    return contents_page
+
+
 COMIC_IMAGE_SUFFIXES = (".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp")
 
 
@@ -1699,7 +1772,7 @@ def _lone_image_clip(page: Any) -> tuple[Any, float] | None:
     MuPDF often lays out EPUB cover pages (percentage or viewport heights) as a
     small image at the top of a blank page.
     """
-    import fitz  # PyMuPDF
+    import pymupdf
 
     if page.get_text().strip() or page.first_annot:
         return None
@@ -1707,7 +1780,7 @@ def _lone_image_clip(page: Any) -> tuple[Any, float] | None:
     if len(images) != 1:
         return None
     # Image and drawing boxes are unrotated page coordinates; get_pixmap clips in rotated ones.
-    bbox = fitz.Rect(images[0]["bbox"])
+    bbox = pymupdf.Rect(images[0]["bbox"])
     if any(not bbox.contains(drawing["rect"]) for drawing in page.get_drawings()):
         return None
     clip = bbox * page.rotation_matrix & page.rect
@@ -1717,7 +1790,7 @@ def _lone_image_clip(page: Any) -> tuple[Any, float] | None:
 
 
 def _render_document_page(doc: Any, page_num: int, dest_stem: Path, suffix: str = ".png") -> Path:
-    import fitz  # PyMuPDF
+    import pymupdf
 
     dest_path = dest_stem.with_name(f"{dest_stem.name}{suffix}")
     page = doc[page_num]
@@ -1727,7 +1800,7 @@ def _render_document_page(doc: Any, page_num: int, dest_stem: Path, suffix: str 
         clip, native_zoom = lone_image
         # Fill the normal page render size without upscaling past the image's own resolution.
         zoom = max(zoom, min(zoom * page.rect.width / clip.width, zoom * page.rect.height / clip.height, native_zoom))
-    pix = page.get_pixmap(matrix=fitz.Matrix(zoom, zoom), clip=clip)
+    pix = page.get_pixmap(matrix=pymupdf.Matrix(zoom, zoom), clip=clip)
     if suffix == ".png":
         pix.save(dest_path)
     else:
@@ -1737,7 +1810,7 @@ def _render_document_page(doc: Any, page_num: int, dest_stem: Path, suffix: str 
 
 def capture_ebook_page(path: str, dest_stem: Path, exclude_pages: set[int], force_suffix: str | None = None) -> tuple[Path, int]:
     """Write one random page of an ebook/comic that is not in `exclude_pages` (any page once all are used)."""
-    import fitz  # PyMuPDF
+    import pymupdf
 
     if Path(path).suffix.lower() in {".cbz", ".cbr"}:
         opened = _open_comic_archive(path)
@@ -1751,8 +1824,8 @@ def capture_ebook_page(path: str, dest_stem: Path, exclude_pages: set[int], forc
             return _write_comic_page(archive, image_files[page], dest_stem, force_suffix), page
 
     with contextlib.suppress(Exception):
-        fitz.TOOLS.mupdf_display_errors(False)
-    with fitz.open(path) as doc:
+        pymupdf.TOOLS.mupdf_display_errors(False)
+    with pymupdf.open(path) as doc:
         if len(doc) == 0:
             raise ValueError("The book does not have pages")
         page = select_ebook_pages(len(doc), 1, [], exclude_pages)[0]
@@ -1773,10 +1846,10 @@ async def generate_ebook_screenshots(
     Pages already registered (for example by the early background capture and
     then reviewed in the Web UI) are reused unless `meta.retake` is set.
     """
-    import fitz  # PyMuPDF
+    import pymupdf
 
     with contextlib.suppress(Exception):
-        fitz.TOOLS.mupdf_display_errors(False)
+        pymupdf.TOOLS.mupdf_display_errors(False)
 
     output_dir = screenshots_dir(base_dir, folder_id).resolve()
     sanitized_filename = await sanitize_filename(filename)
@@ -1854,7 +1927,7 @@ async def generate_ebook_screenshots(
                 except Exception as e:
                     logger.debug(f"[yellow]Warning: EPUB cover extraction failed: {e}[/yellow]")
 
-            with fitz.open(path) as doc:
+            with pymupdf.open(path) as doc:
                 total_pages = len(doc)
                 if total_pages == 0:
                     logger.info(f"[yellow]{extension.upper()} does not have pages[/yellow]")
@@ -1865,7 +1938,12 @@ async def generate_ebook_screenshots(
 
                 if capture_pages:
                     info_page = await asyncio.to_thread(find_ebook_info_page, doc) if num_screens > 1 else None
-                    selected_pages = select_ebook_pages(total_pages, num_screens, [0] if info_page is None else [0, info_page])
+                    fixed_pages = list(dict.fromkeys(page for page in (0, info_page) if page is not None))
+                    # Only look for the contents page when a screenshot slot is left for it.
+                    contents_page = await asyncio.to_thread(find_ebook_contents_page, doc) if num_screens > len(fixed_pages) else None
+                    if contents_page is not None:
+                        fixed_pages.append(contents_page)
+                    selected_pages = select_ebook_pages(total_pages, num_screens, fixed_pages)
                     for i, page_num in enumerate(selected_pages):
                         scr_path = await process_page(page_num, output_dir / f"{sanitized_filename}-{i}")
                         screenshots.append(scr_path)

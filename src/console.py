@@ -87,6 +87,9 @@ def ansi_to_html(ansi_chunk: str, width: int = 120) -> str:
     with inline styles so it can be embedded directly into the web UI.
     """
     try:
+        # Windows pipes and ConPTY end lines with CRLF. Rich decodes a carriage
+        # return as "rewrite this line", which would blank every CRLF line.
+        ansi_chunk = ansi_chunk.replace("\r\n", "\n")
         c = Console(file=io.StringIO(), record=True, force_terminal=True, width=width)
         # Try parsing ANSI sequences first. If there are no style spans and
         # the chunk looks like Rich markup (e.g. contains [bold] tags),

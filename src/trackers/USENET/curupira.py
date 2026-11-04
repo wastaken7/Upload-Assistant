@@ -7,9 +7,8 @@ from xml.etree import ElementTree
 
 import aiofiles
 import httpx
-import langcodes
 
-from src import payload_preview
+from src import language_names, payload_preview
 from src.cogs.redaction import Redaction
 from src.console import logger
 from src.meta import Meta
@@ -268,8 +267,8 @@ class Curupira:
 
     def get_iso_639_1(self, lang_name: str) -> str | None:
         with contextlib.suppress(Exception):
-            lang = langcodes.find(lang_name)
-            if lang and lang.is_valid():
+            lang = language_names.find(lang_name)
+            if lang.is_valid():
                 return lang.language
         return None
 

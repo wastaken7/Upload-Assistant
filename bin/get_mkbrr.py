@@ -11,7 +11,7 @@ from typing import ClassVar
 import aiofiles
 import httpx
 
-from bin.binary_dependencies import DEPENDENCY_VERSIONS
+from bin.binary_dependencies import DEPENDENCY_VERSIONS, static_release_system
 from bin.download_integrity import verify_downloaded_asset
 
 try:
@@ -61,7 +61,7 @@ class MkbrrBinaryManager:
     @staticmethod
     def find_existing_binary(base_dir: str | Path, version: str | None = None) -> str | None:
         """Return an existing mkbrr binary, version-checking the managed cache when requested."""
-        system = platform.system().lower()
+        system = static_release_system()
         machine = platform.machine().lower()
         binary_name = "mkbrr.exe" if system == "windows" else "mkbrr"
         bin_root = Path(base_dir) / "bin"
@@ -83,7 +83,7 @@ class MkbrrBinaryManager:
         if existing_binary:
             return existing_binary
 
-        system = platform.system().lower()
+        system = static_release_system()
         machine = platform.machine().lower()
         logger.debug(f"[blue]Detected system: {system}, architecture: {machine}[/blue]")
 

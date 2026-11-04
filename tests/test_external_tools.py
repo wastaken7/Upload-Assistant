@@ -60,6 +60,20 @@ def test_managed_tool_status_uses_centralized_versions(tmp_path: Path, monkeypat
     assert "10.2" in external_tools._automatic_message("ffmpeg_path")
 
 
+def test_android_uses_static_linux_builds(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(external_tools, "_host", lambda: ("android", "aarch64"))
+
+    bdinfo = external_tools._managed_paths("bdinfo_path", tmp_path, tmp_path)[0]
+    mkbrr = external_tools._managed_paths("mkbrr_path", tmp_path, tmp_path)[-1]
+
+    assert bdinfo[0] == tmp_path / "bin" / "bdinfo" / "linux" / "arm64" / "bdinfo"
+    assert mkbrr[0] == tmp_path / "bin" / "mkbrr" / "linux" / "arm64" / "mkbrr"
+    assert external_tools._is_automatically_managed("bdinfo_path")
+    assert external_tools._is_automatically_managed("mkbrr_path")
+    # Dynamically linked tools keep their own platform support on Android.
+    assert not external_tools._is_automatically_managed("dovi_tool_path")
+
+
 def test_managed_mediainfo_is_reported_with_its_pinned_version(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(external_tools, "_host", lambda: ("windows", "x86_64"))
     monkeypatch.setattr(external_tools, "_is_android", lambda: False)

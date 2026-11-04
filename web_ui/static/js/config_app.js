@@ -1312,6 +1312,7 @@ const trackerDefaultOverrideKeys = new Set([
 const trackerNameMap = {
   AITHER: "Aither",
   ALPHARATIO: "AlphaRatio",
+  AMIGOSSHARE: "Amigos Share Club",
   ANTHELION: "Anthelion",
   ASIANCINEMA: "AsianCinema",
   AVISTAZ: "AvistaZ",
@@ -1334,6 +1335,7 @@ const trackerNameMap = {
   DRUNKENSLUG: "DrunkenSlug",
   EMUWAREZ: "eMuwarez",
   EXOTICAZ: "ExoticaZ",
+  FILEIPLAY: "FileIPlay",
   FILELIST: "FileList",
   FLOOD: "Flood",
   FUNFILE: "FunFile",
@@ -5633,6 +5635,7 @@ function TrackerSettings({
       title: "Authentication & Connection",
       keys: [
         "api_key",
+        "torznab_api_key",
         "announce_url",
         "my_announce_url",
         "username",
@@ -6512,7 +6515,11 @@ function TrackerManager({
       requirements.push({ id, label, complete, note: options.note || "" });
     };
 
-    addRequirement("api", "API credentials", ["ApiUser", "api_key"]);
+    addRequirement("api", "API credentials", [
+      "ApiUser",
+      "api_key",
+      "torznab_api_key",
+    ]);
     const announceKeys = fields.has("announce_url")
       ? fields.has("my_announce_url")
         ? ["announce_url", "my_announce_url"]

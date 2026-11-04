@@ -1,8 +1,8 @@
 import asyncio
 
-import langcodes
 import pytest
 
+from src import language_names
 from src.audio import AudioManager
 from src.get_name import NameManager
 from src.languages import LanguagesManager
@@ -943,7 +943,7 @@ def test_dreadvault_naming_guide(facts, expected, tmp_path):
                 "@type": "Audio",
                 "StreamOrder": str(index + 1),
                 "Default": "Yes" if index == 0 else "No",
-                "Language": langcodes.find(language).language if language else "",
+                "Language": language_names.find(language).language if language else "",
                 "Title": title,
                 "Format": audio_format,
                 "Format_Profile": "Layer 3" if codec == "MP3" else "",

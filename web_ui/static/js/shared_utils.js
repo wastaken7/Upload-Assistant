@@ -556,6 +556,7 @@
   });
   const UA_TRACKER_SCOPES = new Set([
     "alpharatio",
+    "amigosshare",
     "anthelion",
     "beyondhd",
     "bithdtv",

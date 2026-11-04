@@ -98,6 +98,17 @@ def test_configured_trackers_require_complete_setup_independently_of_defaults() 
     assert configured == {"BLUTOPIA"}
 
 
+def test_tracker_setup_requires_torznab_key_when_the_tracker_has_one() -> None:
+    example_trackers = {"FILEIPLAY": {"api_key": "", "torznab_api_key": "", "anon": True}}
+    supported_trackers = {"FILEIPLAY": object()}
+
+    partial = server._configured_tracker_names({"FILEIPLAY": {"api_key": "token", "torznab_api_key": ""}}, example_trackers, supported_trackers)
+    complete = server._configured_tracker_names({"FILEIPLAY": {"api_key": "token", "torznab_api_key": "key"}}, example_trackers, supported_trackers)
+
+    assert partial == set()
+    assert complete == {"FILEIPLAY"}
+
+
 def test_tracker_optional_setup_keys_do_not_block_valid_api_credentials() -> None:
     configured = server._configured_tracker_names(
         {
@@ -316,3 +327,109 @@ def test_refresh_tracker_status_rejects_unknown_tracker(monkeypatch) -> None:
 
     assert response.status_code == 400
     assert response.get_json()["success"] is False
+
+
+def test_shared_cookie_scan_matches_individual_lookups_and_reads_each_file_once(tmp_path: Path, monkeypatch) -> None:
+    from src.cookie_auth import CookieDirectoryScan, find_cookie_file
+
+    cookies_dir = tmp_path / "data" / "cookies"
+    cookies_dir.mkdir(parents=True)
+    (cookies_dir / "EXACTTRK.txt").write_text("cookie data", encoding="utf-8")
+    (cookies_dir / "my_partialtrk_cookies.txt").write_text("cookie data", encoding="utf-8")
+    (cookies_dir / "session.txt").write_text("# Netscape\n.contenttrk\tTRUE\t/\n", encoding="utf-8")
+    (cookies_dir / "notes.json").write_text("{}", encoding="utf-8")
+    (cookies_dir / "nested").mkdir()
+    trackers = ["EXACTTRK", "PARTIALTRK", "CONTENTTRK", "MISSINGTRK", "OTHERTRK"]
+
+    expected = {tracker: find_cookie_file(str(tmp_path), tracker) for tracker in trackers}
+
+    opened: list[str] = []
+    original_open = Path.open
+
+    def counting_open(self: Path, *args, **kwargs):
+        opened.append(self.name)
+        return original_open(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", counting_open)
+    scan = CookieDirectoryScan(tmp_path)
+    shared = {tracker: find_cookie_file(str(tmp_path), tracker, scan=scan) for tracker in trackers}
+
+    assert shared == expected
+    assert Path(shared["EXACTTRK"]).name == "EXACTTRK.txt"
+    assert Path(shared["PARTIALTRK"]).name == "my_partialtrk_cookies.txt"
+    assert Path(shared["CONTENTTRK"]).name == "session.txt"
+    assert Path(shared["MISSINGTRK"]).name == "MISSINGTRK.txt"
+    # Two trackers fall through to the content search; each file is still read once.
+    assert sorted(opened) == ["EXACTTRK.txt", "my_partialtrk_cookies.txt", "notes.json", "session.txt"]
+
+
+def test_prowlarr_report_is_reused_for_the_same_connection_only(monkeypatch) -> None:
+    import src.prowlarr as prowlarr
+
+    calls: list[tuple[str, str]] = []
+
+    def fake_fetch(base_url: str, api_key: str, _supported: set[str]) -> object:
+        calls.append((base_url, api_key))
+        return object()
+
+    monkeypatch.setattr(prowlarr, "fetch_prowlarr_credentials", fake_fetch)
+    with server._prowlarr_report_cache_lock:
+        server._prowlarr_report_cache.clear()
+
+    first = server._cached_prowlarr_credentials("http://prowlarr.test", "key-a", {"AITHER"})
+    assert server._cached_prowlarr_credentials("http://prowlarr.test", "key-a", {"AITHER"}) is first
+    assert len(calls) == 1
+
+    assert server._cached_prowlarr_credentials("http://prowlarr.test", "key-b", {"AITHER"}) is not first
+    assert len(calls) == 2
+
+    monkeypatch.setattr(server, "_PROWLARR_REPORT_CACHE_SECONDS", 0)
+    server._cached_prowlarr_credentials("http://prowlarr.test", "key-b", {"AITHER"})
+    assert len(calls) == 3
+
+    with server._prowlarr_report_cache_lock:
+        server._prowlarr_report_cache.clear()
+
+
+def test_prowlarr_fetch_started_before_invalidation_is_not_cached(monkeypatch) -> None:
+    import src.prowlarr as prowlarr
+
+    calls: list[str] = []
+
+    def fetch_then_invalidate(base_url: str, _api_key: str, _supported: set[str]) -> object:
+        calls.append(base_url)
+        if len(calls) == 1:
+            # A manual Prowlarr test completes while this request is in flight.
+            server._invalidate_prowlarr_report_cache()
+        return object()
+
+    monkeypatch.setattr(prowlarr, "fetch_prowlarr_credentials", fetch_then_invalidate)
+    server._invalidate_prowlarr_report_cache()
+
+    stale = server._cached_prowlarr_credentials("http://prowlarr.test", "key", {"AITHER"})
+    fresh = server._cached_prowlarr_credentials("http://prowlarr.test", "key", {"AITHER"})
+
+    assert fresh is not stale
+    assert len(calls) == 2
+    assert server._cached_prowlarr_credentials("http://prowlarr.test", "key", {"AITHER"}) is fresh
+
+    server._invalidate_prowlarr_report_cache()
+
+
+def test_prowlarr_failures_are_not_cached(monkeypatch) -> None:
+    import src.prowlarr as prowlarr
+
+    calls: list[str] = []
+
+    def failing_fetch(base_url: str, _api_key: str, _supported: set[str]) -> object:
+        calls.append(base_url)
+        raise prowlarr.ProwlarrError("unreachable")
+
+    monkeypatch.setattr(prowlarr, "fetch_prowlarr_credentials", failing_fetch)
+    with server._prowlarr_report_cache_lock:
+        server._prowlarr_report_cache.clear()
+
+    for _ in range(2):
+        with pytest.raises(prowlarr.ProwlarrError):
+            server._cached_prowlarr_credentials("http://prowlarr.test", "key", {"AITHER"})
+    assert len(calls) == 2

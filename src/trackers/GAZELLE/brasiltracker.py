@@ -7,15 +7,15 @@ from pathlib import Path
 from typing import Any, ClassVar, cast
 
 import aiofiles
-import fitz
 import httpx
 import langcodes
+import pymupdf
 import rarfile
 from bs4 import BeautifulSoup
 from langcodes.tag_parser import LanguageTagError
 from rich.markup import escape
 
-from src import payload_preview
+from src import language_names, payload_preview
 from src.console import logger
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder, html_to_bbcode
@@ -429,7 +429,7 @@ class BrasilTracker:
             return None
 
         try:
-            return langcodes.Language.make(lang_code).display_name("pt").capitalize()
+            return language_names.display_name(langcodes.Language.make(lang_code), "pt").capitalize()
 
         except LanguageTagError:
             return lang_code
@@ -1332,7 +1332,7 @@ class BrasilTracker:
         ext = Path(file_path).suffix.lower()
         if ext == ".pdf":
             with contextlib.suppress(Exception):
-                doc = fitz.open(file_path)
+                doc = pymupdf.open(file_path)
                 return str(len(doc))
         elif ext in (".cbz", ".cbr"):
             with contextlib.suppress(Exception):

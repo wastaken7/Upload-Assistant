@@ -394,6 +394,13 @@ def validate_isbn_checksum(candidate: str) -> str | None:
 
 ISBN_CANDIDATE_RE = re.compile(r"\b(?:ISBN(?:-1[03])?:?\s*)?((?:97[89][- ]?)?\d(?:[- ]?\d){8,11}[- ]?[\dX])\b", re.IGNORECASE)
 COPYRIGHT_PAGE_RE = re.compile(r"copyright|©|all rights reserved|todos os direitos reservados|derechos reservados", re.IGNORECASE)
+# Matched against a whole line, so "Índices para catálogo sistemático" on a copyright page is not a heading.
+CONTENTS_HEADING_RE = re.compile(
+    r"(?:(?:table of )?contents|sum[aá]rio|[ií]ndice(?: geral)?|conte[uú]dos?|contenido|table des mati[eè]res|sommaire|inhalt(?:sverzeichnis)?)\s*:?",
+    re.IGNORECASE,
+)
+# A single ellipsis counts only as the leader before an entry's page number.
+TOC_LEADER_RE = re.compile(r"(?:\.\s?){5,}|…{3,}|…[ \t]*\d+[ \t]*$", re.MULTILINE)
 
 
 def _page_search_order(num_pages: int, edge: int = 30) -> list[int]:
@@ -435,12 +442,48 @@ def find_copyright_page(doc: Any, max_pages: int = 30, with_isbn: bool = False) 
     return None
 
 
+def _normalized(text: str) -> str:
+    return " ".join(text.split()).casefold()
+
+
+def find_contents_page(doc: Any, max_pages: int = 30) -> int | None:
+    """Return the table of contents page of an open PyMuPDF document.
+
+    Tries the outline entry for the contents, then a front or back page headed
+    like one, then a front or back page of dotted leaders.
+    """
+    num_pages = len(doc)
+    with contextlib.suppress(Exception):
+        outline = [(_normalized(str(title)), page) for _level, title, page, *_ in doc.get_toc()]
+        contents_targets = [page for title, page in outline if CONTENTS_HEADING_RE.fullmatch(title)]
+        titles = {title for title, _page in outline if len(title) >= 4 and not CONTENTS_HEADING_RE.fullmatch(title)}
+        for page in contents_targets if titles else []:
+            # Outline pages are 1-based; unresolved targets are -1.
+            if not 0 < page <= num_pages:
+                continue
+            # Some outlines point at a page without the list, so require it to name other chapters.
+            # Whole-title matches, so "Part II" on the page does not also count as "Part I".
+            text = _normalized(_page_text(doc, page - 1))
+            if sum(re.search(rf"(?<!\w){re.escape(chapter)}(?!\w)", text) is not None for chapter in titles) >= min(2, len(titles)):
+                return page - 1
+    leader_page = None
+    for page_num in _page_search_order(num_pages, max_pages)[: min(num_pages, 2 * max_pages)]:
+        text = _page_text(doc, page_num)
+        # Page numbers or running headers can come before the heading.
+        top_lines = [line.strip() for line in text.splitlines() if line.strip()][:3]
+        if any(CONTENTS_HEADING_RE.fullmatch(line) for line in top_lines):
+            return page_num
+        if leader_page is None and len(TOC_LEADER_RE.findall(text)) >= 5:
+            leader_page = page_num
+    return leader_page
+
+
 def extract_isbn_from_pdf(pdf_path: str) -> str | None:
-    """Search for and extract a valid ISBN from a PDF file using PyMuPDF (fitz)."""
+    """Search for and extract a valid ISBN from a PDF file using PyMuPDF."""
     try:
-        import fitz
+        import pymupdf
     except ImportError:
-        logger.debug("[yellow]Debug: PyMuPDF (fitz) is not installed. Skipping PDF ISBN extraction.[/yellow]")
+        logger.debug("[yellow]Debug: PyMuPDF is not installed. Skipping PDF ISBN extraction.[/yellow]")
         return None
 
     if not Path(pdf_path).is_file():
@@ -449,9 +492,9 @@ def extract_isbn_from_pdf(pdf_path: str) -> str | None:
     try:
         # Disable mupdf display errors to avoid spamming console
         with contextlib.suppress(Exception):
-            fitz.TOOLS.mupdf_display_errors(False)
+            pymupdf.TOOLS.mupdf_display_errors(False)
 
-        with fitz.open(pdf_path) as doc:
+        with pymupdf.open(pdf_path) as doc:
             found = find_isbn_page(doc)
             if found:
                 page_num, isbn = found

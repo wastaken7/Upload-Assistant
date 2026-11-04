@@ -13,6 +13,7 @@ from typing import Any, cast
 
 import langcodes
 
+from src import language_names
 from src.meta import Meta
 
 DISC = "DISC"
@@ -274,7 +275,7 @@ def _language_code(value: str | None) -> str | None:
     try:
         if re.fullmatch(r"[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,4})?", text):
             return str(cast(Any, langcodes).standardize_tag(text)).split("-")[0].lower()
-        return str(cast(Any, langcodes).find(text).language).lower()
+        return str(language_names.find(text).language).lower()
     except Exception:
         return None
 

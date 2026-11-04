@@ -7,20 +7,13 @@ from pathlib import Path
 from typing import Any
 
 from src.console import logger
+from src.css_colors import CSS4_COLORS
 from src.meta import Meta
 
 
 @cache
-def _css4_colors() -> dict[str, str]:
-    # Imported lazily: matplotlib is slow to import and only a few trackers need color conversion.
-    from matplotlib.colors import CSS4_COLORS
-
-    return dict(CSS4_COLORS)
-
-
-@cache
 def _css4_colors_by_hex() -> dict[str, str]:
-    return {color_hex.lower(): color_name for color_name, color_hex in _css4_colors().items()}
+    return {color_hex.lower(): color_name for color_name, color_hex in CSS4_COLORS.items()}
 
 
 _INLINE_OPEN = r"(?:\[(?:b|i|u|small|size=\d+|color=[^\]]*|font=[^\]]*)\]\s*)*"
@@ -87,6 +80,16 @@ UPLOAD_TOOL_SIGNATURES: dict[str, tuple[str, ...]] = {
     "Only-Uploader": (_signature(r"\[url=https?://github\.com/edge20200/Only-Uploader/?\]" + _URL_BODY),),
     "MAGUS": (_signature(r"\[url=https?://dailyusetools\.com/MAGUS/?\]" + _URL_BODY),),
 }
+
+
+def _quoted(core: str) -> str:
+    """Match core with its inline formatting, and its own quote block when it fills one."""
+    return rf"\[quote\]\s*{_INLINE_OPEN}(?:{core}){_INLINE_CLOSE}\s*\[/quote\]|{_INLINE_OPEN}(?:{core}){_INLINE_CLOSE}"
+
+
+# Notes that the source upload's screenshots were tonemapped. A run that tonemaps
+# adds its own tonemapped_header, so an imported note is only a duplicate.
+TONEMAPPED_NOTES: tuple[str, ...] = (_quoted(r"Foi\s+feito\s+o\s+mapeamento\s+de\s+tonalidade\s+nas\s+screenshots\b[^\[]*?\bcores\s+reais\s+do\s+v[íi]deo\.?"),)
 
 
 # Bold - KEEP
@@ -637,8 +640,8 @@ class BBCODE:
         return desc, imagelist
 
     def remove_known_boilerplate(self, desc: str) -> str:
-        """Remove release group boilerplate and upload tool signatures."""
-        for patterns in (*RELEASE_GROUP_BOILERPLATE.values(), *UPLOAD_TOOL_SIGNATURES.values()):
+        """Remove release group boilerplate, upload tool signatures and tonemapped notes."""
+        for patterns in (*RELEASE_GROUP_BOILERPLATE.values(), *UPLOAD_TOOL_SIGNATURES.values(), TONEMAPPED_NOTES):
             for pattern in patterns:
                 desc = re.sub(pattern, "", desc, flags=re.IGNORECASE)
         return desc
@@ -692,7 +695,7 @@ class BBCODE:
 
         def convert(match: re.Match[str]) -> str:
             color_name = match.group(1).strip().lower()
-            color_hex = _css4_colors().get(color_name)
+            color_hex = CSS4_COLORS.get(color_name)
             return f"[color={color_hex.lower()}]" if color_hex else match.group(0)
 
         return re.sub(r"\[color=([^\]]+)\]", convert, desc, flags=re.IGNORECASE)

@@ -10,7 +10,7 @@ from typing import Any, cast
 import cli_ui
 import langcodes
 
-from src import webui_events
+from src import language_names, webui_events
 from src.console import logger
 from src.meta import Meta
 from src.trackers.common import Common
@@ -590,7 +590,7 @@ def bloated_check(meta: Meta, audio_languages: Sequence[str] | str, is_eng_origi
             clean_lang = audio_language.split("-")[0].split("_")[0].strip().lower()
             if clean_lang:
                 lang = langcodes.Language.get(clean_lang)
-                language_display = lang.display_name()
+                language_display = language_names.display_name(lang)
         except (LookupError, AttributeError, ValueError) as e:
             # Silently fall back to the original language code
             logger.debug(f"[yellow]Debug: Unable to convert language code '{audio_language}' to full name: {e}[/yellow]")

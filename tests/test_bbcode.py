@@ -246,9 +246,9 @@ def test_clean_unit3d_description_keeps_links_to_other_github_projects() -> None
 def test_known_boilerplate_patterns_compile() -> None:
     import re
 
-    from src.bbcode import RELEASE_GROUP_BOILERPLATE, UPLOAD_TOOL_SIGNATURES
+    from src.bbcode import RELEASE_GROUP_BOILERPLATE, TONEMAPPED_NOTES, UPLOAD_TOOL_SIGNATURES
 
-    for patterns in (*RELEASE_GROUP_BOILERPLATE.values(), *UPLOAD_TOOL_SIGNATURES.values()):
+    for patterns in (*RELEASE_GROUP_BOILERPLATE.values(), *UPLOAD_TOOL_SIGNATURES.values(), TONEMAPPED_NOTES):
         for pattern in patterns:
             re.compile(pattern)
 
@@ -319,6 +319,25 @@ def test_block_patterns_only_remove_whole_blocks(monkeypatch) -> None:
     desc = "[center][color=#a61805][size=18][font=Arial]SCREENSHOTS[/font][/size][/color][/center]\nThe SCREENSHOTS below are fictional."
 
     assert _clean_unit3d(desc)[0] == "The SCREENSHOTS below are fictional."
+
+
+def test_portuguese_tonemapped_note_is_removed() -> None:
+    note = (
+        "[quote]Foi feito o mapeamento de tonalidade nas screenshots para melhor compatibilidade com telas SDR, "
+        "o resultado pode não representar as cores reais do vídeo.[/quote]"
+    )
+
+    assert _clean_unit3d(note) == ("", [])
+    assert _clean_unit3d(f"Fictional notes.\n{note}\n[center]{SHOT}[/center]") == ("Fictional notes.", ["https://img.example/s1.png"])
+
+
+def test_tonemapped_note_inside_a_longer_quote_keeps_the_quote_balanced() -> None:
+    desc = (
+        "[quote]Fictional notes. Foi feito o mapeamento de tonalidade nas screenshots para melhor compatibilidade "
+        "com telas SDR, o resultado pode não representar as cores reais do vídeo.[/quote]"
+    )
+
+    assert _clean_unit3d(desc)[0] == "[quote]Fictional notes. [/quote]"
 
 
 def test_upload_tool_signature_does_not_swallow_a_screenshot_in_the_same_block() -> None:

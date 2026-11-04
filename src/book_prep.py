@@ -20,6 +20,7 @@ from urllib.parse import urlparse, urlsplit
 
 import langcodes
 
+from src import language_names
 from src.audible import fetch_audible_metadata, normalize_audible_domain, normalize_audible_url, resolve_audible_url
 from src.book_extractors import (
     extract_audiobook_series_from_title as _extract_audiobook_series_from_title,
@@ -150,13 +151,13 @@ def resolve_book_language(raw: str) -> tuple[str, str]:
     raw = raw.strip()
     with contextlib.suppress(Exception):
         lc = langcodes.get(raw.lower())
-        full_name = lc.display_name("en") or raw.title()
+        full_name = language_names.display_name(lc, "en") or raw.title()
         alpha3 = lc.to_alpha3() or ""
         if full_name and full_name.lower() != raw.lower():
             return full_name, alpha3
     try:
-        lc = langcodes.find(raw)
-        return lc.display_name("en") or raw.title(), lc.to_alpha3() or ""
+        lc = language_names.find(raw)
+        return language_names.display_name(lc, "en") or raw.title(), lc.to_alpha3() or ""
     except Exception:
         return raw.title(), ""
 

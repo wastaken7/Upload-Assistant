@@ -19,7 +19,7 @@ import langcodes
 import pycountry
 from bs4 import BeautifulSoup
 
-from src import payload_preview, webui_events
+from src import language_names, payload_preview, webui_events
 from src.binaries import configured_binary
 from src.cogs.redaction import Redaction
 from src.config_helpers import format_terminal_link
@@ -631,11 +631,11 @@ class MakingOff:
         with contextlib.suppress(Exception):
             lang = langcodes.get(lang_string)
             if lang and lang.is_valid():
-                return lang.display_name("pt").capitalize()
+                return language_names.display_name(lang, "pt").capitalize()
         with contextlib.suppress(Exception):
-            lang = langcodes.find(lang_string)
-            if lang and lang.is_valid():
-                return lang.display_name("pt").capitalize()
+            lang = language_names.find(lang_string)
+            if lang.is_valid():
+                return language_names.display_name(lang, "pt").capitalize()
         return lang_string.capitalize()
 
     def _localizer_countries(self, meta: Meta) -> str:

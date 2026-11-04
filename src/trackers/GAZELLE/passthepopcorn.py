@@ -18,7 +18,7 @@ from rich.markup import escape
 
 from src import payload_preview, webui_events
 from src.bbcode import BBCODE
-from src.cogs.redaction import PathAwareEncoder, Redaction
+from src.cogs.redaction import Redaction
 from src.console import logger, prompt_in_thread
 from src.cookie_auth import CookieValidator
 from src.exceptions import *  # noqa F403
@@ -26,7 +26,9 @@ from src.exceptions import UploadError
 from src.manual_input import Question, ask, choices_from
 from src.mediainfo import MediaInfo
 from src.meta import Meta
-from src.rehostimages import ImageHostPolicy, RehostImagesManager
+from src.meta_file import write_meta_file
+from src.rehostimages import ImageHostPolicy, RehostImagesManager, _image_host
+from src.release_locks import release_image_lock
 from src.screenshot_manifest import files as manifest_files
 from src.takescreens import TakeScreensManager
 from src.temp_paths import artwork_dir
@@ -600,15 +602,17 @@ class PassThePopcorn:
             poster_path = tmp_dir / f"PTP_POSTER{self._poster_extension(image_url, response.headers.get('content-type', ''))}"
             await asyncio.to_thread(poster_path.write_bytes, response.content)
 
-            original_imghost = meta.imghost
-            meta.imghost = selected_host
-            try:
-                uploaded_images, _ = await self.uploadscreens_manager.upload_screens(meta, 1, 1, 0, 1, [str(poster_path)], {})
-            finally:
-                if original_imghost is None:
-                    meta.pop("imghost", None)
-                else:
-                    meta.imghost = original_imghost
+            # The host switch is visible to every tracker sharing this meta.
+            async with release_image_lock(meta):
+                original_imghost = meta.imghost
+                meta.imghost = selected_host
+                try:
+                    uploaded_images, _ = await self.uploadscreens_manager.upload_screens(meta, 1, 1, 0, 1, [str(poster_path)], {})
+                finally:
+                    if original_imghost is None:
+                        meta.pop("imghost", None)
+                    else:
+                        meta.imghost = original_imghost
 
             if uploaded_images:
                 uploaded_url = uploaded_images[0].get("raw_url") or uploaded_images[0].get("img_url")
@@ -937,12 +941,29 @@ class PassThePopcorn:
         menu_images = get_tracker_image_collection(meta, self.tracker, "menu_images")
         return cast(list[dict[str, Any]], [*menu_images, *screenshots])
 
+    def _approved_pack_images(self, meta: Meta, image_key: str, required: int) -> list[dict[str, Any]]:
+        """Return the shared pack images to reuse, or nothing when the group must be regenerated.
+
+        Another tracker may have hosted the pack images first, under its own
+        image-host rules. A group is reused only when enough of its images are
+        on hosts PTP accepts.
+        """
+        images = meta.get(image_key) or []
+        mapping = self.image_host_policy.url_host_mapping
+        approved = [image for image in images if isinstance(image, dict) and _image_host(str(image.get("raw_url", "")), mapping) in self.approved_image_hosts]
+        return approved if len(approved) >= required else []
+
     def _description_image_limit(self, meta: Meta, screenshot_limit: int) -> int:
         if not meta.is_disc:
             return screenshot_limit
         return screenshot_limit + len(get_tracker_image_collection(meta, self.tracker, "menu_images"))
 
     async def edit_desc(self, meta: Meta) -> None:
+        # Pack images are shared with the trackers uploading at the same time.
+        async with release_image_lock(meta):
+            await self._write_description(meta)
+
+    async def _write_description(self, meta: Meta) -> None:
         from src.description_review import get_base_description
 
         base = get_base_description(meta)
@@ -1092,12 +1113,12 @@ class PassThePopcorn:
                                     {"img_url": str(img.get("img_url", "")), "raw_url": str(img.get("raw_url", "")), "web_url": str(img.get("web_url", ""))}
                                 )
 
-                    if meta.get(new_images_key):
+                    if approved_images := self._approved_pack_images(meta, new_images_key, multi_screens):
                         desc.write(f"\n[b]{edition}[/b]\n\n")
                         # Use the summary corresponding to the current bdinfo
                         desc.write(f"[mediainfo]{summary}[/mediainfo]\n\n")
                         logger.debug(f"{self.tracker}: [yellow]Using original uploaded images for first disc")
-                        for img in meta[new_images_key]:
+                        for img in approved_images:
                             raw_url = str(img.get("raw_url", ""))
                             desc.write(f"[img]{raw_url}[/img]\n")
                     else:
@@ -1125,9 +1146,7 @@ class PassThePopcorn:
                                 raw_url = str(img.get("raw_url", ""))
                                 desc.write(f"[img]{raw_url}[/img]\n")
 
-                        meta_filename = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/meta.json"
-                        async with aiofiles.open(meta_filename, "w", encoding="utf-8") as f:
-                            await f.write(json.dumps(meta.to_dict(), indent=4, cls=PathAwareEncoder))
+                        await write_meta_file(meta)
 
         # Handle multiple discs case
         elif len(discs) > 1:
@@ -1171,8 +1190,8 @@ class PassThePopcorn:
                                     meta[new_images_key].append(
                                         {"img_url": str(img.get("img_url", "")), "raw_url": str(img.get("raw_url", "")), "web_url": str(img.get("web_url", ""))}
                                     )
-                        if meta.get(new_images_key):
-                            for img in meta[new_images_key]:
+                        if approved_images := self._approved_pack_images(meta, new_images_key, multi_screens):
+                            for img in approved_images:
                                 raw_url = str(img.get("raw_url", ""))
                                 desc.write(f"[img]{raw_url}[/img]\n")
                             desc.write("\n")
@@ -1197,9 +1216,7 @@ class PassThePopcorn:
                                 desc.write(f"[img]{raw_url}[/img]\n")
                             desc.write("\n")
 
-                            meta_filename = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/meta.json"
-                            async with aiofiles.open(meta_filename, "w", encoding="utf-8") as f:
-                                await f.write(json.dumps(meta.to_dict(), indent=4, cls=PathAwareEncoder))
+                            await write_meta_file(meta)
 
                 elif each["type"] == "DVD":
                     if i == 0:
@@ -1231,8 +1248,8 @@ class PassThePopcorn:
                                 meta[new_images_key] = []
                                 for img in saved_images:
                                     meta[new_images_key].append({"img_url": img.get("img_url", ""), "raw_url": img.get("raw_url", ""), "web_url": img.get("web_url", "")})
-                        if meta.get(new_images_key):
-                            for img in meta[new_images_key]:
+                        if approved_images := self._approved_pack_images(meta, new_images_key, multi_screens):
+                            for img in approved_images:
                                 raw_url = img["raw_url"]
                                 desc.write(f"[img]{raw_url}[/img]\n")
                             desc.write("\n")
@@ -1259,9 +1276,7 @@ class PassThePopcorn:
                                     desc.write(f"[img]{raw_url}[/img]\n")
                                 desc.write("\n")
 
-                        meta_filename = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/meta.json"
-                        async with aiofiles.open(meta_filename, "w", encoding="utf-8") as f:
-                            await f.write(json.dumps(meta.to_dict(), indent=4, cls=PathAwareEncoder))
+                        await write_meta_file(meta)
 
         # Handle single file case
         elif len(filelist) == 1:
@@ -1354,8 +1369,8 @@ class PassThePopcorn:
                             meta[new_images_key] = []
                             for img in saved_images:
                                 meta[new_images_key].append({"img_url": img.get("img_url", ""), "raw_url": img.get("raw_url", ""), "web_url": img.get("web_url", "")})
-                    if meta.get(new_images_key):
-                        for img in meta[new_images_key]:
+                    if approved_images := self._approved_pack_images(meta, new_images_key, multi_screens):
+                        for img in approved_images:
                             raw_url = img["raw_url"]
                             desc.write(f"[img]{raw_url}[/img]\n")
                         desc.write("\n")
@@ -1383,9 +1398,7 @@ class PassThePopcorn:
                                 desc.write(f"[img]{raw_url}[/img]\n")
                             desc.write("\n")
 
-                    meta_filename = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/meta.json"
-                    async with aiofiles.open(meta_filename, "w", encoding="utf-8") as f:
-                        await f.write(json.dumps(meta.to_dict(), indent=4, cls=PathAwareEncoder))
+                    await write_meta_file(meta)
 
         async with aiofiles.open(
             f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt",

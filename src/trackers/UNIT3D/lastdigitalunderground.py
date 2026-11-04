@@ -2,9 +2,9 @@
 import re
 from typing import Any, cast
 
-import langcodes
 from rich.markup import escape
 
+from src import language_names
 from src.console import logger
 from src.languages import languages_manager
 from src.meta import Meta
@@ -173,7 +173,7 @@ class LastDigitalUnderground(UNIT3D):
                 if not audio_language:
                     continue
                 try:
-                    lang = langcodes.find(audio_language).to_alpha3()
+                    lang = language_names.find(audio_language).to_alpha3()
                     iso_audio = lang.upper()
                     if not await languages_manager.has_english_language(audio_language):
                         non_eng_audio = True
@@ -192,7 +192,7 @@ class LastDigitalUnderground(UNIT3D):
                     if not subtitle_language:
                         continue
                     try:
-                        lang = langcodes.find(subtitle_language).to_alpha3()
+                        lang = language_names.find(subtitle_language).to_alpha3()
                         iso_subtitle = f"Subs {lang.upper()}"
                         break
                     except (LookupError, AttributeError, ValueError) as e:

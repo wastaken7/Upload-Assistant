@@ -31,7 +31,7 @@ $$\text{CLI Overrides} > \text{Audible (audiobooks with ASIN)} > \text{MyAnonamo
 1. **EPUB**: Automatically decompresses and parses the internal OPF file (`META-INF/container.xml` or any `.opf` file) to extract `title`, `author`, `language`, `year` (from `date`), `isbn` (from `identifier`), `overview` (description), and `publisher`.
 2. **CBR/CBZ**: Automatically parses the internal `ComicInfo.xml` metadata file (case-insensitively located) to extract `title` (from `<Series>` or `<Title>`), `author` (from `<Writer>` or `<Penciller>`), `publisher` (from `<Publisher>`), `year` (from `<Year>`), `book_language` (from `<LanguageISO>`), `overview` (from `<Summary>`), and `genres`/`keywords` (from `<Genre>`, normalized to space-separated commas).
 3. **MOBI**: Extracts the internal OPF file using the `mobi` library to extract `title`, `author`, `language`, `year`, `isbn`, `overview` (with HTML stripped), and `publisher`.
-4. **PDF**: Scans the first 30 pages and the last 30 pages using **PyMuPDF** (`fitz`). It searches for ISBN strings using regular expressions and validates them mathematically using ISBN-10 and ISBN-13 checksum algorithms to avoid false matches.
+4. **PDF**: Scans the first 30 pages and the last 30 pages using **PyMuPDF**. It searches for ISBN strings using regular expressions and validates them mathematically using ISBN-10 and ISBN-13 checksum algorithms to avoid false matches.
 5. **MediaInfo**: Standard container tags (e.g., `Album`, `Performer`, `Composer`, `Publisher`, `Genre`, `ISBN`, `ASIN`, `Comment`, `Description`) are preserved during the extraction phase for audiobooks and ebook files.
 
 ### B. API Metadata Integrations
@@ -50,8 +50,8 @@ $$\text{CLI Overrides} > \text{Audible (audiobooks with ASIN)} > \text{MyAnonamo
 
 ### A. Ebooks (PDF, EPUB, MOBI)
 
-- Uses **PyMuPDF** (`fitz`) to render pages at double resolution (`matrix=Matrix(2.0, 2.0)`) into PNG files.
-- Randomly samples a configured number of pages (e.g., 5) to generate gallery screenshots.
+- Uses **PyMuPDF** to render pages at double resolution (`matrix=Matrix(2.0, 2.0)`) into PNG files.
+- Generates the configured number of gallery screenshots (e.g., 5): the cover, then the copyright/ISBN page and the table of contents page when found, and random pages for the rest.
 - Renders page 0 as `POSTER.png` (Cover) and the last page as `POSTER_BANNER.png`.
 
 ### B. Comics & Manga (CBR, CBZ)

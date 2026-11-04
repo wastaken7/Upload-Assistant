@@ -16,6 +16,7 @@ from src import webui_events
 from src.console import logger
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
+from src.release_locks import release_image_lock
 from src.temp_paths import artwork_dir
 from src.trackers.UNIT3D import UNIT3D
 from src.uploadscreens import UploadScreensManager
@@ -258,7 +259,9 @@ class Cinematik(UNIT3D):
         if Path(poster_path).exists():
             try:
                 logger.info(f"{self.tracker}: Uploading standard poster to image host....")
-                new_poster_url, _ = await self.uploadscreens_manager.upload_screens(meta, 1, 1, 0, 1, [poster_path], {})
+                # Hosting can switch meta.imghost while other trackers may be hosting images.
+                async with release_image_lock(meta):
+                    new_poster_url, _ = await self.uploadscreens_manager.upload_screens(meta, 1, 1, 0, 1, [poster_path], {})
 
                 # Ensure that the new poster URL is assigned only once
                 poster_urls = new_poster_url

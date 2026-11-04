@@ -21,6 +21,7 @@ import torf
 from rich.progress import BarColumn, TaskProgressColumn, TextColumn
 from torf import Torrent
 
+from bin.binary_dependencies import static_release_system
 from bin.get_mkbrr import MkbrrBinaryManager
 from src.app_paths import CODE_DIR
 from src.binaries import configured_binary
@@ -606,7 +607,7 @@ class TorrentCreator:
         base_dir = Path(meta.base_dir) / "bin" / "mkbrr"
 
         # Detect OS & Architecture
-        system = platform.system().lower()
+        system = static_release_system()
         arch = platform.machine().lower()
 
         if system == "windows":

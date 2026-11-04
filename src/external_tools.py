@@ -16,7 +16,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from bin.binary_dependencies import DEPENDENCY_VERSIONS
+from bin.binary_dependencies import DEPENDENCY_VERSIONS, static_release_system
 from bin.get_mediainfo import MediaInfoBinaryManager
 
 EXTERNAL_TOOL_KEYS = (
@@ -177,7 +177,8 @@ def _managed_paths(key: str, state_dir: Path, code_dir: Path) -> list[tuple[Path
             "arm": "linux/arm",
         },
     }
-    folder = platform_folders.get(system, {}).get(machine, "")
+    # The static go-bdinfo and mkbrr Linux builds also run on Android.
+    folder = platform_folders.get(static_release_system(system), {}).get(machine, "")
     if key == "bdinfo_path" and folder:
         binary = state_dir / "bin" / "bdinfo" / folder / f"bdinfo{executable_suffix}"
         version = DEPENDENCY_VERSIONS["bdinfo"]
