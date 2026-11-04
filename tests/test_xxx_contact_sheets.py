@@ -104,9 +104,43 @@ async def test_animated_xxx_contact_sheet_is_registered_as_webp(tmp_path, monkey
 
     assert len(sheets) == 1
     assert Path(sheets[0]).suffix == ".webp"
-    assert "libwebp_anim" in commands[0]
-    assert "-t 5.0" in commands[0]
-    assert "drawtext" in commands[0]
+    # Tiles are decoded one per ffmpeg run so only one decoder is in memory.
+    *tile_commands, stack_command = commands
+    assert len(tile_commands) == 2
+    assert all(command.count(" -i ") == 1 for command in tile_commands)
+    assert all("ffv1" in command and "drawtext" in command for command in tile_commands)
+    assert stack_command.count(" -i ") == 2
+    assert "libwebp_anim" in stack_command
+    assert "-t 5.0" in stack_command
+    assert "hstack" in stack_command
+    # The intermediate clips are removed once the sheet is written.
+    assert not list((tmp_path / "tmp" / meta.uuid).glob("xxx-tiles-*"))
+
+
+@pytest.mark.asyncio
+async def test_animated_xxx_contact_sheet_stops_when_a_tile_fails(tmp_path, monkeypatch):
+    video = tmp_path / "Studio.Scene.mp4"
+    video.write_bytes(b"video")
+    takescreens._apply_config({"DEFAULT": {"xxx_contact_sheet_rows": 1, "xxx_contact_sheet_columns": 3, "xxx_contact_sheet_animated_webp": True}})
+    commands = []
+
+    def fake_probe(_path):
+        return {"format": {"duration": "60"}, "streams": [{"codec_type": "video"}]}
+
+    async def fake_run_ffmpeg(command):
+        commands.append(" ".join(takescreens.compile_ffmpeg_command(command)))
+        return 1, b"", b"decoder error"
+
+    monkeypatch.setattr(takescreens.ffmpeg, "probe", fake_probe)
+    monkeypatch.setattr(takescreens, "run_ffmpeg", fake_run_ffmpeg)
+    monkeypatch.setattr(takescreens, "_xxx_contact_sheet_fontfile", lambda: None)
+    meta = Meta(base_dir=str(tmp_path), uuid="failed-xxx", category="XXX")
+
+    sheets = await takescreens.xxx_contact_sheets([str(video)], meta.uuid, meta.base_dir, meta)
+
+    assert sheets == []
+    assert len(commands) == 1
+    assert not list((tmp_path / "tmp" / meta.uuid).glob("xxx-tiles-*"))
 
 
 @pytest.mark.asyncio

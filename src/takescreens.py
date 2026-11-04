@@ -9,6 +9,7 @@ import random
 import re
 import secrets
 import sys
+import tempfile
 import time
 import traceback
 import urllib.parse
@@ -40,7 +41,7 @@ from src.screenshot_manifest import forget_file as forget_screenshot_file
 from src.screenshot_manifest import register as register_screenshots
 from src.screenshot_overlays import overlay_filters, overlay_fontfile, overlay_options
 from src.stats import record_event_async
-from src.temp_paths import artwork_dir, screenshots_dir
+from src.temp_paths import artwork_dir, release_temp_dir, screenshots_dir
 from src.webui_progress import complete_progress, publish_progress
 
 default_config: dict[str, Any] = {}
@@ -126,16 +127,51 @@ def _xxx_contact_sheet_static_stream(video_path: Path, frame_count: int, duratio
     return stream.filter("fps", fps=f"{frame_count}/{duration:.6f}").filter("scale", 320, -2).filter("tile", layout=f"{columns}x{rows}", margin=2, padding=2)
 
 
-def _xxx_contact_sheet_animated_stream(video_path: Path, frame_count: int, duration: float, columns: int, rows: int, animation_seconds: float, fontfile: str | None) -> Any:
+def _xxx_contact_sheet_animated_tile(video_path: Path, start_time: float, animation_seconds: float, fontfile: str | None) -> Any:
+    stream = ffmpeg.input(str(video_path), ss=start_time, t=animation_seconds).filter("fps", fps=8).filter("scale", 320, -2)
+    return _xxx_contact_sheet_timestamp_filter(stream, _format_contact_sheet_timestamp(start_time), fontfile).filter("setpts", "PTS-STARTPTS")
+
+
+async def _render_xxx_animated_contact_sheet(
+    video_path: Path,
+    output_path: Path,
+    work_root: Path,
+    frame_count: int,
+    duration: float,
+    columns: int,
+    rows: int,
+    animation_seconds: float,
+    fontfile: str | None,
+    include_title: bool,
+    loglevel: str,
+) -> tuple[int | None, bytes]:
+    """Render an animated sheet one tile at a time, then stack the small clips.
+
+    Decoding every tile in one ffmpeg process keeps one full decoder per tile
+    in memory at once (gigabytes for 4K HEVC). Rendering tiles in sequence
+    holds a single decoder; the final stack only reads 320px clips.
+    """
     max_start = max(0.0, duration - animation_seconds)
-    streams = []
-    for index in range(frame_count):
-        start_time = max_start * index / max(frame_count - 1, 1)
-        stream = ffmpeg.input(str(video_path), ss=start_time, t=animation_seconds).filter("fps", fps=8).filter("scale", 320, -2)
-        stream = _xxx_contact_sheet_timestamp_filter(stream, _format_contact_sheet_timestamp(start_time), fontfile).filter("setpts", "PTS-STARTPTS")
-        streams.append(stream)
-    rows_streams = [ffmpeg.filter(streams[row * columns : (row + 1) * columns], "hstack", inputs=columns) for row in range(rows)]
-    return ffmpeg.filter(rows_streams, "vstack", inputs=rows)
+    work_root.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="xxx-tiles-", dir=work_root, ignore_cleanup_errors=True) as work_dir:
+        tiles: list[Path] = []
+        for index in range(frame_count):
+            start_time = max_start * index / max(frame_count - 1, 1)
+            tile_path = Path(work_dir) / f"tile-{index:03d}.mkv"
+            tile = _xxx_contact_sheet_animated_tile(video_path, start_time, animation_seconds, fontfile)
+            # Lossless intermediate: the clips are re-encoded once, into WebP.
+            command = ffmpeg.output(tile, str(tile_path), vcodec="ffv1", an=None).global_args("-y", "-loglevel", loglevel)
+            return_code, _stdout, stderr = await run_ffmpeg(command)
+            if return_code != 0 or not tile_path.is_file():
+                return return_code, stderr
+            tiles.append(tile_path)
+
+        inputs = [ffmpeg.input(str(tile_path)) for tile_path in tiles]
+        rows_streams = [ffmpeg.filter(inputs[row * columns : (row + 1) * columns], "hstack", inputs=columns) for row in range(rows)]
+        stream = _xxx_contact_sheet_title_filter(ffmpeg.filter(rows_streams, "vstack", inputs=rows), video_path.name, include_title, fontfile)
+        command = ffmpeg.output(stream, str(output_path), vcodec="libwebp_anim", loop=0, r=8, t=animation_seconds).global_args("-y", "-loglevel", loglevel)
+        return_code, _stdout, stderr = await run_ffmpeg(command)
+        return return_code, stderr
 
 
 async def xxx_contact_sheets(paths: list[str], folder_id: str, base_dir: str, meta: Meta, capture_group: str = "main", extra_screens: int = 0) -> list[str]:
@@ -175,15 +211,27 @@ async def xxx_contact_sheets(paths: list[str], folder_id: str, base_dir: str, me
                 duration = float(probe["format"]["duration"])
                 if duration <= 0:
                     raise ValueError("duration must be positive")
+                loglevel = "verbose" if meta.ffdebug else "quiet"
+                include_title = len(video_paths) > 1
                 if animated_webp:
-                    stream = _xxx_contact_sheet_animated_stream(video_path, frame_count, duration, columns, rows, animation_seconds, fontfile)
-                    output_options: dict[str, Any] = {"vcodec": "libwebp_anim", "loop": 0, "r": 8, "t": animation_seconds}
+                    return_code, stderr = await _render_xxx_animated_contact_sheet(
+                        video_path,
+                        output_path,
+                        release_temp_dir(base_dir, folder_id),
+                        frame_count,
+                        duration,
+                        columns,
+                        rows,
+                        animation_seconds,
+                        fontfile,
+                        include_title,
+                        loglevel,
+                    )
                 else:
                     stream = _xxx_contact_sheet_static_stream(video_path, frame_count, duration, columns, rows, fontfile)
-                    output_options = {"vframes": 1, "compression_level": ffmpeg_compression}
-                stream = _xxx_contact_sheet_title_filter(stream, video_path.name, len(video_paths) > 1, fontfile)
-                command = ffmpeg.output(stream, str(output_path), **output_options).global_args("-y", "-loglevel", "verbose" if meta.ffdebug else "quiet")
-                return_code, _stdout, stderr = await run_ffmpeg(command)
+                    stream = _xxx_contact_sheet_title_filter(stream, video_path.name, include_title, fontfile)
+                    command = ffmpeg.output(stream, str(output_path), vframes=1, compression_level=ffmpeg_compression).global_args("-y", "-loglevel", loglevel)
+                    return_code, _stdout, stderr = await run_ffmpeg(command)
                 if return_code != 0 or not output_path.is_file():
                     logger.warning(f"[yellow]Unable to create XXX contact sheet for {video_path.name}: {stderr.decode(errors='replace')}[/yellow]")
                     continue
