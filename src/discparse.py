@@ -368,6 +368,7 @@ class DiscParse:
                             continue
 
                     # Process the BDInfo report once; break leaves early on errors
+                    report_parsed = False
                     while True:
                         try:
                             if not bdinfo_text or not Path(bdinfo_text).is_file():
@@ -402,6 +403,7 @@ class DiscParse:
                             await asyncio.to_thread(Path(extended_summary_file).write_text, ext_bd_summary_cleaned, encoding="utf-8", errors="replace")
 
                             bdinfo = self.parse_bdinfo(bd_summary_cleaned, files[1], path)
+                            report_parsed = True
 
                             # Prompt user for custom edition if conditions are met
                             if len(selected_playlists) > 1:
@@ -460,6 +462,12 @@ class DiscParse:
                             # reading it again cannot fix a parse failure.
                             logger.info(traceback.format_exc())
                             logger.info(f"[bold red]Could not parse BDInfo report {bdinfo_text}")
+                            if not report_parsed and bdinfo_text:
+                                # Drop the cached report so the next run scans the playlist again.
+                                try:
+                                    Path(bdinfo_text).unlink(missing_ok=True)
+                                except OSError as unlink_error:
+                                    logger.info(f"[bold red]Could not remove BDInfo report {bdinfo_text}: {unlink_error}")
                         break
 
             else:

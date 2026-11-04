@@ -78,7 +78,8 @@ async def test_malformed_bdinfo_report_is_not_retried_forever(tmp_path: Path, mo
     save_dir = tmp_path / "tmp" / "example-release"
     save_dir.mkdir(parents=True)
     # A cached report that cannot be parsed.
-    (save_dir / "Disc1_00000_FULL.txt").write_text("not a BDInfo report", encoding="utf-8")
+    report = save_dir / "Disc1_00000_FULL.txt"
+    report.write_text("not a BDInfo report", encoding="utf-8")
     monkeypatch.setattr(discparse, "MplsParser", FakeMplsParser)
     meta = Meta(base_dir=str(tmp_path), uuid="example-release", path=str(release), unattended=True)
     discs = [{"path": str(release / "BDMV"), "name": release.name, "type": "BDMV", "summary": "", "bdinfo": ""}]
@@ -87,6 +88,8 @@ async def test_malformed_bdinfo_report_is_not_retried_forever(tmp_path: Path, mo
     _discs, bdinfo = await asyncio.wait_for(parser.get_bdinfo(meta, discs, meta.uuid, str(tmp_path), []), timeout=10)
 
     assert bdinfo == ""
+    # The next run must rescan instead of reusing the broken report.
+    assert not report.exists()
 
 
 def _bdmv_release(tmp_path: Path) -> Meta:
