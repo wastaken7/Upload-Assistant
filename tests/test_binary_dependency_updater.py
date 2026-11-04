@@ -138,6 +138,36 @@ async def test_mkbrr_treats_android_as_linux(tmp_path: Path, monkeypatch: pytest
     assert await MkbrrBinaryManager.ensure_mkbrr_binary(tmp_path, version) == str(binary)
 
 
+@pytest.mark.asyncio
+async def test_mkbrr_android_download_selects_linux_build(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    version = DEPENDENCY_VERSIONS["mkbrr"]
+    urls: list[str] = []
+
+    class StopDownloadError(Exception):
+        pass
+
+    class Client:
+        async def __aenter__(self) -> "Client":
+            return self
+
+        async def __aexit__(self, *_args: object) -> None:
+            return None
+
+        def stream(self, _method: str, url: str, **_kwargs: object) -> None:
+            urls.append(url)
+            raise StopDownloadError
+
+    monkeypatch.setattr("bin.get_mkbrr.platform.system", lambda: "Android")
+    monkeypatch.setattr("bin.get_mkbrr.platform.machine", lambda: "aarch64")
+    monkeypatch.setattr("bin.get_mkbrr.shutil.which", lambda _command: None)
+    monkeypatch.setattr("bin.get_mkbrr.httpx.AsyncClient", lambda **_kwargs: Client())
+
+    with pytest.raises(StopDownloadError):
+        await MkbrrBinaryManager.ensure_mkbrr_binary(tmp_path, version)
+
+    assert urls == [f"https://github.com/autobrr/mkbrr/releases/download/{version}/mkbrr_{version[1:]}_linux_arm64.tar.gz"]
+
+
 def test_fetch_latest_accepts_a_complete_stable_release(monkeypatch: pytest.MonkeyPatch) -> None:
     assets = updater.DEPENDENCY_SPECS["par2"].assets("v1.5.0")
     monkeypatch.setattr(updater, "_request_json", lambda _url: _release("v1.5.0", assets))
