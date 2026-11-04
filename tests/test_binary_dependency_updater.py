@@ -109,6 +109,35 @@ async def test_runtime_download_urls_derive_asset_names_from_version(
     assert urls[0].endswith(f"/{version}/{expected_asset}")
 
 
+@pytest.mark.asyncio
+async def test_bdinfo_treats_android_as_linux(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("bin.get_bdinfo.platform.system", lambda: "Android")
+    monkeypatch.setattr("bin.get_bdinfo.platform.machine", lambda: "aarch64")
+    version = DEPENDENCY_VERSIONS["bdinfo"]
+    binary = tmp_path / "bin" / "bdinfo" / "linux" / "arm64" / "bdinfo"
+    binary.parent.mkdir(parents=True)
+    binary.write_bytes(b"")
+    binary.chmod(0o755)
+    (binary.parent / version).write_text("installed", encoding="utf-8")
+
+    assert await BDInfoBinaryManager.ensure_bdinfo_binary(tmp_path, version) == str(binary)
+
+
+@pytest.mark.asyncio
+async def test_mkbrr_treats_android_as_linux(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("bin.get_mkbrr.platform.system", lambda: "Android")
+    monkeypatch.setattr("bin.get_mkbrr.platform.machine", lambda: "aarch64")
+    monkeypatch.setattr("bin.get_mkbrr.shutil.which", lambda _command: None)
+    version = DEPENDENCY_VERSIONS["mkbrr"]
+    binary = tmp_path / "bin" / "mkbrr" / "linux" / "arm64" / "mkbrr"
+    binary.parent.mkdir(parents=True)
+    binary.write_bytes(b"")
+    binary.chmod(0o755)
+    (binary.parent / version).write_text("installed", encoding="utf-8")
+
+    assert await MkbrrBinaryManager.ensure_mkbrr_binary(tmp_path, version) == str(binary)
+
+
 def test_fetch_latest_accepts_a_complete_stable_release(monkeypatch: pytest.MonkeyPatch) -> None:
     assets = updater.DEPENDENCY_SPECS["par2"].assets("v1.5.0")
     monkeypatch.setattr(updater, "_request_json", lambda _url: _release("v1.5.0", assets))

@@ -15,6 +15,7 @@ import defusedxml.ElementTree as ElementTree
 from langcodes import Language
 from rich.progress import BarColumn, TaskProgressColumn, TextColumn
 
+from bin.binary_dependencies import static_release_system
 from bin.get_playlist import MplsParser
 from src import language_names, webui_events
 from src.binaries import configured_binary
@@ -321,7 +322,7 @@ class DiscParse:
                             if configured := configured_binary("bdinfo_path", self.config):
                                 bdinfo_executable = [configured, disc_path, "--playlist", playlist["file"], "--reportfilename", str(playlist_report_path)]
                             # Prefer the bundled bdinfo binary for the detected OS/arch.
-                            system = platform.system().lower()
+                            system = static_release_system()
                             machine = platform.machine().lower()
                             if bdinfo_executable is None and system == "linux":
                                 if machine in ("x86_64", "amd64"):
