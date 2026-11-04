@@ -163,12 +163,19 @@ async def _render_xxx_animated_contact_sheet(
             command = ffmpeg.output(tile, str(tile_path), vcodec="ffv1", an=None).global_args("-y", "-loglevel", loglevel)
             return_code, _stdout, stderr = await run_ffmpeg(command)
             if return_code != 0 or not tile_path.is_file():
+                # run_ffmpeg writes its report beside the output; keep the
+                # failed tile's report once the tile directory is removed.
+                for report in Path(work_dir).glob("ffmpeg-*.log"):
+                    with contextlib.suppress(OSError):
+                        report.replace(work_root / report.name)
                 return return_code, stderr
             tiles.append(tile_path)
 
         inputs = [ffmpeg.input(str(tile_path)) for tile_path in tiles]
-        rows_streams = [ffmpeg.filter(inputs[row * columns : (row + 1) * columns], "hstack", inputs=columns) for row in range(rows)]
-        stream = _xxx_contact_sheet_title_filter(ffmpeg.filter(rows_streams, "vstack", inputs=rows), video_path.name, include_title, fontfile)
+        # hstack/vstack reject a single input, so a one-wide row or one-row sheet skips them.
+        rows_streams = [inputs[row * columns] if columns == 1 else ffmpeg.filter(inputs[row * columns : (row + 1) * columns], "hstack", inputs=columns) for row in range(rows)]
+        sheet = rows_streams[0] if rows == 1 else ffmpeg.filter(rows_streams, "vstack", inputs=rows)
+        stream = _xxx_contact_sheet_title_filter(sheet, video_path.name, include_title, fontfile)
         command = ffmpeg.output(stream, str(output_path), vcodec="libwebp_anim", loop=0, r=8, t=animation_seconds).global_args("-y", "-loglevel", loglevel)
         return_code, _stdout, stderr = await run_ffmpeg(command)
         return return_code, stderr

@@ -128,8 +128,15 @@ async def test_animated_xxx_contact_sheet_stops_when_a_tile_fails(tmp_path, monk
         return {"format": {"duration": "60"}, "streams": [{"codec_type": "video"}]}
 
     async def fake_run_ffmpeg(command):
-        commands.append(" ".join(takescreens.compile_ffmpeg_command(command)))
-        return 1, b"", b"decoder error"
+        command_args = takescreens.compile_ffmpeg_command(command)
+        commands.append(" ".join(command_args))
+        output = Path(takescreens.get_ffmpeg_output_path(command, command_args))
+        if len(commands) == 3:
+            # run_ffmpeg writes its report beside the output.
+            (output.parent / "ffmpeg-failed.log").write_text("decoder error")
+            return 1, b"", b""
+        output.write_bytes(b"tile clip")
+        return 0, b"", b""
 
     monkeypatch.setattr(takescreens.ffmpeg, "probe", fake_probe)
     monkeypatch.setattr(takescreens, "run_ffmpeg", fake_run_ffmpeg)
@@ -138,9 +145,48 @@ async def test_animated_xxx_contact_sheet_stops_when_a_tile_fails(tmp_path, monk
 
     sheets = await takescreens.xxx_contact_sheets([str(video)], meta.uuid, meta.base_dir, meta)
 
+    release_dir = tmp_path / "tmp" / meta.uuid
     assert sheets == []
-    assert len(commands) == 1
-    assert not list((tmp_path / "tmp" / meta.uuid).glob("xxx-tiles-*"))
+    # The third tile fails after two clips exist; the stack step never runs.
+    assert len(commands) == 3
+    assert not any("libwebp_anim" in command for command in commands)
+    assert not list(release_dir.glob("xxx-tiles-*"))
+    # The failed tile's ffmpeg report outlives the removed tile directory.
+    assert (release_dir / "ffmpeg-failed.log").read_text() == "decoder error"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("rows", "columns"), [(2, 1), (1, 1)])
+async def test_animated_xxx_contact_sheet_skips_single_input_stacks(tmp_path, monkeypatch, rows, columns):
+    video = tmp_path / "Studio.Clip.mp4"
+    video.write_bytes(b"video")
+    takescreens._apply_config(
+        {"DEFAULT": {"xxx_contact_sheet_rows": rows, "xxx_contact_sheet_columns": columns, "xxx_contact_sheet_animated_webp": True}}
+    )
+    commands = []
+
+    def fake_probe(_path):
+        return {"format": {"duration": "60"}, "streams": [{"codec_type": "video"}]}
+
+    async def fake_run_ffmpeg(command):
+        command_args = takescreens.compile_ffmpeg_command(command)
+        commands.append(" ".join(command_args))
+        Path(takescreens.get_ffmpeg_output_path(command, command_args)).write_bytes(b"clip")
+        return 0, b"", b""
+
+    monkeypatch.setattr(takescreens.ffmpeg, "probe", fake_probe)
+    monkeypatch.setattr(takescreens, "run_ffmpeg", fake_run_ffmpeg)
+    monkeypatch.setattr(takescreens, "_xxx_contact_sheet_fontfile", lambda: None)
+    meta = Meta(base_dir=str(tmp_path), uuid=f"stack-{rows}x{columns}", category="XXX")
+
+    sheets = await takescreens.xxx_contact_sheets([str(video)], meta.uuid, meta.base_dir, meta)
+
+    stack_command = commands[-1]
+    assert len(sheets) == 1
+    # ffmpeg rejects hstack/vstack with inputs=1.
+    assert "hstack" not in stack_command
+    assert ("vstack=inputs=2" in stack_command) == (rows == 2)
+    assert "inputs=1" not in stack_command
 
 
 @pytest.mark.asyncio
