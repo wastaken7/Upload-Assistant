@@ -226,6 +226,16 @@ class TestAvistaZNetwork:
         assert verdict(rules, upload, prof(f"{T}.1080p.WEB-DL.DDP5.1.H.264-NOGRPB")) is REVIEW
         # A Blu-ray encode still replaces WEB-DLs.
         assert verdict(rules, upload, prof(f"{T}.1080p.BluRay.DD5.1.x264-NOGRPB")) is BLOCK
+        # The limit is two WEB-DLs per resolution, whatever their codec.
+        hevc = prof(f"{T}.1080p.ATVP.WEB-DL.DDP5.1.H.265-NOGRPC")
+        assert verdict(rules, hevc, netflix, prof(f"{T}.1080p.DSNP.WEB-DL.DDP5.1.H.264-NOGRPB")) is BLOCK
+
+    def test_avistaz_source_priority_crosses_codecs(self) -> None:
+        rules = AvistaZSlotRules(Meta(category="MOVIE"))
+        webrip = prof(f"{T}.1080p.AMZN.WEBRip.DDP5.1.x265-NOGRPA")
+        assert verdict(rules, webrip, prof(f"{T}.1080p.BluRay.DD5.1.x264-NOGRPB")) is BLOCK
+        assert verdict(rules, webrip, prof(f"{T}.1080p.NF.WEB-DL.DDP5.1.H.264-NOGRPB")) is BLOCK
+        assert verdict(rules, prof(f"{T}.1080p.BluRay.DD5.1.x265-NOGRPA"), prof(f"{T}.1080p.AMZN.WEBRip.DDP5.1.x264-NOGRPB")) is ALLOW
 
     def test_privatehd(self) -> None:
         upload = prof(f"{T}.1080p.AMZN.WEB-DL.DDP5.1.H.264-NOGRPA")
@@ -411,3 +421,30 @@ def test_every_tracker_links_its_rules_page() -> None:
     assert decision is not None
     assert decision.rules_url == RULES_PAGES["AITHER"].url
     assert decision.rules_date == RULES_PAGES["AITHER"].updated
+
+
+def test_trump_needs_room_beside_coexisting_releases() -> None:
+    from collections.abc import Sequence
+
+    from src.slot_rules.models import SlotDecision
+    from src.slot_rules.profile import WEBDL
+
+    class Rules(SlotRules):
+        TRACKER = "FAKE"
+
+        def decide(self, upload: ReleaseProfile, existing: Sequence[ReleaseProfile]) -> SlotDecision | None:
+            return self.by_slot(
+                upload,
+                existing,
+                lambda profile: (profile.resolution,),
+                "1080p",
+                trump=lambda _new, _old: (Verdict.ALLOW, "Better."),
+                coexists=lambda _new, old: old.kind == WEBDL,
+                capacity=2,
+            )
+
+    upload = prof(f"{T}.1080p.AMZN.WEB-DL.DDP5.1.H.264-NOGRPA")
+    webrip = prof(f"{T}.1080p.AMZN.WEBRip.DDP5.1.x264-NOGRPB")
+    netflix = prof(f"{T}.1080p.NF.WEB-DL.DDP5.1.H.264-NOGRPB")
+    assert verdict(Rules(), upload, netflix, webrip) is ALLOW
+    assert verdict(Rules(), upload, netflix, prof(f"{T}.1080p.DSNP.WEB-DL.DDP5.1.H.264-NOGRPC"), webrip) is BLOCK

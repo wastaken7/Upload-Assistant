@@ -61,9 +61,20 @@ class AvistaZSlotRules(SlotRules):
         kind = self.require(profile.kind, "release type")
         if kind == REMUX:
             return (res, "Remux")
+        if kind == WEBDL:
+            # Up to two WEB-DLs per resolution, whatever their codec.
+            return (res, "WEB-DL")
         codec = self.require(profile.codec, "video codec")
-        # WEB-DLs count as encodes (priority 2) in AvistaZ's source priority. x264 and x265 coexist.
+        # x264 and x265 encodes coexist; source priority is checked across codecs in ``better_sources``.
         return (res, "encode", "XviD/DivX" if codec == XVID else codec)
+
+    @staticmethod
+    def better_sources(upload: ReleaseProfile, existing: Sequence[ReleaseProfile]) -> list[ReleaseProfile]:
+        """Releases at the upload's resolution from a higher-priority source, in any x264/x265 slot or the WEB-DL slot."""
+        rank = AVISTAZ_PRIORITY.get(upload.kind or "")
+        if rank is None or upload.codec == XVID:
+            return []
+        return [profile for profile in existing if profile.resolution == upload.resolution and profile.codec != XVID and AVISTAZ_PRIORITY.get(profile.kind or "", rank) < rank]
 
     @staticmethod
     def web_dls_coexist(new: ReleaseProfile, old: ReleaseProfile) -> bool:
@@ -77,6 +88,15 @@ class AvistaZSlotRules(SlotRules):
                 Verdict.REVIEW, "AvistaZ's TV rules need a manual check.", why="The TV dupe list only covers HDTV and Blu-ray formats; WEB releases are not listed."
             )
         upload_key = self.key(upload)
+        better = self.better_sources(upload, existing)
+        if better:
+            return self.decision(
+                Verdict.BLOCK,
+                "A release from a better source is already on the site.",
+                better,
+                slot=slot_label(upload_key),
+                why="AvistaZ keeps the best source (Blu-ray > WEB-DL > HDTV > WEBRip); lower-priority encodes are removed once a better one exists.",
+            )
         priority_trump = _priority_trump(AVISTAZ_PRIORITY)
 
         def trump(new: ReleaseProfile, old: ReleaseProfile) -> tuple[Verdict, str]:

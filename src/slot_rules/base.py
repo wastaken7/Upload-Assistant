@@ -217,6 +217,10 @@ class SlotRules:
         if blocking:
             why = next((reason for _, reason in blocking if reason), "")
             return self.decision(Verdict.BLOCK, "Another release already fills this slot.", [profile for profile, _ in blocking], notes, slot=label, why=why)
+        # Replacing the competing releases must still leave room beside the ones that coexist.
+        coexisting = [profile for profile in occupants if coexists and coexists(upload, profile)]
+        if len(coexisting) >= capacity:
+            return self.decision(Verdict.BLOCK, f"All {capacity} places in this slot are already taken.", coexisting, notes, slot=label)
         reviewing = [(profile, reason) for profile, verdict, reason in results if verdict is Verdict.REVIEW]
         if reviewing:
             return self.decision(

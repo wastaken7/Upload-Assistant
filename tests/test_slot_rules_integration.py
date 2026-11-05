@@ -99,12 +99,16 @@ async def test_unattended_allow_uploads_despite_basic_dupes(monkeypatch: pytest.
 @pytest.mark.parametrize("embed", [True, False])
 async def test_slot_box_links_the_rules_page(monkeypatch: pytest.MonkeyPatch, embed: bool) -> None:
     messages: list[str] = []
+    slot_calls: list[dict[str, Any]] = []
+    monkeypatch.setattr("src.uphelper.webui_events.slot", lambda *_args, **kwargs: slot_calls.append(kwargs))
     helper = make_helper(monkeypatch, messages, [])
     helper.default_config["embed_links"] = embed
     slot = decision(Verdict.ALLOW)
     slot.rules_url = "https://tracker.invalid/rules"
     await helper.dupe_check(["other release"], make_meta(unattended=True), "AITHER", slot)
     (link_line,) = [message for message in messages if "Rules page:" in message]
+    (slot_call,) = slot_calls
+    assert slot_call["rules_url"] == "https://tracker.invalid/rules"
     if embed:
         assert "[link=https://tracker.invalid/rules]AITHER rules[/link]" in link_line
     else:
