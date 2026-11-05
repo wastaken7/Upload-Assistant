@@ -261,6 +261,7 @@ Language                                 : ${track.language}`,
       why: "Your release adds HDR10+ metadata, which may qualify it as a trump.",
       rules:
         "Rules as of 2026-01-01. This is only a recommendation; tracker rules change over time.",
+      rules_url: "https://tracker.invalid/rules",
     }),
     gui({
       kind: "dupes",

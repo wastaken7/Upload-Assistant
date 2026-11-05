@@ -27,3 +27,5 @@ class SlotDecision:
     # Existing torrents that hold (or compete for) the upload's slot.
     conflicts: list[dict[str, Any]] = field(default_factory=lambda: list[dict[str, Any]]())
     notes: list[str] = field(default_factory=lambda: list[str]())
+    # The tracker's rules page, when known.
+    rules_url: str = ""

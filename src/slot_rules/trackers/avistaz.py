@@ -1,11 +1,11 @@
 # Upload Assistant © 2026 Audionut & wastaken7 — Licensed under UAPL v1.0
-"""AvistaZ network dupe rules: CinemaZ, AvistaZ and PrivateHD (transcribed 2026-10-15)."""
+"""AvistaZ network dupe rules: CinemaZ, AvistaZ and PrivateHD."""
 
 from collections.abc import Sequence
 
 from src.slot_rules.base import SlotKey, SlotRules, TrumpTest, UnknownTraitError, is_repack_of, slot_label
 from src.slot_rules.models import SlotDecision, Verdict
-from src.slot_rules.profile import DVDRIP, ENCODE, H264, H265, HDTV, REMUX, WEBDL, WEBRIP, XVID, ReleaseProfile
+from src.slot_rules.profile import DVDRIP, ENCODE, HDTV, REMUX, WEBDL, WEBRIP, XVID, ReleaseProfile
 
 # Priority of sources for encodes; 1 is best. WEBRip is 4 on both sites.
 CINEMAZ_PRIORITY = {ENCODE: 1, DVDRIP: 1, HDTV: 3, WEBRIP: 4}
@@ -62,8 +62,13 @@ class AvistaZSlotRules(SlotRules):
         if kind == REMUX:
             return (res, "Remux")
         codec = self.require(profile.codec, "video codec")
-        # WEB-DLs count as encodes (priority 2) in AvistaZ's source priority.
-        return (res, "encode", "XviD/DivX" if codec == XVID else "x264/x265")
+        # WEB-DLs count as encodes (priority 2) in AvistaZ's source priority. x264 and x265 coexist.
+        return (res, "encode", "XviD/DivX" if codec == XVID else codec)
+
+    @staticmethod
+    def web_dls_coexist(new: ReleaseProfile, old: ReleaseProfile) -> bool:
+        """Up to two WEB-DLs of one resolution may coexist when they come from different streaming services."""
+        return new.kind == WEBDL and old.kind == WEBDL and new.provider is not None and old.provider is not None and new.provider != old.provider
 
     def decide(self, upload: ReleaseProfile, existing: Sequence[ReleaseProfile]) -> SlotDecision | None:
         meta_category = str(getattr(self.meta, "category", "") or "") if self.meta is not None else ""
@@ -75,11 +80,11 @@ class AvistaZSlotRules(SlotRules):
         priority_trump = _priority_trump(AVISTAZ_PRIORITY)
 
         def trump(new: ReleaseProfile, old: ReleaseProfile) -> tuple[Verdict, str]:
-            if {new.codec, old.codec} == {H264, H265}:
-                return Verdict.REVIEW, "AvistaZ says x264 and x265 will coexist only 'when x265 is more stabilized'; ask staff."
+            if new.kind == WEBDL and old.kind == WEBDL and (new.provider is None or old.provider is None):
+                return Verdict.REVIEW, "Two WEB-DLs from different streaming services can coexist, but the service of one of them is unknown."
             return priority_trump(new, old)
 
-        return self.by_slot(upload, existing, self.key, slot_label(upload_key), trump=trump)
+        return self.by_slot(upload, existing, self.key, slot_label(upload_key), trump=trump, coexists=self.web_dls_coexist, capacity=2 if upload.kind == WEBDL else 1)
 
 
 class PrivateHDSlotRules(SlotRules):

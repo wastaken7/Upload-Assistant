@@ -1,5 +1,5 @@
 # Upload Assistant © 2026 Audionut & wastaken7 — Licensed under UAPL v1.0
-"""CapybaraBR (Regras de Trump) and Samaritano (Aplicação de duplicidade), transcribed 2026-10-15."""
+"""CapybaraBR (Regras de Trump) and Samaritano (Aplicação de duplicidade)."""
 
 from collections.abc import Sequence
 

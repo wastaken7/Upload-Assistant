@@ -1,5 +1,5 @@
 # Upload Assistant © 2026 Audionut & wastaken7 — Licensed under UAPL v1.0
-"""Luminarr coexistence and trumping rules (sections 8 and 9, transcribed 2026-10-15)."""
+"""Luminarr coexistence and trumping rules (sections 8 and 9)."""
 
 from collections.abc import Sequence
 

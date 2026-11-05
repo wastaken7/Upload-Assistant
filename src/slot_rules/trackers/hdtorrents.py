@@ -1,5 +1,5 @@
 # Upload Assistant © 2026 Audionut & wastaken7 — Licensed under UAPL v1.0
-"""HD-Torrents dupe rules (transcribed 2026-10-15)."""
+"""HD-Torrents dupe rules."""
 
 from collections.abc import Sequence
 

@@ -597,6 +597,7 @@ def slot(
     conflicts: Iterable[Mapping[str, Any]] = (),
     notes: Iterable[str] = (),
     rules_date: date | None = None,
+    rules_url: str = "",
     source_size: int | None = None,
 ) -> None:
     """Report a tracker's slot recommendation with the same detail as the terminal box."""
@@ -622,6 +623,9 @@ def slot(
         age_days = (datetime.now().astimezone().date() - rules_date).days
         age = "today" if age_days <= 0 else f"{age_days} day{'s' if age_days != 1 else ''} ago"
         payload["rules"] = f"Rules as of {rules_date.isoformat()} ({age}). This is only a recommendation; tracker rules change over time."
+    rules_link = _http_link(rules_url) if rules_url else ""
+    if rules_link:
+        payload["rules_url"] = rules_link
     _emit("slot", payload)
 
 
