@@ -180,6 +180,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
         logger.debug(f"[cyan]DEBUG: Clients to inject into: {inject_clients}[/cyan]")
 
         clients_config = self.config.get("TORRENT_CLIENTS", {})
+        added_to_a_client = False
         for client_name in inject_clients:
             client_to_skip = self.config["TRACKERS"][tracker].get("client_to_skip", [])
             if client_name in client_to_skip:
@@ -216,9 +217,13 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                 await record_event_async(
                     "api", service=client_name, operation="torrent_client_add", outcome="success", duration_ms=(time.monotonic() - operation_started) * 1000
                 )
+                added_to_a_client = True
             except Exception as e:
                 await record_event_async("api", service=client_name, operation="torrent_client_add", outcome="error", duration_ms=(time.monotonic() - operation_started) * 1000)
                 logger.info(f"[bold red]Failed to add torrent to {client_name}: {e}")
+        if cross and added_to_a_client:
+            # One cross-seed per tracker, however many clients received it.
+            await record_event_async("post_upload", service="cross_seed", operation="injected", outcome="success", destination=str(tracker).replace(" ", "").upper())
         return
 
     async def inject_delay(self, meta: Meta, tracker: str, client_name: str) -> None:

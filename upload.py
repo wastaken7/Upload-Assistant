@@ -2249,7 +2249,7 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
             if not reuse_torrent or not Path(reuse_torrent).exists():
                 reuse_torrent = await client.find_existing_torrent(meta)
             if reuse_torrent is not None:
-                await TORRENT_CREATOR.create_base_from_existing_torrent(reuse_torrent, meta.base_dir, meta.uuid, meta.source_size)
+                await TORRENT_CREATOR.create_base_from_existing_torrent(reuse_torrent, meta.base_dir, meta.uuid)
 
         # 2. Re-create base torrents if rehash is True
         if meta.rehash is True and meta.nohash is False:
@@ -2263,7 +2263,7 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
                 and Path(base_reuse_torrent).exists()
                 and (not has_local_subs or client._torrent_has_no_subtitles(base_reuse_torrent))
             ):
-                await TORRENT_CREATOR.create_base_from_existing_torrent(base_reuse_torrent, meta.base_dir, meta.uuid, meta.source_size)
+                await TORRENT_CREATOR.create_base_from_existing_torrent(base_reuse_torrent, meta.base_dir, meta.uuid)
             if torrent_manifest.default_path("base") is None and meta.nohash is False:
                 await TORRENT_CREATOR.create_torrent(meta, Path(cast(str, meta.path)), "BASE")
             if has_local_subs and torrent_manifest.default_path("base_subs") is None and meta.nohash is False:
@@ -2513,7 +2513,20 @@ async def do_the_thing(base_dir: str) -> None:
     if webui_roots is not None:
         validate_argument_paths(sys.argv[2:], webui_roots)
     from src.api_key_expiry import reset_api_key_expiry_warnings
-    from src.stats import accumulate_upload_durations, configure_stats, record_completed_item_stats_async, record_event_async, record_release_profile_async, set_stats_context
+    from src.stats import (
+        accumulate_upload_durations,
+        begin_item_timing,
+        configure_stats,
+        install_metadata_api_tracking,
+        item_elapsed_ms,
+        observe_run_event,
+        record_completed_item_stats_async,
+        record_event_async,
+        record_item_timings_async,
+        record_release_profile_async,
+        set_stats_context,
+        stats_collection_enabled,
+    )
 
     reset_api_key_expiry_warnings()
     load_heavy_globals()
@@ -2538,6 +2551,9 @@ async def do_the_thing(base_dir: str) -> None:
         logger.warning(f"[yellow]Warning: could not reload config from disk: {exc}[/yellow]")
 
     configure_stats(config)
+    if stats_collection_enabled(config):
+        install_metadata_api_tracking()
+        webui_events.add_listener(observe_run_event)
 
     tmp_dir = Path(base_dir) / "tmp"
     if not Path(tmp_dir).exists():
@@ -2862,6 +2878,7 @@ async def do_the_thing(base_dir: str) -> None:
                 meta.path = path
                 meta.uuid = ""
                 set_stats_context(debug=bool(meta.debug), category="")
+                begin_item_timing()
                 await record_event_async("item", operation="started", outcome="success")
                 _publish_webui_preview_target(path)
                 webui_events.begin_item(path, item_number, total_files)
@@ -2919,8 +2936,10 @@ async def do_the_thing(base_dir: str) -> None:
                 if not skipped:
                     webui_events.fail_active_stage()
                 set_stats_context(debug=bool(meta.debug), category=str(meta.category or ""))
-                await record_event_async("item", operation="completed", outcome=outcome)
+                # Keep processed volume consistent with the release profile record below.
+                await record_event_async("item", operation="completed", outcome=outcome, bytes_count=max(0, int(meta.source_size or 0)), duration_ms=item_elapsed_ms())
                 await record_release_profile_async(meta, outcome)
+                await record_item_timings_async()
                 if "queue" in meta and meta.queue is not None:
                     processed_files_count += 1
                     skipped_files_count += 1
@@ -3328,7 +3347,14 @@ async def do_the_thing(base_dir: str) -> None:
 
             for tracker in meta.trumping_trackers:
                 logger.info(f"[yellow]Submitting trumpable report to {tracker}.....")
-                await tracker_setup.make_trumpable_report(meta, tracker)
+                reported = await tracker_setup.make_trumpable_report(meta, tracker)
+                await record_event_async(
+                    "post_upload",
+                    service="trump_report",
+                    operation="submitted",
+                    outcome="success" if reported else "error",
+                    destination=str(tracker).replace(" ", "").upper(),
+                )
 
             find_requests = config["DEFAULT"].get("search_requests", False) if meta.search_requests is None else meta.search_requests
             if find_requests and meta.trackers not in ([], None, "") and not (meta.site_check and not meta.is_disc):

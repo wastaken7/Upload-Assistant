@@ -35,6 +35,16 @@ from src.torrent_policy import hdbits_pieces_allowed as hdbits_pieces_allowed
 from src.webui_progress import complete_progress, has_progress_callback, publish_progress
 
 SUBTITLE_EXTENSIONS = (".srt", ".sub", ".vtt", ".ssa", ".ass", ".idx")
+
+
+def _torrent_content_size(path: str | os.PathLike[str], fallback: int) -> int:
+    """Return the payload size a torrent hashed, or ``fallback`` when it cannot be read."""
+    try:
+        return int(Torrent.read(path).size or 0) or fallback
+    except Exception:
+        return fallback
+
+
 DISC_EXCLUDE_GLOBS = ("._*", "*/._*", "*.lwi")
 
 
@@ -431,7 +441,9 @@ class TorrentCreator:
                                 return result
 
                         async with resource_slot("torrent-hash", "torrent hashing"):
+                            hash_started = time.monotonic()
                             result = await asyncio.to_thread(run_mkbrr)
+                            hash_ms = (time.monotonic() - hash_started) * 1000
 
                         # Verify the torrent was actually created
                         if result != 0:
@@ -445,9 +457,19 @@ class TorrentCreator:
                             manifest = TorrentManifest(meta.base_dir, meta.uuid)
                             entry = manifest.register(output_path, "base_subs" if is_subs else "base", "generated", make_default=make_default)
                             output_path.unlink(missing_ok=True)
-                            await record_event_async("artifact", service="torrent", operation="created", outcome="success", category="base")
+                            await record_event_async(
+                                "artifact", service="torrent", operation="created", outcome="success", category="base", bytes_count=entry.content_size, duration_ms=hash_ms
+                            )
                             return str(manifest.entry_path(entry))
-                        await record_event_async("artifact", service="torrent", operation="created", outcome="success", category="tracker")
+                        await record_event_async(
+                            "artifact",
+                            service="torrent",
+                            operation="created",
+                            outcome="success",
+                            category="tracker",
+                            bytes_count=_torrent_content_size(output_path, initial_size),
+                            duration_ms=hash_ms,
+                        )
                         return output_path
 
                     except subprocess.CalledProcessError as e:
@@ -497,7 +519,9 @@ class TorrentCreator:
 
                 try:
                     async with resource_slot("torrent-hash", "torrent hashing"):
+                        hash_started = time.monotonic()
                         await asyncio.to_thread(generate_torrent)
+                        hash_ms = (time.monotonic() - hash_started) * 1000
                 except Exception as error:
                     publish_progress(progress_id, progress_label, detail=str(error), status="failed", group="media", unit="pieces")
                     raise
@@ -514,9 +538,19 @@ class TorrentCreator:
                     manifest = TorrentManifest(meta.base_dir, meta.uuid)
                     entry = manifest.register(staging_path, "base_subs" if is_subs else "base", "generated", make_default=make_default)
                     staging_path.unlink(missing_ok=True)
-                    await record_event_async("artifact", service="torrent", operation="created", outcome="success", category="base")
+                    await record_event_async(
+                        "artifact", service="torrent", operation="created", outcome="success", category="base", bytes_count=entry.content_size, duration_ms=hash_ms
+                    )
                     return str(manifest.entry_path(entry))
-                await record_event_async("artifact", service="torrent", operation="created", outcome="success", category="tracker")
+                await record_event_async(
+                    "artifact",
+                    service="torrent",
+                    operation="created",
+                    outcome="success",
+                    category="tracker",
+                    bytes_count=int(torrent.size or 0) or initial_size,
+                    duration_ms=hash_ms,
+                )
                 return torrent
             finally:
                 cls._create_torrent_inflight -= 1
@@ -578,20 +612,14 @@ class TorrentCreator:
             record_event("artifact", service="torrent", operation="created", outcome="success", category="randomized")
 
     @staticmethod
-    async def create_base_from_existing_torrent(torrentpath: str, base_dir: str, uuid: str, source_size: int = 0) -> str | None:
+    async def create_base_from_existing_torrent(torrentpath: str, base_dir: str, uuid: str) -> str | None:
+        # Reuse statistics are recorded when the item completes, from the
+        # manifest, because client searches can also register reusable bases.
         if Path(torrentpath).exists():
             base_torrent = Torrent.read(torrentpath)
             has_subs = any(Path(str(f)).suffix.lower() in SUBTITLE_EXTENSIONS for f in base_torrent.files)
             manifest = TorrentManifest(base_dir, uuid)
             entry = manifest.register(torrentpath, "base_subs" if has_subs else "base", "client")
-            await record_event_async(
-                "artifact",
-                service="torrent",
-                operation="reused",
-                outcome="success",
-                category="base",
-                bytes_count=source_size,
-            )
             return str(manifest.entry_path(entry))
         return None
 
@@ -668,8 +696,8 @@ def create_random_torrents(base_dir: str, uuid: str, num: int | str, path: str) 
     TorrentCreator.create_random_torrents(base_dir, uuid, num, path)
 
 
-async def create_base_from_existing_torrent(torrentpath: str, base_dir: str, uuid: str, source_size: int = 0) -> str | None:
-    return await TorrentCreator.create_base_from_existing_torrent(torrentpath, base_dir, uuid, source_size)
+async def create_base_from_existing_torrent(torrentpath: str, base_dir: str, uuid: str) -> str | None:
+    return await TorrentCreator.create_base_from_existing_torrent(torrentpath, base_dir, uuid)
 
 
 def get_mkbrr_path(meta: Meta) -> str:

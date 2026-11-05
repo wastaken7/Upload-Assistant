@@ -146,7 +146,11 @@ def test_stats_combines_charts_with_expandable_tables():
 
     assert "function DonutChart" in stats_app
     assert "const ChartWithTable" in stats_app
-    assert stats_app.count("<ChartWithTable") == 10
+    assert stats_app.count("<ChartWithTable") == 14
+    for title in ("Time per stage", "Upload problems", "Image hosts", "After upload"):
+        assert f'title="{title}"' in stats_app
+    assert "overview.hashing_bytes_per_second" in stats_app
+    assert "formatReasonCounts(r.error_reasons)" in stats_app
     assert 'title="Successful media time"' in stats_app
     assert 'centerLabel="uploaded"' in stats_app
     assert "valueFormatter={formatMediaHours}" in stats_app
@@ -291,7 +295,8 @@ def test_stats_ui_exposes_volume_profiles_comparisons_and_actions():
 def test_stats_generated_artifacts_combines_screenshot_types():
     stats_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
 
-    assert 'label="Screenshots created"' in stats_app
+    assert '"Screenshots created"' in stats_app
+    assert '"Screenshots created (global)"' in stats_app
     assert "overview.screenshots_created" in stats_app
     assert 'row.type === "screenshot" && row.operation === "created"' in stats_app
     assert "screenshotArtifactMap.standard" in stats_app

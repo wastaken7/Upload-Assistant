@@ -26,6 +26,7 @@
   });
   const STATS_ICON_MAP = Object.freeze({
     "activity-heatmap": "flame",
+    "after-upload": "hand-coins",
     "api-operations": "network",
     "artifact-activity": "boxes",
     "average-item-size": "chart-spline",
@@ -40,6 +41,8 @@
     "execution-source": "square-terminal",
     "external-operations": "globe",
     "hashing-io-avoided": "gauge",
+    "hashing-throughput": "chart-column-increasing",
+    "image-hosts": "images",
     "items-completed": "clipboard-check",
     "media-profile": "list-tree",
     "nzbs-created": "cloud-upload",
@@ -47,11 +50,13 @@
     "pioneering-rate": "flag",
     "screenshots-created": "image-plus",
     settings: "sliders-horizontal",
+    "stage-timing": "hourglass",
     "streaming-services": "circle-play",
     "successful-uploads": "upload",
     "torrents-created": "magnet",
     "unique-data-uploaded": "file-stack",
     "upload-flow": "workflow",
+    "upload-problems": "triangle-alert",
     "uploads-by-destination": "crosshair",
   });
 
