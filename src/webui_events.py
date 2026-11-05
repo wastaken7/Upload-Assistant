@@ -24,7 +24,7 @@ import os
 import re
 import sys
 import time
-from collections.abc import Generator, Iterable, Mapping
+from collections.abc import Callable, Generator, Iterable, Mapping
 from datetime import date, datetime
 from pathlib import Path
 from threading import Lock
@@ -73,6 +73,22 @@ _FLAG_CODE = re.compile(r"[a-z]{2}")
 
 def enabled() -> bool:
     return os.environ.get(GUI_EVENTS_ENV) == "1" and bool(os.environ.get(GUI_EVENT_NONCE_ENV))
+
+
+# In-process observers (e.g. aggregate statistics) of stage changes and request
+# matches. They are called in CLI runs too, and never receive release names.
+_listeners: list[Callable[[str, Mapping[str, Any]], None]] = []
+
+
+def add_listener(listener: Callable[[str, Mapping[str, Any]], None]) -> None:
+    if listener not in _listeners:
+        _listeners.append(listener)
+
+
+def _notify(kind: str, payload: Mapping[str, Any]) -> None:
+    for listener in _listeners:
+        with contextlib.suppress(Exception):
+            listener(kind, payload)
 
 
 def event_prefix(nonce: str) -> str:
@@ -189,6 +205,7 @@ def stage(key: str, status: StageStatus) -> None:
         _started_stages.add(key)
     elif _active_stage == key:
         _active_stage = None
+    _notify("stage", {"key": key, "status": status})
     _emit("stage", {"key": key, "status": status})
 
 
@@ -634,6 +651,7 @@ def tracker_result(
 
 
 def request_match(tracker: str, name: Any, *, link: Any = None, reward: Any = None, status: Any = None, exact: bool = False) -> None:
+    _notify("request", {"tracker": str(tracker), "exact": bool(exact)})
     if not enabled():
         return
     payload: dict[str, Any] = {"tracker": plain_text(tracker, 64), "name": plain_text(name, 300, markup=False), "exact": bool(exact)}

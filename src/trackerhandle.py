@@ -23,7 +23,7 @@ from src.qbitwait import Wait
 from src.rehostimages import check_tracker_image_hosts, has_restricted_image_hosts, select_common_image_host
 from src.slot_rules.models import Verdict
 from src.slot_rules.registry import evaluate_slots
-from src.stats import record_event_async
+from src.stats import exception_error_reason, record_event_async
 from src.torrent_provision import provision_tracker_torrents
 from src.trackers.GAZELLE.passthepopcorn import PassThePopcorn
 from src.trackersetup import TrackerSetup
@@ -253,6 +253,7 @@ async def process_trackers(
                         finally:
                             meta[f"{tracker}_upload_duration"] = time.monotonic() - upload_start_time
                     except Exception as e:
+                        meta.tracker_status.setdefault(tracker, {})["error_reason"] = exception_error_reason(e)
                         logger.info(f"[red]Upload failed: {escape(str(e))}[/red]")
                         logger.info(traceback.format_exc(), extra={"markup": False})
                         return
@@ -294,6 +295,7 @@ async def process_trackers(
                         finally:
                             meta[f"{tracker}_upload_duration"] = time.monotonic() - upload_start_time
                     except Exception as e:
+                        meta.tracker_status.setdefault(tracker, {})["error_reason"] = exception_error_reason(e)
                         logger.info(f"[red]Upload failed: {escape(str(e))}[/red]")
                         logger.info(traceback.format_exc(), extra={"markup": False})
                         return
@@ -375,6 +377,7 @@ async def process_trackers(
                         finally:
                             meta[f"{tracker}_upload_duration"] = time.monotonic() - upload_start_time
                     except Exception as e:
+                        meta.tracker_status.setdefault(tracker, {})["error_reason"] = exception_error_reason(e)
                         logger.info(f"[red]Upload failed: {escape(str(e))}[/red]")
                         logger.info(traceback.format_exc(), extra={"markup": False})
                         return

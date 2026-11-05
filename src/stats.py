@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import functools
+import json
 import os
 import re
 import sqlite3
@@ -47,6 +49,17 @@ def configure_stats(config: Mapping[str, Any] | None) -> None:
     global _enabled
     with _configuration_lock:
         _enabled = stats_collection_enabled(config)
+        if not _enabled:
+            _item_timing_reset()
+
+
+def _item_timing_reset() -> None:
+    global _item_started_at
+    with _timing_lock:
+        _item_started_at = None
+        _stage_started_at.clear()
+        _stage_totals.clear()
+        _request_matches.clear()
 
 
 def set_stats_context(*, debug: bool | None = None, category: str | None = None) -> None:
@@ -347,16 +360,274 @@ async def record_event_async(family: str, **kwargs: Any) -> None:
     await asyncio.to_thread(record_event, family, **kwargs)
 
 
-def tracker_route_outcome(status: Mapping[str, Any]) -> str:
-    """Normalize one target's terminal state into the dashboard route taxonomy."""
+# Per-item timing and post-upload counters, kept in memory and written once
+# when the item finishes. Items run one after another in a process.
+STAGE_KEYS = ("prep", "confirm", "dupes", "screens", "torrent", "upload", "requests")
+_timing_lock = threading.Lock()
+_item_started_at: float | None = None
+_stage_started_at: dict[str, float] = {}
+_stage_totals: dict[str, tuple[float, bool]] = {}
+_request_matches: defaultdict[tuple[str, bool], int] = defaultdict(int)
+
+
+def begin_item_timing() -> None:
+    """Start timing a new item and discard anything left from the previous one."""
+    global _item_started_at
+    _item_timing_reset()
+    with _timing_lock:
+        _item_started_at = time.monotonic()
+
+
+def observe_run_event(kind: str, payload: Mapping[str, Any]) -> None:
+    """Listener for run events (stages and request matches) published by ``webui_events``."""
+    now = time.monotonic()
+    with _timing_lock:
+        if _item_started_at is None:
+            return
+        if kind == "stage":
+            key = str(payload.get("key", ""))
+            status = str(payload.get("status", ""))
+            if key not in STAGE_KEYS:
+                return
+            if status == "start":
+                _stage_started_at[key] = now
+            elif key in _stage_started_at:
+                elapsed = now - _stage_started_at.pop(key)
+                seconds, failed = _stage_totals.get(key, (0.0, False))
+                _stage_totals[key] = (seconds + elapsed, failed or status == "fail")
+        elif kind == "request":
+            tracker = _dimension(str(payload.get("tracker", "")).replace(" ", "").upper())
+            if tracker:
+                _request_matches[(tracker, bool(payload.get("exact")))] += 1
+
+
+def item_elapsed_ms() -> float:
+    with _timing_lock:
+        return (time.monotonic() - _item_started_at) * 1000 if _item_started_at is not None else 0.0
+
+
+def upload_stage_started() -> bool:
+    """Return whether the current item reached its upload stage (True when untimed)."""
+    with _timing_lock:
+        return _item_started_at is None or "upload" in _stage_started_at or "upload" in _stage_totals
+
+
+async def record_item_timings_async() -> None:
+    """Write the finished item's stage durations and request matches, then reset them."""
+    with _timing_lock:
+        stages = dict(_stage_totals)
+        requests = dict(_request_matches)
+        _stage_started_at.clear()
+        _stage_totals.clear()
+        _request_matches.clear()
+    for key, (seconds, failed) in stages.items():
+        await record_event_async("stage", service=key, operation="completed", outcome="error" if failed else "success", duration_ms=seconds * 1000)
+    for (tracker, exact), count in requests.items():
+        await record_event_async(
+            "post_upload",
+            service="request_match",
+            operation="exact" if exact else "partial",
+            destination=tracker,
+            count=count,
+        )
+
+
+# Hosts of metadata providers whose requests count as external operations.
+# Tracker, image host and srrDB requests are recorded where they are made.
+_METADATA_API_HOSTS = {
+    "api.themoviedb.org": "tmdb",
+    "api.graphql.imdb.com": "imdb",
+    "www.imdb.com": "imdb",
+    "api4.thetvdb.com": "tvdb",
+    "api.tvmaze.com": "tvmaze",
+    "api.igdb.com": "igdb",
+    "id.twitch.tv": "igdb",
+    "graphql.anilist.co": "anilist",
+    "arm.haglund.dev": "anime_relations",
+    "musicbrainz.org": "musicbrainz",
+    "api.discogs.com": "discogs",
+    "openlibrary.org": "openlibrary",
+    "m.douban.com": "douban",
+    "store.steampowered.com": "steam",
+    "www.blu-ray.com": "bluray_com",
+    "predb.pw": "predb",
+}
+_metadata_tracking_installed = False
+
+
+def metadata_api_service(url: Any) -> str:
+    """Return the provider name for a metadata API URL, or "" for any other host."""
+    host = str(getattr(url, "host", "") or "").lower()
+    if host == "www.googleapis.com":
+        return "google_books" if str(getattr(url, "path", "")).startswith("/books") else ""
+    if host.startswith("api.audible."):
+        return "audible"
+    return _METADATA_API_HOSTS.get(host, "")
+
+
+def _metadata_outcome(status_code: int) -> str:
+    # A 404 is a valid "not found" answer from a lookup, not a failed call.
+    return "success" if status_code < 400 or status_code == 404 else "error"
+
+
+def install_metadata_api_tracking() -> None:
+    """Count metadata provider requests made through httpx, once per process.
+
+    Every provider module builds its own httpx client, so the shared ``send``
+    methods are wrapped. Only hosts in ``_METADATA_API_HOSTS`` are recorded,
+    the request itself is never changed, and nothing about it but the provider,
+    outcome and duration is stored.
+    """
+    global _metadata_tracking_installed
+    with _configuration_lock:
+        if _metadata_tracking_installed:
+            return
+        try:
+            import httpx
+        except ImportError:
+            return
+        original_async_send = httpx.AsyncClient.send
+        original_sync_send = httpx.Client.send
+
+        @functools.wraps(original_async_send)
+        async def tracked_async_send(self: Any, request: Any, *args: Any, **kwargs: Any) -> Any:
+            service = metadata_api_service(request.url) if _enabled else ""
+            if not service:
+                return await original_async_send(self, request, *args, **kwargs)
+            started = time.monotonic()
+            try:
+                response = await original_async_send(self, request, *args, **kwargs)
+            except Exception:
+                await record_event_async("api", service=service, operation="metadata", outcome="error", duration_ms=(time.monotonic() - started) * 1000)
+                raise
+            await record_event_async(
+                "api", service=service, operation="metadata", outcome=_metadata_outcome(response.status_code), duration_ms=(time.monotonic() - started) * 1000
+            )
+            return response
+
+        @functools.wraps(original_sync_send)
+        def tracked_sync_send(self: Any, request: Any, *args: Any, **kwargs: Any) -> Any:
+            service = metadata_api_service(request.url) if _enabled else ""
+            if not service:
+                return original_sync_send(self, request, *args, **kwargs)
+            started = time.monotonic()
+            try:
+                response = original_sync_send(self, request, *args, **kwargs)
+            except Exception:
+                record_event("api", service=service, operation="metadata", outcome="error", duration_ms=(time.monotonic() - started) * 1000)
+                raise
+            record_event("api", service=service, operation="metadata", outcome=_metadata_outcome(response.status_code), duration_ms=(time.monotonic() - started) * 1000)
+            return response
+
+        httpx.AsyncClient.send = tracked_async_send  # type: ignore[method-assign]
+        httpx.Client.send = tracked_sync_send  # type: ignore[method-assign]
+        _metadata_tracking_installed = True
+
+
+def _status_text(status: Mapping[str, Any]) -> str:
+    message = status.get("status_message", "")
+    if isinstance(message, (Mapping, list)):
+        try:
+            return json.dumps(message, default=str).lower()
+        except TypeError, ValueError:
+            return str(message).lower()
+    return str(message or "").lower()
+
+
+def tracker_route_outcome(status: Mapping[str, Any], *, upload_started: bool = True, site_check: bool = False) -> str:
+    """Normalize one target's terminal state into the dashboard route taxonomy.
+
+    ``upload_started`` is False when the item stopped before its upload stage,
+    so approved routes were never attempted: a site check never uploads, and
+    otherwise too few trackers passed.
+    """
     if status.get("upload_success") is True:
         return "success"
-    message = str(status.get("status_message", "") or "").lower()
+    message = _status_text(status)
+    if status.get("banned"):
+        return "skipped:banned"
+    if "error redoing dupe check" in message:
+        return "skipped:search_error"
     if status.get("dupe") or "dupe" in message or "duplicate" in message:
         return "skipped:dupe"
-    if status.get("upload_success") is False or status.get("upload") is True:
+    if status.get("upload_success") is False:
         return "error"
-    return "skipped:no_upload"
+    if status.get("upload") is True:
+        if upload_started:
+            return "error"
+        return "skipped:site_check" if site_check else "skipped:too_few_trackers"
+    return f"skipped:{_skip_reason(status, message)}"
+
+
+def _skip_reason(status: Mapping[str, Any], message: str) -> str:
+    explicit = _dimension(status.get("skip_reason"))
+    if explicit:
+        return explicit
+    if "claimed" in message:
+        return "claimed"
+    if "policy-compliant" in message or "torrent provisioning" in message or "torrent creation" in message:
+        return "torrent_policy"
+    if status.get("skipped") or message:
+        return "rules"
+    if status.get("upload") is False and "skipped" in status:
+        # Passed every check but was not approved at the upload prompt.
+        return "declined"
+    return "no_upload"
+
+
+# Ordered: the first matching category wins. Codes are matched as whole words
+# so sizes or IDs that contain the same digits are not misread.
+_ERROR_REASON_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
+    (
+        "auth",
+        re.compile(r"\b(401|403)\b|unauthori[sz]ed|forbidden|log ?in|logged in|cookie|passkey|api[ _-]?key|token|credential|authenticat|csrf|session expired"),
+    ),
+    ("rate_limit", re.compile(r"\b429\b|rate[ _-]?limit|too many|flood|slow down")),
+    ("timeout", re.compile(r"time[ d]?out|timed out")),
+    ("server", re.compile(r"\b5\d\d\b|bad gateway|service unavailable|internal server error|maintenance|cloudflare")),
+    ("network", re.compile(r"connection|connect ?error|\bdns\b|name resolution|getaddrinfo|\bssl\b|certificate|network|unreachable")),
+    ("invalid_response", re.compile(r"data error|\bjson\b|decod|unexpected response|could not parse|parse error")),
+    ("rejected", re.compile(r"reject|not allowed|invalid|required|already exists|denied|validation|must |banned|\brules?\b")),
+)
+
+
+def _classify_error_text(text: str) -> str:
+    for reason, pattern in _ERROR_REASON_PATTERNS:
+        if pattern.search(text):
+            return reason
+    return ""
+
+
+def upload_error_reason(status: Mapping[str, Any]) -> str:
+    """Return a low-cardinality reason for a failed upload route; the message itself is never stored."""
+    explicit = _dimension(status.get("error_reason"))
+    if explicit:
+        return explicit
+    message = _status_text(status)
+    if not message:
+        return "unknown"
+    return _classify_error_text(message) or "other"
+
+
+def exception_error_reason(error: BaseException) -> str:
+    """Return a low-cardinality reason for an exception raised while uploading."""
+    if isinstance(error, TimeoutError):
+        return "timeout"
+    response = getattr(error, "response", None)
+    status_code = getattr(response, "status_code", None)
+    if isinstance(status_code, int):
+        if status_code in {401, 403}:
+            return "auth"
+        if status_code == 429:
+            return "rate_limit"
+        if status_code >= 500:
+            return "server"
+    name = type(error).__name__.lower()
+    if "timeout" in name:
+        return "timeout"
+    if isinstance(error, ConnectionError) or "connect" in name or "network" in name:
+        return "network"
+    return _classify_error_text(f"{name} {error}".lower()) or "exception"
 
 
 def accumulate_upload_durations(meta: Any, flow_meta: Any, destinations: Iterable[str]) -> None:
@@ -366,6 +637,34 @@ def accumulate_upload_durations(meta: Any, flow_meta: Any, destinations: Iterabl
         duration = float(flow_meta.get(key) or 0)
         if duration > 0:
             meta[key] = float(meta.get(key) or 0) + duration
+
+
+def _is_client_origin(origin: str) -> bool:
+    """Return whether a manifest torrent came from a torrent client instead of local hashing."""
+    return origin == "client" or origin.startswith("client:")
+
+
+def _torrent_manifest(meta: Any) -> Any:
+    release_id = str(getattr(meta, "uuid", "") or "")
+    if not release_id:
+        return None
+    try:
+        from src.torrent_manifest import TorrentManifest
+
+        return TorrentManifest(getattr(meta, "base_dir", ""), release_id)
+    except OSError, TypeError, ValueError:
+        return None
+
+
+def _manifest_entry(manifest: Any, kind: str, key: str) -> Any:
+    """Return the default (by layout) or selected (by tracker) manifest entry, if any."""
+    if manifest is None:
+        return None
+    try:
+        path = manifest.default_path(key) if kind == "default" else manifest.selected_path(key)
+        return manifest.entry_for_path(path) if path is not None else None
+    except OSError, TypeError, ValueError:
+        return None
 
 
 async def record_completed_item_stats_async(meta: Any, tracker_class_map: Mapping[str, Any]) -> None:
@@ -388,11 +687,27 @@ async def record_completed_item_stats_async(meta: Any, tracker_class_map: Mappin
     prepared_category = str(getattr(meta, "content_duration_category", "") or "")
     content_category = prepared_category or content_duration_category(meta)
     content_seconds = prepared_content_duration(meta) if prepared_category else existing_content_duration(meta)
-    normalized_outcomes = [tracker_route_outcome(status) for _destination, status, _kind in routes]
+    upload_started = upload_stage_started()
+    site_check = bool(getattr(meta, "site_check", False))
+    normalized_outcomes = [tracker_route_outcome(status, upload_started=upload_started, site_check=site_check) for _destination, status, _kind in routes]
     item_outcome = "success" if "success" in normalized_outcomes else "error" if "error" in normalized_outcomes else "no_upload"
-    await record_event_async("item", operation="completed", outcome=item_outcome, bytes_count=item_size)
+    await record_event_async("item", operation="completed", outcome=item_outcome, bytes_count=item_size, duration_ms=item_elapsed_ms())
     await record_release_profile_async(meta, item_outcome)
     await record_media_profile_async(meta)
+    manifest = _torrent_manifest(meta)
+    # A client torrent registered as a default base is what spares the base
+    # hash, whichever stage found it, so count it once per completed item.
+    for layout in ("base", "base_subs"):
+        entry = _manifest_entry(manifest, "default", layout)
+        if entry is not None and _is_client_origin(entry.origin):
+            await record_event_async(
+                "artifact",
+                service="torrent",
+                operation="reused",
+                outcome="success",
+                category=layout,
+                bytes_count=entry.content_size or item_size,
+            )
     if item_outcome == "success" and content_category and content_seconds > 0:
         await record_event_async(
             "content",
@@ -403,7 +718,7 @@ async def record_completed_item_stats_async(meta: Any, tracker_class_map: Mappin
         )
 
     for destination, status, destination_type in routes:
-        outcome = tracker_route_outcome(status)
+        outcome = tracker_route_outcome(status, upload_started=upload_started, site_check=site_check)
         duration_ms = float(getattr(meta, "get", lambda *_args: 0)(f"{destination}_upload_duration") or 0) * 1000
         await record_event_async(
             "upload",
@@ -415,6 +730,15 @@ async def record_completed_item_stats_async(meta: Any, tracker_class_map: Mappin
             duration_ms=duration_ms,
             bytes_count=item_size,
         )
+        if outcome == "error":
+            await record_event_async(
+                "upload_error",
+                service=destination,
+                operation=upload_error_reason(status),
+                outcome="error",
+                category=category,
+                destination=destination,
+            )
         scoped_outcome = "success" if outcome == "success" else "error" if outcome == "error" else "no_upload"
         await record_release_profile_async(meta, scoped_outcome, destination=destination)
         await record_media_profile_async(meta, destination=destination)
@@ -428,34 +752,28 @@ async def record_completed_item_stats_async(meta: Any, tracker_class_map: Mappin
                 content_seconds=content_seconds,
             )
         if destination_type == "torrent_tracker":
-            torrent_path = Path(str(getattr(meta, "base_dir", ""))) / "tmp" / str(getattr(meta, "uuid", "")) / f"[{destination}].torrent"
-            if torrent_path.is_file():
+            # The tracker's [NAME].torrent is a copy of its selected base, so
+            # only the selected base's origin says whether it was hashed or reused.
+            entry = _manifest_entry(manifest, "selection", destination)
+            if entry is not None and _is_client_origin(entry.origin):
+                await record_event_async(
+                    "artifact",
+                    service="torrent",
+                    operation="reused",
+                    outcome="success",
+                    category=entry.layout,
+                    destination=destination,
+                    bytes_count=entry.content_size or item_size,
+                )
+            elif entry is not None and entry.origin == "generated":
                 await record_event_async(
                     "artifact",
                     service="torrent",
                     operation="created",
                     outcome="success",
-                    category="tracker",
+                    category=entry.layout,
                     destination=destination,
                 )
-            try:
-                from src.torrent_manifest import TorrentManifest
-
-                manifest = TorrentManifest(getattr(meta, "base_dir", ""), str(getattr(meta, "uuid", "")))
-                selected = manifest.selected_path(destination)
-                entry = manifest.entry_for_path(selected) if selected is not None else None
-                if entry is not None and entry.origin == "client":
-                    await record_event_async(
-                        "artifact",
-                        service="torrent",
-                        operation="reused",
-                        outcome="success",
-                        category="base",
-                        destination=destination,
-                        bytes_count=item_size,
-                    )
-            except OSError, TypeError, ValueError:
-                pass
         else:
             nzb_paths = getattr(meta, "usenet_nzb_paths", [])
             nzb_count = sum(1 for path in nzb_paths if Path(str(path)).is_file()) if isinstance(nzb_paths, list) else 0
@@ -469,6 +787,7 @@ async def record_completed_item_stats_async(meta: Any, tracker_class_map: Mappin
                     destination=destination,
                     count=nzb_count,
                 )
+    await record_item_timings_async()
 
 
 def _parse_date(value: str | None, label: str) -> date:
@@ -553,7 +872,14 @@ def _empty_payload(
             "duplicate_preventions": 0,
             "pioneering_rate": 0.0,
             "hashing_bytes_avoided": 0,
+            "hashed_bytes": 0,
+            "hashing_bytes_per_second": 0,
+            "hashing_seconds_saved": 0,
+            "average_item_seconds": 0.0,
         },
+        "stages": [],
+        "image_hosts": {"hosts": [], "fallbacks": []},
+        "post_upload": {"cross_seeds": 0, "requests_exact": 0, "requests_partial": 0, "trump_reports": 0, "trump_report_errors": 0, "by_destination": []},
         "timeline": [],
         "heatmap": [],
         "comparison": {"items_completed_pct": None, "uploads_pct": None, "cache_hit_rate_delta": None},
@@ -702,18 +1028,62 @@ def get_stats(
     release_profile_categories: dict[tuple[str, str], dict[str, int]] = defaultdict(lambda: defaultdict(int))
     content_categories: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
     sources: dict[str, int] = defaultdict(int)
+    error_reasons: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    stages: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    fallbacks: dict[tuple[str, str], int] = defaultdict(int)
+    post_upload: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    hashed_bytes = hashed_ms = timed_items = timed_item_ms = 0
     overview = payload["overview"]
 
     for day, family, service, operation, outcome, category, source, count, duration_ms, content_seconds, bytes_count, destination in rows:
         count = int(count)
         effective_destination = destination or (service if family == "upload" else "")
+        # Hashing speed and item time describe this machine, so they are global in every view.
+        if family == "artifact" and service == "torrent" and operation == "created" and not destination and int(duration_ms) > 0:
+            hashed_bytes += int(bytes_count)
+            hashed_ms += int(duration_ms)
+        if family == "item" and operation == "completed" and int(duration_ms) > 0:
+            timed_items += count
+            timed_item_ms += int(duration_ms)
+        if active_tracker and family == "artifact" and service == "screenshot" and not destination:
+            # Screenshots are shared by every destination of an item, so a
+            # tracker view reports the global count (labelled as such) instead of zero.
+            if operation == "created" and outcome == "success":
+                overview["screenshots_created"] += count
+            continue
         if family in {"item", "media", "media_matrix", "release_profile", "artifact", "content"}:
             if active_tracker:
                 if family == "item" or destination != active_tracker:
                     continue
             elif destination:
                 continue
-        elif (family == "upload" and active_tracker and effective_destination != active_tracker) or (family in {"cache", "api"} and destination):
+        elif (
+            (family == "upload" and active_tracker and effective_destination != active_tracker)
+            or (family in {"upload_error", "post_upload"} and active_tracker and destination != active_tracker)
+            or (family in {"cache", "api"} and destination)
+        ):
+            continue
+        if family == "upload_error":
+            error_reasons[service][operation] += count
+            continue
+        if family == "stage":
+            stage_bucket = stages[service]
+            stage_bucket["count"] += count
+            stage_bucket["duration_ms"] += int(duration_ms)
+            if outcome == "error":
+                stage_bucket["failures"] += count
+            continue
+        if family == "image_fallback":
+            fallbacks[(service, operation)] += count
+            continue
+        if family == "post_upload":
+            post_bucket = post_upload[destination or service]
+            if service == "cross_seed":
+                post_bucket["cross_seeds"] += count
+            elif service == "request_match":
+                post_bucket["requests_exact" if operation == "exact" else "requests_partial"] += count
+            elif service == "trump_report":
+                post_bucket["trump_reports" if outcome == "success" else "trump_report_errors"] += count
             continue
         if family == "item":
             if operation == "completed":
@@ -853,6 +1223,7 @@ def get_stats(
             "bytes": values["bytes"],
             "processed_bytes": values["processed_bytes"],
             "skip_reasons": {key.removeprefix("reason:"): value for key, value in values.items() if key.startswith("reason:")},
+            "error_reasons": dict(sorted(error_reasons.get(service, {}).items(), key=lambda item: -item[1])),
             "pioneering_rate": round(100 * values["success"] / (values["success"] + values["reason:dupe"]), 1) if values["success"] + values["reason:dupe"] else 0.0,
         }
         for (service, destination_type), values in sorted(destinations.items(), key=lambda item: -item[1]["success"])
@@ -876,6 +1247,53 @@ def get_stats(
     pioneering_total = overview["uploads"] + duplicate_preventions
     overview["duplicate_preventions"] = duplicate_preventions
     overview["pioneering_rate"] = round(100 * overview["uploads"] / pioneering_total, 1) if pioneering_total else 0.0
+    hashing_speed = round(hashed_bytes / (hashed_ms / 1000)) if hashed_ms else 0
+    overview["hashed_bytes"] = hashed_bytes
+    overview["hashing_bytes_per_second"] = hashing_speed
+    # The time a reused base would have taken at this machine's measured hashing speed.
+    overview["hashing_seconds_saved"] = round(overview["hashing_bytes_avoided"] / hashing_speed) if hashing_speed else 0
+    overview["average_item_seconds"] = round(timed_item_ms / timed_items / 1000, 1) if timed_items else 0.0
+    stage_order = {key: index for index, key in enumerate(STAGE_KEYS)}
+    payload["stages"] = [
+        {
+            "stage": name,
+            "items": values["count"],
+            "failures": values["failures"],
+            "total_ms": values["duration_ms"],
+            "average_ms": round(values["duration_ms"] / values["count"]) if values["count"] else 0,
+        }
+        for name, values in sorted(stages.items(), key=lambda item: (stage_order.get(item[0], len(stage_order)), item[0]))
+    ]
+    fallbacks_from: defaultdict[str, int] = defaultdict(int)
+    for (from_host, _to_host), value in fallbacks.items():
+        fallbacks_from[from_host] += value
+    image_hosts = [
+        {
+            "host": service,
+            "uploads": values["success"],
+            "failures": values["error"],
+            "success_rate": round(100 * values["success"] / (values["success"] + values["error"]), 1) if values["success"] + values["error"] else 0.0,
+            "average_duration_ms": round(values["duration_ms"] / (values["success"] + values["error"])) if values["success"] + values["error"] else 0,
+            "bytes": values["bytes"],
+            "fallbacks_from": fallbacks_from.get(service, 0),
+        }
+        for (service, operation), values in api_services.items()
+        if operation == "image_upload"
+    ]
+    payload["image_hosts"] = {
+        "hosts": sorted(image_hosts, key=lambda row: (-(row["uploads"] + row["failures"]), row["host"])),
+        "fallbacks": [{"from": from_host, "to": to_host, "count": value} for (from_host, to_host), value in sorted(fallbacks.items(), key=lambda item: (-item[1], item[0]))],
+    }
+    post_rows = [
+        {"destination": name, **{key: values[key] for key in ("cross_seeds", "requests_exact", "requests_partial", "trump_reports", "trump_report_errors")}}
+        for name, values in post_upload.items()
+    ]
+    payload["post_upload"] = {
+        **{key: sum(row[key] for row in post_rows) for key in ("cross_seeds", "requests_exact", "requests_partial", "trump_reports", "trump_report_errors")},
+        "by_destination": sorted(
+            post_rows, key=lambda row: (-(row["cross_seeds"] + row["requests_exact"] + row["requests_partial"] + row["trump_reports"]), row["destination"])
+        ),
+    }
     payload["media"]["categories"] = sorted({category for category, _dimension_name, _value in media_dimensions if category})
     payload["media"]["dimensions"] = [
         {"category": category, "dimension": dimension, "value": value, "count": totals["count"], "bytes": totals["bytes"]}

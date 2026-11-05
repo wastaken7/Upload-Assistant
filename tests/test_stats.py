@@ -5,11 +5,14 @@ import sys
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 
+import httpx
 import pytest
+from torf import Torrent
 
-from src import stats
+from src import stats, webui_events
 from src.meta import Meta
 from src.metadata_cache import cache_for, is_cache_miss
+from src.torrent_manifest import TorrentManifest
 
 
 @pytest.fixture(autouse=True)
@@ -17,6 +20,9 @@ def reset_stats_configuration(monkeypatch):
     stats.configure_stats({"DEFAULT": {"stats_enabled": True}})
     stats.set_stats_context(debug=False, category="")
     monkeypatch.delenv("UA_STATS_SOURCE", raising=False)
+    yield
+    # Leave collection off so later test modules never record by accident.
+    stats.configure_stats(None)
 
 
 def test_stats_aggregate_real_activity(tmp_path):
@@ -58,6 +64,10 @@ def test_stats_aggregate_real_activity(tmp_path):
         "duplicate_preventions": 1,
         "pioneering_rate": 50.0,
         "hashing_bytes_avoided": 0,
+        "hashed_bytes": 0,
+        "hashing_bytes_per_second": 0,
+        "hashing_seconds_saved": 0,
+        "average_item_seconds": 0.0,
     }
     destination = result["uploads"]["by_destination"][0]
     assert destination["destination"] == "FICTIONAL"
@@ -119,11 +129,57 @@ def test_completed_item_outcome_uses_definitive_upload_results(statuses, expecte
         ({"upload_success": True}, "success"),
         ({"dupe": True, "upload_success": False}, "skipped:dupe"),
         ({"upload": True, "upload_success": False}, "error"),
-        ({"status_message": "Skipped by a fictional rule"}, "skipped:no_upload"),
+        ({"status_message": "Skipped by a fictional rule"}, "skipped:rules"),
+        ({"banned": True, "upload": False}, "skipped:banned"),
+        ({"skipped": True, "status_message": "Claimed release found on this tracker"}, "skipped:claimed"),
+        ({"upload": False, "status_message": "Skipped: no policy-compliant torrent is available and hashing is disabled"}, "skipped:torrent_policy"),
+        ({"skipped": True, "skip_reason": "missing_fields"}, "skipped:missing_fields"),
+        ({"banned": False, "skipped": False, "dupe": False, "upload": False}, "skipped:declined"),
+        ({"status_message": "Skipped: Error redoing dupe check after bandwidth wait: boom"}, "skipped:search_error"),
+        ({}, "skipped:no_upload"),
     ],
 )
 def test_tracker_route_outcome_has_stable_precedence(status, expected):
     assert stats.tracker_route_outcome(status) == expected
+
+
+def test_approved_routes_are_skipped_when_the_upload_stage_never_started():
+    assert stats.tracker_route_outcome({"upload": True}, upload_started=False) == "skipped:too_few_trackers"
+    assert stats.tracker_route_outcome({"upload": True}, upload_started=True) == "error"
+    # A site check never reaches the upload stage, so its routes are not "too few trackers".
+    assert stats.tracker_route_outcome({"upload": True}, upload_started=False, site_check=True) == "skipped:site_check"
+
+
+@pytest.mark.parametrize(
+    ("status", "expected"),
+    [
+        ({"status_message": "Error: 401 Unauthorized"}, "auth"),
+        ({"status_message": {"message": "Invalid API key provided"}}, "auth"),
+        ({"status_message": "HTTP 429 Too Many Requests"}, "rate_limit"),
+        ({"status_message": "Request timed out"}, "timeout"),
+        ({"status_message": "502 Bad Gateway"}, "server"),
+        ({"status_message": "data error: unexpected response"}, "invalid_response"),
+        ({"status_message": "Upload rejected: resolution not allowed"}, "rejected"),
+        ({"status_message": "Release is 1500 MB"}, "other"),
+        ({}, "unknown"),
+        ({"error_reason": "timeout", "status_message": "401"}, "timeout"),
+    ],
+)
+def test_upload_error_reason_is_a_short_category(status, expected):
+    assert stats.upload_error_reason(status) == expected
+
+
+def test_exception_error_reason_uses_type_and_status_code():
+    class FictionalResponse:
+        status_code = 503
+
+    class FictionalHTTPError(Exception):
+        response = FictionalResponse()
+
+    assert stats.exception_error_reason(TimeoutError()) == "timeout"
+    assert stats.exception_error_reason(ConnectionResetError()) == "network"
+    assert stats.exception_error_reason(FictionalHTTPError("boom")) == "server"
+    assert stats.exception_error_reason(ValueError("plain failure")) == "exception"
 
 
 @pytest.mark.asyncio
@@ -515,6 +571,78 @@ def test_reused_torrent_reports_media_volume_as_hashing_io_avoided(tmp_path):
     assert result["artifacts"] == [{"type": "torrent", "operation": "reused", "variant": "base", "count": 1, "bytes": 64_000}]
 
 
+def _write_torrent(path, size):
+    piece_size = 16_384
+    torrent = Torrent()
+    torrent.metainfo["info"] = {"name": "fictional.mkv", "length": size, "piece length": piece_size, "pieces": b"x" * (20 * -(-size // piece_size))}
+    torrent.write(path, overwrite=True)
+
+
+class _TorrentTracker:
+    is_usenet = False
+
+
+def _completed_meta(tmp_path):
+    return Meta(
+        base_dir=str(tmp_path),
+        uuid="fictional-release",
+        category="MOVIE",
+        source_size=70_000,
+        tracker_status={"FICTIONAL": {"upload_success": True}},
+    )
+
+
+@pytest.mark.asyncio
+async def test_client_torrent_registered_by_the_prep_search_counts_as_hashing_io_avoided(monkeypatch, tmp_path):
+    monkeypatch.setattr(stats, "_database_path", lambda _state_dir=None: tmp_path / "data" / "stats.sqlite3")
+    source = tmp_path / "client.torrent"
+    _write_torrent(source, 64_000)
+    manifest = TorrentManifest(tmp_path, "fictional-release")
+    # The prep-stage client search registers candidates as "client:<name>" and
+    # later re-registrations of the managed copy keep that origin.
+    entry = manifest.register(source, "base", "client:fictional-qbit")
+    manifest.register(manifest.entry_path(entry), "base", "client")
+    manifest.select("FICTIONAL", "base")
+    (manifest.root / "[FICTIONAL].torrent").write_bytes(manifest.entry_path(entry).read_bytes())
+
+    await stats.record_completed_item_stats_async(_completed_meta(tmp_path), {"FICTIONAL": _TorrentTracker})
+
+    global_result = stats.get_stats("all", "real", tmp_path)
+    filtered = stats.get_stats("all", "real", tmp_path, tracker="FICTIONAL")
+    assert global_result["overview"]["hashing_bytes_avoided"] == 64_000
+    assert global_result["overview"]["torrents_created"] == 0
+    assert filtered["overview"]["hashing_bytes_avoided"] == 64_000
+    # The tracker's copy of a reused base is not a newly hashed torrent.
+    assert filtered["overview"]["torrents_created"] == 0
+
+
+@pytest.mark.asyncio
+async def test_tracker_view_counts_a_generated_base_as_created_not_reused(monkeypatch, tmp_path):
+    monkeypatch.setattr(stats, "_database_path", lambda _state_dir=None: tmp_path / "data" / "stats.sqlite3")
+    source = tmp_path / "generated.torrent"
+    _write_torrent(source, 64_000)
+    manifest = TorrentManifest(tmp_path, "fictional-release")
+    manifest.register(source, "base", "generated")
+    manifest.select("FICTIONAL", "base")
+
+    await stats.record_completed_item_stats_async(_completed_meta(tmp_path), {"FICTIONAL": _TorrentTracker})
+
+    filtered = stats.get_stats("all", "real", tmp_path, tracker="FICTIONAL")
+    assert filtered["overview"]["torrents_created"] == 1
+    assert filtered["overview"]["hashing_bytes_avoided"] == 0
+    assert stats.get_stats("all", "real", tmp_path)["overview"]["hashing_bytes_avoided"] == 0
+
+
+def test_tracker_view_reports_global_screenshots_without_mixing_them_into_artifacts(tmp_path):
+    stats.record_event("artifact", service="screenshot", operation="created", category="standard", count=5, state_dir=tmp_path)
+    stats.record_event("upload", service="FICTIONAL", operation="torrent_tracker", outcome="success", destination="FICTIONAL", state_dir=tmp_path)
+
+    filtered = stats.get_stats("all", "real", tmp_path, tracker="FICTIONAL")
+
+    assert filtered["overview"]["screenshots_created"] == 5
+    assert filtered["artifacts"] == []
+
+
 def test_stats_reports_heatmap_and_previous_period_comparison(tmp_path):
     stats.record_event("item", operation="started", outcome="success", state_dir=tmp_path)
     stats.record_event("item", operation="completed", outcome="success", state_dir=tmp_path)
@@ -734,3 +862,154 @@ async def test_metadata_cache_does_not_infer_api_calls_from_cache_activity(monke
     assert result["cache"]["hits"] == 1
     assert result["api"]["total"] == 0
     assert b"Fictional Work" not in (tmp_path / "data" / "stats.sqlite3").read_bytes()
+
+
+@pytest.mark.asyncio
+async def test_stage_times_item_time_and_request_matches_are_recorded_when_the_item_completes(monkeypatch, tmp_path):
+    monkeypatch.setattr(stats, "_database_path", lambda _state_dir=None: tmp_path / "data" / "stats.sqlite3")
+    now = {"value": 100.0}
+    monkeypatch.setattr(stats.time, "monotonic", lambda: now["value"])
+    stats.begin_item_timing()
+    stats.observe_run_event("stage", {"key": "prep", "status": "start"})
+    now["value"] = 103.0
+    stats.observe_run_event("stage", {"key": "prep", "status": "done"})
+    stats.observe_run_event("stage", {"key": "upload", "status": "start"})
+    now["value"] = 104.5
+    stats.observe_run_event("stage", {"key": "upload", "status": "fail"})
+    stats.observe_run_event("request", {"tracker": "fictional", "exact": True})
+    stats.observe_run_event("request", {"tracker": "fictional", "exact": False})
+    stats.observe_run_event("request", {"tracker": "imaginary", "exact": False})
+    now["value"] = 110.0
+
+    await stats.record_completed_item_stats_async(Meta(category="MOVIE", tracker_status={"FICTIONAL": {"upload_success": True}}), {})
+
+    result = stats.get_stats("all", "real", tmp_path)
+    assert result["stages"] == [
+        {"stage": "prep", "items": 1, "failures": 0, "total_ms": 3000, "average_ms": 3000},
+        {"stage": "upload", "items": 1, "failures": 1, "total_ms": 1500, "average_ms": 1500},
+    ]
+    assert result["overview"]["average_item_seconds"] == 10.0
+    assert result["post_upload"]["requests_exact"] == 1
+    assert result["post_upload"]["requests_partial"] == 2
+    filtered = stats.get_stats("all", "real", tmp_path, tracker="FICTIONAL")
+    assert filtered["post_upload"]["requests_partial"] == 1
+    # Stage times describe the whole run, so a tracker view keeps them.
+    assert len(filtered["stages"]) == 2
+
+
+def test_webui_events_notify_listeners_in_cli_runs(monkeypatch):
+    seen = []
+    monkeypatch.setattr(webui_events, "_listeners", [])
+    monkeypatch.delenv(webui_events.GUI_EVENTS_ENV, raising=False)
+    webui_events.add_listener(lambda kind, payload: seen.append((kind, dict(payload))))
+
+    webui_events.stage("prep", "start")
+    webui_events.request_match("FICTIONAL", "Fictional Request", exact=True)
+
+    assert seen == [("stage", {"key": "prep", "status": "start"}), ("request", {"tracker": "FICTIONAL", "exact": True})]
+
+
+def test_hashing_speed_estimates_time_saved_by_reused_torrents(tmp_path):
+    stats.record_event("artifact", service="torrent", operation="created", category="base", bytes_count=8_000_000, duration_ms=2_000, state_dir=tmp_path)
+    stats.record_event("artifact", service="torrent", operation="reused", category="base", bytes_count=40_000_000, state_dir=tmp_path)
+
+    overview = stats.get_stats("all", "real", tmp_path)["overview"]
+
+    assert overview["hashed_bytes"] == 8_000_000
+    assert overview["hashing_bytes_per_second"] == 4_000_000
+    assert overview["hashing_seconds_saved"] == 10
+
+
+@pytest.mark.asyncio
+async def test_failed_routes_record_an_error_category_per_destination(monkeypatch, tmp_path):
+    monkeypatch.setattr(stats, "_database_path", lambda _state_dir=None: tmp_path / "data" / "stats.sqlite3")
+    meta = Meta(
+        category="MOVIE",
+        tracker_status={
+            "FICTIONAL": {"upload": True, "upload_success": False, "status_message": "401 Unauthorized"},
+            "IMAGINARY": {"upload": True, "error_reason": "timeout"},
+        },
+    )
+
+    await stats.record_completed_item_stats_async(meta, {})
+
+    rows = {row["destination"]: row for row in stats.get_stats("all", "real", tmp_path)["uploads"]["by_destination"]}
+    assert rows["FICTIONAL"]["error_reasons"] == {"auth": 1}
+    assert rows["IMAGINARY"]["error_reasons"] == {"timeout": 1}
+    filtered = stats.get_stats("all", "real", tmp_path, tracker="IMAGINARY")["uploads"]["by_destination"]
+    assert [row["error_reasons"] for row in filtered] == [{"timeout": 1}]
+    assert b"Unauthorized" not in (tmp_path / "data" / "stats.sqlite3").read_bytes()
+
+
+def test_post_upload_activity_is_aggregated_per_destination(tmp_path):
+    stats.record_event("post_upload", service="cross_seed", operation="injected", destination="FICTIONAL", state_dir=tmp_path)
+    stats.record_event("post_upload", service="trump_report", operation="submitted", destination="FICTIONAL", state_dir=tmp_path)
+    stats.record_event("post_upload", service="trump_report", operation="submitted", outcome="error", destination="IMAGINARY", state_dir=tmp_path)
+
+    post_upload = stats.get_stats("all", "real", tmp_path)["post_upload"]
+
+    assert post_upload["cross_seeds"] == 1
+    assert post_upload["trump_reports"] == 1
+    assert post_upload["trump_report_errors"] == 1
+    assert [row["destination"] for row in post_upload["by_destination"]] == ["FICTIONAL", "IMAGINARY"]
+
+
+def test_image_hosts_report_reliability_and_fallbacks(tmp_path):
+    stats.record_event("api", service="fictionalhost", operation="image_upload", count=3, duration_ms=300, bytes_count=900, state_dir=tmp_path)
+    stats.record_event("api", service="fictionalhost", operation="image_upload", outcome="error", count=1, duration_ms=100, state_dir=tmp_path)
+    stats.record_event("image_fallback", service="fictionalhost", operation="imaginaryhost", state_dir=tmp_path)
+
+    image_hosts = stats.get_stats("all", "real", tmp_path)["image_hosts"]
+
+    assert image_hosts["hosts"] == [
+        {"host": "fictionalhost", "uploads": 3, "failures": 1, "success_rate": 75.0, "average_duration_ms": 100, "bytes": 900, "fallbacks_from": 1}
+    ]
+    assert image_hosts["fallbacks"] == [{"from": "fictionalhost", "to": "imaginaryhost", "count": 1}]
+
+
+@pytest.fixture
+def metadata_tracking(monkeypatch, tmp_path):
+    """Install the httpx wrapper for one test and restore the original methods afterwards."""
+    monkeypatch.setattr(httpx.AsyncClient, "send", httpx.AsyncClient.send)
+    monkeypatch.setattr(httpx.Client, "send", httpx.Client.send)
+    monkeypatch.setattr(stats, "_metadata_tracking_installed", False)
+    monkeypatch.setattr(stats, "_database_path", lambda _state_dir=None: tmp_path / "data" / "stats.sqlite3")
+    stats.install_metadata_api_tracking()
+    return tmp_path
+
+
+@pytest.mark.asyncio
+async def test_metadata_provider_requests_count_as_external_operations(metadata_tracking):
+    statuses = {"/3/movie/1": 200, "/3/movie/2": 404, "/3/movie/3": 500}
+
+    def handler(request):
+        return httpx.Response(statuses.get(request.url.path, 200))
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        for path in statuses:
+            await client.get(f"https://api.themoviedb.org{path}")
+        await client.get("https://tracker.example/api/torrents")
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        client.get("https://api.tvmaze.com/shows/1")
+
+    services = {(row["service"], row["operation"]): row for row in stats.get_stats("all", "real", metadata_tracking)["api"]["by_service"]}
+    assert set(services) == {("tmdb", "metadata"), ("tvmaze", "metadata")}
+    assert services[("tmdb", "metadata")]["successes"] == 2
+    assert services[("tmdb", "metadata")]["errors"] == 1
+    assert services[("tvmaze", "metadata")]["requests"] == 1
+
+
+@pytest.mark.asyncio
+async def test_metadata_tracking_records_nothing_while_collection_is_disabled(metadata_tracking):
+    stats.configure_stats(None)
+    async with httpx.AsyncClient(transport=httpx.MockTransport(lambda _request: httpx.Response(200))) as client:
+        await client.get("https://api.themoviedb.org/3/movie/1")
+
+    assert not (metadata_tracking / "data" / "stats.sqlite3").exists()
+
+
+def test_metadata_service_names_only_known_provider_hosts():
+    assert stats.metadata_api_service(httpx.URL("https://www.googleapis.com/books/v1/volumes")) == "google_books"
+    assert stats.metadata_api_service(httpx.URL("https://www.googleapis.com/drive/v3/files")) == ""
+    assert stats.metadata_api_service(httpx.URL("https://api.audible.co.uk/1.0/catalog")) == "audible"
+    assert stats.metadata_api_service(httpx.URL("https://image.tmdb.org/t/p/w500/poster.jpg")) == ""

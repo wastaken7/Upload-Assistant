@@ -53,6 +53,7 @@ const DEFAULT_STATS_SETTINGS = Object.freeze({
     duplicatesPrevented: true,
     pioneeringRate: true,
     hashingAvoided: true,
+    hashingThroughput: true,
     health: true,
     cacheHitRate: true,
     cacheWrites: true,
@@ -74,6 +75,10 @@ const DEFAULT_STATS_SETTINGS = Object.freeze({
     cacheByProvider: true,
     externalOperations: true,
     executionSource: true,
+    stageTiming: true,
+    uploadProblems: true,
+    imageHosts: true,
+    afterUpload: true,
   },
 });
 const SUMMARY_VISIBILITY = [
@@ -94,6 +99,7 @@ const SUMMARY_VISIBILITY = [
       ["duplicatesPrevented", "Duplicates prevented"],
       ["pioneeringRate", "Pioneering rate"],
       ["hashingAvoided", "Hashing I/O avoided"],
+      ["hashingThroughput", "Hashing throughput"],
     ],
   },
   {
@@ -129,6 +135,10 @@ const SECTION_VISIBILITY = [
   ["cacheByProvider", "Cache by provider"],
   ["externalOperations", "External operations"],
   ["executionSource", "Execution source"],
+  ["stageTiming", "Time per stage"],
+  ["uploadProblems", "Upload problems"],
+  ["imageHosts", "Image hosts"],
+  ["afterUpload", "After upload"],
 ];
 const CHART_COLORS = [
   "#3b82f6",
@@ -251,6 +261,7 @@ const formatUploadType = (value) =>
 const OPERATION_LABELS = {
   credential_sync: "Sync credentials",
   image_upload: "Upload images",
+  metadata: "Metadata lookup",
   nntp_post: "Post to Usenet",
   search: "Search existing releases",
   torrent_client_add: "Add to torrent client",
@@ -268,6 +279,58 @@ const formatOperation = (value) => {
       .replaceAll("_", " ")
       .replace(/\b\w/g, (character) => character.toUpperCase())
   );
+};
+const STAGE_LABELS = {
+  prep: "Preparation",
+  confirm: "Confirmation",
+  dupes: "Dupe checks",
+  screens: "Screenshots & images",
+  torrent: "Torrent",
+  upload: "Upload",
+  requests: "Request search",
+};
+const REASON_LABELS = {
+  auth: "Authentication",
+  rate_limit: "Rate limited",
+  timeout: "Timeout",
+  server: "Server error",
+  network: "Network",
+  invalid_response: "Invalid response",
+  rejected: "Rejected by tracker",
+  exception: "Unexpected error",
+  other: "Other",
+  unknown: "No message",
+  dupe: "Duplicate",
+  banned: "Banned group",
+  claimed: "Claimed",
+  torrent_policy: "Torrent rules",
+  rules: "Tracker checks",
+  declined: "Declined",
+  search_error: "Search failed",
+  missing_fields: "Missing fields",
+  too_few_trackers: "Too few trackers",
+  site_check: "Site check only",
+  no_upload: "Not uploaded",
+};
+const formatStage = (value) =>
+  STAGE_LABELS[value] || formatDimensionValue(value);
+const formatReason = (value) =>
+  REASON_LABELS[value] || formatDimensionValue(value);
+const formatReasonCounts = (reasons) =>
+  Object.entries(reasons || {})
+    .map(([reason, count]) => `${formatReason(reason)}: ${count}`)
+    .join(", ") || "—";
+const formatStageTime = (milliseconds) =>
+  milliseconds < 60000
+    ? formatDuration(Math.round(milliseconds || 0))
+    : formatElapsed(milliseconds / 1000);
+const formatElapsed = (seconds) => {
+  const total = Math.round(Math.max(0, Number(seconds) || 0));
+  if (total < 60) return `${total}s`;
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  if (hours) return `${formatNumber(hours)}h ${minutes}m`;
+  return `${minutes}m ${total % 60}s`;
 };
 const formatTrend = (value, suffix = "%") => {
   if (value == null) return "";
@@ -2384,6 +2447,39 @@ function StatsApp() {
       }, {}),
     [data],
   );
+  const uploadProblemRows = useMemo(() => {
+    const totals = new Map();
+    for (const row of data?.uploads?.by_destination || []) {
+      const name = row.display_name || row.destination;
+      for (const [kind, reasons] of [
+        ["Error", row.error_reasons],
+        ["Skip", row.skip_reasons],
+      ]) {
+        for (const [reason, count] of Object.entries(reasons || {})) {
+          const key = `${kind}:${reason}`;
+          const entry = totals.get(key) || {
+            key,
+            kind,
+            reason,
+            count: 0,
+            destinations: [],
+          };
+          entry.count += count;
+          entry.destinations.push([name, count]);
+          totals.set(key, entry);
+        }
+      }
+    }
+    return [...totals.values()]
+      .map((entry) => ({
+        ...entry,
+        destinations: entry.destinations
+          .sort((left, right) => right[1] - left[1])
+          .map(([name, count]) => `${name}: ${count}`)
+          .join(", "),
+      }))
+      .sort((left, right) => right.count - left.count);
+  }, [data]);
   const screenshotArtifactMap = useMemo(
     () =>
       (data?.artifacts || []).reduce((totals, row) => {
@@ -2736,7 +2832,27 @@ function StatsApp() {
                         icon="hashing-io-avoided"
                         label="Hashing I/O avoided"
                         value={formatBytes(overview.hashing_bytes_avoided)}
-                        detail="Media volume covered by reused base torrents"
+                        detail={
+                          overview.hashing_seconds_saved
+                            ? `About ${formatElapsed(overview.hashing_seconds_saved)} of hashing saved by reused base torrents`
+                            : "Media volume covered by reused base torrents"
+                        }
+                      />
+                    )}
+                    {visible.hashingThroughput && (
+                      <Card
+                        icon="hashing-throughput"
+                        label={
+                          activeTracker
+                            ? "Hashing throughput (global)"
+                            : "Hashing throughput"
+                        }
+                        value={
+                          overview.hashing_bytes_per_second
+                            ? `${formatBytes(overview.hashing_bytes_per_second)}/s`
+                            : "—"
+                        }
+                        detail={`${formatBytes(overview.hashed_bytes)} hashed into new torrents`}
                       />
                     )}
                   </MetricGroup>
@@ -2801,9 +2917,17 @@ function StatsApp() {
                     {visible.screenshotsCreated && (
                       <Card
                         icon="screenshots-created"
-                        label="Screenshots created"
+                        label={
+                          activeTracker
+                            ? "Screenshots created (global)"
+                            : "Screenshots created"
+                        }
                         value={formatNumber(overview.screenshots_created)}
-                        detail={`${formatNumber(screenshotArtifactMap.standard)} standard · ${formatNumber(screenshotArtifactMap.menu)} menus · ${formatNumber(screenshotArtifactMap.spectrogram)} spectrograms · ${formatNumber((screenshotArtifactMap.dovi_plot || 0) + (screenshotArtifactMap.hdr10plus_plot || 0))} HDR plots`}
+                        detail={
+                          activeTracker
+                            ? "Shared by all destinations"
+                            : `${formatNumber(screenshotArtifactMap.standard)} standard · ${formatNumber(screenshotArtifactMap.menu)} menus · ${formatNumber(screenshotArtifactMap.spectrogram)} spectrograms · ${formatNumber((screenshotArtifactMap.dovi_plot || 0) + (screenshotArtifactMap.hdr10plus_plot || 0))} HDR plots`
+                        }
                       />
                     )}
                   </MetricGroup>
@@ -2916,13 +3040,13 @@ function StatsApp() {
                               render: (r) => formatNumber(r.skipped),
                             },
                             {
-                              label: "Skip reasons",
+                              label: "Error reasons",
                               render: (r) =>
-                                Object.entries(r.skip_reasons || {})
-                                  .map(
-                                    ([reason, count]) => `${reason}: ${count}`,
-                                  )
-                                  .join(", ") || "—",
+                                formatReasonCounts(r.error_reasons),
+                            },
+                            {
+                              label: "Skip reasons",
+                              render: (r) => formatReasonCounts(r.skip_reasons),
                             },
                             {
                               label: "Rate",
@@ -3267,6 +3391,257 @@ function StatsApp() {
                               sortValue: (r) => r.bytes,
                               render: (r) =>
                                 r.bytes > 0 ? formatBytes(r.bytes) : "—",
+                            },
+                          ]}
+                        />
+                      }
+                    />
+                  </Section>
+                )}
+                {visible.stageTiming && (
+                  <Section
+                    icon="stage-timing"
+                    title="Time per stage"
+                    subtitle={`${activeTracker ? "These totals include all trackers, even when one is selected. " : ""}See the average time each stage takes per item${overview.average_item_seconds ? `; a whole item takes ${formatStageTime(overview.average_item_seconds * 1000)} on average` : ""}. Confirmation and dupe checks include time spent waiting for your answers.`}
+                  >
+                    <ChartWithTable
+                      preferenceKey="stage-timing"
+                      chart={
+                        <BarChart
+                          ariaLabel="Average time per stage"
+                          showFavicons={false}
+                          valueFormatter={formatStageTime}
+                          rows={data.stages.map((row) => ({
+                            label: formatStage(row.stage),
+                            value: row.average_ms,
+                          }))}
+                        />
+                      }
+                      table={
+                        <Table
+                          rows={data.stages.map((row) => ({
+                            ...row,
+                            key: row.stage,
+                          }))}
+                          headers={[
+                            {
+                              label: "Stage",
+                              sortValue: (r) => formatStage(r.stage),
+                              render: (r) => formatStage(r.stage),
+                            },
+                            {
+                              label: "Items",
+                              sortValue: (r) => r.items,
+                              render: (r) => formatNumber(r.items),
+                            },
+                            {
+                              label: "Avg time",
+                              sortValue: (r) => r.average_ms,
+                              render: (r) => formatStageTime(r.average_ms),
+                            },
+                            {
+                              label: "Total time",
+                              sortValue: (r) => r.total_ms,
+                              render: (r) => formatStageTime(r.total_ms),
+                            },
+                            {
+                              label: "Failures",
+                              sortValue: (r) => r.failures,
+                              render: (r) => formatNumber(r.failures),
+                            },
+                          ]}
+                        />
+                      }
+                    />
+                  </Section>
+                )}
+                {visible.uploadProblems && (
+                  <Section
+                    icon="upload-problems"
+                    title="Upload problems"
+                    subtitle="See why routes failed or were skipped. Only a short category is saved, never the tracker's message."
+                  >
+                    <ChartWithTable
+                      preferenceKey="upload-problems"
+                      chart={
+                        <DistributionChart
+                          preferenceKey="upload-problems"
+                          ariaLabel="Failed and skipped routes by reason"
+                          rows={uploadProblemRows.map((row) => ({
+                            label: `${row.kind} · ${formatReason(row.reason)}`,
+                            value: row.count,
+                          }))}
+                        />
+                      }
+                      table={
+                        <Table
+                          rows={uploadProblemRows}
+                          headers={[
+                            { label: "Kind", key: "kind" },
+                            {
+                              label: "Reason",
+                              sortValue: (r) => formatReason(r.reason),
+                              render: (r) => formatReason(r.reason),
+                            },
+                            {
+                              label: "Routes",
+                              sortValue: (r) => r.count,
+                              render: (r) => formatNumber(r.count),
+                            },
+                            { label: "Destinations", key: "destinations" },
+                          ]}
+                        />
+                      }
+                    />
+                  </Section>
+                )}
+                {visible.imageHosts && (
+                  <Section
+                    icon="image-hosts"
+                    title="Image hosts"
+                    subtitle={`${activeTracker ? "These totals include all trackers, even when one is selected. " : ""}See each image host's reliability and how often uploads moved on to the next host.`}
+                  >
+                    <ChartWithTable
+                      preferenceKey="image-hosts"
+                      chart={
+                        <DistributionChart
+                          preferenceKey="image-hosts"
+                          ariaLabel="Image uploads by host"
+                          rows={data.image_hosts.hosts.map((row) => ({
+                            label: row.host,
+                            value: row.uploads + row.failures,
+                          }))}
+                        />
+                      }
+                      table={
+                        <div className="space-y-4">
+                          <Table
+                            rows={data.image_hosts.hosts.map((row) => ({
+                              ...row,
+                              key: row.host,
+                            }))}
+                            headers={[
+                              { label: "Host", key: "host" },
+                              {
+                                label: "Uploaded",
+                                sortValue: (r) => r.uploads,
+                                render: (r) => formatNumber(r.uploads),
+                              },
+                              {
+                                label: "Failed",
+                                sortValue: (r) => r.failures,
+                                render: (r) => formatNumber(r.failures),
+                              },
+                              {
+                                label: "Rate",
+                                sortValue: (r) => r.success_rate,
+                                render: (r) => `${r.success_rate}%`,
+                              },
+                              {
+                                label: "Avg time",
+                                sortValue: (r) => r.average_duration_ms,
+                                render: (r) =>
+                                  formatDuration(r.average_duration_ms),
+                              },
+                              {
+                                label: "Volume",
+                                sortValue: (r) => r.bytes,
+                                render: (r) => formatBytes(r.bytes),
+                              },
+                              {
+                                label: "Fell back",
+                                sortValue: (r) => r.fallbacks_from,
+                                render: (r) => formatNumber(r.fallbacks_from),
+                              },
+                            ]}
+                          />
+                          {data.image_hosts.fallbacks.length > 0 && (
+                            <Table
+                              rows={data.image_hosts.fallbacks.map((row) => ({
+                                ...row,
+                                key: `${row.from}:${row.to}`,
+                              }))}
+                              headers={[
+                                { label: "From host", key: "from" },
+                                { label: "To host", key: "to" },
+                                {
+                                  label: "Fallbacks",
+                                  sortValue: (r) => r.count,
+                                  render: (r) => formatNumber(r.count),
+                                },
+                              ]}
+                            />
+                          )}
+                        </div>
+                      }
+                    />
+                  </Section>
+                )}
+                {visible.afterUpload && (
+                  <Section
+                    icon="after-upload"
+                    title="After upload"
+                    subtitle="See cross-seeds added to your torrent client, matching requests found, and trump reports sent."
+                  >
+                    <ChartWithTable
+                      preferenceKey="after-upload"
+                      chart={
+                        <DonutChart
+                          ariaLabel="Activity after upload"
+                          showFavicons={false}
+                          rows={[
+                            {
+                              label: "Cross-seeds",
+                              value: data.post_upload.cross_seeds,
+                            },
+                            {
+                              label: "Exact request matches",
+                              value: data.post_upload.requests_exact,
+                            },
+                            {
+                              label: "Partial request matches",
+                              value: data.post_upload.requests_partial,
+                            },
+                            {
+                              label: "Trump reports",
+                              value: data.post_upload.trump_reports,
+                            },
+                          ]}
+                        />
+                      }
+                      table={
+                        <Table
+                          rows={data.post_upload.by_destination.map((row) => ({
+                            ...row,
+                            key: row.destination,
+                          }))}
+                          headers={[
+                            { label: "Destination", key: "destination" },
+                            {
+                              label: "Cross-seeds",
+                              sortValue: (r) => r.cross_seeds,
+                              render: (r) => formatNumber(r.cross_seeds),
+                            },
+                            {
+                              label: "Exact requests",
+                              sortValue: (r) => r.requests_exact,
+                              render: (r) => formatNumber(r.requests_exact),
+                            },
+                            {
+                              label: "Partial requests",
+                              sortValue: (r) => r.requests_partial,
+                              render: (r) => formatNumber(r.requests_partial),
+                            },
+                            {
+                              label: "Trump reports",
+                              sortValue: (r) => r.trump_reports,
+                              render: (r) => formatNumber(r.trump_reports),
+                            },
+                            {
+                              label: "Report errors",
+                              sortValue: (r) => r.trump_report_errors,
+                              render: (r) =>
+                                formatNumber(r.trump_report_errors),
                             },
                           ]}
                         />

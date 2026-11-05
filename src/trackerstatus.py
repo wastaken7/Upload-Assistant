@@ -164,6 +164,7 @@ class TrackerStatusManager:
                 tracker_class = tracker_class_map[tracker_name](config=self.config)
                 if tracker_name == "PASSTHEPOPCORN" and local_meta.get("imdb_id", 0) == 0:
                     local_tracker_status["skipped"] = True
+                    local_tracker_status["skip_reason"] = "missing_fields"
 
                 if not local_tracker_status["skipped"]:
                     result = await tracker_setup.check_banned_group(tracker_class.tracker, tracker_class.banned_groups, local_meta)
@@ -191,6 +192,7 @@ class TrackerStatusManager:
                     if book_missing:
                         logger.info(f"[yellow]{tracker_name}: Skipping upload because required BOOK fields are missing: {', '.join(book_missing)}[/yellow]")
                         local_tracker_status["skipped"] = True
+                        local_tracker_status["skip_reason"] = "missing_fields"
 
                 # Check for missing required GAME fields in unattended mode
                 elif local_meta.get("category") == "GAME" and local_meta.get("unattended", False):
@@ -203,6 +205,7 @@ class TrackerStatusManager:
                     if game_missing:
                         logger.info(f"[yellow]{tracker_name}: Skipping upload because required GAME fields are missing: {', '.join(game_missing)}[/yellow]")
                         local_tracker_status["skipped"] = True
+                        local_tracker_status["skip_reason"] = "missing_fields"
 
                 if not local_tracker_status["banned"] and not local_tracker_status["skipped"]:
                     claimed = await tracker_setup.get_torrent_claims(local_meta, tracker_name)
@@ -236,6 +239,7 @@ class TrackerStatusManager:
                                 logger.info(f"[bold red]Error searching for duplicates on {tracker_name}: {e}[/bold red]")
                                 if local_meta.get("unattended", False):
                                     local_tracker_status["skipped"] = True
+                                    local_tracker_status["skip_reason"] = "search_error"
                                     local_meta.skipping = tracker_name
                                     dupes = []
                                 else:
@@ -255,6 +259,7 @@ class TrackerStatusManager:
                                                 meta.setdefault("dupe_checked_trackers", []).append(tracker_name)
                                         else:
                                             local_tracker_status["skipped"] = True
+                                            local_tracker_status["skip_reason"] = "search_error"
                                             local_meta.skipping = tracker_name
                                             dupes = []
                                     except EOFError:
@@ -289,6 +294,7 @@ class TrackerStatusManager:
                                 logger.info(f"[bold red]Error searching for duplicates on {tracker_name}: {e}[/bold red]")
                                 if local_meta.get("unattended", False):
                                     local_tracker_status["skipped"] = True
+                                    local_tracker_status["skip_reason"] = "search_error"
                                     local_meta.skipping = tracker_name
                                     dupes = []
                                 else:
@@ -305,6 +311,7 @@ class TrackerStatusManager:
                                             dupes = []
                                         else:
                                             local_tracker_status["skipped"] = True
+                                            local_tracker_status["skip_reason"] = "search_error"
                                             local_meta.skipping = tracker_name
                                             dupes = []
                                     except EOFError:
