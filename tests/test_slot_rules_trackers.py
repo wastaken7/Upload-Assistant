@@ -235,7 +235,19 @@ class TestAvistaZNetwork:
         webrip = prof(f"{T}.1080p.AMZN.WEBRip.DDP5.1.x265-NOGRPA")
         assert verdict(rules, webrip, prof(f"{T}.1080p.BluRay.DD5.1.x264-NOGRPB")) is BLOCK
         assert verdict(rules, webrip, prof(f"{T}.1080p.NF.WEB-DL.DDP5.1.H.264-NOGRPB")) is BLOCK
-        assert verdict(rules, prof(f"{T}.1080p.BluRay.DD5.1.x265-NOGRPA"), prof(f"{T}.1080p.AMZN.WEBRip.DDP5.1.x264-NOGRPB")) is ALLOW
+        bluray = prof(f"{T}.1080p.BluRay.DD5.1.x265-NOGRPA")
+        assert verdict(rules, bluray, prof(f"{T}.1080p.AMZN.WEBRip.DDP5.1.x264-NOGRPB")) is ALLOW
+        # A better source whose codec is unknown may be in the XviD/DivX slot.
+        assert verdict(rules, webrip, replace(prof(f"{T}.1080p.BluRay.DD5.1.x264-NOGRPB"), codec=None)) is REVIEW
+
+    def test_avistaz_lists_replaced_releases_from_other_slots(self) -> None:
+        rules = AvistaZSlotRules(Meta(category="MOVIE"))
+        webrip = prof(f"{T}.1080p.AMZN.WEBRip.DDP5.1.x264-NOGRPB")
+        decision = rules.evaluate(prof(f"{T}.1080p.AMZN.WEB-DL.DDP5.1.H.264-NOGRPA"), [webrip])
+        assert decision is not None
+        assert decision.verdict is ALLOW
+        assert [entry["name"] for entry in decision.conflicts] == [webrip.name]
+        assert "Report it as a trump" in decision.reason
 
     def test_privatehd(self) -> None:
         upload = prof(f"{T}.1080p.AMZN.WEB-DL.DDP5.1.H.264-NOGRPA")

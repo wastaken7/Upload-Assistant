@@ -10,6 +10,7 @@ from src.slot_rules.profile import DVDRIP, ENCODE, HDTV, REMUX, WEBDL, WEBRIP, X
 # Priority of sources for encodes; 1 is best. WEBRip is 4 on both sites.
 CINEMAZ_PRIORITY = {ENCODE: 1, DVDRIP: 1, HDTV: 3, WEBRIP: 4}
 AVISTAZ_PRIORITY = {ENCODE: 1, DVDRIP: 1, WEBDL: 2, HDTV: 3, WEBRIP: 4}
+PRIORITY_RULE = "AvistaZ keeps the best source (Blu-ray > WEB-DL > HDTV > WEBRip); lower-priority encodes are removed once a better one exists."
 
 
 def _priority_trump(priority: dict[str, int]) -> TrumpTest:
@@ -65,16 +66,34 @@ class AvistaZSlotRules(SlotRules):
             # Up to two WEB-DLs per resolution, whatever their codec.
             return (res, "WEB-DL")
         codec = self.require(profile.codec, "video codec")
-        # x264 and x265 encodes coexist; source priority is checked across codecs in ``better_sources``.
+        # x264 and x265 encodes coexist; source priority is checked across codecs in ``by_priority``.
         return (res, "encode", "XviD/DivX" if codec == XVID else codec)
 
     @staticmethod
-    def better_sources(upload: ReleaseProfile, existing: Sequence[ReleaseProfile]) -> list[ReleaseProfile]:
-        """Releases at the upload's resolution from a higher-priority source, in any x264/x265 slot or the WEB-DL slot."""
+    def by_priority(upload: ReleaseProfile, existing: Sequence[ReleaseProfile]) -> tuple[list[ReleaseProfile], list[ReleaseProfile], list[ReleaseProfile]]:
+        """Split releases at the upload's resolution, across the x264/x265 and WEB-DL slots, by source priority.
+
+        Returns ``(better, maybe_better, worse)``: ``maybe_better`` has a better source but an
+        unknown codec, so it may sit in the separate XviD/DivX slot.
+        """
         rank = AVISTAZ_PRIORITY.get(upload.kind or "")
         if rank is None or upload.codec == XVID:
-            return []
-        return [profile for profile in existing if profile.resolution == upload.resolution and profile.codec != XVID and AVISTAZ_PRIORITY.get(profile.kind or "", rank) < rank]
+            return [], [], []
+        better: list[ReleaseProfile] = []
+        maybe_better: list[ReleaseProfile] = []
+        worse: list[ReleaseProfile] = []
+        for profile in existing:
+            other = AVISTAZ_PRIORITY.get(profile.kind or "")
+            if profile.resolution != upload.resolution or other is None or other == rank or profile.codec == XVID:
+                continue
+            if other > rank:
+                if profile.codec is not None:
+                    worse.append(profile)
+            elif profile.codec is None:
+                maybe_better.append(profile)
+            else:
+                better.append(profile)
+        return better, maybe_better, worse
 
     @staticmethod
     def web_dls_coexist(new: ReleaseProfile, old: ReleaseProfile) -> bool:
@@ -88,14 +107,17 @@ class AvistaZSlotRules(SlotRules):
                 Verdict.REVIEW, "AvistaZ's TV rules need a manual check.", why="The TV dupe list only covers HDTV and Blu-ray formats; WEB releases are not listed."
             )
         upload_key = self.key(upload)
-        better = self.better_sources(upload, existing)
+        label = slot_label(upload_key)
+        better, maybe_better, worse = self.by_priority(upload, existing)
         if better:
+            return self.decision(Verdict.BLOCK, "A release from a better source is already on the site.", better, slot=label, why=PRIORITY_RULE)
+        if maybe_better:
             return self.decision(
-                Verdict.BLOCK,
-                "A release from a better source is already on the site.",
-                better,
-                slot=slot_label(upload_key),
-                why="AvistaZ keeps the best source (Blu-ray > WEB-DL > HDTV > WEBRip); lower-priority encodes are removed once a better one exists.",
+                Verdict.REVIEW,
+                "A release from a better source may already be on the site.",
+                maybe_better,
+                slot=label,
+                why=f"Its video codec is unknown, so it could be in the separate XviD/DivX slot. {PRIORITY_RULE}",
             )
         priority_trump = _priority_trump(AVISTAZ_PRIORITY)
 
@@ -104,7 +126,14 @@ class AvistaZSlotRules(SlotRules):
                 return Verdict.REVIEW, "Two WEB-DLs from different streaming services can coexist, but the service of one of them is unknown."
             return priority_trump(new, old)
 
-        return self.by_slot(upload, existing, self.key, slot_label(upload_key), trump=trump, coexists=self.web_dls_coexist, capacity=2 if upload.kind == WEBDL else 1)
+        decision = self.by_slot(upload, existing, self.key, label, trump=trump, coexists=self.web_dls_coexist, capacity=2 if upload.kind == WEBDL else 1)
+        if decision.verdict is Verdict.ALLOW and worse:
+            # Lower-priority releases in other slots are replaced too, so they must be reported as trumped.
+            listed = decision.conflicts
+            decision.conflicts = [*listed, *(dict(profile.entry) for profile in worse if dict(profile.entry) not in listed)]
+            decision.reason = "Your release can replace a lower-priority release on the site. Report it as a trump after uploading."
+            decision.why = " ".join(dict.fromkeys(part for part in (decision.why, PRIORITY_RULE) if part))
+        return decision
 
 
 class PrivateHDSlotRules(SlotRules):
