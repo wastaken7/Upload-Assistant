@@ -152,7 +152,7 @@ class UploadScreensManager:
             # Results that did not come from a host upload pass (e.g. a reused list).
             service = str(meta.imghost or self.config.get("DEFAULT", {}).get(f"img_host_{img_host_num}", "image_host"))
             successes = max(0, uploaded)
-            failures = max(0, attempted - successes) or (0 if successes else 1)
+            failures = max(0, attempted - successes)
             bytes_sent = max(0, int(return_dict.get("_stats_image_upload_bytes", 0) or 0) - bytes_before)
             per_host = [(service, successes, failures, bytes_sent)]
         # Spread the batch time over every image so durations are not double counted.

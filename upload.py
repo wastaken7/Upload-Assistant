@@ -2924,6 +2924,12 @@ async def do_the_thing(base_dir: str) -> None:
 
             try:
                 meta_success = await process_meta(meta, base_dir)
+            except Exception:
+                webui_events.fail_active_stage()
+                # The error ends the run, so keep the stage times measured so far.
+                with contextlib.suppress(Exception):
+                    await record_item_timings_async()
+                raise
             except BaseException:
                 webui_events.fail_active_stage()
                 raise

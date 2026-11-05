@@ -309,6 +309,7 @@ const REASON_LABELS = {
   search_error: "Search failed",
   missing_fields: "Missing fields",
   too_few_trackers: "Too few trackers",
+  site_check: "Site check only",
   no_upload: "Not uploaded",
 };
 const formatStage = (value) =>
@@ -3401,7 +3402,7 @@ function StatsApp() {
                   <Section
                     icon="stage-timing"
                     title="Time per stage"
-                    subtitle={`${activeTracker ? "These totals include all trackers, even when one is selected. " : ""}See the average time each stage takes per item${overview.average_item_seconds ? `; a whole item takes ${formatElapsed(overview.average_item_seconds)} on average` : ""}. Confirmation and dupe checks include time spent waiting for your answers.`}
+                    subtitle={`${activeTracker ? "These totals include all trackers, even when one is selected. " : ""}See the average time each stage takes per item${overview.average_item_seconds ? `; a whole item takes ${formatStageTime(overview.average_item_seconds * 1000)} on average` : ""}. Confirmation and dupe checks include time spent waiting for your answers.`}
                   >
                     <ChartWithTable
                       preferenceKey="stage-timing"

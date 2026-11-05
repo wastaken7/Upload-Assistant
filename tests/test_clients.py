@@ -87,6 +87,26 @@ def test_cross_seed_counts_once_per_tracker_across_clients(tmp_path: Path, cross
         assert cross_seeds[0].kwargs["destination"] == "TEST"
 
 
+def test_failed_qbittorrent_add_is_not_counted_as_an_injection(tmp_path: Path) -> None:
+    clients = Clients({"DEFAULT": {"default_torrent_client": "qbit"}, "TRACKERS": {"TEST": {}}, "TORRENT_CLIENTS": {"qbit": {"torrent_client": "qbit"}}})
+    meta = Meta(base_dir=str(tmp_path), uuid="fictional-release", path=str(tmp_path / "video.mkv"), client=None)
+    torrent_path = tmp_path / "tmp" / meta.uuid / "[TEST_cross].torrent"
+    torrent_path.parent.mkdir(parents=True)
+    torrent_path.touch()
+
+    with (
+        patch("src.clients.Torrent.read"),
+        patch.object(clients, "remote_path_map", new=AsyncMock(return_value=(None, None))),
+        patch.object(clients, "inject_delay", new=AsyncMock()),
+        patch.object(clients, "qbittorrent", new=AsyncMock(return_value=False)),
+        patch("src.clients.record_event_async", new_callable=AsyncMock) as recorder,
+    ):
+        asyncio.run(clients.add_to_client(meta, "TEST", cross=True))
+
+    events = [(call.args[0], call.kwargs.get("operation"), call.kwargs.get("outcome")) for call in recorder.await_args_list]
+    assert events == [("api", "torrent_client_add", "error")]
+
+
 def test_empty_inject_delay_is_a_no_op() -> None:
     sleep_calls = 0
 

@@ -146,6 +146,8 @@ def test_tracker_route_outcome_has_stable_precedence(status, expected):
 def test_approved_routes_are_skipped_when_the_upload_stage_never_started():
     assert stats.tracker_route_outcome({"upload": True}, upload_started=False) == "skipped:too_few_trackers"
     assert stats.tracker_route_outcome({"upload": True}, upload_started=True) == "error"
+    # A site check never reaches the upload stage, so its routes are not "too few trackers".
+    assert stats.tracker_route_outcome({"upload": True}, upload_started=False, site_check=True) == "skipped:site_check"
 
 
 @pytest.mark.parametrize(

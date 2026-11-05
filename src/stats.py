@@ -534,11 +534,12 @@ def _status_text(status: Mapping[str, Any]) -> str:
     return str(message or "").lower()
 
 
-def tracker_route_outcome(status: Mapping[str, Any], *, upload_started: bool = True) -> str:
+def tracker_route_outcome(status: Mapping[str, Any], *, upload_started: bool = True, site_check: bool = False) -> str:
     """Normalize one target's terminal state into the dashboard route taxonomy.
 
-    ``upload_started`` is False when the item stopped before its upload stage
-    (too few trackers passed), so approved routes were never attempted.
+    ``upload_started`` is False when the item stopped before its upload stage,
+    so approved routes were never attempted: a site check never uploads, and
+    otherwise too few trackers passed.
     """
     if status.get("upload_success") is True:
         return "success"
@@ -552,7 +553,9 @@ def tracker_route_outcome(status: Mapping[str, Any], *, upload_started: bool = T
     if status.get("upload_success") is False:
         return "error"
     if status.get("upload") is True:
-        return "error" if upload_started else "skipped:too_few_trackers"
+        if upload_started:
+            return "error"
+        return "skipped:site_check" if site_check else "skipped:too_few_trackers"
     return f"skipped:{_skip_reason(status, message)}"
 
 
@@ -685,7 +688,8 @@ async def record_completed_item_stats_async(meta: Any, tracker_class_map: Mappin
     content_category = prepared_category or content_duration_category(meta)
     content_seconds = prepared_content_duration(meta) if prepared_category else existing_content_duration(meta)
     upload_started = upload_stage_started()
-    normalized_outcomes = [tracker_route_outcome(status, upload_started=upload_started) for _destination, status, _kind in routes]
+    site_check = bool(getattr(meta, "site_check", False))
+    normalized_outcomes = [tracker_route_outcome(status, upload_started=upload_started, site_check=site_check) for _destination, status, _kind in routes]
     item_outcome = "success" if "success" in normalized_outcomes else "error" if "error" in normalized_outcomes else "no_upload"
     await record_event_async("item", operation="completed", outcome=item_outcome, bytes_count=item_size, duration_ms=item_elapsed_ms())
     await record_release_profile_async(meta, item_outcome)
@@ -714,7 +718,7 @@ async def record_completed_item_stats_async(meta: Any, tracker_class_map: Mappin
         )
 
     for destination, status, destination_type in routes:
-        outcome = tracker_route_outcome(status, upload_started=upload_started)
+        outcome = tracker_route_outcome(status, upload_started=upload_started, site_check=site_check)
         duration_ms = float(getattr(meta, "get", lambda *_args: 0)(f"{destination}_upload_duration") or 0) * 1000
         await record_event_async(
             "upload",

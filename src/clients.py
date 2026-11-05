@@ -204,10 +204,12 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
 
             operation_started = time.monotonic()
             try:
+                # qBittorrent reports failures by returning False; the other clients raise.
+                added = True
                 if torrent_client.lower() == "rtorrent":
                     self.rtorrent(meta.path, torrent_path, torrent, meta, local_path, remote_path, client, tracker)
                 elif torrent_client == "qbit":
-                    await self.qbittorrent(meta.path, torrent, local_path, remote_path, client, meta.is_disc, meta.filelist, meta, tracker, cross)
+                    added = await self.qbittorrent(meta.path, torrent, local_path, remote_path, client, meta.is_disc, meta.filelist, meta, tracker, cross) is not False
                 elif torrent_client.lower() == "deluge":
                     self.deluge(meta.path, torrent_path, torrent, local_path, remote_path, client)
                 elif torrent_client.lower() == "transmission":
@@ -215,9 +217,13 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                 elif torrent_client.lower() == "watch":
                     shutil.copy(torrent_path, client["watch_folder"])
                 await record_event_async(
-                    "api", service=client_name, operation="torrent_client_add", outcome="success", duration_ms=(time.monotonic() - operation_started) * 1000
+                    "api",
+                    service=client_name,
+                    operation="torrent_client_add",
+                    outcome="success" if added else "error",
+                    duration_ms=(time.monotonic() - operation_started) * 1000,
                 )
-                added_to_a_client = True
+                added_to_a_client = added_to_a_client or added
             except Exception as e:
                 await record_event_async("api", service=client_name, operation="torrent_client_add", outcome="error", duration_ms=(time.monotonic() - operation_started) * 1000)
                 logger.info(f"[bold red]Failed to add torrent to {client_name}: {e}")

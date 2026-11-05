@@ -314,6 +314,9 @@ def test_upload_screens_preserves_partial_successes_across_fallback(tmp_path: Pa
     assert len(image_list) == 2
     assert calls == [("image-1.png", "imgbox"), ("image-2.png", "imgbox"), ("image-2.png", "ptscreens")]
     assert stats_counters["_stats_image_upload_bytes"] == 2 * len(b"image")
+    # Each host is credited with its own attempts, successes and bytes.
+    assert stats_counters["_stats_image_upload_hosts"] == {"imgbox": [2, 1, len(b"image")], "ptscreens": [1, 1, len(b"image")]}
+    assert stats_counters["_stats_image_host_fallbacks"] == [("imgbox", "ptscreens")]
 
 
 def test_upload_screens_handles_infinite_concurrency(tmp_path: Path) -> None:

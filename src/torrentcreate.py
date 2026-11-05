@@ -458,7 +458,13 @@ class TorrentCreator:
                             entry = manifest.register(output_path, "base_subs" if is_subs else "base", "generated", make_default=make_default)
                             output_path.unlink(missing_ok=True)
                             await record_event_async(
-                                "artifact", service="torrent", operation="created", outcome="success", category="base", bytes_count=entry.content_size, duration_ms=hash_ms
+                                "artifact",
+                                service="torrent",
+                                operation="created",
+                                outcome="success",
+                                category="base_subs" if is_subs else "base",
+                                bytes_count=entry.content_size,
+                                duration_ms=hash_ms,
                             )
                             return str(manifest.entry_path(entry))
                         await record_event_async(
@@ -539,7 +545,13 @@ class TorrentCreator:
                     entry = manifest.register(staging_path, "base_subs" if is_subs else "base", "generated", make_default=make_default)
                     staging_path.unlink(missing_ok=True)
                     await record_event_async(
-                        "artifact", service="torrent", operation="created", outcome="success", category="base", bytes_count=entry.content_size, duration_ms=hash_ms
+                        "artifact",
+                        service="torrent",
+                        operation="created",
+                        outcome="success",
+                        category="base_subs" if is_subs else "base",
+                        bytes_count=entry.content_size,
+                        duration_ms=hash_ms,
                     )
                     return str(manifest.entry_path(entry))
                 await record_event_async(
