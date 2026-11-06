@@ -3723,6 +3723,14 @@ config: dict[str, Any] = {
             # Remote path mapping (docker/etc.) CASE SENSITIVE
             "local_path": [""],
             "remote_path": [""],
+            # For a client that seeds its own copy of your files, such as a seedbox.
+            # Before adding, UA looks in this client for a complete torrent holding the same files (names and sizes)
+            # and seeds the new torrent from that torrent's folder, without path mapping or linking.
+            # "prefer": use that copy when found, otherwise use the path mapping above.
+            # "require": add the torrent to this client only when such a copy is found.
+            # Leave empty to always use the path mapping.
+            # Guide: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/seeding-from-a-second-client.md
+            "match_existing_content": "",
             # Set to False to skip verify certificate for HTTPS connections; for instance, if the connection is using a self-signed certificate.
             # "VERIFY_WEBUI_CERTIFICATE": True,
         },

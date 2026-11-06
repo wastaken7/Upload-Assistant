@@ -3,6 +3,7 @@
 [Screenshot Overlays](screenshot-overlays.md)
 [Custom Hooks](custom-hooks.md)
 [Upload Order and qBittorrent Bandwidth Control](upload-order-and-bandwidth-control.md)
+[Seeding From a Second Client (Seedbox)](seeding-from-a-second-client.md)
 [XXX Category Upload Guide](xxx-upload.md)
 
 [WebUI](web-ui.md)
