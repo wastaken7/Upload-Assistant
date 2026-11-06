@@ -185,26 +185,20 @@ async def _render_xxx_animated_contact_sheet(
 def _select_xxx_contact_sheet_videos(video_paths: list[Path], max_videos: int) -> list[Path]:
     """Pick up to ``max_videos`` videos, spread across the pack's folders.
 
-    A flat release keeps its first videos. A pack with subfolders takes the
-    videos in turns from each folder, so every part is represented instead of
-    only the first folder. The result keeps the release order.
+    Videos are taken in turns from each folder, so every part of a pack is
+    represented instead of only the first folder; a flat release keeps its
+    first videos. The order is the order of picking, so a smaller limit always
+    selects a prefix of a larger one. Cached sheets are reused by position, so
+    this keeps each cached sheet matched to the same video.
     """
-    if len(video_paths) <= max_videos:
-        return video_paths
-
     folders: dict[Path, list[Path]] = {}
-    for path in video_paths:
+    for path in dict.fromkeys(video_paths):
         folders.setdefault(path.parent, []).append(path)
-    if len(folders) == 1:
-        return video_paths[:max_videos]
 
-    selected: set[Path] = set()
-    queues = list(folders.values())
-    while len(selected) < max_videos:
-        for queue in queues:
-            if queue and len(selected) < max_videos:
-                selected.add(queue.pop(0))
-    return [path for path in video_paths if path in selected]
+    picked: list[Path] = []
+    for round_index in range(max((len(queue) for queue in folders.values()), default=0)):
+        picked.extend(queue[round_index] for queue in folders.values() if round_index < len(queue))
+    return picked[:max_videos]
 
 
 def _xxx_contact_sheet_titles(video_paths: list[Path], release_path: str | None) -> dict[Path, str]:

@@ -133,13 +133,18 @@ class VideoManager:
 
         Recursive scans skip sample folders and macOS ``._`` folders, and do not
         follow directory symlinks, so a stray link cannot pull in a whole library.
+        An unreadable subfolder raises instead of being skipped, so a pack is
+        never prepared from a partial file list.
         """
         root = Path(videoloc)
         if not recursive:
             return [p for p in root.iterdir() if p.is_file() and not p.name.startswith("._")]
 
+        def walk_error(error: OSError) -> None:
+            raise error
+
         entries: list[Path] = []
-        for dirpath, dirnames, filenames in os.walk(root):
+        for dirpath, dirnames, filenames in os.walk(root, onerror=walk_error):
             dirnames[:] = [d for d in dirnames if not d.startswith("._") and d.lower() not in ("sample", "samples")]
             entries.extend(Path(dirpath) / name for name in filenames if not name.startswith("._") and (Path(dirpath) / name).is_file())
         return entries
@@ -158,7 +163,10 @@ class VideoManager:
             logger.debug(f"[blue]Scanning directory{' and subfolders' if recursive else ''} for video files...[/blue]")
             try:
                 entries = self._video_entries(videoloc, recursive)
-            except Exception:
+            except Exception as error:
+                # An unreadable folder stops discovery; the caller reports that no videos were found.
+                failed_path = error.filename if isinstance(error, OSError) and error.filename else videoloc
+                logger.error(f"[bold red]Unable to read {failed_path}: {error}[/bold red]")
                 entries = []
 
             for entry in entries:

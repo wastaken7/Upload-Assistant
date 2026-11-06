@@ -1,6 +1,7 @@
 """Regression coverage for AVI season packs and empty video discovery."""
 
 import asyncio
+import os
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -130,3 +131,31 @@ def test_only_xxx_scans_subfolders_for_videos(tmp_path, monkeypatch, category, r
         asyncio.run(process_media_files(SimpleNamespace(), meta, str(tmp_path), {}))
 
     assert get_video.await_args.kwargs == {"recursive": recursive}
+
+
+def test_xxx_pack_keeps_every_nested_video_in_the_file_list(tmp_path):
+    root = _make_nested_pack(tmp_path / "Studio Pack")
+    meta = Meta(path=str(root), category="XXX", isdir=True)
+    # Stop right after discovery; the rest of preparation is not under test.
+    scene = AsyncMock(side_effect=RuntimeError("stop after discovery"))
+    prep = SimpleNamespace(scene_manager=SimpleNamespace(is_scene=scene))
+
+    with pytest.raises(RuntimeError, match="stop after discovery"):
+        asyncio.run(process_media_files(prep, meta, str(root), {}))
+
+    assert meta.filelist == sorted(str(root / relative) for relative in ("Root.Scene_1080p.mp4", "Part 1/Alpha.Scene_1080p.mp4", "Part 2/Beta.Scene_1080p.mp4", "Part 2/Deeper/Gamma.Scene_1080p.mp4"))
+
+
+def test_recursive_discovery_stops_when_a_subfolder_cannot_be_read(tmp_path, monkeypatch):
+    root = _make_nested_pack(tmp_path / "Studio Pack")
+    real_walk = os.walk
+
+    def walk_with_unreadable_folder(top, onerror=None, **kwargs):
+        yield from real_walk(top, onerror=onerror, **kwargs)
+        # Like os.walk, an unreadable folder is skipped silently unless onerror is given.
+        if onerror is not None:
+            onerror(PermissionError(13, "Permission denied", str(root / "Part 3")))
+
+    monkeypatch.setattr("src.video.os.walk", walk_with_unreadable_folder)
+
+    assert asyncio.run(VideoManager().get_video(str(root), recursive=True)) == ("", [])
