@@ -127,3 +127,9 @@ NOTE: If using Windows paths, change `\` into `\\`. For example `C:\Downloads\TV
              "watch_folder" : "/Path/To/Watch/Folder"
          },
   ```
+
+### Seeding from a second client
+
+When the same files already seed in a second qBittorrent client (for example a seedbox), list both clients in `injecting_client_list` and set `"match_existing_content": "require"` on the second one. UA then adds each new torrent to that client using the folder of the copy it already has, with no `local_path`/`remote_path` mapping or linking. See the step-by-step guide: [Seeding From a Second Client (Seedbox)](seeding-from-a-second-client.md).
+
+After adding a torrent, UA reads its state from qBittorrent and warns when the client reports `missingFiles` or `error`.

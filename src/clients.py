@@ -204,12 +204,18 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
 
             operation_started = time.monotonic()
             try:
-                # qBittorrent reports failures by returning False; the other clients raise.
+                # qBittorrent reports failures by returning False and skips by returning None; the other clients raise.
                 added = True
                 if torrent_client.lower() == "rtorrent":
                     self.rtorrent(meta.path, torrent_path, torrent, meta, local_path, remote_path, client, tracker)
                 elif torrent_client == "qbit":
-                    added = await self.qbittorrent(meta.path, torrent, local_path, remote_path, client, meta.is_disc, meta.filelist, meta, tracker, cross) is not False
+                    qbit_result = await self.qbittorrent(
+                        meta.path, torrent, local_path, remote_path, client, meta.is_disc, meta.filelist, meta, tracker, cross, client_name=client_name
+                    )
+                    if qbit_result is None:
+                        # match_existing_content "require" found no copy of the files in this client.
+                        continue
+                    added = qbit_result
                 elif torrent_client.lower() == "deluge":
                     self.deluge(meta.path, torrent_path, torrent, local_path, remote_path, client)
                 elif torrent_client.lower() == "transmission":

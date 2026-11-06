@@ -1109,6 +1109,7 @@ const formatConfigFieldLabel = (key, pathParts = []) => {
       linked_folder: "Linked Folders",
       local_path: "Local Paths",
       remote_path: "Remote Paths",
+      match_existing_content: "Match Existing Content",
       watch_folder: "Watch Folder",
     };
     if (torrentClientFieldLabels[key]) return torrentClientFieldLabels[key];
@@ -2506,6 +2507,9 @@ function ConfigLeafEditor({
   const helpBelongsToTorrentClientCrossSeedNote =
     pathParts.includes("TORRENT_CLIENTS") &&
     ["qbit_cross_tag", "qbit_cross_cat", "content_layout"].includes(item.key);
+  const helpBelongsToTorrentClientExistingContentNote =
+    pathParts.includes("TORRENT_CLIENTS") &&
+    item.key === "match_existing_content";
   const hideRedundantImageHostHelp =
     pathParts[0] === "DEFAULT" &&
     (REDUNDANT_IMAGE_HOST_API_HELP_KEYS.has(item.key) ||
@@ -2518,6 +2522,7 @@ function ConfigLeafEditor({
     !helpBelongsToTorrentStorageNote &&
     !helpBelongsToTorrentClientOrganizationNote &&
     !helpBelongsToTorrentClientCrossSeedNote &&
+    !helpBelongsToTorrentClientExistingContentNote &&
     !hideRedundantImageHostHelp &&
     !isSuperSeedTrackerField
       ? getConfigHelpText(item, pathParts)
@@ -2569,6 +2574,11 @@ function ConfigLeafEditor({
   };
   const isContentLayoutField = (key, pathParts) => {
     return key === "content_layout" && pathParts.includes("TORRENT_CLIENTS");
+  };
+  const isMatchExistingContentField = (key, pathParts) => {
+    return (
+      key === "match_existing_content" && pathParts.includes("TORRENT_CLIENTS")
+    );
   };
   const torrentClientListFields = new Set([
     "linked_folder",
@@ -2849,7 +2859,10 @@ function ConfigLeafEditor({
     );
   }
 
-  if (typeof item.value === "boolean") {
+  if (
+    typeof item.value === "boolean" &&
+    !isMatchExistingContentField(item.key, pathParts)
+  ) {
     const originalValue = Boolean(item.value);
 
     return (
@@ -3245,6 +3258,63 @@ function ConfigLeafEditor({
             });
           }}
           options={contentLayoutOptions}
+          isDarkMode={isDarkMode}
+        />
+      </div>
+    );
+  }
+
+  if (isMatchExistingContentField(item.key, pathParts)) {
+    const matchExistingContentOptions = [
+      { value: "", label: "Off (Use Path Mapping)" },
+      { value: "prefer", label: "Prefer Existing Copy" },
+      { value: "require", label: "Require Existing Copy" },
+    ];
+    // Mirror the runtime parser: case and spacing are ignored, True means "prefer" and False is off.
+    const loweredExistingContentValue = selectedValue.trim().toLowerCase();
+    const normalizedExistingContentValue =
+      loweredExistingContentValue === "true"
+        ? "prefer"
+        : loweredExistingContentValue === "false"
+          ? ""
+          : loweredExistingContentValue;
+    const existingContentValue = matchExistingContentOptions.some(
+      (option) => option.value === normalizedExistingContentValue,
+    )
+      ? normalizedExistingContentValue
+      : selectedValue;
+    if (
+      !matchExistingContentOptions.some(
+        (option) => option.value === existingContentValue,
+      )
+    ) {
+      matchExistingContentOptions.unshift({
+        value: existingContentValue,
+        label: `${existingContentValue} (Unsupported)`,
+      });
+    }
+
+    const originalValue =
+      item.value === null || item.value === undefined ? "" : String(item.value);
+
+    return (
+      <div className="space-y-2">
+        <label htmlFor={fieldId} className={labelClass}>
+          {displayLabel}
+        </label>
+        <SelectDropdown
+          id={fieldId}
+          value={existingContentValue}
+          onChange={(newValue) => {
+            setSelectedValue(newValue);
+            onValueChange(path, newValue, {
+              originalValue,
+              isSensitive: false,
+              isRedacted: false,
+              readOnly: false,
+            });
+          }}
+          options={matchExistingContentOptions}
           isDarkMode={isDarkMode}
         />
       </div>
@@ -5107,6 +5177,11 @@ function TorrentClientSettings({
         : ["linking"],
     },
     {
+      id: "existing-content",
+      title: "Existing Content",
+      keys: ["match_existing_content"],
+    },
+    {
       id: "watch",
       title: "Watch Folder",
       keys: ["watch_folder"],
@@ -5225,6 +5300,16 @@ function TorrentClientSettings({
                   different layout.
                 </p>
               </div>
+            )}
+            {group.id === "existing-content" && (
+              <p className="ua-config-service-description mt-3 text-xs leading-relaxed">
+                <span className="font-semibold">Match Existing Content:</span>{" "}
+                For a client that seeds its own copy of your files, such as a
+                seedbox. Before adding, UA looks in this client for a complete
+                torrent with the same files and seeds from its folder, without
+                path mapping or linking. Prefer falls back to the path mapping
+                when no copy is found; Require skips this client instead.
+              </p>
             )}
             {group.id === "linking" && (
               <div className="ua-config-service-description mt-3 space-y-1 text-xs leading-relaxed">
