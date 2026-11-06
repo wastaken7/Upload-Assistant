@@ -246,6 +246,8 @@ class BJShare:
         "PS5": "18",
         "PSP": "14",
         "SWITCH": "16",
+        # No dedicated Switch 2 option yet.
+        "SWITCH2": "16",
         "WII": "8",
         "WIIU": "9",
         "XBOX": "17",

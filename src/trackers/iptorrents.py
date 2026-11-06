@@ -337,7 +337,7 @@ class IPTorrents:
 
         if category == "GAME":
             platform = str(meta.platform).upper()
-            if platform in {"NDS", "3DS", "SWITCH"}:
+            if platform in {"NDS", "3DS", "SWITCH", "SWITCH2"}:
                 return game_nin
             if platform in {"WII", "WIIU"}:
                 return game_wii

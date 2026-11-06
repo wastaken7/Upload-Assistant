@@ -366,6 +366,8 @@ class BrasilTracker:
             "PS4": "PS4",
             "PSVITA": "PS Vita",
             "SWITCH": f"{nin_term} Switch",
+            # No dedicated Switch 2 option yet.
+            "SWITCH2": f"{nin_term} Switch",
             "WII": "Wii",
             "WIIU": "Wii U",
             "XBOX": "Xbox Clássico",
@@ -388,7 +390,7 @@ class BrasilTracker:
             return "Linux"
         if platform == "MOBILE":
             return "Android"
-        if platform in {"PS1", "PS2", "PS3", "PS4", "PS5", "PSVITA", "SWITCH", "WII", "WIIU", "XBOX", "X360", "XONE", "XSX"}:
+        if platform in {"PS1", "PS2", "PS3", "PS4", "PS5", "PSVITA", "SWITCH", "SWITCH2", "WII", "WIIU", "XBOX", "X360", "XONE", "XSX"}:
             return "Console"
         return ""
 

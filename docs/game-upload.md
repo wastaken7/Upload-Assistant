@@ -129,13 +129,15 @@ In attended mode, the terminal guides the user to fill in missing fields and rev
 
 You can override auto-detected values or pass specific parameters using the following command-line flags:
 
-| Flag     | Full Argument               | Accepted Values                                                                                                        | Description                                           |
-| :------- | :-------------------------- | :--------------------------------------------------------------------------------------------------------------------- | :---------------------------------------------------- |
-| `-plat`  | `--platform`, `--platforms` | `pc`, `ps5`, `ps4`, `ps3`, `ps2`, `xbox`, `x360`, `xone`, `xsx`, `switch`, `3ds`, `nds`, `wiiu`, `wii`, `mac`, `linux` | Overrides the target game platform                    |
-| `-gv`    | `--game-version`            | e.g. `v1.15`, `Build 1002`                                                                                             | Overrides the game version                            |
-| `-gsc`   | `--game-subcategory`        | `full_game`, `full_game_dlc`, `dlc`, `update`                                                                          | Specifies the category/format of the game release     |
-| `-igdb`  | `--igdb`                    | e.g. `119388`                                                                                                          | Explicitly sets the IGDB game ID to query             |
-| `-steam` | `--steam`                   | e.g. `413150` or full Store URL                                                                                        | Explicitly sets the Steam App ID/URL to fetch details |
+Passing any game-only flag (`--igdb`, `--steam`, `--platform`, `--game-title`, `--developer`, `--game-version` or `--game-subcategory`) sets the category to `GAME`, so `--category game` is not needed with them. An explicit `--category` always wins.
+
+| Flag     | Full Argument               | Accepted Values                                                                                                                   | Description                                           |
+| :------- | :-------------------------- | :-------------------------------------------------------------------------------------------------------------------------------- | :---------------------------------------------------- |
+| `-plat`  | `--platform`, `--platforms` | `pc`, `ps5`, `ps4`, `ps3`, `ps2`, `xbox`, `x360`, `xone`, `xsx`, `switch`, `switch2`, `3ds`, `nds`, `wiiu`, `wii`, `mac`, `linux` | Overrides the target game platform                    |
+| `-gv`    | `--game-version`            | e.g. `v1.15`, `Build 1002`                                                                                                        | Overrides the game version                            |
+| `-gsc`   | `--game-subcategory`        | `full_game`, `full_game_dlc`, `dlc`, `update`                                                                                     | Specifies the category/format of the game release     |
+| `-igdb`  | `--igdb`                    | e.g. `119388`                                                                                                                     | Explicitly sets the IGDB game ID to query             |
+| `-steam` | `--steam`                   | e.g. `413150` or full Store URL                                                                                                   | Explicitly sets the Steam App ID/URL to fetch details |
 
 ---
 

@@ -237,7 +237,7 @@ class ImmortalSeed:
 
         if category == "GAME":
             platform = str(meta.platform).upper()
-            if platform in {"NDS", "3DS", "SWITCH", "WII", "WIIU"}:
+            if platform in {"NDS", "3DS", "SWITCH", "SWITCH2", "WII", "WIIU"}:
                 return game_nin
             if platform in {"PS1", "PS2", "PS3", "PS4", "PS5", "PSP", "PSVITA"}:
                 return game_playstation

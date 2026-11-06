@@ -133,6 +133,120 @@ def _to_int(value: Any, default: int = 0) -> int:
         return default
 
 
+# CLI arguments that describe a release of only one category, as {category: {meta field: flag}}.
+# Passing any of them names the category, as ``--category`` would.  Arguments shared
+# between categories (--publisher, --cast, --imdb, --tvdb, --mal) and switches that
+# only change behaviour (--multi, --music-check-log, --no-music-discogs,
+# --music-enrich) are left out on purpose.  ``--tmdb movie/`` and ``--tmdb tv/``
+# already set the category while the arguments are parsed.
+CATEGORY_ONLY_ARGS: dict[str, dict[str, str]] = {
+    "GAME": {
+        "igdb_manual": "--igdb",
+        "steam_manual": "--steam",
+        "manual_platform": "--platform",
+        "game_title": "--game-title",
+        "game_developer": "--developer",
+        "game_version": "--game-version",
+        "game_subcategory": "--game-subcategory",
+    },
+    "BOOK": {
+        "book_author": "--author",
+        "book_title": "--book-title",
+        "book_narrator": "--book-narrator",
+        "book_translator": "--book-translator",
+        "book_language": "--book-language",
+        "book_isbn": "--isbn",
+        "book_asin": "--asin",
+        "audible_url": "--audible-url",
+        "openlibrary": "--openlibrary",
+        "comic": "--comic",
+        "manga": "--manga",
+        "magazine": "--magazine",
+        "newspaper": "--newspaper",
+    },
+    "MUSIC": {
+        "music_artist": "--music-artist",
+        "music_album": "--music-album",
+        "music_media": "--music-media",
+        "music_release_type": "--music-release-type",
+        "music_release_year": "--music-release-year",
+        "music_edition_year": "--music-edition-year",
+        "music_unknown_release": "--music-unknown-release",
+        "music_artist_roles": "--music-artist-role",
+        "music_request_id": "--music-request-id",
+        "music_group_id": "--music-group-id",
+        "music_watermark": "--music-watermark",
+        "music_lineage": "--music-lineage",
+        "music_showcase": "--music-showcase",
+        "music_label": "--music-label",
+        "music_catalogue_number": "--music-catalogue-number",
+        "music_genres": "--music-genre",
+        "music_discogs_id": "--music-discogs-id",
+        "music_discogs_release_id": "--music-discogs-release-id",
+        "music_discogs_master_id": "--music-discogs-master-id",
+    },
+    "TV": {
+        "manual_season": "--season",
+        "manual_episode": "--episode",
+        "manual_episode_title": "--manual-episode-title",
+        "manual_date": "--daily",
+        "tvmaze_manual": "--tvmaze",
+    },
+}
+
+
+def category_args_given(meta: Meta) -> dict[str, list[str]]:
+    """Return ``{category: [flags]}`` for the category-only CLI arguments set on ``meta``."""
+    given: dict[str, list[str]] = {}
+    for category, fields in CATEGORY_ONLY_ARGS.items():
+        flags = [flag for field, flag in fields.items() if getattr(meta, field, None)]
+        if flags:
+            given[category] = flags
+    return given
+
+
+def _category_from_args(meta: Meta, *, warn: bool) -> tuple[str, list[str]] | None:
+    """Return the one category the CLI arguments point to, with the flags that point to it."""
+    given = category_args_given(meta)
+    if not given:
+        return None
+    # ``--tmdb movie/`` or ``--tmdb tv/`` names a category too.
+    tmdb_category = str(meta.tmdb_manual_category or "").upper()
+    implied: set[str] = set(given)
+    if tmdb_category:
+        implied.add(tmdb_category)
+    if len(implied) > 1:
+        if warn:
+            described = "; ".join(f"{category}: {', '.join(flags)}" for category, flags in given.items())
+            outcome = f"keeping {tmdb_category} from --tmdb" if tmdb_category else "leaving the category to automatic detection"
+            logger.info(f"[yellow]Arguments for different categories were given ({described}); {outcome}. Use --category to choose one.[/yellow]")
+        return None
+    return next(iter(given.items()))
+
+
+def apply_category_from_args(meta: Meta) -> None:
+    """Let GAME, BOOK and MUSIC arguments name the category before file-type detection.
+
+    TV arguments wait for :func:`apply_tv_category_from_args`, so a book, game or
+    music release passed with ``--season`` keeps the category of its files.
+    """
+    result = _category_from_args(meta, warn=True)
+    if result and result[0] != "TV":
+        category, flags = result
+        meta.category = category
+        logger.debug(f"[cyan]Category set to {category} by {', '.join(flags)}[/cyan]")
+
+
+def apply_tv_category_from_args(meta: Meta) -> None:
+    """After file-type detection, let TV arguments replace an unset or automatic MOVIE category."""
+    if meta.manual_category or str(meta.category or "").upper() not in ("", "MOVIE"):
+        return
+    result = _category_from_args(meta, warn=False)
+    if result and result[0] == "TV":
+        meta.category = "TV"
+        logger.debug(f"[cyan]Category set to TV by {', '.join(result[1])}[/cyan]")
+
+
 def check_pre_release(meta: Meta) -> bool:
     release_type = (meta.type or "").upper()
     rel_source = (meta.source or "").upper()
@@ -248,6 +362,8 @@ async def detect_disc_and_category(prep_instance: Any, meta: Meta) -> tuple[str,
         # Sports is a tracker classification; metadata still needs TV/MOVIE.
         if manual_category != "SPORTS":
             meta.category = manual_category
+    else:
+        apply_category_from_args(meta)
 
     # If category is manually set to BOOK, ensure meta.audiobook is set if audio files are present
     if meta.category == "BOOK" and not meta.audiobook:
@@ -371,6 +487,7 @@ async def detect_disc_and_category(prep_instance: Any, meta: Meta) -> tuple[str,
             ".nca",
             ".nds",
             ".nsp",
+            ".nup",
             ".nsz",
             ".pbp",
             ".pkg",
@@ -442,6 +559,9 @@ async def detect_disc_and_category(prep_instance: Any, meta: Meta) -> tuple[str,
     if not meta.category and not meta.manual_category and not meta.is_disc and meta.path and await asyncio.to_thread(is_xxx_video_release, meta.path):
         meta.category = "XXX"
         logger.debug("[cyan]Auto-detected category: XXX[/cyan]")
+
+    # TV arguments only decide between TV and MOVIE, once the files ruled out the other categories.
+    apply_tv_category_from_args(meta)
 
     if meta.category == "XXX":
         for field_name, value in extract_xxx_metadata(meta.basename_no_ext).items():
