@@ -76,6 +76,9 @@ def test_stats_enabled_is_grouped_with_main_settings_only_in_webui() -> None:
     assert stats_items[0]["value"] is True
     assert stats_items[0]["example_value"] is False
     assert stats_items[0]["help"] == comments["DEFAULT/stats_enabled"]
+    history_items = [item for item in main_settings["children"] if item["key"] == "history_enabled"]
+    assert len(history_items) == 1
+    assert history_items[0]["example_value"] is True
     assert list(defaults) == original_keys
     assert defaults["stats_enabled"] is False
 
