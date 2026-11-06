@@ -127,22 +127,51 @@ class VideoManager:
             video_codec = f"MPEG-{mi_dict['media']['track'][1].get('Format_Version')}"
         return video_encode, video_codec, has_encode_settings, bit_depth
 
-    async def get_video(self, videoloc: str, sorted_filelist: bool = False) -> tuple[str, list[str]]:
+    @staticmethod
+    def _video_entries(videoloc: str, recursive: bool) -> list[Path]:
+        """List candidate files in a release folder, descending into subfolders when asked.
+
+        Recursive scans skip sample folders and macOS ``._`` folders, and do not
+        follow directory symlinks, so a stray link cannot pull in a whole library.
+        An unreadable subfolder raises instead of being skipped, so a pack is
+        never prepared from a partial file list.
+        """
+        root = Path(videoloc)
+        if not recursive:
+            return [p for p in root.iterdir() if p.is_file() and not p.name.startswith("._")]
+
+        def walk_error(error: OSError) -> None:
+            raise error
+
+        entries: list[Path] = []
+        for dirpath, dirnames, filenames in os.walk(root, onerror=walk_error):
+            dirnames[:] = [d for d in dirnames if not d.startswith("._") and d.lower() not in ("sample", "samples")]
+            entries.extend(Path(dirpath) / name for name in filenames if not name.startswith("._") and (Path(dirpath) / name).is_file())
+        return entries
+
+    async def get_video(self, videoloc: str, sorted_filelist: bool = False, recursive: bool = False) -> tuple[str, list[str]]:
+        """Return the main video and every video in ``videoloc``.
+
+        ``recursive`` also collects videos from subfolders, for packs that nest
+        their videos one or more folders below the release root.
+        """
         filelist: list[str] = []
         videoloc = str(Path(videoloc).resolve())
         logger.debug(f"[blue]Video location: [yellow]{videoloc}[/yellow][/blue]")
         video = ""
         if Path(videoloc).is_dir():
-            logger.debug("[blue]Scanning directory for video files...[/blue]")
+            logger.debug(f"[blue]Scanning directory{' and subfolders' if recursive else ''} for video files...[/blue]")
             try:
-                entries = [p.name for p in Path(videoloc).iterdir() if p.is_file() and not p.name.startswith("._")]
-            except Exception:
+                entries = self._video_entries(videoloc, recursive)
+            except Exception as error:
+                # An unreadable folder stops discovery; the caller reports that no videos were found.
+                failed_path = error.filename if isinstance(error, OSError) and error.filename else videoloc
+                logger.error(f"[bold red]Unable to read {failed_path}: {error}[/bold red]")
                 entries = []
 
-            for file in entries:
-                fname_lower = file.lower()
-                ext = Path(file).suffix.lower()
-                if ext not in VIDEO_EXTENSIONS:
+            for entry in entries:
+                fname_lower = entry.name.lower()
+                if entry.suffix.lower() not in VIDEO_EXTENSIONS:
                     continue
 
                 # Skip obvious sample files unless explicitly marked with !sample
@@ -150,7 +179,7 @@ class VideoManager:
                     continue
 
                 # Preserve the release layout when an episode is a symlink.
-                filelist.append(str(Path(videoloc) / file))
+                filelist.append(str(entry))
 
             filelist = sorted(filelist)
             if filelist:

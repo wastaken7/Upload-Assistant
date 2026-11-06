@@ -328,3 +328,88 @@ async def test_xxx_fallback_cover_skips_audio_only_candidates(tmp_path, monkeypa
 
     assert cover is not None
     assert probed == [audio.name, video.name]
+
+
+def test_flat_release_keeps_its_first_videos_for_contact_sheets(tmp_path):
+    videos = [tmp_path / f"Scene.{index}.mp4" for index in range(5)]
+
+    assert takescreens._select_xxx_contact_sheet_videos(videos, 3) == videos[:3]
+
+
+def test_nested_pack_spreads_contact_sheets_across_folders(tmp_path):
+    part_one = [tmp_path / "Part 1" / f"Scene.{index}.mp4" for index in range(4)]
+    part_two = [tmp_path / "Part 2" / f"Scene.{index}.mp4" for index in range(4)]
+    part_three = [tmp_path / "Part 3" / "Scene.0.mp4"]
+    videos = [tmp_path / "Root.Scene.mp4", *part_one, *part_two, *part_three]
+
+    selected = takescreens._select_xxx_contact_sheet_videos(videos, 5)
+
+    # One from each folder first, then a second round.
+    assert selected == [videos[0], part_one[0], part_two[0], part_three[0], part_one[1]]
+
+
+def test_contact_sheet_selection_is_a_prefix_of_any_larger_limit(tmp_path):
+    # Cached sheets are reused by position, so a lower limit must not reorder them.
+    videos = [tmp_path / part / f"Scene.{index}.mp4" for part in ("Part 1", "Part 2", "Part 3") for index in range(3)]
+    selections = [takescreens._select_xxx_contact_sheet_videos(videos, limit) for limit in range(1, len(videos) + 2)]
+
+    for smaller, larger in zip(selections, selections[1:], strict=False):
+        assert larger[: len(smaller)] == smaller
+    assert sorted(selections[-1]) == sorted(videos)
+
+
+def test_contact_sheet_selection_ignores_duplicate_paths(tmp_path):
+    part_one = tmp_path / "Part 1" / "Scene.mp4"
+    part_two = tmp_path / "Part 2" / "Scene.mp4"
+
+    assert takescreens._select_xxx_contact_sheet_videos([part_one, part_one, part_one, part_two], 3) == [part_one, part_two]
+
+
+def test_nested_pack_contact_sheet_titles_show_the_subfolder(tmp_path):
+    root = tmp_path / "Studio Pack"
+    videos = [root / "Root.Scene.mp4", root / "Part 1" / "Scene.mp4"]
+
+    assert takescreens._xxx_contact_sheet_titles(videos, str(root)) == {videos[0]: "Root.Scene.mp4", videos[1]: "Part 1/Scene.mp4"}
+    assert takescreens._xxx_contact_sheet_titles(videos[1:], str(root)) == {videos[1]: "Scene.mp4"}
+    assert takescreens._xxx_contact_sheet_titles(videos, None) == {videos[0]: "Root.Scene.mp4", videos[1]: "Scene.mp4"}
+
+
+@pytest.mark.asyncio
+async def test_nested_pack_contact_sheets_cover_each_part(tmp_path, monkeypatch):
+    root = (tmp_path / "Studio Pack").resolve()
+    videos = []
+    for part in ("Part 1", "Part 2"):
+        for index in range(3):
+            video = root / part / f"Scene.{index}.mp4"
+            video.parent.mkdir(parents=True, exist_ok=True)
+            video.write_bytes(b"video")
+            videos.append(str(video))
+    takescreens._apply_config({"DEFAULT": {"xxx_contact_sheet_rows": 1, "xxx_contact_sheet_columns": 1, "xxx_contact_sheet_max_videos": 2}})
+    commands = []
+
+    def fake_probe(_path):
+        return {"format": {"duration": "60"}, "streams": [{"codec_type": "video"}]}
+
+    async def fake_run_ffmpeg(command):
+        command_args = takescreens.compile_ffmpeg_command(command)
+        commands.append(command_args)
+        output = Path(takescreens.get_ffmpeg_output_path(command, command_args))
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_bytes(b"contact sheet")
+        return 0, b"", b""
+
+    async def fake_record_event(_family, **_values):
+        return None
+
+    monkeypatch.setattr(takescreens.ffmpeg, "probe", fake_probe)
+    monkeypatch.setattr(takescreens, "run_ffmpeg", fake_run_ffmpeg)
+    monkeypatch.setattr(takescreens, "_xxx_contact_sheet_fontfile", lambda: "C:/Windows/Fonts/arial.ttf")
+    monkeypatch.setattr(takescreens, "record_event_async", fake_record_event)
+    meta = Meta(base_dir=str(tmp_path), uuid="nested-xxx", category="XXX", path=str(root), isdir=True)
+
+    sheets = await takescreens.xxx_contact_sheets(videos, meta.uuid, meta.base_dir, meta)
+
+    assert len(sheets) == 2
+    # The title is checked in the drawtext filter, not in the input path.
+    assert any("drawtext" in argument and "Part 1/Scene.0.mp4" in argument for argument in commands[0])
+    assert any("drawtext" in argument and "Part 2/Scene.0.mp4" in argument for argument in commands[1])
