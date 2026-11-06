@@ -109,8 +109,14 @@ def extract_version_from_nfo(nfo_path: str) -> str | None:
     return None
 
 
+SWITCH2_NAME_PATTERN = re.compile(r"\b(?:switch\s*2|nsw?2)\b")
+
+
 def map_to_clean_code(p_name: str) -> str:
     p_name_norm = p_name.lower()
+    # Checked first: the generic "switch" entries below also match "Switch 2".
+    if SWITCH2_NAME_PATTERN.search(p_name_norm):
+        return "SWITCH2"
     nin_term = bytes([110, 105, 110, 116, 101, 110, 100, 111]).decode()
     reverse_map = {
         "playstation 5": "PS5",
@@ -163,7 +169,7 @@ def clean_game_search_title(value: str) -> str:
     title = re.sub(r"(?i)\b(?:update|patch|build|version)\b.*", "", title)
     title = re.sub(r"(?i)\bv\d+.*", "", title)
     tags_to_remove = (
-        r"(?:nsw|switch|nds|3ds|ps1|ps2|ps3|ps4|ps5|psp|psvita|vita|wii|wiiu|xbox|xbox360|x360|xone|xsx|pc|"
+        r"(?:nsw2|ns2|switch2|switch 2|nsw|switch|nds|3ds|ps1|ps2|ps3|ps4|ps5|psp|psvita|vita|wii|wiiu|xbox|xbox360|x360|xone|xsx|pc|"
         r"multi\d*|eng|english|fre|french|ger|german|spa|spanish|ita|italian|jpn|japanese|por|portuguese|bra|brazilian|"
         r"proper|repack|readnfo|internal|dvd|rip|iso|god|jb|psn|eshop|cracked|unlocked|crackfix)"
     )
@@ -399,6 +405,10 @@ async def detect_platform_from_files(
 
     # --- 1. Extension and specific file/folder pattern checks ---
 
+    # Switch 2 (checked first: a Switch 2 release can also carry Switch files)
+    if any(b.endswith(".nup") for b in basenames_lower):
+        return "SWITCH2"
+
     # Switch
     switch_exts = (".nsp", ".xci", ".nca", ".szs", ".nsz", ".xcz")
     if any(b.endswith(switch_exts) for b in basenames_lower):
@@ -495,6 +505,8 @@ async def detect_platform_from_files(
             "XONE": ["xone", "xbox one", "xboxone"],
             "X360": ["x360", "xbox 360", "xbox360"],
             "XBOX": ["xbox"],
+            # Before SWITCH: "\bswitch\b" also matches "switch 2".
+            "SWITCH2": ["nsw2", "ns2", "switch 2", "switch2"],
             "SWITCH": ["nsw", "switch", f"{nin_term} switch", f"{nin_term}switch"],
             "3DS": ["3ds", f"{nin_term} 3ds"],
             "NDS": ["nds", f"{nin_term} ds", f"{nin_term}ds", f"{nin_term} ds"],

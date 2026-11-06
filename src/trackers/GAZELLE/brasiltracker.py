@@ -388,7 +388,7 @@ class BrasilTracker:
             return "Linux"
         if platform == "MOBILE":
             return "Android"
-        if platform in {"PS1", "PS2", "PS3", "PS4", "PS5", "PSVITA", "SWITCH", "WII", "WIIU", "XBOX", "X360", "XONE", "XSX"}:
+        if platform in {"PS1", "PS2", "PS3", "PS4", "PS5", "PSVITA", "SWITCH", "SWITCH2", "WII", "WIIU", "XBOX", "X360", "XONE", "XSX"}:
             return "Console"
         return ""
 
@@ -415,7 +415,7 @@ class BrasilTracker:
         # Infer from platform
         if platform in {"PS1", "PS2"}:
             return "ISO"
-        if platform in {"PS3", "PS4", "SWITCH"}:
+        if platform in {"PS3", "PS4", "SWITCH", "SWITCH2"}:
             return "ISO"
         if platform == "PC":
             return "EXE"

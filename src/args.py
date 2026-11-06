@@ -459,6 +459,7 @@ class Args:
                 "xone": "Xbox One",
                 "xsx": "Xbox Series X/S",
                 "switch": "Nintendo Switch",
+                "switch2": "Nintendo Switch 2",
                 "3ds": "Nintendo 3DS",
                 "nds": "Nintendo DS",
                 "wiiu": "Nintendo Wii U",
@@ -802,9 +803,9 @@ class Args:
             "--platforms",
             nargs=1,
             required=False,
-            help="Game platform (PC, PS5, PS4, PS3, PS2, Xbox, X360, XOne, XSX, Switch, 3DS, NDS, WiiU, Wii, Mac, Linux)",
+            help="Game platform (PC, PS5, PS4, PS3, PS2, Xbox, X360, XOne, XSX, Switch, Switch2, 3DS, NDS, WiiU, Wii, Mac, Linux)",
             type=str.lower,
-            choices=["pc", "ps5", "ps4", "ps3", "ps2", "xbox", "x360", "xone", "xsx", "switch", "3ds", "nds", "wiiu", "wii", "mac", "linux"],
+            choices=["pc", "ps5", "ps4", "ps3", "ps2", "xbox", "x360", "xone", "xsx", "switch", "switch2", "ns2", "3ds", "nds", "wiiu", "wii", "mac", "linux"],
             dest="manual_platform",
         )
         action_plat.completer = platform_completer
@@ -1666,6 +1667,8 @@ class Args:
                 "xone": "XONE",
                 "xsx": "XSX",
                 "switch": "SWITCH",
+                "switch2": "SWITCH2",
+                "ns2": "SWITCH2",
                 "3ds": "3DS",
                 "nds": "NDS",
                 "ds": "NDS",
