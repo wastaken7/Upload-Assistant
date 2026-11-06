@@ -203,3 +203,159 @@ def test_detail_events_reach_the_history_without_the_web_ui(monkeypatch):
     assert list(upload_history._item.requests.values()) == [
         {"tracker": "FICT", "name": "Fictional request", "exact": False, "link": "https://fictional.example/requests/1"}
     ]
+
+
+def _tracker(tracker, status, **values):
+    return {"tracker": tracker, "status": status, "message": "", "link": "", "torrent_id": "", "duration": None, "dupes": None, "slot": None, **values}
+
+
+def _record(history_database, **overrides):
+    record = {
+        "started_at": "2026-03-01T10:00:00+00:00",
+        "finished_at": "2026-03-01T10:05:00+00:00",
+        "source": "webui",
+        "path": "/media/Fictional.Movie.2020",
+        "name": "Fictional Movie 2020 1080p WEB-DL-FICTIONALGROUP",
+        "title": "Fictional Movie",
+        "year": 2020,
+        "category": "MOVIE",
+        "release_type": "WEBDL",
+        "resolution": "1080p",
+        "release_group": "FICTIONALGROUP",
+        "season": "",
+        "episode": "",
+        "size": 5 * MIB,
+        "fingerprint": "fictional-fingerprint",
+        "infohash": "",
+        "outcome": "success",
+        "reason": "",
+        "duration_ms": 1200,
+        "site_check": False,
+        "personal_release": False,
+        "artwork_url": "",
+        "ids": {"imdb": "tt0000001", "tmdb": "movie/1"},
+        "trackers": [
+            _tracker("FICT", "success", link="https://fictional.example/t/1", torrent_id="1", duration=2.0),
+            _tracker("OTHER", "dupe", message="Possible dupe", dupes={"entries": [{"name": "Older copy"}]}),
+        ],
+        "requests": [{"tracker": "FICT", "name": "Fictional Movie request", "link": "https://fictional.example/r/1", "reward": "50 BP", "status": "", "exact": True}],
+    }
+    record.update(overrides)
+    return upload_history.record_item(record, history_database.parent.parent)
+
+
+def test_listing_filters_paginates_and_counts(history_on):
+    _record(history_on)
+    _record(
+        history_on,
+        name="Fictional Show S01 720p HDTV-OTHERGROUP",
+        title="Fictional Show",
+        category="TV",
+        outcome="error",
+        finished_at="2026-03-02T10:00:00+00:00",
+        trackers=[_tracker("FICT", "failed", message="Timeout")],
+        requests=[],
+    )
+    _record(
+        history_on,
+        name="Fictional Album 2021 FLAC",
+        title="Fictional Album",
+        category="MUSIC",
+        outcome="no_upload",
+        finished_at="2026-03-03T10:00:00+00:00",
+        trackers=[],
+        requests=[],
+        ids={},
+    )
+    state_dir = history_on.parent.parent
+
+    everything = upload_history.list_items(state_dir)
+    assert [item["category"] for item in everything["items"]] == ["MUSIC", "TV", "MOVIE"]
+    assert everything["counts"] == {"success": 1, "error": 1, "no_upload": 1, "skipped": 0}
+    assert everything["facets"] == {"categories": ["MOVIE", "MUSIC", "TV"], "trackers": ["FICT", "OTHER"]}
+    movie = everything["items"][2]
+    assert movie["ids"] == {"imdb": "tt0000001", "tmdb": "movie/1"}
+    assert movie["request_count"] == 1
+    assert [tracker["status"] for tracker in movie["trackers"]] == ["success", "dupe"]
+
+    assert [item["title"] for item in upload_history.list_items(state_dir, search="fictional show")["items"]] == ["Fictional Show"]
+    assert upload_history.list_items(state_dir, search="100%")["total"] == 0
+    assert [item["title"] for item in upload_history.list_items(state_dir, tracker="fict", tracker_status="failed")["items"]] == ["Fictional Show"]
+    assert [item["title"] for item in upload_history.list_items(state_dir, has_requests=True)["items"]] == ["Fictional Movie"]
+    errors = upload_history.list_items(state_dir, outcome="error")
+    assert errors["total"] == 1
+    assert errors["counts"]["success"] == 1
+    window = upload_history.list_items(state_dir, after="2026-03-02", before="2026-03-03T00:00:00Z")
+    assert [item["title"] for item in window["items"]] == ["Fictional Show"]
+    second_page = upload_history.list_items(state_dir, limit=1, offset=1)
+    assert second_page["total"] == 3
+    assert [item["title"] for item in second_page["items"]] == ["Fictional Show"]
+
+
+def test_listing_rejects_unknown_filters(history_on):
+    with pytest.raises(ValueError, match="outcome"):
+        upload_history.list_items(history_on.parent.parent, outcome="maybe")
+    with pytest.raises(ValueError, match="tracker_status"):
+        upload_history.list_items(history_on.parent.parent, tracker_status="maybe")
+    with pytest.raises(ValueError, match="after"):
+        upload_history.list_items(history_on.parent.parent, after="yesterday")
+
+
+def test_listing_an_empty_installation_does_not_create_the_database(tmp_path):
+    page = upload_history.list_items(tmp_path)
+
+    assert page["items"] == []
+    assert page["total"] == 0
+    assert not (tmp_path / "data").exists()
+
+
+def test_entry_details_delete_and_clear(history_on):
+    state_dir = history_on.parent.parent
+    first = _record(history_on)
+    second = _record(history_on)
+
+    item = upload_history.get_item(first, state_dir)
+    assert item["ids"] == [
+        {"provider": "imdb", "value": "tt0000001", "link": "https://www.imdb.com/title/tt0000001/"},
+        {"provider": "tmdb", "value": "movie/1", "link": "https://www.themoviedb.org/movie/1"},
+    ]
+    assert item["trackers"][1]["dupes"] == {"entries": [{"name": "Older copy"}]}
+    assert item["requests"][0]["reward"] == "50 BP"
+    assert upload_history.get_item(9999, state_dir) is None
+
+    assert upload_history.delete_item(first, state_dir) is True
+    assert upload_history.delete_item(first, state_dir) is False
+    assert _rows(history_on, "SELECT COUNT(*) FROM history_trackers WHERE item_id = ?", first) == [(0,)]
+    assert upload_history.clear_history(state_dir) == 1
+    assert upload_history.get_item(second, state_dir) is None
+
+
+def test_clearing_history_keeps_statistics(history_on):
+    from src import stats
+
+    state_dir = history_on.parent.parent
+    stats.configure_stats({"DEFAULT": {"stats_enabled": True}})
+    try:
+        stats.record_event("item", operation="completed", state_dir=state_dir)
+        _record(history_on)
+        upload_history.clear_history(state_dir)
+        assert stats.get_stats("all", "real", state_dir)["overview"]["items_completed"] == 1
+    finally:
+        stats.configure_stats(None)
+
+
+@pytest.mark.parametrize(
+    ("provider", "value", "link"),
+    [
+        ("imdb", "tt0000001", "https://www.imdb.com/title/tt0000001/"),
+        ("imdb", "0000001", ""),
+        ("tmdb", "tv/5", "https://www.themoviedb.org/tv/5"),
+        ("tmdb", "person/5", ""),
+        ("tvdb", "7", "https://thetvdb.com/dereferrer/series/7"),
+        ("discogs_master", "8", "https://www.discogs.com/master/8"),
+        ("isbn", "9780000000000", ""),
+        ("tvdb", "../7", ""),
+    ],
+)
+def test_id_links_only_for_well_formed_ids(provider, value, link):
+    assert upload_history.id_link(provider, value) == link

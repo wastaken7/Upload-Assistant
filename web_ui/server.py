@@ -31,7 +31,7 @@ from types import ModuleType
 from pathlib import Path
 from typing import Any, Literal, Protocol, TypedDict, cast
 from collections import deque
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from collections.abc import Mapping, Sequence
 
 import psutil
@@ -3154,7 +3154,7 @@ def _require_auth_for_webui():  # pyright: ignore[reportUnusedFunction]
         return None
     if _webui_auth_configured() and _webui_auth_ok():
         return None
-    if request.path in {"/config", "/stats", "/", "/index.html"}:
+    if request.path in {"/config", "/stats", "/history", "/", "/index.html"}:
         return redirect(url_for("login_page"))
 
     return None
@@ -4663,6 +4663,93 @@ def stats_api():
         return jsonify(payload), 200 if payload["success"] else 500
     except ValueError as exc:
         return jsonify({"success": False, "error": str(exc)}), 400
+
+
+@app.route("/history")
+def history_page():
+    """Serve the local upload history."""
+    if not _is_authenticated():
+        return redirect(url_for("login_page"))
+    return render_template("history.html", app_version=APP_VERSION, csrf_token=_ensure_csrf_token())
+
+
+def _history_request_error() -> tuple[Any, int] | None:
+    """Allow history requests only from an authenticated browser session (no API tokens)."""
+    if not _is_authenticated() or _get_bearer_from_header():
+        return jsonify({"success": False, "error": "Authentication required (web session)"}), 401
+    if not _verify_csrf_header() or not _verify_same_origin():
+        return jsonify({"success": False, "error": "CSRF/Origin validation failed"}), 403
+    return None
+
+
+def _history_tracker_names(codes: Iterable[str]) -> dict[str, str]:
+    from src.trackersetup import tracker_class_map
+
+    return {code: str(getattr(tracker_class_map.get(code), "display_name", code)) for code in codes}
+
+
+@app.route("/api/history", methods=["GET", "DELETE"])
+def history_api():
+    """List or clear the local upload history."""
+    error = _history_request_error()
+    if error is not None:
+        return error
+
+    from src.upload_history import clear_history, history_enabled, list_items
+
+    if request.method == "DELETE":
+        if _request_json_dict().get("confirmation") != "CLEAR":
+            return jsonify({"success": False, "error": "Type CLEAR to confirm"}), 400
+        try:
+            return jsonify({"success": True, "removed": clear_history(STATE_DIR)})
+        except OSError, sqlite3.Error:
+            return jsonify({"success": False, "error": "Unable to clear the upload history"}), 500
+
+    args = request.args
+    try:
+        page = list_items(
+            STATE_DIR,
+            search=str(args.get("q", ""))[:200],
+            category=str(args.get("category", "")),
+            tracker=str(args.get("tracker", "")),
+            tracker_status=str(args.get("tracker_status", "")),
+            outcome=str(args.get("outcome", "")),
+            has_requests=str(args.get("requests", "")).lower() in {"1", "true", "yes"},
+            after=str(args.get("after", "")),
+            before=str(args.get("before", "")),
+            limit=int(args.get("limit", 50)),
+            offset=int(args.get("offset", 0)),
+        )
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
+    except OSError, sqlite3.Error:
+        return jsonify({"success": False, "error": "Unable to read the upload history"}), 500
+    trackers = {tracker["tracker"] for item in page["items"] for tracker in item["trackers"]} | set(page["facets"]["trackers"])
+    config = _load_config_from_file(STATE_DIR / "data" / "config.py") or {}
+    return jsonify({**page, "tracker_names": _history_tracker_names(sorted(trackers)), "enabled": history_enabled(config), "success": True})
+
+
+@app.route("/api/history/<int:item_id>", methods=["GET", "DELETE"])
+def history_item_api(item_id: int):
+    """Read or delete one upload history entry."""
+    error = _history_request_error()
+    if error is not None:
+        return error
+
+    from src.upload_history import delete_item, get_item
+
+    try:
+        if request.method == "DELETE":
+            if not delete_item(item_id, STATE_DIR):
+                return jsonify({"success": False, "error": "History entry not found"}), 404
+            return jsonify({"success": True})
+        item = get_item(item_id, STATE_DIR)
+    except OSError, sqlite3.Error:
+        return jsonify({"success": False, "error": "Unable to read the upload history"}), 500
+    if item is None:
+        return jsonify({"success": False, "error": "History entry not found"}), 404
+    item["tracker_names"] = _history_tracker_names(tracker["tracker"] for tracker in item["trackers"])
+    return jsonify({"success": True, "item": item})
 
 
 @app.route("/api/update_status")

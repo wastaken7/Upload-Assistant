@@ -387,6 +387,7 @@ function WorkspaceNav({
     ["upload", "Upload", "/"],
     ["config", "Config", "/config"],
     ["stats", "Stats", "/stats"],
+    ["history", "History", "/history"],
   ];
   useEffect(() => {
     if (!appearanceOpen) return undefined;

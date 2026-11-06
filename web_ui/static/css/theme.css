@@ -3981,6 +3981,61 @@ html[data-ua-shape="square"] .ua-appearance-segment {
   );
 }
 
+/* Upload history page */
+.ua-history-page main :is(.border, .border-t, .border-b),
+.ua-history-page [role="dialog"] :is(.border, .border-t, .border-b),
+.ua-history-page .divide-y > :not([hidden]) ~ :not([hidden]) {
+  border-color: color-mix(in srgb, var(--ua-config-border) 85%, transparent);
+}
+
+.ua-history-status {
+  --ua-history-tone: var(--ua-config-muted);
+  background: color-mix(in srgb, var(--ua-history-tone) 16%, transparent);
+  color: color-mix(in srgb, var(--ua-history-tone) 65%, var(--ua-config-text));
+}
+
+.ua-history-status[data-tone="success"] {
+  --ua-history-tone: #22c55e;
+}
+
+.ua-history-status[data-tone="error"] {
+  --ua-history-tone: #ef4444;
+}
+
+.ua-history-status[data-tone="attention"] {
+  --ua-history-tone: #f59e0b;
+}
+
+.ua-history-status[data-tone="info"] {
+  --ua-history-tone: #38bdf8;
+}
+
+.ua-history-row {
+  transition: background-color 120ms ease;
+}
+
+.ua-history-row:hover,
+.ua-history-row:focus-visible {
+  background: color-mix(
+    in srgb,
+    var(--ua-copper-bright) 7%,
+    var(--ua-config-surface-raised)
+  );
+}
+
+.ua-history-row:focus-visible {
+  outline: 2px solid var(--ua-copper-bright);
+  outline-offset: -2px;
+}
+
+.ua-history-cover-placeholder {
+  background: color-mix(in srgb, var(--ua-config-muted) 12%, transparent);
+}
+
+.ua-history-link {
+  color: color-mix(in srgb, var(--ua-copper-bright) 75%, var(--ua-config-text));
+}
+
 .ua-config-sidebar,
 .ua-config-header {
   background: var(--ua-config-surface);
