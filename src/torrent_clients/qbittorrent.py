@@ -536,6 +536,7 @@ class QbittorrentClientMixin:
             logger.info(f"[yellow]Could not list torrents to find existing content: {e}")
             return None
         if not isinstance(listed, list):
+            logger.info("[yellow]Could not list torrents to find existing content: the client returned no torrent list")
             return None
         candidates = select_candidates(cast(list[dict[str, Any]], listed), sum(size for _path, size in expected), str(torrent.name))
         logger.debug(f"[cyan]Checking {len(candidates)} client torrent(s) for the files of {torrent.name}")
@@ -550,9 +551,10 @@ class QbittorrentClientMixin:
                     f"read the files of torrent {torrent_hash}",
                 )
             except Exception as e:
-                logger.debug(f"[yellow]Could not read the files of torrent {torrent_hash}: {e}")
+                logger.info(f"[yellow]Could not read the files of torrent {torrent_hash} to find existing content: {e}")
                 continue
             if not isinstance(files, list):
+                logger.info(f"[yellow]Could not read the files of torrent {torrent_hash} to find existing content: the client returned no file list")
                 continue
             placement = match_content_layout(expected, multi_file, cast(list[dict[str, Any]], files))
             if placement is None:

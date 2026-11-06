@@ -2859,7 +2859,10 @@ function ConfigLeafEditor({
     );
   }
 
-  if (typeof item.value === "boolean") {
+  if (
+    typeof item.value === "boolean" &&
+    !isMatchExistingContentField(item.key, pathParts)
+  ) {
     const originalValue = Boolean(item.value);
 
     return (
@@ -3267,11 +3270,14 @@ function ConfigLeafEditor({
       { value: "prefer", label: "Prefer Existing Copy" },
       { value: "require", label: "Require Existing Copy" },
     ];
-    // Mirror the runtime parser: case and spacing are ignored and True means "prefer".
+    // Mirror the runtime parser: case and spacing are ignored, True means "prefer" and False is off.
+    const loweredExistingContentValue = selectedValue.trim().toLowerCase();
     const normalizedExistingContentValue =
-      selectedValue === "true" || selectedValue === "True"
+      loweredExistingContentValue === "true"
         ? "prefer"
-        : selectedValue.trim().toLowerCase();
+        : loweredExistingContentValue === "false"
+          ? ""
+          : loweredExistingContentValue;
     const existingContentValue = matchExistingContentOptions.some(
       (option) => option.value === normalizedExistingContentValue,
     )

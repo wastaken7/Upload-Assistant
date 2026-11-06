@@ -142,17 +142,18 @@ Examples, using a fictional release:
 
 ## What you'll see in the log
 
-| Message                                                                                                        | What it means                                                                   | What to do                                                                                   |
-| -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `TRACKER: seedbox_qbit already has these files (torrent NAME); seeding from PATH`                              | It worked. B got the torrent pointing at its own copy.                          | Nothing.                                                                                     |
-| `TRACKER: seedbox_qbit has no complete copy of these files; not adding the torrent to it.`                     | `"require"`: B doesn't have the files (or they don't match), so it was skipped. | Expected if B really doesn't have them. If it does, see [Troubleshooting](#troubleshooting). |
-| `TRACKER: seedbox_qbit has no complete copy of these files; adding it with the usual linking or path mapping.` | `"prefer"`: no copy found; UA added the torrent the normal way.                 | Check B's linking or `local_path`/`remote_path` settings.                                    |
-| `seedbox_qbit: ignoring unsupported match_existing_content value '...'`                                        | Typo in the value.                                                              | Use exactly `"prefer"`, `"require"` or `""`.                                                 |
-| `TRACKER: qBittorrent reports 'missingFiles' for the added torrent. Check that its files exist under PATH`     | The client can't find the files at the path it was given.                       | Fix the path or mapping, then run "Force recheck" on that torrent in qBittorrent.            |
+| Message                                                                                                        | What it means                                                                | What to do                                                                                   |
+| -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `TRACKER: seedbox_qbit already has these files (torrent NAME); seeding from PATH`                              | UA found B's copy and will add the torrent pointing at it.                   | Nothing, unless a later line reports an error. You can check the torrent in B.               |
+| `TRACKER: seedbox_qbit has no complete copy of these files; not adding the torrent to it.`                     | `"require"`: UA found no matching copy in B, so B was skipped.               | Expected if B really doesn't have them. If it does, see [Troubleshooting](#troubleshooting). |
+| `TRACKER: seedbox_qbit has no complete copy of these files; adding it with the usual linking or path mapping.` | `"prefer"`: no copy found; UA will add the torrent the normal way.           | Check the torrent in B, and B's linking or `local_path`/`remote_path` settings.              |
+| `Could not list torrents to find existing content: ...` or `Could not read the files of torrent HASH ...`      | UA couldn't read B's torrent list or a torrent's files, so it found no copy. | Check that B's qBittorrent (or its qui proxy) is reachable and that the login works.         |
+| `seedbox_qbit: ignoring unsupported match_existing_content value '...'`                                        | Typo in the value.                                                           | Use exactly `"prefer"`, `"require"` or `""`.                                                 |
+| `TRACKER: qBittorrent reports 'missingFiles' for the added torrent. Check that its files exist under PATH`     | The client can't find the files at the path it was given.                    | Fix the path or mapping, then run "Force recheck" on that torrent in qBittorrent.            |
 
 ## Testing it safely
 
-`--debug` doesn't upload anything, but with most trackers it **does** add a test torrent to your clients. That torrent has a fake tracker (`https://fake.tracker`), so it never announces anywhere real. This makes `--debug` a good way to test the setup:
+`--debug` doesn't upload the release to any tracker (screenshots still go to your image host as usual), but with most trackers it **does** add a test torrent to your clients. That torrent has a fake tracker (`https://fake.tracker`), so it never announces anywhere real. This makes `--debug` a good way to test the setup:
 
 1. Pick something you know is on both A and B, and run UA on it with `--debug` and a single tracker. If the log says `Torrent file ...[TRACKER_DEBUG].torrent does not exist, cannot add to client`, that tracker doesn't create a test torrent in debug mode: try again with another tracker.
 2. In the log, look for the line `already has these files ... seeding from ...`.
@@ -169,6 +170,7 @@ If you'd rather not get test torrents at all, add `--no-seed` to the command. UA
 
 **B has the files, but UA says "no complete copy".**
 
+- Is there a `Could not list torrents` or `Could not read the files` line just before it? Then UA couldn't talk to B. Check B's qBittorrent or qui proxy, then try again.
 - Is B's torrent 100% complete? Partly downloaded torrents, or torrents with skipped files, don't count.
 - Was a file renamed, removed, or added in B? Names and sizes must match.
 - Is B's torrent in an error state? Fix it in qBittorrent first, then try again.
