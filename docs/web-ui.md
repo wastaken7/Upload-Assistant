@@ -425,6 +425,16 @@ Each entry keeps the release name, path, size, category and release details, its
 
 Search matches the release name, title, release group, and path. Filters narrow the list by category, tracker, tracker result (for example, every release that failed on one tracker), entries with request matches, and a date range in the browser's local time. The outcome buttons show how many entries match the other filters. Select an entry to see its details, copy its path, or delete it. **Clear history** requires typing `CLEAR` and removes only history entries; statistics, caches, configuration, torrents, and NZBs are untouched.
 
+### Saved IDs and answers
+
+Upload Assistant also remembers, per release, the external IDs you confirmed and the answers you gave to its questions (for example, adult tags or a game's platform). The next time the same release is processed, even from a renamed folder or after its `tmp` folder was deleted, those IDs are used as if they had been passed with `--imdb`, `--tmdb`, `--tvdb`, `--tvmaze`, `--mal`, `--douban`, `--igdb`, the Discogs options, `--isbn`, or `--asin`, and the answers are not asked again. The log names each reused ID.
+
+- A release is recognised by the relative paths and sizes of its files (files under 1 MiB, such as NFOs, are ignored when larger files exist), so adding or replacing a media file makes it a new release.
+- IDs are remembered only after you answer **yes** to "Is this correct?", or after an upload with them succeeds. IDs found automatically in an unattended run that uploaded nothing are not remembered.
+- IDs are reused only when the release still has the same category and no ID was given on the command line: saved IDs are used together or not at all, so a corrected `--imdb` is never paired with an old `--tmdb`. Answers given with `--answer` also win over saved ones.
+- Debug runs are remembered too, so IDs confirmed during a `--debug` run are reused by the real upload. This does not depend on `history_enabled`.
+- Pass `--no-saved-ids` to search for the IDs again; correcting an ID at the confirmation prompt replaces the saved one.
+
 Recording is controlled by `DEFAULT.history_enabled`, which is on by default. Turning it off stops new entries without deleting stored ones. The history is stored in the application database, `data/upload_assistant.sqlite3` below the user-state directory. Unlike the statistics tables, it contains release names, paths, and links, so treat a copy of that file like your upload logs.
 
 ## Appearance, Help, and Changelog

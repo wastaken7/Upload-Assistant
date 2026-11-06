@@ -15,7 +15,7 @@ import cli_ui
 import guessit
 from torf import Torrent
 
-from src import webui_events
+from src import upload_history, webui_events
 from src.bluray_com import find_bluray_url, get_bluray_releases, use_bluray_url
 from src.book_prep import AUDIOBOOK_EXTENSIONS, BOOK_EXTENSIONS, BOOK_SERVICES
 from src.cleanup import cleanup_manager
@@ -1073,6 +1073,13 @@ async def search_metadata(
     _bdinfo: dict[str, Any],
     mi: dict[str, Any] | None,
 ) -> None:
+    if meta.saved_ids:
+        # IDs remembered from an earlier run need the category they were confirmed with;
+        # detect it now (it only depends on the path) instead of after the ID handling below.
+        if not meta.category:
+            meta.category = (await prep_instance.get_cat(videopath, meta) or "").upper()
+        upload_history.apply_saved_ids(meta)
+
     # Ensure all manual IDs have proper default values
     meta.tmdb_manual = meta.tmdb_manual or 0
     meta.imdb_manual = meta.imdb_manual or 0

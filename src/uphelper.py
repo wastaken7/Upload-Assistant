@@ -1111,6 +1111,7 @@ class UploadHelper:
                 logger.info(f"[green]Upload data changed in the Web UI:[/green] {escape(change)}", extra={"highlighter": None})
 
         if confirm:
+            meta.ids_confirmed = True
             if (
                 meta.original_imdb == meta.imdb_id
                 and meta.original_tmdb == meta.tmdb_id

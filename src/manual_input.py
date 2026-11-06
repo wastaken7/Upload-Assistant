@@ -8,7 +8,7 @@ which resolves it in this order:
 
 1. an answer given on the command line (``--answer KEY=VALUE``);
 2. an answer given earlier for the same release (``meta.manual_answers``,
-   saved in ``meta.json`` and reloaded on the next run);
+   remembered per release by :mod:`src.upload_history` and reloaded on the next run);
 3. the unattended policy, when nobody is there to answer;
 4. an interactive prompt, which the Web UI's GUI mode shows as a form.
 
@@ -22,15 +22,12 @@ import asyncio
 import contextlib
 import contextvars
 import inspect
-import json
 import re
 import weakref
 from collections.abc import AsyncGenerator, Awaitable, Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any, Literal, cast
 
-import aiofiles
 import cli_ui
 
 from src import webui_events
@@ -316,24 +313,6 @@ async def confirm_override(meta: Meta | None, question: str = "Do you want to up
             return bool(await prompt_in_thread(cli_ui.ask_yes_no, question, default=default))
         except EOFError:
             return False
-
-
-async def load_saved_answers(meta: Meta) -> None:
-    """Reload answers given in an earlier run of this release from its meta.json."""
-    if not meta.uuid:
-        return
-    meta_file = Path(meta.base_dir) / "tmp" / meta.uuid / "meta.json"
-    if not meta_file.is_file():
-        return
-    try:
-        async with aiofiles.open(meta_file, encoding="utf-8") as handle:
-            saved = json.loads(await handle.read()).get("manual_answers")
-    except (OSError, ValueError, AttributeError) as e:
-        logger.debug(f"Unable to read saved answers from {meta_file}: {e}")
-        return
-    if isinstance(saved, Mapping):
-        for key, value in saved.items():
-            meta.manual_answers.setdefault(str(key), value)
 
 
 def choices_from(values: Iterable[str] | Mapping[str, str]) -> tuple[Choice, ...]:

@@ -684,6 +684,13 @@ class Args:
         parser.add_argument("-tvdb", "--tvdb", nargs=1, required=False, help="TVDB ID", type=str, dest="tvdb_manual")
         parser.add_argument("-douban", "--douban", nargs=1, required=False, help="Douban ID (Number only)", dest="douban_manual", default=0)
         parser.add_argument("--no-metadata-cache", action="store_true", required=False, help="Do not read or write the persistent metadata cache", dest="no_metadata_cache")
+        parser.add_argument(
+            "--no-saved-ids",
+            action="store_true",
+            required=False,
+            help="Do not reuse the IDs confirmed for this release in an earlier run",
+            dest="no_saved_ids",
+        )
         parser.add_argument("-igdb", "--igdb", nargs=1, required=False, help="IGDB ID", type=str, dest="igdb_manual")
         parser.add_argument("-steam", "--steam", nargs=1, required=False, help="Steam App ID or URL", type=str, dest="steam_manual")
         parser.add_argument("-g", "--tag", nargs="*", required=False, help="Group Tag", type=str)

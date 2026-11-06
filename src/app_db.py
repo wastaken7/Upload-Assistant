@@ -189,8 +189,23 @@ def _migrate_2(db: sqlite3.Connection, _data_dir: Path) -> None:
     db.execute("CREATE INDEX history_requests_item ON history_requests (item_id)")
 
 
+def _migrate_3(db: sqlite3.Connection, _data_dir: Path) -> None:
+    """What earlier runs learned about a release (confirmed IDs and manual answers), by content fingerprint."""
+    db.execute(
+        """
+        CREATE TABLE release_memory (
+            fingerprint TEXT PRIMARY KEY,
+            updated_at TEXT NOT NULL,
+            category TEXT NOT NULL DEFAULT '',
+            ids TEXT NOT NULL DEFAULT '',
+            answers TEXT NOT NULL DEFAULT ''
+        )
+        """
+    )
+
+
 # Append only: a migration that has shipped must never change.
-MIGRATIONS: tuple[Callable[[sqlite3.Connection, Path], None], ...] = (_migrate_1, _migrate_2)
+MIGRATIONS: tuple[Callable[[sqlite3.Connection, Path], None], ...] = (_migrate_1, _migrate_2, _migrate_3)
 SCHEMA_VERSION = len(MIGRATIONS)
 
 

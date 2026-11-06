@@ -244,6 +244,8 @@ class Meta:
     igdb_first_release_date: str = ""
     igdb_id: int = 0
     igdb_manual: str | None = None
+    # Set when a person answered yes to "Is this correct?", so the IDs can be remembered.
+    ids_confirmed: bool = False
     igdb_rating_count: int | str = ""
     igdb_rating: float | str = ""
     igdb_url: str | None = None
@@ -286,7 +288,7 @@ class Meta:
     mal_manual: str | int | None = None
     mal: int | None = None
     manga: bool = False
-    # Answers given to src/manual_input.py questions; reloaded from meta.json.
+    # Answers given to src/manual_input.py questions; remembered per release by src/upload_history.py.
     manual_answers: dict[str, Any] = field(default_factory=dict)
     manual_category: str | None = None
     manual_commentary: bool = False
@@ -356,6 +358,7 @@ class Meta:
     no_imdb: bool = False
     automatic_imdb_rejected: bool = False
     no_override: bool = False
+    no_saved_ids: bool = False
     no_season: bool = False
     no_seed: bool = False
     no_subs: bool = False
@@ -414,6 +417,8 @@ class Meta:
     quickie_search: bool = False
     randomized: int = 0
     regex_secondary_title: str = ""
+    # Content fingerprint and the IDs remembered for it by an earlier run (src/upload_history.py).
+    release_fingerprint: str = ""
     regex_title: str = ""
     regex_year: str = ""
     region: str = ""
@@ -473,6 +478,7 @@ class Meta:
     season_pack_incomplete: bool = False
     season_pack_link: str | None = None
     season_pack_name: str = ""
+    saved_ids: dict[str, str] = field(default_factory=dict)
     season: int | str | None = 0
     secondary_title: str | None = None
     service_longname: str = ""
