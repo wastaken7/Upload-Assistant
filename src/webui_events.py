@@ -91,6 +91,30 @@ def _notify(kind: str, payload: Mapping[str, Any]) -> None:
             listener(kind, payload)
 
 
+# In-process observers of the release details shown in the results panel
+# (possible dupes, slot verdicts and request matches), used by the local
+# upload history. Unlike the listeners above, they receive the same sanitized
+# names and links as the Web UI, in CLI runs too.
+_detail_listeners: list[Callable[[str, Mapping[str, Any]], None]] = []
+
+
+def add_detail_listener(listener: Callable[[str, Mapping[str, Any]], None]) -> None:
+    if listener not in _detail_listeners:
+        _detail_listeners.append(listener)
+
+
+def _wants_details() -> bool:
+    return enabled() or bool(_detail_listeners)
+
+
+def _publish_detail(kind: str, payload: Mapping[str, Any]) -> None:
+    """Hand a results-panel event to detail observers, then to the Web UI."""
+    for listener in _detail_listeners:
+        with contextlib.suppress(Exception):
+            listener(kind, payload)
+    _emit(kind, payload)
+
+
 def event_prefix(nonce: str) -> str:
     """Return the line prefix of events written with ``nonce``."""
     return f"{GUI_EVENT_STDOUT_PREFIX}{nonce}:"
@@ -578,12 +602,12 @@ def _release_entries(entries: Iterable[Mapping[str, Any] | str], source_size: in
 
 def dupes(tracker: str, entries: Iterable[Mapping[str, Any] | str], *, source_size: int | None = None, note: str = "", trumpable: bool = False) -> None:
     """Report the possible duplicates shown before an "upload anyway?" prompt."""
-    if not enabled():
+    if not _wants_details():
         return
     payload: dict[str, Any] = {"tracker": plain_text(tracker, 64), "entries": _release_entries(entries, source_size), "trumpable": bool(trumpable)}
     if note:
         payload["note"] = plain_text(note)
-    _emit("dupes", payload)
+    _publish_detail("dupes", payload)
 
 
 def slot(
@@ -601,7 +625,7 @@ def slot(
     source_size: int | None = None,
 ) -> None:
     """Report a tracker's slot recommendation with the same detail as the terminal box."""
-    if not enabled():
+    if not _wants_details():
         return
     payload: dict[str, Any] = {
         "tracker": plain_text(tracker, 64),
@@ -626,7 +650,7 @@ def slot(
     rules_link = _http_link(rules_url) if rules_url else ""
     if rules_link:
         payload["rules_url"] = rules_link
-    _emit("slot", payload)
+    _publish_detail("slot", payload)
 
 
 def tracker_result(
@@ -656,7 +680,7 @@ def tracker_result(
 
 def request_match(tracker: str, name: Any, *, link: Any = None, reward: Any = None, status: Any = None, exact: bool = False) -> None:
     _notify("request", {"tracker": str(tracker), "exact": bool(exact)})
-    if not enabled():
+    if not _wants_details():
         return
     payload: dict[str, Any] = {"tracker": plain_text(tracker, 64), "name": plain_text(name, 300, markup=False), "exact": bool(exact)}
     url = _http_link(link)
@@ -667,7 +691,7 @@ def request_match(tracker: str, name: Any, *, link: Any = None, reward: Any = No
     if status not in (None, ""):
         payload["status"] = plain_text(status, 100)
     if payload["name"]:
-        _emit("request", payload)
+        _publish_detail("request", payload)
 
 
 def tracker_status_from_meta(status: Mapping[str, Any], *, final: bool, upload_started: bool = True) -> TrackerStatus:
@@ -697,7 +721,7 @@ def tracker_status_from_meta(status: Mapping[str, Any], *, final: bool, upload_s
     return "skipped"
 
 
-_DEFAULT_STATUS_MESSAGES: dict[str, str] = {
+DEFAULT_STATUS_MESSAGES: dict[str, str] = {
     "banned": "Release group is banned on this tracker",
     "dupe": "Possible dupe on this tracker",
     "skipped": "Not uploaded",
@@ -721,5 +745,5 @@ def publish_tracker_statuses(tracker_status: Mapping[str, Any], *, final: bool =
             # Passed the dupe check and approved; the upload result comes later.
             tracker_result(str(tracker), resolved, message="No potential dupes found" if status.get("dupe") is False else None)
             continue
-        message = status.get("status_message") or _DEFAULT_STATUS_MESSAGES.get(resolved)
+        message = status.get("status_message") or DEFAULT_STATUS_MESSAGES.get(resolved)
         tracker_result(str(tracker), resolved, message=message)

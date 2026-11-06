@@ -3980,10 +3980,12 @@ def _prepare_default_webui_section(
             comments_map.setdefault(f"DEFAULT/{client_key}", help_text)
             subsection_map[f"DEFAULT/{client_key}"] = "CLIENT SELECTION"
 
-    if "stats_enabled" in prepared:
-        # Group statistics with Main Settings only for WebUI presentation.
+    if "stats_enabled" in prepared or "history_enabled" in prepared:
+        # Group statistics and history with Main Settings only for WebUI presentation.
         # Keep the fields together so the builder emits a single subsection.
-        subsection_map["DEFAULT/stats_enabled"] = "MAIN SETTINGS"
+        for local_data_key in ("stats_enabled", "history_enabled"):
+            if local_data_key in prepared:
+                subsection_map[f"DEFAULT/{local_data_key}"] = "MAIN SETTINGS"
         main_settings = {key: value for key, value in prepared.items() if subsection_map.get(f"DEFAULT/{key}") == "MAIN SETTINGS"}
         prepared = {**main_settings, **prepared}
 

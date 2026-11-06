@@ -86,7 +86,7 @@ from rich.markup import escape
 
 from bin.get_ffmpeg import FfmpegBinaryManager
 from bin.get_mkbrr import MkbrrBinaryManager
-from src import webui_events
+from src import upload_history, webui_events
 from src.add_comparison import ComparisonManager
 from src.app_paths import CODE_DIR, STATE_DIR
 from src.args import Args, cli_argument_catalog, cli_option_choices, read_paths_from_stdin
@@ -2554,6 +2554,10 @@ async def do_the_thing(base_dir: str) -> None:
     if stats_collection_enabled(config):
         install_metadata_api_tracking()
         webui_events.add_listener(observe_run_event)
+    upload_history.configure_history(config)
+    if upload_history.history_enabled(config):
+        webui_events.add_listener(upload_history.observe_run_event)
+        webui_events.add_detail_listener(upload_history.observe_detail)
 
     tmp_dir = Path(base_dir) / "tmp"
     if not Path(tmp_dir).exists():
@@ -2879,6 +2883,7 @@ async def do_the_thing(base_dir: str) -> None:
                 meta.uuid = ""
                 set_stats_context(debug=bool(meta.debug), category="")
                 begin_item_timing()
+                upload_history.begin_item()
                 await record_event_async("item", operation="started", outcome="success")
                 _publish_webui_preview_target(path)
                 webui_events.begin_item(path, item_number, total_files)
@@ -2929,6 +2934,7 @@ async def do_the_thing(base_dir: str) -> None:
                 # The error ends the run, so keep the stage times measured so far.
                 with contextlib.suppress(Exception):
                     await record_item_timings_async()
+                await upload_history.record_item_async(meta, tracker_class_map, outcome="error", reason="exception")
                 raise
             except BaseException:
                 webui_events.fail_active_stage()
@@ -2946,6 +2952,12 @@ async def do_the_thing(base_dir: str) -> None:
                 await record_event_async("item", operation="completed", outcome=outcome, bytes_count=max(0, int(meta.source_size or 0)), duration_ms=item_elapsed_ms())
                 await record_release_profile_async(meta, outcome)
                 await record_item_timings_async()
+                await upload_history.record_item_async(
+                    meta,
+                    tracker_class_map,
+                    outcome="skipped" if skipped else "error",
+                    reason="skipped_by_user" if meta.skipped_by_user else "unsupported" if meta.skipped_unsupported else "",
+                )
                 if "queue" in meta and meta.queue is not None:
                     processed_files_count += 1
                     skipped_files_count += 1
@@ -3379,6 +3391,7 @@ async def do_the_thing(base_dir: str) -> None:
             webui_events.update_item(artwork=meta)
             # Persist and expose the completed item before user-managed hooks run.
             # Hooks may inspect the final tracker status and files have not yet been cleaned.
+            await upload_history.record_item_async(meta, tracker_class_map)
             await record_completed_item_stats_async(meta, tracker_class_map)
             await write_meta_file(meta)
             _publish_webui_preview_target(cast(str, meta.path or ""), meta.uuid or None)
