@@ -29,8 +29,9 @@ def test_dates_are_normalized_and_cache_is_specific_to_tracker_site_and_key(tmp_
     assert expiry.get_api_key_expiry("LST", "secret-key", "https://lst.gg/", tmp_path)["expires_at"] == observed["expires_at"]
     for tracker, key, site in [("LST", "replacement", "https://lst.gg"), ("AITHER", "secret-key", "https://lst.gg"), ("LST", "secret-key", "https://another.site")]:
         assert expiry.get_api_key_expiry(tracker, key, site, tmp_path)["state"] == "unknown"
-    cache = tmp_path / "data" / "api_key_expiry.sqlite3"
-    assert b"secret-key" not in cache.read_bytes()
+    cache = tmp_path / "data" / "upload_assistant.sqlite3"
+    stored = b"".join(path.read_bytes() for path in cache.parent.glob(f"{cache.name}*"))
+    assert b"secret-key" not in stored
     assert "identity" not in observed
 
 
