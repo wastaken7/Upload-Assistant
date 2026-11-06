@@ -521,6 +521,8 @@ class Meta:
     tmdb_localized_data: dict[str, Any] = field(default_factory=dict)
     tmdb_logo: str = ""
     tmdb_manual: int | str | None = None
+    # MOVIE or TV when --tmdb carried a movie/ or tv/ prefix.
+    tmdb_manual_category: str = ""
     tmdb_poster_path: str = ""
     tmdb_season_data: dict[str, Any] | None = None
     tmdb_type: str = ""

@@ -24,10 +24,11 @@ def test_nup_file_is_detected_as_game(tmp_path):
     assert meta.category == "GAME"
 
 
-def test_switch2_platform_arg_is_accepted():
+@pytest.mark.parametrize("alias", ["switch2", "ns2"])
+def test_switch2_platform_arg_is_accepted(alias):
     from src.args import Args
 
-    meta, _, _ = Args({"DEFAULT": {"screens": 1}}).parse(["example.nup", "--platform", "switch2"], Meta())
+    meta, _, _ = Args({"DEFAULT": {"screens": 1}}).parse(["example.nup", "--platform", alias], Meta())
 
     assert meta.platform == "SWITCH2"
 
@@ -43,6 +44,11 @@ def test_switch2_platform_arg_is_accepted():
 )
 def test_platform_is_detected_from_file_extension(files, expected):
     assert asyncio.run(detect_platform_from_files(files)) == expected
+
+
+@pytest.mark.parametrize("name", ["Example.Quest.NSW2-GROUP", "Example Quest [Switch 2]", "Example_Quest_Switch2"])
+def test_switch2_tag_wins_over_shared_switch_extensions(name):
+    assert asyncio.run(detect_platform_from_files([f"{name}/Example Quest.nsp"], name)) == "SWITCH2"
 
 
 @pytest.mark.parametrize(

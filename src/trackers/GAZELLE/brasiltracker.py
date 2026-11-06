@@ -366,6 +366,8 @@ class BrasilTracker:
             "PS4": "PS4",
             "PSVITA": "PS Vita",
             "SWITCH": f"{nin_term} Switch",
+            # No dedicated Switch 2 option yet.
+            "SWITCH2": f"{nin_term} Switch",
             "WII": "Wii",
             "WIIU": "Wii U",
             "XBOX": "Xbox Clássico",
@@ -415,7 +417,7 @@ class BrasilTracker:
         # Infer from platform
         if platform in {"PS1", "PS2"}:
             return "ISO"
-        if platform in {"PS3", "PS4", "SWITCH", "SWITCH2"}:
+        if platform in {"PS3", "PS4", "SWITCH"}:
             return "ISO"
         if platform == "PC":
             return "EXE"

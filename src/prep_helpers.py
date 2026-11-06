@@ -205,24 +205,46 @@ def category_args_given(meta: Meta) -> dict[str, list[str]]:
     return given
 
 
-def apply_category_from_args(meta: Meta) -> None:
-    """Set ``meta.category`` when the CLI arguments point to exactly one category."""
+def _category_from_args(meta: Meta, *, warn: bool) -> tuple[str, list[str]] | None:
+    """Return the one category the CLI arguments point to, with the flags that point to it."""
     given = category_args_given(meta)
     if not given:
-        return
-    # ``--tmdb movie/`` or ``--tmdb tv/`` may already have named the category.
-    current = str(meta.category or "").upper()
+        return None
+    # ``--tmdb movie/`` or ``--tmdb tv/`` names a category too.
+    tmdb_category = str(meta.tmdb_manual_category or "").upper()
     implied: set[str] = set(given)
-    if current:
-        implied.add(current)
+    if tmdb_category:
+        implied.add(tmdb_category)
     if len(implied) > 1:
-        described = "; ".join(f"{category}: {', '.join(flags)}" for category, flags in given.items())
-        outcome = f"keeping {current} from --tmdb" if current else "detecting the category automatically"
-        logger.info(f"[yellow]Arguments for different categories were given ({described}); {outcome}. Use --category to choose one.[/yellow]")
+        if warn:
+            described = "; ".join(f"{category}: {', '.join(flags)}" for category, flags in given.items())
+            outcome = f"keeping {tmdb_category} from --tmdb" if tmdb_category else "leaving the category to automatic detection"
+            logger.info(f"[yellow]Arguments for different categories were given ({described}); {outcome}. Use --category to choose one.[/yellow]")
+        return None
+    return next(iter(given.items()))
+
+
+def apply_category_from_args(meta: Meta) -> None:
+    """Let GAME, BOOK and MUSIC arguments name the category before file-type detection.
+
+    TV arguments wait for :func:`apply_tv_category_from_args`, so a book, game or
+    music release passed with ``--season`` keeps the category of its files.
+    """
+    result = _category_from_args(meta, warn=True)
+    if result and result[0] != "TV":
+        category, flags = result
+        meta.category = category
+        logger.debug(f"[cyan]Category set to {category} by {', '.join(flags)}[/cyan]")
+
+
+def apply_tv_category_from_args(meta: Meta) -> None:
+    """After file-type detection, let TV arguments replace an unset or automatic MOVIE category."""
+    if meta.manual_category or str(meta.category or "").upper() not in ("", "MOVIE"):
         return
-    category, flags = next(iter(given.items()))
-    meta.category = category
-    logger.debug(f"[cyan]Category set to {category} by {', '.join(flags)}[/cyan]")
+    result = _category_from_args(meta, warn=False)
+    if result and result[0] == "TV":
+        meta.category = "TV"
+        logger.debug(f"[cyan]Category set to TV by {', '.join(result[1])}[/cyan]")
 
 
 def check_pre_release(meta: Meta) -> bool:
@@ -537,6 +559,9 @@ async def detect_disc_and_category(prep_instance: Any, meta: Meta) -> tuple[str,
     if not meta.category and not meta.manual_category and not meta.is_disc and meta.path and await asyncio.to_thread(is_xxx_video_release, meta.path):
         meta.category = "XXX"
         logger.debug("[cyan]Auto-detected category: XXX[/cyan]")
+
+    # TV arguments only decide between TV and MOVIE, once the files ruled out the other categories.
+    apply_tv_category_from_args(meta)
 
     if meta.category == "XXX":
         for field_name, value in extract_xxx_metadata(meta.basename_no_ext).items():

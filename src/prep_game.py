@@ -409,9 +409,12 @@ async def detect_platform_from_files(
     if any(b.endswith(".nup") for b in basenames_lower):
         return "SWITCH2"
 
-    # Switch
+    # Switch (Switch 2 games can ship in the same formats; the release name tells them apart)
     switch_exts = (".nsp", ".xci", ".nca", ".szs", ".nsz", ".xcz")
     if any(b.endswith(switch_exts) for b in basenames_lower):
+        release_name = Path(path_to_check or (filelist[0] if filelist else "")).name.lower()
+        if SWITCH2_NAME_PATTERN.search(re.sub(r"[._\-\[\]]", " ", release_name)):
+            return "SWITCH2"
         return "SWITCH"
 
     # 3DS

@@ -63,12 +63,16 @@ FLAG_VALUES: dict[str, list[str]] = {
 FLAG_CATEGORIES = [(flag, category) for category, fields in CATEGORY_ONLY_ARGS.items() for flag in fields.values()]
 
 
-def _detect(tmp_path, argv: list[str]) -> Meta:
-    video = tmp_path / "Example.Release.2026.1080p.WEB-DL.mkv"
-    video.write_bytes(b"not a real video")
-    meta, _, _ = Args({"DEFAULT": {"screens": 1}}).parse([str(video), *argv], Meta())
-    prep = SimpleNamespace(disc_info_manager=SimpleNamespace(get_disc=AsyncMock(return_value=("", str(video), {}, []))))
+def _run_detection(meta: Meta) -> None:
+    prep = SimpleNamespace(disc_info_manager=SimpleNamespace(get_disc=AsyncMock(return_value=("", str(meta.path), {}, []))))
     asyncio.run(detect_disc_and_category(prep, meta))
+
+
+def _detect(tmp_path, argv: list[str], filename: str = "Example.Release.2026.1080p.WEB-DL.mkv") -> Meta:
+    release = tmp_path / filename
+    release.write_bytes(b"not a real release")
+    meta, _, _ = Args({"DEFAULT": {"screens": 1}}).parse([str(release), *argv], Meta())
+    _run_detection(meta)
     return meta
 
 
@@ -100,6 +104,35 @@ def test_manual_category_wins_over_category_only_flags(tmp_path):
     meta = _detect(tmp_path, ["--category", "movie", "--igdb", "000000"])
 
     assert meta.category == "MOVIE"
+
+
+def test_sports_category_is_not_replaced_by_tv_flags(tmp_path):
+    meta = _detect(tmp_path, ["--category", "sports", "--season", "1"])
+
+    # SPORTS is a tracker classification; TV or MOVIE is still decided later.
+    assert meta.category == ""
+
+
+@pytest.mark.parametrize(("filename", "category"), [("Example Book.epub", "BOOK"), ("Example Quest.nsp", "GAME")])
+def test_tv_flags_do_not_replace_the_category_of_the_files(filename, category, tmp_path):
+    meta = _detect(tmp_path, ["--season", "1"], filename)
+
+    assert meta.category == category
+
+
+@pytest.mark.parametrize(("argv", "category"), [(["--igdb", "000000"], "GAME"), (["--season", "1"], "TV")])
+def test_edited_arguments_replace_an_automatic_movie_category(argv, category, tmp_path):
+    release = tmp_path / "Example.Release.2026.1080p.WEB-DL.mkv"
+    release.write_bytes(b"not a real release")
+    parser = Args({"DEFAULT": {"screens": 1}})
+    meta, _, _ = parser.parse([str(release)], Meta())
+    _run_detection(meta)
+    meta.category = "MOVIE"  # chosen by the later name-based detection
+
+    meta, _, _ = parser.parse([str(release), *argv], meta)
+    _run_detection(meta)
+
+    assert meta.category == category
 
 
 def test_tmdb_category_agreeing_with_flags_is_kept(tmp_path):

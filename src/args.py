@@ -1257,6 +1257,7 @@ class Args:
 
         if meta.tmdb_manual is not None or meta.imdb_manual is not None:
             meta.tmdb_manual = meta.tmdb_id = meta.tmdb = meta.imdb_id = meta.imdb = None
+            meta.tmdb_manual_category = ""
         # An ASIN correction replaces a carried product URL. Explicit URLs in
         # this invocation are still checked for conflicts below.
         if parsed_args.get("book_asin") and not parsed_args.get("audible_url") and meta.audible_url:
@@ -1317,7 +1318,10 @@ class Args:
                     elif key == "manual_date":
                         meta.manual_date = value2
                     elif key == "tmdb_manual":
-                        meta.category, meta.tmdb_manual = self.parse_tmdb_id(value2, meta.category)
+                        tmdb_category, meta.tmdb_manual = self.parse_tmdb_id(value2, None)
+                        meta.tmdb_manual_category = tmdb_category
+                        if tmdb_category:
+                            meta.category = tmdb_category
                     elif key == "tracker_id":
                         for tracker_id_value in value_list:
                             tracker_name, torrent_id = self.parse_tracker_id(tracker_id_value)
