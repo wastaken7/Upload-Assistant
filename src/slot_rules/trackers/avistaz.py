@@ -77,19 +77,21 @@ class AvistaZSlotRules(SlotRules):
         unknown codec, so it may sit in the separate XviD/DivX slot.
         """
         rank = AVISTAZ_PRIORITY.get(upload.kind or "")
-        if rank is None or upload.codec == XVID:
+        # WEB-DLs share one slot whatever their codec; only encodes have a separate XviD/DivX slot.
+        if rank is None or (upload.kind != WEBDL and upload.codec == XVID):
             return [], [], []
         better: list[ReleaseProfile] = []
         maybe_better: list[ReleaseProfile] = []
         worse: list[ReleaseProfile] = []
         for profile in existing:
             other = AVISTAZ_PRIORITY.get(profile.kind or "")
-            if profile.resolution != upload.resolution or other is None or other == rank or profile.codec == XVID:
+            if profile.resolution != upload.resolution or other is None or other == rank or (profile.kind != WEBDL and profile.codec == XVID):
                 continue
+            codec_unknown = profile.kind != WEBDL and profile.codec is None
             if other > rank:
-                if profile.codec is not None:
+                if not codec_unknown:
                     worse.append(profile)
-            elif profile.codec is None:
+            elif codec_unknown:
                 maybe_better.append(profile)
             else:
                 better.append(profile)

@@ -249,6 +249,17 @@ class TestAvistaZNetwork:
         assert [entry["name"] for entry in decision.conflicts] == [webrip.name]
         assert "Report it as a trump" in decision.reason
 
+    def test_avistaz_xvid_web_dls_follow_source_priority(self) -> None:
+        rules = AvistaZSlotRules(Meta(category="MOVIE"))
+        xvid_web = prof(f"{T}.576p.AMZN.WEB-DL.AAC2.0.XviD-NOGRPA")
+        assert verdict(rules, xvid_web, prof(f"{T}.576p.BluRay.DD2.0.x264-NOGRPB")) is BLOCK
+        decision = rules.evaluate(prof(f"{T}.576p.BluRay.DD2.0.x264-NOGRPA"), [prof(f"{T}.576p.AMZN.WEB-DL.AAC2.0.XviD-NOGRPB")])
+        assert decision is not None
+        assert decision.verdict is ALLOW
+        assert len(decision.conflicts) == 1
+        # A WEB-DL's codec doesn't decide its slot, so an unknown one is still compared.
+        assert verdict(rules, prof(f"{T}.1080p.AMZN.WEBRip.DDP5.1.x264-NOGRPA"), replace(prof(f"{T}.1080p.NF.WEB-DL.DDP5.1.H.264-NOGRPB"), codec=None)) is BLOCK
+
     def test_privatehd(self) -> None:
         upload = prof(f"{T}.1080p.AMZN.WEB-DL.DDP5.1.H.264-NOGRPA")
         assert verdict(PrivateHDSlotRules(), upload, prof(f"{T}.1080p.NF.WEB-DL.DDP5.1.H.264-NOGRPB")) is ALLOW
