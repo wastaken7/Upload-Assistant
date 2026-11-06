@@ -40,7 +40,11 @@ def torrent_file_entries(torrent: Any) -> list[tuple[str, int]]:
 
 
 def select_candidates(torrents: Iterable[Mapping[str, Any]], expected_size: int, torrent_name: str) -> list[Mapping[str, Any]]:
-    """Pick complete client torrents large enough to hold the content, closest size first."""
+    """Pick complete client torrents large enough to hold the content.
+
+    Torrents with the same name come first, so a renamed or busy library cannot
+    push the likeliest copy past the candidate limit; then the closest size wins.
+    """
     allowance = max(int(expected_size * EXTRA_SIZE_RATIO), EXTRA_SIZE_FLOOR)
     candidates: list[tuple[int, bool, Mapping[str, Any]]] = []
     for info in torrents:
@@ -56,7 +60,7 @@ def select_candidates(torrents: Iterable[Mapping[str, Any]], expected_size: int,
         extra = size - expected_size
         if 0 <= extra <= allowance:
             candidates.append((extra, str(info.get("name") or "") != torrent_name, info))
-    candidates.sort(key=lambda item: (item[0], item[1]))
+    candidates.sort(key=lambda item: (item[1], item[0]))
     return [info for _extra, _other_name, info in candidates[:MAX_CANDIDATES]]
 
 

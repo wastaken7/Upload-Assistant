@@ -3267,14 +3267,24 @@ function ConfigLeafEditor({
       { value: "prefer", label: "Prefer Existing Copy" },
       { value: "require", label: "Require Existing Copy" },
     ];
+    // Mirror the runtime parser: case and spacing are ignored and True means "prefer".
+    const normalizedExistingContentValue =
+      selectedValue === "true" || selectedValue === "True"
+        ? "prefer"
+        : selectedValue.trim().toLowerCase();
+    const existingContentValue = matchExistingContentOptions.some(
+      (option) => option.value === normalizedExistingContentValue,
+    )
+      ? normalizedExistingContentValue
+      : selectedValue;
     if (
       !matchExistingContentOptions.some(
-        (option) => option.value === selectedValue,
+        (option) => option.value === existingContentValue,
       )
     ) {
       matchExistingContentOptions.unshift({
-        value: selectedValue,
-        label: `${selectedValue} (Unsupported)`,
+        value: existingContentValue,
+        label: `${existingContentValue} (Unsupported)`,
       });
     }
 
@@ -3288,7 +3298,7 @@ function ConfigLeafEditor({
         </label>
         <SelectDropdown
           id={fieldId}
-          value={selectedValue}
+          value={existingContentValue}
           onChange={(newValue) => {
             setSelectedValue(newValue);
             onValueChange(path, newValue, {

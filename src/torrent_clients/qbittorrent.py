@@ -932,7 +932,7 @@ class QbittorrentClientMixin:
                     await access.session.aclose()
                 return None
             else:
-                logger.info(f"[yellow]{tracker}: {label} has no complete copy of these files; using the configured path mapping.")
+                logger.info(f"[yellow]{tracker}: {label} has no complete copy of these files; adding it with the usual linking or path mapping.")
                 # The normal flow below opens its own connection after linking.
                 if access.session:
                     await access.session.aclose()

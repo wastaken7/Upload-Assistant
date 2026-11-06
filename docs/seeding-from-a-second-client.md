@@ -96,12 +96,17 @@ UA adds every new torrent to each client in this list, in order.
 | Value       | When B has the files                     | When B does **not** have the files                                                         |
 | ----------- | ---------------------------------------- | ------------------------------------------------------------------------------------------ |
 | `"require"` | Adds the torrent, seeding from B's copy. | **Skips B.** Nothing is added to B. This is not an error: client A still gets the torrent. |
-| `"prefer"`  | Adds the torrent, seeding from B's copy. | Adds the torrent the normal way, using `local_path`/`remote_path`.                         |
+| `"prefer"`  | Adds the torrent, seeding from B's copy. | Adds the torrent the normal way, as if the option were off (see below).                    |
 | `""` (off)  | Ignored; always uses the normal way.     | Normal way.                                                                                |
 
 **Not sure? Use `"require"`.** A seedbox normally can't see computer A's disk, so the normal way would only give B a broken torrent pointing at a folder that doesn't exist. With `"require"`, B only gets torrents it can actually seed.
 
 Use `"prefer"` only when B can see the same files through a path mapping and you want B to receive every torrent.
+
+"The normal way" means B's usual settings apply:
+
+- With `linking` set to `hardlink` or `symlink`, UA creates the links and adds the torrent from the linked folder. If linking fails and `allow_fallback` is `False`, nothing is added to B.
+- Without linking, UA uses `local_path`/`remote_path` to translate the path.
 
 ### Using the WebUI
 
@@ -137,19 +142,19 @@ Examples, using a fictional release:
 
 ## What you'll see in the log
 
-| Message                                                                                                    | What it means                                                                   | What to do                                                                                   |
-| ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `TRACKER: seedbox_qbit already has these files (torrent NAME); seeding from PATH`                          | It worked. B got the torrent pointing at its own copy.                          | Nothing.                                                                                     |
-| `TRACKER: seedbox_qbit has no complete copy of these files; not adding the torrent to it.`                 | `"require"`: B doesn't have the files (or they don't match), so it was skipped. | Expected if B really doesn't have them. If it does, see [Troubleshooting](#troubleshooting). |
-| `TRACKER: seedbox_qbit has no complete copy of these files; using the configured path mapping.`            | `"prefer"`: no copy found; UA used `local_path`/`remote_path`.                  | Check that the mapping is right.                                                             |
-| `seedbox_qbit: ignoring unsupported match_existing_content value '...'`                                    | Typo in the value.                                                              | Use exactly `"prefer"`, `"require"` or `""`.                                                 |
-| `TRACKER: qBittorrent reports 'missingFiles' for the added torrent. Check that its files exist under PATH` | The client can't find the files at the path it was given.                       | Fix the path or mapping, then run "Force recheck" on that torrent in qBittorrent.            |
+| Message                                                                                                        | What it means                                                                   | What to do                                                                                   |
+| -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `TRACKER: seedbox_qbit already has these files (torrent NAME); seeding from PATH`                              | It worked. B got the torrent pointing at its own copy.                          | Nothing.                                                                                     |
+| `TRACKER: seedbox_qbit has no complete copy of these files; not adding the torrent to it.`                     | `"require"`: B doesn't have the files (or they don't match), so it was skipped. | Expected if B really doesn't have them. If it does, see [Troubleshooting](#troubleshooting). |
+| `TRACKER: seedbox_qbit has no complete copy of these files; adding it with the usual linking or path mapping.` | `"prefer"`: no copy found; UA added the torrent the normal way.                 | Check B's linking or `local_path`/`remote_path` settings.                                    |
+| `seedbox_qbit: ignoring unsupported match_existing_content value '...'`                                        | Typo in the value.                                                              | Use exactly `"prefer"`, `"require"` or `""`.                                                 |
+| `TRACKER: qBittorrent reports 'missingFiles' for the added torrent. Check that its files exist under PATH`     | The client can't find the files at the path it was given.                       | Fix the path or mapping, then run "Force recheck" on that torrent in qBittorrent.            |
 
 ## Testing it safely
 
-`--debug` doesn't upload anything, but it **does** add a test torrent to your clients. That torrent has a fake tracker (`https://fake.tracker`), so it never announces anywhere real. This makes `--debug` a good way to test the setup:
+`--debug` doesn't upload anything, but with most trackers it **does** add a test torrent to your clients. That torrent has a fake tracker (`https://fake.tracker`), so it never announces anywhere real. This makes `--debug` a good way to test the setup:
 
-1. Pick something you know is on both A and B, and run UA on it with `--debug` and a single tracker.
+1. Pick something you know is on both A and B, and run UA on it with `--debug` and a single tracker. If the log says `Torrent file ...[TRACKER_DEBUG].torrent does not exist, cannot add to client`, that tracker doesn't create a test torrent in debug mode: try again with another tracker.
 2. In the log, look for the line `already has these files ... seeding from ...`.
 3. In B's qBittorrent, find the new torrent. It has the release's name, so it sits next to the torrent B already had; the test one is the torrent whose tracker is `fake.tracker`. Check that its save path is B's folder and that it isn't stuck on "Missing files".
 4. If you want to be completely sure, right-click it and choose **Force recheck**. It should end at 100%.
@@ -168,6 +173,7 @@ If you'd rather not get test torrents at all, add `--no-seed` to the command. UA
 - Was a file renamed, removed, or added in B? Names and sizes must match.
 - Is B's torrent in an error state? Fix it in qBittorrent first, then try again.
 - Is the new torrent much smaller than B's, like one episode from a season pack? That isn't supported.
+- Does B's torrent have a different name? UA checks torrents with the same name first, then the 25 closest in size. In a big library, a renamed copy can fall outside those 25.
 
 **It's slow.**
 

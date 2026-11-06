@@ -17,6 +17,7 @@ from src.torrent_clients.existing_content import (
     existing_content_mode,
     join_client_path,
     match_content_layout,
+    MAX_CANDIDATES,
     select_candidates,
     torrent_file_entries,
 )
@@ -107,6 +108,18 @@ def test_select_candidates_keeps_complete_torrents_of_a_compatible_size() -> Non
     assert [info["hash"] for info in select_candidates(torrents, 10 * GIB, "Fictional")] == ["b", "a"]
 
 
+def test_select_candidates_checks_same_name_copies_before_the_limit() -> None:
+    crowd = [
+        {"hash": f"other{i}", "name": f"Other.{i}", "save_path": "/data", "total_size": 10 * GIB + i, "progress": 1, "state": "stalledUP"}
+        for i in range(MAX_CANDIDATES + 5)
+    ]
+    # Our copy also holds a sample, so it is bigger than every unrelated torrent.
+    copy = {"hash": "mine", "name": "Fictional", "save_path": "/data", "total_size": 10 * GIB + 200 * 1024**2, "progress": 1, "state": "stalledUP"}
+    selected = select_candidates([*crowd, copy], 10 * GIB, "Fictional")
+    assert len(selected) == MAX_CANDIDATES
+    assert selected[0]["hash"] == "mine"
+
+
 @pytest.mark.parametrize(
     ("save_path", "prefix", "expected"),
     [
@@ -141,7 +154,8 @@ async def test_find_existing_content_through_the_webui(tmp_path: Path) -> None:
     _release_dir, _video, torrent = _release(tmp_path)
     qbit = _FakeQbit(
         [
-            {"hash": "other", "name": "Unrelated", "save_path": "/seed", "total_size": torrent.size, "progress": 1, "state": "stalledUP"},
+            # Same name and closer in size, but holding other files: checked first and rejected.
+            {"hash": "other", "name": "Fictional.Movie.2025-GROUP", "save_path": "/seed", "total_size": torrent.size, "progress": 1, "state": "stalledUP"},
             {"hash": "copy", "name": "Fictional.Movie.2025-GROUP", "save_path": "/seed/movies", "total_size": torrent.size + 7, "progress": 1, "state": "stalledUP"},
         ],
         {
