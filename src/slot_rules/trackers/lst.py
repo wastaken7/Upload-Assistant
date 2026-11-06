@@ -1,5 +1,5 @@
 # Upload Assistant © 2026 Audionut & wastaken7 — Licensed under UAPL v1.0
-"""LST slots (Upload Rules, Slots & Trumping, transcribed 2026-10-15)."""
+"""LST slots (Upload Rules, Slots & Trumping)."""
 
 from collections.abc import Sequence
 
@@ -75,7 +75,7 @@ class LstSlotRules(SlotRules):
 
         def trump(new: ReleaseProfile, old: ReleaseProfile) -> tuple[Verdict, str]:
             if old.internal and not (new.group and new.group == old.group):
-                return Verdict.BLOCK, "It is an internal release; only its own group can replace it."
+                return Verdict.REVIEW, "It is an internal release that only its own group can replace; a directly superior release may still be uploaded beside it."
             if is_repack_of(new, old):
                 return Verdict.ALLOW, "A REPACK/PROPER replaces the original release from the same group."
             if new.kind == ENCODE:

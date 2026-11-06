@@ -134,9 +134,10 @@ class TestLst:
     def test_720p_x265_is_not_listed(self) -> None:
         assert verdict(self.rules, prof(f"{T}.720p.BluRay.DD5.1.x265-NOGRPA")) is REVIEW
 
-    def test_internal_holder_blocks(self) -> None:
+    def test_internal_holder_needs_review(self) -> None:
+        # Only a directly superior release may be uploaded beside an internal; the user has to judge that.
         upload = prof(f"{T}.1080p.AMZN.WEB-DL.DDP5.1.H.264-NOGRPA")
-        assert verdict(self.rules, upload, prof(f"{T}.1080p.AMZN.WEB-DL.DDP5.1.H.264-NOGRPB", internal=1)) is BLOCK
+        assert verdict(self.rules, upload, prof(f"{T}.1080p.AMZN.WEB-DL.DDP5.1.H.264-NOGRPB", internal=1)) is REVIEW
 
 
 class TestUlcx:
@@ -208,11 +209,56 @@ class TestAvistaZNetwork:
         assert verdict(CinemaZSlotRules(), webrip, bluray) is BLOCK
         assert verdict(CinemaZSlotRules(), bluray, webrip) is ALLOW
 
-    def test_avistaz_codec_coexistence_is_unclear(self) -> None:
+    def test_avistaz_x264_and_x265_coexist(self) -> None:
         meta = Meta(category="MOVIE")
         upload = prof(f"{T}.1080p.BluRay.DD5.1.x265-NOGRPA")
-        assert verdict(AvistaZSlotRules(meta), upload, prof(f"{T}.1080p.BluRay.DD5.1.x264-NOGRPB")) is REVIEW
+        assert verdict(AvistaZSlotRules(meta), upload, prof(f"{T}.1080p.BluRay.DD5.1.x264-NOGRPB")) is ALLOW
+        assert verdict(AvistaZSlotRules(meta), upload, prof(f"{T}.1080p.BluRay.DTS.x265-NOGRPB")) is BLOCK
         assert verdict(AvistaZSlotRules(Meta(category="TV")), upload) is REVIEW
+
+    def test_avistaz_two_web_dls_from_different_services(self) -> None:
+        rules = AvistaZSlotRules(Meta(category="MOVIE"))
+        upload = prof(f"{T}.1080p.AMZN.WEB-DL.DDP5.1.H.264-NOGRPA")
+        netflix = prof(f"{T}.1080p.NF.WEB-DL.DDP5.1.H.264-NOGRPB")
+        assert verdict(rules, upload, netflix) is ALLOW
+        assert verdict(rules, upload, prof(f"{T}.1080p.AMZN.WEB-DL.DDP5.1.H.264-NOGRPB")) is BLOCK
+        assert verdict(rules, upload, netflix, prof(f"{T}.1080p.ATVP.WEB-DL.DDP5.1.H.264-NOGRPC")) is BLOCK
+        assert verdict(rules, upload, prof(f"{T}.1080p.WEB-DL.DDP5.1.H.264-NOGRPB")) is REVIEW
+        # A Blu-ray encode still replaces WEB-DLs.
+        assert verdict(rules, upload, prof(f"{T}.1080p.BluRay.DD5.1.x264-NOGRPB")) is BLOCK
+        # The limit is two WEB-DLs per resolution, whatever their codec.
+        hevc = prof(f"{T}.1080p.ATVP.WEB-DL.DDP5.1.H.265-NOGRPC")
+        assert verdict(rules, hevc, netflix, prof(f"{T}.1080p.DSNP.WEB-DL.DDP5.1.H.264-NOGRPB")) is BLOCK
+
+    def test_avistaz_source_priority_crosses_codecs(self) -> None:
+        rules = AvistaZSlotRules(Meta(category="MOVIE"))
+        webrip = prof(f"{T}.1080p.AMZN.WEBRip.DDP5.1.x265-NOGRPA")
+        assert verdict(rules, webrip, prof(f"{T}.1080p.BluRay.DD5.1.x264-NOGRPB")) is BLOCK
+        assert verdict(rules, webrip, prof(f"{T}.1080p.NF.WEB-DL.DDP5.1.H.264-NOGRPB")) is BLOCK
+        bluray = prof(f"{T}.1080p.BluRay.DD5.1.x265-NOGRPA")
+        assert verdict(rules, bluray, prof(f"{T}.1080p.AMZN.WEBRip.DDP5.1.x264-NOGRPB")) is ALLOW
+        # A better source whose codec is unknown may be in the XviD/DivX slot.
+        assert verdict(rules, webrip, replace(prof(f"{T}.1080p.BluRay.DD5.1.x264-NOGRPB"), codec=None)) is REVIEW
+
+    def test_avistaz_lists_replaced_releases_from_other_slots(self) -> None:
+        rules = AvistaZSlotRules(Meta(category="MOVIE"))
+        webrip = prof(f"{T}.1080p.AMZN.WEBRip.DDP5.1.x264-NOGRPB")
+        decision = rules.evaluate(prof(f"{T}.1080p.AMZN.WEB-DL.DDP5.1.H.264-NOGRPA"), [webrip])
+        assert decision is not None
+        assert decision.verdict is ALLOW
+        assert [entry["name"] for entry in decision.conflicts] == [webrip.name]
+        assert "Report it as a trump" in decision.reason
+
+    def test_avistaz_xvid_web_dls_follow_source_priority(self) -> None:
+        rules = AvistaZSlotRules(Meta(category="MOVIE"))
+        xvid_web = prof(f"{T}.576p.AMZN.WEB-DL.AAC2.0.XviD-NOGRPA")
+        assert verdict(rules, xvid_web, prof(f"{T}.576p.BluRay.DD2.0.x264-NOGRPB")) is BLOCK
+        decision = rules.evaluate(prof(f"{T}.576p.BluRay.DD2.0.x264-NOGRPA"), [prof(f"{T}.576p.AMZN.WEB-DL.AAC2.0.XviD-NOGRPB")])
+        assert decision is not None
+        assert decision.verdict is ALLOW
+        assert len(decision.conflicts) == 1
+        # A WEB-DL's codec doesn't decide its slot, so an unknown one is still compared.
+        assert verdict(rules, prof(f"{T}.1080p.AMZN.WEBRip.DDP5.1.x264-NOGRPA"), replace(prof(f"{T}.1080p.NF.WEB-DL.DDP5.1.H.264-NOGRPB"), codec=None)) is BLOCK
 
     def test_privatehd(self) -> None:
         upload = prof(f"{T}.1080p.AMZN.WEB-DL.DDP5.1.H.264-NOGRPA")
@@ -385,3 +431,43 @@ def test_repack_from_another_provider_is_a_different_release() -> None:
     assert verdict(TorrentLeechSlotRules(), upload, prof(f"{T}.REPACK.1080p.NF.WEB-DL.DDP5.1.H.264-NOGRPA")) is ALLOW
     assert verdict(TorrentLeechSlotRules(), upload, prof(f"{T}.REPACK.1080p.AMZN.WEB-DL.DDP5.1.H.264-NOGRPA")) is BLOCK
     assert verdict(TorrentLeechSlotRules(), upload, prof(f"{T}.REPACK.1080p.WEB-DL.DDP5.1.H.264-NOGRPA")) is REVIEW
+
+
+def test_every_tracker_links_its_rules_page() -> None:
+    from src.slot_rules.pages import RULES_PAGES
+    from src.slot_rules.registry import MUSIC_SLOT_RULES, SLOT_RULES
+
+    trackers = (set(SLOT_RULES) | set(MUSIC_SLOT_RULES)) - {"TORRENTLEECH"}
+    assert trackers == set(RULES_PAGES)
+    assert all(page.url.startswith("https://") for page in RULES_PAGES.values())
+    decision = AitherSlotRules().evaluate(prof(f"{T}.1080p.AMZN.WEB-DL.DDP5.1.H.264-NOGRPA"), [])
+    assert decision is not None
+    assert decision.rules_url == RULES_PAGES["AITHER"].url
+    assert decision.rules_date == RULES_PAGES["AITHER"].updated
+
+
+def test_trump_needs_room_beside_coexisting_releases() -> None:
+    from collections.abc import Sequence
+
+    from src.slot_rules.models import SlotDecision
+    from src.slot_rules.profile import WEBDL
+
+    class Rules(SlotRules):
+        TRACKER = "FAKE"
+
+        def decide(self, upload: ReleaseProfile, existing: Sequence[ReleaseProfile]) -> SlotDecision | None:
+            return self.by_slot(
+                upload,
+                existing,
+                lambda profile: (profile.resolution,),
+                "1080p",
+                trump=lambda _new, _old: (Verdict.ALLOW, "Better."),
+                coexists=lambda _new, old: old.kind == WEBDL,
+                capacity=2,
+            )
+
+    upload = prof(f"{T}.1080p.AMZN.WEB-DL.DDP5.1.H.264-NOGRPA")
+    webrip = prof(f"{T}.1080p.AMZN.WEBRip.DDP5.1.x264-NOGRPB")
+    netflix = prof(f"{T}.1080p.NF.WEB-DL.DDP5.1.H.264-NOGRPB")
+    assert verdict(Rules(), upload, netflix, webrip) is ALLOW
+    assert verdict(Rules(), upload, netflix, prof(f"{T}.1080p.DSNP.WEB-DL.DDP5.1.H.264-NOGRPC"), webrip) is BLOCK

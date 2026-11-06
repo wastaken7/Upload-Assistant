@@ -385,6 +385,7 @@ class UploadHelper:
             conflicts=decision.conflicts,
             notes=decision.notes,
             rules_date=decision.rules_date,
+            rules_url=decision.rules_url,
             source_size=meta.source_size,
         )
         gui_off = {"highlighter": None, "ua_gui": False}
@@ -429,6 +430,9 @@ class UploadHelper:
         age = "today" if age_days <= 0 else f"{age_days} day{'s' if age_days != 1 else ''} ago"
         line()
         paragraph(f"Rules as of {decision.rules_date.isoformat()} ({age}). This is only a recommendation; tracker rules change over time.", style="dim")
+        if decision.rules_url:
+            rules_link = format_terminal_link(f"{decision.tracker} rules", decision.rules_url, self.default_config)
+            line(f"[dim]Rules page:[/dim] [cyan]{rules_link}[/cyan]")
         logger.info(f"[{color}]{bottom}[/{color}]", extra=gui_off)
         logger.info("")
 

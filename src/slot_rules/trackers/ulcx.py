@@ -1,5 +1,5 @@
 # Upload Assistant © 2026 Audionut & wastaken7 — Licensed under UAPL v1.0
-"""ULCX slot framework (sections 4, 5 and 8, transcribed 2026-10-15)."""
+"""ULCX slot framework (sections 4, 5 and 8)."""
 
 from collections.abc import Sequence
 

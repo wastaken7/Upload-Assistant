@@ -18,7 +18,7 @@ class TorrentLeechSlotRules(SlotRules):
 
 
 class DreadVaultSlotRules(SlotRules):
-    """DreadVault has no slots yet; only an exact duplicate is refused (rules page, 2026-10-15)."""
+    """DreadVault has no slots yet; only an exact duplicate is refused."""
 
     TRACKER = "DREADVAULT"
 
@@ -27,7 +27,7 @@ class DreadVaultSlotRules(SlotRules):
 
 
 class MTeamSlotRules(SlotRules):
-    """M-Team (發佈規則 "轉種需知", 2026-10-15).
+    """M-Team (發佈規則 "轉種需知").
 
     The same content from a different group, with a different video codec or at a
     different resolution may all be posted. A DUPE is the same content with the

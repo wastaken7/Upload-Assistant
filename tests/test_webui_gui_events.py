@@ -395,6 +395,7 @@ def test_slot_events_carry_the_terminal_details(gui_env, capsys) -> None:
         conflicts=[{"name": "Fictional.Movie.2020-OTHERGRP", "link": "https://tracker.invalid/t/1", "size": "4 GiB"}],
         notes=["Check the audio tracks."],
         rules_date=date(2020, 1, 1),
+        rules_url="https://tracker.invalid/rules",
         source_size=4 * 1024**3,
     )
 
@@ -404,6 +405,7 @@ def test_slot_events_carry_the_terminal_details(gui_env, capsys) -> None:
     assert event["why"] == "One release per group and resolution."
     assert event["notes"] == ["Check the audio tracks."]
     assert event["rules"].startswith("Rules as of 2020-01-01 (")
+    assert event["rules_url"] == "https://tracker.invalid/rules"
     (conflict,) = event["conflicts"]
     assert conflict["diff_pct"] == 0
     # Same size as the upload: the terminal's red end of the scale.

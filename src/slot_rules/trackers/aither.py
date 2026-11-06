@@ -1,5 +1,5 @@
 # Upload Assistant © 2026 Audionut & wastaken7 — Licensed under UAPL v1.0
-"""Aither slots (wiki "Slots", transcribed 2026-10-15)."""
+"""Aither slots (wiki "Slots")."""
 
 from collections.abc import Sequence
 
@@ -76,7 +76,10 @@ class AitherSlotRules(SlotRules):
                 Verdict.REVIEW,
                 "WEBRips need a manual check on Aither.",
                 [profile for profile in existing if profile.kind in (WEBDL, WEBRIP) and profile.resolution == upload.resolution],
-                why="A WEBRip is only allowed when it comes from a higher-resolution WEB-DL or no WEB-DL exists, and it needs 6 comparison screenshots.",
+                why=(
+                    "A WEBRip is only allowed when it comes from a higher-resolution WEB-DL, is proven better than the existing WEB-DL, "
+                    "or no WEB-DL exists, and it needs 10 comparison screenshots."
+                ),
             )
         upload_key = self.key(upload)
         if isinstance(upload_key, tuple) and UNLISTED in upload_key:

@@ -1,5 +1,5 @@
 # Upload Assistant © 2026 Audionut & wastaken7 — Licensed under UAPL v1.0
-"""Anthelion slots (wiki "Slots", transcribed 2026-10-15)."""
+"""Anthelion slots (wiki "Slots")."""
 
 from collections.abc import Sequence
 from typing import cast
