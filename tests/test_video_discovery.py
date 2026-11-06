@@ -75,3 +75,58 @@ def test_empty_directory_stops_before_scene_or_mediainfo_processing(tmp_path, mo
 
     scene.assert_not_awaited()
     export.assert_not_awaited()
+
+
+def _make_nested_pack(root):
+    """Build a fictional site-rip pack: one root video, two part folders, extras."""
+    files = {
+        "Root.Scene_1080p.mp4": b"root",
+        "Part 1/Alpha.Scene_1080p.mp4": b"alpha",
+        "Part 2/Beta.Scene_1080p.mp4": b"beta",
+        "Part 2/Deeper/Gamma.Scene_1080p.mp4": b"gamma",
+        "Screens/Alpha.Scene.jpg": b"image",
+        "Sample/Alpha.Scene_1080p.mp4": b"sample",
+        "._Part 3/Delta.Scene_1080p.mp4": b"sidecar",
+    }
+    for relative, payload in files.items():
+        path = root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(payload)
+    return root.resolve()
+
+
+def test_recursive_discovery_collects_videos_from_subfolders(tmp_path):
+    root = _make_nested_pack(tmp_path / "Studio Pack")
+
+    video, filelist = asyncio.run(VideoManager().get_video(str(root), recursive=True))
+
+    expected = sorted(str(root / relative) for relative in ("Root.Scene_1080p.mp4", "Part 1/Alpha.Scene_1080p.mp4", "Part 2/Beta.Scene_1080p.mp4", "Part 2/Deeper/Gamma.Scene_1080p.mp4"))
+    assert filelist == expected
+    assert video == expected[0]
+
+
+def test_default_discovery_still_reads_only_the_release_root(tmp_path):
+    root = _make_nested_pack(tmp_path / "Studio Pack")
+
+    assert asyncio.run(VideoManager().get_video(str(root))) == (str(root / "Root.Scene_1080p.mp4"), [str(root / "Root.Scene_1080p.mp4")])
+
+
+def test_recursive_discovery_finds_videos_below_an_empty_root(tmp_path):
+    root = tmp_path / "Studio Pack"
+    nested = root / "Studio 2012-2020 Part 1"
+    nested.mkdir(parents=True)
+    (nested / "Scene_1080p.mp4").write_bytes(b"video")
+
+    assert asyncio.run(VideoManager().get_video(str(root), recursive=True)) == (str((nested / "Scene_1080p.mp4").resolve()), [str((nested / "Scene_1080p.mp4").resolve())])
+
+
+@pytest.mark.parametrize(("category", "recursive"), [("XXX", True), ("MOVIE", False), ("TV", False)])
+def test_only_xxx_scans_subfolders_for_videos(tmp_path, monkeypatch, category, recursive):
+    meta = Meta(path=str(tmp_path), category=category, isdir=True)
+    get_video = AsyncMock(return_value=("", []))
+    monkeypatch.setattr("src.prep_helpers.video_manager.get_video", get_video)
+
+    with pytest.raises(ValueError, match="No video files found"):
+        asyncio.run(process_media_files(SimpleNamespace(), meta, str(tmp_path), {}))
+
+    assert get_video.await_args.kwargs == {"recursive": recursive}

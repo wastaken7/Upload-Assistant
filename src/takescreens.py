@@ -142,6 +142,7 @@ async def _render_xxx_animated_contact_sheet(
     rows: int,
     animation_seconds: float,
     fontfile: str | None,
+    title: str,
     include_title: bool,
     loglevel: str,
 ) -> tuple[int | None, bytes]:
@@ -175,10 +176,51 @@ async def _render_xxx_animated_contact_sheet(
         # hstack/vstack reject a single input, so a one-wide row or one-row sheet skips them.
         rows_streams = [inputs[row * columns] if columns == 1 else ffmpeg.filter(inputs[row * columns : (row + 1) * columns], "hstack", inputs=columns) for row in range(rows)]
         sheet = rows_streams[0] if rows == 1 else ffmpeg.filter(rows_streams, "vstack", inputs=rows)
-        stream = _xxx_contact_sheet_title_filter(sheet, video_path.name, include_title, fontfile)
+        stream = _xxx_contact_sheet_title_filter(sheet, title, include_title, fontfile)
         command = ffmpeg.output(stream, str(output_path), vcodec="libwebp_anim", loop=0, r=8, t=animation_seconds).global_args("-y", "-loglevel", loglevel)
         return_code, _stdout, stderr = await run_ffmpeg(command)
         return return_code, stderr
+
+
+def _select_xxx_contact_sheet_videos(video_paths: list[Path], max_videos: int) -> list[Path]:
+    """Pick up to ``max_videos`` videos, spread across the pack's folders.
+
+    A flat release keeps its first videos. A pack with subfolders takes the
+    videos in turns from each folder, so every part is represented instead of
+    only the first folder. The result keeps the release order.
+    """
+    if len(video_paths) <= max_videos:
+        return video_paths
+
+    folders: dict[Path, list[Path]] = {}
+    for path in video_paths:
+        folders.setdefault(path.parent, []).append(path)
+    if len(folders) == 1:
+        return video_paths[:max_videos]
+
+    selected: set[Path] = set()
+    queues = list(folders.values())
+    while len(selected) < max_videos:
+        for queue in queues:
+            if queue and len(selected) < max_videos:
+                selected.add(queue.pop(0))
+    return [path for path in video_paths if path in selected]
+
+
+def _xxx_contact_sheet_titles(video_paths: list[Path], release_path: str | None) -> dict[Path, str]:
+    """Label each sheet by file name, or by its path in the pack when the videos span folders."""
+    root = Path(release_path) if release_path else None
+    if root is None or len({path.parent for path in video_paths}) <= 1:
+        return {path: path.name for path in video_paths}
+    with contextlib.suppress(OSError):
+        root = root.resolve()
+    titles: dict[Path, str] = {}
+    for path in video_paths:
+        try:
+            titles[path] = path.relative_to(root).as_posix()
+        except ValueError:
+            titles[path] = path.name
+    return titles
 
 
 async def xxx_contact_sheets(paths: list[str], folder_id: str, base_dir: str, meta: Meta, capture_group: str = "main", extra_screens: int = 0) -> list[str]:
@@ -189,7 +231,7 @@ async def xxx_contact_sheets(paths: list[str], folder_id: str, base_dir: str, me
     """
     rows, columns, max_videos = xxx_contact_sheet_settings()
     animated_webp, animation_seconds = xxx_contact_sheet_animation_settings()
-    video_paths = [Path(path) for path in paths if Path(path).is_file()][:max_videos]
+    video_paths = _select_xxx_contact_sheet_videos([Path(path) for path in paths if Path(path).is_file()], max_videos)
     if not video_paths:
         meta.screens = 0
         return []
@@ -207,6 +249,7 @@ async def xxx_contact_sheets(paths: list[str], folder_id: str, base_dir: str, me
         fontfile = _xxx_contact_sheet_fontfile()
         if fontfile is None:
             logger.warning("[yellow]No system font found for XXX contact-sheet labels; generating sheets without labels.[/yellow]")
+        titles = _xxx_contact_sheet_titles(video_paths, meta.path if meta.isdir else None)
         for index, video_path in enumerate(video_paths, start=1):
             output_path = screenshot_dir / f"xxx-contact-sheet-{index}.{'webp' if animated_webp else 'png'}"
             if output_path.exists() and not meta.retake:
@@ -231,12 +274,13 @@ async def xxx_contact_sheets(paths: list[str], folder_id: str, base_dir: str, me
                         rows,
                         animation_seconds,
                         fontfile,
+                        titles[video_path],
                         include_title,
                         loglevel,
                     )
                 else:
                     stream = _xxx_contact_sheet_static_stream(video_path, frame_count, duration, columns, rows, fontfile)
-                    stream = _xxx_contact_sheet_title_filter(stream, video_path.name, include_title, fontfile)
+                    stream = _xxx_contact_sheet_title_filter(stream, titles[video_path], include_title, fontfile)
                     command = ffmpeg.output(stream, str(output_path), vframes=1, compression_level=ffmpeg_compression).global_args("-y", "-loglevel", loglevel)
                     return_code, _stdout, stderr = await run_ffmpeg(command)
                 if return_code != 0 or not output_path.is_file():
