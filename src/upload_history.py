@@ -788,6 +788,76 @@ def _like_pattern(term: str) -> str:
     return f"%{escaped}%"
 
 
+# A search term without a prefix also matches these IDs, whose stored form
+# (tt0123456, movie/42, an ISBN, an ASIN, OL123W) cannot be mistaken for a
+# year or another number; "provider:value" (e.g. tvdb:12345) matches any ID.
+_DISTINCT_ID_PROVIDERS = ("imdb", "tmdb", "isbn", "asin", "openlibrary")
+_ID_SEARCH_ALIASES = {"discogs": ("discogs_release", "discogs_master")}
+
+
+def _id_search_key(value: str) -> str:
+    """Compare IDs without case or hyphens (ISBNs are often written with them)."""
+    return value.strip().replace("-", "").upper()
+
+
+def _id_exists(providers: tuple[str, ...], values: list[str]) -> tuple[str, list[object]]:
+    """Return a clause matching entries with one of ``values`` for one of ``providers``."""
+    if not values:
+        return "0", []
+    provider_marks = ", ".join("?" for _ in providers)
+    value_marks = ", ".join("?" for _ in values)
+    clause = (
+        f"EXISTS (SELECT 1 FROM history_ids i WHERE i.item_id = history_items.id AND i.provider IN ({provider_marks}) AND UPPER(REPLACE(i.value, '-', '')) IN ({value_marks}))"  # noqa: S608
+    )
+    return clause, [*providers, *values]
+
+
+def _plain_id_values(term: str) -> list[str]:
+    """Return the stored forms a search term matches among the distinctive IDs."""
+    key = _id_search_key(term)
+    values = [key] if key else []
+    imdb = _id_number(key) if key.startswith("TT") else 0
+    if imdb and f"TT{imdb:07d}" != key:
+        # tt123456 and tt0123456 are the same title.
+        values.append(f"TT{imdb:07d}")
+    return values
+
+
+def _searched_id_values(provider: str, value: str) -> list[str]:
+    """Return the stored forms of an ID typed after ``provider:``."""
+    key = _id_search_key(value)
+    if not key:
+        return []
+    if provider == "imdb":
+        number = _id_number(key)
+        return [f"TT{number:07d}"] if number else []
+    if provider == "tmdb":
+        kind, separator, number = key.partition("/")
+        if separator:
+            return [f"{kind}/{int(number)}"] if kind in {"MOVIE", "TV"} and number.isdigit() else []
+        return [f"MOVIE/{int(key)}", f"TV/{int(key)}"] if key.isdigit() else []
+    if provider in {"isbn", "asin", "openlibrary"}:
+        return [key]
+    if provider.startswith("discogs"):
+        from src.music.sources import DiscogsEnricher
+
+        reference = DiscogsEnricher.parse_reference(value.strip(), "master" if provider == "discogs_master" else "release")
+        return [reference[1]] if reference else []
+    number = _positive_int(key)
+    return [str(number)] if number else []
+
+
+def _prefixed_id_filter(term: str) -> tuple[str, list[object]] | None:
+    """Return the clause for a ``provider:value`` term, or None when the term has no known provider."""
+    prefix, separator, value = term.partition(":")
+    provider = prefix.lower()
+    if not separator or (provider not in _PROVIDER_LABELS and provider not in _ID_SEARCH_ALIASES):
+        return None
+    providers = _ID_SEARCH_ALIASES.get(provider, (provider,))
+    # A known provider with a malformed ID matches nothing rather than every name containing it.
+    return _id_exists(providers, _searched_id_values(provider, value))
+
+
 def _filters(
     *,
     search: str,
@@ -801,10 +871,17 @@ def _filters(
     clauses: list[str] = []
     parameters: list[object] = []
     for term in search.split()[:10]:
+        prefixed = _prefixed_id_filter(term)
+        if prefixed is not None:
+            clauses.append(prefixed[0])
+            parameters.extend(prefixed[1])
+            continue
         pattern = _like_pattern(term)
-        clauses.append("(" + " OR ".join(f"{column} LIKE ? ESCAPE ?" for column in ("name", "title", "path", "release_group")) + ")")
+        id_clause, id_parameters = _id_exists(_DISTINCT_ID_PROVIDERS, _plain_id_values(term))
+        clauses.append("(" + " OR ".join([*(f"{column} LIKE ? ESCAPE ?" for column in ("name", "title", "path", "release_group")), id_clause]) + ")")
         for _column in range(4):
             parameters.extend([pattern, _LIKE_ESCAPE])
+        parameters.extend(id_parameters)
     if category:
         clauses.append("category = ?")
         parameters.append(category.upper())
