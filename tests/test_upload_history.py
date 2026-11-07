@@ -182,6 +182,29 @@ async def test_items_that_stop_early_keep_their_outcome_and_reason(tmp_path, his
 
 
 @pytest.mark.asyncio
+async def test_an_error_after_the_uploads_keeps_them_and_otherwise_is_an_error(tmp_path, history_on):
+    for tracker_status, outcome in (({"FICT": {"upload_success": True}}, "success"), ({}, "error")):
+        upload_history.begin_item()
+        assert upload_history.item_active()
+        await upload_history.record_item_async(_finished_meta(tmp_path, tracker_status=tracker_status), {}, reason="exception")
+        assert not upload_history.item_active()
+        assert _rows(history_on, "SELECT outcome, reason FROM history_items ORDER BY id DESC LIMIT 1") == [(outcome, "exception")]
+
+
+def test_fingerprint_skips_broken_symlinks(tmp_path):
+    release = tmp_path / "Fictional.Show.S01"
+    _sized(release / "Fictional.Show.S01E01.mkv", 2 * MIB)
+    before = upload_history.content_fingerprint(release)
+    try:
+        (release / "missing.mkv").symlink_to(tmp_path / "nowhere.mkv")
+    except OSError:
+        pytest.skip("symlinks cannot be created here")
+
+    assert before
+    assert upload_history.content_fingerprint(release) == before
+
+
+@pytest.mark.asyncio
 async def test_database_failure_never_breaks_the_upload(tmp_path, monkeypatch):
     def unavailable(*_args, **_kwargs):
         raise sqlite3.OperationalError("disk I/O error")
@@ -291,6 +314,47 @@ def test_listing_filters_paginates_and_counts(history_on):
     second_page = upload_history.list_items(state_dir, limit=1, offset=1)
     assert second_page["total"] == 3
     assert [item["title"] for item in second_page["items"]] == ["Fictional Show"]
+
+
+def _titles(state_dir, search):
+    return sorted(item["title"] for item in upload_history.list_items(state_dir, search=search)["items"])
+
+
+def test_search_finds_entries_by_their_external_ids(history_on):
+    _record(history_on, title="Fictional Movie", ids={"imdb": "tt0123456", "tmdb": "movie/42", "tvdb": "2020"})
+    _record(history_on, name="Fictional Show S01", path="/media/show", title="Fictional Show", category="TV", ids={"tmdb": "tv/42", "tvdb": "777"})
+    _record(history_on, name="Fictional Book", path="/media/book", title="Fictional Book", category="BOOK", ids={"isbn": "978-0-00-000000-1", "asin": "B000FICT01", "openlibrary": "OL1W"})
+    _record(history_on, name="Fictional Album FLAC", path="/media/album", title="Fictional Album", category="MUSIC", ids={"discogs_release": "123", "discogs_master": "45"})
+    state_dir = history_on.parent.parent
+
+    # Distinctive IDs match without a prefix, in any case and with or without padding or hyphens.
+    assert _titles(state_dir, "TT0123456") == _titles(state_dir, "tt123456") == ["Fictional Movie"]
+    assert _titles(state_dir, "movie/42") == ["Fictional Movie"]
+    assert _titles(state_dir, "9780000000001") == _titles(state_dir, "b000fict01") == _titles(state_dir, "ol1w") == ["Fictional Book"]
+    # Bare numbers stay text searches: 2020 is the movie's year in its name, not its TVDB ID.
+    assert _titles(state_dir, "777") == []
+    assert _titles(state_dir, "2020") == ["Fictional Movie"]
+    # A prefix matches any provider, and narrows TMDb to the kind given.
+    assert _titles(state_dir, "tvdb:777") == ["Fictional Show"]
+    assert _titles(state_dir, "TMDB:42") == ["Fictional Movie", "Fictional Show"]
+    assert _titles(state_dir, "tmdb:tv/42") == ["Fictional Show"]
+    assert _titles(state_dir, "imdb:123456") == ["Fictional Movie"]
+    assert _titles(state_dir, "isbn:978-0000000001") == ["Fictional Book"]
+    assert _titles(state_dir, "discogs:45") == _titles(state_dir, "discogs_release:https://www.discogs.com/release/123") == ["Fictional Album"]
+    # Prefixed IDs combine with text terms; a malformed ID matches nothing.
+    assert _titles(state_dir, "fictional tmdb:42") == ["Fictional Movie", "Fictional Show"]
+    assert _titles(state_dir, "imdb:fictional") == []
+    # An unknown prefix is ordinary text.
+    assert _titles(state_dir, "movie:42") == []
+    assert upload_history.export_items(state_dir, search="tvdb:777")[0]["title"] == "Fictional Show"
+    # The Discogs kind in the value is kept; one contradicting the prefix matches nothing.
+    _record(history_on, name="Other Album FLAC", path="/media/other", title="Other Album", category="MUSIC", ids={"discogs_release": "45"})
+    assert _titles(state_dir, "discogs:45") == ["Fictional Album", "Other Album"]
+    assert _titles(state_dir, "discogs:master/45") == _titles(state_dir, "discogs_master:45") == ["Fictional Album"]
+    assert _titles(state_dir, "discogs:https://www.discogs.com/release/45-Other") == ["Other Album"]
+    assert _titles(state_dir, "discogs_release:https://www.discogs.com/master/45") == []
+    # Digits that are not ASCII never reach int().
+    assert _titles(state_dir, "tmdb:²") == _titles(state_dir, "tmdb:tv/²") == []
 
 
 def test_listing_rejects_unknown_filters(history_on):

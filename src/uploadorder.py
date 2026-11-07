@@ -46,4 +46,9 @@ async def run_upload_order(
             async with _bandwidth_slot(bandwidth_control and has_torrent_trackers):
                 await upload_torrents(bandwidth_control)
 
-        await asyncio.gather(upload_usenet(), bandwidth_controlled_torrents())
+        # A failure in one flow waits for the other: it must not keep running
+        # unobserved (a Usenet post would be recorded as failed while it continues).
+        results = await asyncio.gather(upload_usenet(), bandwidth_controlled_torrents(), return_exceptions=True)
+        for result in results:
+            if isinstance(result, BaseException):
+                raise result

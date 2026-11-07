@@ -421,6 +421,10 @@ class Meta:
     regex_secondary_title: str = ""
     # Content fingerprint and the IDs remembered for it by an earlier run (src/upload_history.py).
     release_fingerprint: str = ""
+    # Whether that memory was read in this run, and each field the saved IDs filled
+    # as field -> [value before, value set], so a confirmation edit can undo them.
+    release_memory_loaded: bool = False
+    saved_id_fields: dict[str, list[Any]] = field(default_factory=dict)
     regex_title: str = ""
     regex_year: str = ""
     region: str = ""

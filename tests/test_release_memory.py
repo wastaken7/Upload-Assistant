@@ -1,6 +1,7 @@
 import asyncio
 import sqlite3
 from contextlib import closing
+from types import SimpleNamespace
 
 import pytest
 
@@ -85,7 +86,9 @@ def test_a_successful_upload_confirms_ids_without_a_prompt(tmp_path):
 def test_a_later_unconfirmed_run_keeps_the_confirmed_ids(tmp_path):
     release = _release(tmp_path)
     upload_history.remember_release(_confirmed_meta(release))
-    later = Meta(path=str(release), category="MOVIE", imdb_id=7654321)
+    later = _load(release)
+    later.category, later.imdb_id = "MOVIE", 7654321
+    # A saved answer that no longer fits is dropped when the question is asked.
     later.manual_answers = {"game.platform": "PC"}
 
     upload_history.remember_release(later)
@@ -93,6 +96,18 @@ def test_a_later_unconfirmed_run_keeps_the_confirmed_ids(tmp_path):
 
     assert loaded.saved_ids["imdb"] == "tt1234567"
     assert loaded.manual_answers == {"game.platform": "PC"}
+
+
+def test_answers_survive_an_item_that_stops_before_reading_them(tmp_path):
+    release = _release(tmp_path)
+    upload_history.remember_release(_confirmed_meta(release))
+    stopped = Meta(path=str(release), category="MOVIE")
+    stopped.manual_answers = {"game.platform": "PC"}
+
+    upload_history.remember_release(stopped)
+    upload_history.remember_release(Meta(path=str(release), category="MOVIE"))
+
+    assert _load(release).manual_answers == {"xxx.tags": ["fictional tag"], "game.platform": "PC"}
 
 
 def test_any_id_given_on_the_command_line_disables_saved_ids_and_answer_wins(tmp_path):
@@ -238,3 +253,111 @@ def test_confirmed_ids_replace_ids_found_automatically(tmp_path):
     assert applied == ["IMDb tt1234567", "TMDb movie/42"]
     assert meta.imdb_id is None
     assert meta.imdb_manual == "tt1234567"
+
+
+def _confirmation_edit(meta, **edits):
+    """Re-parse at "Is this correct?" as Args.parse does, then prepare the release again."""
+    meta.tmdb_manual = meta.tmdb_id = meta.imdb_id = None
+    meta.tmdb_manual_category = ""
+    for key, value in edits.items():
+        setattr(meta, key, value)
+    asyncio.run(upload_history.load_release_memory(meta))
+    return upload_history.apply_saved_ids(meta)
+
+
+def _tv_meta_with_saved_ids(tmp_path):
+    release = _release(tmp_path, "Fictional.Show.S01")
+    upload_history.remember_release(_confirm(Meta(path=str(release), category="TV", imdb_id=1, tmdb_id=2, tvdb_id=3)))
+    meta = _load(release)
+    meta.category = "TV"
+    upload_history.apply_saved_ids(meta)
+    # The metadata search copies the manual TVDB ID.
+    meta.tvdb_id = int(meta.tvdb_manual)
+    return meta
+
+
+def test_an_edit_without_ids_applies_the_saved_ids_again(tmp_path):
+    meta = _tv_meta_with_saved_ids(tmp_path)
+
+    assert _confirmation_edit(meta, tag="-FICT") == ["IMDb tt0000001", "TMDb tv/2", "TVDB 3"]
+    assert (meta.imdb_manual, meta.tmdb_manual, meta.tvdb_manual) == ("tt0000001", 2, "3")
+
+
+@pytest.mark.parametrize("edits", [{"tmdb_manual": 99, "tmdb_manual_category": "TV"}, {"no_saved_ids": True}])
+def test_an_id_or_no_saved_ids_in_an_edit_drops_the_saved_ids(tmp_path, edits):
+    meta = _tv_meta_with_saved_ids(tmp_path)
+    expected_tmdb = edits.get("tmdb_manual")
+
+    assert _confirmation_edit(meta, **edits) == []
+    assert (meta.imdb_manual, meta.tvdb_manual, meta.tvdb_id) == (None, None, None)
+    assert meta.tmdb_manual == expected_tmdb
+
+
+def test_an_edit_keeps_an_id_given_in_place_of_a_saved_one(tmp_path):
+    meta = _tv_meta_with_saved_ids(tmp_path)
+
+    assert _confirmation_edit(meta, tvdb_manual="77") == []
+    assert (meta.tvdb_manual, meta.imdb_manual) == ("77", None)
+
+
+def test_a_steam_id_given_disables_the_saved_igdb_id(tmp_path):
+    release = _release(tmp_path, "Fictional Game")
+    upload_history.remember_release(_confirm(Meta(path=str(release), category="GAME", igdb_id=12)))
+
+    meta = _load(release, steam_manual="34")
+    meta.category = "GAME"
+
+    assert upload_history.apply_saved_ids(meta) == []
+    assert not meta.igdb_manual
+
+
+def test_saved_book_ids_reach_the_isbn_and_asin_lookups(tmp_path):
+    release = _release(tmp_path, "Fictional Audiobook")
+    upload_history.remember_release(_confirm(Meta(path=str(release), category="BOOK", isbn="9780000000002", asin="B000000000")))
+
+    meta = _load(release)
+    meta.category = "BOOK"
+    upload_history.apply_saved_ids(meta)
+
+    assert (meta.book_isbn, meta.isbn, meta.book_asin, meta.asin) == ("9780000000002", "9780000000002", "B000000000", "B000000000")
+
+
+def test_discogs_ids_come_from_the_music_release_or_normalized_arguments():
+    matched = Meta(category="MUSIC", music_release={"external_ids": {"discogs_release": "123", "discogs_master": "45"}})
+    from_url = Meta(category="MUSIC", music_discogs_id="https://www.discogs.com/master/678-Fictional-Album")
+
+    assert upload_history.external_ids(matched) == {"discogs_release": "123", "discogs_master": "45"}
+    assert upload_history.external_ids(from_url) == {"discogs_master": "678"}
+    assert upload_history.external_ids(Meta(category="MUSIC", music_discogs_release_id="not an id")) == {}
+
+
+def test_saved_discogs_ids_are_labelled(tmp_path):
+    release = _release(tmp_path, "Fictional Album")
+    upload_history.remember_release(_confirm(Meta(path=str(release), category="MUSIC", music_release={"external_ids": {"discogs_release": "123"}})))
+
+    meta = _load(release)
+    meta.category = "MUSIC"
+
+    assert upload_history.apply_saved_ids(meta) == ["Discogs release 123"]
+    assert meta.music_discogs_release_id == "123"
+
+
+def test_an_id_given_again_in_an_edit_is_kept_with_no_saved_ids(tmp_path):
+    meta = _tv_meta_with_saved_ids(tmp_path)
+    parser = SimpleNamespace(_actions=[SimpleNamespace(dest="tmdb_manual", option_strings=["-tmdb", "--tmdb"])])
+    # Args.parse clears the TMDb ID, then sets the one given: the same as the saved one.
+    meta.imdb_id = None
+    meta.tmdb_manual, meta.tmdb_manual_category, meta.no_saved_ids = 2, "TV", True
+
+    upload_history.keep_given_ids(meta, parser, ["--tag", "FICT", "--tmdb", "tv/2", "--no-saved-ids"])
+    asyncio.run(upload_history.load_release_memory(meta))
+
+    assert upload_history.apply_saved_ids(meta) == []
+    assert (meta.tmdb_manual, meta.tmdb_manual_category) == (2, "TV")
+    assert (meta.imdb_manual, meta.tvdb_manual) == (None, None)
+
+
+def test_discogs_arguments_do_not_join_the_selected_release():
+    meta = Meta(category="MUSIC", music_discogs_master_id="45", music_release={"external_ids": {"discogs_release": "123"}})
+
+    assert upload_history.external_ids(meta) == {"discogs_release": "123"}

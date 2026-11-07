@@ -125,8 +125,11 @@ const TrackerFavicon = ({ tracker, className = "h-4 w-4" }) => {
   );
 };
 
+// Links come from stored tracker data; only web pages are opened.
+const isWebLink = (href) => typeof href === "string" && /^https?:\/\//i.test(href);
+
 const ExternalLink = ({ href, children, className = "" }) =>
-  href ? (
+  isWebLink(href) ? (
     <a
       href={href}
       target="_blank"
@@ -1250,7 +1253,8 @@ function HistoryApp() {
                 type="search"
                 value={searchInput}
                 onChange={(event) => setSearchInput(event.target.value)}
-                placeholder="Search name, title, group or path"
+                placeholder="Search name, title, group, path or ID"
+                aria-describedby="history-search-help"
                 className="ua-stats-control w-full rounded-xl pl-9 pr-3 text-sm"
               />
             </label>
@@ -1322,6 +1326,11 @@ function HistoryApp() {
               />
             </label>
           </div>
+          <p id="history-search-help" className="mt-2 text-xs opacity-60">
+            IMDb (tt0123456), TMDb (movie/42), ISBN, ASIN and Open Library IDs
+            match as typed. For other IDs, put the provider first: tvdb:12345,
+            tmdb:42, tvmaze:, mal:, douban:, igdb:, discogs:.
+          </p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <div
               className="ua-stats-period-group flex flex-wrap items-center rounded-xl p-1"
