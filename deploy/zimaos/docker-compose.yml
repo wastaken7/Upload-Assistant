@@ -11,8 +11,8 @@ services:
     restart: unless-stopped
     network_mode: bridge
     environment:
-      PUID: $PUID
-      PGID: $PGID
+      PUID: ${PUID:-1000}
+      PGID: ${PGID:-1000}
       TZ: $TZ
       UA_BROWSE_ROOTS: /data/torrents,/state/tmp
       XDG_CONFIG_HOME: /state/config
@@ -22,7 +22,9 @@ services:
         protocol: tcp
     volumes:
       - type: bind
-        source: /DATA/AppData/$AppID
+        # A fixed folder: if AppID were empty, /DATA/AppData itself would be
+        # mounted and the entrypoint would change the owner of every app's files.
+        source: /DATA/AppData/upload-assistant
         target: /state
         bind:
           create_host_path: true
