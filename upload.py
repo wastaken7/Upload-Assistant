@@ -3384,7 +3384,13 @@ async def do_the_thing(base_dir: str) -> None:
                     trackers = [t for t in cast(list[Any], meta.trackers) if isinstance(t, str)]
                     logger.debug(f"[cyan]Using trackers for request search: {trackers}[/cyan]")
                 webui_events.stage("requests", "start")
-                await tracker_setup.tracker_request(meta, trackers)
+                try:
+                    await tracker_setup.tracker_request(meta, trackers)
+                except Exception:
+                    # The uploads already happened; keep them in the history before the error ends the run.
+                    webui_events.stage("requests", "fail")
+                    await upload_history.record_item_async(meta, tracker_class_map)
+                    raise
                 webui_events.stage("requests", "done")
 
             webui_events.publish_tracker_statuses(meta.tracker_status, final=True)
