@@ -361,3 +361,16 @@ def test_discogs_arguments_do_not_join_the_selected_release():
     meta = Meta(category="MUSIC", music_discogs_master_id="45", music_release={"external_ids": {"discogs_release": "123"}})
 
     assert upload_history.external_ids(meta) == {"discogs_release": "123"}
+
+
+def test_confirmed_xxx_metadata_ids_are_reused(tmp_path):
+    release = _release(tmp_path, "Fictional.Studio.26.01.02.Fictional.Scene.XXX")
+    meta = _confirm(Meta(path=str(release), category="XXX", tpdb_id="scenes/00000000-0000-4000-8000-000000000001", blvckout_id="4242"))
+    assert upload_history.remember_release(meta) is True
+
+    loaded = _load(release)
+    loaded.category = "XXX"
+    applied = upload_history.apply_saved_ids(loaded)
+
+    assert (loaded.tpdb_manual, loaded.blvckout_manual) == ("scenes/00000000-0000-4000-8000-000000000001", "4242")
+    assert applied == ["ThePornDB scenes/00000000-0000-4000-8000-000000000001", "BLVCKOUT 4242"]

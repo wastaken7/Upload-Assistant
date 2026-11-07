@@ -24,7 +24,7 @@ from src.audible import build_audible_author_url, resolve_audible_url
 from src.bbcode import BBCODE
 from src.bluray_com import ensure_release_subheader
 from src.console import logger
-from src.description_languages import COMMON_LABELS, GAME_LABELS, MUSIC_LABELS, get_book_labels, get_labels
+from src.description_languages import COMMON_LABELS, GAME_LABELS, MUSIC_LABELS, XXX_LABELS, get_book_labels, get_labels
 from src.description_review import apply_saved_draft
 from src.languages import languages_manager
 from src.mediainfo import MediaInfo
@@ -996,6 +996,38 @@ class DescriptionBuilder:
         desc_parts.append("[/center]\n")
         return "".join(desc_parts)
 
+    def _build_xxx_desc_section(self, meta: Meta, max_tags: int = 30) -> str:
+        """Studio, date, performers, tags, runtime and synopsis of an XXX release."""
+        if meta.category != "XXX":
+            return ""
+        labels = get_labels(XXX_LABELS, self.language)
+        release = meta.xxx_match if isinstance(meta.xxx_match, dict) else {}
+        rows: list[tuple[str, str]] = []
+        if meta.publisher:
+            rows.append((labels["studio"], _safe_game_field(meta.publisher)))
+        network = _safe_game_field(release.get("network"))
+        if network and network.casefold() != str(meta.publisher or "").casefold():
+            rows.append((labels["network"], network))
+        if re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(meta.release_date or "")):
+            rows.append((labels["release_date"], meta.release_date))
+        if meta.cast:
+            rows.append((labels["performers"], ", ".join(_safe_game_field(name) for name in meta.cast)))
+        tags = [_safe_game_field(tag) for tag in meta.keywords or [] if _safe_game_field(tag)]
+        if tags:
+            rows.append((labels["tags"], ", ".join(tags[:max_tags])))
+        # A runtime describes one video; packs have none.
+        if meta.video_duration and len(meta.filelist or []) <= 1:
+            rows.append((labels["duration"], f"{int(meta.video_duration)} {labels['minutes']}"))
+        overview = _clean_description_text(re.sub(r"<[^>]+>", "", str(meta.overview or ""))).strip()
+        if not rows and not overview:
+            return ""
+        parts: list[str] = []
+        if rows:
+            parts.append("\n".join(f"[b]{label}:[/b] {value}" for label, value in rows))
+        if overview:
+            parts.append(f"[b]{labels['synopsis']}[/b]\n{overview.replace('[', '(').replace(']', ')')}")
+        return "[center]" + "\n\n".join(parts) + "[/center]"
+
     def _build_book_desc_section(self, meta: Meta, table: bool = True, underline: bool = False, bullet: str = "") -> str:
         """Build the BBCode table or list for BOOK-category uploads."""
         if self.tracker in ("TORRENTLEECH", "IMMORTALSEED", "IPTORRENTS", "SPEEDAPP"):
@@ -1714,6 +1746,7 @@ class DescriptionBuilder:
         ua_signature: bool = True,  # ci: ua_signature v4.9
         user_description: bool = True,
         music: bool = True,
+        xxx: bool = True,
         dynamic_hdr_plot: bool = True,
         approved_image_hosts: list[str] | None = None,
         signature: str = "",  # ci: ua_signature v4.9
@@ -1840,6 +1873,12 @@ class DescriptionBuilder:
             game_section = self._build_game_desc_section(meta)
             if game_section:
                 desc_parts.append(game_section)
+
+        # XXX details: studio, performers, tags, synopsis
+        if xxx and meta.category == "XXX":
+            xxx_section = self._build_xxx_desc_section(meta)
+            if xxx_section:
+                desc_parts.append(xxx_section)
 
         # Music details
         if music and meta.category == "MUSIC":

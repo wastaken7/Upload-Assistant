@@ -45,7 +45,12 @@ def test_bitporn_resolution_mapping() -> None:
 
     assert asyncio.run(bitporn.get_resolution_id(meta)) == {"resolution_id": "18"}  # noqa: S101
     assert asyncio.run(bitporn.get_resolution_id(meta, "2048p")) == {"resolution_id": "14"}  # noqa: S101
-    assert asyncio.run(bitporn.get_resolution_id(meta, "1080i")) == {"resolution_id": "11"}  # noqa: S101
+    assert asyncio.run(bitporn.get_resolution_id(meta, "1080i")) == {"resolution_id": "13"}  # noqa: S101
+    assert asyncio.run(bitporn.get_resolution_id(meta, "1440p")) == {"resolution_id": "20"}  # noqa: S101
+    # VR frames: BitPorn uploaders list 2880p as 6K and 4096p as 8K.
+    assert asyncio.run(bitporn.get_resolution_id(meta, "2880p")) == {"resolution_id": "15"}  # noqa: S101
+    assert asyncio.run(bitporn.get_resolution_id(meta, "4096p")) == {"resolution_id": "16"}  # noqa: S101
+    assert asyncio.run(bitporn.get_resolution_id(Meta(category="XXX", resolution="OTHER"))) == {"resolution_id": "11"}  # noqa: S101
 
 
 def test_bitporn_uses_its_image_upload_contract(tmp_path: Path) -> None:
@@ -74,3 +79,34 @@ def test_bitporn_uses_its_image_upload_contract(tmp_path: Path) -> None:
     assert "torrent-banner" not in files  # noqa: S101
     assert "[upimg1]" in data["description"]  # noqa: S101
     assert data["description_image_widths[1]"] == "450"  # noqa: S101
+
+
+def _category(meta: Meta) -> str:
+    bitporn = tracker()
+    names = {value: name for name, value in bitporn.category_ids.items()}
+    return names[asyncio.run(bitporn.get_category_id(meta))["category_id"]]
+
+
+def _match(**values: object) -> dict[str, object]:
+    return {"provider": "tpdb", "kind": "scenes", "id": "1", "title": "Fictional Scene", **values}
+
+
+def test_bitporn_category_follows_the_release_format() -> None:
+    # Format beats genre words in the name: a VR scene or a pack is listed as such.
+    assert _category(Meta(category="XXX", basename_no_ext="[ExampleVR.com] Jane Example - Big Tits Day 8K")) == "VR"  # noqa: S101
+    assert _category(Meta(category="XXX", basename_no_ext="ExampleStudio.2025.36Clips.XXX.HEVC")) == "Collection"  # noqa: S101
+    videos = [f"C:/fake/clip{index}.mp4" for index in range(3)]
+    assert _category(Meta(category="XXX", basename_no_ext="Jane Example videos", filelist=videos)) == "Collection"  # noqa: S101
+    assert _category(Meta(category="XXX", basename_no_ext="Example Feature 13 XXX WEB-DL", xxx_match=_match(kind="movies"))) == "Movie"  # noqa: S101
+    assert _category(Meta(category="XXX", basename_no_ext="ABCD-123", xxx_match=_match(kind="jav"))) == "Asian"  # noqa: S101
+    assert _category(Meta(category="XXX", basename_no_ext="Jane Example clip", xxx_match=_match(studio="Jane Example", network="Manyvids"))) == "Fansite"  # noqa: S101
+    assert _category(Meta(category="XXX", basename_no_ext="[ExampleJapanHD] 26.01.02 Jane Example", xxx_match=_match(studio="ExampleJapanHD"))) == "Asian"  # noqa: S101
+
+
+def test_bitporn_category_uses_who_is_in_the_scene_not_the_acts() -> None:
+    lesbian = Meta(category="XXX", basename_no_ext="ExampleStudio.26.01.02.Jane.Example", keywords=["Deep Throat", "Lesbian", "Anal"])
+    acts_only = Meta(category="XXX", basename_no_ext="ExampleStudio.26.01.02.Jane.Example", keywords=["Deep Throat", "Anal", "Creampie"])
+
+    assert _category(lesbian) == "Lesbian"  # noqa: S101
+    # Acts are subjective as the main genre; Uncategorized is better than a guess.
+    assert _category(acts_only) == "Uncategorized"  # noqa: S101

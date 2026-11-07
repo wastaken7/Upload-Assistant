@@ -694,6 +694,15 @@ class Args:
         )
         parser.add_argument("-igdb", "--igdb", nargs=1, required=False, help="IGDB ID", type=str, dest="igdb_manual")
         parser.add_argument("-steam", "--steam", nargs=1, required=False, help="Steam App ID or URL", type=str, dest="steam_manual")
+        parser.add_argument(
+            "--tpdb",
+            nargs=1,
+            required=False,
+            help="ThePornDB scene or movie ID or link for an XXX release (e.g. scenes/ID or movies/ID)",
+            type=str,
+            dest="tpdb_manual",
+        )
+        parser.add_argument("--blvckout", nargs=1, required=False, help="BLVCKOUT release ID or link for an XXX movie", type=str, dest="blvckout_manual")
         parser.add_argument("-g", "--tag", nargs="*", required=False, help="Group Tag", type=str)
         parser.add_argument("-serv", "--service", nargs="*", required=False, help="Streaming Service", type=str)
         parser.add_argument("-dist", "--distributor", nargs="*", required=False, help="Disc Distributor e.g.(Criterion, BFI, etc.)", type=str)

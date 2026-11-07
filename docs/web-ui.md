@@ -427,7 +427,7 @@ Search matches the release name, title, release group, and path, and the release
 
 ### Saved IDs and answers
 
-Upload Assistant also remembers, per release, the external IDs you confirmed and the answers you gave to its questions (for example, adult tags or a game's platform). The next time the same release is processed, even from a renamed folder or after its `tmp` folder was deleted, those IDs are used as if they had been passed with `--imdb`, `--tmdb`, `--tvdb`, `--tvmaze`, `--mal`, `--douban`, `--igdb`, the Discogs options, `--isbn`, `--asin`, or `--openlibrary`, and the answers are not asked again. The log names each reused ID.
+Upload Assistant also remembers, per release, the external IDs you confirmed and the answers you gave to its questions (for example, adult tags or a game's platform). The next time the same release is processed, even from a renamed folder or after its `tmp` folder was deleted, those IDs are used as if they had been passed with `--imdb`, `--tmdb`, `--tvdb`, `--tvmaze`, `--mal`, `--douban`, `--igdb`, the Discogs options, `--isbn`, `--asin`, `--openlibrary`, `--tpdb`, or `--blvckout`, and the answers are not asked again. The log names each reused ID.
 
 - A release is recognised by the relative paths and sizes of its files (files under 1 MiB, such as NFOs, are ignored when larger files exist), so adding or replacing a media file makes it a new release.
 - IDs are remembered only after you answer **yes** to "Is this correct?", or after an upload with them succeeds. IDs found automatically in an unattended run that uploaded nothing, or found after the confirmation (for example by tracker checks) in a run that uploaded nothing, are not remembered. A confirmed run without any IDs keeps the ones saved earlier.

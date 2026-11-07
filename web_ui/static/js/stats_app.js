@@ -241,6 +241,8 @@ const CACHE_PROVIDER_LABELS = {
   myanonamouse: "MyAnonamouse",
   musicbrainz: "MusicBrainz",
   discogs: "Discogs",
+  tpdb: "ThePornDB",
+  blvckout: "BLVCKOUT",
   audible: "Audible",
 };
 const formatCacheProvider = (value) => {

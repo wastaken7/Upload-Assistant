@@ -522,6 +522,7 @@ const DEFAULT_WORKFLOW_GROUPS = [
       "ARR INTEGRATION",
       "METADATA CACHING",
       "MUSIC METADATA",
+      "XXX METADATA",
     ],
   },
   {
@@ -666,6 +667,8 @@ const METADATA_CACHE_SERVICE_LABELS = {
   myanonamouse: "MyAnonamouse",
   musicbrainz: "MusicBrainz",
   discogs: "Discogs",
+  tpdb: "ThePornDB",
+  blvckout: "BLVCKOUT",
 };
 
 const METADATA_CACHE_SERVICE_GROUPS = [
@@ -679,6 +682,7 @@ const METADATA_CACHE_SERVICE_GROUPS = [
     services: ["google_books", "openlibrary", "myanonamouse"],
   },
   { label: "Music", services: ["musicbrainz", "discogs"] },
+  { label: "Adult", services: ["tpdb", "blvckout"] },
 ];
 
 const CONFIG_HEADING_LABELS = {
@@ -691,6 +695,7 @@ const CONFIG_HEADING_LABELS = {
   "CLIENT SELECTION": "Client Selection",
   "METADATA CACHING": "Metadata Caching",
   "MUSIC METADATA": "Music Metadata",
+  "XXX METADATA": "XXX Metadata",
   "TRACKER SEARCH AND IMPORT": "Tracker Search and Import",
   "PROWLARR CREDENTIAL FALLBACK": "Prowlarr Credential Fallback",
   "IMAGE HOSTING": "Image Hosting",
@@ -978,6 +983,10 @@ const DISPLAY_LABEL_OVERRIDES = {
   utppm_api: "UTPPM API Key",
   zipline_api_key: "Zipline API Key",
   ggn_api_key: "GazelleGames API Key",
+  tpdb_api_key: "ThePornDB API Key",
+  blvckout_api_key: "BLVCKOUT API Key",
+  xxx_metadata_lookup: "Look Up XXX Metadata",
+  xxx_generate_names: "Name Non-Scene XXX Releases",
   audible_domain: "Audible Marketplace Domain",
   ffmpeg_path: "FFmpeg",
   ffprobe_path: "FFprobe",
@@ -1191,6 +1200,16 @@ const INLINE_FIELD_HELP = {
     href: "https://console.cloud.google.com/apis/library/books.googleapis.com",
     linkLabel: "Open Google Cloud",
     linkOnNewLine: true,
+  },
+  tpdb_api_key: {
+    description:
+      "Create a ThePornDB API token for XXX scene and movie metadata: title, studio, performers, tags, synopsis, cover and banner.",
+    href: "https://theporndb.net/register",
+    linkLabel: "Sign up at ThePornDB",
+    linkOnNewLine: true,
+  },
+  blvckout_api_key: {
+    description: "A BLVCKOUT API key with read permission, for XXX movie metadata.",
   },
   twitch_client_id: {
     description:

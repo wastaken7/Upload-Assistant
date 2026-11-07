@@ -70,6 +70,11 @@ config: dict[str, Any] = {
         # Obtain them from the Twitch Developer Console: https://dev.twitch.tv/console.
         "twitch_client_id": "",
         "twitch_client_secret": "",
+        # ThePornDB API token for XXX metadata (title, studio, performers, tags, synopsis, cover and banner).
+        # Leave blank to disable. Sign up at https://theporndb.net/register, then create an API token in your account.
+        "tpdb_api_key": "",
+        # BLVCKOUT read API key for XXX movie metadata. Leave blank to disable.
+        "blvckout_api_key": "",
         # MyAnonamouse (MAM) API key or session cookie (mam_id). Leave blank to disable.
         # Find it under Preferences > Security > View IP locked session cookie.
         "mam_api_key": "",
@@ -178,6 +183,9 @@ config: dict[str, Any] = {
             "gazellegames": {"enabled": True, "ttl_hours": 24},
             # Music release metadata; it also uses 30 days because it changes rarely.
             "musicbrainz": {"enabled": True, "ttl_hours": 720},
+            # XXX scene and movie metadata from ThePornDB and BLVCKOUT.
+            "tpdb": {"enabled": True, "ttl_hours": 168},
+            "blvckout": {"enabled": True, "ttl_hours": 168},
             "discogs": {"enabled": True, "ttl_hours": 720},
         },
         # Tracker-ID metadata cache
@@ -203,6 +211,13 @@ config: dict[str, Any] = {
         # lookups are bounded and read-only; this token raises Discogs API
         # limits but is never written to release metadata or logs.
         "music_discogs_token": "",
+        # --- XXX METADATA ---
+        # Look up XXX releases on ThePornDB and BLVCKOUT (needs tpdb_api_key or blvckout_api_key).
+        # A result is used without asking only when it clearly is the release; otherwise you choose.
+        "xxx_metadata_lookup": True,
+        # Name a release whose filename is not scene-style (such as "clip_0123.mp4") from its match:
+        # Studio.YY.MM.DD.Performer.Title.XXX.1080p.MP4. Scene-style names are always kept.
+        "xxx_generate_names": True,
         # --- TRACKER SEARCH AND IMPORT ---
         # Skip automatic searches for matching torrents in configured clients.
         # When False, Upload Assistant reuses matching hashes and searches supported trackers.

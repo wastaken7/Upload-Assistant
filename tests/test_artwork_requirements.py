@@ -424,3 +424,26 @@ async def test_prompt_music_meta_offers_conflicting_years_in_the_web_ui() -> Non
     assert context["summary"]["Album"] == "Test Album"
     assert context["actions"] == [("", "Keep 2026"), ("2019", "2019")]
     assert "file tag" in context["hint"]
+
+
+@pytest.mark.asyncio
+async def test_provider_poster_and_banner_links_are_downloaded(tmp_path: Path) -> None:
+    source = tmp_path / "source.jpg"
+    Image.new("RGB", (64, 32), "blue").save(source)
+    meta = Meta(
+        base_dir=str(tmp_path),
+        uuid="xxx-artwork",
+        category="XXX",
+        artwork_download_url="https://cdn.example/poster?sig=1",
+        artwork_banner_url="https://cdn.example/banner.jpg",
+    )
+    download = AsyncMock(return_value=source.read_bytes())
+
+    with patch("src.artwork.is_public_http_url", return_value=True), patch("src.artwork.download_public_image", new=download):
+        await prepare_artwork(meta)
+
+    assert [call.args[0] for call in download.await_args_list] == ["https://cdn.example/poster?sig=1", "https://cdn.example/banner.jpg"]
+    assert Path(meta.artwork_path).is_file()
+    assert meta.artwork_banner_path and Path(meta.artwork_banner_path).is_file()
+    # A link only meant for downloading is never published.
+    assert meta.artwork_url == ""

@@ -68,6 +68,8 @@ def test_supported_categories(category: str, kept: bool) -> None:
         ({"basename_no_ext": "Fakestudio.Some.Scene.XXX", "keywords": ["VR"], "resolution": "OTHER", "video_height": 4096}, 24),
         ({"basename_no_ext": "Fakestudio.Some.Movie.XXX.VR", "resolution": "2160p"}, 15),
         ({"basename_no_ext": "Fakestudio.SiteRip.XXX.1080p", "resolution": "1080p"}, 26),
+        ({"basename_no_ext": "Fakestudio.2025.36Clips.XXX.HEVC.x265", "resolution": "720p"}, 26),
+        ({"basename_no_ext": "[SiteRip] Fake Studio [2021-2025]", "resolution": "1080p"}, 26),
     ],
 )
 def test_category_id(values: dict[str, Any], expected: int) -> None:

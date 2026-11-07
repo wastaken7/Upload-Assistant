@@ -221,6 +221,31 @@ MUSIC_LABELS = {
     },
 }
 
+XXX_LABELS = {
+    "en": {
+        "details": "Details",
+        "studio": "Studio",
+        "network": "Network",
+        "release_date": "Release Date",
+        "performers": "Performers",
+        "tags": "Tags",
+        "duration": "Duration",
+        "minutes": "min",
+        "synopsis": "Synopsis",
+    },
+    "pt-BR": {
+        "details": "Detalhes",
+        "studio": "Estúdio",
+        "network": "Rede",
+        "release_date": "Data de Lançamento",
+        "performers": "Elenco",
+        "tags": "Tags",
+        "duration": "Duração",
+        "minutes": "min",
+        "synopsis": "Sinopse",
+    },
+}
+
 COMMON_LABELS = {
     "en": {
         "audio_languages": "Audio Language/s",
