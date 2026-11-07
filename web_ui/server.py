@@ -4731,6 +4731,7 @@ def history_api():
 
 
 @app.route("/api/history/export")
+@limiter.limit("120 per hour", key_func=_rate_limit_key_func, override_defaults=True)
 def history_export_api():
     """Download every history entry matching the list filters as CSV or JSON."""
     error = _history_request_error()
