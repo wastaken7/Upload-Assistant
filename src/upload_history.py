@@ -11,6 +11,8 @@ record for the person running Upload Assistant, enabled by default through
 from __future__ import annotations
 
 import asyncio
+import csv
+import io
 import json
 import os
 import sqlite3
@@ -19,7 +21,7 @@ import time
 from collections.abc import Mapping
 from contextlib import closing
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from hashlib import sha256
 from pathlib import Path
 from typing import Any, cast
@@ -37,6 +39,7 @@ MAX_REQUESTS_PER_ITEM = 100
 OUTCOMES = ("success", "error", "no_upload", "skipped")
 
 _enabled = True
+_retention_days = 0
 _state_lock = threading.Lock()
 _record_lock = threading.Lock()
 
@@ -63,8 +66,9 @@ def history_enabled(config: Mapping[str, Any] | None) -> bool:
 
 
 def configure_history(config: Mapping[str, Any] | None) -> None:
-    global _enabled
+    global _enabled, _retention_days
     _enabled = history_enabled(config)
+    _retention_days = history_retention_days(config)
 
 
 def _tracker_key(value: object) -> str:
@@ -558,6 +562,8 @@ async def record_item_async(meta: Any, tracker_class_map: Mapping[str, Any], *, 
         record = await asyncio.to_thread(build_item_record, meta, tracker_class_map, outcome=outcome, reason=reason)
         if record is not None:
             await asyncio.to_thread(record_item, record)
+            if _retention_days:
+                await asyncio.to_thread(prune_history, _retention_days)
     except Exception as exc:
         logger.debug(f"Upload history was not saved: {exc}")
     finally:
@@ -830,3 +836,132 @@ def clear_history(state_dir: str | Path | None = None) -> int:
         return 0
     with _record_lock, closing(connect_app_db(path)) as db, db:
         return db.execute("DELETE FROM history_items").rowcount
+
+
+# Export and retention -----------------------------------------------------------
+
+EXPORT_MAX_ITEMS = 100_000
+EXPORT_CSV_COLUMNS = (
+    "finished_at",
+    "name",
+    "title",
+    "year",
+    "category",
+    "release_type",
+    "resolution",
+    "release_group",
+    "season",
+    "episode",
+    "size",
+    "outcome",
+    "reason",
+    "source",
+    "path",
+    "ids",
+    "trackers",
+    "links",
+    "requests",
+)
+# A spreadsheet runs a cell starting with these as a formula; names and
+# messages come from release folders and trackers, so they are neutralized.
+_FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
+
+
+def export_items(
+    state_dir: str | Path | None = None,
+    *,
+    search: str = "",
+    category: str = "",
+    tracker: str = "",
+    tracker_status: str = "",
+    outcome: str = "",
+    has_requests: bool = False,
+    after: str = "",
+    before: str = "",
+) -> list[dict[str, Any]]:
+    """Return every entry matching the filters (newest first, at most EXPORT_MAX_ITEMS) with all details."""
+    if outcome and outcome not in OUTCOMES:
+        raise ValueError(f"outcome must be one of: {', '.join(OUTCOMES)}")
+    clauses, parameters = _filters(
+        search=search,
+        category=category,
+        tracker=tracker,
+        tracker_status=tracker_status,
+        has_requests=has_requests,
+        after=after,
+        before=before,
+    )
+    if outcome:
+        clauses.append("outcome = ?")
+        parameters.append(outcome)
+    path = database_path(state_dir)
+    if not database_available(path):
+        return []
+    where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+    selected = f"SELECT id FROM history_items {where} ORDER BY finished_at DESC, id DESC LIMIT {EXPORT_MAX_ITEMS}"  # noqa: S608
+    with closing(connect_app_db(path)) as db:
+        rows = db.execute(
+            f"SELECT {', '.join(_ITEM_COLUMNS)} FROM history_items WHERE id IN ({selected}) ORDER BY finished_at DESC, id DESC",  # noqa: S608
+            parameters,
+        ).fetchall()
+        items = [_row_dict(_ITEM_COLUMNS, row) for row in rows]
+        by_id = {item["id"]: item for item in items}
+        for item in items:
+            item.update(ids={}, trackers=[], requests=[])
+        for item_id, provider, value in db.execute(f"SELECT item_id, provider, value FROM history_ids WHERE item_id IN ({selected}) ORDER BY provider", parameters):  # noqa: S608
+            by_id[item_id]["ids"][provider] = value
+        for item_id, name, status, message, link, torrent_id, duration in db.execute(
+            f"SELECT item_id, tracker, status, message, link, torrent_id, duration FROM history_trackers WHERE item_id IN ({selected}) ORDER BY tracker",  # noqa: S608
+            parameters,
+        ):
+            by_id[item_id]["trackers"].append({"tracker": name, "status": status, "message": message, "link": link, "torrent_id": torrent_id, "duration": duration})
+        for item_id, name, request_name, link, reward, status, exact in db.execute(
+            f"SELECT item_id, tracker, name, link, reward, status, exact FROM history_requests WHERE item_id IN ({selected}) ORDER BY id",  # noqa: S608
+            parameters,
+        ):
+            by_id[item_id]["requests"].append({"tracker": name, "name": request_name, "link": link, "reward": reward, "status": status, "exact": bool(exact)})
+    return items
+
+
+def _csv_cell(value: object) -> str:
+    text = "" if value is None else str(value)
+    return f"'{text}" if text.startswith(_FORMULA_PREFIXES) else text
+
+
+def export_csv(items: list[dict[str, Any]]) -> str:
+    """Render exported entries as CSV, one row per entry, with list fields joined by "; "."""
+    buffer = io.StringIO()
+    writer = csv.writer(buffer, lineterminator="\n")
+    writer.writerow(EXPORT_CSV_COLUMNS)
+    for item in items:
+        flattened = {
+            **item,
+            "ids": "; ".join(f"{provider}={value}" for provider, value in item["ids"].items()),
+            "trackers": "; ".join(f"{tracker['tracker']}={tracker['status']}" for tracker in item["trackers"]),
+            "links": "; ".join(f"{tracker['tracker']}={tracker['link']}" for tracker in item["trackers"] if tracker["link"]),
+            "requests": "; ".join(f"{request['tracker']}: {request['name']}" + (f" ({request['reward']})" if request["reward"] else "") for request in item["requests"]),
+        }
+        writer.writerow([_csv_cell(flattened.get(column)) for column in EXPORT_CSV_COLUMNS])
+    return buffer.getvalue()
+
+
+def history_retention_days(config: Mapping[str, Any] | None) -> int:
+    """Days entries are kept (``DEFAULT.history_retention_days``); 0 keeps them forever."""
+    default = config.get("DEFAULT") if isinstance(config, Mapping) else None
+    value = cast(Mapping[str, Any], default).get("history_retention_days", 0) if isinstance(default, Mapping) else 0
+    if isinstance(value, bool):
+        return 0
+    try:
+        return max(0, int(value))
+    except TypeError, ValueError:
+        return 0
+
+
+def prune_history(days: int, state_dir: str | Path | None = None) -> int:
+    """Remove entries that finished more than ``days`` days ago; return how many were removed."""
+    path = database_path(state_dir)
+    if days <= 0 or not database_available(path):
+        return 0
+    cutoff = (datetime.now(UTC) - timedelta(days=days)).isoformat()
+    with _record_lock, closing(connect_app_db(path)) as db, db:
+        return db.execute("DELETE FROM history_items WHERE finished_at < ?", (cutoff,)).rowcount

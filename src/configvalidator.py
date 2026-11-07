@@ -155,6 +155,7 @@ DEFAULT_KEY_TYPES: dict[str, tuple[type, ...]] = {
     "music_discogs_token": (str,),
     "stats_enabled": (bool,),
     "history_enabled": (bool,),
+    "history_retention_days": (int,),
     "metadata_cache_enabled": (bool,),
     "metadata_cache_dir": (str,),
     "metadata_cache_default_ttl_hours": (int,),

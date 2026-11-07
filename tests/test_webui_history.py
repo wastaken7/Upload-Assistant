@@ -114,3 +114,29 @@ def test_every_page_links_to_history():
     for script in ("app.js", "config_app.js", "stats_app.js", "history_app.js"):
         assert "/history" in (js_root / script).read_text(encoding="utf-8"), script
     assert 'history: "archive"' in (js_root / "shared_utils.js").read_text(encoding="utf-8")
+
+
+def test_history_export_downloads_filtered_csv_and_json(monkeypatch, tmp_path):
+    client = _authenticated(monkeypatch, tmp_path)
+    upload_history.record_item(RECORD, tmp_path)
+    upload_history.record_item({**RECORD, "name": "Fictional Other", "category": "TV"}, tmp_path)
+
+    csv_response = client.get("/api/history/export?format=csv&category=MOVIE")
+    json_response = client.get("/api/history/export?format=json")
+
+    assert csv_response.status_code == 200
+    assert csv_response.mimetype == "text/csv"
+    assert "attachment;" in csv_response.headers["Content-Disposition"]
+    assert csv_response.data.decode("utf-8").count("\n") == 2
+    assert [item["name"] for item in json_response.json["items"]] == ["Fictional Other", "Fictional Movie 2020"]
+    assert client.get("/api/history/export?format=xml").status_code == 400
+    assert client.get("/api/history/export?outcome=maybe").status_code == 400
+
+
+def test_upload_page_reads_the_history_handoff_once():
+    app_js = (server.CODE_DIR / "web_ui" / "static" / "js" / "app.js").read_text(encoding="utf-8")
+    history_js = (server.CODE_DIR / "web_ui" / "static" / "js" / "history_app.js").read_text(encoding="utf-8")
+
+    assert 'sessionStorage.removeItem("ua_history_upload_path")' in app_js
+    assert 'UPLOAD_PATH_HANDOFF_KEY = "ua_history_upload_path"' in history_js
+    assert "?path=" not in history_js

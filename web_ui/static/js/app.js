@@ -5648,6 +5648,19 @@ function AudionutsUAGUI() {
     setSelectedName(items[0]?.path.split(/[/\\]/).pop() || "");
   };
 
+  // History's "Upload again" leaves the release path here for one page load.
+  useEffect(() => {
+    if (screenshotMode) return;
+    let path = "";
+    try {
+      path = window.sessionStorage.getItem("ua_history_upload_path") || "";
+      window.sessionStorage.removeItem("ua_history_upload_path");
+    } catch (_error) {
+      return;
+    }
+    if (path) handlePathInputChange(path);
+  }, []);
+
   const renderSelectedPathOrQueue = (isMobileView = false) => {
     const pathText =
       manualPathsText !== null

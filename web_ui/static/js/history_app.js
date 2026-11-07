@@ -371,6 +371,19 @@ function HelpResourcesModal({ onClose }) {
 
 const trackerLabel = (names, tracker) => names?.[tracker] || tracker;
 
+// Read once by the Upload page. Kept out of the URL so paths do not end up in
+// browser history or access logs.
+const UPLOAD_PATH_HANDOFF_KEY = "ua_history_upload_path";
+
+const uploadAgain = (path) => {
+  try {
+    window.sessionStorage.setItem(UPLOAD_PATH_HANDOFF_KEY, path);
+  } catch (_error) {
+    // Without session storage the Upload page simply opens empty.
+  }
+  window.location = `${APP_BASE}/`;
+};
+
 const releaseDetails = (item) =>
   [
     item.category,
@@ -801,14 +814,25 @@ function HistoryDetail({ itemId, onClose, onDeleted }) {
                 </button>
               </>
             ) : (
-              <button
-                type="button"
-                className="ua-config-danger-button inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm"
-                onClick={() => setConfirmDelete(true)}
-              >
-                <AssetIcon name="trash-2" className="h-4 w-4" />
-                Delete entry
-              </button>
+              <>
+                <button
+                  type="button"
+                  className="ua-config-danger-button mr-auto inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm"
+                  onClick={() => setConfirmDelete(true)}
+                >
+                  <AssetIcon name="trash-2" className="h-4 w-4" />
+                  Delete entry
+                </button>
+                <button
+                  type="button"
+                  className="ua-stats-control inline-flex min-w-0 items-center gap-1.5 rounded-lg px-3 py-2 text-sm"
+                  onClick={() => uploadAgain(item.path)}
+                  title="Open the Upload page with this path in the queue"
+                >
+                  <AssetIcon name="upload" className="h-4 w-4" />
+                  Upload again
+                </button>
+              </>
             )}
           </footer>
         )}
@@ -921,6 +945,8 @@ function HistoryApp() {
   const [loading, setLoading] = useState(true);
   const [openItem, setOpenItem] = useState(null);
   const [refresh, setRefresh] = useState(0);
+  const [exporting, setExporting] = useState("");
+  const [exportError, setExportError] = useState("");
 
   useEffect(() => {
     window.setUAThemeMode(isDarkMode);
@@ -942,24 +968,58 @@ function HistoryApp() {
     dateTo,
   ]);
 
+  const filterQuery = () => {
+    const query = new URLSearchParams();
+    if (search) query.set("q", search);
+    if (outcome) query.set("outcome", outcome);
+    if (category) query.set("category", category);
+    if (tracker) query.set("tracker", tracker);
+    if (trackerStatus) query.set("tracker_status", trackerStatus);
+    if (withRequests) query.set("requests", "1");
+    if (dateFrom) query.set("after", localDayStart(dateFrom));
+    if (dateTo) query.set("before", localDayStart(dateTo, 1));
+    return query;
+  };
+
+  const exportHistory = async (format) => {
+    setExporting(format);
+    setExportError("");
+    try {
+      const query = filterQuery();
+      query.set("format", format);
+      const response = await apiFetch(
+        `${APP_BASE}/api/history/export?${query.toString()}`,
+      );
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.error || "Unable to export the history");
+      }
+      const disposition = response.headers.get("Content-Disposition") || "";
+      const filename =
+        disposition.match(/filename="([^"]+)"/)?.[1] ||
+        `upload-assistant-history.${format}`;
+      const url = URL.createObjectURL(await response.blob());
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setExportError(err.message);
+    } finally {
+      setExporting("");
+    }
+  };
+
   useEffect(() => {
     const controller = new AbortController();
     (async () => {
       setLoading(true);
       setError("");
       try {
-        const query = new URLSearchParams({
-          limit: String(PAGE_SIZE),
-          offset: String(offset),
-        });
-        if (search) query.set("q", search);
-        if (outcome) query.set("outcome", outcome);
-        if (category) query.set("category", category);
-        if (tracker) query.set("tracker", tracker);
-        if (trackerStatus) query.set("tracker_status", trackerStatus);
-        if (withRequests) query.set("requests", "1");
-        if (dateFrom) query.set("after", localDayStart(dateFrom));
-        if (dateTo) query.set("before", localDayStart(dateTo, 1));
+        const query = filterQuery();
+        query.set("limit", String(PAGE_SIZE));
+        query.set("offset", String(offset));
         const response = await apiFetch(
           `${APP_BASE}/api/history?${query.toString()}`,
           { signal: controller.signal },
@@ -1080,16 +1140,36 @@ function HistoryApp() {
               runs are not recorded.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => setClearOpen(true)}
-            disabled={!totalAll && !filtersActive && !outcome}
-            className="ua-config-danger-button inline-flex items-center gap-1.5 self-start rounded-lg border px-3 py-2 text-sm disabled:opacity-40 sm:self-auto"
-          >
-            <AssetIcon name="trash-2" className="h-4 w-4" />
-            Clear history
-          </button>
+          <div className="flex flex-wrap gap-2 self-start sm:self-auto">
+            {["csv", "json"].map((format) => (
+              <button
+                key={format}
+                type="button"
+                onClick={() => exportHistory(format)}
+                disabled={!total || Boolean(exporting)}
+                title={`Download the entries matching the filters as ${format.toUpperCase()}`}
+                className="ua-stats-control inline-flex min-w-0 items-center gap-1.5 rounded-lg px-3 py-2 text-sm disabled:opacity-40"
+              >
+                <AssetIcon name="download" className="h-4 w-4" />
+                {exporting === format ? "Exporting…" : format.toUpperCase()}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => setClearOpen(true)}
+              disabled={!totalAll && !filtersActive && !outcome}
+              className="ua-config-danger-button inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm disabled:opacity-40"
+            >
+              <AssetIcon name="trash-2" className="h-4 w-4" />
+              Clear history
+            </button>
+          </div>
         </header>
+        {exportError && (
+          <p role="alert" className="mt-3 text-sm text-red-500">
+            {exportError}
+          </p>
+        )}
 
         {data && data.enabled === false && (
           <div
