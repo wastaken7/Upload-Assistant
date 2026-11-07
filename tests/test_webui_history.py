@@ -175,5 +175,8 @@ def test_upload_page_takes_the_history_handoff_while_restoring_tabs():
     take = restore.index("const handoffPath = window.UAUploadHandoff?.take()")
     assert take < restore.index("if (handoffPath) handlePathInputChange(handoffPath);") < restore.index("/sessions")
     assert "!handoffPath &&" in restore
+    # Drafts left out because the handoff took a tab stay saved for a later load.
+    assert "unrestoredDraftsRef.current = drafts.slice(draftRoom);" in restore
+    assert "saveUploadTabDrafts([...drafts, ...unrestoredDraftsRef.current]);" in app_js
     assert "window.UAUploadHandoff.offer(path)" in history_js
     assert "?path=" not in history_js
