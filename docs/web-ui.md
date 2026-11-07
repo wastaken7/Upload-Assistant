@@ -14,6 +14,7 @@ For a minimal first run, see the [WebUI Quick Start](web-ui-basic.md). Docker an
 - [Configuration workspace](#configuration-workspace)
 - [Security and administration](#security-and-administration)
 - [Statistics](#statistics)
+- [History](#history)
 - [Appearance, Help, and Changelog](#appearance-help-and-changelog)
 - [Mobile layout](#mobile-layout)
 - [Troubleshooting](#troubleshooting)
@@ -98,7 +99,7 @@ The sign-in and recovery pages use the color theme, light/dark mode, and corner 
 
 The desktop interface has three main areas:
 
-1. **Application rail:** switches between Upload, Configuration, and Stats and opens Changelog, Help, Appearance, or Log out.
+1. **Application rail:** switches between Upload, Configuration, Stats, and History and opens Changelog, Help, Appearance, or Log out.
 2. **Workspace navigation:** File Browser on the Upload page or the settings navigation on the Configuration page.
 3. **Main workspace:** upload controls, execution output, configuration fields, or administration tools.
 
@@ -415,6 +416,16 @@ Open the **⋯** actions menu to download the current filtered response as JSON,
 Statistics are daily aggregates. Upload Assistant does not store release names, paths, release-group names or tags, external media IDs, URLs, or credentials in the statistics tables. Personal releases are stored only as a `personal` or `standard` aggregate. Collection begins when the feature is installed; existing cache files and logs are not scanned or backfilled, though later accesses to an existing cache count as new hits or misses.
 
 Statistics are stored in the application database, `data/upload_assistant.sqlite3` below the user-state directory. Versions before the shared database used `data/stats.sqlite3` and `data/api_key_expiry.sqlite3`; their contents are copied into the new file once, when it is created, and the old files are then no longer read or written. A file that cannot be read (for example, a damaged one or an unsupported older statistics format) is skipped, so keep the old files, or a backup of them, until you have checked that your statistics appear on the Stats page. Collection is disabled by default; set `DEFAULT.stats_enabled` to `True` to opt in. While disabled, the dashboard is blocked and does not return or display previously collected aggregates. Stored aggregates remain intact and become visible again if collection is re-enabled. **Reset statistics** in the actions menu requires typing `RESET` and removes only statistics; it never removes cache entries, configuration, torrents, or NZBs.
+
+## History
+
+Open **History** from the application workspace navigation to see every release processed on this installation, newest first. An entry is added when an item finishes, including items that failed, were skipped at a prompt, were unsupported, or did not reach any tracker. Runs started with `--debug` are not recorded.
+
+Each entry keeps the release name, path, size, category and release details, its external IDs (IMDb, TMDb, TVDB, TVmaze, MAL, IGDB, Douban, Discogs, ISBN, and others) with links to their pages where one exists, every tracker's final result with its message, duration, and torrent link, the possible dupes and slot recommendation shown for each tracker, and request matches with their rewards. CLI and Web UI runs are both recorded.
+
+Search matches the release name, title, release group, and path. Filters narrow the list by category, tracker, tracker result (for example, every release that failed on one tracker), entries with request matches, and a date range in the browser's local time. The outcome buttons show how many entries match the other filters. Select an entry to see its details, copy its path, or delete it. **Clear history** requires typing `CLEAR` and removes only history entries; statistics, caches, configuration, torrents, and NZBs are untouched.
+
+Recording is controlled by `DEFAULT.history_enabled`, which is on by default. Turning it off stops new entries without deleting stored ones. The history is stored in the application database, `data/upload_assistant.sqlite3` below the user-state directory. Unlike the statistics tables, it contains release names, paths, and links, so treat a copy of that file like your upload logs.
 
 ## Appearance, Help, and Changelog
 

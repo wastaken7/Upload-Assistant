@@ -13,6 +13,7 @@
     "file-structure": "folder",
     gamepad: "gamepad-2",
     help: "circle-help",
+    history: "archive",
     logout: "log-out",
     movie: "clapperboard",
     music: "music-2",

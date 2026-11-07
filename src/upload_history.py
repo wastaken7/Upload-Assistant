@@ -26,7 +26,7 @@ from typing import Any, cast
 
 from src import webui_events
 from src.app_db import connect as connect_app_db
-from src.app_db import database_path
+from src.app_db import database_available, database_path
 from src.console import logger
 
 # Files below this size (NFOs, checksums, small artwork) change without the
@@ -444,3 +444,277 @@ async def record_item_async(meta: Any, tracker_class_map: Mapping[str, Any], *, 
     finally:
         with _state_lock:
             _item = None
+
+
+# Reading the history (Web UI) ------------------------------------------------
+
+TRACKER_STATUSES = ("success", "failed", "dupe", "banned", "skipped")
+MAX_PAGE_SIZE = 200
+# Largest value SQLite can bind; larger IDs or offsets cannot match anything.
+_SQLITE_MAX_INTEGER = 2**63 - 1
+_ITEM_COLUMNS = (
+    "id",
+    "started_at",
+    "finished_at",
+    "source",
+    "path",
+    "name",
+    "title",
+    "year",
+    "category",
+    "release_type",
+    "resolution",
+    "release_group",
+    "season",
+    "episode",
+    "size",
+    "fingerprint",
+    "infohash",
+    "outcome",
+    "reason",
+    "duration_ms",
+    "site_check",
+    "personal_release",
+    "artwork_url",
+)
+_SUMMARY_COLUMNS = tuple(column for column in _ITEM_COLUMNS if column not in {"started_at", "fingerprint", "infohash", "duration_ms"})
+_LIKE_ESCAPE = "\\"
+
+
+def _instant(value: str, label: str) -> str:
+    """Normalize an ISO date or date-time to the UTC form stored in ``finished_at``."""
+    try:
+        parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise ValueError(f"{label} must be an ISO 8601 date or date-time") from exc
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC).isoformat()
+
+
+def _like_pattern(term: str) -> str:
+    escaped = term.replace(_LIKE_ESCAPE, _LIKE_ESCAPE * 2).replace("%", f"{_LIKE_ESCAPE}%").replace("_", f"{_LIKE_ESCAPE}_")
+    return f"%{escaped}%"
+
+
+def _filters(
+    *,
+    search: str,
+    category: str,
+    tracker: str,
+    tracker_status: str,
+    has_requests: bool,
+    after: str,
+    before: str,
+) -> tuple[list[str], list[object]]:
+    clauses: list[str] = []
+    parameters: list[object] = []
+    for term in search.split()[:10]:
+        pattern = _like_pattern(term)
+        clauses.append("(" + " OR ".join(f"{column} LIKE ? ESCAPE ?" for column in ("name", "title", "path", "release_group")) + ")")
+        for _column in range(4):
+            parameters.extend([pattern, _LIKE_ESCAPE])
+    if category:
+        clauses.append("category = ?")
+        parameters.append(category.upper())
+    if tracker_status and tracker_status not in TRACKER_STATUSES:
+        raise ValueError(f"tracker_status must be one of: {', '.join(TRACKER_STATUSES)}")
+    if tracker:
+        clause = "EXISTS (SELECT 1 FROM history_trackers t WHERE t.item_id = history_items.id AND t.tracker = ?"
+        parameters.append(_tracker_key(tracker))
+        if tracker_status:
+            clause += " AND t.status = ?"
+            parameters.append(tracker_status)
+        clauses.append(clause + ")")
+    elif tracker_status:
+        clauses.append("EXISTS (SELECT 1 FROM history_trackers t WHERE t.item_id = history_items.id AND t.status = ?)")
+        parameters.append(tracker_status)
+    if has_requests:
+        clauses.append("EXISTS (SELECT 1 FROM history_requests r WHERE r.item_id = history_items.id)")
+    if after:
+        clauses.append("finished_at >= ?")
+        parameters.append(_instant(after, "after"))
+    if before:
+        clauses.append("finished_at < ?")
+        parameters.append(_instant(before, "before"))
+    return clauses, parameters
+
+
+def _empty_page(limit: int, offset: int) -> dict[str, Any]:
+    return {
+        "items": [],
+        "total": 0,
+        "limit": limit,
+        "offset": offset,
+        "counts": dict.fromkeys(OUTCOMES, 0),
+        "facets": {"categories": [], "trackers": []},
+    }
+
+
+def _row_dict(columns: tuple[str, ...], row: tuple[Any, ...]) -> dict[str, Any]:
+    item = dict(zip(columns, row, strict=True))
+    for flag in ("site_check", "personal_release"):
+        if flag in item:
+            item[flag] = bool(item[flag])
+    return item
+
+
+def list_items(
+    state_dir: str | Path | None = None,
+    *,
+    search: str = "",
+    category: str = "",
+    tracker: str = "",
+    tracker_status: str = "",
+    outcome: str = "",
+    has_requests: bool = False,
+    after: str = "",
+    before: str = "",
+    limit: int = 50,
+    offset: int = 0,
+) -> dict[str, Any]:
+    """Return one page of history entries, newest first, with outcome counts and filter options."""
+    limit = max(1, min(MAX_PAGE_SIZE, int(limit)))
+    offset = max(0, min(_SQLITE_MAX_INTEGER, int(offset)))
+    if outcome and outcome not in OUTCOMES:
+        raise ValueError(f"outcome must be one of: {', '.join(OUTCOMES)}")
+    clauses, parameters = _filters(
+        search=search,
+        category=category,
+        tracker=tracker,
+        tracker_status=tracker_status,
+        has_requests=has_requests,
+        after=after,
+        before=before,
+    )
+    page = _empty_page(limit, offset)
+    path = database_path(state_dir)
+    if not database_available(path):
+        return page
+    # Outcome counts ignore the outcome filter itself, so every chip keeps its number.
+    base_where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+    page_clauses = [*clauses, "outcome = ?"] if outcome else clauses
+    page_parameters = [*parameters, outcome] if outcome else parameters
+    page_where = f"WHERE {' AND '.join(page_clauses)}" if page_clauses else ""
+    with closing(connect_app_db(path)) as db:
+        for row_outcome, count in db.execute(f"SELECT outcome, COUNT(*) FROM history_items {base_where} GROUP BY outcome", parameters):  # noqa: S608
+            if row_outcome in page["counts"]:
+                page["counts"][row_outcome] = int(count)
+        page["total"] = int(db.execute(f"SELECT COUNT(*) FROM history_items {page_where}", page_parameters).fetchone()[0])  # noqa: S608
+        rows = db.execute(
+            f"SELECT {', '.join(_SUMMARY_COLUMNS)} FROM history_items {page_where} ORDER BY finished_at DESC, id DESC LIMIT ? OFFSET ?",  # noqa: S608
+            [*page_parameters, limit, offset],
+        ).fetchall()
+        items = [_row_dict(_SUMMARY_COLUMNS, row) for row in rows]
+        by_id = {item["id"]: item for item in items}
+        for item in items:
+            item.update(trackers=[], request_count=0, ids={})
+        if by_id:
+            marks = ", ".join("?" for _ in by_id)
+            ids = list(by_id)
+            for item_id, name, status, link in db.execute(
+                f"SELECT item_id, tracker, status, link FROM history_trackers WHERE item_id IN ({marks}) ORDER BY tracker",  # noqa: S608
+                ids,
+            ):
+                by_id[item_id]["trackers"].append({"tracker": name, "status": status, "link": link})
+            for item_id, count in db.execute(f"SELECT item_id, COUNT(*) FROM history_requests WHERE item_id IN ({marks}) GROUP BY item_id", ids):  # noqa: S608
+                by_id[item_id]["request_count"] = int(count)
+            for item_id, provider, value in db.execute(f"SELECT item_id, provider, value FROM history_ids WHERE item_id IN ({marks})", ids):  # noqa: S608
+                by_id[item_id]["ids"][provider] = value
+        page["items"] = items
+        page["facets"] = {
+            "categories": [row[0] for row in db.execute("SELECT DISTINCT category FROM history_items WHERE category != '' ORDER BY category")],
+            "trackers": [row[0] for row in db.execute("SELECT DISTINCT tracker FROM history_trackers ORDER BY tracker")],
+        }
+    return page
+
+
+def id_link(provider: str, value: str) -> str:
+    """Return the public page of an external ID, or "" when it has none."""
+    if provider == "imdb":
+        return f"https://www.imdb.com/title/{value}/" if value.startswith("tt") and value[2:].isdigit() else ""
+    if provider == "tmdb":
+        kind, _separator, number = value.partition("/")
+        return f"https://www.themoviedb.org/{kind}/{number}" if kind in {"movie", "tv"} and number.isdigit() else ""
+    if provider == "openlibrary":
+        kinds = {"W": "works", "M": "books", "A": "authors"}
+        identifier = value.upper()
+        valid = identifier.startswith("OL") and identifier[2:-1].isdigit() and identifier[-1:] in kinds
+        return f"https://openlibrary.org/{kinds[identifier[-1]]}/{identifier}" if valid else ""
+    if not value.isdigit():
+        return ""
+    return {
+        "tvdb": f"https://thetvdb.com/dereferrer/series/{value}",
+        "tvmaze": f"https://www.tvmaze.com/shows/{value}",
+        "mal": f"https://myanimelist.net/anime/{value}",
+        "douban": f"https://movie.douban.com/subject/{value}/",
+        "discogs_release": f"https://www.discogs.com/release/{value}",
+        "discogs_master": f"https://www.discogs.com/master/{value}",
+    }.get(provider, "")
+
+
+def _loads(value: str) -> Any:
+    if not value:
+        return None
+    try:
+        return json.loads(value)
+    except ValueError:
+        return None
+
+
+def get_item(item_id: int, state_dir: str | Path | None = None) -> dict[str, Any] | None:
+    """Return one entry with its IDs, tracker results and request matches, or None."""
+    path = database_path(state_dir)
+    if not 0 < int(item_id) <= _SQLITE_MAX_INTEGER or not database_available(path):
+        return None
+    with closing(connect_app_db(path)) as db:
+        row = db.execute(f"SELECT {', '.join(_ITEM_COLUMNS)} FROM history_items WHERE id = ?", (int(item_id),)).fetchone()  # noqa: S608
+        if row is None:
+            return None
+        item = _row_dict(_ITEM_COLUMNS, row)
+        item["ids"] = [
+            {"provider": provider, "value": value, "link": id_link(provider, value)}
+            for provider, value in db.execute("SELECT provider, value FROM history_ids WHERE item_id = ? ORDER BY provider", (item["id"],))
+        ]
+        item["trackers"] = [
+            {
+                "tracker": tracker,
+                "status": status,
+                "message": message,
+                "link": link,
+                "torrent_id": torrent_id,
+                "duration": duration,
+                "dupes": _loads(dupes),
+                "slot": _loads(slot),
+            }
+            for tracker, status, message, link, torrent_id, duration, dupes, slot in db.execute(
+                "SELECT tracker, status, message, link, torrent_id, duration, dupes, slot FROM history_trackers WHERE item_id = ? ORDER BY tracker",
+                (item["id"],),
+            )
+        ]
+        item["requests"] = [
+            {"tracker": tracker, "name": name, "link": link, "reward": reward, "status": status, "exact": bool(exact)}
+            for tracker, name, link, reward, status, exact in db.execute(
+                "SELECT tracker, name, link, reward, status, exact FROM history_requests WHERE item_id = ? ORDER BY id",
+                (item["id"],),
+            )
+        ]
+    return item
+
+
+def delete_item(item_id: int, state_dir: str | Path | None = None) -> bool:
+    """Remove one entry and its details; return whether it existed."""
+    path = database_path(state_dir)
+    if not 0 < int(item_id) <= _SQLITE_MAX_INTEGER or not database_available(path):
+        return False
+    with _record_lock, closing(connect_app_db(path)) as db, db:
+        return db.execute("DELETE FROM history_items WHERE id = ?", (int(item_id),)).rowcount > 0
+
+
+def clear_history(state_dir: str | Path | None = None) -> int:
+    """Remove every entry; statistics and other tables are untouched. Return the number removed."""
+    path = database_path(state_dir)
+    if not database_available(path):
+        return 0
+    with _record_lock, closing(connect_app_db(path)) as db, db:
+        return db.execute("DELETE FROM history_items").rowcount

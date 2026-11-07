@@ -303,6 +303,7 @@ const WorkspaceSwitcher = ({ activeWorkspace, isDarkMode, stretch }) => {
     { id: "upload", label: "Upload", href: `${APP_BASE}/` },
     { id: "config", label: "Configuration", href: `${APP_BASE}/config` },
     { id: "stats", label: "Stats", href: `${APP_BASE}/stats` },
+    { id: "history", label: "History", href: `${APP_BASE}/history` },
   ];
 
   return (
@@ -419,6 +420,13 @@ function ConfigApplicationRail({
         <a href={`${APP_BASE}/stats`} className="ua-app-rail-button rounded-lg">
           <RailStatsIcon />
           <span>Stats</span>
+        </a>
+        <a
+          href={`${APP_BASE}/history`}
+          className="ua-app-rail-button rounded-lg"
+        >
+          <RailAssetIcon name="history" />
+          <span>History</span>
         </a>
       </nav>
 

@@ -1398,6 +1398,8 @@ const ChangelogIcon = () => <WebUiIcon name="changelog" />;
 
 const StatsIcon = () => <WebUiIcon name="stats" />;
 
+const HistoryIcon = () => <WebUiIcon name="history" />;
+
 const UploadRailIcon = () => <WebUiIcon name="upload" />;
 
 const LogoutIcon = () => <WebUiIcon name="logout" />;
@@ -1412,6 +1414,7 @@ const WorkspaceSwitcher = ({
     { id: "upload", label: "Upload", href: `${appBase}/` },
     { id: "config", label: "Configuration", href: `${appBase}/config` },
     { id: "stats", label: "Stats", href: `${appBase}/stats` },
+    { id: "history", label: "History", href: `${appBase}/history` },
   ];
 
   return (
@@ -1468,6 +1471,12 @@ const ApplicationRail = ({
       label: "Stats",
       href: `${appBase}/stats`,
       icon: <StatsIcon />,
+    },
+    {
+      id: "history",
+      label: "History",
+      href: `${appBase}/history`,
+      icon: <HistoryIcon />,
     },
   ];
 
