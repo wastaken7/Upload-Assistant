@@ -14,7 +14,7 @@ def test_stats_api_reports_unreadable_database(monkeypatch, tmp_path):
     monkeypatch.setattr(server, "STATE_DIR", tmp_path)
     monkeypatch.setattr(server, "_load_config_from_file", lambda _path: {"DEFAULT": {"stats_enabled": True}})
     (tmp_path / "data").mkdir()
-    (tmp_path / "data/stats.sqlite3").write_bytes(b"fictional invalid database")
+    (tmp_path / "data/upload_assistant.sqlite3").write_bytes(b"fictional invalid database")
 
     response = server.app.test_client().get("/api/stats?range=all")
 

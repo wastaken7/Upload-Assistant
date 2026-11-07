@@ -3,13 +3,14 @@ import sqlite3
 import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import closing
 from datetime import UTC, datetime, timedelta
 
 import httpx
 import pytest
 from torf import Torrent
 
-from src import stats, webui_events
+from src import app_db, stats, webui_events
 from src.meta import Meta
 from src.metadata_cache import cache_for, is_cache_miss
 from src.torrent_manifest import TorrentManifest
@@ -184,7 +185,7 @@ def test_exception_error_reason_uses_type_and_status_code():
 
 @pytest.mark.asyncio
 async def test_completed_item_records_one_route_per_tracker_and_supports_filtering(monkeypatch, tmp_path):
-    monkeypatch.setattr(stats, "_database_path", lambda _state_dir=None: tmp_path / "data" / "stats.sqlite3")
+    monkeypatch.setattr(stats, "_database_path", lambda _state_dir=None: tmp_path / "data" / "upload_assistant.sqlite3")
 
     class TorrentTracker:
         is_usenet = False
@@ -221,7 +222,7 @@ async def test_completed_item_records_one_route_per_tracker_and_supports_filteri
 
 @pytest.mark.asyncio
 async def test_completed_item_keeps_upload_durations_from_flow_copies(monkeypatch, tmp_path):
-    monkeypatch.setattr(stats, "_database_path", lambda _state_dir=None: tmp_path / "data" / "stats.sqlite3")
+    monkeypatch.setattr(stats, "_database_path", lambda _state_dir=None: tmp_path / "data" / "upload_assistant.sqlite3")
 
     class TorrentTracker:
         is_usenet = False
@@ -251,7 +252,7 @@ async def test_completed_item_keeps_upload_durations_from_flow_copies(monkeypatc
 
 @pytest.mark.asyncio
 async def test_duplicate_only_item_is_not_classified_as_an_error(monkeypatch, tmp_path):
-    monkeypatch.setattr(stats, "_database_path", lambda _state_dir=None: tmp_path / "data" / "stats.sqlite3")
+    monkeypatch.setattr(stats, "_database_path", lambda _state_dir=None: tmp_path / "data" / "upload_assistant.sqlite3")
     meta = Meta(
         category="TV",
         source_size=10_000,
@@ -265,45 +266,71 @@ async def test_duplicate_only_item_is_not_classified_as_an_error(monkeypatch, tm
     assert result["overview"]["duplicate_preventions"] == 1
 
 
-def test_schema_v2_recreates_unreleased_v1_aggregates(tmp_path):
-    database = tmp_path / "data" / "stats.sqlite3"
-    database.parent.mkdir(parents=True)
-    with sqlite3.connect(database) as db:
+def test_legacy_v1_statistics_file_is_not_imported(tmp_path):
+    legacy = tmp_path / "data" / "stats.sqlite3"
+    legacy.parent.mkdir(parents=True)
+    with closing(sqlite3.connect(legacy)) as db, db:
         db.execute("CREATE TABLE stats_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
         db.execute("INSERT INTO stats_meta VALUES ('schema_version', '1')")
         db.execute("CREATE TABLE stats_daily (legacy TEXT)")
 
     stats.record_event("item", operation="completed", state_dir=tmp_path)
 
-    with sqlite3.connect(database) as db:
-        columns = {row[1] for row in db.execute("PRAGMA table_info(stats_daily)")}
-        assert "destination" in columns
-        assert db.execute("SELECT value FROM stats_meta WHERE key = 'schema_version'").fetchone() == ("2",)
+    assert stats.get_stats("all", "real", tmp_path)["overview"]["items_completed"] == 1
 
 
-def test_unknown_schema_is_preserved_instead_of_reset(tmp_path):
+def test_newer_schema_is_preserved_instead_of_reset(tmp_path):
     stats.record_event("item", operation="completed", count=3, state_dir=tmp_path)
-    database = tmp_path / "data/stats.sqlite3"
-    with sqlite3.connect(database) as db:
-        db.execute("UPDATE stats_meta SET value = '999' WHERE key = 'schema_version'")
-    stats._initialized_paths.discard(database)
+    database = tmp_path / "data/upload_assistant.sqlite3"
+    with closing(sqlite3.connect(database)) as db:
+        db.execute("PRAGMA user_version = 999")
 
     assert stats.get_stats("all", "real", tmp_path)["success"] is False
     stats.record_event("item", operation="completed", state_dir=tmp_path)
     with pytest.raises(sqlite3.DatabaseError):
         stats.reset_stats(tmp_path)
 
-    with sqlite3.connect(database) as db:
+    with closing(sqlite3.connect(database)) as db:
         assert db.execute("SELECT SUM(count) FROM stats_daily").fetchone() == (3,)
-        assert db.execute("SELECT value FROM stats_meta WHERE key = 'schema_version'").fetchone() == ("999",)
+        assert db.execute("PRAGMA user_version").fetchone() == (999,)
 
 
-def test_content_duration_column_is_added_without_losing_v2_aggregates(tmp_path):
-    database = tmp_path / "data" / "stats.sqlite3"
-    database.parent.mkdir(parents=True)
-    with sqlite3.connect(database) as db:
+def test_legacy_content_time_is_preserved(tmp_path):
+    legacy = tmp_path / "data" / app_db.LEGACY_STATS_FILENAME
+    legacy.parent.mkdir(parents=True)
+    with closing(sqlite3.connect(legacy)) as db, db:
         db.execute("CREATE TABLE stats_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
         db.execute("INSERT INTO stats_meta VALUES ('schema_version', '2')")
+        db.execute(
+            """
+            CREATE TABLE stats_daily (
+                day TEXT NOT NULL, family TEXT NOT NULL, service TEXT NOT NULL,
+                operation TEXT NOT NULL, outcome TEXT NOT NULL, category TEXT NOT NULL,
+                source TEXT NOT NULL, mode TEXT NOT NULL, destination TEXT NOT NULL,
+                count INTEGER NOT NULL DEFAULT 0, duration_ms INTEGER NOT NULL DEFAULT 0,
+                content_seconds INTEGER NOT NULL DEFAULT 0, bytes INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (day, family, service, operation, outcome, category, source, mode, destination)
+            )
+            """
+        )
+        db.execute(
+            "INSERT INTO stats_daily VALUES (?, 'content', '', 'uploaded', 'success', 'movie', 'cli', 'real', '', 1, 0, 5400, 0)",
+            (datetime.now(UTC).date().isoformat(),),
+        )
+
+    stats.get_stats("all", "real", tmp_path)
+
+    with closing(sqlite3.connect(app_db.database_path(tmp_path))) as db:
+        assert db.execute("SELECT content_seconds FROM stats_daily WHERE family = 'content'").fetchone() == (5400,)
+
+
+def test_legacy_statistics_file_is_imported_once_and_left_unchanged(tmp_path):
+    legacy = tmp_path / "data" / "stats.sqlite3"
+    legacy.parent.mkdir(parents=True)
+    with closing(sqlite3.connect(legacy)) as db, db:
+        db.execute("CREATE TABLE stats_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+        db.execute("INSERT INTO stats_meta VALUES ('schema_version', '2')")
+        db.execute("INSERT INTO stats_meta VALUES ('reset_at', '2026-01-01T00:00:00+00:00')")
         db.execute(
             """
             CREATE TABLE stats_daily (
@@ -320,19 +347,22 @@ def test_content_duration_column_is_added_without_losing_v2_aggregates(tmp_path)
             "INSERT INTO stats_daily VALUES (?, 'item', '', 'completed', 'success', 'MOVIE', 'cli', 'real', '', 3, 0, 12000)",
             (datetime.now(UTC).date().isoformat(),),
         )
+    legacy_bytes = legacy.read_bytes()
 
     result = stats.get_stats("all", "real", tmp_path)
+    stats.record_event("item", operation="completed", state_dir=tmp_path)
 
     assert result["overview"]["items_completed"] == 3
-    with sqlite3.connect(database) as db:
-        columns = {row[1] for row in db.execute("PRAGMA table_info(stats_daily)")}
-        assert "content_seconds" in columns
-        assert db.execute("SELECT count, bytes, content_seconds FROM stats_daily").fetchone() == (3, 12_000, 0)
+    assert stats.get_stats("all", "real", tmp_path)["overview"]["items_completed"] == 4
+    assert legacy.read_bytes() == legacy_bytes
+    with closing(sqlite3.connect(tmp_path / "data" / "upload_assistant.sqlite3")) as db:
+        assert db.execute("SELECT count, bytes, content_seconds FROM stats_daily WHERE count = 3").fetchone() == (3, 12_000, 0)
+        assert db.execute("SELECT value FROM stats_meta WHERE key = 'reset_at'").fetchone() == ("2026-01-01T00:00:00+00:00",)
 
 
 @pytest.mark.asyncio
 async def test_successful_content_time_counts_once_globally_and_per_destination(monkeypatch, tmp_path):
-    monkeypatch.setattr(stats, "_database_path", lambda _state_dir=None: tmp_path / "data" / "stats.sqlite3")
+    monkeypatch.setattr(stats, "_database_path", lambda _state_dir=None: tmp_path / "data" / "upload_assistant.sqlite3")
 
     class TorrentTracker:
         is_usenet = False
@@ -367,7 +397,7 @@ async def test_successful_content_time_counts_once_globally_and_per_destination(
 
 @pytest.mark.asyncio
 async def test_failed_prepared_pack_duration_does_not_fall_back_to_representative_mediainfo(monkeypatch, tmp_path):
-    monkeypatch.setattr(stats, "_database_path", lambda _state_dir=None: tmp_path / "data" / "stats.sqlite3")
+    monkeypatch.setattr(stats, "_database_path", lambda _state_dir=None: tmp_path / "data" / "upload_assistant.sqlite3")
     meta = Meta(
         category="TV",
         content_duration_category="TV",
@@ -428,7 +458,7 @@ def test_stats_separate_debug_and_webui(monkeypatch, tmp_path):
 
 @pytest.mark.asyncio
 async def test_media_profile_records_category_appropriate_dimensions(monkeypatch, tmp_path):
-    monkeypatch.setattr(stats, "_database_path", lambda _state_dir=None: tmp_path / "data" / "stats.sqlite3")
+    monkeypatch.setattr(stats, "_database_path", lambda _state_dir=None: tmp_path / "data" / "upload_assistant.sqlite3")
     meta = Meta(
         category="MOVIE",
         resolution="2160p",
@@ -477,7 +507,7 @@ def test_web_media_without_a_service_is_grouped_as_unknown():
 @pytest.mark.asyncio
 @pytest.mark.parametrize(("service", "name"), [("audible", "Audible"), ("ubook", "Ubook")])
 async def test_book_streaming_service_appears_in_stats(monkeypatch, tmp_path, service, name):
-    monkeypatch.setattr(stats, "_database_path", lambda _state_dir=None: tmp_path / "data" / "stats.sqlite3")
+    monkeypatch.setattr(stats, "_database_path", lambda _state_dir=None: tmp_path / "data" / "upload_assistant.sqlite3")
     meta = Meta(category="BOOK", audiobook=True, service=service, service_longname=name, source_size=12_000)
 
     await stats.record_media_profile_async(meta)
@@ -522,7 +552,7 @@ def test_hdr_bucket_preserves_dolby_vision_depth(hdr, profile, compatibility, ex
 
 @pytest.mark.asyncio
 async def test_release_profiles_aggregate_personal_results_without_group_names(monkeypatch, tmp_path):
-    monkeypatch.setattr(stats, "_database_path", lambda _state_dir=None: tmp_path / "data" / "stats.sqlite3")
+    monkeypatch.setattr(stats, "_database_path", lambda _state_dir=None: tmp_path / "data" / "upload_assistant.sqlite3")
     personal = Meta(category="MOVIE", personalrelease=True, tag="-FICTIONALGROUP", source_size=75_000)
     standard = Meta(category="TV", personalrelease=False, source_size=25_000)
 
@@ -551,7 +581,7 @@ async def test_release_profiles_aggregate_personal_results_without_group_names(m
         },
     ]
     assert result["release_profiles"]["by_category"][0]["category"] == "MOVIE"
-    assert b"FICTIONALGROUP" not in (tmp_path / "data" / "stats.sqlite3").read_bytes()
+    assert b"FICTIONALGROUP" not in (tmp_path / "data" / "upload_assistant.sqlite3").read_bytes()
 
 
 def test_reused_torrent_reports_media_volume_as_hashing_io_avoided(tmp_path):
@@ -594,7 +624,7 @@ def _completed_meta(tmp_path):
 
 @pytest.mark.asyncio
 async def test_client_torrent_registered_by_the_prep_search_counts_as_hashing_io_avoided(monkeypatch, tmp_path):
-    monkeypatch.setattr(stats, "_database_path", lambda _state_dir=None: tmp_path / "data" / "stats.sqlite3")
+    monkeypatch.setattr(stats, "_database_path", lambda _state_dir=None: tmp_path / "data" / "upload_assistant.sqlite3")
     source = tmp_path / "client.torrent"
     _write_torrent(source, 64_000)
     manifest = TorrentManifest(tmp_path, "fictional-release")
@@ -618,7 +648,7 @@ async def test_client_torrent_registered_by_the_prep_search_counts_as_hashing_io
 
 @pytest.mark.asyncio
 async def test_tracker_view_counts_a_generated_base_as_created_not_reused(monkeypatch, tmp_path):
-    monkeypatch.setattr(stats, "_database_path", lambda _state_dir=None: tmp_path / "data" / "stats.sqlite3")
+    monkeypatch.setattr(stats, "_database_path", lambda _state_dir=None: tmp_path / "data" / "upload_assistant.sqlite3")
     source = tmp_path / "generated.torrent"
     _write_torrent(source, 64_000)
     manifest = TorrentManifest(tmp_path, "fictional-release")
@@ -648,7 +678,7 @@ def test_stats_reports_heatmap_and_previous_period_comparison(tmp_path):
     stats.record_event("item", operation="completed", outcome="success", state_dir=tmp_path)
     stats.record_event("upload", service="FICTIONAL", operation="tracker", outcome="success", state_dir=tmp_path)
     stats.record_event("cache", service="fictional", operation="title", outcome="hit", state_dir=tmp_path)
-    database = tmp_path / "data" / "stats.sqlite3"
+    database = tmp_path / "data" / "upload_assistant.sqlite3"
     prior_day = (datetime.now(UTC).date() - timedelta(days=7)).isoformat()
     with sqlite3.connect(database) as db:
         db.execute("UPDATE stats_daily SET day = ?", (prior_day,))
@@ -695,14 +725,14 @@ def test_stats_reset_only_removes_aggregates(tmp_path):
 
     assert reset_at.endswith("+00:00")
     assert stats.get_stats("all", "real", tmp_path)["overview"]["items_completed"] == 0
-    with sqlite3.connect(tmp_path / "data" / "stats.sqlite3") as db:
+    with sqlite3.connect(tmp_path / "data" / "upload_assistant.sqlite3") as db:
         assert db.execute("SELECT value FROM stats_meta WHERE key = 'reset_at'").fetchone() == (reset_at,)
 
 
 def test_stats_reset_establishes_a_boundary_before_the_first_event(tmp_path):
     reset_at = stats.reset_stats(tmp_path)
 
-    with sqlite3.connect(tmp_path / "data" / "stats.sqlite3") as db:
+    with sqlite3.connect(tmp_path / "data" / "upload_assistant.sqlite3") as db:
         assert db.execute("SELECT COUNT(*) FROM stats_daily").fetchone() == (0,)
         assert db.execute("SELECT value FROM stats_meta WHERE key = 'reset_at'").fetchone() == (reset_at,)
 
@@ -771,7 +801,7 @@ async def test_record_event_async_offloads_the_sqlite_write(monkeypatch):
 
 
 def test_corrupt_database_does_not_break_recording_and_reports_read_failure(tmp_path):
-    database = tmp_path / "data" / "stats.sqlite3"
+    database = tmp_path / "data" / "upload_assistant.sqlite3"
     database.parent.mkdir(parents=True)
     database.write_bytes(b"not a sqlite database")
 
@@ -788,7 +818,7 @@ def test_api_timeline_and_totals_count_operations_once_per_day(tmp_path):
         stats.record_event("api", service="fictional", operation="lookup", outcome=outcome, count=3, state_dir=tmp_path)
     stats.record_event("api", service="imaginary", operation="search", outcome="error", state_dir=tmp_path)
     prior_day = (datetime.now(UTC).date() - timedelta(days=1)).isoformat()
-    with sqlite3.connect(tmp_path / "data/stats.sqlite3") as db:
+    with sqlite3.connect(tmp_path / "data/upload_assistant.sqlite3") as db:
         db.execute("UPDATE stats_daily SET day = ? WHERE outcome = 'request'", (prior_day,))
     stats.record_event("api", service="fictional", operation="lookup", outcome="request", count=3, state_dir=tmp_path)
 
@@ -804,7 +834,7 @@ def test_empty_period_reports_decline_from_previous_activity(tmp_path):
     stats.record_event("item", operation="completed", state_dir=tmp_path)
     stats.record_event("upload", service="FICTIONAL", operation="tracker", state_dir=tmp_path)
     prior_day = (datetime.now(UTC).date() - timedelta(days=7)).isoformat()
-    with sqlite3.connect(tmp_path / "data/stats.sqlite3") as db:
+    with sqlite3.connect(tmp_path / "data/upload_assistant.sqlite3") as db:
         db.execute("UPDATE stats_daily SET day = ?", (prior_day,))
 
     result = stats.get_stats("7d", "real", tmp_path)
@@ -849,7 +879,7 @@ def test_one_year_range_contains_365_inclusive_days():
 
 @pytest.mark.asyncio
 async def test_metadata_cache_does_not_infer_api_calls_from_cache_activity(monkeypatch, tmp_path):
-    monkeypatch.setattr(stats, "_database_path", lambda _state_dir=None: tmp_path / "data" / "stats.sqlite3")
+    monkeypatch.setattr(stats, "_database_path", lambda _state_dir=None: tmp_path / "data" / "upload_assistant.sqlite3")
     cache = cache_for(tmp_path, {"DEFAULT": {"metadata_cache_dir": "cache"}})
 
     assert is_cache_miss(await cache.get("imaginarydb", "title", "fictional-key"))
@@ -861,12 +891,12 @@ async def test_metadata_cache_does_not_infer_api_calls_from_cache_activity(monke
     assert result["cache"]["writes"] == 1
     assert result["cache"]["hits"] == 1
     assert result["api"]["total"] == 0
-    assert b"Fictional Work" not in (tmp_path / "data" / "stats.sqlite3").read_bytes()
+    assert b"Fictional Work" not in (tmp_path / "data" / "upload_assistant.sqlite3").read_bytes()
 
 
 @pytest.mark.asyncio
 async def test_stage_times_item_time_and_request_matches_are_recorded_when_the_item_completes(monkeypatch, tmp_path):
-    monkeypatch.setattr(stats, "_database_path", lambda _state_dir=None: tmp_path / "data" / "stats.sqlite3")
+    monkeypatch.setattr(stats, "_database_path", lambda _state_dir=None: tmp_path / "data" / "upload_assistant.sqlite3")
     now = {"value": 100.0}
     monkeypatch.setattr(stats.time, "monotonic", lambda: now["value"])
     stats.begin_item_timing()
@@ -922,7 +952,7 @@ def test_hashing_speed_estimates_time_saved_by_reused_torrents(tmp_path):
 
 @pytest.mark.asyncio
 async def test_failed_routes_record_an_error_category_per_destination(monkeypatch, tmp_path):
-    monkeypatch.setattr(stats, "_database_path", lambda _state_dir=None: tmp_path / "data" / "stats.sqlite3")
+    monkeypatch.setattr(stats, "_database_path", lambda _state_dir=None: tmp_path / "data" / "upload_assistant.sqlite3")
     meta = Meta(
         category="MOVIE",
         tracker_status={
@@ -938,7 +968,7 @@ async def test_failed_routes_record_an_error_category_per_destination(monkeypatc
     assert rows["IMAGINARY"]["error_reasons"] == {"timeout": 1}
     filtered = stats.get_stats("all", "real", tmp_path, tracker="IMAGINARY")["uploads"]["by_destination"]
     assert [row["error_reasons"] for row in filtered] == [{"timeout": 1}]
-    assert b"Unauthorized" not in (tmp_path / "data" / "stats.sqlite3").read_bytes()
+    assert b"Unauthorized" not in (tmp_path / "data" / "upload_assistant.sqlite3").read_bytes()
 
 
 def test_post_upload_activity_is_aggregated_per_destination(tmp_path):
@@ -973,7 +1003,7 @@ def metadata_tracking(monkeypatch, tmp_path):
     monkeypatch.setattr(httpx.AsyncClient, "send", httpx.AsyncClient.send)
     monkeypatch.setattr(httpx.Client, "send", httpx.Client.send)
     monkeypatch.setattr(stats, "_metadata_tracking_installed", False)
-    monkeypatch.setattr(stats, "_database_path", lambda _state_dir=None: tmp_path / "data" / "stats.sqlite3")
+    monkeypatch.setattr(stats, "_database_path", lambda _state_dir=None: tmp_path / "data" / "upload_assistant.sqlite3")
     stats.install_metadata_api_tracking()
     return tmp_path
 
@@ -1005,7 +1035,7 @@ async def test_metadata_tracking_records_nothing_while_collection_is_disabled(me
     async with httpx.AsyncClient(transport=httpx.MockTransport(lambda _request: httpx.Response(200))) as client:
         await client.get("https://api.themoviedb.org/3/movie/1")
 
-    assert not (metadata_tracking / "data" / "stats.sqlite3").exists()
+    assert not (metadata_tracking / "data" / "upload_assistant.sqlite3").exists()
 
 
 def test_metadata_service_names_only_known_provider_hosts():

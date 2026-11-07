@@ -18,10 +18,10 @@ from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any, cast
 
-from src.app_paths import DATA_DIR
+from src.app_db import connect as connect_app_db
+from src.app_db import database_available, database_path
 from src.content_duration import content_duration_category, existing_content_duration, prepared_content_duration
 
-_SCHEMA_VERSION = "2"
 _PERIOD_DAYS = {"7d": 7, "30d": 30, "90d": 90, "1y": 365}
 _DIMENSION_RE = re.compile(r"[^A-Za-z0-9_.:-]+")
 _mode: ContextVar[str] = ContextVar("ua_stats_mode", default="real")
@@ -29,8 +29,6 @@ _category: ContextVar[str] = ContextVar("ua_stats_category", default="")
 _enabled = False
 _configuration_lock = threading.Lock()
 _record_lock = threading.Lock()
-_schema_lock = threading.Lock()
-_initialized_paths: set[Path] = set()
 
 
 def stats_collection_enabled(config: Mapping[str, Any] | None) -> bool:
@@ -246,55 +244,11 @@ def _dimension(value: object, *, default: str = "") -> str:
 
 
 def _database_path(state_dir: str | Path | None = None) -> Path:
-    return Path(state_dir) / "data" / "stats.sqlite3" if state_dir is not None else DATA_DIR / "stats.sqlite3"
+    return database_path(state_dir)
 
 
 def _connect(path: Path) -> sqlite3.Connection:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    db = sqlite3.connect(path, timeout=5)
-    db.execute("PRAGMA busy_timeout = 5000")
-    with _schema_lock:
-        if path not in _initialized_paths:
-            db.execute("PRAGMA journal_mode = WAL")
-            db.execute("CREATE TABLE IF NOT EXISTS stats_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
-            schema_row = db.execute("SELECT value FROM stats_meta WHERE key = 'schema_version'").fetchone()
-            if schema_row is not None and schema_row[0] not in {"1", _SCHEMA_VERSION}:
-                db.close()
-                raise sqlite3.DatabaseError("Unsupported statistics schema version")
-            existing_columns = {str(row[1]) for row in db.execute("PRAGMA table_info(stats_daily)")}
-            if (schema_row is not None and schema_row[0] != _SCHEMA_VERSION) or (existing_columns and "destination" not in existing_columns):
-                db.execute("DROP TABLE IF EXISTS stats_daily")
-            db.execute(
-                """
-                CREATE TABLE IF NOT EXISTS stats_daily (
-                    day TEXT NOT NULL,
-                    family TEXT NOT NULL,
-                    service TEXT NOT NULL,
-                    operation TEXT NOT NULL,
-                    outcome TEXT NOT NULL,
-                    category TEXT NOT NULL,
-                    source TEXT NOT NULL,
-                    mode TEXT NOT NULL,
-                    destination TEXT NOT NULL,
-                    count INTEGER NOT NULL DEFAULT 0,
-                    duration_ms INTEGER NOT NULL DEFAULT 0,
-                    content_seconds INTEGER NOT NULL DEFAULT 0,
-                    bytes INTEGER NOT NULL DEFAULT 0,
-                    PRIMARY KEY (day, family, service, operation, outcome, category, source, mode, destination)
-                )
-                """
-            )
-            current_columns = {str(row[1]) for row in db.execute("PRAGMA table_info(stats_daily)")}
-            if "content_seconds" not in current_columns:
-                try:
-                    db.execute("ALTER TABLE stats_daily ADD COLUMN content_seconds INTEGER NOT NULL DEFAULT 0")
-                except sqlite3.OperationalError as exc:
-                    if "duplicate column" not in str(exc).lower():
-                        raise
-            db.execute("INSERT OR REPLACE INTO stats_meta VALUES ('schema_version', ?)", (_SCHEMA_VERSION,))
-            db.commit()
-            _initialized_paths.add(path)
-    return db
+    return connect_app_db(path)
 
 
 def record_event(
@@ -949,7 +903,7 @@ def get_stats(
     start = payload["period"]["from"]
     end = payload["period"]["to"]
     path = _database_path(state_dir)
-    if not path.is_file():
+    if not database_available(path):
         return payload
     try:
         with closing(_connect(path)) as db:

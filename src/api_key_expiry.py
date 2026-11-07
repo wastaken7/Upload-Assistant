@@ -11,6 +11,8 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+from src.app_db import connect as connect_app_db
+from src.app_db import database_available, database_path
 from src.app_paths import STATE_DIR
 from src.console import logger
 
@@ -37,7 +39,7 @@ def _identity(tracker: str, api_key: str, base_url: str) -> str:
 
 
 def _cache_path(state_dir: str | Path | None) -> Path:
-    return Path(state_dir or STATE_DIR) / "data" / "api_key_expiry.sqlite3"
+    return database_path(state_dir or STATE_DIR)
 
 
 def _status(expires_at: str | None, checked_at: str | None, now: datetime | None = None) -> dict[str, Any]:
@@ -63,10 +65,10 @@ def get_api_key_expiry(tracker: str, api_key: str, base_url: str, state_dir: str
     """Read only the status of this exact key; never return the key or its hash."""
     unknown = _status(None, None)
     path = _cache_path(state_dir)
-    if not api_key.strip() or not path.is_file():
+    if not api_key.strip() or not database_available(path):
         return unknown
     try:
-        with closing(sqlite3.connect(path, timeout=2)) as db:
+        with closing(connect_app_db(path)) as db:
             row = db.execute("SELECT expires_at, checked_at FROM api_key_expiry WHERE identity = ?", (_identity(tracker, api_key, base_url),)).fetchone()
         return _status(*row, now=now) if row else unknown
     except sqlite3.Error, OSError:
@@ -112,9 +114,7 @@ def record_api_key_expiry(
     status = _status(expires_at, checked_at)
     try:
         path = _cache_path(state_dir)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with closing(sqlite3.connect(path, timeout=2)) as db, db:
-            db.execute("CREATE TABLE IF NOT EXISTS api_key_expiry (identity TEXT PRIMARY KEY, expires_at TEXT, checked_at TEXT NOT NULL)")
+        with closing(connect_app_db(path)) as db, db:
             db.execute(
                 "INSERT OR REPLACE INTO api_key_expiry VALUES (?, ?, ?)",
                 (_identity(tracker, api_key, base_url), expires_at, checked_at),
