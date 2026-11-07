@@ -9,6 +9,7 @@ the Web UI server.
 
 from __future__ import annotations
 
+import os
 import sqlite3
 import threading
 import time
@@ -123,8 +124,85 @@ def _migrate_1(db: sqlite3.Connection, data_dir: Path) -> None:
     _import_legacy_api_key_expiry(db, data_dir)
 
 
+def _migrate_2(db: sqlite3.Connection, _data_dir: Path) -> None:
+    """Upload history: one row per processed item, with its IDs, tracker results and request matches."""
+    db.execute(
+        """
+        CREATE TABLE history_items (
+            id INTEGER PRIMARY KEY,
+            started_at TEXT NOT NULL,
+            finished_at TEXT NOT NULL,
+            source TEXT NOT NULL DEFAULT '',
+            path TEXT NOT NULL,
+            name TEXT NOT NULL,
+            title TEXT NOT NULL DEFAULT '',
+            year INTEGER,
+            category TEXT NOT NULL DEFAULT '',
+            release_type TEXT NOT NULL DEFAULT '',
+            resolution TEXT NOT NULL DEFAULT '',
+            release_group TEXT NOT NULL DEFAULT '',
+            season TEXT NOT NULL DEFAULT '',
+            episode TEXT NOT NULL DEFAULT '',
+            size INTEGER NOT NULL DEFAULT 0,
+            fingerprint TEXT NOT NULL DEFAULT '',
+            infohash TEXT NOT NULL DEFAULT '',
+            outcome TEXT NOT NULL,
+            reason TEXT NOT NULL DEFAULT '',
+            duration_ms INTEGER NOT NULL DEFAULT 0,
+            site_check INTEGER NOT NULL DEFAULT 0,
+            personal_release INTEGER NOT NULL DEFAULT 0,
+            artwork_url TEXT NOT NULL DEFAULT ''
+        )
+        """
+    )
+    db.execute("CREATE INDEX history_items_finished_at ON history_items (finished_at)")
+    db.execute("CREATE INDEX history_items_fingerprint ON history_items (fingerprint)")
+    db.execute(
+        """
+        CREATE TABLE history_ids (
+            item_id INTEGER NOT NULL REFERENCES history_items (id) ON DELETE CASCADE,
+            provider TEXT NOT NULL,
+            value TEXT NOT NULL,
+            PRIMARY KEY (item_id, provider)
+        )
+        """
+    )
+    db.execute(
+        """
+        CREATE TABLE history_trackers (
+            item_id INTEGER NOT NULL REFERENCES history_items (id) ON DELETE CASCADE,
+            tracker TEXT NOT NULL,
+            status TEXT NOT NULL,
+            message TEXT NOT NULL DEFAULT '',
+            link TEXT NOT NULL DEFAULT '',
+            torrent_id TEXT NOT NULL DEFAULT '',
+            duration REAL,
+            dupes TEXT NOT NULL DEFAULT '',
+            slot TEXT NOT NULL DEFAULT '',
+            PRIMARY KEY (item_id, tracker)
+        )
+        """
+    )
+    db.execute("CREATE INDEX history_trackers_tracker ON history_trackers (tracker, status)")
+    db.execute(
+        """
+        CREATE TABLE history_requests (
+            id INTEGER PRIMARY KEY,
+            item_id INTEGER NOT NULL REFERENCES history_items (id) ON DELETE CASCADE,
+            tracker TEXT NOT NULL,
+            name TEXT NOT NULL,
+            link TEXT NOT NULL DEFAULT '',
+            reward TEXT NOT NULL DEFAULT '',
+            status TEXT NOT NULL DEFAULT '',
+            exact INTEGER NOT NULL DEFAULT 0
+        )
+        """
+    )
+    db.execute("CREATE INDEX history_requests_item ON history_requests (item_id)")
+
+
 # Append only: a migration that has shipped must never change.
-MIGRATIONS: tuple[Callable[[sqlite3.Connection, Path], None], ...] = (_migrate_1,)
+MIGRATIONS: tuple[Callable[[sqlite3.Connection, Path], None], ...] = (_migrate_1, _migrate_2)
 SCHEMA_VERSION = len(MIGRATIONS)
 
 
@@ -163,6 +241,27 @@ def _migrate(db: sqlite3.Connection, path: Path) -> None:
         raise
 
 
+def _restrict_permissions(path: Path) -> None:
+    """Keep the database readable by its owner only: the history holds release names, paths and links.
+
+    The file is created with mode 0600 before SQLite opens it, and SQLite gives
+    its -wal and -shm files the same mode. Files left more open by an earlier
+    version are tightened. On Windows the per-user profile folder is already private.
+    """
+    if os.name == "nt":
+        return
+    try:
+        path.touch(mode=0o600, exist_ok=True)
+    except OSError:
+        return
+    for candidate in (path, path.with_name(f"{path.name}-wal"), path.with_name(f"{path.name}-shm")):
+        try:
+            if candidate.stat().st_mode & 0o077:
+                candidate.chmod(0o600)
+        except OSError:
+            continue
+
+
 def connect(path: Path | None = None) -> sqlite3.Connection:
     """Open the shared database, creating or upgrading its schema on first use.
 
@@ -171,6 +270,7 @@ def connect(path: Path | None = None) -> sqlite3.Connection:
     """
     path = path or database_path()
     path.parent.mkdir(parents=True, exist_ok=True)
+    _restrict_permissions(path)
     db = sqlite3.connect(path, timeout=5)
     try:
         db.execute("PRAGMA busy_timeout = 5000")

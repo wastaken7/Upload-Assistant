@@ -123,6 +123,12 @@ config: dict[str, Any] = {
         # names, paths, external IDs, URLs, or credentials are stored. Opt in by
         # changing this setting to True.
         "stats_enabled": False,
+        # --- UPLOAD HISTORY ---
+        # Keep a local history of processed releases for the History Web UI page:
+        # release names, paths, external IDs, tracker results with links, and
+        # request matches. Debug runs are not recorded. Set to False to stop
+        # recording; entries already stored are kept until you clear them.
+        "history_enabled": True,
         # --- METADATA CACHING ---
         # Public metadata cache
         # Cache responses from sites such as TMDB and IMDb for reuse in future runs, reducing API requests.
