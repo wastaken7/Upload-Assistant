@@ -203,3 +203,63 @@ def test_detail_events_reach_the_history_without_the_web_ui(monkeypatch):
     assert list(upload_history._item.requests.values()) == [
         {"tracker": "FICT", "name": "Fictional request", "exact": False, "link": "https://fictional.example/requests/1"}
     ]
+
+
+def test_fingerprint_is_empty_when_a_subfolder_cannot_be_listed(tmp_path, monkeypatch):
+    _sized(tmp_path / "release" / "Fictional.mkv", 2 * MIB)
+
+    def walk(_top, onerror=None):
+        yield str(tmp_path / "release"), [], ["Fictional.mkv"]
+        onerror(PermissionError("fictional denied"))
+
+    monkeypatch.setattr(upload_history.os, "walk", walk)
+
+    assert upload_history.content_fingerprint(tmp_path / "release") == ""
+
+
+@pytest.mark.asyncio
+async def test_bracketed_names_openlibrary_ids_and_published_links_are_kept(tmp_path, history_on):
+    class InstanceUrlTracker:
+        pass
+
+    upload_history.begin_item()
+    webui_events.tracker_result("FICT", "success", link="https://fictional.example/details/9", torrent_id="9")
+    meta = _finished_meta(
+        tmp_path,
+        name="Fictional Artist - Fictional Album [b] [FLAC]",
+        category="BOOK",
+        openlibrary="OL45883W",
+        tracker_status={"FICT": {"upload": True, "upload_success": True, "torrent_id": "9"}},
+    )
+
+    await upload_history.record_item_async(meta, {"FICT": InstanceUrlTracker})
+
+    assert _rows(history_on, "SELECT name FROM history_items") == [("Fictional Artist - Fictional Album [b] [FLAC]",)]
+    assert ("openlibrary", "OL45883W") in _rows(history_on, "SELECT provider, value FROM history_ids")
+    assert _rows(history_on, "SELECT link, torrent_id FROM history_trackers") == [("https://fictional.example/details/9", "9")]
+
+
+@pytest.mark.parametrize(("nzb_path", "upload_started", "expected"), [("/out/fictional.nzb", False, ("success", "Posted to Usenet")), ("", True, ("failed", "Usenet upload failed"))])
+def test_a_requested_usenet_post_has_its_own_result(tmp_path, nzb_path, upload_started, expected):
+    upload_history.begin_item()
+    if upload_started:
+        upload_history.observe_run_event("stage", {"key": "upload", "status": "start"})
+    meta = _finished_meta(tmp_path, trackers=["USENET"], nzb_path=nzb_path, tracker_status={})
+
+    record = upload_history.build_item_record(meta, {})
+
+    assert [(row["tracker"], row["status"], row["message"]) for row in record["trackers"]] == [("USENET", *expected)]
+    assert record["outcome"] == ("success" if nzb_path else "error")
+
+
+def test_the_database_is_private_to_its_owner(history_on):
+    if upload_history.os.name == "nt":
+        pytest.skip("Windows relies on the per-user profile folder's permissions")
+    history_on.parent.mkdir(parents=True)
+    history_on.touch(mode=0o644)
+    history_on.chmod(0o644)
+
+    with closing(app_db.connect(history_on)):
+        pass
+
+    assert history_on.stat().st_mode & 0o777 == 0o600

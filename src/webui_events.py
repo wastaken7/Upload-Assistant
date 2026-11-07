@@ -662,7 +662,7 @@ def tracker_result(
     message: Any = None,
     duration: float | None = None,
 ) -> None:
-    if not enabled() or status not in TRACKER_STATUSES:
+    if not _wants_details() or status not in TRACKER_STATUSES:
         return
     payload: dict[str, Any] = {"tracker": plain_text(tracker, 64), "status": status}
     url = _http_link(link)
@@ -675,7 +675,7 @@ def tracker_result(
         payload["message"] = text
     if isinstance(duration, (int, float)) and duration > 0:
         payload["duration"] = round(float(duration), 2)
-    _emit("tracker", payload)
+    _publish_detail("tracker", payload)
 
 
 def request_match(tracker: str, name: Any, *, link: Any = None, reward: Any = None, status: Any = None, exact: bool = False) -> None:

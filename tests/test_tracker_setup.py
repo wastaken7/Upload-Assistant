@@ -28,6 +28,21 @@ def test_music_trackers_are_filtered_before_tracker_specific_work():
     assert meta.tracker_status["AITHER"] == {"upload": False, "skipped": True}
 
 
+def test_trackers_without_credentials_are_reported_as_skipped():
+    meta = Meta(category="MOVIE", trackers=["AITHER"])
+    setup = TrackerSetup({"TRACKERS": {"AITHER": {}}})
+
+    setup.filter_unsupported_trackers(meta)
+
+    assert meta.trackers == []
+    assert meta.tracker_status["AITHER"] == {
+        "upload": False,
+        "skipped": True,
+        "status_message": "Missing API key in the tracker configuration",
+        "skip_reason": "not_configured",
+    }
+
+
 def test_cathoderaytube_is_registered_for_supported_categories():
     meta = Meta(category="GAME", trackers=["CATHODERAYTUBE"])
     setup = TrackerSetup({"TRACKERS": {"CATHODERAYTUBE": {"announce_url": "https://signal.cathode-ray.tube/passkey/announce"}}})
