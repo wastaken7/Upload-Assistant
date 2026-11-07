@@ -676,6 +676,7 @@ const argumentSections = [
       { flag: "--tvmaze", placeholder: "ID" },
       { flag: "--mal", placeholder: "ID" },
       { flag: "--douban", placeholder: "ID" },
+      "--no-saved-ids",
       "--no-metadata-cache",
     ],
   },

@@ -12,7 +12,7 @@ import aiofiles
 import cli_ui
 from rich.markup import escape
 
-from src import confirm_options, payload_preview, webui_events
+from src import confirm_options, payload_preview, upload_history, webui_events
 from src.audible import resolve_audible_url
 from src.bdinfo_comparator import compare_bdinfo, has_bdinfo_content
 from src.cleanup import cleanup_manager
@@ -1111,6 +1111,8 @@ class UploadHelper:
                 logger.info(f"[green]Upload data changed in the Web UI:[/green] {escape(change)}", extra={"highlighter": None})
 
         if confirm:
+            meta.ids_confirmed = True
+            meta.confirmed_ids = upload_history.external_ids(meta)
             if (
                 meta.original_imdb == meta.imdb_id
                 and meta.original_tmdb == meta.tmdb_id

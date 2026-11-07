@@ -432,9 +432,204 @@ def record_item(record: Mapping[str, Any], state_dir: str | Path | None = None) 
     return None
 
 
+# Remembering a release between runs -------------------------------------------
+#
+# Keyed by content fingerprint, so a renamed folder or a fresh tmp/ directory
+# still finds what an earlier run learned. Unlike the history list, this is
+# also kept for debug runs: a person confirming IDs there confirms them for
+# the real upload too.
+
+_PROVIDER_LABELS = {
+    "imdb": "IMDb",
+    "tmdb": "TMDb",
+    "tvdb": "TVDB",
+    "tvmaze": "TVmaze",
+    "mal": "MAL",
+    "douban": "Douban",
+    "igdb": "IGDB",
+    "openlibrary": "Open Library",
+    "isbn": "ISBN",
+    "asin": "ASIN",
+}
+# Fields set by ID arguments, and IDs already resolved before the metadata search.
+_MANUAL_ID_FIELDS = (
+    "imdb_manual",
+    "tmdb_manual",
+    "tvdb_manual",
+    "tvmaze_manual",
+    "mal_manual",
+    "douban_manual",
+    "igdb_manual",
+    "music_discogs_id",
+    "music_discogs_release_id",
+    "music_discogs_master_id",
+    "book_isbn",
+    "book_asin",
+    "openlibrary",
+)
+
+
+def _read_memory(fingerprint: str, state_dir: str | Path | None = None) -> dict[str, Any] | None:
+    """Return the category, IDs and answers saved for a fingerprint, or None."""
+    path = database_path(state_dir)
+    if not fingerprint or not database_available(path):
+        return None
+    with closing(connect_app_db(path)) as db:
+        row = db.execute("SELECT category, ids, answers FROM release_memory WHERE fingerprint = ?", (fingerprint,)).fetchone()
+    if row is None:
+        return None
+    ids = _loads(row[1])
+    answers = _loads(row[2])
+    return {
+        "category": str(row[0] or ""),
+        "ids": {str(key): str(value) for key, value in ids.items() if value} if isinstance(ids, dict) else {},
+        "answers": answers if isinstance(answers, dict) else {},
+    }
+
+
+async def load_release_memory(meta: Any) -> None:
+    """Fingerprint the release, then reload the answers and confirmed IDs an earlier run saved for it.
+
+    Answers already on ``meta`` (from ``--answer``) win. The IDs are only kept on
+    ``meta.saved_ids`` here; :func:`apply_saved_ids` uses them once the category is known.
+    """
+    path = str(getattr(meta, "path", "") or "")
+    if not path:
+        return
+    try:
+        fingerprint = await asyncio.to_thread(content_fingerprint, path)
+        meta.release_fingerprint = fingerprint
+        memory = await asyncio.to_thread(_read_memory, fingerprint)
+    except (OSError, sqlite3.Error) as exc:
+        logger.debug(f"Could not read what earlier runs saved for this release: {exc}")
+        return
+    if memory is None:
+        return
+    for key, value in memory["answers"].items():
+        meta.manual_answers.setdefault(str(key), value)
+    meta.saved_ids = {**memory["ids"], "category": memory["category"]} if memory["ids"] else {}
+
+
+def apply_saved_ids(meta: Any) -> list[str]:
+    """Use remembered IDs as if they had been given on the command line, for IDs not given there.
+
+    They are applied only when the release still has the category it had when
+    they were confirmed. Return a description of each ID used.
+    """
+    saved = dict(getattr(meta, "saved_ids", {}) or {})
+    category = str(getattr(meta, "category", "") or "").upper()
+    if not saved or not category:
+        # Video categories are only known when the metadata search starts; try again then.
+        return []
+    # Decided once per run, whatever the outcome.
+    meta.saved_ids = {}
+    saved_category = saved.pop("category", "").upper()
+    if getattr(meta, "no_saved_ids", False):
+        return []
+    if saved_category != category:
+        # A video without an episode or season pattern is first guessed as MOVIE;
+        # a TV category confirmed earlier replaces that guess, as --tmdb tv/ would.
+        guessed_movie = category == "MOVIE" and not getattr(meta, "manual_category", None) and not getattr(meta, "tmdb_manual_category", "")
+        if not (guessed_movie and saved_category == "TV"):
+            return []
+        meta.category = category = "TV"
+    # Saved IDs belong together: once any ID was given (for example a corrected
+    # --imdb at the confirmation prompt), the others may no longer match it.
+    # IDs found automatically (scene or tracker data) are replaced instead.
+    given = [field_name for field_name in _MANUAL_ID_FIELDS if getattr(meta, field_name, None)]
+    if given:
+        logger.debug(f"Not reusing saved IDs because IDs were given: {', '.join(given)}")
+        return []
+    applied: list[str] = []
+
+    def fill(field_name: str, provider: str, value: object) -> None:
+        """Set one manual ID field from a saved value and note it for the log."""
+        if value not in (None, "", 0):
+            setattr(meta, field_name, value)
+            applied.append(f"{_PROVIDER_LABELS.get(provider, provider)} {saved[provider]}")
+
+    if category in {"MOVIE", "TV"}:
+        if not getattr(meta, "no_imdb", False):
+            fill("imdb_manual", "imdb", saved.get("imdb"))
+        kind, _separator, number = saved.get("tmdb", "").partition("/")
+        if number.isdigit() and kind.upper() == category:
+            fill("tmdb_manual", "tmdb", int(number))
+            meta.tmdb_manual_category = category
+        fill("tvdb_manual", "tvdb", saved.get("tvdb"))
+        fill("mal_manual", "mal", saved.get("mal"))
+        fill("douban_manual", "douban", _positive_int(saved.get("douban")))
+        if category == "TV":
+            fill("tvmaze_manual", "tvmaze", _positive_int(saved.get("tvmaze")))
+    elif category == "GAME":
+        fill("igdb_manual", "igdb", saved.get("igdb"))
+    elif category == "MUSIC":
+        fill("music_discogs_release_id", "discogs_release", saved.get("discogs_release"))
+        fill("music_discogs_master_id", "discogs_master", saved.get("discogs_master"))
+    elif category == "BOOK":
+        fill("book_isbn", "isbn", saved.get("isbn"))
+        fill("book_asin", "asin", saved.get("asin"))
+        fill("openlibrary", "openlibrary", saved.get("openlibrary"))
+    if category in {"MOVIE", "TV"} and (getattr(meta, "imdb_manual", None) or getattr(meta, "tmdb_manual", None)):
+        # As when --imdb or --tmdb is given: confirmed IDs win over ones found automatically.
+        meta.imdb_id = meta.imdb = meta.tmdb_id = meta.tmdb = None
+    if applied:
+        logger.info(f"[cyan]Using IDs confirmed for this release in an earlier run: {', '.join(applied)}. Use --no-saved-ids to search again.[/cyan]")
+    return applied
+
+
+def _trusted_ids(meta: Any) -> dict[str, str] | None:
+    """Return the IDs an upload succeeded with, else those a person confirmed, else None.
+
+    Confirmed IDs are the ones shown at "Is this correct?": an ID found later,
+    for example by a tracker check, is only trusted once an upload used it.
+    """
+    statuses = getattr(meta, "tracker_status", {})
+    if isinstance(statuses, Mapping) and any(isinstance(status, Mapping) and status.get("upload_success") is True for status in cast(Mapping[str, Any], statuses).values()):
+        return external_ids(meta)
+    if getattr(meta, "ids_confirmed", False) is True:
+        return dict(getattr(meta, "confirmed_ids", {}) or {})
+    return None
+
+
+def remember_release(meta: Any, state_dir: str | Path | None = None) -> bool:
+    """Save the release's manual answers, and its IDs when confirmed, for later runs. Return whether a row was written."""
+    path = str(getattr(meta, "path", "") or "")
+    fingerprint = str(getattr(meta, "release_fingerprint", "") or "") or (content_fingerprint(path) if path else "")
+    if not fingerprint:
+        return False
+    answers = dict(getattr(meta, "manual_answers", {}) or {})
+    # An empty set (e.g. a release with no IDs) keeps what an earlier run confirmed.
+    ids = _trusted_ids(meta) or None
+    database = database_path(state_dir)
+    if not answers and not ids and not database_available(database):
+        return False
+    with _record_lock, closing(connect_app_db(database)) as db, db:
+        existing = db.execute("SELECT category, ids FROM release_memory WHERE fingerprint = ?", (fingerprint,)).fetchone()
+        if existing is None and not answers and not ids:
+            return False
+        category = _text(getattr(meta, "category", ""), 20).upper() if ids else (existing[0] if existing else "")
+        stored_ids = _json(ids) if ids is not None else (existing[1] if existing else "")
+        db.execute(
+            """
+            INSERT INTO release_memory (fingerprint, updated_at, category, ids, answers) VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT (fingerprint) DO UPDATE SET
+                updated_at = excluded.updated_at, category = excluded.category, ids = excluded.ids, answers = excluded.answers
+            """,
+            (fingerprint, datetime.now(UTC).isoformat(), category, stored_ids, _json(answers)),
+        )
+    return True
+
+
 async def record_item_async(meta: Any, tracker_class_map: Mapping[str, Any], *, outcome: str | None = None, reason: str = "") -> None:
-    """Record a finished item without blocking the event loop. The history must never break an upload."""
+    """Record a finished item and remember the release without blocking the event loop.
+
+    Neither may break an upload, so failures are only logged.
+    """
     global _item
+    try:
+        await asyncio.to_thread(remember_release, meta)
+    except Exception as exc:
+        logger.debug(f"Release IDs and answers were not saved: {exc}")
     try:
         record = await asyncio.to_thread(build_item_record, meta, tracker_class_map, outcome=outcome, reason=reason)
         if record is not None:

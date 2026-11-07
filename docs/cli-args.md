@@ -114,6 +114,7 @@ If you pass a `.txt` file as the main positional input path (without specifying 
 - `-mal`, `--mal MAL_ID`: MAL id.
 - `-tvmaze`, `--tvmaze TVMAZE_ID`: TVMaze id.
 - `-tvdb`, `--tvdb TVDB_ID`: TVDB id.
+- `--no-saved-ids`: Do not reuse the IDs confirmed for this release in an earlier run, and search for them again. See [Saved IDs and answers](web-ui.md#saved-ids-and-answers).
 
 Note: if a manual TMDb or IMDb id is present in the incoming `meta` before parsing, the parser clears `tmdb_manual`, `tmdb_id`, `tmdb`, `imdb_id`, `imdb` in `meta` so CLI values take precedence cleanly.
 
