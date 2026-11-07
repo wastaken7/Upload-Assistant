@@ -155,7 +155,7 @@ DEFAULT_KEY_TYPES: dict[str, tuple[type, ...]] = {
     "music_discogs_token": (str,),
     "stats_enabled": (bool,),
     "history_enabled": (bool,),
-    "history_retention_days": (int,),
+    "history_retention_days": (str, int, float),
     "metadata_cache_enabled": (bool,),
     "metadata_cache_dir": (str,),
     "metadata_cache_default_ttl_hours": (int,),
@@ -575,6 +575,22 @@ def _validate_default_section(default: dict[str, Any]) -> tuple[list[str], list[
                     f"Invalid value '{upload_order}' for upload_order. Must be one of: 'concurrent', 'usenet', 'tracker'", key="upload_order", section="DEFAULT"
                 )
             )
+
+    retention = default.get("history_retention_days")
+    if retention is not None:
+        # Mirrors src.upload_history.history_retention_days, where True/False and
+        # unparsable values keep entries forever.
+        message = ""
+        if isinstance(retention, bool):
+            message = "Must be a number of days; true or false keeps entries forever"
+        else:
+            try:
+                if int(retention) < 0:
+                    message = "Must be 0 (keep forever) or a positive number of days"
+            except TypeError, ValueError:
+                message = "Must be a whole number of days; this value keeps entries forever"
+        if message:
+            warnings.append(ConfigValidationWarning(message, key="history_retention_days", section="DEFAULT"))
 
     if "embed_dupe_links" in default:
         warnings.append(

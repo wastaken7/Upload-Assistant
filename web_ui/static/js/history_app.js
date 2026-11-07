@@ -372,17 +372,11 @@ function HelpResourcesModal({ onClose }) {
 
 const trackerLabel = (names, tracker) => names?.[tracker] || tracker;
 
-// Read once by the Upload page. Kept out of the URL so paths do not end up in
-// browser history or access logs.
-const UPLOAD_PATH_HANDOFF_KEY = "ua_history_upload_path";
-
+// Return false when the browser blocks session storage, so the caller can say so.
 const uploadAgain = (path) => {
-  try {
-    window.sessionStorage.setItem(UPLOAD_PATH_HANDOFF_KEY, path);
-  } catch (_error) {
-    // Without session storage the Upload page simply opens empty.
-  }
+  if (!window.UAUploadHandoff.offer(path)) return false;
   window.location = `${APP_BASE}/`;
+  return true;
 };
 
 const releaseDetails = (item) =>
@@ -867,7 +861,12 @@ function HistoryDetail({ itemId, onClose, onDeleted }) {
                 <button
                   type="button"
                   className="ua-stats-control inline-flex min-w-0 items-center gap-1.5 rounded-lg px-3 py-2 text-sm"
-                  onClick={() => uploadAgain(item.path)}
+                  onClick={() => {
+                    if (!uploadAgain(item.path))
+                      setError(
+                        "This browser blocks session storage, so the path cannot be passed to the Upload page. Copy the path above and paste it there.",
+                      );
+                  }}
                   title="Open the Upload page with this path in the queue"
                 >
                   <AssetIcon name="upload" className="h-4 w-4" />
@@ -1027,6 +1026,10 @@ function HistoryApp() {
     setExportError("");
     try {
       const query = filterQuery();
+      // Use the text in the search box, even if the list has not caught up with it yet.
+      const typed = searchInput.trim();
+      if (typed) query.set("q", typed);
+      else query.delete("q");
       query.set("format", format);
       const response = await apiFetch(
         `${APP_BASE}/api/history/export?${query.toString()}`,

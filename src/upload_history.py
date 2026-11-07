@@ -983,6 +983,9 @@ def export_items(
     where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
     selected = f"SELECT id FROM history_items {where} ORDER BY finished_at DESC, id DESC LIMIT {EXPORT_MAX_ITEMS}"  # noqa: S608
     with closing(connect_app_db(path)) as db:
+        # One read transaction: an item recorded while exporting must not
+        # appear in the detail queries without appearing in the item query.
+        db.execute("BEGIN")
         rows = db.execute(
             f"SELECT {', '.join(_ITEM_COLUMNS)} FROM history_items WHERE id IN ({selected}) ORDER BY finished_at DESC, id DESC",  # noqa: S608
             parameters,
@@ -1003,13 +1006,15 @@ def export_items(
             parameters,
         ):
             by_id[item_id]["requests"].append({"tracker": name, "name": request_name, "link": link, "reward": reward, "status": status, "exact": bool(exact)})
+        db.commit()
     return items
 
 
 def _csv_cell(value: object) -> str:
     """Return a CSV cell that a spreadsheet will show as text, never run as a formula."""
     text = "" if value is None else str(value)
-    return f"'{text}" if text.startswith(_FORMULA_PREFIXES) else text
+    # Some importers trim leading whitespace before deciding a cell is a formula.
+    return f"'{text}" if text.lstrip(" \t\r\n").startswith(_FORMULA_PREFIXES) else text
 
 
 def export_csv(items: list[dict[str, Any]]) -> str:

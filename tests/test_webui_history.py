@@ -164,10 +164,14 @@ def test_history_export_downloads_filtered_csv_and_json(monkeypatch, tmp_path):
     assert client.get("/api/history/export?outcome=maybe").status_code == 400
 
 
-def test_upload_page_reads_the_history_handoff_once():
+def test_upload_page_takes_the_history_handoff_while_restoring_tabs():
     app_js = (server.CODE_DIR / "web_ui" / "static" / "js" / "app.js").read_text(encoding="utf-8")
     history_js = (server.CODE_DIR / "web_ui" / "static" / "js" / "history_app.js").read_text(encoding="utf-8")
+    restore = app_js[app_js.index("const restoreUploadSessions = async") : app_js.index("setUploadTabsRestored(true);")]
 
-    assert 'sessionStorage.removeItem("ua_history_upload_path")' in app_js
-    assert 'UPLOAD_PATH_HANDOFF_KEY = "ua_history_upload_path"' in history_js
+    # Restoring sessions or drafts must not replace the tab that receives the path.
+    assert "const handoffPath = window.UAUploadHandoff?.take()" in restore
+    assert "!handoffPath &&" in restore
+    assert "if (handoffPath) handlePathInputChange(handoffPath);" in restore
+    assert "window.UAUploadHandoff.offer(path)" in history_js
     assert "?path=" not in history_js

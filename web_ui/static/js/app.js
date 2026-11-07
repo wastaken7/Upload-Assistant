@@ -5648,19 +5648,6 @@ function AudionutsUAGUI() {
     setSelectedName(items[0]?.path.split(/[/\\]/).pop() || "");
   };
 
-  // History's "Upload again" leaves the release path here for one page load.
-  useEffect(() => {
-    if (screenshotMode) return;
-    let path = "";
-    try {
-      path = window.sessionStorage.getItem("ua_history_upload_path") || "";
-      window.sessionStorage.removeItem("ua_history_upload_path");
-    } catch (_error) {
-      return;
-    }
-    if (path) handlePathInputChange(path);
-  }, []);
-
   const renderSelectedPathOrQueue = (isMobileView = false) => {
     const pathText =
       manualPathsText !== null
@@ -7085,9 +7072,13 @@ function AudionutsUAGUI() {
       console.error("Failed to load upload sessions:", error);
     }
     const drafts = loadUploadTabDrafts();
+    // History's "Upload again" hands over a release path for this page load;
+    // the first tab keeps it instead of being replaced by restored tabs.
+    const handoffPath = window.UAUploadHandoff?.take() || "";
 
     const firstTab = getTabRuntime("tab-1");
     const replaceFirstTab =
+      !handoffPath &&
       firstTab &&
       !firstTab.run.isExecuting &&
       !firstTab.sessionRecord &&
@@ -7145,6 +7136,7 @@ function AudionutsUAGUI() {
       setIsExecuting(visible.run.isExecuting);
     }
     restoredSessions.forEach((tab) => attachRestoredSession(tab.id));
+    if (handoffPath) handlePathInputChange(handoffPath);
     setUploadTabsRestored(true);
   };
 

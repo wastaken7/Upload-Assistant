@@ -401,6 +401,24 @@ def test_retention_setting_is_a_non_negative_number_of_days(value, days):
     assert upload_history.history_retention_days({"DEFAULT": {}}) == 0
 
 
+@pytest.mark.parametrize(
+    ("value", "neutralized"),
+    [("=1+1", True), (" =1+1", True), ("\t@SUM(A1)", True), ("\n-2", True), ("Fictional = name", False), ("", False)],
+)
+def test_csv_cells_that_a_spreadsheet_could_run_are_neutralized(value, neutralized):
+    assert upload_history._csv_cell(value) == (f"'{value}" if neutralized else value)
+
+
+@pytest.mark.parametrize(("value", "warns"), [(30, False), ("30", False), (30.0, False), (0, False), (True, True), (-1, True), ("soon", True), ("30.5", True)])
+def test_retention_setting_warnings_match_how_it_is_read(value, warns):
+    from src.configvalidator import _validate_default_section
+
+    _errors, warnings = _validate_default_section({"tmdb_api": "test", "history_retention_days": value})
+
+    assert any(warning.key == "history_retention_days" for warning in warnings) is warns
+    assert (upload_history.history_retention_days({"DEFAULT": {"history_retention_days": value}}) > 0) is (not warns and int(value) > 0)
+
+
 def test_retention_removes_only_entries_older_than_the_limit(history_on):
     state_dir = history_on.parent.parent
     _record(history_on, finished_at="2000-01-01T00:00:00+00:00", title="Old")
