@@ -4689,6 +4689,7 @@ def _history_tracker_names(codes: Iterable[str]) -> dict[str, str]:
 
 
 @app.route("/api/history", methods=["GET", "DELETE"])
+@limiter.limit("600 per hour", key_func=_rate_limit_key_func, override_defaults=True)
 def history_api():
     """List or clear the local upload history."""
     error = _history_request_error()
@@ -4730,6 +4731,7 @@ def history_api():
 
 
 @app.route("/api/history/<int:item_id>", methods=["GET", "DELETE"])
+@limiter.limit("600 per hour", key_func=_rate_limit_key_func, override_defaults=True)
 def history_item_api(item_id: int):
     """Read or delete one upload history entry."""
     error = _history_request_error()

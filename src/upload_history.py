@@ -628,6 +628,8 @@ async def record_item_async(meta: Any, tracker_class_map: Mapping[str, Any], *, 
 
 TRACKER_STATUSES = ("success", "failed", "dupe", "banned", "skipped")
 MAX_PAGE_SIZE = 200
+# Largest value SQLite can bind; larger IDs or offsets cannot match anything.
+_SQLITE_MAX_INTEGER = 2**63 - 1
 _ITEM_COLUMNS = (
     "id",
     "started_at",
@@ -751,7 +753,7 @@ def list_items(
 ) -> dict[str, Any]:
     """Return one page of history entries, newest first, with outcome counts and filter options."""
     limit = max(1, min(MAX_PAGE_SIZE, int(limit)))
-    offset = max(0, int(offset))
+    offset = max(0, min(_SQLITE_MAX_INTEGER, int(offset)))
     if outcome and outcome not in OUTCOMES:
         raise ValueError(f"outcome must be one of: {', '.join(OUTCOMES)}")
     clauses, parameters = _filters(
@@ -841,7 +843,7 @@ def _loads(value: str) -> Any:
 def get_item(item_id: int, state_dir: str | Path | None = None) -> dict[str, Any] | None:
     """Return one entry with its IDs, tracker results and request matches, or None."""
     path = database_path(state_dir)
-    if not database_available(path):
+    if not 0 < int(item_id) <= _SQLITE_MAX_INTEGER or not database_available(path):
         return None
     with closing(connect_app_db(path)) as db:
         row = db.execute(f"SELECT {', '.join(_ITEM_COLUMNS)} FROM history_items WHERE id = ?", (int(item_id),)).fetchone()  # noqa: S608
@@ -881,7 +883,7 @@ def get_item(item_id: int, state_dir: str | Path | None = None) -> dict[str, Any
 def delete_item(item_id: int, state_dir: str | Path | None = None) -> bool:
     """Remove one entry and its details; return whether it existed."""
     path = database_path(state_dir)
-    if not database_available(path):
+    if not 0 < int(item_id) <= _SQLITE_MAX_INTEGER or not database_available(path):
         return False
     with _record_lock, closing(connect_app_db(path)) as db, db:
         return db.execute("DELETE FROM history_items WHERE id = ?", (int(item_id),)).rowcount > 0
