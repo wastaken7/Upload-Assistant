@@ -1,53 +1,13 @@
 // Loaded only for the authenticated Upload page with ?screenshot=1.
+// The demo is frozen at the "Is this correct?" step, where the user checks the
+// matched IDs and release names before anything is uploaded.
 (() => {
   const release =
     "The.Automation.Menace.1968.Hybrid.2160p.UHD.BluRay.REMUX.DV.HDR10Plus.HEVC.DTS-HD.MA.5.1-Group";
   const path = `E:\\Movies\\${release}`;
-  const progress = [
-    ["mkbrr", "mkbrr hashing...", 64, 100, "percent", "100 MiB/s | ETA: 04:27"],
-    [
-      "usenet",
-      "Creating Usenet archive",
-      8,
-      100,
-      "percent",
-      "6.1 GiB / 72.3 GiB processed",
-    ],
-    ["ffmpeg", "FFmpeg screenshots", 3, 6, "frames", "3/6 frames completed"],
-    [
-      "spectrogram",
-      "Generating audio spectrogram",
-      1,
-      3,
-      "items",
-      "Rendering audio streams",
-    ],
-    [
-      "hdr",
-      "Generating dynamic HDR plots",
-      1,
-      2,
-      "items",
-      "Processing dynamic metadata",
-    ],
-    ["image-upload-1", "Uploading images", 4, 6, "images", "imgbox"],
-    [
-      "bandwidth",
-      "Waiting for bandwidth",
-      2350,
-      2000,
-      "kbps",
-      "Average over last 20/60s",
-    ],
-  ].map(([id, label, current, total, unit, detail]) => ({
-    id,
-    label,
-    current,
-    total,
-    unit,
-    detail,
-    status: "running",
-  }));
+  const baseName = release
+    .replaceAll(".", " ")
+    .replace("DTS-HD MA 5 1", "DTS-HD MA 5.1");
   // Flat SVG "frames" stand in for real captures, so no real media ships.
   const frame = (hue, index) =>
     `data:image/svg+xml;charset=utf-8,${encodeURIComponent(
@@ -98,16 +58,13 @@ The machines took over the assembly lines. Then they took over the city.
       },
     ],
   };
-  // Other upload tabs shown next to the demo run; they are display-only.
+  // The demo run is the only upload tab.
   const tabs = [
     {
       title: "The Automation Menace (1968)",
       detail: release,
-      status: "running",
+      status: "input",
     },
-    { title: "Signal From Orbit (1974)", detail: "", status: "input" },
-    { title: "Queue (3)", detail: "", status: "scheduled" },
-    { title: "Harbor Lights S01", detail: "", status: "done" },
   ];
   const media = {
     media_id: "screenshot-demo",
@@ -118,7 +75,7 @@ The machines took over the assembly lines. Then they took over the city.
     source: "BluRay",
     resolution: "2160p",
     path,
-    name: release.replaceAll(".", " "),
+    name: baseName,
     genres: ["Science Fiction", "Mystery", "Adventure"],
     metadata_sources: [
       { key: "tmdb", label: "TMDb", value: "0000" },
@@ -165,7 +122,14 @@ The machines took over the assembly lines. Then they took over the city.
       { language: "Chinese", language_code: "zh", format: "PGS" },
       { language: "Dutch", language_code: "nl", format: "PGS" },
     ].map((track, index) => ({ ...track, index: index + 1 })),
-    progress,
+    // No external tool runs before the IDs are confirmed.
+    progress: [],
+  };
+  // One fictional tracker keeps the base name; the other uses its own format.
+  const releaseNames = {
+    NOVA: baseName,
+    ORBIT:
+      "The Automation Menace (1968) Hybrid 2160p UHD BluRay REMUX DV HDR10+ HEVC DTS-HD MA 5.1-Group",
   };
   const output = `<pre><span style="color:#ffff00">$ python upload.py "${path}"\n→ Starting execution...</span>
 <span style="color:#00cc00">Gathering info for ${release}</span>
@@ -182,9 +146,12 @@ The machines took over the assembly lines. Then they took over the city.
 <span style="color:#00aaaa">Type......</span> REMUX
 <span style="color:#00aaaa">Group Tag.</span> Group
 
-<b>Base Name:</b> ${media.name}
+<b>Base Name:</b> ${baseName}
 
-<span style="color:#00cc00">Preparing screenshots, torrent and Usenet archive...</span></pre>`;
+NOVA:  ${releaseNames.NOVA}
+ORBIT: ${releaseNames.ORBIT}
+
+<span style="color:#00cc00">::</span> Is this correct? (y/N)</pre>`;
 
   const mediainfo = {
     success: true,
@@ -229,105 +196,148 @@ Language                                 : ${track.language}`,
     ],
   };
 
-  // Structured events for the GUI output view: the run is paused at a dupe
-  // prompt, with fictional trackers in each result state.
-  const gib = (value) => Math.round(value * 1024 ** 3);
+  // Each fictional tracker's upload form, as the confirmation shows it.
+  const payload = (tracker, name) => ({
+    tracker,
+    name,
+    fields: [
+      { key: "name", label: "Name", kind: "text", value: name, max: 255 },
+      {
+        key: "category_id",
+        label: "Category",
+        kind: "choice",
+        value: "1",
+        display: "Movie (1)",
+        choices: "c0",
+      },
+      {
+        key: "type_id",
+        label: "Type",
+        kind: "choice",
+        value: "2",
+        display: "Remux (2)",
+        choices: "c1",
+      },
+      {
+        key: "resolution_id",
+        label: "Resolution",
+        kind: "choice",
+        value: "1",
+        display: "2160p (1)",
+        choices: "c2",
+      },
+      {
+        key: "tmdb",
+        label: "TMDB ID",
+        kind: "text",
+        value: "0000",
+        max: 20,
+        numeric: true,
+      },
+      {
+        key: "imdb",
+        label: "IMDB ID",
+        kind: "text",
+        value: "0000000",
+        max: 20,
+        numeric: true,
+      },
+      { key: "anonymous", label: "Anonymous", kind: "flag", value: false },
+      {
+        key: "description",
+        label: "Description",
+        kind: "deferred",
+        note: "Built after the screenshots are uploaded",
+      },
+      {
+        key: "mediainfo",
+        label: "MediaInfo",
+        kind: "deferred",
+        note: "Read from the MediaInfo report at upload time",
+      },
+    ],
+  });
+  const option = (key, label, group, value, hint) => ({
+    key,
+    label,
+    group,
+    type: "toggle",
+    value,
+    ...(hint ? { hint } : {}),
+  });
+
+  // Structured events for the GUI output view: metadata is done and the run
+  // waits for the user to confirm the matched IDs.
   const gui = (data) => ({ type: "gui", data });
   const guiEvents = [
     gui({ kind: "stage", key: "prep", status: "start" }),
     gui({ kind: "stage", key: "prep", status: "done" }),
     gui({ kind: "stage", key: "confirm", status: "start" }),
-    gui({ kind: "stage", key: "confirm", status: "done" }),
-    gui({ kind: "stage", key: "dupes", status: "start" }),
-    gui({
-      kind: "notice",
-      level: "warning",
-      text: "Image host returned a slow response; retrying with the next host.",
-    }),
-    gui({
-      kind: "notice",
-      level: "attention",
-      text: "Distributor 'Fictional Media' is not recognized.",
-      tracker: "HELIX",
-      key: "distributor:HELIX",
-    }),
-    gui({
-      kind: "slot",
-      tracker: "NOVA",
-      verdict: "review",
-      title: "Review before uploading",
-      reason: "A remux with the same audio already fills the UHD slot.",
-      slot: "UHD Remux",
-      why: "Your release adds HDR10+ metadata, which may qualify it as a trump.",
-      rules:
-        "Rules as of 2026-01-01. This is only a recommendation; tracker rules change over time.",
-      rules_url: "https://tracker.invalid/rules",
-    }),
-    gui({
-      kind: "dupes",
-      tracker: "NOVA",
-      trumpable: false,
-      entries: [
-        {
-          name: "The Automation Menace 1968 2160p UHD BluRay REMUX DV HEVC DTS-HD MA 5.1-Other",
-          size: gib(71.9),
-          diff_pct: -1,
-          color: "#ff0000",
-        },
-        {
-          name: "The Automation Menace 1968 1080p BluRay REMUX AVC DTS-HD MA 5.1-Other",
-          size: gib(34.2),
-          diff_pct: -53,
-          color: "#00ff00",
-        },
-      ],
-    }),
-    gui({
-      kind: "tracker",
-      tracker: "ORBIT",
-      status: "pending",
-      message: "No potential dupes found",
-    }),
-    gui({
-      kind: "tracker",
-      tracker: "ZENITH",
-      status: "dupe",
-      message: "Possible dupe on this tracker",
-    }),
-    gui({
-      kind: "tracker",
-      tracker: "HELIX",
-      status: "skipped",
-      message: "Not uploading: missing distributor information.",
-    }),
     gui({
       kind: "prompt",
       action: "open",
       id: 1,
       type: "yes_no",
-      question: "Upload to NOVA anyway?",
+      question: "Is this correct?",
       default: false,
-      context: { kind: "dupes", tracker: "NOVA" },
-    }),
-    gui({ kind: "prompt", action: "close", id: 1 }),
-    gui({
-      kind: "prompt",
-      action: "open",
-      id: 3,
-      type: "text",
-      question:
-        "Input args that need correction e.g. (--tag NTb --category tv --tmdb 12345), 'continue' to keep them, or 'skip' to skip this upload",
       context: {
-        kind: "edit_args",
-        values: {
-          "--category": "movie",
-          "--tmdb": "movie/0000",
-          "--tag": "Group",
-        },
-        applied: "",
-        actions: [
-          ["continue", "Continue without changes"],
-          ["skip", "Skip this upload"],
+        kind: "confirm",
+        base_name: baseName,
+        release_names: releaseNames,
+        debug: false,
+        run_options: [
+          option(
+            "dynamic_hdr_plot",
+            "Dolby Vision / HDR10+ plots",
+            "media",
+            true,
+          ),
+          option("audio_spectrogram", "Audio spectrograms", "media", false),
+          option(
+            "anon",
+            "Anonymous",
+            "upload",
+            false,
+            "Trackers set to anonymous in your config stay anonymous",
+          ),
+          option("personalrelease", "Personal release", "upload", false),
+          option(
+            "modq",
+            "Moderation queue",
+            "upload",
+            false,
+            "On trackers that support it",
+          ),
+          option("no_seed", "Don't add to the torrent client", "upload", false),
+        ],
+        payloads: Object.entries(releaseNames).map(([tracker, name]) =>
+          payload(tracker, name),
+        ),
+        payload_choices: [
+          {
+            id: "c0",
+            choices: [
+              ["1", "Movie"],
+              ["2", "TV"],
+            ],
+          },
+          {
+            id: "c1",
+            choices: [
+              ["1", "Full Disc"],
+              ["2", "Remux"],
+              ["3", "Encode"],
+              ["4", "WEB-DL"],
+            ],
+          },
+          {
+            id: "c2",
+            choices: [
+              ["1", "2160p"],
+              ["2", "1080p"],
+              ["3", "720p"],
+            ],
+          },
         ],
       },
     }),
