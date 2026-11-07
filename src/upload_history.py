@@ -86,6 +86,12 @@ def begin_item() -> None:
         _item = _ItemState(started_at=datetime.now(UTC).isoformat(), started_monotonic=time.monotonic())
 
 
+def item_active() -> bool:
+    """Whether an item was started and not yet recorded."""
+    with _state_lock:
+        return _item is not None
+
+
 def observe_run_event(kind: str, payload: Mapping[str, Any]) -> None:
     """Listener for stage events; the history only needs to know which stages started."""
     if kind != "stage" or payload.get("status") != "start":
@@ -136,7 +142,14 @@ def content_fingerprint(path: str | Path) -> str:
             for directory, _dirs, files in os.walk(root, onerror=unreadable):
                 for name in files:
                     file_path = Path(directory) / name
-                    entries.append((file_path.relative_to(root).as_posix(), file_path.stat().st_size))
+                    try:
+                        size = file_path.stat().st_size
+                    except FileNotFoundError:
+                        # A broken symlink is not part of the release's content.
+                        if file_path.is_symlink():
+                            continue
+                        raise
+                    entries.append((file_path.relative_to(root).as_posix(), size))
                     if len(entries) > FINGERPRINT_MAX_FILES:
                         return ""
     except OSError:
@@ -175,6 +188,30 @@ def _positive_int(value: object) -> int:
     return number if number > 0 else 0
 
 
+def _discogs_ids(meta: Any) -> dict[str, str]:
+    """Return the Discogs release and master IDs, as numbers.
+
+    The music pipeline keeps the IDs it used (from an argument, a choice or an
+    automatic match) in ``music_release``; the arguments, which may be URLs,
+    are only read when the pipeline did not run.
+    """
+    from src.music.sources import DiscogsEnricher
+
+    ids: dict[str, str] = {}
+    release = getattr(meta, "music_release", None)
+    known = cast(Mapping[str, Any], release).get("external_ids") if isinstance(release, Mapping) else None
+    if isinstance(known, Mapping):
+        for kind in ("release", "master"):
+            reference = DiscogsEnricher.parse_reference(cast(Mapping[str, Any], known).get(f"discogs_{kind}"), kind)
+            if reference and reference[0] == kind:
+                ids[f"discogs_{kind}"] = reference[1]
+    for attribute, default_kind in (("music_discogs_release_id", "release"), ("music_discogs_master_id", "master"), ("music_discogs_id", "release")):
+        reference = DiscogsEnricher.parse_reference(getattr(meta, attribute, ""), default_kind)
+        if reference:
+            ids.setdefault(f"discogs_{reference[0]}", reference[1])
+    return ids
+
+
 def external_ids(meta: Any) -> dict[str, str]:
     """Return the release's known external IDs as provider -> value, in the format the CLI accepts."""
     ids: dict[str, str] = {}
@@ -195,10 +232,9 @@ def external_ids(meta: Any) -> dict[str, str]:
         number = _positive_int(getattr(meta, attribute, 0))
         if number:
             ids[provider] = str(number)
+    ids.update(_discogs_ids(meta))
     for provider, attributes in (
         ("openlibrary", ("openlibrary",)),
-        ("discogs_release", ("music_discogs_release_id",)),
-        ("discogs_master", ("music_discogs_master_id",)),
         ("isbn", ("book_isbn", "isbn")),
         ("asin", ("book_asin", "asin")),
     ):
@@ -323,7 +359,8 @@ def build_item_record(meta: Any, tracker_class_map: Mapping[str, Any], *, outcom
     trackers = _tracker_rows(meta, tracker_class_map, state)
     if outcome not in OUTCOMES:
         statuses = {row["status"] for row in trackers}
-        outcome = "success" if "success" in statuses else "error" if "failed" in statuses else "no_upload"
+        failed = "failed" in statuses or reason == "exception"
+        outcome = "success" if "success" in statuses else "error" if failed else "no_upload"
     site_check = bool(getattr(meta, "site_check", False))
     if not reason and site_check:
         reason = "site_check"
@@ -345,7 +382,7 @@ def build_item_record(meta: Any, tracker_class_map: Mapping[str, Any], *, outcom
         "season": _text(getattr(meta, "season", ""), 20, markup=False) if str(getattr(meta, "season", "") or "") not in {"0", ""} else "",
         "episode": _text(getattr(meta, "episode", ""), 20, markup=False),
         "size": max(0, _positive_int(getattr(meta, "source_size", 0))),
-        "fingerprint": content_fingerprint(path),
+        "fingerprint": str(getattr(meta, "release_fingerprint", "") or "") or content_fingerprint(path),
         "infohash": _text(getattr(meta, "infohash", ""), 64, markup=False).lower(),
         "outcome": outcome,
         "reason": _text(reason, 60),
@@ -454,6 +491,8 @@ _PROVIDER_LABELS = {
     "openlibrary": "Open Library",
     "isbn": "ISBN",
     "asin": "ASIN",
+    "discogs_release": "Discogs release",
+    "discogs_master": "Discogs master",
 }
 # Fields set by ID arguments, and IDs already resolved before the metadata search.
 _MANUAL_ID_FIELDS = (
@@ -464,6 +503,7 @@ _MANUAL_ID_FIELDS = (
     "mal_manual",
     "douban_manual",
     "igdb_manual",
+    "steam_manual",
     "music_discogs_id",
     "music_discogs_release_id",
     "music_discogs_master_id",
@@ -471,6 +511,29 @@ _MANUAL_ID_FIELDS = (
     "book_asin",
     "openlibrary",
 )
+# IDs the metadata search copies from a manual field and keeps on a later pass.
+_DERIVED_ID_FIELDS = {"tvdb_manual": "tvdb_id", "tvmaze_manual": "tvmaze_id", "mal_manual": "mal_id"}
+
+
+def _id_number(value: object) -> int:
+    """Return an ID as a number (``tt`` prefix allowed), or 0."""
+    text = str(value or "").strip()
+    return _positive_int(text[2:] if text.lower().startswith("tt") else text)
+
+
+def _undo_saved_ids(meta: Any) -> None:
+    """Restore the fields an earlier pass filled from saved IDs, unless something changed them since.
+
+    A confirmation edit prepares the release again on the same ``meta``; the
+    saved IDs are then decided afresh (an ID given in the edit, or
+    ``--no-saved-ids``, must not leave the earlier pass's IDs in place).
+    """
+    filled = dict(getattr(meta, "saved_id_fields", {}) or {})
+    meta.saved_id_fields = {}
+    for field_name, (previous, applied) in filled.items():
+        current = getattr(meta, field_name, None)
+        if current == applied or (_id_number(applied) and _id_number(current) == _id_number(applied)):
+            setattr(meta, field_name, previous)
 
 
 def _read_memory(fingerprint: str, state_dir: str | Path | None = None) -> dict[str, Any] | None:
@@ -497,6 +560,7 @@ async def load_release_memory(meta: Any) -> None:
     Answers already on ``meta`` (from ``--answer``) win. The IDs are only kept on
     ``meta.saved_ids`` here; :func:`apply_saved_ids` uses them once the category is known.
     """
+    _undo_saved_ids(meta)
     path = str(getattr(meta, "path", "") or "")
     if not path:
         return
@@ -507,6 +571,8 @@ async def load_release_memory(meta: Any) -> None:
     except (OSError, sqlite3.Error) as exc:
         logger.debug(f"Could not read what earlier runs saved for this release: {exc}")
         return
+    # Saved answers are now on meta (or there were none), so saving them later may drop rejected ones.
+    meta.release_memory_loaded = bool(fingerprint)
     if memory is None:
         return
     for key, value in memory["answers"].items():
@@ -530,13 +596,23 @@ def apply_saved_ids(meta: Any) -> list[str]:
     saved_category = saved.pop("category", "").upper()
     if getattr(meta, "no_saved_ids", False):
         return []
+    # Each field set here is noted so a confirmation edit, which prepares the
+    # release again, can undo it before the saved IDs are decided again.
+    filled: dict[str, list[Any]] = {}
+    meta.saved_id_fields = filled
+
+    def assign(field_name: str, value: object) -> None:
+        filled.setdefault(field_name, [getattr(meta, field_name, None), value])
+        setattr(meta, field_name, value)
+
     if saved_category != category:
         # A video without an episode or season pattern is first guessed as MOVIE;
         # a TV category confirmed earlier replaces that guess, as --tmdb tv/ would.
         guessed_movie = category == "MOVIE" and not getattr(meta, "manual_category", None) and not getattr(meta, "tmdb_manual_category", "")
         if not (guessed_movie and saved_category == "TV"):
             return []
-        meta.category = category = "TV"
+        category = "TV"
+        assign("category", category)
     # Saved IDs belong together: once any ID was given (for example a corrected
     # --imdb at the confirmation prompt), the others may no longer match it.
     # IDs found automatically (scene or tracker data) are replaced instead.
@@ -546,11 +622,18 @@ def apply_saved_ids(meta: Any) -> list[str]:
         return []
     applied: list[str] = []
 
-    def fill(field_name: str, provider: str, value: object) -> None:
-        """Set one manual ID field from a saved value and note it for the log."""
-        if value not in (None, "", 0):
-            setattr(meta, field_name, value)
-            applied.append(f"{_PROVIDER_LABELS.get(provider, provider)} {saved[provider]}")
+    def fill(field_name: str, provider: str, value: object, *copies: str) -> None:
+        """Set one manual ID field (and the fields it is copied to) from a saved value and note it for the log."""
+        if value in (None, "", 0):
+            return
+        assign(field_name, value)
+        for copy in copies:
+            assign(copy, value)
+        if field_name in _DERIVED_ID_FIELDS:
+            # The metadata search copies it there and keeps it on a later pass; undone with it.
+            derived = _DERIVED_ID_FIELDS[field_name]
+            filled.setdefault(derived, [getattr(meta, derived, None), value])
+        applied.append(f"{_PROVIDER_LABELS.get(provider, provider)} {saved[provider]}")
 
     if category in {"MOVIE", "TV"}:
         if not getattr(meta, "no_imdb", False):
@@ -558,7 +641,7 @@ def apply_saved_ids(meta: Any) -> list[str]:
         kind, _separator, number = saved.get("tmdb", "").partition("/")
         if number.isdigit() and kind.upper() == category:
             fill("tmdb_manual", "tmdb", int(number))
-            meta.tmdb_manual_category = category
+            assign("tmdb_manual_category", category)
         fill("tvdb_manual", "tvdb", saved.get("tvdb"))
         fill("mal_manual", "mal", saved.get("mal"))
         fill("douban_manual", "douban", _positive_int(saved.get("douban")))
@@ -570,8 +653,9 @@ def apply_saved_ids(meta: Any) -> list[str]:
         fill("music_discogs_release_id", "discogs_release", saved.get("discogs_release"))
         fill("music_discogs_master_id", "discogs_master", saved.get("discogs_master"))
     elif category == "BOOK":
-        fill("book_isbn", "isbn", saved.get("isbn"))
-        fill("book_asin", "asin", saved.get("asin"))
+        # As --isbn and --asin do (Args._apply_book_meta_overrides), the lookups read isbn and asin.
+        fill("book_isbn", "isbn", saved.get("isbn"), "isbn")
+        fill("book_asin", "asin", saved.get("asin"), "asin")
         fill("openlibrary", "openlibrary", saved.get("openlibrary"))
     if category in {"MOVIE", "TV"} and (getattr(meta, "imdb_manual", None) or getattr(meta, "tmdb_manual", None)):
         # As when --imdb or --tmdb is given: confirmed IDs win over ones found automatically.
@@ -601,14 +685,20 @@ def remember_release(meta: Any, state_dir: str | Path | None = None) -> bool:
     fingerprint = str(getattr(meta, "release_fingerprint", "") or "") or (content_fingerprint(path) if path else "")
     if not fingerprint:
         return False
-    answers = dict(getattr(meta, "manual_answers", {}) or {})
+    answers: dict[str, Any] = dict(getattr(meta, "manual_answers", {}) or {})
     # An empty set (e.g. a release with no IDs) keeps what an earlier run confirmed.
     ids = _trusted_ids(meta) or None
     database = database_path(state_dir)
     if not answers and not ids and not database_available(database):
         return False
     with _record_lock, closing(connect_app_db(database)) as db, db:
-        existing = db.execute("SELECT category, ids FROM release_memory WHERE fingerprint = ?", (fingerprint,)).fetchone()
+        existing = db.execute("SELECT category, ids, answers FROM release_memory WHERE fingerprint = ?", (fingerprint,)).fetchone()
+        if existing is not None and not getattr(meta, "release_memory_loaded", False):
+            # The saved answers never reached meta (the item stopped first, or
+            # reading them failed): keep them, with this run's answers on top.
+            saved_answers = _loads(existing[2])
+            if isinstance(saved_answers, dict):
+                answers = {**cast(dict[str, Any], saved_answers), **answers}
         if existing is None and not answers and not ids:
             return False
         category = _text(getattr(meta, "category", ""), 20).upper() if ids else (existing[0] if existing else "")
@@ -981,29 +1071,30 @@ def export_items(
     if not database_available(path):
         return []
     where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
-    selected = f"SELECT id FROM history_items {where} ORDER BY finished_at DESC, id DESC LIMIT {EXPORT_MAX_ITEMS}"  # noqa: S608
     with closing(connect_app_db(path)) as db:
         # One read transaction: an item recorded while exporting must not
         # appear in the detail queries without appearing in the item query.
         db.execute("BEGIN")
         rows = db.execute(
-            f"SELECT {', '.join(_ITEM_COLUMNS)} FROM history_items WHERE id IN ({selected}) ORDER BY finished_at DESC, id DESC",  # noqa: S608
+            f"SELECT {', '.join(_ITEM_COLUMNS)} FROM history_items {where} ORDER BY finished_at DESC, id DESC LIMIT {EXPORT_MAX_ITEMS}",  # noqa: S608
             parameters,
         ).fetchall()
         items = [_row_dict(_ITEM_COLUMNS, row) for row in rows]
         by_id = {item["id"]: item for item in items}
         for item in items:
             item.update(ids={}, trackers=[], requests=[])
-        for item_id, provider, value in db.execute(f"SELECT item_id, provider, value FROM history_ids WHERE item_id IN ({selected}) ORDER BY provider", parameters):  # noqa: S608
+        # The details are read for the selected items only, without filtering again.
+        db.execute("CREATE TEMP TABLE IF NOT EXISTS export_selection (id INTEGER PRIMARY KEY)")
+        db.execute("DELETE FROM export_selection")
+        db.executemany("INSERT INTO export_selection VALUES (?)", ((item_id,) for item_id in by_id))
+        for item_id, provider, value in db.execute("SELECT item_id, provider, value FROM history_ids JOIN export_selection s ON s.id = item_id ORDER BY provider"):
             by_id[item_id]["ids"][provider] = value
         for item_id, name, status, message, link, torrent_id, duration in db.execute(
-            f"SELECT item_id, tracker, status, message, link, torrent_id, duration FROM history_trackers WHERE item_id IN ({selected}) ORDER BY tracker",  # noqa: S608
-            parameters,
+            "SELECT item_id, tracker, status, message, link, torrent_id, duration FROM history_trackers JOIN export_selection s ON s.id = item_id ORDER BY tracker"
         ):
             by_id[item_id]["trackers"].append({"tracker": name, "status": status, "message": message, "link": link, "torrent_id": torrent_id, "duration": duration})
         for item_id, name, request_name, link, reward, status, exact in db.execute(
-            f"SELECT item_id, tracker, name, link, reward, status, exact FROM history_requests WHERE item_id IN ({selected}) ORDER BY id",  # noqa: S608
-            parameters,
+            "SELECT item_id, tracker, name, link, reward, status, exact FROM history_requests JOIN export_selection s ON s.id = item_id ORDER BY history_requests.id"
         ):
             by_id[item_id]["requests"].append({"tracker": name, "name": request_name, "link": link, "reward": reward, "status": status, "exact": bool(exact)})
         db.commit()

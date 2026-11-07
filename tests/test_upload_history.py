@@ -182,6 +182,29 @@ async def test_items_that_stop_early_keep_their_outcome_and_reason(tmp_path, his
 
 
 @pytest.mark.asyncio
+async def test_an_error_after_the_uploads_keeps_them_and_otherwise_is_an_error(tmp_path, history_on):
+    for tracker_status, outcome in (({"FICT": {"upload_success": True}}, "success"), ({}, "error")):
+        upload_history.begin_item()
+        assert upload_history.item_active()
+        await upload_history.record_item_async(_finished_meta(tmp_path, tracker_status=tracker_status), {}, reason="exception")
+        assert not upload_history.item_active()
+        assert _rows(history_on, "SELECT outcome, reason FROM history_items ORDER BY id DESC LIMIT 1") == [(outcome, "exception")]
+
+
+def test_fingerprint_skips_broken_symlinks(tmp_path):
+    release = tmp_path / "Fictional.Show.S01"
+    _sized(release / "Fictional.Show.S01E01.mkv", 2 * MIB)
+    before = upload_history.content_fingerprint(release)
+    try:
+        (release / "missing.mkv").symlink_to(tmp_path / "nowhere.mkv")
+    except OSError:
+        pytest.skip("symlinks cannot be created here")
+
+    assert before
+    assert upload_history.content_fingerprint(release) == before
+
+
+@pytest.mark.asyncio
 async def test_database_failure_never_breaks_the_upload(tmp_path, monkeypatch):
     def unavailable(*_args, **_kwargs):
         raise sqlite3.OperationalError("disk I/O error")

@@ -3387,9 +3387,7 @@ async def do_the_thing(base_dir: str) -> None:
                 try:
                     await tracker_setup.tracker_request(meta, trackers)
                 except Exception:
-                    # The uploads already happened; keep them in the history before the error ends the run.
                     webui_events.stage("requests", "fail")
-                    await upload_history.record_item_async(meta, tracker_class_map)
                     raise
                 webui_events.stage("requests", "done")
 
@@ -3438,6 +3436,10 @@ async def do_the_thing(base_dir: str) -> None:
 
     except Exception as e:
         webui_events.fail_active_stage()
+        if upload_history.item_active():
+            # The error ends the run after the item was prepared (cross-seeding, an
+            # upload or the request search): keep it, and any finished uploads, in the history.
+            await upload_history.record_item_async(meta, tracker_class_map, reason="exception")
         logger.info(f"[bold red]An unexpected error occurred: {escape(str(e))}[/bold red]")
         if sanitize_meta:
             meta = await Redaction.clean_meta_for_export(meta)

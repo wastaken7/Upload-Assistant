@@ -125,8 +125,11 @@ const TrackerFavicon = ({ tracker, className = "h-4 w-4" }) => {
   );
 };
 
+// Links come from stored tracker data; only web pages are opened.
+const isWebLink = (href) => typeof href === "string" && /^https?:\/\//i.test(href);
+
 const ExternalLink = ({ href, children, className = "" }) =>
-  href ? (
+  isWebLink(href) ? (
     <a
       href={href}
       target="_blank"

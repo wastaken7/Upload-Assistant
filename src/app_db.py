@@ -29,7 +29,8 @@ LEGACY_API_KEY_EXPIRY_FILENAME = "api_key_expiry.sqlite3"
 # Threads of one process opening a new database wait for each other here;
 # other processes are serialized by the write lock taken in _migrate.
 _migration_lock = threading.Lock()
-_WAL_ATTEMPTS = 50
+# Total time spent retrying the WAL switch; each attempt can also wait busy_timeout.
+_WAL_RETRY_SECONDS = 5.0
 
 
 class NewerSchemaError(sqlite3.DatabaseError):
@@ -227,12 +228,13 @@ def _schema_version(db: sqlite3.Connection) -> int:
 
 def _enable_wal(db: sqlite3.Connection) -> None:
     """Switch to WAL; another connection reading the new file can briefly hold the lock this needs."""
-    for attempt in range(_WAL_ATTEMPTS):
+    deadline = time.monotonic() + _WAL_RETRY_SECONDS
+    while True:
         try:
             db.execute("PRAGMA journal_mode = WAL")
             return
         except sqlite3.OperationalError as exc:
-            if attempt == _WAL_ATTEMPTS - 1 or not any(reason in str(exc).lower() for reason in ("busy", "locked")):
+            if time.monotonic() >= deadline or not any(reason in str(exc).lower() for reason in ("busy", "locked")):
                 raise
             time.sleep(0.1)
 

@@ -184,7 +184,7 @@ def _normalize(question: Question, value: Any) -> Any:
 
 
 def _check_saved(question: Question, value: Any) -> bool:
-    """Whether a value loaded from meta.json still fits the question."""
+    """Whether an answer saved by an earlier run (src/upload_history.py) still fits the question."""
     if question.kind == "confirm":
         return isinstance(value, bool)
     if question.kind in ("text", "choice"):
