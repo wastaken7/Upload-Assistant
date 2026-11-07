@@ -56,11 +56,12 @@ const AssetIcon = ({ name, className = "h-5 w-5" }) => (
   <LucideIcon name={name} className={className} />
 );
 
+// The shared helper refreshes the CSRF token and retries once, e.g. after
+// signing out and back in from another tab.
 const apiFetch = (url, options = {}) =>
-  fetch(url, {
+  window.uaApiFetch(url, {
     ...options,
     headers: {
-      "X-CSRF-Token": window.UA_CSRF_TOKEN,
       ...(options.body ? { "Content-Type": "application/json" } : {}),
       ...(options.headers || {}),
     },
@@ -500,6 +501,53 @@ function DupesList({ dupes }) {
   );
 }
 
+function SlotDetails({ slot }) {
+  if (!slot?.title) return null;
+  const conflicts = Array.isArray(slot.conflicts) ? slot.conflicts : [];
+  const notes = Array.isArray(slot.notes) ? slot.notes : [];
+  return (
+    <div className="mt-0.5 text-xs opacity-70">
+      <p>
+        Slot: {slot.title}
+        {slot.slot ? ` (${slot.slot})` : ""}
+        {slot.reason ? ` — ${slot.reason}` : ""}
+      </p>
+      {slot.why && <p className="mt-0.5">{slot.why}</p>}
+      {conflicts.length > 0 && (
+        <ul className="mt-0.5 space-y-0.5 pl-4">
+          {conflicts.map((entry, index) => (
+            <li
+              key={`${entry.link || entry.name}-${index}`}
+              className="break-words"
+            >
+              <ExternalLink href={entry.link}>{entry.name}</ExternalLink>
+              {entry.size ? (
+                <span className="opacity-60"> · {formatBytes(entry.size)}</span>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      )}
+      {notes.map((note, index) => (
+        <p key={index} className="mt-0.5">
+          {note}
+        </p>
+      ))}
+      {(slot.rules || slot.rules_url) && (
+        <p className="mt-0.5">
+          {slot.rules_url ? (
+            <ExternalLink href={slot.rules_url}>
+              {slot.rules || "Tracker rules"}
+            </ExternalLink>
+          ) : (
+            slot.rules
+          )}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function HistoryDetail({ itemId, onClose, onDeleted }) {
   const dialogRef = window.useUAModalFocus(onClose);
   const [item, setItem] = useState(null);
@@ -725,14 +773,7 @@ function HistoryDetail({ itemId, onClose, onDeleted }) {
                             {tracker.message}
                           </p>
                         )}
-                        {tracker.slot?.title && (
-                          <p className="mt-0.5 text-xs opacity-70">
-                            Slot: {tracker.slot.title}
-                            {tracker.slot.reason
-                              ? ` — ${tracker.slot.reason}`
-                              : ""}
-                          </p>
-                        )}
+                        <SlotDetails slot={tracker.slot} />
                         <DupesList dupes={tracker.dupes} />
                       </li>
                     ))}
@@ -967,6 +1008,11 @@ function HistoryApp() {
         const body = await response.json();
         if (!response.ok || !body.success)
           throw new Error(body.error || "Unable to load the history");
+        if (!body.items.length && offset > 0 && body.total > 0) {
+          // The last entry of this page was deleted: show the last page that has entries.
+          setOffset(Math.floor((body.total - 1) / PAGE_SIZE) * PAGE_SIZE);
+          return;
+        }
         setData(body);
       } catch (err) {
         if (err?.name === "AbortError") return;
