@@ -3908,6 +3908,7 @@ def _prepare_default_webui_section(
     comments_map: dict[str, list[str]],
     subsection_map: dict[str, str],
 ) -> dict[str, Any]:
+    """Arrange the DEFAULT section for the Config page: add optional fields and group related settings."""
     client_list_defaults: tuple[tuple[str, list[str], list[str]], ...] = (
         (
             "injecting_client_list",

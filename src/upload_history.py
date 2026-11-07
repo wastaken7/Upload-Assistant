@@ -1007,6 +1007,7 @@ def export_items(
 
 
 def _csv_cell(value: object) -> str:
+    """Return a CSV cell that a spreadsheet will show as text, never run as a formula."""
     text = "" if value is None else str(value)
     return f"'{text}" if text.startswith(_FORMULA_PREFIXES) else text
 
