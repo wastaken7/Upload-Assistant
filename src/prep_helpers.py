@@ -1073,6 +1073,7 @@ async def search_metadata(
     _bdinfo: dict[str, Any],
     mi: dict[str, Any] | None,
 ) -> None:
+    """Resolve the release's external IDs and metadata from arguments, saved IDs, Sonarr/Radarr and providers."""
     if meta.saved_ids:
         # IDs remembered from an earlier run need the category they were confirmed with;
         # detect it now (it only depends on the path) instead of after the ID handling below.

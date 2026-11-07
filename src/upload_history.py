@@ -470,6 +470,7 @@ _MANUAL_ID_FIELDS = (
 
 
 def _read_memory(fingerprint: str, state_dir: str | Path | None = None) -> dict[str, Any] | None:
+    """Return the category, IDs and answers saved for a fingerprint, or None."""
     path = database_path(state_dir)
     if not fingerprint or not database_available(path):
         return None
@@ -542,6 +543,7 @@ def apply_saved_ids(meta: Any) -> list[str]:
     applied: list[str] = []
 
     def fill(field_name: str, provider: str, value: object) -> None:
+        """Set one manual ID field from a saved value and note it for the log."""
         if value not in (None, "", 0):
             setattr(meta, field_name, value)
             applied.append(f"{_PROVIDER_LABELS.get(provider, provider)} {saved[provider]}")

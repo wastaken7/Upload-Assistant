@@ -344,6 +344,7 @@ class Args:
             parser.error(str(error))
 
     def parse(self, argv: Sequence[str], meta: Meta) -> tuple[Meta, CustomArgumentParser, list[str]]:
+        """Parse command-line arguments into ``meta``; return it with the parser and the arguments left over."""
         input = list(argv)
         parser = CustomArgumentParser(
             usage="upload.py [path...] [options]",

@@ -166,6 +166,7 @@ class Prep:
             self.publish_preview(str(meta.path or ""), meta.uuid)
 
     async def gather_prep(self, meta: Meta, mode: str) -> Meta:
+        """Collect everything known about the release before the upload: category, media info, IDs and artwork."""
         reset_release_subheader_cache()
         meta_start_time = time.time()
         set_run_disabled(bool(getattr(meta, "no_metadata_cache", False)))
