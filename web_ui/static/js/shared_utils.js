@@ -2205,8 +2205,49 @@
     );
   }
 
+  // History's "Upload again" hands a release path to the next Upload page
+  // load in the same tab. It stays out of the URL so paths do not reach
+  // browser history or access logs, and expires quickly so a later visit
+  // cannot pick up a handoff whose page load failed.
+  const UPLOAD_HANDOFF_KEY = "ua_history_upload_path";
+  const UPLOAD_HANDOFF_TTL_MS = 60 * 1000;
+  const uploadHandoff = Object.freeze({
+    offer(path, now = Date.now()) {
+      try {
+        sessionStorage.setItem(
+          UPLOAD_HANDOFF_KEY,
+          JSON.stringify({ path: String(path), at: now }),
+        );
+        return true;
+      } catch (_error) {
+        return false;
+      }
+    },
+    take(now = Date.now()) {
+      let raw = null;
+      try {
+        raw = sessionStorage.getItem(UPLOAD_HANDOFF_KEY);
+        sessionStorage.removeItem(UPLOAD_HANDOFF_KEY);
+      } catch (_error) {
+        return "";
+      }
+      try {
+        const { path, at } = JSON.parse(raw);
+        const age = now - Number(at);
+        return typeof path === "string" &&
+          age >= 0 &&
+          age <= UPLOAD_HANDOFF_TTL_MS
+          ? path
+          : "";
+      } catch (_error) {
+        return "";
+      }
+    },
+  });
+
   // Expose as globals for non-module usage by existing scripts.
   if (typeof window !== "undefined") {
+    window.UAUploadHandoff = window.UAUploadHandoff || uploadHandoff;
     window.UAStorage = window.UAStorage || uaStorage;
     window.UAThemes = window.UAThemes || UA_THEMES;
     window.UAInterfaceStyles = window.UAInterfaceStyles || UA_INTERFACE_STYLES;

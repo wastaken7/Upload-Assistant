@@ -1,6 +1,7 @@
 import json
 import sqlite3
 from contextlib import closing
+from datetime import UTC, datetime
 
 import pytest
 
@@ -362,6 +363,85 @@ def test_clearing_history_keeps_statistics(history_on):
 )
 def test_id_links_only_for_well_formed_ids(provider, value, link):
     assert upload_history.id_link(provider, value) == link
+
+
+def test_export_includes_every_matching_entry_with_its_details(history_on):
+    state_dir = history_on.parent.parent
+    _record(history_on)
+    _record(history_on, name="Fictional Show S01", title="Fictional Show", category="TV", outcome="error", trackers=[], requests=[], ids={})
+
+    movies = upload_history.export_items(state_dir, category="movie")
+    everything = upload_history.export_items(state_dir)
+
+    assert [item["title"] for item in movies] == ["Fictional Movie"]
+    assert movies[0]["ids"] == {"imdb": "tt0000001", "tmdb": "movie/1"}
+    assert movies[0]["trackers"][0]["link"] == "https://fictional.example/t/1"
+    assert movies[0]["requests"][0]["reward"] == "50 BP"
+    assert len(everything) == 2
+    with pytest.raises(ValueError, match="outcome"):
+        upload_history.export_items(state_dir, outcome="maybe")
+
+
+def test_csv_export_flattens_details_and_neutralizes_formulas(history_on):
+    _record(history_on, name="=HYPERLINK(\"https://fictional.example\")", trackers=[_tracker("FICT", "failed", message="-1 error")])
+
+    text = upload_history.export_csv(upload_history.export_items(history_on.parent.parent))
+    header, row = text.splitlines()
+
+    assert header.split(",")[:3] == ["finished_at", "name", "title"]
+    assert row.split(",")[1].startswith("\"'=HYPERLINK")
+    assert "FICT=failed" in row
+    assert "imdb=tt0000001; tmdb=movie/1" in row
+    assert "FICT: Fictional Movie request (50 BP)" in row
+
+
+@pytest.mark.parametrize(("value", "days"), [(30, 30), ("7", 7), (0, 0), (-5, 0), ("soon", 0), (True, 0), (None, 0)])
+def test_retention_setting_is_a_non_negative_number_of_days(value, days):
+    assert upload_history.history_retention_days({"DEFAULT": {"history_retention_days": value}}) == days
+    assert upload_history.history_retention_days({"DEFAULT": {}}) == 0
+
+
+@pytest.mark.parametrize(
+    ("value", "neutralized"),
+    [("=1+1", True), (" =1+1", True), ("\t@SUM(A1)", True), ("\n-2", True), ("Fictional = name", False), ("", False)],
+)
+def test_csv_cells_that_a_spreadsheet_could_run_are_neutralized(value, neutralized):
+    assert upload_history._csv_cell(value) == (f"'{value}" if neutralized else value)
+
+
+@pytest.mark.parametrize(
+    ("value", "warns"), [(30, False), ("30", False), (30.0, False), (0, False), (True, True), (-1, True), ("soon", True), ("30.5", True), (float("inf"), True)]
+)
+def test_retention_setting_warnings_match_how_it_is_read(value, warns):
+    from src.configvalidator import _validate_default_section
+
+    _errors, warnings = _validate_default_section({"tmdb_api": "test", "history_retention_days": value})
+
+    assert any(warning.key == "history_retention_days" for warning in warnings) is warns
+    assert (upload_history.history_retention_days({"DEFAULT": {"history_retention_days": value}}) > 0) is (not warns and int(value) > 0)
+
+
+def test_retention_removes_only_entries_older_than_the_limit(history_on):
+    state_dir = history_on.parent.parent
+    _record(history_on, finished_at="2000-01-01T00:00:00+00:00", title="Old")
+    _record(history_on, finished_at=datetime.now(UTC).isoformat(), title="Recent")
+
+    assert upload_history.prune_history(0, state_dir) == 0
+    assert upload_history.prune_history(999_999, state_dir) == 0
+    assert upload_history.prune_history(30, state_dir) == 1
+    assert [item["title"] for item in upload_history.list_items(state_dir)["items"]] == ["Recent"]
+    assert _rows(history_on, "SELECT COUNT(*) FROM history_trackers") == [(2,)]
+
+
+@pytest.mark.asyncio
+async def test_recording_applies_the_configured_retention(tmp_path, history_on):
+    _record(history_on, finished_at="2000-01-01T00:00:00+00:00", title="Old")
+    upload_history.configure_history({"DEFAULT": {"history_retention_days": 30}})
+    upload_history.begin_item()
+
+    await upload_history.record_item_async(_finished_meta(tmp_path), {})
+
+    assert [row[0] for row in _rows(history_on, "SELECT title FROM history_items")] == ["Fictional Movie"]
 
 
 def test_fingerprint_is_empty_when_a_subfolder_cannot_be_listed(tmp_path, monkeypatch):

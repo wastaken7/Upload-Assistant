@@ -18,7 +18,7 @@ If an earlier automatic update restored options you deliberately removed, restor
 
 `DEFAULT.stats_enabled` controls collection of privacy-preserving daily aggregates for the Web UI Stats workspace. It defaults to `False`; setting it to `True` enables collection and display. Disabling it again hides existing statistics without deleting them.
 
-`DEFAULT.history_enabled` controls the local upload history shown on the Web UI History page. It defaults to `True`. Each processed release is recorded when it finishes, with its name, path, external IDs, every tracker's result and link, and request matches; debug runs are not recorded. Setting it to `False` stops recording without deleting stored entries.
+`DEFAULT.history_enabled` controls the local upload history shown on the Web UI History page. It defaults to `True`. Each processed release is recorded when it finishes, with its name, path, external IDs, every tracker's result and link, and request matches; debug runs are not recorded. Setting it to `False` stops recording without deleting stored entries. `DEFAULT.history_retention_days` deletes entries older than that many days whenever a new one is recorded; `0` (the default) keeps them forever.
 
 ## Config file shape
 

@@ -423,7 +423,7 @@ Open **History** from the application workspace navigation to see every release 
 
 Each entry keeps the release name, path, size, category and release details, its external IDs (IMDb, TMDb, TVDB, TVmaze, MAL, IGDB, Douban, Discogs, ISBN, and others) with links to their pages where one exists, every tracker's final result with its message, duration, and torrent link, the possible dupes and slot recommendation shown for each tracker, and request matches with their rewards. CLI and Web UI runs are both recorded.
 
-Search matches the release name, title, release group, and path. Filters narrow the list by category, tracker, tracker result (for example, every release that failed on one tracker), entries with request matches, and a date range in the browser's local time. The outcome buttons show how many entries match the other filters. Select an entry to see its details, copy its path, or delete it. **Clear history** requires typing `CLEAR` and removes only history entries; statistics, caches, configuration, torrents, and NZBs are untouched.
+Search matches the release name, title, release group, and path. Filters narrow the list by category, tracker, tracker result (for example, every release that failed on one tracker), entries with request matches, and a date range in the browser's local time. The outcome buttons show how many entries match the other filters. Select an entry to see its details, copy its path, delete it, or choose **Upload again** to open the Upload page with its path in the queue. **CSV** and **JSON** download every entry matching the current filters (up to 100,000), with IDs, tracker results, links, and request matches; in the CSV, cells that a spreadsheet would run as a formula are prefixed with an apostrophe. **Clear history** requires typing `CLEAR` and removes only history entries; statistics, caches, configuration, torrents, and NZBs are untouched.
 
 ### Saved IDs and answers
 
@@ -435,7 +435,7 @@ Upload Assistant also remembers, per release, the external IDs you confirmed and
 - Debug runs are remembered too, so IDs confirmed during a `--debug` run are reused by the real upload. This does not depend on `history_enabled`.
 - Pass `--no-saved-ids` to search for the IDs again; correcting an ID at the confirmation prompt replaces the saved one.
 
-Recording is controlled by `DEFAULT.history_enabled`, which is on by default. Turning it off stops new entries without deleting stored ones. The history is stored in the application database, `data/upload_assistant.sqlite3` below the user-state directory. Unlike the statistics tables, it contains release names, paths, and links, so treat a copy of that file like your upload logs.
+Recording is controlled by `DEFAULT.history_enabled`, which is on by default. Turning it off stops new entries without deleting stored ones. Set `DEFAULT.history_retention_days` to delete entries older than that many days each time a new one is recorded; the default, `0`, keeps them forever. The history is stored in the application database, `data/upload_assistant.sqlite3` below the user-state directory. Unlike the statistics tables, it contains release names, paths, and links, so treat a copy of that file like your upload logs.
 
 ## Appearance, Help, and Changelog
 

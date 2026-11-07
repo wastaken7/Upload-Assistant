@@ -129,6 +129,8 @@ config: dict[str, Any] = {
         # request matches. Debug runs are not recorded. Set to False to stop
         # recording; entries already stored are kept until you clear them.
         "history_enabled": True,
+        # Delete history entries older than this many days. 0 keeps them forever.
+        "history_retention_days": 0,
         # --- METADATA CACHING ---
         # Public metadata cache
         # Cache responses from sites such as TMDB and IMDb for reuse in future runs, reducing API requests.
