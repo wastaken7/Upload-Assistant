@@ -1042,7 +1042,7 @@ def history_retention_days(config: Mapping[str, Any] | None) -> int:
         return 0
     try:
         return max(0, int(value))
-    except TypeError, ValueError:
+    except TypeError, ValueError, OverflowError:
         return 0
 
 
@@ -1051,6 +1051,10 @@ def prune_history(days: int, state_dir: str | Path | None = None) -> int:
     path = database_path(state_dir)
     if days <= 0 or not database_available(path):
         return 0
-    cutoff = (datetime.now(UTC) - timedelta(days=days)).isoformat()
+    try:
+        cutoff = (datetime.now(UTC) - timedelta(days=days)).isoformat()
+    except OverflowError:
+        # Older than any date that can be represented: nothing is old enough.
+        return 0
     with _record_lock, closing(connect_app_db(path)) as db, db:
         return db.execute("DELETE FROM history_items WHERE finished_at < ?", (cutoff,)).rowcount

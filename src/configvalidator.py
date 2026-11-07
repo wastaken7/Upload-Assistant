@@ -587,7 +587,7 @@ def _validate_default_section(default: dict[str, Any]) -> tuple[list[str], list[
             try:
                 if int(retention) < 0:
                     message = "Must be 0 (keep forever) or a positive number of days"
-            except TypeError, ValueError:
+            except TypeError, ValueError, OverflowError:
                 message = "Must be a whole number of days; this value keeps entries forever"
         if message:
             warnings.append(ConfigValidationWarning(message, key="history_retention_days", section="DEFAULT"))

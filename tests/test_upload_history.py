@@ -409,7 +409,9 @@ def test_csv_cells_that_a_spreadsheet_could_run_are_neutralized(value, neutraliz
     assert upload_history._csv_cell(value) == (f"'{value}" if neutralized else value)
 
 
-@pytest.mark.parametrize(("value", "warns"), [(30, False), ("30", False), (30.0, False), (0, False), (True, True), (-1, True), ("soon", True), ("30.5", True)])
+@pytest.mark.parametrize(
+    ("value", "warns"), [(30, False), ("30", False), (30.0, False), (0, False), (True, True), (-1, True), ("soon", True), ("30.5", True), (float("inf"), True)]
+)
 def test_retention_setting_warnings_match_how_it_is_read(value, warns):
     from src.configvalidator import _validate_default_section
 
@@ -425,6 +427,7 @@ def test_retention_removes_only_entries_older_than_the_limit(history_on):
     _record(history_on, finished_at=datetime.now(UTC).isoformat(), title="Recent")
 
     assert upload_history.prune_history(0, state_dir) == 0
+    assert upload_history.prune_history(999_999, state_dir) == 0
     assert upload_history.prune_history(30, state_dir) == 1
     assert [item["title"] for item in upload_history.list_items(state_dir)["items"]] == ["Recent"]
     assert _rows(history_on, "SELECT COUNT(*) FROM history_trackers") == [(2,)]

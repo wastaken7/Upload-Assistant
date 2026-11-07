@@ -7045,6 +7045,12 @@ function AudionutsUAGUI() {
    * browser had prepared, so closing or reloading the page loses neither.
    */
   const restoreUploadSessions = async () => {
+    // History's "Upload again" hands over a release path for this page load.
+    // Take it before waiting for the server, and fill the first tab (the one
+    // shown now) right away, so later edits are kept and restoring sessions
+    // or drafts does not replace that tab.
+    const handoffPath = window.UAUploadHandoff?.take() || "";
+    if (handoffPath) handlePathInputChange(handoffPath);
     let sessions = [];
     try {
       const response = await apiFetch(`${API_BASE}/sessions`, {
@@ -7072,9 +7078,6 @@ function AudionutsUAGUI() {
       console.error("Failed to load upload sessions:", error);
     }
     const drafts = loadUploadTabDrafts();
-    // History's "Upload again" hands over a release path for this page load;
-    // the first tab keeps it instead of being replaced by restored tabs.
-    const handoffPath = window.UAUploadHandoff?.take() || "";
 
     const firstTab = getTabRuntime("tab-1");
     const replaceFirstTab =
@@ -7136,7 +7139,6 @@ function AudionutsUAGUI() {
       setIsExecuting(visible.run.isExecuting);
     }
     restoredSessions.forEach((tab) => attachRestoredSession(tab.id));
-    if (handoffPath) handlePathInputChange(handoffPath);
     setUploadTabsRestored(true);
   };
 

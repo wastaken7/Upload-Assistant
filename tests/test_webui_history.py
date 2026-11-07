@@ -170,8 +170,10 @@ def test_upload_page_takes_the_history_handoff_while_restoring_tabs():
     restore = app_js[app_js.index("const restoreUploadSessions = async") : app_js.index("setUploadTabsRestored(true);")]
 
     # Restoring sessions or drafts must not replace the tab that receives the path.
-    assert "const handoffPath = window.UAUploadHandoff?.take()" in restore
+    # Taken and applied before the sessions request, so a slow server cannot expire it
+    # and a tab the user switches to meanwhile is not overwritten.
+    take = restore.index("const handoffPath = window.UAUploadHandoff?.take()")
+    assert take < restore.index("if (handoffPath) handlePathInputChange(handoffPath);") < restore.index("/sessions")
     assert "!handoffPath &&" in restore
-    assert "if (handoffPath) handlePathInputChange(handoffPath);" in restore
     assert "window.UAUploadHandoff.offer(path)" in history_js
     assert "?path=" not in history_js
