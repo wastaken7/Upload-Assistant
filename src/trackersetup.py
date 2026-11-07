@@ -173,6 +173,12 @@ JsonDict = dict[str, Any]
 example_config: dict[str, Any]
 
 
+def _mark_unconfigured(meta: Meta, tracker_name: str, message: str) -> None:
+    """Record why a selected tracker was left out, so results and history still list it as skipped."""
+    status = meta.setdefault("tracker_status", {}).setdefault(tracker_name, {})
+    status.update(upload=False, skipped=True, status_message=message, skip_reason="not_configured")
+
+
 class TrackerSetup:
     def __init__(self, config: dict[str, Any]):
         self.config: dict[str, Any] = config
@@ -210,11 +216,13 @@ class TrackerSetup:
                 if "api_key" in example_tracker_config and not tracker_config.get("api_key") and not has_legacy_btn_api:
                     logger.info(f"{tracker_name}: [bold red]Tracker is missing an API key and will be ignored.[/bold red]")
                     if not meta.debug:
+                        _mark_unconfigured(meta, tracker_name, "Missing API key in the tracker configuration")
                         continue
 
                 if "announce_url" in example_tracker_config and not tracker_config.get("announce_url"):
                     logger.info(f"{tracker_name}: [bold red]Tracker is missing an announce URL and will be ignored.[/bold red]")
                     if not meta.debug:
+                        _mark_unconfigured(meta, tracker_name, "Missing announce URL in the tracker configuration")
                         continue
 
             supported_cats = getattr(tracker_class, "supported_categories", None)
