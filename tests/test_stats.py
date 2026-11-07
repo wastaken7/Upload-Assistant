@@ -284,7 +284,6 @@ def test_newer_schema_is_preserved_instead_of_reset(tmp_path):
     database = tmp_path / "data/upload_assistant.sqlite3"
     with closing(sqlite3.connect(database)) as db:
         db.execute("PRAGMA user_version = 999")
-    app_db._initialized_paths.discard(database.resolve())
 
     assert stats.get_stats("all", "real", tmp_path)["success"] is False
     stats.record_event("item", operation="completed", state_dir=tmp_path)
@@ -294,6 +293,35 @@ def test_newer_schema_is_preserved_instead_of_reset(tmp_path):
     with closing(sqlite3.connect(database)) as db:
         assert db.execute("SELECT SUM(count) FROM stats_daily").fetchone() == (3,)
         assert db.execute("PRAGMA user_version").fetchone() == (999,)
+
+
+def test_legacy_content_time_is_preserved(tmp_path):
+    legacy = tmp_path / "data" / app_db.LEGACY_STATS_FILENAME
+    legacy.parent.mkdir(parents=True)
+    with closing(sqlite3.connect(legacy)) as db, db:
+        db.execute("CREATE TABLE stats_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+        db.execute("INSERT INTO stats_meta VALUES ('schema_version', '2')")
+        db.execute(
+            """
+            CREATE TABLE stats_daily (
+                day TEXT NOT NULL, family TEXT NOT NULL, service TEXT NOT NULL,
+                operation TEXT NOT NULL, outcome TEXT NOT NULL, category TEXT NOT NULL,
+                source TEXT NOT NULL, mode TEXT NOT NULL, destination TEXT NOT NULL,
+                count INTEGER NOT NULL DEFAULT 0, duration_ms INTEGER NOT NULL DEFAULT 0,
+                content_seconds INTEGER NOT NULL DEFAULT 0, bytes INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (day, family, service, operation, outcome, category, source, mode, destination)
+            )
+            """
+        )
+        db.execute(
+            "INSERT INTO stats_daily VALUES (?, 'content', '', 'uploaded', 'success', 'movie', 'cli', 'real', '', 1, 0, 5400, 0)",
+            (datetime.now(UTC).date().isoformat(),),
+        )
+
+    stats.get_stats("all", "real", tmp_path)
+
+    with closing(sqlite3.connect(app_db.database_path(tmp_path))) as db:
+        assert db.execute("SELECT content_seconds FROM stats_daily WHERE family = 'content'").fetchone() == (5400,)
 
 
 def test_legacy_statistics_file_is_imported_once_and_left_unchanged(tmp_path):
@@ -322,7 +350,6 @@ def test_legacy_statistics_file_is_imported_once_and_left_unchanged(tmp_path):
     legacy_bytes = legacy.read_bytes()
 
     result = stats.get_stats("all", "real", tmp_path)
-    app_db._initialized_paths.clear()
     stats.record_event("item", operation="completed", state_dir=tmp_path)
 
     assert result["overview"]["items_completed"] == 3
