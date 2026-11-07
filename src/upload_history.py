@@ -341,7 +341,7 @@ def build_item_record(meta: Any, tracker_class_map: Mapping[str, Any], *, outcom
         "season": _text(getattr(meta, "season", ""), 20, markup=False) if str(getattr(meta, "season", "") or "") not in {"0", ""} else "",
         "episode": _text(getattr(meta, "episode", ""), 20, markup=False),
         "size": max(0, _positive_int(getattr(meta, "source_size", 0))),
-        "fingerprint": str(getattr(meta, "release_fingerprint", "") or "") or content_fingerprint(path),
+        "fingerprint": content_fingerprint(path),
         "infohash": _text(getattr(meta, "infohash", ""), 64, markup=False).lower(),
         "outcome": outcome,
         "reason": _text(reason, 60),
@@ -466,8 +466,6 @@ _MANUAL_ID_FIELDS = (
     "book_isbn",
     "book_asin",
     "openlibrary",
-    "imdb_id",
-    "tmdb_id",
 )
 
 
@@ -524,10 +522,19 @@ def apply_saved_ids(meta: Any) -> list[str]:
         return []
     # Decided once per run, whatever the outcome.
     meta.saved_ids = {}
-    if getattr(meta, "no_saved_ids", False) or saved.pop("category", "").upper() != category:
+    saved_category = saved.pop("category", "").upper()
+    if getattr(meta, "no_saved_ids", False):
         return []
+    if saved_category != category:
+        # A video without an episode or season pattern is first guessed as MOVIE;
+        # a TV category confirmed earlier replaces that guess, as --tmdb tv/ would.
+        guessed_movie = category == "MOVIE" and not getattr(meta, "manual_category", None) and not getattr(meta, "tmdb_manual_category", "")
+        if not (guessed_movie and saved_category == "TV"):
+            return []
+        meta.category = category = "TV"
     # Saved IDs belong together: once any ID was given (for example a corrected
     # --imdb at the confirmation prompt), the others may no longer match it.
+    # IDs found automatically (scene or tracker data) are replaced instead.
     given = [field_name for field_name in _MANUAL_ID_FIELDS if getattr(meta, field_name, None)]
     if given:
         logger.debug(f"Not reusing saved IDs because IDs were given: {', '.join(given)}")
@@ -560,19 +567,26 @@ def apply_saved_ids(meta: Any) -> list[str]:
         fill("book_isbn", "isbn", saved.get("isbn"))
         fill("book_asin", "asin", saved.get("asin"))
         fill("openlibrary", "openlibrary", saved.get("openlibrary"))
+    if category in {"MOVIE", "TV"} and (getattr(meta, "imdb_manual", None) or getattr(meta, "tmdb_manual", None)):
+        # As when --imdb or --tmdb is given: confirmed IDs win over ones found automatically.
+        meta.imdb_id = meta.imdb = meta.tmdb_id = meta.tmdb = None
     if applied:
         logger.info(f"[cyan]Using IDs confirmed for this release in an earlier run: {', '.join(applied)}. Use --no-saved-ids to search again.[/cyan]")
     return applied
 
 
-def _ids_confirmed(meta: Any) -> bool:
-    """IDs are trusted when a person confirmed them, or when an upload with them succeeded."""
-    if getattr(meta, "ids_confirmed", False) is True:
-        return True
+def _trusted_ids(meta: Any) -> dict[str, str] | None:
+    """Return the IDs an upload succeeded with, else those a person confirmed, else None.
+
+    Confirmed IDs are the ones shown at "Is this correct?": an ID found later,
+    for example by a tracker check, is only trusted once an upload used it.
+    """
     statuses = getattr(meta, "tracker_status", {})
-    if not isinstance(statuses, Mapping):
-        return False
-    return any(isinstance(status, Mapping) and status.get("upload_success") is True for status in cast(Mapping[str, Any], statuses).values())
+    if isinstance(statuses, Mapping) and any(isinstance(status, Mapping) and status.get("upload_success") is True for status in cast(Mapping[str, Any], statuses).values()):
+        return external_ids(meta)
+    if getattr(meta, "ids_confirmed", False) is True:
+        return dict(getattr(meta, "confirmed_ids", {}) or {})
+    return None
 
 
 def remember_release(meta: Any, state_dir: str | Path | None = None) -> bool:
@@ -582,7 +596,8 @@ def remember_release(meta: Any, state_dir: str | Path | None = None) -> bool:
     if not fingerprint:
         return False
     answers = dict(getattr(meta, "manual_answers", {}) or {})
-    ids = external_ids(meta) if _ids_confirmed(meta) else None
+    # An empty set (e.g. a release with no IDs) keeps what an earlier run confirmed.
+    ids = _trusted_ids(meta) or None
     database = database_path(state_dir)
     if not answers and not ids and not database_available(database):
         return False
