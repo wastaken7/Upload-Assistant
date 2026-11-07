@@ -491,9 +491,10 @@ def test_exact_title_on_the_same_day_matches_an_abbreviated_studio() -> None:
     release = tpdb.normalize(_scene(), "scenes")
     assert release is not None
 
-    best = confident_choice(rank([release], ReleaseFacts(title="Sunny Afternoon", studio="EXS", date="2026-08-21")))
-
-    assert best is not None
+    # "ES18" is the initials of "Example Studio" (digits ignored).
+    assert confident_choice(rank([release], ReleaseFacts(title="Sunny Afternoon", studio="ES18", date="2026-08-21"))) is not None
+    # Another site with a scene of the same title that day is not accepted without asking.
+    assert confident_choice(rank([release], ReleaseFacts(title="Sunny Afternoon", studio="OtherSite", date="2026-08-21"))) is None
 
 
 def test_jav_product_code_is_an_exact_match(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -669,3 +670,171 @@ def test_xxx_description_section(tmp_path: Path) -> None:
     assert "[b]Duration:[/b] 31 min" in section
     assert "[b]Synopsis[/b]\nFirst line.\n\nSecond & last." in section
     assert DescriptionBuilder("BITPORN", {"DEFAULT": {}, "TRACKERS": {"BITPORN": {}}})._build_xxx_desc_section(_meta(tmp_path, "x", category="MOVIE")) == ""
+
+
+# --- Review fixes -----------------------------------------------------------------
+
+
+def test_records_without_a_name_do_not_become_none() -> None:
+    movie = blvckout.normalize({"id": "7", "title": "Example Feature", "performers": [{"name": None}, "Jane Example", {}], "genres": [{"name": None}, "Romance"]})
+    scene = tpdb.normalize(_scene(tags=[{"name": None}, {"name": "Outdoor"}], performers=[{"name": None, "parent": {"name": None}}, {"name": "Mary Sample"}]), "scenes")
+
+    assert movie is not None and scene is not None
+    assert movie.performers == ["Jane Example"]
+    assert movie.tags == ["Romance"]
+    assert scene.tags == ["Outdoor"]
+    assert scene.performers == ["Mary Sample"]
+
+
+def test_cast_argument_replaces_provider_performers(tmp_path: Path) -> None:
+    meta = _meta(tmp_path, "clip", manual_cast=["Given Name"], xxx_performers=["Provider Name"])
+
+    meta.populate_cast(limit=100)
+
+    assert meta.cast == ["Given Name"]
+
+
+def test_generated_name_uses_cli_corrections(tmp_path: Path) -> None:
+    release = tpdb.normalize(_scene(), "scenes")
+    assert release is not None
+    meta = _meta(tmp_path, "clip_0001", resolution="1080p", container="mp4", book_publisher="Given Studio", manual_cast=["Given Name"])
+    apply_release(meta, release, rename=True)
+
+    assert generated_release_name(meta) == "GivenStudio.26.08.21.Given.Name.Sunny.Afternoon.XXX.1080p.MP4"
+
+
+def test_a_name_with_only_the_performer_is_not_confident() -> None:
+    release = tpdb.normalize(_scene(title="Some Other Scene"), "scenes")
+    assert release is not None
+
+    assert confident_choice(rank([release], ReleaseFacts(title="Jane Example"))) is None
+
+
+@pytest.mark.parametrize(
+    ("name", "expected"),
+    [
+        ("ExampleStudio.26.08.21.Jane.Full-Length", "ExampleStudio.26.08.21.Jane.Full-Length"),
+        ("ExampleStudio.26.08.21.Jane.XXX.1080p.MP4-EXAMPLEGRP", "ExampleStudio.26.08.21.Jane.XXX.1080p.MP4"),
+        ("Example Feature XXX DVDRip x264-ExGrp", "Example Feature XXX DVDRip x264"),
+    ],
+)
+def test_strip_group_keeps_hyphenated_titles(name: str, expected: str) -> None:
+    from src.xxx_match import strip_group
+
+    assert strip_group(name) == expected
+
+
+def test_several_videos_never_get_one_scene(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    requests = _mock(monkeypatch, lambda _request: httpx.Response(200, json={"data": [_scene()]}))
+    meta = _meta(tmp_path, "ExampleStudio.26.08.21.Sunny.Afternoon.XXX.MP4-GRP", publisher="ExampleStudio", release_date="2026-08-21", title="Sunny Afternoon")
+    meta.filelist = [*meta.filelist, str(Path(meta.filelist[0]).with_name("second.mp4"))]
+
+    asyncio.run(lookup_xxx_metadata(meta, CONFIG))
+
+    assert requests == []
+    assert meta.tpdb_id == ""
+
+
+def test_match_answer_none_skips_even_a_confident_result(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    requests = _mock(monkeypatch, lambda _request: httpx.Response(200, json={"data": [_scene()]}))
+    meta = _meta(
+        tmp_path, "ExampleStudio.26.08.21.Sunny.Afternoon.XXX.MP4-GRP", publisher="ExampleStudio", release_date="2026-08-21", title="Sunny Afternoon", answers={"xxx.match": "none"}
+    )
+
+    asyncio.run(lookup_xxx_metadata(meta, CONFIG))
+
+    assert requests == []
+    assert meta.tpdb_id == ""
+    assert meta.manual_answers["xxx.match"] == "none"
+
+
+def test_match_answer_token_is_fetched_directly(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == f"/scenes/{OTHER_ID}"
+        return httpx.Response(200, json={"data": _scene(OTHER_ID, title="Chosen Scene")})
+
+    requests = _mock(monkeypatch, handler)
+    meta = _meta(tmp_path, "ExampleStudio.26.08.21.Sunny.Afternoon.XXX.MP4-GRP", manual_answers={"xxx.match": f"tpdb:scenes/{OTHER_ID}"})
+
+    asyncio.run(lookup_xxx_metadata(meta, CONFIG))
+
+    assert len(requests) == 1
+    assert meta.title == "Chosen Scene"
+
+
+def test_rerun_without_a_result_undoes_the_earlier_match(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    release = tpdb.normalize(_scene(), "scenes")
+    assert release is not None
+    meta = _meta(tmp_path, "clip_0001", title="clip 0001", keywords=["solo"], resolution="1080p")
+    apply_release(meta, release, rename=True)
+    meta.artwork_path = str(tmp_path / "POSTER.jpg")
+    assert generated_release_name(meta)
+
+    _mock(monkeypatch, lambda _request: httpx.Response(200, json={"data": []}))
+    asyncio.run(lookup_xxx_metadata(meta, CONFIG))
+
+    assert meta.title == "clip 0001"
+    assert meta.keywords == ["solo"]
+    assert meta.publisher == meta.overview == meta.release_date == ""
+    assert meta.artwork_url == meta.artwork_banner_url == meta.artwork_path == ""
+    assert meta.tpdb_id == ""
+    assert meta.xxx_match == {}
+    assert generated_release_name(meta) == ""
+
+
+def test_a_new_match_replaces_the_earlier_provider_and_artwork(tmp_path: Path) -> None:
+    first = tpdb.normalize(_scene(), "scenes")
+    second = blvckout.normalize({"id": "4242", "title": "Example Feature", "front_cover": "https://covers.example.test/front.jpg"})
+    assert first is not None and second is not None
+    meta = _meta(tmp_path, "clip_0001")
+
+    apply_release(meta, first, rename=True)
+    apply_release(meta, second, rename=True)
+
+    assert (meta.tpdb_id, meta.blvckout_id) == ("", "4242")
+    assert meta.artwork_url == "https://covers.example.test/front.jpg"
+    assert meta.artwork_banner_url == ""
+    assert meta.title == "Example Feature"
+
+
+def test_performers_come_from_the_name_when_the_match_has_none(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _mock(monkeypatch, lambda _request: httpx.Response(200, json={"data": _scene(performers=[])}))
+    meta = _meta(tmp_path, "ExampleStudio.26.08.21.Jane.Example.Sunny.XXX.MP4-GRP", tpdb_manual=f"scenes/{SCENE_ID}")
+
+    asyncio.run(lookup_xxx_metadata(meta, CONFIG))
+
+    assert meta.tpdb_id == f"scenes/{SCENE_ID}"
+    assert meta.xxx_performers == ["Jane Example"]
+
+
+def test_free_word_search_runs_when_results_cannot_be_chosen(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if "q" in request.url.params:
+            return httpx.Response(200, json={"data": [_scene(OTHER_ID, title="Sunny Afternoon", duration=600)]})
+        # The site's scene that day is plausible, but its runtime is far from the file's.
+        return httpx.Response(200, json={"data": [_scene(title="Sunny Afternoon", duration=3600)]})
+
+    requests = _mock(monkeypatch, handler)
+    meta = _meta(
+        tmp_path, "ExampleStudio.26.08.21.Sunny.Afternoon.XXX.MP4-GRP", publisher="ExampleStudio", release_date="2026-08-21", title="Sunny Afternoon", video_duration=10
+    )
+
+    asyncio.run(lookup_xxx_metadata(meta, CONFIG))
+
+    assert any("q" in request.url.params for request in requests)
+    assert meta.tpdb_id == f"scenes/{OTHER_ID}"
+
+
+def test_restored_blvckout_id_is_looked_up(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.host == "blvckout.foo"
+        assert request.url.path == "/api/v1/releases/4242"
+        return httpx.Response(200, json={"id": "4242", "title": "Example Feature", "studio": "Example Pictures"})
+
+    requests = _mock(monkeypatch, handler)
+    meta = _meta(tmp_path, "Example Feature XXX WEB-DL", blvckout_manual="4242")
+
+    asyncio.run(lookup_xxx_metadata(meta, {"DEFAULT": {"blvckout_api_key": "blvckout-test-key"}}))
+
+    assert len(requests) == 1
+    assert (meta.blvckout_id, meta.publisher) == ("4242", "Example Pictures")

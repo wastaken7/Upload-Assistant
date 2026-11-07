@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import asyncio
 import re
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, cast
 
@@ -73,6 +74,8 @@ def generated_release_name(meta: Meta) -> str:
     release = XxxRelease.from_dict(meta.xxx_match)
     if release is None:
         return ""
+    # --publisher and --cast correct the provider's studio and performers in the name too.
+    release = replace(release, studio=str(meta.book_publisher or "").strip() or release.studio, performers=list(meta.manual_cast or release.performers))
     container = meta.container or Path(str(meta.filelist[0] if meta.filelist else meta.path or "")).suffix.lstrip(".")
     return build_release_name(release, resolution=str(meta.resolution or ""), container=container)
 
@@ -215,6 +218,11 @@ class XxxMetadataLookup:
                     # "Studio - Title" or "Performer - Title": also search the title alone.
                     steps.extend([("movies-if-none", right), ("scenes-if-none", right)])
 
+        if len(videos) >= 2:
+            # Several videos are a movie in parts or a collection, never one scene:
+            # a dated name would otherwise give one scene's metadata to all of them.
+            steps = [step for step in steps if step[0] in ("jav", "movies", "movies-if-none")]
+
         if self.tpdb.enabled and len(videos) == 1:
             file_hash = await asyncio.to_thread(oshash, videos[0])
             if file_hash:
@@ -224,10 +232,14 @@ class XxxMetadataLookup:
                     return match, ranked
 
         for kind, query in steps:
-            if kind == "words" or kind.endswith("-if-none"):
+            if kind == "words":
+                # Reached only without a confident match, which a plausible result with a
+                # conflicting runtime cannot become; the free-word search may still find it.
+                found.extend(await self.tpdb.search_words(query))
+            elif kind.endswith("-if-none"):
                 if plausible():
                     continue
-                found.extend(await (self.tpdb.search_words(query) if kind == "words" else self.tpdb.search(kind.removesuffix("-if-none"), query)))
+                found.extend(await self.tpdb.search(kind.removesuffix("-if-none"), query))
             else:
                 found.extend(await self.tpdb.search(kind, query))
             match = decide()
@@ -262,10 +274,36 @@ class XxxMetadataLookup:
         )
         return next((release for release in plausible if release.token == answer), None)
 
+    async def _answered(self, meta: Meta) -> tuple[bool, XxxRelease | None]:
+        """Use an ``xxx.match`` answer (``--answer`` or remembered) before any search result."""
+        given = meta.answers.get(MATCH_QUESTION_KEY)
+        answer = str(given if given is not None else meta.manual_answers.get(MATCH_QUESTION_KEY) or "").strip()
+        if not answer:
+            return False, None
+        if given is not None:
+            meta.manual_answers[MATCH_QUESTION_KEY] = answer
+        if answer.casefold() == _NO_MATCH:
+            logger.info("[yellow]XXX metadata lookup skipped: the xxx.match answer is none.[/yellow]")
+            return True, None
+        provider, _separator, reference = answer.partition(":")
+        release = None
+        if provider == "tpdb" and (tpdb_reference := parse_tpdb_reference(reference)) and self.tpdb.enabled:
+            release = await self.tpdb.detail(*tpdb_reference)
+        elif provider == "blvckout" and (identity := parse_blvckout_reference(reference)) and self.blvckout.enabled:
+            release = await self.blvckout.detail(identity)
+        if release is None:
+            logger.info(f"[yellow]Ignoring the xxx.match answer {answer!r}: it names no available result.[/yellow]")
+            meta.manual_answers.pop(MATCH_QUESTION_KEY, None)
+            return False, None
+        return True, release
+
     async def find(self, meta: Meta) -> XxxRelease | None:
         manual = await self._manual(meta)
         if manual:
             return manual
+        answered, release = await self._answered(meta)
+        if answered:
+            return release
         if not self.tpdb.enabled and not self.blvckout.enabled:
             return None
         name = release_name(meta)
@@ -282,24 +320,60 @@ class XxxMetadataLookup:
         return await self._details(match)
 
 
+def _assign(meta: Meta, field_name: str, value: Any) -> None:
+    """Set a field from a match and note its earlier value, so forget_release() can restore it."""
+    applied = meta.xxx_applied
+    if field_name not in applied:
+        applied[field_name] = [getattr(meta, field_name), value]
+    else:
+        applied[field_name][1] = value
+    setattr(meta, field_name, value)
+
+
+def forget_release(meta: Meta) -> None:
+    """Undo what an earlier match applied, unless something changed those fields since.
+
+    A confirmation edit prepares the release again on the same ``meta``; the
+    lookup then decides afresh, and nothing from the earlier match (IDs,
+    artwork, tags, name) may survive when another result, or none, is chosen.
+    """
+    applied = dict(meta.xxx_applied or {})
+    meta.xxx_applied = {}
+    for field_name, (previous, value) in applied.items():
+        if getattr(meta, field_name) == value:
+            setattr(meta, field_name, previous)
+            if field_name in ("artwork_url", "artwork_download_url") and not meta.explicit_poster:
+                # The prepared file came from that link; prepare_artwork() looks again.
+                meta.artwork_path = ""
+            if field_name == "artwork_banner_url" and not meta.explicit_banner:
+                meta.artwork_banner_path = None
+    meta.xxx_match = {}
+    meta.xxx_source_url = ""
+    meta.tpdb_id = meta.blvckout_id = ""
+    meta.xxx_performers = []
+    meta.xxx_rename = False
+
+
 def apply_release(meta: Meta, release: XxxRelease, *, rename: bool) -> None:
     """Copy a match into the release metadata; values given on the command line are kept."""
+    forget_release(meta)
     meta.xxx_match = release.to_dict()
     meta.xxx_source_url = release.url
+    # Only the ID of the chosen result is kept and remembered.
     if release.provider == "tpdb":
         meta.tpdb_id = release.ref
     else:
         meta.blvckout_id = release.ref
     if release.title:
-        meta.title = release.title
+        _assign(meta, "title", release.title)
     if release.studio and not meta.book_publisher:
-        meta.publisher = release.studio
+        _assign(meta, "publisher", release.studio)
     if release.date:
-        meta.release_date = release.date
+        _assign(meta, "release_date", release.date)
     if release.year and meta.manual_year in (None, "", 0, "0"):
-        meta.year = release.year
+        _assign(meta, "year", release.year)
     if release.description and not meta.manual_overview:
-        meta.overview = release.description
+        _assign(meta, "overview", release.description)
     if release.performers:
         meta.xxx_performers = list(release.performers)
     if release.tags:
@@ -309,15 +383,12 @@ def apply_release(meta: Meta, release: XxxRelease, *, rename: bool) -> None:
             if tag.casefold() not in seen:
                 seen.add(tag.casefold())
                 keywords.append(tag)
-        meta.keywords = keywords
+        _assign(meta, "keywords", keywords)
     if release.poster_url and not meta.explicit_poster and not meta.artwork_url and not meta.artwork_download_url:
         # Signed or extensionless links can expire; download those instead of publishing them.
-        if is_stable_image_url(release.poster_url):
-            meta.artwork_url = release.poster_url
-        else:
-            meta.artwork_download_url = release.poster_url
+        _assign(meta, "artwork_url" if is_stable_image_url(release.poster_url) else "artwork_download_url", release.poster_url)
     if release.banner_url and release.banner_url != release.poster_url and not meta.explicit_banner and not meta.artwork_banner_url:
-        meta.artwork_banner_url = release.banner_url
+        _assign(meta, "artwork_banner_url", release.banner_url)
     # Only a dated scene gets a built name; movie and JAV names (titles, product codes) are kept.
     is_scene = release.kind == "scenes" and bool(release.studio and release.date)
     meta.xxx_rename = rename and is_scene and meta.manual_name is None and not is_scene_style_name(release_name(meta))
@@ -327,11 +398,13 @@ async def lookup_xxx_metadata(meta: Meta, config: dict[str, Any]) -> None:
     """Fill title, studio, date, performers, tags, synopsis and artwork for an XXX release."""
     if meta.category != "XXX":
         return
+    forget_release(meta)
     lookup = XxxMetadataLookup(config, meta)
     release = await lookup.find(meta) if lookup.enabled else None
     if release is not None:
         apply_release(meta, release, rename=parse_bool(lookup.default.get("xxx_generate_names", True), default=True))
         how = " (same file hash)" if release.via_hash else ""
         logger.info(f"[green]{_describe(release)}{how}[/green]")
-    elif not meta.xxx_performers and not meta.manual_cast:
+    # Also for a match without performers: a dated name may still give them.
+    if not meta.xxx_performers and not meta.manual_cast:
         meta.xxx_performers = performers_from_name(release_name(meta))

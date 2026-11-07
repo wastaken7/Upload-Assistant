@@ -374,3 +374,23 @@ def test_confirmed_xxx_metadata_ids_are_reused(tmp_path):
 
     assert (loaded.tpdb_manual, loaded.blvckout_manual) == ("scenes/00000000-0000-4000-8000-000000000001", "4242")
     assert applied == ["ThePornDB scenes/00000000-0000-4000-8000-000000000001", "BLVCKOUT 4242"]
+
+
+
+def test_a_confirmed_xxx_category_is_restored_before_preparation(tmp_path):
+    release = _release(tmp_path, "clip_0001")
+    meta = _confirm(Meta(path=str(release), category="XXX", tpdb_id="scenes/1"))
+    assert upload_history.remember_release(meta) is True
+
+    # Category detection leaves a plain video without a category until the metadata search.
+    restored = _load(release)
+    upload_history.apply_saved_ids(restored)
+    assert (restored.category, restored.tpdb_manual) == ("XXX", "scenes/1")
+
+    chosen = _load(release, manual_category="MOVIE")
+    upload_history.apply_saved_ids(chosen)
+    assert chosen.category == ""
+
+    skipped = _load(release, no_saved_ids=True)
+    upload_history.apply_saved_ids(skipped)
+    assert skipped.category == ""

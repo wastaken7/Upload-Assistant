@@ -21,7 +21,7 @@ from src.xxx_keywords_list import XXX_METADATA_KEYWORDS
 
 # Part of every cache key: raise it when the fields read from a provider change,
 # so results cached by an earlier version are fetched again.
-RECORD_VERSION = 2
+RECORD_VERSION = 3
 
 
 @dataclass
@@ -153,6 +153,9 @@ def unique_names(values: Any, limit: int = 100, length: int = 120) -> list[str]:
     names: list[str] = []
     seen: set[str] = set()
     for value in values if isinstance(values, list) else []:  # pyright: ignore[reportUnknownVariableType]
+        if value is None:
+            # A record without a name; str() would make it "None".
+            continue
         name = " ".join(str(value).split())[:length]  # pyright: ignore[reportUnknownArgumentType]
         if name and name.casefold() not in seen:
             seen.add(name.casefold())
@@ -290,6 +293,10 @@ class MatchScore:
     code_match: bool
     # Set by rank(): no other result of the same kind has (nearly) this title.
     only_title: bool = False
+    # How well "performers + title" matches the whole name, without partial coverage.
+    combined_title: float = 0.0
+    # The name's studio is the initials of the result's studio ("BFTP18": Blast From The Past).
+    studio_abbreviated: bool = False
 
     @property
     def exact(self) -> bool:
@@ -313,7 +320,9 @@ class MatchScore:
             return True
         if self.date_conflict or self.duration_conflict:
             return False
-        # The same title on the same day; the site may be abbreviated in the name (BFTP18).
+        if self.studio_conflict and not self.studio_abbreviated:
+            return False
+        # The same title on the same day, also when the name abbreviates the site.
         if self.date_match and self.title >= 0.95:
             return True
         if self.studio_conflict:
@@ -322,8 +331,9 @@ class MatchScore:
             return True
         if self.title >= 0.8 and (self.date_match or self.studio_match):
             return True
-        # The name gives a performer and the title of this scene.
-        if self.performer_match and self.title >= 0.9:
+        # The name gives a performer and the title of this scene. Partial coverage does
+        # not count here: a name with only a performer must not pick one of their scenes.
+        if self.performer_match and self.combined_title >= 0.9:
             return True
         # A movie with exactly this title, from the same year, or the only one with this
         # numbered title ("Example Feature 13"); a generic title alone is not enough.
@@ -364,15 +374,16 @@ def score(release: XxxRelease, facts: ReleaseFacts) -> MatchScore:
     if separator and not facts.studio and studio_matches(left, release):
         # "Studio - Title": compare the title alone, and the studio too.
         facts = replace(facts, title=right, studio=left)
-    title = 0.0
+    title = combined_title = 0.0
     performer_match = False
     if facts.title:
-        title = title_similarity(release.title, facts.title)
+        title = combined_title = title_similarity(release.title, facts.title)
         if release.performers:
             # Scene names often carry the performers in place of, or before, the title.
             combined = f"{' '.join(release.performers)} {release.title}"
             performer_match = _performer_named(facts.title, release.performers)
-            title = max(title, title_similarity(combined, facts.title))
+            combined_title = max(title, title_similarity(combined, facts.title))
+            title = combined_title
             if performer_match:
                 # A name listing the performers and a few words of the title.
                 title = max(title, 0.9 * _coverage(facts.title, combined))
@@ -390,7 +401,32 @@ def score(release: XxxRelease, facts: ReleaseFacts) -> MatchScore:
         # Encodes and site versions differ a little; a different scene differs a lot.
         duration_conflict = abs(facts.duration_minutes - release.duration_minutes) > max(5, release.duration_minutes * 0.15)
     code_match = bool(facts.code and release.code and compact(facts.code) == compact(release.code))
-    return MatchScore(release, title, performer_match, date_match, date_conflict, year_match, studio_match, studio_conflict, duration_conflict, code_match)
+    return MatchScore(
+        release,
+        title,
+        performer_match,
+        date_match,
+        date_conflict,
+        year_match,
+        studio_match,
+        studio_conflict,
+        duration_conflict,
+        code_match,
+        combined_title=combined_title,
+        studio_abbreviated=studio_conflict and _abbreviates(facts.studio, release),
+    )
+
+
+def _abbreviates(short: str, release: XxxRelease) -> bool:
+    """Whether a name's studio is the initials of the result's studio, ignoring digits."""
+    letters = re.sub(r"[^a-z]", "", compact(short))
+    if len(letters) < 2:
+        return False
+    for studio in (release.studio, release.network):
+        words = re.findall(r"[A-Za-z]+", unicodedata.normalize("NFKD", studio))
+        if len(words) >= 2 and "".join(word[0] for word in words).casefold() == letters:
+            return True
+    return False
 
 
 def rank(releases: list[XxxRelease], facts: ReleaseFacts) -> list[MatchScore]:
@@ -433,8 +469,16 @@ _MOVIE_NAME = re.compile(r"(?i)(?:^|[._ -])(?:movies?|feature|full[._ -]movie|dv
 
 
 def strip_group(name: str) -> str:
+    """Remove a trailing ``-GROUP``, but keep hyphenated title words such as ``Full-Length``.
+
+    A suffix is a group when it follows a technical tag (``…1080p.MP4-GRP``) or is
+    written in capitals; a capitalized word after a title word is part of the title.
+    """
     head, separator, tail = name.rpartition("-")
-    return head if separator and head and tail and not re.search(r"[. ]", tail) else name
+    if not separator or not head or not tail or re.search(r"[. ]", tail):
+        return name
+    last_word = re.split(r"[._ ]+", head.strip("._ "))[-1]
+    return head if _TECHNICAL_TOKEN.match(last_word) or not re.search(r"[a-z]", tail) else name
 
 
 def search_title(name: str, *, has_group: bool = True) -> str:

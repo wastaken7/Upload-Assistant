@@ -619,7 +619,10 @@ def apply_saved_ids(meta: Any) -> list[str]:
     """
     saved = dict(getattr(meta, "saved_ids", {}) or {})
     category = str(getattr(meta, "category", "") or "").upper()
-    if not saved or not category:
+    # XXX is only detected from markers in the name, so a confirmed adult video
+    # without one would be prepared as a movie; restore XXX before that happens.
+    restore_xxx = not category and str(saved.get("category", "")).upper() == "XXX" and not getattr(meta, "manual_category", None)
+    if not saved or (not category and not restore_xxx):
         # Video categories are only known when the metadata search starts; try again then.
         return []
     # Decided once per run, whatever the outcome.
@@ -636,13 +639,17 @@ def apply_saved_ids(meta: Any) -> list[str]:
         filled.setdefault(field_name, [getattr(meta, field_name, None), value])
         setattr(meta, field_name, value)
 
+    if restore_xxx:
+        category = "XXX"
+        assign("category", category)
     if saved_category != category:
         # A video without an episode or season pattern is first guessed as MOVIE;
-        # a TV category confirmed earlier replaces that guess, as --tmdb tv/ would.
+        # a TV category confirmed earlier replaces that guess, as --tmdb tv/ would,
+        # and so does XXX for an adult video whose name carries no XXX marker.
         guessed_movie = category == "MOVIE" and not getattr(meta, "manual_category", None) and not getattr(meta, "tmdb_manual_category", "")
-        if not (guessed_movie and saved_category == "TV"):
+        if not (guessed_movie and saved_category in ("TV", "XXX")):
             return []
-        category = "TV"
+        category = saved_category
         assign("category", category)
     # Saved IDs belong together: once any ID was given (for example a corrected
     # --imdb at the confirmation prompt), the others may no longer match it.

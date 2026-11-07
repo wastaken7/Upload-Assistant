@@ -8,7 +8,7 @@ from src.media_extensions import VIDEO_EXTENSIONS
 from src.meta import Meta
 from src.screenshot_manifest import files as manifest_files
 from src.trackers.UNIT3D import UNIT3D
-from src.xxx_match import XxxRelease, compact, is_pack_name
+from src.xxx_match import XxxRelease, is_pack_name
 
 Config = dict[str, Any]
 
@@ -182,7 +182,10 @@ class BitPorn(UNIT3D):
         ("BBW", r"\bbbw\b"),
         ("Mature", r"\b(?:mature|granny|grandma)\b"),
     )
-    _vr_name = re.compile(r"\b(?:vr|vr180|180x180|3dh|oculus|virtual reality)\b|vr\b")
+    # Standalone VR markers, or a site name ending in VR ("examplevr"); a short word
+    # that merely ends in "vr" is not one.
+    _vr_name = re.compile(r"\b(?:vr|vr180|180x180|3dh|oculus|virtual reality)\b|\b[a-z0-9]{4,}vr\b")
+    _asian_studio = re.compile(r"(?<![a-z])(?:asian|thai|jav)|japan")
     _fansite_names = re.compile(r"\b(?:onlyfans|fansly|fanvue|manyvids|fancentro|loyalfans|justforfans|clips4sale|pornhub|chaturbate)\b")
 
     def category_from_metadata(self, meta: Meta, basename: str) -> str | None:
@@ -191,18 +194,23 @@ class BitPorn(UNIT3D):
         release = XxxRelease.from_dict(meta.xxx_match)
         videos = [path for path in meta.filelist or [] if Path(str(path)).suffix.casefold() in VIDEO_EXTENSIONS]
         tags = [re.sub(r"[^a-z0-9+]+", " ", str(tag).casefold()).strip() for tag in meta.keywords or []]
-        if is_pack_name(basename) or len(videos) >= 3:
+        if is_pack_name(basename):
             return "Collection"
         if self._vr_name.search(normalized_basename) or any(tag in ("vr", "virtual reality") for tag in tags):
             return "VR"
+        # A movie matched by title stays a movie when it is split into several files.
         if release is not None and release.kind == "movies":
             return "Movie"
+        if len(videos) >= 3:
+            return "Collection"
         if release is not None and release.kind == "jav":
             return "Asian"
         platform = " ".join(re.sub(r"[^a-z0-9]+", " ", value.casefold()) for value in (release.network, release.studio)) if release else ""
         if self._fansite_names.search(platform):
             return "Fansite"
-        if release is not None and re.search(r"japan|jav|asian|thai", compact(f"{release.studio} {release.network}")):
+        # Site names are often joined words ("ExampleJapanHD"); "asian" only counts at a
+        # word start, so "Caucasian" is not Asian.
+        if release is not None and self._asian_studio.search(f"{release.studio} {release.network}".casefold()):
             return "Asian"
         for category_name, pattern in self._category_patterns:
             if re.search(pattern, normalized_basename):
@@ -223,6 +231,11 @@ class BitPorn(UNIT3D):
             return {value: name for name, value in self.resolution_ids.items()}
 
         resolved_resolution = str(resolution if resolution else meta.resolution)
+        height_value = int(meta.video_height or 0)
+        if not resolution and height_value > 2160 and resolved_resolution in ("4320p", "8640p", "OTHER"):
+            # UA rounds a frame up to the next standard size, so a 5760x2880 VR video
+            # is "4320p"; BitPorn uploaders list it by its height (2880p is 6K).
+            resolved_resolution = f"{height_value}p"
         if resolved_resolution in self.resolution_ids:
             return {"resolution_id": self.resolution_ids[resolved_resolution]}
         # VR and other non-standard frames (2880p, 4096p): use the closest BitPorn

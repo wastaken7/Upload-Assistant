@@ -110,3 +110,23 @@ def test_bitporn_category_uses_who_is_in_the_scene_not_the_acts() -> None:
     assert _category(lesbian) == "Lesbian"  # noqa: S101
     # Acts are subjective as the main genre; Uncategorized is better than a guess.
     assert _category(acts_only) == "Uncategorized"  # noqa: S101
+
+
+
+def test_bitporn_category_review_cases() -> None:
+    # A word ending in "vr" is not a VR site.
+    assert _category(Meta(category="XXX", basename_no_ext="Lavr Scene")) == "Uncategorized"  # noqa: S101
+    # A movie in three parts is still a movie.
+    parts = [f"C:/fake/part{index}.mp4" for index in range(3)]
+    assert _category(Meta(category="XXX", basename_no_ext="Example Feature 13", filelist=parts, xxx_match=_match(kind="movies"))) == "Movie"  # noqa: S101
+    # "Caucasian" is not an Asian studio.
+    assert _category(Meta(category="XXX", basename_no_ext="Jane Example clip", xxx_match=_match(studio="Caucasian Example Productions"))) == "Uncategorized"  # noqa: S101
+
+
+def test_bitporn_vr_resolution_uses_the_frame_height() -> None:
+    bitporn = tracker()
+    # UA rounds a 5760x2880 frame up to 4320p; BitPorn lists 2880p as 6K.
+    assert asyncio.run(bitporn.get_resolution_id(Meta(category="XXX", resolution="4320p", video_height=2880))) == {"resolution_id": "15"}  # noqa: S101
+    assert asyncio.run(bitporn.get_resolution_id(Meta(category="XXX", resolution="4320p", video_height=4320))) == {"resolution_id": "16"}  # noqa: S101
+    # An explicit resolution is kept.
+    assert asyncio.run(bitporn.get_resolution_id(Meta(category="XXX", video_height=2880), "4320p")) == {"resolution_id": "16"}  # noqa: S101

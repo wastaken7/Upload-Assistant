@@ -59,15 +59,15 @@ A result is used without asking only when it is clearly the release, with nothin
 - the same file hash or JAV product code;
 - the same day and site with a matching title or a performer named in the release name, or exactly the same title on the same day (the site may be abbreviated in the name);
 - a performer named in the release name together with the scene's title;
-- a movie with exactly this title from the same year, or the only movie with this numbered title (`… 13`). A generic title alone is not enough. When several results are plausible, Upload Assistant asks which one is the release (`xxx.match`); unattended runs skip the lookup instead of guessing. Answer in advance with `--answer xxx.match=tpdb:scenes/ID`, `--answer xxx.match=blvckout:ID` or `--answer xxx.match=none`.
+- a movie with exactly this title from the same year, or the only movie with this numbered title (`… 13`). A generic title alone is not enough. When several results are plausible, Upload Assistant asks which one is the release (`xxx.match`); unattended runs skip the lookup instead of guessing. Answer in advance with `--answer xxx.match=tpdb:scenes/ID`, `--answer xxx.match=blvckout:ID` or `--answer xxx.match=none`. An answer, given or remembered for the release, is used before any search, so `none` also keeps a confident result from being applied.
 
-Packs and site rips are not looked up. Results are cached like other metadata (`metadata_cache_services` → `tpdb` and `blvckout`).
+Packs and site rips are not looked up. A release with several videos is a movie in parts or a collection, never one scene, so it is only looked up as a movie. Results are cached like other metadata (`metadata_cache_services` → `tpdb` and `blvckout`).
 
 ThePornDB tags are added to the keywords (without shop labels such as "Feature" or combined `A - B` genres), which ExoticaZ and DirtyBytes turn into their own tags. For scenes and JAV titles, the cover and banner are the scene's original image; ThePornDB's `poster` for those is a cropped thumbnail with the site's logo, so it is not used. For movies, the cover is the front cover. Signed or extensionless artwork links are downloaded for the upload but not published, because they can expire.
 
 When a dated scene's filename is not scene-style (for example `clip_0123.mp4`), `xxx_generate_names` names the upload from the match, such as `Studio.26.08.21.Performer.Name.Scene.Title.XXX.1080p.MP4`. Scene-style names (dots, no spaces, an `.XXX` marker), movie titles and JAV product codes are always kept, and `--name` always wins.
 
-Values given on the command line (`--publisher`, `--year`, `--overview`, `--cast`, `--poster`, `--banner`, `--name`) take precedence over provider data.
+Values given on the command line (`--publisher`, `--year`, `--overview`, `--cast`, `--poster`, `--banner`, `--name`) take precedence over provider data; `--cast` replaces the provider's performers, and `--publisher` and `--cast` are also used in a built name. When the release is prepared again (for example after editing at the confirmation prompt), whatever the earlier match filled in is undone before the lookup decides again.
 
 ## Overrides
 

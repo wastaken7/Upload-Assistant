@@ -60,6 +60,8 @@ class Meta:
     xxx_source_url: str = ""
     xxx_performers: list[str] = field(default_factory=list[str])
     xxx_rename: bool = False
+    # Fields a match changed, as {field: [earlier value, applied value]}, so a new lookup can undo them.
+    xxx_applied: dict[str, list[Any]] = field(default_factory=dict[str, list[Any]])
     asian: bool = False
     asin: str = ""
     ask_dupe: bool = False
@@ -670,7 +672,9 @@ class Meta:
 
     def populate_cast(self, limit: int = 5) -> None:
         """Build the canonical cast list from manual, IMDb, and TMDb sources."""
-        source_lists = [self.manual_cast, self.imdb_info.get("stars", []) if isinstance(self.imdb_info, dict) else [], self.tmdb_cast, self.xxx_performers]
+        # --cast replaces an XXX release's detected performers rather than joining them.
+        xxx_performers = [] if self.manual_cast and self.category == "XXX" else self.xxx_performers
+        source_lists = [self.manual_cast, self.imdb_info.get("stars", []) if isinstance(self.imdb_info, dict) else [], self.tmdb_cast, xxx_performers]
         names: list[str] = []
         seen: set[str] = set()
 
