@@ -6,13 +6,6 @@ import pytest
 from src import app_db
 
 
-@pytest.fixture(autouse=True)
-def fresh_initialization():
-    app_db._initialized_paths.clear()
-    yield
-    app_db._initialized_paths.clear()
-
-
 def test_new_database_has_the_latest_schema(tmp_path):
     path = app_db.database_path(tmp_path)
 
@@ -27,7 +20,6 @@ def test_new_database_has_the_latest_schema(tmp_path):
 def test_reopening_does_not_apply_migrations_again(tmp_path, monkeypatch):
     path = app_db.database_path(tmp_path)
     app_db.connect(path).close()
-    app_db._initialized_paths.clear()
 
     def unexpected(*_args):
         raise AssertionError("migration applied twice")
@@ -39,14 +31,53 @@ def test_reopening_does_not_apply_migrations_again(tmp_path, monkeypatch):
 
 def test_newer_database_is_refused_and_left_unchanged(tmp_path):
     path = app_db.database_path(tmp_path)
-    with closing(app_db.connect(path)) as db:
+    path.parent.mkdir(parents=True)
+    with closing(sqlite3.connect(path)) as db:
         db.execute("PRAGMA user_version = 999")
-    app_db._initialized_paths.clear()
 
     with pytest.raises(app_db.NewerSchemaError):
         app_db.connect(path)
     with closing(sqlite3.connect(path)) as db:
         assert db.execute("PRAGMA user_version").fetchone() == (999,)
+        assert db.execute("PRAGMA journal_mode").fetchone() == ("delete",)
+
+
+def test_a_database_replaced_while_running_is_migrated_again(tmp_path):
+    path = app_db.database_path(tmp_path)
+    app_db.connect(path).close()
+    for leftover in path.parent.glob(f"{path.name}*"):
+        leftover.unlink()
+
+    with closing(app_db.connect(path)) as db:
+        assert db.execute("PRAGMA user_version").fetchone() == (app_db.SCHEMA_VERSION,)
+        assert db.execute("SELECT COUNT(*) FROM stats_daily").fetchone() == (0,)
+
+
+def test_a_busy_legacy_file_postpones_the_migration_until_it_can_be_read(tmp_path, monkeypatch):
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    legacy = data_dir / app_db.LEGACY_API_KEY_EXPIRY_FILENAME
+    with closing(sqlite3.connect(legacy)) as db, db:
+        db.execute("CREATE TABLE api_key_expiry (identity TEXT PRIMARY KEY, expires_at TEXT, checked_at TEXT NOT NULL)")
+        db.execute("INSERT INTO api_key_expiry VALUES ('fictional-hash', NULL, '2026-01-01T00:00:00+00:00')")
+    real_connect = sqlite3.connect
+    busy = True
+
+    def connect(database, *args, **kwargs):
+        if busy and kwargs.get("uri"):
+            raise sqlite3.OperationalError("database is locked")
+        return real_connect(database, *args, **kwargs)
+
+    monkeypatch.setattr(app_db.sqlite3, "connect", connect)
+    path = app_db.database_path(tmp_path)
+
+    with pytest.raises(sqlite3.OperationalError, match="locked"):
+        app_db.connect(path)
+    with closing(real_connect(path)) as db:
+        assert db.execute("PRAGMA user_version").fetchone() == (0,)
+    busy = False
+    with closing(app_db.connect(path)) as db:
+        assert db.execute("SELECT identity FROM api_key_expiry").fetchall() == [("fictional-hash",)]
 
 
 def test_failed_migration_is_rolled_back(tmp_path, monkeypatch):
