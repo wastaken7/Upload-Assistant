@@ -36,6 +36,7 @@ from src.tags import get_tag, tag_override
 from src.tvmaze import tvmaze_manager
 from src.video import video_manager
 from src.xxx_keywords import extract_xxx_keywords
+from src.xxx_lookup import lookup_xxx_metadata
 from src.xxx_platforms import XXX_PLATFORM_KEYWORDS
 
 guessit_module: Any = cast(Any, guessit)
@@ -184,6 +185,10 @@ CATEGORY_ONLY_ARGS: dict[str, dict[str, str]] = {
         "music_discogs_id": "--music-discogs-id",
         "music_discogs_release_id": "--music-discogs-release-id",
         "music_discogs_master_id": "--music-discogs-master-id",
+    },
+    "XXX": {
+        "tpdb_manual": "--tpdb",
+        "blvckout_manual": "--blvckout",
     },
     "TV": {
         "manual_season": "--season",
@@ -1469,7 +1474,11 @@ async def search_metadata(
 
     _reject_invalid_automatic_imdb(meta, filename)
 
-    meta.populate_cast()
+    if meta.category == "XXX":
+        await lookup_xxx_metadata(meta, prep_instance.config)
+
+    # XXX trackers take every performer of a scene; other categories list the main cast.
+    meta.populate_cast(limit=100 if meta.category == "XXX" else 5)
 
 
 async def finalize_metadata(

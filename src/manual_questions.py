@@ -37,6 +37,7 @@ QUESTION_KEYS: dict[str, KeyInfo] = {
     "release.audio_languages": KeyInfo("Languages of audio tracks without a language tag, comma-separated"),
     "release.hardcoded_sub_language": KeyInfo("Language of the hardcoded subtitles"),
     "release.subtitle_languages": KeyInfo("Languages of subtitle tracks without a language tag, comma-separated"),
+    "xxx.match": KeyInfo("ThePornDB or BLVCKOUT result for an adult release (tpdb:scenes/ID, tpdb:movies/ID, blvckout:ID or none)"),
     "xxx.tags": KeyInfo("Adult content tags in English, comma-separated"),
     # Tracker fields
     "alpharatio.cover": KeyInfo("Cover image link (.jpg, .png or .gif)"),

@@ -240,6 +240,8 @@ def external_ids(meta: Any) -> dict[str, str]:
         ("openlibrary", ("openlibrary",)),
         ("isbn", ("book_isbn", "isbn")),
         ("asin", ("book_asin", "asin")),
+        ("tpdb", ("tpdb_id",)),
+        ("blvckout", ("blvckout_id",)),
     ):
         for attribute in attributes:
             value = _text(getattr(meta, attribute, ""), 64, markup=False)
@@ -496,6 +498,8 @@ _PROVIDER_LABELS = {
     "asin": "ASIN",
     "discogs_release": "Discogs release",
     "discogs_master": "Discogs master",
+    "tpdb": "ThePornDB",
+    "blvckout": "BLVCKOUT",
 }
 # Fields set by ID arguments, and IDs already resolved before the metadata search.
 _MANUAL_ID_FIELDS = (
@@ -513,6 +517,8 @@ _MANUAL_ID_FIELDS = (
     "book_isbn",
     "book_asin",
     "openlibrary",
+    "tpdb_manual",
+    "blvckout_manual",
 )
 # IDs the metadata search copies from a manual field and keeps on a later pass.
 _DERIVED_ID_FIELDS = {"tvdb_manual": "tvdb_id", "tvmaze_manual": "tvmaze_id", "mal_manual": "mal_id"}
@@ -613,7 +619,10 @@ def apply_saved_ids(meta: Any) -> list[str]:
     """
     saved = dict(getattr(meta, "saved_ids", {}) or {})
     category = str(getattr(meta, "category", "") or "").upper()
-    if not saved or not category:
+    # XXX is only detected from markers in the name, so a confirmed adult video
+    # without one would be prepared as a movie; restore XXX before that happens.
+    restore_xxx = not category and str(saved.get("category", "")).upper() == "XXX" and not getattr(meta, "manual_category", None)
+    if not saved or (not category and not restore_xxx):
         # Video categories are only known when the metadata search starts; try again then.
         return []
     # Decided once per run, whatever the outcome.
@@ -630,21 +639,26 @@ def apply_saved_ids(meta: Any) -> list[str]:
         filled.setdefault(field_name, [getattr(meta, field_name, None), value])
         setattr(meta, field_name, value)
 
-    if saved_category != category:
-        # A video without an episode or season pattern is first guessed as MOVIE;
-        # a TV category confirmed earlier replaces that guess, as --tmdb tv/ would.
-        guessed_movie = category == "MOVIE" and not getattr(meta, "manual_category", None) and not getattr(meta, "tmdb_manual_category", "")
-        if not (guessed_movie and saved_category == "TV"):
-            return []
-        category = "TV"
-        assign("category", category)
     # Saved IDs belong together: once any ID was given (for example a corrected
     # --imdb at the confirmation prompt), the others may no longer match it.
     # IDs found automatically (scene or tracker data) are replaced instead.
+    # Checked before the category changes, which only the saved IDs justify.
     given = [field_name for field_name in _MANUAL_ID_FIELDS if getattr(meta, field_name, None)]
     if given:
         logger.debug(f"Not reusing saved IDs because IDs were given: {', '.join(given)}")
         return []
+    if restore_xxx:
+        category = "XXX"
+        assign("category", category)
+    if saved_category != category:
+        # A video without an episode or season pattern is first guessed as MOVIE;
+        # a TV category confirmed earlier replaces that guess, as --tmdb tv/ would,
+        # and so does XXX for an adult video whose name carries no XXX marker.
+        guessed_movie = category == "MOVIE" and not getattr(meta, "manual_category", None) and not getattr(meta, "tmdb_manual_category", "")
+        if not (guessed_movie and saved_category in ("TV", "XXX")):
+            return []
+        category = saved_category
+        assign("category", category)
     applied: list[str] = []
 
     def fill(field_name: str, provider: str, value: object, *copies: str) -> None:
@@ -682,6 +696,9 @@ def apply_saved_ids(meta: Any) -> list[str]:
         fill("book_isbn", "isbn", saved.get("isbn"), "isbn")
         fill("book_asin", "asin", saved.get("asin"), "asin")
         fill("openlibrary", "openlibrary", saved.get("openlibrary"))
+    elif category == "XXX":
+        fill("tpdb_manual", "tpdb", saved.get("tpdb"))
+        fill("blvckout_manual", "blvckout", saved.get("blvckout"))
     if category in {"MOVIE", "TV"} and (getattr(meta, "imdb_manual", None) or getattr(meta, "tmdb_manual", None)):
         # As when --imdb or --tmdb is given: confirmed IDs win over ones found automatically.
         meta.imdb_id = meta.imdb = meta.tmdb_id = meta.tmdb = None
@@ -816,7 +833,7 @@ def _like_pattern(term: str) -> str:
 # A search term without a prefix also matches these IDs, whose stored form
 # (tt0123456, movie/42, an ISBN, an ASIN, OL123W) cannot be mistaken for a
 # year or another number; "provider:value" (e.g. tvdb:12345) matches any ID.
-_DISTINCT_ID_PROVIDERS = ("imdb", "tmdb", "isbn", "asin", "openlibrary")
+_DISTINCT_ID_PROVIDERS = ("imdb", "tmdb", "isbn", "asin", "openlibrary", "tpdb")
 _ID_SEARCH_ALIASES = {"discogs": ("discogs_release", "discogs_master")}
 
 
@@ -862,8 +879,11 @@ def _searched_id_values(provider: str, value: str) -> list[str]:
             return [f"{kind}/{_positive_int(number)}"] if kind in {"MOVIE", "TV"} and _positive_int(number) else []
         number_value = _positive_int(key)
         return [f"MOVIE/{number_value}", f"TV/{number_value}"] if number_value else []
-    if provider in {"isbn", "asin", "openlibrary"}:
+    if provider in {"isbn", "asin", "openlibrary", "blvckout"}:
         return [key]
+    if provider == "tpdb":
+        # Stored as scenes/ID or movies/ID; a bare ID matches either.
+        return [key] if "/" in key else [f"{kind}/{key}" for kind in ("SCENES", "MOVIES", "JAV")]
     number = _positive_int(key)
     return [str(number)] if number else []
 

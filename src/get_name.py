@@ -15,6 +15,7 @@ from src.cleanup import cleanup_manager
 from src.console import logger
 from src.meta import Meta
 from src.trackers.common import Common
+from src.xxx_lookup import generated_release_name
 
 guessit_module: Any = cast(Any, guessit)
 GuessitFn = Callable[[str, dict[str, Any] | None], dict[str, Any]]
@@ -178,7 +179,7 @@ class NameManager:
         if meta.manual_name is not None:
             name = str(meta.manual_name).strip()
         elif meta.category == "XXX":
-            release_name = str(meta.scene_name or meta.basename_no_ext or meta.uuid or meta.title)
+            release_name = generated_release_name(meta) or str(meta.scene_name or meta.basename_no_ext or meta.uuid or meta.title)
             name = release_name.replace(".", " ")
         elif meta.category == "MOVIE":  # MOVIE SPECIFIC
             if type == "DISC":  # Disk

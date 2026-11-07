@@ -211,8 +211,10 @@ async def prepare_artwork(meta: Meta) -> None:
             source = source_path
         elif value and urlparse(value).scheme in {"http", "https"}:
             source = await download_public_image(value)
-        elif kind == "poster" and is_public_http_url(meta.artwork_url):
-            source = await download_public_image(meta.artwork_url)
+        elif kind == "poster" and is_public_http_url(meta.artwork_url or meta.artwork_download_url):
+            source = await download_public_image(meta.artwork_url or meta.artwork_download_url)
+        elif kind == "banner" and is_public_http_url(meta.artwork_banner_url):
+            source = await download_public_image(meta.artwork_banner_url)
         elif value:
             logger.warning(f"[yellow]{input_name.replace('_', ' ')} must be an existing image file or public HTTP(S) URL; ignoring it.[/yellow]")
             continue

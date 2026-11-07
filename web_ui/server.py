@@ -2310,6 +2310,13 @@ def _extract_metadata_sources(meta_data: Mapping[str, object]) -> list[MetadataS
             igdb_url if _is_http_url(igdb_url) else f"https://www.igdb.com/search?type=1&q={quote(igdb_value)}",
         )
 
+    if category == "XXX":
+        source_url = _stringify_preview_value(meta_data.get("xxx_source_url"))
+        for key, label in (("tpdb", "ThePornDB"), ("blvckout", "BLVCKOUT")):
+            value = _stringify_preview_value(meta_data.get(f"{key}_id"))
+            if value:
+                _append_metadata_source(sources, seen_keys, key, label, value, source_url if _is_http_url(source_url) else "")
+
     if category == "GAME" and steam_url:
         steam_value = steam_url.rstrip("/").split("/")[-1] or steam_url
         _append_metadata_source(sources, seen_keys, "steam", "Steam", steam_value, steam_url)

@@ -885,6 +885,18 @@ const argumentSections = [
     ],
   },
   {
+    id: "xxx",
+    title: "XXX",
+    entries: [
+      { flag: "--tpdb", placeholder: "scenes/ID" },
+      { flag: "--blvckout", placeholder: "ID" },
+      { flag: "--publisher", placeholder: "STUDIO" },
+      { flag: "--cast", placeholder: "NAME1,NAME2" },
+      { flag: "--keywords", placeholder: "TAG1,TAG2" },
+      { flag: "--overview", placeholder: "SYNOPSIS" },
+    ],
+  },
+  {
     id: "tracker-refs",
     title: "Tracker References",
     subtitle:
@@ -1097,6 +1109,7 @@ const argumentViews = [
     icon: "shapes",
     description: "Sports, fan resyncs and adult releases",
     sections: [
+      "xxx",
       ...VIDEO_ARGUMENT_SECTIONS.filter((id) => id !== "analysis"),
       ...COMMON_ARGUMENT_SECTIONS,
     ],

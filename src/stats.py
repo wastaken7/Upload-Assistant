@@ -405,6 +405,8 @@ _METADATA_API_HOSTS = {
     "store.steampowered.com": "steam",
     "www.blu-ray.com": "bluray_com",
     "predb.pw": "predb",
+    "api.theporndb.net": "tpdb",
+    "blvckout.foo": "blvckout",
 }
 _metadata_tracking_installed = False
 

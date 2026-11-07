@@ -1,11 +1,14 @@
 # Upload Assistant © 2026 Audionut & wastaken7 — Licensed under UAPL v1.0
 import re
+from pathlib import Path
 from typing import Any, ClassVar
 
 from src.get_desc import DescriptionBuilder
+from src.media_extensions import VIDEO_EXTENSIONS
 from src.meta import Meta
 from src.screenshot_manifest import files as manifest_files
 from src.trackers.UNIT3D import UNIT3D
+from src.xxx_match import XxxRelease, is_pack_name
 
 Config = dict[str, Any]
 
@@ -139,11 +142,16 @@ class BitPorn(UNIT3D):
         "576p": "12",
         "720p": "17",
         "1080p": "13",
+        "1440p": "20",
+        "1600p": "19",
         "2048p": "14",
         "2160p": "18",
         "3160p": "15",
         "4320p": "16",
     }
+
+    # Frame heights of the resolutions above, for frames that are not listed.
+    _resolution_heights: ClassVar[dict[int, str]] = {480: "12", 576: "12", 720: "17", 1080: "13", 1440: "20", 1600: "19", 2160: "18", 3160: "15", 4320: "16"}
 
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name=self.tracker)
@@ -158,12 +166,59 @@ class BitPorn(UNIT3D):
             return {"category_id": self.category_ids.get(category, self.category_ids["Uncategorized"])}
 
         basename = str(meta.basename_no_ext or "")
+        name = self.category_ids.get(self.category_from_metadata(meta, basename) or "", self.category_ids["Uncategorized"])
+        return {"category_id": name}
+
+    # ThePornDB tags that describe who is in the scene. Acts (anal, deepthroat, ...)
+    # are left out: uploaders do not pick the category from them, so a guess is
+    # worse than Uncategorized. Used only when the name decides nothing.
+    _tag_patterns = (
+        ("Gay / Bi", r"\b(?:gay|bisexual)\b"),
+        ("Shemale", r"\b(?:trans|transgender|transsexual|shemale|tgirl)\b"),
+        ("Lesbian", r"\b(?:lesbian|girl on girl)\b"),
+        ("Asian", r"\b(?:asian|japanese|jav|thai|chinese|korean|filipina)\b"),
+        ("Interracial", r"\binterracial\b"),
+        ("Black", r"\b(?:ebony|black (?:girl|woman|female))\b"),
+        ("BBW", r"\bbbw\b"),
+        ("Mature", r"\b(?:mature|granny|grandma)\b"),
+    )
+    # Standalone VR markers, or a site name ending in VR ("examplevr"); a short word
+    # that merely ends in "vr" is not one.
+    _vr_name = re.compile(r"\b(?:vr|vr180|180x180|3dh|oculus|virtual reality)\b|\b[a-z0-9]{4,}vr\b")
+    _asian_studio = re.compile(r"(?<![a-z])(?:asian|thai|jav)|japan")
+    _fansite_names = re.compile(r"\b(?:onlyfans|fansly|fanvue|manyvids|fancentro|loyalfans|justforfans|clips4sale|pornhub|chaturbate)\b")
+
+    def category_from_metadata(self, meta: Meta, basename: str) -> str | None:
+        """Choose a BitPorn category: release format first, then the name, then provider tags."""
         normalized_basename = re.sub(r"[^a-z0-9]+", " ", basename.casefold())
+        release = XxxRelease.from_dict(meta.xxx_match)
+        videos = [path for path in meta.filelist or [] if Path(str(path)).suffix.casefold() in VIDEO_EXTENSIONS]
+        tags = [re.sub(r"[^a-z0-9+]+", " ", str(tag).casefold()).strip() for tag in meta.keywords or []]
+        if is_pack_name(basename):
+            return "Collection"
+        if self._vr_name.search(normalized_basename) or any(tag in ("vr", "virtual reality") for tag in tags):
+            return "VR"
+        # A movie matched by title stays a movie when it is split into several files.
+        if release is not None and release.kind == "movies":
+            return "Movie"
+        if len(videos) >= 3:
+            return "Collection"
+        if release is not None and release.kind == "jav":
+            return "Asian"
+        platform = " ".join(re.sub(r"[^a-z0-9]+", " ", value.casefold()) for value in (release.network, release.studio)) if release else ""
+        if self._fansite_names.search(platform):
+            return "Fansite"
+        # Site names are often joined words ("ExampleJapanHD"); "asian" only counts at a
+        # word start, so "Caucasian" is not Asian.
+        if release is not None and self._asian_studio.search(f"{release.studio} {release.network}".casefold()):
+            return "Asian"
         for category_name, pattern in self._category_patterns:
             if re.search(pattern, normalized_basename):
-                return {"category_id": self.category_ids[category_name]}
-
-        return {"category_id": self.category_ids["Uncategorized"]}
+                return category_name
+        for category_name, pattern in self._tag_patterns:
+            if any(re.search(pattern, tag) for tag in tags):
+                return category_name
+        return None
 
     async def get_type_id(self, meta: Meta, type: str | None = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         _ = meta, type, reverse, mapping_only
@@ -175,8 +230,23 @@ class BitPorn(UNIT3D):
         if reverse:
             return {value: name for name, value in self.resolution_ids.items()}
 
-        resolved_resolution = resolution if resolution else meta.resolution
-        return {"resolution_id": self.resolution_ids.get(str(resolved_resolution), self.resolution_ids["OTHER"])}
+        resolved_resolution = str(resolution if resolution else meta.resolution)
+        height_value = int(meta.video_height or 0)
+        if not resolution and height_value > 2160 and resolved_resolution in ("4320p", "8640p", "OTHER"):
+            # UA rounds a frame up to the next standard size, so a 5760x2880 VR video
+            # is "4320p"; BitPorn uploaders list it by its height (2880p is 6K).
+            resolved_resolution = f"{height_value}p"
+        if resolved_resolution in self.resolution_ids:
+            return {"resolution_id": self.resolution_ids[resolved_resolution]}
+        # VR and other non-standard frames (2880p, 4096p): use the closest BitPorn
+        # resolution, as uploaders list 2880p as 6K and 4096p as 8K.
+        match = re.fullmatch(r"(\d{3,4})[pi]", resolved_resolution)
+        height = int(match.group(1)) if match else int(meta.video_height or 0)
+        if height:
+            closest = min(self._resolution_heights, key=lambda value: abs(value - height))
+            if abs(closest - height) <= closest * 0.25:
+                return {"resolution_id": self._resolution_heights[closest]}
+        return {"resolution_id": self.resolution_ids["OTHER"]}
 
     async def _description_image_files(self, meta: Meta) -> list[tuple[str, bytes, str]]:
         """Return local XXX contact sheets for BitPorn to host during upload."""

@@ -361,3 +361,51 @@ def test_discogs_arguments_do_not_join_the_selected_release():
     meta = Meta(category="MUSIC", music_discogs_master_id="45", music_release={"external_ids": {"discogs_release": "123"}})
 
     assert upload_history.external_ids(meta) == {"discogs_release": "123"}
+
+
+def test_confirmed_xxx_metadata_ids_are_reused(tmp_path):
+    release = _release(tmp_path, "Fictional.Studio.26.01.02.Fictional.Scene.XXX")
+    meta = _confirm(Meta(path=str(release), category="XXX", tpdb_id="scenes/00000000-0000-4000-8000-000000000001", blvckout_id="4242"))
+    assert upload_history.remember_release(meta) is True
+
+    loaded = _load(release)
+    loaded.category = "XXX"
+    applied = upload_history.apply_saved_ids(loaded)
+
+    assert (loaded.tpdb_manual, loaded.blvckout_manual) == ("scenes/00000000-0000-4000-8000-000000000001", "4242")
+    assert applied == ["ThePornDB scenes/00000000-0000-4000-8000-000000000001", "BLVCKOUT 4242"]
+
+
+
+def test_a_confirmed_xxx_category_is_restored_before_preparation(tmp_path):
+    release = _release(tmp_path, "clip_0001")
+    meta = _confirm(Meta(path=str(release), category="XXX", tpdb_id="scenes/1"))
+    assert upload_history.remember_release(meta) is True
+
+    # Category detection leaves a plain video without a category until the metadata search.
+    restored = _load(release)
+    upload_history.apply_saved_ids(restored)
+    assert (restored.category, restored.tpdb_manual) == ("XXX", "scenes/1")
+
+    chosen = _load(release, manual_category="MOVIE")
+    upload_history.apply_saved_ids(chosen)
+    assert chosen.category == ""
+
+    skipped = _load(release, no_saved_ids=True)
+    upload_history.apply_saved_ids(skipped)
+    assert skipped.category == ""
+
+
+
+def test_a_given_id_keeps_the_saved_xxx_category_from_being_restored(tmp_path):
+    release = _release(tmp_path, "clip_0001")
+    assert upload_history.remember_release(_confirm(Meta(path=str(release), category="XXX", tpdb_id="scenes/1"))) is True
+
+    unset = _load(release, imdb_manual="tt0000001")
+    upload_history.apply_saved_ids(unset)
+    guessed = _load(release, imdb_manual="tt0000001", category="MOVIE")
+    upload_history.apply_saved_ids(guessed)
+
+    # The saved IDs are not reused, so neither is the category they were confirmed with.
+    assert (unset.category, unset.tpdb_manual) == ("", None)
+    assert (guessed.category, guessed.tpdb_manual) == ("MOVIE", None)

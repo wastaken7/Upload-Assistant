@@ -16,6 +16,8 @@ from src.get_desc import DescriptionBuilder
 from src.meta import Meta
 from src.screenshot_manifest import files as manifest_files
 from src.trackers.common import Common
+from src.xxx_lookup import generated_release_name
+from src.xxx_match import is_pack_name
 
 Config = dict[str, Any]
 
@@ -91,7 +93,7 @@ class DirtyBytes:
 
     def get_category_id(self, meta: Meta) -> int:
         name = self._normalized_name(meta)
-        if self._pack_re.search(name):
+        if self._pack_re.search(name) or is_pack_name(str(meta.basename_no_ext or "")):
             return self.pack_id
 
         is_movie = meta.is_disc == "DVD" or bool(self._movie_re.search(name))
@@ -120,7 +122,7 @@ class DirtyBytes:
     async def get_name(self, meta: Meta) -> str:
         if meta.manual_name is not None:
             return meta.manual_name.strip()
-        return str(meta.scene_name or meta.basename_no_ext)
+        return generated_release_name(meta) or str(meta.scene_name or meta.basename_no_ext)
 
     async def get_mediainfo(self, meta: Meta) -> str:
         if meta.is_disc == "BDMV":
@@ -245,12 +247,15 @@ class DirtyBytes:
         tags = [str(tag).strip()[:64] for tag in meta.keywords or [] if str(tag).strip()]
         languages = [str(language).strip().lower() for language in meta.audio_languages or [] if str(language).strip()]
         year = meta.year if isinstance(meta.year, int) and meta.year >= 1888 else None
+        # A runtime describes one video; packs and multi-file releases have none.
+        runtime = int(meta.video_duration or 0) if len(meta.filelist or []) <= 1 and self.get_category_id(meta) != self.pack_id else 0
         optional: dict[str, Any] = {
             "studio": str(meta.publisher or "").strip()[:120],
             "performers": ", ".join(performers[:100]),
             "content_tags": ", ".join(tags[:12]),
             "language": ", ".join(dict.fromkeys(languages)),
             "release_year": str(year) if year else "",
+            "runtime_minutes": str(runtime) if 1 <= runtime <= 65535 else "",
             "mediainfo": "" if preview else await self.get_mediainfo(meta),
             "firstpic": self.get_firstpic(meta),
         }
@@ -301,6 +306,7 @@ class DirtyBytes:
             "content_tags": payload_preview.text("Tags", max_length=1000),
             "language": payload_preview.text("Language"),
             "release_year": payload_preview.number("Year"),
+            "runtime_minutes": payload_preview.number("Runtime (minutes)"),
             "firstpic": payload_preview.text("Cover URL", max_length=1000),
         }
         deferred = {"nfo": payload_preview.DESCRIPTION_NOTE, "mediainfo": "Read from the MediaInfo report at upload time"}

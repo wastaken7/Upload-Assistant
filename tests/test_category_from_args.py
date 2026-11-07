@@ -58,6 +58,8 @@ FLAG_VALUES: dict[str, list[str]] = {
     "--manual-episode-title": ["Example Episode"],
     "--daily": ["2026-01-01"],
     "--tvmaze": ["000000"],
+    "--tpdb": ["scenes/00000000-0000-0000-0000-000000000000"],
+    "--blvckout": ["000000"],
 }
 
 FLAG_CATEGORIES = [(flag, category) for category, fields in CATEGORY_ONLY_ARGS.items() for flag in fields.values()]
