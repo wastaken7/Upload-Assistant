@@ -227,3 +227,37 @@ def test_after_usenet_setting_cannot_bypass_disabled_master_switch():
     )
 
     assert events == ["usenet", "torrents:False"]
+
+
+def test_concurrent_order_finishes_the_usenet_post_before_a_tracker_error_ends_it():
+    events: list[str] = []
+
+    async def upload_usenet() -> None:
+        await asyncio.sleep(0.05)
+        events.append("usenet")
+
+    async def upload_torrents(_bandwidth_control: bool) -> None:
+        raise RuntimeError("fictional tracker error")
+
+    async def wait_for_bandwidth() -> None:
+        events.append("bandwidth")
+
+    async def run() -> None:
+        await run_upload_order(
+            "concurrent",
+            upload_usenet,
+            upload_torrents,
+            wait_for_bandwidth,
+            bandwidth_control=False,
+            bandwidth_control_after_usenet=False,
+            has_usenet_upload=True,
+            has_torrent_trackers=True,
+        )
+
+    try:
+        asyncio.run(run())
+    except RuntimeError as error:
+        assert str(error) == "fictional tracker error"
+    else:
+        raise AssertionError("the tracker error was not raised")
+    assert events == ["usenet"]

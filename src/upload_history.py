@@ -201,10 +201,13 @@ def _discogs_ids(meta: Any) -> dict[str, str]:
     release = getattr(meta, "music_release", None)
     known = cast(Mapping[str, Any], release).get("external_ids") if isinstance(release, Mapping) else None
     if isinstance(known, Mapping):
+        # The selected release's IDs belong together; an argument the pipeline
+        # did not use (for example with --no-music-discogs) must not join them.
         for kind in ("release", "master"):
             reference = DiscogsEnricher.parse_reference(cast(Mapping[str, Any], known).get(f"discogs_{kind}"), kind)
             if reference and reference[0] == kind:
                 ids[f"discogs_{kind}"] = reference[1]
+        return ids
     for attribute, default_kind in (("music_discogs_release_id", "release"), ("music_discogs_master_id", "master"), ("music_discogs_id", "release")):
         reference = DiscogsEnricher.parse_reference(getattr(meta, attribute, ""), default_kind)
         if reference:
@@ -521,6 +524,28 @@ def _id_number(value: object) -> int:
     return _positive_int(text[2:] if text.lower().startswith("tt") else text)
 
 
+# Fields set together with a manual ID field, by its argument or by apply_saved_ids.
+_COMPANION_ID_FIELDS = {"tmdb_manual": ("tmdb_manual_category",), "book_isbn": ("isbn",), "book_asin": ("asin",)}
+
+
+def keep_given_ids(meta: Any, parser: Any, args: list[str] | tuple[str, ...]) -> None:
+    """Keep the IDs ``args`` (a confirmation edit) gives, even when they equal a saved ID.
+
+    Without this, an edit such as ``--tmdb tv/2 --no-saved-ids`` after saved
+    ID tv/2 was applied would have that ID undone with the other saved ones.
+    """
+    filled = getattr(meta, "saved_id_fields", None)
+    if not isinstance(filled, dict) or not filled:
+        return
+    for action in getattr(parser, "_actions", []):
+        dest = getattr(action, "dest", "")
+        options = getattr(action, "option_strings", [])
+        if dest not in filled or not any(arg == option or arg.startswith(f"{option}=") for option in options for arg in args):
+            continue
+        for field_name in (dest, _DERIVED_ID_FIELDS.get(dest, ""), *_COMPANION_ID_FIELDS.get(dest, ())):
+            cast(dict[str, Any], filled).pop(field_name, None)
+
+
 def _undo_saved_ids(meta: Any) -> None:
     """Restore the fields an earlier pass filled from saved IDs, unless something changed them since.
 
@@ -639,8 +664,8 @@ def apply_saved_ids(meta: Any) -> list[str]:
         if not getattr(meta, "no_imdb", False):
             fill("imdb_manual", "imdb", saved.get("imdb"))
         kind, _separator, number = saved.get("tmdb", "").partition("/")
-        if number.isdigit() and kind.upper() == category:
-            fill("tmdb_manual", "tmdb", int(number))
+        if _positive_int(number) and kind.upper() == category:
+            fill("tmdb_manual", "tmdb", _positive_int(number))
             assign("tmdb_manual_category", category)
         fill("tvdb_manual", "tvdb", saved.get("tvdb"))
         fill("mal_manual", "mal", saved.get("mal"))
@@ -834,17 +859,33 @@ def _searched_id_values(provider: str, value: str) -> list[str]:
     if provider == "tmdb":
         kind, separator, number = key.partition("/")
         if separator:
-            return [f"{kind}/{int(number)}"] if kind in {"MOVIE", "TV"} and number.isdigit() else []
-        return [f"MOVIE/{int(key)}", f"TV/{int(key)}"] if key.isdigit() else []
+            return [f"{kind}/{_positive_int(number)}"] if kind in {"MOVIE", "TV"} and _positive_int(number) else []
+        number_value = _positive_int(key)
+        return [f"MOVIE/{number_value}", f"TV/{number_value}"] if number_value else []
     if provider in {"isbn", "asin", "openlibrary"}:
         return [key]
-    if provider.startswith("discogs"):
-        from src.music.sources import DiscogsEnricher
-
-        reference = DiscogsEnricher.parse_reference(value.strip(), "master" if provider == "discogs_master" else "release")
-        return [reference[1]] if reference else []
     number = _positive_int(key)
     return [str(number)] if number else []
+
+
+def _discogs_search(provider: str, value: str) -> tuple[tuple[str, ...], list[str]]:
+    """Return the providers and ID a Discogs search term matches.
+
+    A kind written in the value (``master/45`` or a master URL) selects that
+    kind; a bare ID searches both unless the prefix names one, and a kind that
+    contradicts the prefix matches nothing.
+    """
+    from src.music.sources import DiscogsEnricher
+
+    reference = DiscogsEnricher.parse_reference(value.strip(), "")
+    if reference is None:
+        return _ID_SEARCH_ALIASES["discogs"], []
+    kind, identifier = reference
+    if not kind:
+        return _ID_SEARCH_ALIASES.get(provider, (provider,)), [identifier]
+    if provider not in {"discogs", f"discogs_{kind}"}:
+        return (provider,), []
+    return (f"discogs_{kind}",), [identifier]
 
 
 def _prefixed_id_filter(term: str) -> tuple[str, list[object]] | None:
@@ -853,9 +894,10 @@ def _prefixed_id_filter(term: str) -> tuple[str, list[object]] | None:
     provider = prefix.lower()
     if not separator or (provider not in _PROVIDER_LABELS and provider not in _ID_SEARCH_ALIASES):
         return None
-    providers = _ID_SEARCH_ALIASES.get(provider, (provider,))
+    if provider.startswith("discogs"):
+        return _id_exists(*_discogs_search(provider, value))
     # A known provider with a malformed ID matches nothing rather than every name containing it.
-    return _id_exists(providers, _searched_id_values(provider, value))
+    return _id_exists(_ID_SEARCH_ALIASES.get(provider, (provider,)), _searched_id_values(provider, value))
 
 
 def _filters(

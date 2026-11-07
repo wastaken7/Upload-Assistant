@@ -1478,7 +1478,7 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
         # Carry original args over, let parse handle duplicates
         original_args = meta.item_args if meta.item_args is not None else list(sys.argv[1:])
         try:
-            edited_meta, _help, _before_args = cast(
+            edited_meta, edit_parser, _before_args = cast(
                 tuple[Meta, Any, Any], parser.parse(list(original_args) + list(next_editargs), meta.copy() if webui_roots is not None else meta)
             )
         except SystemExit:
@@ -1495,6 +1495,7 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
         if edited_meta is not meta:
             # Apply the validated copy in place: the caller keeps using this object for the upload.
             meta.update(edited_meta)
+        upload_history.keep_given_ids(meta, edit_parser, next_editargs)
         editargs_tracking = next_editargs
         if not meta.trackers:
             meta.trackers = previous_trackers

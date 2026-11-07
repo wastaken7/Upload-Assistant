@@ -1,6 +1,7 @@
 import asyncio
 import sqlite3
 from contextlib import closing
+from types import SimpleNamespace
 
 import pytest
 
@@ -339,3 +340,24 @@ def test_saved_discogs_ids_are_labelled(tmp_path):
 
     assert upload_history.apply_saved_ids(meta) == ["Discogs release 123"]
     assert meta.music_discogs_release_id == "123"
+
+
+def test_an_id_given_again_in_an_edit_is_kept_with_no_saved_ids(tmp_path):
+    meta = _tv_meta_with_saved_ids(tmp_path)
+    parser = SimpleNamespace(_actions=[SimpleNamespace(dest="tmdb_manual", option_strings=["-tmdb", "--tmdb"])])
+    # Args.parse clears the TMDb ID, then sets the one given: the same as the saved one.
+    meta.imdb_id = None
+    meta.tmdb_manual, meta.tmdb_manual_category, meta.no_saved_ids = 2, "TV", True
+
+    upload_history.keep_given_ids(meta, parser, ["--tag", "FICT", "--tmdb", "tv/2", "--no-saved-ids"])
+    asyncio.run(upload_history.load_release_memory(meta))
+
+    assert upload_history.apply_saved_ids(meta) == []
+    assert (meta.tmdb_manual, meta.tmdb_manual_category) == (2, "TV")
+    assert (meta.imdb_manual, meta.tvdb_manual) == (None, None)
+
+
+def test_discogs_arguments_do_not_join_the_selected_release():
+    meta = Meta(category="MUSIC", music_discogs_master_id="45", music_release={"external_ids": {"discogs_release": "123"}})
+
+    assert upload_history.external_ids(meta) == {"discogs_release": "123"}

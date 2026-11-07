@@ -347,6 +347,14 @@ def test_search_finds_entries_by_their_external_ids(history_on):
     # An unknown prefix is ordinary text.
     assert _titles(state_dir, "movie:42") == []
     assert upload_history.export_items(state_dir, search="tvdb:777")[0]["title"] == "Fictional Show"
+    # The Discogs kind in the value is kept; one contradicting the prefix matches nothing.
+    _record(history_on, name="Other Album FLAC", path="/media/other", title="Other Album", category="MUSIC", ids={"discogs_release": "45"})
+    assert _titles(state_dir, "discogs:45") == ["Fictional Album", "Other Album"]
+    assert _titles(state_dir, "discogs:master/45") == _titles(state_dir, "discogs_master:45") == ["Fictional Album"]
+    assert _titles(state_dir, "discogs:https://www.discogs.com/release/45-Other") == ["Other Album"]
+    assert _titles(state_dir, "discogs_release:https://www.discogs.com/master/45") == []
+    # Digits that are not ASCII never reach int().
+    assert _titles(state_dir, "tmdb:²") == _titles(state_dir, "tmdb:tv/²") == []
 
 
 def test_listing_rejects_unknown_filters(history_on):
