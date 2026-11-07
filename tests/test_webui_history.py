@@ -85,6 +85,37 @@ def test_history_api_rejects_tokens_and_cross_site_requests(monkeypatch, tmp_pat
     assert client.delete("/api/history/1").status_code == 403
 
 
+def test_history_deletions_require_the_csrf_token(monkeypatch, tmp_path):
+    client = _authenticated(monkeypatch, tmp_path)
+    item_id = upload_history.record_item(RECORD, tmp_path)
+    monkeypatch.setattr(server, "_verify_csrf_header", lambda: False)
+
+    assert client.delete(f"/api/history/{item_id}").status_code == 403
+    assert client.delete("/api/history", json={"confirmation": "CLEAR"}).status_code == 403
+    monkeypatch.setattr(server, "_verify_csrf_header", lambda: True)
+    assert client.get(f"/api/history/{item_id}").status_code == 200
+
+
+def test_history_api_handles_ids_and_offsets_beyond_sqlite_integers(monkeypatch, tmp_path):
+    client = _authenticated(monkeypatch, tmp_path)
+    upload_history.record_item(RECORD, tmp_path)
+    huge = 2**64
+
+    assert client.get(f"/api/history/{huge}").status_code == 404
+    assert client.delete(f"/api/history/{huge}").status_code == 404
+    page = client.get(f"/api/history?offset={huge}")
+    assert page.status_code == 200
+    assert page.json["items"] == []
+    assert page.json["total"] == 1
+
+
+def test_history_page_refreshes_the_csrf_token_through_the_shared_helper():
+    history_js = (server.CODE_DIR / "web_ui" / "static" / "js" / "history_app.js").read_text(encoding="utf-8")
+
+    assert "window.uaApiFetch(url" in history_js
+    assert "UA_CSRF_TOKEN" not in history_js
+
+
 def test_history_api_deletes_and_clears_with_confirmation(monkeypatch, tmp_path):
     client = _authenticated(monkeypatch, tmp_path)
     first = upload_history.record_item(RECORD, tmp_path)
