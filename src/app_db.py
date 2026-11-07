@@ -10,7 +10,6 @@ the Web UI server.
 from __future__ import annotations
 
 import sqlite3
-import threading
 from collections.abc import Callable
 from contextlib import closing
 from pathlib import Path
@@ -22,9 +21,6 @@ DATABASE_FILENAME = "upload_assistant.sqlite3"
 # read once, when the shared database is created, and never written again.
 LEGACY_STATS_FILENAME = "stats.sqlite3"
 LEGACY_API_KEY_EXPIRY_FILENAME = "api_key_expiry.sqlite3"
-
-_init_lock = threading.Lock()
-_initialized_paths: set[Path] = set()
 
 
 class NewerSchemaError(sqlite3.DatabaseError):
@@ -46,8 +42,15 @@ def _legacy_rows(path: Path, query: str) -> list[tuple[object, ...]]:
     if not path.is_file():
         return []
     try:
-        with closing(sqlite3.connect(f"{path.resolve().as_uri()}?mode=ro", uri=True, timeout=2)) as legacy:
+        with closing(sqlite3.connect(f"{path.resolve().as_uri()}?mode=ro", uri=True, timeout=5)) as legacy:
             return list(legacy.execute(query).fetchall())
+    except sqlite3.OperationalError as exc:
+        if any(reason in str(exc).lower() for reason in ("busy", "locked")):
+            # Still being written, e.g. by an older version that is running:
+            # abort the migration so the import is tried again on the next open.
+            raise
+        # Missing tables or an unreadable file: there is nothing to import.
+        return []
     except sqlite3.Error, OSError, ValueError:
         return []
 
@@ -244,19 +247,19 @@ def connect(path: Path | None = None) -> sqlite3.Connection:
     try:
         db.execute("PRAGMA busy_timeout = 5000")
         db.execute("PRAGMA foreign_keys = ON")
-        key = path.resolve()
-        with _init_lock:
-            if key not in _initialized_paths:
-                db.execute("PRAGMA journal_mode = WAL")
-                # Migrations manage their own BEGIN/COMMIT.
-                db.isolation_level = None
-                try:
-                    _migrate(db, path)
-                finally:
-                    db.isolation_level = "DEFERRED"
-                _initialized_paths.add(key)
-            elif _schema_version(db) > SCHEMA_VERSION:
-                raise NewerSchemaError(f"{path.name} was created by a newer version of Upload Assistant")
+        # Checked on every open (a cheap header read), so a file replaced while
+        # running is migrated too, and a newer one is refused before any change.
+        version = _schema_version(db)
+        if version > SCHEMA_VERSION:
+            raise NewerSchemaError(f"{path.name} was created by a newer version of Upload Assistant")
+        if version < SCHEMA_VERSION:
+            db.execute("PRAGMA journal_mode = WAL")
+            # Migrations manage their own BEGIN/COMMIT.
+            db.isolation_level = None
+            try:
+                _migrate(db, path)
+            finally:
+                db.isolation_level = "DEFERRED"
     except BaseException:
         db.close()
         raise
