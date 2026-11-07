@@ -109,6 +109,15 @@ Notes:
 
 ---
 
+## NAS app templates (Unraid, ZimaOS, CasaOS)
+
+Ready-made templates live in [`deploy/`](../deploy):
+
+- **Unraid:** [`deploy/unraid/upload-assistant.xml`](../deploy/unraid/upload-assistant.xml). Until it is listed in Community Applications, add it by hand: open **Docker**, then **Add Container**, then paste the raw template URL into **Template**.
+- **ZimaOS / CasaOS:** [`deploy/zimaos/docker-compose.yml`](../deploy/zimaos/docker-compose.yml). Until it is in the App Store, import it with **App Store**, then **Custom Install**, then **Import**.
+
+Both templates keep everything, including the WebUI login, in one appdata folder mounted at `/state`, and set `XDG_CONFIG_HOME=/state/config` for that. On the first start, read the one-time setup code from the container log.
+
 ## Unraid (Compose plugin / Stack) notes
 
 - Use the Community Applications Compose plugin or add the container via the Docker templates.
