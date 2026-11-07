@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import os
 import sqlite3
+import threading
+import time
 from collections.abc import Callable
 from contextlib import closing
 from pathlib import Path
@@ -22,6 +24,12 @@ DATABASE_FILENAME = "upload_assistant.sqlite3"
 # read once, when the shared database is created, and never written again.
 LEGACY_STATS_FILENAME = "stats.sqlite3"
 LEGACY_API_KEY_EXPIRY_FILENAME = "api_key_expiry.sqlite3"
+
+
+# Threads of one process opening a new database wait for each other here;
+# other processes are serialized by the write lock taken in _migrate.
+_migration_lock = threading.Lock()
+_WAL_ATTEMPTS = 50
 
 
 class NewerSchemaError(sqlite3.DatabaseError):
@@ -217,6 +225,18 @@ def _schema_version(db: sqlite3.Connection) -> int:
     return int(db.execute("PRAGMA user_version").fetchone()[0])
 
 
+def _enable_wal(db: sqlite3.Connection) -> None:
+    """Switch to WAL; another connection reading the new file can briefly hold the lock this needs."""
+    for attempt in range(_WAL_ATTEMPTS):
+        try:
+            db.execute("PRAGMA journal_mode = WAL")
+            return
+        except sqlite3.OperationalError as exc:
+            if attempt == _WAL_ATTEMPTS - 1 or not any(reason in str(exc).lower() for reason in ("busy", "locked")):
+                raise
+            time.sleep(0.1)
+
+
 def _migrate(db: sqlite3.Connection, path: Path) -> None:
     if _schema_version(db) == SCHEMA_VERSION:
         return
@@ -276,13 +296,14 @@ def connect(path: Path | None = None) -> sqlite3.Connection:
         if version > SCHEMA_VERSION:
             raise NewerSchemaError(f"{path.name} was created by a newer version of Upload Assistant")
         if version < SCHEMA_VERSION:
-            db.execute("PRAGMA journal_mode = WAL")
-            # Migrations manage their own BEGIN/COMMIT.
-            db.isolation_level = None
-            try:
-                _migrate(db, path)
-            finally:
-                db.isolation_level = "DEFERRED"
+            with _migration_lock:
+                _enable_wal(db)
+                # Migrations manage their own BEGIN/COMMIT.
+                db.isolation_level = None
+                try:
+                    _migrate(db, path)
+                finally:
+                    db.isolation_level = "DEFERRED"
     except BaseException:
         db.close()
         raise
