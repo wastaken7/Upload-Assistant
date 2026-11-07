@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>upload-assistant</Name>
+  <Repository>ghcr.io/wastaken7/upload-assistant:latest</Repository>
+  <Registry>https://github.com/wastaken7/Upload-Assistant/pkgs/container/upload-assistant</Registry>
+  <Network>bridge</Network>
+  <Privileged>false</Privileged>
+  <Shell>bash</Shell>
+  <Support>https://github.com/wastaken7/Upload-Assistant/issues</Support>
+  <Project>https://github.com/wastaken7/Upload-Assistant</Project>
+  <ReadMe>https://github.com/wastaken7/Upload-Assistant/blob/development/docs/docker-gui.md</ReadMe>
+  <Overview>Upload Assistant prepares and uploads releases to private trackers. It reads MediaInfo or BDInfo, takes screenshots, builds descriptions, creates the torrent and sends it to your torrent client. This template runs the WebUI.
+
+On the first start, open the container log and copy the one-time setup code, then open the WebUI and create your account. The configuration file is created under the appdata folder and can be edited from the WebUI.
+
+Map the downloads folder to the same host folder your torrent client uses. If the container paths differ from the client's paths, set local_path and remote_path for that client in the configuration.</Overview>
+  <Category>Downloaders: Tools:</Category>
+  <WebUI>http://[IP]:[PORT:5000]/</WebUI>
+  <TemplateURL>https://raw.githubusercontent.com/wastaken7/Upload-Assistant/development/deploy/unraid/upload-assistant.xml</TemplateURL>
+  <Icon>https://raw.githubusercontent.com/wastaken7/Upload-Assistant/development/docs/assets/logo.png</Icon>
+  <PostArgs>--webui 0.0.0.0:5000</PostArgs>
+  <Config Name="WebUI port" Target="5000" Default="5000" Mode="tcp" Description="Port for the WebUI." Type="Port" Display="always" Required="true" Mask="false">5000</Config>
+  <Config Name="Appdata" Target="/state" Default="/mnt/user/appdata/upload-assistant" Mode="rw" Description="Configuration, WebUI login, cookies, caches and temporary release files." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/upload-assistant</Config>
+  <Config Name="Downloads" Target="/data/torrents" Default="/mnt/user/data/torrents" Mode="rw" Description="The folder your torrent client downloads to. The WebUI file browser shows this folder." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/data/torrents</Config>
+  <Config Name="qBittorrent BT_backup (optional)" Target="/torrent_storage_dir" Default="" Mode="rw" Description="Optional. The qBittorrent BT_backup folder, used to reuse existing torrents. Set torrent_storage_dir to /torrent_storage_dir in the configuration." Type="Path" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="PUID" Target="PUID" Default="99" Description="User ID the app runs as. It must be able to read your downloads: use the same user as your torrent client, or give this user read access to that folder." Type="Variable" Display="advanced" Required="true" Mask="false">99</Config>
+  <Config Name="PGID" Target="PGID" Default="100" Description="Group ID the app runs as." Type="Variable" Display="advanced" Required="true" Mask="false">100</Config>
+  <Config Name="UA_BROWSE_ROOTS" Target="UA_BROWSE_ROOTS" Default="/data/torrents,/state/tmp" Description="Comma-separated container paths the WebUI file browser may open. Add the container path of any extra folder you map." Type="Variable" Display="advanced" Required="true" Mask="false">/data/torrents,/state/tmp</Config>
+  <Config Name="XDG_CONFIG_HOME" Target="XDG_CONFIG_HOME" Default="/state/config" Description="Keeps the WebUI login and session secret inside the appdata folder." Type="Variable" Display="advanced" Required="true" Mask="false">/state/config</Config>
+</Container>
