@@ -27,8 +27,15 @@ def _release(tmp_path, folder="Fictional.Movie.2020"):
     return root
 
 
+def _confirm(meta):
+    """Answer yes at "Is this correct?" for the IDs the release has now."""
+    meta.ids_confirmed = True
+    meta.confirmed_ids = upload_history.external_ids(meta)
+    return meta
+
+
 def _confirmed_meta(path, **values):
-    meta = Meta(path=str(path), category="MOVIE", imdb_id=1234567, tmdb_id=42, tvdb_id=0, ids_confirmed=True, **values)
+    meta = _confirm(Meta(path=str(path), category="MOVIE", imdb_id=1234567, tmdb_id=42, tvdb_id=0, **values))
     meta.manual_answers = {"xxx.tags": ["fictional tag"]}
     return meta
 
@@ -118,7 +125,7 @@ def test_saved_ids_are_skipped_for_another_category_or_when_disabled(tmp_path, c
 
 def test_tv_ids_fill_their_manual_fields(tmp_path):
     release = _release(tmp_path, "Fictional.Show.S01")
-    meta = Meta(path=str(release), category="TV", imdb_id=1, tmdb_id=2, tvdb_id=3, tvmaze_id=4, mal_id=5, ids_confirmed=True)
+    meta = _confirm(Meta(path=str(release), category="TV", imdb_id=1, tmdb_id=2, tvdb_id=3, tvmaze_id=4, mal_id=5))
     upload_history.remember_release(meta)
 
     loaded = _load(release)
@@ -132,7 +139,7 @@ def test_nothing_is_written_for_a_release_with_nothing_to_remember(tmp_path, dat
     release = _release(tmp_path)
 
     assert upload_history.remember_release(Meta(path=str(release), category="MOVIE")) is False
-    assert upload_history.remember_release(Meta(path=str(tmp_path / "missing"), category="MOVIE", ids_confirmed=True, imdb_id=1)) is False
+    assert upload_history.remember_release(_confirm(Meta(path=str(tmp_path / "missing"), category="MOVIE", imdb_id=1))) is False
     assert not database.exists()
 
 
@@ -175,7 +182,7 @@ def test_saved_ids_wait_until_the_category_is_known(tmp_path):
 
 def test_book_ids_fill_their_manual_fields(tmp_path):
     release = _release(tmp_path, "Fictional Book")
-    meta = Meta(path=str(release), category="BOOK", openlibrary="OL1W", book_isbn="9780000000001", ids_confirmed=True)
+    meta = _confirm(Meta(path=str(release), category="BOOK", openlibrary="OL1W", book_isbn="9780000000001"))
     upload_history.remember_release(meta)
 
     loaded = _load(release)
@@ -184,3 +191,50 @@ def test_book_ids_fill_their_manual_fields(tmp_path):
 
     assert (loaded.openlibrary, loaded.book_isbn) == ("OL1W", "9780000000001")
     assert applied == ["ISBN 9780000000001", "Open Library OL1W"]
+
+
+def test_ids_found_after_the_confirmation_are_not_remembered_without_an_upload(tmp_path):
+    release = _release(tmp_path)
+    meta = _confirmed_meta(release)
+    meta.douban_id = 999
+
+    upload_history.remember_release(meta)
+
+    assert "douban" not in _load(release).saved_ids
+
+
+def test_a_confirmed_run_without_ids_keeps_the_saved_ones(tmp_path):
+    release = _release(tmp_path)
+    upload_history.remember_release(_confirmed_meta(release))
+
+    upload_history.remember_release(_confirm(Meta(path=str(release), category="MOVIE")))
+
+    assert _load(release).saved_ids["imdb"] == "tt1234567"
+
+
+def test_a_saved_tv_category_replaces_a_movie_guess_but_not_an_explicit_one(tmp_path):
+    release = _release(tmp_path, "Fictional.Show.Complete")
+    upload_history.remember_release(_confirm(Meta(path=str(release), category="TV", imdb_id=1, tmdb_id=2)))
+
+    guessed = _load(release)
+    guessed.category = "MOVIE"
+    explicit = _load(release, manual_category="MOVIE")
+    explicit.category = "MOVIE"
+
+    assert upload_history.apply_saved_ids(guessed) == ["IMDb tt0000001", "TMDb tv/2"]
+    assert (guessed.category, guessed.tmdb_manual_category) == ("TV", "TV")
+    assert upload_history.apply_saved_ids(explicit) == []
+    assert explicit.category == "MOVIE"
+
+
+def test_confirmed_ids_replace_ids_found_automatically(tmp_path):
+    release = _release(tmp_path)
+    upload_history.remember_release(_confirmed_meta(release))
+
+    meta = _load(release, imdb_id=7654321)
+    meta.category = "MOVIE"
+    applied = upload_history.apply_saved_ids(meta)
+
+    assert applied == ["IMDb tt1234567", "TMDb movie/42"]
+    assert meta.imdb_id is None
+    assert meta.imdb_manual == "tt1234567"

@@ -244,8 +244,10 @@ class Meta:
     igdb_first_release_date: str = ""
     igdb_id: int = 0
     igdb_manual: str | None = None
-    # Set when a person answered yes to "Is this correct?", so the IDs can be remembered.
+    # Set when a person answered yes to "Is this correct?", with the IDs shown then,
+    # so only those are remembered (not IDs found later, e.g. by tracker checks).
     ids_confirmed: bool = False
+    confirmed_ids: dict[str, str] = field(default_factory=dict)
     igdb_rating_count: int | str = ""
     igdb_rating: float | str = ""
     igdb_url: str | None = None
