@@ -634,6 +634,11 @@ def id_link(provider: str, value: str) -> str:
     if provider == "tmdb":
         kind, _separator, number = value.partition("/")
         return f"https://www.themoviedb.org/{kind}/{number}" if kind in {"movie", "tv"} and number.isdigit() else ""
+    if provider == "openlibrary":
+        kinds = {"W": "works", "M": "books", "A": "authors"}
+        identifier = value.upper()
+        valid = identifier.startswith("OL") and identifier[2:-1].isdigit() and identifier[-1:] in kinds
+        return f"https://openlibrary.org/{kinds[identifier[-1]]}/{identifier}" if valid else ""
     if not value.isdigit():
         return ""
     return {

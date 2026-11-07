@@ -354,6 +354,9 @@ def test_clearing_history_keeps_statistics(history_on):
         ("tvdb", "7", "https://thetvdb.com/dereferrer/series/7"),
         ("discogs_master", "8", "https://www.discogs.com/master/8"),
         ("isbn", "9780000000000", ""),
+        ("openlibrary", "OL45883W", "https://openlibrary.org/works/OL45883W"),
+        ("openlibrary", "OL7353617M", "https://openlibrary.org/books/OL7353617M"),
+        ("openlibrary", "OL/../W", ""),
         ("tvdb", "../7", ""),
     ],
 )
