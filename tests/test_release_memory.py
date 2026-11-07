@@ -171,3 +171,16 @@ def test_saved_ids_wait_until_the_category_is_known(tmp_path):
     assert upload_history.apply_saved_ids(meta) == ["IMDb tt1234567", "TMDb movie/42"]
     assert meta.saved_ids == {}
     assert upload_history.apply_saved_ids(meta) == []
+
+
+def test_book_ids_fill_their_manual_fields(tmp_path):
+    release = _release(tmp_path, "Fictional Book")
+    meta = Meta(path=str(release), category="BOOK", openlibrary="OL1W", book_isbn="9780000000001", ids_confirmed=True)
+    upload_history.remember_release(meta)
+
+    loaded = _load(release)
+    loaded.category = "BOOK"
+    applied = upload_history.apply_saved_ids(loaded)
+
+    assert (loaded.openlibrary, loaded.book_isbn) == ("OL1W", "9780000000001")
+    assert applied == ["ISBN 9780000000001", "Open Library OL1W"]

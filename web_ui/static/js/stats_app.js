@@ -309,6 +309,7 @@ const REASON_LABELS = {
   search_error: "Search failed",
   missing_fields: "Missing fields",
   too_few_trackers: "Too few trackers",
+  not_configured: "Not configured",
   site_check: "Site check only",
   no_upload: "Not uploaded",
 };

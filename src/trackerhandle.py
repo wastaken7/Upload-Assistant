@@ -76,9 +76,7 @@ async def process_trackers(
     )
 
     def publish_tracker_result(tracker: str, tracker_class: Any, status: Mapping[str, Any], is_success: bool) -> None:
-        """Send the result to the Web UI's GUI mode, whatever the terminal print settings are."""
-        if not webui_events.enabled():
-            return
+        """Send the result to the Web UI's GUI mode and the upload history, whatever the terminal print settings are."""
         duration = meta.get(f"{tracker}_upload_duration")
         duration_value = float(duration) if isinstance(duration, (int, float)) else None
         if not is_success:

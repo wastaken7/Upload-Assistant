@@ -9,6 +9,7 @@ the Web UI server.
 
 from __future__ import annotations
 
+import os
 import sqlite3
 from collections.abc import Callable
 from contextlib import closing
@@ -235,6 +236,27 @@ def _migrate(db: sqlite3.Connection, path: Path) -> None:
         raise
 
 
+def _restrict_permissions(path: Path) -> None:
+    """Keep the database readable by its owner only: the history holds release names, paths and links.
+
+    The file is created with mode 0600 before SQLite opens it, and SQLite gives
+    its -wal and -shm files the same mode. Files left more open by an earlier
+    version are tightened. On Windows the per-user profile folder is already private.
+    """
+    if os.name == "nt":
+        return
+    try:
+        path.touch(mode=0o600, exist_ok=True)
+    except OSError:
+        return
+    for candidate in (path, path.with_name(f"{path.name}-wal"), path.with_name(f"{path.name}-shm")):
+        try:
+            if candidate.stat().st_mode & 0o077:
+                candidate.chmod(0o600)
+        except OSError:
+            continue
+
+
 def connect(path: Path | None = None) -> sqlite3.Connection:
     """Open the shared database, creating or upgrading its schema on first use.
 
@@ -243,6 +265,7 @@ def connect(path: Path | None = None) -> sqlite3.Connection:
     """
     path = path or database_path()
     path.parent.mkdir(parents=True, exist_ok=True)
+    _restrict_permissions(path)
     db = sqlite3.connect(path, timeout=5)
     try:
         db.execute("PRAGMA busy_timeout = 5000")

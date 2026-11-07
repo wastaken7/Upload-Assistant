@@ -49,6 +49,8 @@ class _ItemState:
     dupes: dict[str, dict[str, Any]] = field(default_factory=dict[str, dict[str, Any]])
     slots: dict[str, dict[str, Any]] = field(default_factory=dict[str, dict[str, Any]])
     requests: dict[str, dict[str, Any]] = field(default_factory=dict[str, dict[str, Any]])
+    # Torrent links as published when each upload finished (the tracker instance knows its URL).
+    links: dict[str, dict[str, str]] = field(default_factory=dict[str, dict[str, str]])
 
 
 _item: _ItemState | None = None
@@ -63,11 +65,13 @@ def history_enabled(config: Mapping[str, Any] | None) -> bool:
 
 
 def configure_history(config: Mapping[str, Any] | None) -> None:
+    """Apply the run's history settings."""
     global _enabled
     _enabled = history_enabled(config)
 
 
 def _tracker_key(value: object) -> str:
+    """Normalize a tracker name to the key used in ``meta.tracker_status``."""
     return str(value or "").replace(" ", "").upper()
 
 
@@ -101,6 +105,8 @@ def observe_detail(kind: str, payload: Mapping[str, Any]) -> None:
             _item.dupes[tracker] = {"entries": entries, "note": payload.get("note") or previous.get("note") or "", "trumpable": bool(payload.get("trumpable"))}
         elif kind == "slot":
             _item.slots[tracker] = {key: value for key, value in payload.items() if key != "tracker"}
+        elif kind == "tracker" and payload.get("status") == "success" and payload.get("link"):
+            _item.links[tracker] = {"link": str(payload["link"]), "torrent_id": str(payload.get("torrent_id") or "")}
         elif kind == "request" and len(_item.requests) < MAX_REQUESTS_PER_ITEM:
             key = f"{tracker}|{payload.get('link') or payload.get('name')}"
             _item.requests.setdefault(key, {**payload, "tracker": tracker})
@@ -114,11 +120,16 @@ def content_fingerprint(path: str | Path) -> str:
     """
     root = Path(path)
     entries: list[tuple[str, int]] = []
+
+    def unreadable(error: OSError) -> None:
+        # A fingerprint of only the readable part could match another release.
+        raise error
+
     try:
         if root.is_file():
             entries.append((root.name, root.stat().st_size))
         elif root.is_dir():
-            for directory, _dirs, files in os.walk(root):
+            for directory, _dirs, files in os.walk(root, onerror=unreadable):
                 for name in files:
                     file_path = Path(directory) / name
                     entries.append((file_path.relative_to(root).as_posix(), file_path.stat().st_size))
@@ -133,7 +144,8 @@ def content_fingerprint(path: str | Path) -> str:
     return sha256("\n".join(f"{name}\t{size}" for name, size in chosen).encode("utf-8")).hexdigest()
 
 
-def _text(value: object, limit: int = webui_events.MAX_TEXT_LENGTH) -> str:
+def _text(value: object, limit: int = webui_events.MAX_TEXT_LENGTH, *, markup: bool = True) -> str:
+    """Return redacted plain text; ``markup=False`` keeps literal brackets, as in release names."""
     if value in (None, ""):
         return ""
     if isinstance(value, (Mapping, list)):
@@ -141,15 +153,17 @@ def _text(value: object, limit: int = webui_events.MAX_TEXT_LENGTH) -> str:
             value = json.dumps(value, default=str)
         except TypeError, ValueError:
             value = str(value)
-    return webui_events.plain_text(value, limit)
+    return webui_events.plain_text(value, limit, markup=markup)
 
 
 def _http_link(value: object) -> str:
-    link = _text(value, 2000)
+    """Return ``value`` when it is an http(s) link, otherwise ""."""
+    link = _text(value, 2000, markup=False)
     return link if link.lower().startswith(("http://", "https://")) else ""
 
 
 def _positive_int(value: object) -> int:
+    """Return ``value`` as a positive integer, or 0."""
     try:
         number = int(str(value).strip())
     except TypeError, ValueError:
@@ -173,19 +187,19 @@ def external_ids(meta: Any) -> dict[str, str]:
         ("mal", "mal_id"),
         ("igdb", "igdb_id"),
         ("douban", "douban_id"),
-        ("openlibrary", "openlibrary_id"),
     ):
         number = _positive_int(getattr(meta, attribute, 0))
         if number:
             ids[provider] = str(number)
     for provider, attributes in (
+        ("openlibrary", ("openlibrary",)),
         ("discogs_release", ("music_discogs_release_id",)),
         ("discogs_master", ("music_discogs_master_id",)),
         ("isbn", ("book_isbn", "isbn")),
         ("asin", ("book_asin", "asin")),
     ):
         for attribute in attributes:
-            value = _text(getattr(meta, attribute, ""), 64)
+            value = _text(getattr(meta, attribute, ""), 64, markup=False)
             if value and value not in {"0", "None"}:
                 ids[provider] = value
                 break
@@ -193,6 +207,7 @@ def external_ids(meta: Any) -> dict[str, str]:
 
 
 def _tracker_link(status: Mapping[str, Any], tracker_class: Any) -> str:
+    """Return the torrent page from the status, or from the tracker's torrent URL and the torrent ID."""
     link = _http_link(status.get("torrent_link"))
     torrent_id = status.get("torrent_id")
     if not link and torrent_id not in (None, ""):
@@ -200,7 +215,29 @@ def _tracker_link(status: Mapping[str, Any], tracker_class: Any) -> str:
     return link
 
 
+def _usenet_row(meta: Any, upload_started: bool) -> dict[str, Any] | None:
+    """Return the result of an NNTP post the run asked for, which has no tracker status of its own."""
+    trackers = getattr(meta, "trackers", None) or []
+    requested = bool(getattr(meta, "usenet", False)) or "USENET" in {_tracker_key(tracker) for tracker in trackers if isinstance(tracker, str)}
+    if not requested:
+        return None
+    posted = bool(getattr(meta, "nzb_path", None))
+    if not posted and not upload_started:
+        return None
+    return {
+        "tracker": "USENET",
+        "status": "success" if posted else "failed",
+        "message": "Posted to Usenet" if posted else "Usenet upload failed",
+        "link": "",
+        "torrent_id": "",
+        "duration": None,
+        "dupes": None,
+        "slot": None,
+    }
+
+
 def _tracker_rows(meta: Any, tracker_class_map: Mapping[str, Any], state: _ItemState | None) -> list[dict[str, Any]]:
+    """Return one row per destination with its final result, link, dupes and slot verdict."""
     raw_statuses = getattr(meta, "tracker_status", {})
     statuses = cast(Mapping[str, Any], raw_statuses if isinstance(raw_statuses, Mapping) else {})
     upload_started = state is None or "upload" in state.started_stages
@@ -218,13 +255,16 @@ def _tracker_rows(meta: Any, tracker_class_map: Mapping[str, Any], state: _ItemS
         else:
             message_text = _text(message) or webui_events.DEFAULT_STATUS_MESSAGES.get(resolved, "")
         duration = getattr(meta, "get", lambda *_args: None)(f"{tracker}_upload_duration")
+        published = state.links.get(tracker, {}) if state else {}
+        link = (published.get("link") or _tracker_link(status, tracker_class_map.get(tracker))) if resolved == "success" else ""
+        torrent_id = status.get("torrent_id") or published.get("torrent_id")
         rows.append(
             {
                 "tracker": tracker,
                 "status": resolved,
                 "message": message_text,
-                "link": _tracker_link(status, tracker_class_map.get(tracker)) if resolved == "success" else "",
-                "torrent_id": _text(status.get("torrent_id"), 64) if resolved == "success" else "",
+                "link": link,
+                "torrent_id": _text(torrent_id, 64, markup=False) if resolved == "success" else "",
                 "duration": round(float(duration), 2) if isinstance(duration, (int, float)) and duration > 0 else None,
                 "dupes": state.dupes.get(tracker) if state else None,
                 "slot": state.slots.get(tracker) if state else None,
@@ -246,10 +286,14 @@ def _tracker_rows(meta: Any, tracker_class_map: Mapping[str, Any], state: _ItemS
             }
             for tracker in sorted((set(state.dupes) | set(state.slots)) - known)
         )
+    usenet = _usenet_row(meta, upload_started)
+    if usenet is not None:
+        rows.append(usenet)
     return rows
 
 
 def _artwork_url(meta: Any) -> str:
+    """Return a public cover URL for the release, or ""."""
     url = _http_link(getattr(meta, "artwork_url", ""))
     if url:
         return url
@@ -258,6 +302,7 @@ def _artwork_url(meta: Any) -> str:
 
 
 def _year(meta: Any) -> int | None:
+    """Return the release year when it is plausible."""
     year = _positive_int(getattr(meta, "year", 0))
     return year if 1800 <= year <= 2200 else None
 
@@ -286,18 +331,18 @@ def build_item_record(meta: Any, tracker_class_map: Mapping[str, Any], *, outcom
         "finished_at": datetime.now(UTC).isoformat(),
         "source": _text(os.environ.get("UA_STATS_SOURCE", "cli"), 20) or "cli",
         "path": path,
-        "name": _text(getattr(meta, "name", ""), 500) or _text(Path(path).name, 500),
-        "title": _text(getattr(meta, "title", ""), 300),
+        "name": _text(getattr(meta, "name", ""), 500, markup=False) or _text(Path(path).name, 500, markup=False),
+        "title": _text(getattr(meta, "title", ""), 300, markup=False),
         "year": _year(meta),
-        "category": _text(getattr(meta, "category", ""), 20).upper(),
-        "release_type": _text(getattr(meta, "type", ""), 40),
-        "resolution": _text(getattr(meta, "resolution", ""), 20),
-        "release_group": _text(str(getattr(meta, "tag", "") or "").lstrip("-"), 100),
-        "season": _text(getattr(meta, "season", ""), 20) if str(getattr(meta, "season", "") or "") not in {"0", ""} else "",
-        "episode": _text(getattr(meta, "episode", ""), 20),
+        "category": _text(getattr(meta, "category", ""), 20, markup=False).upper(),
+        "release_type": _text(getattr(meta, "type", ""), 40, markup=False),
+        "resolution": _text(getattr(meta, "resolution", ""), 20, markup=False),
+        "release_group": _text(str(getattr(meta, "tag", "") or "").lstrip("-"), 100, markup=False),
+        "season": _text(getattr(meta, "season", ""), 20, markup=False) if str(getattr(meta, "season", "") or "") not in {"0", ""} else "",
+        "episode": _text(getattr(meta, "episode", ""), 20, markup=False),
         "size": max(0, _positive_int(getattr(meta, "source_size", 0))),
         "fingerprint": str(getattr(meta, "release_fingerprint", "") or "") or content_fingerprint(path),
-        "infohash": _text(getattr(meta, "infohash", ""), 64).lower(),
+        "infohash": _text(getattr(meta, "infohash", ""), 64, markup=False).lower(),
         "outcome": outcome,
         "reason": _text(reason, 60),
         "duration_ms": duration_ms,
@@ -311,6 +356,7 @@ def build_item_record(meta: Any, tracker_class_map: Mapping[str, Any], *, outcom
 
 
 def _json(value: object) -> str:
+    """Serialize a stored detail compactly, or "" when there is none."""
     if not value:
         return ""
     try:
@@ -393,7 +439,18 @@ def record_item(record: Mapping[str, Any], state_dir: str | Path | None = None) 
 # also kept for debug runs: a person confirming IDs there confirms them for
 # the real upload too.
 
-_PROVIDER_LABELS = {"imdb": "IMDb", "tmdb": "TMDb", "tvdb": "TVDB", "tvmaze": "TVmaze", "mal": "MAL", "douban": "Douban", "igdb": "IGDB"}
+_PROVIDER_LABELS = {
+    "imdb": "IMDb",
+    "tmdb": "TMDb",
+    "tvdb": "TVDB",
+    "tvmaze": "TVmaze",
+    "mal": "MAL",
+    "douban": "Douban",
+    "igdb": "IGDB",
+    "openlibrary": "Open Library",
+    "isbn": "ISBN",
+    "asin": "ASIN",
+}
 # Fields set by ID arguments, and IDs already resolved before the metadata search.
 _MANUAL_ID_FIELDS = (
     "imdb_manual",
@@ -408,6 +465,7 @@ _MANUAL_ID_FIELDS = (
     "music_discogs_master_id",
     "book_isbn",
     "book_asin",
+    "openlibrary",
     "imdb_id",
     "tmdb_id",
 )
@@ -501,6 +559,7 @@ def apply_saved_ids(meta: Any) -> list[str]:
     elif category == "BOOK":
         fill("book_isbn", "isbn", saved.get("isbn"))
         fill("book_asin", "asin", saved.get("asin"))
+        fill("openlibrary", "openlibrary", saved.get("openlibrary"))
     if applied:
         logger.info(f"[cyan]Using IDs confirmed for this release in an earlier run: {', '.join(applied)}. Use --no-saved-ids to search again.[/cyan]")
     return applied
@@ -753,6 +812,11 @@ def id_link(provider: str, value: str) -> str:
     if provider == "tmdb":
         kind, _separator, number = value.partition("/")
         return f"https://www.themoviedb.org/{kind}/{number}" if kind in {"movie", "tv"} and number.isdigit() else ""
+    if provider == "openlibrary":
+        kinds = {"W": "works", "M": "books", "A": "authors"}
+        identifier = value.upper()
+        valid = identifier.startswith("OL") and identifier[2:-1].isdigit() and identifier[-1:] in kinds
+        return f"https://openlibrary.org/{kinds[identifier[-1]]}/{identifier}" if valid else ""
     if not value.isdigit():
         return ""
     return {
