@@ -639,6 +639,14 @@ def apply_saved_ids(meta: Any) -> list[str]:
         filled.setdefault(field_name, [getattr(meta, field_name, None), value])
         setattr(meta, field_name, value)
 
+    # Saved IDs belong together: once any ID was given (for example a corrected
+    # --imdb at the confirmation prompt), the others may no longer match it.
+    # IDs found automatically (scene or tracker data) are replaced instead.
+    # Checked before the category changes, which only the saved IDs justify.
+    given = [field_name for field_name in _MANUAL_ID_FIELDS if getattr(meta, field_name, None)]
+    if given:
+        logger.debug(f"Not reusing saved IDs because IDs were given: {', '.join(given)}")
+        return []
     if restore_xxx:
         category = "XXX"
         assign("category", category)
@@ -651,13 +659,6 @@ def apply_saved_ids(meta: Any) -> list[str]:
             return []
         category = saved_category
         assign("category", category)
-    # Saved IDs belong together: once any ID was given (for example a corrected
-    # --imdb at the confirmation prompt), the others may no longer match it.
-    # IDs found automatically (scene or tracker data) are replaced instead.
-    given = [field_name for field_name in _MANUAL_ID_FIELDS if getattr(meta, field_name, None)]
-    if given:
-        logger.debug(f"Not reusing saved IDs because IDs were given: {', '.join(given)}")
-        return []
     applied: list[str] = []
 
     def fill(field_name: str, provider: str, value: object, *copies: str) -> None:

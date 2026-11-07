@@ -394,3 +394,18 @@ def test_a_confirmed_xxx_category_is_restored_before_preparation(tmp_path):
     skipped = _load(release, no_saved_ids=True)
     upload_history.apply_saved_ids(skipped)
     assert skipped.category == ""
+
+
+
+def test_a_given_id_keeps_the_saved_xxx_category_from_being_restored(tmp_path):
+    release = _release(tmp_path, "clip_0001")
+    assert upload_history.remember_release(_confirm(Meta(path=str(release), category="XXX", tpdb_id="scenes/1"))) is True
+
+    unset = _load(release, imdb_manual="tt0000001")
+    upload_history.apply_saved_ids(unset)
+    guessed = _load(release, imdb_manual="tt0000001", category="MOVIE")
+    upload_history.apply_saved_ids(guessed)
+
+    # The saved IDs are not reused, so neither is the category they were confirmed with.
+    assert (unset.category, unset.tpdb_manual) == ("", None)
+    assert (guessed.category, guessed.tpdb_manual) == ("MOVIE", None)

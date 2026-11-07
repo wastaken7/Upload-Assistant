@@ -478,7 +478,9 @@ def strip_group(name: str) -> str:
     if not separator or not head or not tail or re.search(r"[. ]", tail):
         return name
     last_word = re.split(r"[._ ]+", head.strip("._ "))[-1]
-    return head if _TECHNICAL_TOKEN.match(last_word) or not re.search(r"[a-z]", tail) else name
+    # Capitals mean at least one capital letter: "Vol-2" or a date's "-21" is no group.
+    written_in_capitals = bool(re.search(r"[A-Z]", tail)) and not re.search(r"[a-z]", tail)
+    return head if _TECHNICAL_TOKEN.match(last_word) or written_in_capitals else name
 
 
 def search_title(name: str, *, has_group: bool = True) -> str:

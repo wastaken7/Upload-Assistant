@@ -838,3 +838,12 @@ def test_restored_blvckout_id_is_looked_up(tmp_path: Path, monkeypatch: pytest.M
 
     assert len(requests) == 1
     assert (meta.blvckout_id, meta.publisher) == ("4242", "Example Pictures")
+
+
+
+@pytest.mark.parametrize("name", ["ExampleStudio.Sunny.Afternoon.Vol-2", "ExampleStudio.2026-08-21"])
+def test_strip_group_keeps_numeric_suffixes(name: str) -> None:
+    from src.xxx_match import strip_group
+
+    # Digits are not a release group: a volume or a date's day stays in the name.
+    assert strip_group(name) == name

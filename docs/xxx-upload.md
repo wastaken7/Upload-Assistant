@@ -59,7 +59,9 @@ A result is used without asking only when it is clearly the release, with nothin
 - the same file hash or JAV product code;
 - the same day and site with a matching title or a performer named in the release name, or exactly the same title on the same day (the site may be abbreviated in the name);
 - a performer named in the release name together with the scene's title;
-- a movie with exactly this title from the same year, or the only movie with this numbered title (`… 13`). A generic title alone is not enough. When several results are plausible, Upload Assistant asks which one is the release (`xxx.match`); unattended runs skip the lookup instead of guessing. Answer in advance with `--answer xxx.match=tpdb:scenes/ID`, `--answer xxx.match=blvckout:ID` or `--answer xxx.match=none`. An answer, given or remembered for the release, is used before any search, so `none` also keeps a confident result from being applied.
+- a movie with exactly this title from the same year, or the only movie with this numbered title (`… 13`). A generic title alone is not enough.
+
+When several results are plausible, Upload Assistant asks which one is the release (`xxx.match`); unattended runs skip the lookup instead of guessing. Answer in advance with `--answer xxx.match=tpdb:scenes/ID`, `--answer xxx.match=blvckout:ID` or `--answer xxx.match=none`. An answer, given or remembered for the release, is used before any search, so `none` also keeps a confident result from being applied.
 
 Packs and site rips are not looked up. A release with several videos is a movie in parts or a collection, never one scene, so it is only looked up as a movie. Results are cached like other metadata (`metadata_cache_services` → `tpdb` and `blvckout`).
 
