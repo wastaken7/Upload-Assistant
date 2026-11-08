@@ -2,6 +2,7 @@ import asyncio
 from pathlib import Path
 from types import SimpleNamespace
 
+import httpx
 import pytest
 from bs4 import BeautifulSoup
 from PIL import Image
@@ -42,6 +43,77 @@ def test_get_screenshots_converts_webp_to_png(tmp_path: Path) -> None:
     assert result == ["https://img.example/release-0.png"]  # noqa: S101
     assert uploaded[0][1] == f"{screenshot.stem}.png"  # noqa: S101
     assert uploaded[0][0].startswith(b"\x89PNG\r\n\x1a\n")  # noqa: S101
+
+
+def test_get_screenshots_falls_back_to_common_host_for_failed_local_upload(tmp_path: Path) -> None:
+    screenshots = tmp_path / "tmp" / "release" / "screenshots"
+    screenshots.mkdir(parents=True)
+    paths = []
+    for index in range(2):
+        path = screenshots / f"Example-{index}.png"
+        Image.new("RGB", (2, 2), "red").save(path, format="PNG")
+        paths.append(path)
+    first, second = register(tmp_path, "release", paths, "main")
+    tracker = object.__new__(BJShare)
+    tracker.tracker = "BJSHARE"
+
+    async def fake_img_host(_image_bytes: bytes, filename: str) -> str | None:
+        return None if filename == second.name else "https://tracker.example/first.png"
+
+    tracker.img_host = fake_img_host
+    meta = Meta(
+        {
+            "base_dir": str(tmp_path),
+            "uuid": "release",
+            "image_list": [
+                {"raw_url": "https://common.example/first.png", "local_file_path": str(first)},
+                {"raw_url": "https://common.example/second.png", "local_file_path": str(second)},
+            ],
+        }
+    )
+
+    result = asyncio.run(tracker.get_screenshots(meta))
+
+    assert sorted(result) == ["https://common.example/second.png", "https://tracker.example/first.png"]  # noqa: S101
+
+
+def test_get_screenshots_keeps_common_host_links_when_rehosting_fails(tmp_path: Path) -> None:
+    class FailingSession:
+        async def get(self, _url, **_kwargs):
+            raise httpx.ConnectError("offline")
+
+    tracker = object.__new__(BJShare)
+    tracker.tracker = "BJSHARE"
+    tracker.session = FailingSession()
+    urls = ["https://common.example/menu.png", "https://common.example/first.png", "https://common.example/second.png"]
+    meta = Meta(
+        {
+            "base_dir": str(tmp_path),
+            "uuid": "release",
+            "menu_images": [{"raw_url": urls[0]}],
+            "image_list": [{"raw_url": urls[1]}, {"raw_url": urls[2]}],
+        }
+    )
+
+    assert asyncio.run(tracker.get_screenshots(meta)) == urls  # noqa: S101
+
+
+def test_get_cover_falls_back_to_tmdb_link_when_image_host_fails() -> None:
+    class PosterSession:
+        async def get(self, _url, **_kwargs):
+            return SimpleNamespace(raise_for_status=lambda: None, content=b"poster")
+
+    tracker = object.__new__(BJShare)
+    tracker.tracker = "BJSHARE"
+    tracker.session = PosterSession()
+    tracker.main_tmdb_data = {"poster_path": "/poster.jpg"}
+
+    async def failing_img_host(_image_bytes: bytes, _filename: str) -> None:
+        return None
+
+    tracker.img_host = failing_img_host
+
+    assert asyncio.run(tracker.get_cover(Meta({"category": "MOVIE"}))) == "https://image.tmdb.org/t/p/w500/poster.jpg"  # noqa: S101
 
 
 class FakeSession:
