@@ -116,6 +116,10 @@ class CustomTorrent(torf.Torrent):
             return
 
 
+# Characters mkbrr reads as pattern syntax or as a separator in --exclude.
+_MKBRR_GLOB_CHARACTERS = frozenset(",*?[]{}\\")
+
+
 class TorrentCreator:
     # Limit concurrent torrent creation to avoid heavy parallel hashing
     _create_torrent_semaphore = asyncio.Semaphore(1)
@@ -196,7 +200,8 @@ class TorrentCreator:
         return piece_size
 
     @staticmethod
-    def build_mkbrr_exclude_string(root_folder: str, filelist: Sequence[str], allow_subs: bool = False) -> str:
+    def _mkbrr_exclude_parts(root_folder: str, filelist: Sequence[str], allow_subs: bool = False) -> tuple[list[str], list[str]]:
+        """Return the unselected file names and the extension patterns to exclude."""
         if allow_subs:
             manual_patterns = ["*.nfo", "*.jpg", "*.png", "*.txt", "*.xml"]
         else:
@@ -213,17 +218,31 @@ class TorrentCreator:
                     continue
                 exclude_files.add(fname)
 
-        return ",".join(sorted(exclude_files) + manual_patterns)
+        return sorted(exclude_files), manual_patterns
 
     @staticmethod
-    def mkbrr_exclude_hits_selected(exclude_string: str, filelist: Sequence[str]) -> bool:
-        """Return whether a selected file matches one of mkbrr's exclude patterns.
+    def build_mkbrr_exclude_string(root_folder: str, filelist: Sequence[str], allow_subs: bool = False) -> str:
+        names, manual_patterns = TorrentCreator._mkbrr_exclude_parts(root_folder, filelist, allow_subs)
+        return ",".join(names + manual_patterns)
 
-        mkbrr matches these patterns against file names, not paths, so excluding
-        ``bonus/E01.mkv`` would also drop a selected ``E01.mkv``.
+    @staticmethod
+    def mkbrr_exact_exclude_string(root_folder: str, filelist: Sequence[str], allow_subs: bool = False) -> str | None:
+        """Return mkbrr exclusions that drop only unselected files, or None when none exist.
+
+        mkbrr splits ``--exclude`` at commas and matches each glob, ignoring case,
+        against file names rather than paths. Excluding ``bonus/E01.mkv`` would
+        therefore also drop a selected ``E01.mkv``, and a name with a comma or
+        glob characters, such as ``sample.[GRP].mkv``, would not be excluded.
         """
-        patterns = [pattern.casefold() for pattern in exclude_string.split(",") if pattern]
-        return any(fnmatch.fnmatchcase(Path(file).name.casefold(), pattern) for file in filelist for pattern in patterns)
+        names, manual_patterns = TorrentCreator._mkbrr_exclude_parts(root_folder, filelist, allow_subs)
+        if any(not _MKBRR_GLOB_CHARACTERS.isdisjoint(name) for name in names):
+            return None
+        selected = {Path(file).name.casefold() for file in filelist}
+        if any(name.casefold() in selected for name in names):
+            return None
+        if any(fnmatch.fnmatchcase(name, pattern) for name in selected for pattern in manual_patterns):
+            return None
+        return ",".join(names + manual_patterns)
 
     @classmethod
     async def create_torrent(
@@ -322,10 +341,9 @@ class TorrentCreator:
                 mkbrr_exclude: str | None = None
                 use_mkbrr = bool(meta.mkbrr)
                 if use_mkbrr and not meta.is_disc and is_video:
-                    mkbrr_exclude = cls.build_mkbrr_exclude_string(str(path), creation_filelist, allow_subs=is_subs)
-                    if cls.mkbrr_exclude_hits_selected(mkbrr_exclude, creation_filelist):
-                        # mkbrr cannot exclude one file while keeping another with the same name.
-                        logger.debug("[yellow]An excluded file has the same name as a selected file; creating this torrent without mkbrr.[/yellow]")
+                    mkbrr_exclude = await asyncio.to_thread(cls.mkbrr_exact_exclude_string, str(path), creation_filelist, is_subs)
+                    if mkbrr_exclude is None:
+                        logger.debug("[yellow]mkbrr cannot exclude only the unselected files; creating this torrent without mkbrr.[/yellow]")
                         use_mkbrr = False
 
                 # If using mkbrr, run the external application

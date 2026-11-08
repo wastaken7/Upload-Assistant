@@ -1,3 +1,4 @@
+import fnmatch
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -897,20 +898,26 @@ async def test_whole_folder_reuse_rejects_a_missing_release_folder(tmp_path):
     assert not valid  # noqa: S101
 
 
-@pytest.mark.asyncio
-@pytest.mark.parametrize("output_filename", ["BASE", "BASE_SUBS"])
-async def test_mkbrr_is_skipped_when_an_excluded_file_shares_a_selected_name(tmp_path, monkeypatch, output_filename):
+def _mkbrr_season_pack(tmp_path, monkeypatch, unselected_names):
     release = tmp_path / "Fictional.Show.2025"
     videos = [release / "E01.mkv", release / "E02.mkv"]
     subtitle = release / "E01.pt-BR.srt"
-    for file in [*videos, subtitle, release / "bonus" / "E01.mkv"]:
+    for file in [*videos, subtitle, release / "release.nfo", release / "unselected.srt", *(release / name for name in unselected_names)]:
         file.parent.mkdir(parents=True, exist_ok=True)
         file.write_bytes(b"test data")
+    commands = []
 
-    def unexpected_mkbrr(*_args, **_kwargs):
-        raise AssertionError("mkbrr would drop E01.mkv by excluding bonus/E01.mkv")
+    def run_mkbrr(command, **_kwargs):
+        commands.append(command)
+        # Like mkbrr, match each pattern against file names, ignoring case.
+        patterns = [pattern.casefold() for pattern in command[command.index("--exclude") + 1].split(",")]
+        torrent = Torrent(path=command[2], piece_size=32768)
+        torrent.filepaths = [file for file in torrent.filepaths if not any(fnmatch.fnmatchcase(file.name.casefold(), pattern) for pattern in patterns)]
+        torrent.generate()
+        torrent.write(command[command.index("-o") + 1], overwrite=True)
+        return SimpleNamespace(stdout=iter(()), wait=lambda: 0)
 
-    monkeypatch.setattr("src.torrentcreate.subprocess.Popen", unexpected_mkbrr)
+    monkeypatch.setattr("src.torrentcreate.subprocess.Popen", run_mkbrr)
     binary = tmp_path / "mkbrr"
     binary.write_bytes(b"mock binary")
     monkeypatch.setattr(TorrentCreator, "get_mkbrr_path", staticmethod(lambda _meta: str(binary)))
@@ -920,6 +927,7 @@ async def test_mkbrr_is_skipped_when_an_excluded_file_shares_a_selected_name(tmp
         path=str(release),
         filelist=[str(file) for file in videos],
         subtitle_files=[str(subtitle)],
+        # The early base-torrent task runs before MOVIE/TV is detected.
         category="",
         isdir=True,
         tv_pack=True,
@@ -929,15 +937,47 @@ async def test_mkbrr_is_skipped_when_an_excluded_file_shares_a_selected_name(tmp
         trackers=[],
     )
     (tmp_path / "tmp" / meta.uuid).mkdir(parents=True)
+    return release, videos, subtitle, meta, commands
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("output_filename", ["BASE", "BASE_SUBS"])
+async def test_mkbrr_excludes_unselected_files_for_unset_category(tmp_path, monkeypatch, output_filename):
+    release, videos, subtitle, meta, commands = _mkbrr_season_pack(tmp_path, monkeypatch, ["bonus/featurette.mkv"])
 
     torrent = Torrent.read(await TorrentCreator.create_torrent(meta, str(release), output_filename))
 
+    assert len(commands) == 1  # noqa: S101
+    excluded = commands[0][commands[0].index("--exclude") + 1].split(",")
+    assert "featurette.mkv" in excluded  # noqa: S101
+    assert ("unselected.srt" in excluded) is (output_filename == "BASE_SUBS")  # noqa: S101
+    expected = [*videos, subtitle] if output_filename == "BASE_SUBS" else videos
+    assert sorted(file.as_posix() for file in torrent.files) == sorted(f"{release.name}/{file.name}" for file in expected)  # noqa: S101
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("output_filename", ["BASE", "BASE_SUBS"])
+@pytest.mark.parametrize("unselected_name", ["bonus/E01.mkv", "bonus/e01.MKV", "sample.[GRP].mkv", "E01,final.mkv"])
+async def test_mkbrr_is_skipped_when_it_cannot_exclude_only_unselected_files(tmp_path, monkeypatch, output_filename, unselected_name):
+    release, videos, subtitle, meta, commands = _mkbrr_season_pack(tmp_path, monkeypatch, [unselected_name])
+
+    torrent = Torrent.read(await TorrentCreator.create_torrent(meta, str(release), output_filename))
+
+    assert commands == []  # noqa: S101
     expected = [*videos, subtitle] if output_filename == "BASE_SUBS" else videos
     assert sorted(file.as_posix() for file in torrent.files) == sorted(f"{release.name}/{file.name}" for file in expected)  # noqa: S101
     assert meta.mkbrr  # noqa: S101
 
 
-def test_mkbrr_exclude_hits_selected_matches_names_only():
-    selected = ["/release/E01.mkv", "/release/E01.pt-BR.srt"]
-    assert TorrentCreator.mkbrr_exclude_hits_selected("e01.MKV,*.nfo", selected)  # noqa: S101
-    assert not TorrentCreator.mkbrr_exclude_hits_selected("E02.mkv,*.nfo,*.jpg", selected)  # noqa: S101
+def test_mkbrr_exact_exclude_string(tmp_path):
+    release = tmp_path / "release"
+    (release / "bonus").mkdir(parents=True)
+    selected = [release / "E01.mkv", release / "E01.pt-BR.srt"]
+    for file in [*selected, release / "E02.mkv", release / "cover.jpg"]:
+        file.write_bytes(b"test data")
+    filelist = [str(file) for file in selected]
+
+    assert TorrentCreator.mkbrr_exact_exclude_string(str(release), filelist, allow_subs=True) == "E02.mkv,*.nfo,*.jpg,*.png,*.txt,*.xml"  # noqa: S101
+    assert TorrentCreator.mkbrr_exact_exclude_string(str(release), filelist) is None  # noqa: S101 - "*.srt" drops the selected subtitle
+    (release / "bonus" / "E01.mkv").write_bytes(b"test data")
+    assert TorrentCreator.mkbrr_exact_exclude_string(str(release), filelist, allow_subs=True) is None  # noqa: S101
