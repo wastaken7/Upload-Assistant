@@ -895,3 +895,49 @@ async def test_whole_folder_reuse_rejects_a_missing_release_folder(tmp_path):
     valid, _ = await Clients({}).is_valid_torrent(meta, str(torrent_path), infohash, "qbit", {})
 
     assert not valid  # noqa: S101
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("output_filename", ["BASE", "BASE_SUBS"])
+async def test_mkbrr_is_skipped_when_an_excluded_file_shares_a_selected_name(tmp_path, monkeypatch, output_filename):
+    release = tmp_path / "Fictional.Show.2025"
+    videos = [release / "E01.mkv", release / "E02.mkv"]
+    subtitle = release / "E01.pt-BR.srt"
+    for file in [*videos, subtitle, release / "bonus" / "E01.mkv"]:
+        file.parent.mkdir(parents=True, exist_ok=True)
+        file.write_bytes(b"test data")
+
+    def unexpected_mkbrr(*_args, **_kwargs):
+        raise AssertionError("mkbrr would drop E01.mkv by excluding bonus/E01.mkv")
+
+    monkeypatch.setattr("src.torrentcreate.subprocess.Popen", unexpected_mkbrr)
+    binary = tmp_path / "mkbrr"
+    binary.write_bytes(b"mock binary")
+    monkeypatch.setattr(TorrentCreator, "get_mkbrr_path", staticmethod(lambda _meta: str(binary)))
+    meta = Meta(
+        base_dir=str(tmp_path),
+        uuid=release.name,
+        path=str(release),
+        filelist=[str(file) for file in videos],
+        subtitle_files=[str(subtitle)],
+        category="",
+        isdir=True,
+        tv_pack=True,
+        mkbrr=True,
+        mkbrr_threads="0",
+        max_piece_size=1,
+        trackers=[],
+    )
+    (tmp_path / "tmp" / meta.uuid).mkdir(parents=True)
+
+    torrent = Torrent.read(await TorrentCreator.create_torrent(meta, str(release), output_filename))
+
+    expected = [*videos, subtitle] if output_filename == "BASE_SUBS" else videos
+    assert sorted(file.as_posix() for file in torrent.files) == sorted(f"{release.name}/{file.name}" for file in expected)  # noqa: S101
+    assert meta.mkbrr  # noqa: S101
+
+
+def test_mkbrr_exclude_hits_selected_matches_names_only():
+    selected = ["/release/E01.mkv", "/release/E01.pt-BR.srt"]
+    assert TorrentCreator.mkbrr_exclude_hits_selected("e01.MKV,*.nfo", selected)  # noqa: S101
+    assert not TorrentCreator.mkbrr_exclude_hits_selected("E02.mkv,*.nfo,*.jpg", selected)  # noqa: S101

@@ -215,6 +215,16 @@ class TorrentCreator:
 
         return ",".join(sorted(exclude_files) + manual_patterns)
 
+    @staticmethod
+    def mkbrr_exclude_hits_selected(exclude_string: str, filelist: Sequence[str]) -> bool:
+        """Return whether a selected file matches one of mkbrr's exclude patterns.
+
+        mkbrr matches these patterns against file names, not paths, so excluding
+        ``bonus/E01.mkv`` would also drop a selected ``E01.mkv``.
+        """
+        patterns = [pattern.casefold() for pattern in exclude_string.split(",") if pattern]
+        return any(fnmatch.fnmatchcase(Path(file).name.casefold(), pattern) for file in filelist for pattern in patterns)
+
     @classmethod
     async def create_torrent(
         cls,
@@ -309,8 +319,17 @@ class TorrentCreator:
 
                 initial_size = await asyncio.to_thread(calculate_size)
 
+                mkbrr_exclude: str | None = None
+                use_mkbrr = bool(meta.mkbrr)
+                if use_mkbrr and not meta.is_disc and is_video:
+                    mkbrr_exclude = cls.build_mkbrr_exclude_string(str(path), creation_filelist, allow_subs=is_subs)
+                    if cls.mkbrr_exclude_hits_selected(mkbrr_exclude, creation_filelist):
+                        # mkbrr cannot exclude one file while keeping another with the same name.
+                        logger.debug("[yellow]An excluded file has the same name as a selected file; creating this torrent without mkbrr.[/yellow]")
+                        use_mkbrr = False
+
                 # If using mkbrr, run the external application
-                if meta.mkbrr:
+                if use_mkbrr:
                     try:
                         # Validate input path to prevent potential command injection
                         if not Path(path).exists():
@@ -360,9 +379,8 @@ class TorrentCreator:
                         if meta.mkbrr_threads != "0":
                             cmd.extend(["--workers", str(meta.mkbrr_threads)])
 
-                        if not meta.is_disc and is_video:
-                            exclude_str = cls.build_mkbrr_exclude_string(str(path), creation_filelist, allow_subs=is_subs)
-                            cmd.extend(["--exclude", exclude_str])
+                        if mkbrr_exclude is not None:
+                            cmd.extend(["--exclude", mkbrr_exclude])
                         elif meta.is_disc:
                             cmd.extend(["--exclude", ",".join(exclude)])
 
