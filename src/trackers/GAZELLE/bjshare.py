@@ -1491,10 +1491,14 @@ class BJShare:
                 image_bytes = response.content
                 filename = Path(cover_path).name
 
-                return await self.img_host(image_bytes, filename)
+                hosted_cover = await self.img_host(image_bytes, filename)
             except Exception as e:
                 logger.info(f"{self.tracker}: Falha ao processar pôster da URL {cover_tmdb_url}: {e}", extra={"markup": False})
-                return None
+                hosted_cover = None
+            if hosted_cover:
+                return hosted_cover
+            logger.warning(f"{self.tracker}: [bold yellow]The tracker image host failed for the poster; using the TMDB link instead.[/bold yellow]")
+            return cover_tmdb_url
 
         if category in ("BOOK", "GAME", "XXX"):
             cover_path = meta.artwork_path
@@ -1544,30 +1548,81 @@ class BJShare:
                 logger.info(f"{self.tracker}: Failed to process screenshot from URL {url}: {e}", extra={"markup": False})
                 return None
 
-        results: list[str] = []
+        async def upload_local_file_safely(path: Path) -> tuple[Path, str | None]:
+            try:
+                return path, await upload_local_file(path)
+            except Exception as e:
+                logger.info(f"{self.tracker}: Failed to process screenshot {path.name}: {e}", extra={"markup": False})
+                return path, None
 
-        # Upload menu images
+        results: list[str] = []
+        fallback_count = 0
+        missing_count = 0
+
+        # Upload menu images, keeping the common host's link when the tracker host fails
         for url in disc_menu_links:
             result = await upload_remote_file(url)
             if result:
                 results.append(result)
+            else:
+                results.append(url)
+                fallback_count += 1
 
         # Use existing files
         if local_files:
             paths: list[Path] = local_files[: 6 - len(results)]
+            selected_names = {path.name for path in paths}
+            hosted_by_name: dict[str, str] = {}
+            hosted_pool: list[str] = []
+            for img in meta.image_list:
+                raw_url = img.get("raw_url")
+                if not raw_url:
+                    continue
+                local_path = img.get("local_file_path")
+                name = Path(str(local_path)).name if local_path else ""
+                if name in selected_names:
+                    hosted_by_name.setdefault(name, str(raw_url))
+                else:
+                    hosted_pool.append(str(raw_url))
 
-            for coro in asyncio.as_completed([upload_local_file(p) for p in paths]):
-                result = await coro
+            failed_paths: list[Path] = []
+            for coro in asyncio.as_completed([upload_local_file_safely(p) for p in paths]):
+                path, result = await coro
                 if result:
                     results.append(result)
+                else:
+                    failed_paths.append(path)
+
+            # Fall back to the same screenshot on the common host, or to another unused one
+            for path in failed_paths:
+                fallback_url = hosted_by_name.get(path.name) or (hosted_pool.pop(0) if hosted_pool else None)
+                if fallback_url:
+                    results.append(fallback_url)
+                    fallback_count += 1
+                else:
+                    missing_count += 1
 
         else:
             image_links = [str(img.get("raw_url")) for img in meta.image_list if img.get("raw_url")][: 6 - len(results)]
 
-            for coro in asyncio.as_completed([upload_remote_file(url) for url in image_links]):
-                result = await coro
+            hosted_results = await asyncio.gather(*(upload_remote_file(url) for url in image_links))
+            for url, result in zip(image_links, hosted_results, strict=True):
                 if result:
                     results.append(result)
+                else:
+                    results.append(url)
+                    fallback_count += 1
+
+        if fallback_count:
+            logger.warning(
+                f"{self.tracker}: [bold yellow]The tracker image host failed for {fallback_count} screenshot(s); "
+                "using the links from the app's image host instead.[/bold yellow]"
+            )
+        if missing_count:
+            logger.warning(
+                f"{self.tracker}: [bold yellow]The tracker image host failed for {missing_count} screenshot(s) "
+                "and no image host link is available to use instead.[/bold yellow]"
+            )
 
         return results
 
