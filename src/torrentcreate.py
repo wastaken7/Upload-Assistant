@@ -116,6 +116,10 @@ class CustomTorrent(torf.Torrent):
             return
 
 
+# Characters mkbrr reads as pattern syntax or as a separator in --exclude.
+_MKBRR_GLOB_CHARACTERS = frozenset(",*?[]{}\\")
+
+
 class TorrentCreator:
     # Limit concurrent torrent creation to avoid heavy parallel hashing
     _create_torrent_semaphore = asyncio.Semaphore(1)
@@ -196,7 +200,8 @@ class TorrentCreator:
         return piece_size
 
     @staticmethod
-    def build_mkbrr_exclude_string(root_folder: str, filelist: Sequence[str], allow_subs: bool = False) -> str:
+    def _mkbrr_exclude_parts(root_folder: str, filelist: Sequence[str], allow_subs: bool = False) -> tuple[list[str], list[str]]:
+        """Return the unselected file names and the extension patterns to exclude."""
         if allow_subs:
             manual_patterns = ["*.nfo", "*.jpg", "*.png", "*.txt", "*.xml"]
         else:
@@ -213,7 +218,31 @@ class TorrentCreator:
                     continue
                 exclude_files.add(fname)
 
-        return ",".join(sorted(exclude_files) + manual_patterns)
+        return sorted(exclude_files), manual_patterns
+
+    @staticmethod
+    def build_mkbrr_exclude_string(root_folder: str, filelist: Sequence[str], allow_subs: bool = False) -> str:
+        names, manual_patterns = TorrentCreator._mkbrr_exclude_parts(root_folder, filelist, allow_subs)
+        return ",".join(names + manual_patterns)
+
+    @staticmethod
+    def mkbrr_exact_exclude_string(root_folder: str, filelist: Sequence[str], allow_subs: bool = False) -> str | None:
+        """Return mkbrr exclusions that drop only unselected files, or None when none exist.
+
+        mkbrr splits ``--exclude`` at commas and matches each glob, ignoring case,
+        against file names rather than paths. Excluding ``bonus/E01.mkv`` would
+        therefore also drop a selected ``E01.mkv``, and a name with a comma or
+        glob characters, such as ``sample.[GRP].mkv``, would not be excluded.
+        """
+        names, manual_patterns = TorrentCreator._mkbrr_exclude_parts(root_folder, filelist, allow_subs)
+        if any(not _MKBRR_GLOB_CHARACTERS.isdisjoint(name) for name in names):
+            return None
+        selected = {Path(file).name.casefold() for file in filelist}
+        if any(name.casefold() in selected for name in names):
+            return None
+        if any(fnmatch.fnmatchcase(name, pattern) for name in selected for pattern in manual_patterns):
+            return None
+        return ",".join(names + manual_patterns)
 
     @classmethod
     async def create_torrent(
@@ -259,7 +288,12 @@ class TorrentCreator:
                 if is_subs and Path(path).is_file():
                     path = Path(path).parent
 
-                if meta.category not in ("MOVIE", "TV"):
+                # MOVIE and TV are detected only after the early base-torrent
+                # task starts, while every other category is set before it, so
+                # an unset category is a video release.
+                is_video = str(meta.category or "").upper() in ("", "MOVIE", "TV")
+
+                if not is_video:
                     # Music releases always keep their folder, including
                     # one-track singles (e.g. Orpheus rejects folderless music).
                     if meta.isdir and len(meta.filelist) == 1 and not meta.keep_folder and meta.category != "MUSIC":
@@ -304,8 +338,16 @@ class TorrentCreator:
 
                 initial_size = await asyncio.to_thread(calculate_size)
 
+                mkbrr_exclude: str | None = None
+                use_mkbrr = bool(meta.mkbrr)
+                if use_mkbrr and not meta.is_disc and is_video:
+                    mkbrr_exclude = await asyncio.to_thread(cls.mkbrr_exact_exclude_string, str(path), creation_filelist, is_subs)
+                    if mkbrr_exclude is None:
+                        logger.debug("[yellow]mkbrr cannot exclude only the unselected files; creating this torrent without mkbrr.[/yellow]")
+                        use_mkbrr = False
+
                 # If using mkbrr, run the external application
-                if meta.mkbrr:
+                if use_mkbrr:
                     try:
                         # Validate input path to prevent potential command injection
                         if not Path(path).exists():
@@ -355,9 +397,8 @@ class TorrentCreator:
                         if meta.mkbrr_threads != "0":
                             cmd.extend(["--workers", str(meta.mkbrr_threads)])
 
-                        if not meta.is_disc and meta.category in ("MOVIE", "TV"):
-                            exclude_str = cls.build_mkbrr_exclude_string(str(path), creation_filelist, allow_subs=is_subs)
-                            cmd.extend(["--exclude", exclude_str])
+                        if mkbrr_exclude is not None:
+                            cmd.extend(["--exclude", mkbrr_exclude])
                         elif meta.is_disc:
                             cmd.extend(["--exclude", ",".join(exclude)])
 
