@@ -9,6 +9,7 @@ import pytest
 from src import webui_events
 from src.meta import Meta
 from src.slot_rules.models import SlotDecision, Verdict
+from src.trump_reports import TrumpSupport
 from src.uphelper import UploadHelper
 
 
@@ -33,6 +34,11 @@ class Tracker:
     async def get_name(self, meta):
         """Keep the synthetic release name unchanged."""
         return meta.name
+
+
+class TrumpTracker(Tracker):
+    """A local tracker stub that accepts trump reports."""
+    trump_support = TrumpSupport(searchable=False)
 
 
 def helper_with_answers(monkeypatch, ask=None):
@@ -179,10 +185,11 @@ async def test_only_trackers_with_manual_prompts_are_counted(gui, monkeypatch, c
 async def test_slot_override_and_two_trump_questions_count_once_per_tracker(gui, monkeypatch, capsys):
     """A slot-only conflict and a multi-question trump flow are both manual reviews."""
     helper = helper_with_answers(monkeypatch)
+    helper.tracker_class_map = {**helper.tracker_class_map, "SECOND": lambda **_kwargs: TrumpTracker()}
     slot = SlotDecision(Verdict.BLOCK, "Slot filled", "FIRST", date(2026, 10, 15))
     with webui_events.dupe_review_scope(["FIRST", "SECOND"]):
         await helper.dupe_check([], Meta(category="MOVIE", name="Example"), "FIRST", slot)
-        await helper.dupe_check([{"name": "Trumpable release", "trumpable": True}], Meta(category="MOVIE", name="Example", trumpable_id=1), "SECOND")
+        await helper.dupe_check([{"name": "Trumpable release", "id": 1, "trumpable": True, "trump_target": True}], Meta(category="MOVIE", name="Example"), "SECOND")
     output = events(capsys)
     prompts = [event for event in output if event["kind"] == "prompt" and event["action"] == "open"]
     assert len(prompts) == 3

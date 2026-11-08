@@ -582,7 +582,7 @@ def test_dreadvault_adds_foreign_audio_language_before_source_for_yearless_dvd_r
 def test_dreadvault_never_adds_trump_suffix_for_exact_match():
     meta = Meta(
         name="Example Movie 2001 1080p BluRay DD 5.1 x264-GRP",
-        trump_reason="exact_match",
+        trump_plans={"DREADVAULT": {"tracker": "DREADVAULT", "reported_id": "7", "reported_name": "Older release", "reason": "exact_match"}},
         language_checked=True,
     )
 

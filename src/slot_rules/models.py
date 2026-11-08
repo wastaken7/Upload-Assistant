@@ -29,3 +29,5 @@ class SlotDecision:
     notes: list[str] = field(default_factory=lambda: list[str]())
     # The tracker's rules page, when known.
     rules_url: str = ""
+    # The upload replaces the releases in ``conflicts`` (a trump), rather than sitting beside them.
+    trump: bool = False

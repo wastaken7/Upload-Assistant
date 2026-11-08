@@ -16,6 +16,8 @@ class DupeEntry(TypedDict, total=False):
     files: list[str]
     file_count: int
     trumpable: bool
+    # Set by filter_dupes: marked trumpable on the site and in the upload's resolution.
+    trump_target: bool
     link: str | None
     download: str | None
     flags: list[str]
@@ -67,7 +69,6 @@ class DupeChecker:
             else:
                 logger.debug(dupes)
 
-        meta.trumpable_id = None
         meta.season_pack_exists = False
         meta.season_pack_id = None
         meta.season_pack_link = None
@@ -554,10 +555,11 @@ class DupeChecker:
                 logger.debug(f"[cyan]Book duplicate matched: {each}")
                 return False
 
-            # AITHER-specific trumping logic - no internal checking, if it's marked trumpable, it's trumpable
-            if tracker_name in ["AITHER", "LST"] and entry.get("trumpable", False) and res_id and target_resolution == res_id:
-                meta.trumpable_id = entry.get("id")
-                remember_match("trumpable_id")
+            # No internal check: if the site marks it trumpable, it is trumpable.
+            # Only trackers that accept trump reports offer it (src.trump_reports).
+            # It does not remember the match: the matched download link is for cross-seeding.
+            if entry.get("trumpable", False) and res_id and target_resolution == res_id:
+                entry["trump_target"] = True
 
             if not meta.is_disc:
                 for file in filenames:

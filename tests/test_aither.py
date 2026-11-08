@@ -325,8 +325,18 @@ def test_aither_falls_back_to_generic_name_for_unknown_type() -> None:
     assert _name(meta) == "Synthetic Feature 2024 Generic Name"
 
 
+def _trump(tracker: str, reason: str) -> dict[str, dict[str, object]]:
+    return {tracker: {"tracker": tracker, "reported_id": "7", "reported_name": "Older release", "reason": reason}}
+
+
 def test_aither_appends_trump_marker() -> None:
-    assert _name(_movie(trump_reason="exact_match")) == "Synthetic Feature 2024 1080p NF WEB-DL DD+ 5.1 H.264-TESTGROUP - TRUMP"
+    assert _name(_movie(trump_plans=_trump("AITHER", "exact_match"))) == "Synthetic Feature 2024 1080p NF WEB-DL DD+ 5.1 H.264-TESTGROUP - TRUMP"
+
+
+@pytest.mark.parametrize("plans", [_trump("AITHER", "slot_rules"), _trump("LST", "exact_match")])
+def test_aither_trump_marker_needs_its_own_exact_trump(plans: dict[str, dict[str, object]]) -> None:
+    """Only an exact-files trump on Aither itself renames the Aither upload."""
+    assert _name(_movie(trump_plans=plans)) == "Synthetic Feature 2024 1080p NF WEB-DL DD+ 5.1 H.264-TESTGROUP"
 
 
 @pytest.mark.parametrize(("is_disc", "checked"), [("BDMV", False), ("DVD", False), ("HDDVD", True), ("", True)])

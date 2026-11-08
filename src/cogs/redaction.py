@@ -172,6 +172,8 @@ class Redaction:
         async with aiofiles.open(output_path, "w", encoding="utf-8") as f:
             export_data = meta.to_dict()
             export_data.pop("archive_password", None)
+            # Trump plans belong to one duplicate review; a reused meta file must not send them again.
+            export_data.pop("trump_plans", None)
             await f.write(json.dumps(export_data, indent=4, cls=PathAwareEncoder))
 
         return meta

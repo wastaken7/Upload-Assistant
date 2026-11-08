@@ -8,6 +8,7 @@ from src.music.sources import DiscogsEnricher
 from src.trackers.common import Common
 from src.trackers.naming import BLU_NAME_RULES, add_incomplete_pack_marker, build_video_name
 from src.trackers.UNIT3D import UNIT3D
+from src.trump_reports import TrumpPlan, TrumpSupport, is_exact_trump
 
 Config = dict[str, Any]
 # The LST templates have no Edition slot, not even for full discs.
@@ -28,7 +29,9 @@ class LST(UNIT3D):
     upload_url = f"{base_url}/api/torrents/upload"
     search_url = f"{base_url}/api/torrents/filter"
     torrent_url = f"{base_url}/torrents/"
-    trumping_url = f"{base_url}/api/reports/torrents/"
+    trump_reports_url = f"{base_url}/api/reports/torrents"
+    # LST cannot list existing reports; its reports carry a reason instead of comparisons.
+    trump_support = TrumpSupport(note=True)
     supported_categories = ("TV", "MOVIE", "BOOK", "MUSIC", "XXX")
     tracker_urls = ("https://lst.gg",)
 
@@ -172,16 +175,19 @@ class LST(UNIT3D):
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
         if meta.category == "MUSIC":
-            return {"name": self._append_trump(self._music_name(meta), meta)}
+            return {"name": self._append_trump(self._music_name(meta), meta, self.tracker)}
 
         if meta.category == "BOOK":
-            return {"name": self._append_trump(self._book_name(meta), meta)}
+            return {"name": self._append_trump(self._book_name(meta), meta, self.tracker)}
 
-        lst_name = await build_video_name(meta, BLU_NAME_RULES, self.tracker) or meta.name
-        if meta.trump_reason == "exact_match":
-            lst_name = lst_name + " - TRUMP"
-
+        lst_name = self._append_trump(await build_video_name(meta, BLU_NAME_RULES, self.tracker) or meta.name, meta, self.tracker)
         return {"name": add_incomplete_pack_marker(lst_name, meta, self.tracker)}
+
+    def trump_report_request(self, plan: TrumpPlan, trumping_id: Any, message: str) -> tuple[str, dict[str, Any]]:
+        reported_id = str(plan.reported_id).strip()
+        if not reported_id.isdigit():
+            raise ValueError(f"invalid reported torrent ID {plan.reported_id!r}")
+        return f"{self.trump_reports_url}/{int(reported_id)}/trump", {"message": f"{message}: {self.torrent_url}{trumping_id}"}
 
     @staticmethod
     def _with_tag(parts: list[str], tag: str | None) -> str:
@@ -192,8 +198,8 @@ class LST(UNIT3D):
         return f"{name}-{normalized_tag}" if normalized_tag else name
 
     @staticmethod
-    def _append_trump(name: str, meta: Meta) -> str:
-        return f"{name} - TRUMP" if meta.trump_reason == "exact_match" else name
+    def _append_trump(name: str, meta: Meta, tracker: str) -> str:
+        return f"{name} - TRUMP" if is_exact_trump(meta, tracker) else name
 
     @staticmethod
     def _release_field(release: dict[str, Any], name: str, default: Any = "") -> Any:

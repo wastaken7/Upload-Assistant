@@ -86,7 +86,7 @@ from rich.markup import escape
 
 from bin.get_ffmpeg import FfmpegBinaryManager
 from bin.get_mkbrr import MkbrrBinaryManager
-from src import upload_history, webui_events
+from src import trump_reports, upload_history, webui_events
 from src.add_comparison import ComparisonManager
 from src.app_paths import CODE_DIR, STATE_DIR
 from src.args import Args, cli_argument_catalog, cli_option_choices, read_paths_from_stdin
@@ -2994,31 +2994,6 @@ async def do_the_thing(base_dir: str) -> None:
 
             else:
                 meta = meta
-                if meta.were_trumping:
-                    trump_trackers = [t for t in cast(list[Any], meta.trackers) if isinstance(t, str)]
-                    logger.info("[yellow]Checking for existing trump reports.....")
-                    tracker_status = cast(dict[str, dict[str, Any]], meta.tracker_status or {})
-                    trumping_trackers: list[str] = []
-                    for tracker in trump_trackers:
-                        is_trumping = await tracker_setup.process_trumpables(meta, tracker=tracker)
-                        skip_upload_trackers = set(meta.skip_upload_trackers or [])
-
-                        # Apply any per-tracker skip decisions made during trumpable processing
-
-                        if skip_upload_trackers:
-                            for t in skip_upload_trackers:
-                                per_tracker = tracker_status.setdefault(t, {})
-                                per_tracker["upload"] = False
-                                per_tracker["skipped"] = True
-
-                            meta.trackers = [t for t in meta.trackers if t not in skip_upload_trackers]
-                            logger.debug(f"[yellow]Skipping trackers due to trump report selection: {', '.join(sorted(skip_upload_trackers))}[/yellow]")
-                            if not meta.trackers:
-                                logger.info("[bold red]No trackers left to upload after trump checking.[/bold red]")
-                        if is_trumping and not skip_upload_trackers.__contains__(tracker):
-                            trumping_trackers.append(tracker)
-
-                    meta.trumping_trackers = trumping_trackers
 
                 # allowing the skip uploading feature to only apply when double dupe checking is enabled
                 successful_trackers = 10
@@ -3364,9 +3339,7 @@ async def do_the_thing(base_dir: str) -> None:
             finish_time = time.time()
             logger.debug(f"Uploads processed in {finish_time - start_time:.4f} seconds")
 
-            for tracker in meta.trumping_trackers:
-                logger.info(f"[yellow]Submitting trumpable report to {tracker}.....")
-                reported = await tracker_setup.make_trumpable_report(meta, tracker)
+            for tracker, reported in (await trump_reports.submit_reports(meta, config, tracker_class_map)).items():
                 await record_event_async(
                     "post_upload",
                     service="trump_report",
