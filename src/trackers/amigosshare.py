@@ -27,7 +27,7 @@ from src.description_review import get_base_description
 from src.genre_map import ENG_TO_PTBR_GENRE_MAP
 from src.get_desc import DescriptionBuilder
 from src.languages import languages_manager
-from src.manual_input import Question, ask, choices_from, confirm_override
+from src.manual_input import Question, ask, choices_from
 from src.manual_questions import game_platform
 from src.meta import Meta
 from src.screenshot_manifest import files as manifest_files
@@ -788,16 +788,17 @@ class AmigosShare:
         if meta.category == "XXX" and meta.source_size < self.minimum_adult_size:
             logger.info(f"{self.tracker}: [bold red]Adult videos must be at least 100 MB (rule 5.16).[/bold red]")
             return False
+        passed = True
         if self.tracker_config.get("check_for_rules", True) and (warnings := self.rules(meta)):
             logger.info(f"{self.tracker}: [red]Rule check returned the following warning(s):[/red]\n\n" + "\n\n".join(warnings))
-            if not await confirm_override(meta, "Do you want to continue anyway?"):
-                return False
+            passed = False
         if meta.category in ("MOVIE", "TV"):
             if not meta.language_checked:
                 await languages_manager.process_desc_language(meta, tracker=self.tracker)
             # Foreign content needs Brazilian Portuguese audio or subtitles (rule 15.2.11).
-            return await self.common.check_portuguese_video_requirements(meta, self.tracker)
-        return True
+            if not await self.common.check_portuguese_video_requirements(meta, self.tracker):
+                passed = False
+        return passed
 
     def search_params(self, meta: Meta) -> dict[str, str]:
         key = self.get_profile_key(meta)

@@ -304,13 +304,11 @@ class InfinityHD(TmdbTvNaming, UNIT3D):
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         if meta.resolution not in ["4320p", "2160p", "1440p", "1080p", "1080i"]:
-            if not meta.unattended or meta.debug:
-                logger.info(f"{self.tracker}: [bold red]Uploads must be at least 1080 resolution for {self.tracker}.[/bold red]")
+            logger.info(f"{self.tracker}: [bold red]Uploads must be at least 1080 resolution for {self.tracker}.[/bold red]")
             return False
 
         if not meta.valid_mi_settings:
-            if not meta.unattended or meta.debug:
-                logger.info(f"{self.tracker}: [bold red]No encoding settings in mediainfo, skipping {self.tracker} upload.[/bold red]")
+            logger.info(f"{self.tracker}: [bold red]No encoding settings in mediainfo, skipping {self.tracker} upload.[/bold red]")
             return False
 
         if meta.is_disc != "BDMV":
@@ -335,8 +333,7 @@ class InfinityHD(TmdbTvNaming, UNIT3D):
             has_eng_subs = await languages_manager.has_english_language(subtitle_languages if subtitle_languages else "")
             # Require at least one English audio/subtitle track or an original language audio track
             if not (original_language or has_eng_audio or has_eng_subs):
-                if not meta.unattended or meta.debug:
-                    logger.info(f"{self.tracker}: [bold red]requires at least one English audio or subtitle track or an original language audio track.")
+                logger.info(f"{self.tracker}: [bold red]requires at least one English audio or subtitle track or an original language audio track.")
                 return False
 
-        return await self.common.check_and_confirm_adult_media_upload(meta, self.tracker)
+        return await self.common.check_adult_media_allowed(meta, self.tracker)

@@ -601,8 +601,6 @@ def test_orpheus_additional_checks_block_prohibited_music_artists():
 
     assert not asyncio.run(adapter.get_additional_checks(meta))
     assert "Paul_DVR" in meta.tracker_status["ORPHEUS"]["status_message"]
-    assert not asyncio.run(adapter.upload(meta))
-    assert "debug_payload" not in meta.tracker_status["ORPHEUS"]
 
 
 def test_orpheus_additional_checks_block_blacklisted_releases_and_labels():

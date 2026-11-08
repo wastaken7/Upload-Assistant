@@ -4,7 +4,6 @@ from typing import Any, ClassVar
 
 from src.console import logger
 from src.get_desc import DescriptionBuilder
-from src.manual_input import confirm_override
 from src.meta import Meta
 from src.rehostimages import ImageHostPolicy, RehostImagesManager
 from src.trackers.common import Common
@@ -72,24 +71,23 @@ class SkipTheCommercials(UNIT3D):
         return {"type_id": type_id}
 
     async def get_additional_checks(self, meta: Meta) -> bool:
+        passed = True
         category = str(meta.category).upper()
         combined_genres = meta.combined_genres if isinstance(meta.combined_genres, list) else [genre.strip() for genre in str(meta.combined_genres).split(",") if genre.strip()]
         documentary_metadata = [*(meta.genres or []), *(meta.keywords or []), *combined_genres]
         is_documentary = any(str(value).strip().lower() in {"documentary", "documentaries"} for value in documentary_metadata)
 
         if category != "TV" and not (category == "MOVIE" and is_documentary):
-            if not meta.unattended:
-                logger.info(f"{self.tracker}: [bold red]Only TV and documentary movie uploads are allowed at {self.tracker}.[/bold red]")
+            logger.info(f"{self.tracker}: [bold red]Only TV and documentary movie uploads are allowed at {self.tracker}.[/bold red]")
             return False
 
         genres = ", ".join(str(value) for value in [*(meta.keywords or []), *combined_genres])
         adult_keywords = ["xxx", "erotic", "porn", "adult", "orgy", "hentai", "adult animation", "softcore"]
         if any(re.search(rf"(^|,\s*){re.escape(keyword)}(\s*,|$)", genres, re.IGNORECASE) for keyword in adult_keywords):
             logger.info(f"{self.tracker}: [bold red]Porn is not allowed at {self.tracker}.[/bold red]")
-            if not await confirm_override(meta):
-                return False
+            passed = False
 
-        return True
+        return passed
 
     async def get_description(self, meta: Meta) -> dict[str, str]:
         return {

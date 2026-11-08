@@ -831,9 +831,8 @@ class Orpheus:
         return payload_preview.describe(self.tracker, data, specs, deferred=deferred, name=await self.get_name(meta))
 
     async def upload(self, meta: Meta) -> bool:
+        # The blacklist was checked before upload and the user chose whether to continue.
         release = self._release(meta)
-        if not await self.get_additional_checks(meta):
-            return False
         status = meta.tracker_status.setdefault(self.tracker, {})
         issues = OrpheusMusicValidator().validate(release)
         errors = [issue.message for issue in issues if issue.level == ValidationLevel.ERROR]

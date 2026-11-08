@@ -16,7 +16,7 @@ from src import payload_preview
 from src.app_paths import CODE_DIR
 from src.cogs.redaction import Redaction
 from src.console import logger
-from src.manual_input import Question, ask, choices_from, confirm_override, has_answer
+from src.manual_input import Question, ask, choices_from, has_answer
 from src.meta import Meta
 from src.screenshot_manifest import files as manifest_files
 from src.trackers.AVISTAZ import AZTrackerBase
@@ -386,12 +386,12 @@ class ExoticaZ(AZTrackerBase):
         return "\n\n".join(warnings)
 
     async def get_additional_checks(self, meta: Meta) -> bool:
+        passed = True
         if self.config["TRACKERS"][self.tracker].get("check_for_rules", True):
             warnings = self.rules(meta)
             if warnings:
                 logger.info(f"{self.tracker}: [red]Rule check returned the following warning(s):[/red]\n\n{warnings}")
-                if not await confirm_override(meta, "Do you want to continue anyway?"):
-                    return False
+                passed = False
 
         media_info = await self.get_file_info(meta)
         if len(media_info.encode("utf-8")) > MAXIMUM_MEDIAINFO_SIZE:
@@ -403,7 +403,7 @@ class ExoticaZ(AZTrackerBase):
             logger.info(f"{self.tracker}: [yellow]Unattended mode: no site tags were found for this release. Skipping {self.tracker} upload.[/yellow]")
             return False
 
-        return True
+        return passed
 
     async def search_existing(self, meta: Meta) -> list[dict[str, str]]:
         duplicates: list[dict[str, str]] = []

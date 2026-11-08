@@ -522,8 +522,7 @@ class Anthelion:
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         if meta.valid_mi is False:
-            if not meta.unattended:
-                logger.info(f"{self.tracker}: [bold red]No unique ID in mediainfo, skipping {self.tracker} upload.")
+            logger.info(f"{self.tracker}: [bold red]No unique ID in mediainfo, skipping {self.tracker} upload.")
             return False
 
         return True

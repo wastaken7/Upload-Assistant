@@ -123,7 +123,7 @@ from src.trackers.common import Common
 from src.trackers.GAZELLE.alpharatio import AlphaRatio
 from src.trackers.GAZELLE.passthepopcorn import PassThePopcorn
 from src.trackersetup import TrackerSetup, api_trackers, http_trackers, other_api_trackers, tracker_class_map
-from src.trackerstatus import TrackerStatusManager
+from src.trackerstatus import TrackerStatusManager, run_tracker_checks
 from src.tvdb import close_tvdb
 from src.uphelper import UploadHelper
 from src.uploadorder import run_upload_order
@@ -3522,29 +3522,15 @@ async def process_cross_seeds(meta: Meta) -> None:
 
                 # Search for existing torrents
                 if tracker != "PASSTHEPOPCORN":
-                    if hasattr(tracker_class, "get_additional_checks"):
-                        import inspect
-
-                        if inspect.iscoroutinefunction(tracker_class.get_additional_checks):
-                            should_continue = await tracker_class.get_additional_checks(meta)
-                        else:
-                            should_continue = tracker_class.get_additional_checks(meta)
-                        if not should_continue:
-                            meta.skipping = tracker
-                            return
+                    if not await run_tracker_checks(tracker_class, meta):
+                        meta.skipping = tracker
+                        return
                     dupes = await tracker_class.search_existing(meta)
                 else:
                     ptp = PassThePopcorn(config=config)
-                    if hasattr(ptp, "get_additional_checks"):
-                        import inspect
-
-                        if inspect.iscoroutinefunction(ptp.get_additional_checks):
-                            should_continue = await ptp.get_additional_checks(meta)
-                        else:
-                            should_continue = ptp.get_additional_checks(meta)
-                        if not should_continue:
-                            meta.skipping = tracker
-                            return
+                    if not await run_tracker_checks(ptp, meta):
+                        meta.skipping = tracker
+                        return
                     group_id = meta.ptp_groupid
                     if not group_id and meta.imdb:
                         group_id = await ptp.get_group_by_imdb(meta.imdb)

@@ -21,7 +21,7 @@ from src.console import logger, prompt_in_thread
 from src.cookie_auth import CookieValidator
 from src.get_desc import DescriptionBuilder
 from src.languages import languages_manager
-from src.manual_input import Question, ask, confirm_override
+from src.manual_input import Question, ask
 from src.meta import Meta
 from src.screenshot_manifest import files as manifest_files
 from src.stats import record_event_async
@@ -207,17 +207,16 @@ class AZTrackerBase:
         return False
 
     async def get_additional_checks(self, meta: Meta) -> bool:
+        passed = True
         if self.config["TRACKERS"][self.tracker].get("check_for_rules", True):
             warnings = self.rules(meta)
             if warnings:
                 logger.info(f"{self.tracker}: [red]Rule check returned the following warning(s):[/red]\n\n{warnings}")
-                if not await confirm_override(meta, "Do you want to continue anyway?"):
-                    return False
+                passed = False
 
         if meta.type not in ["WEBDL"] and self.tracker == "PRIVATEHD" and meta.tag in ["FGT", "EVO"]:
             logger.info(f"{self.tracker}: [bold red]Group {meta.tag} is only allowed for web-dl[/bold red]")
-            if not await confirm_override(meta):
-                return False
+            passed = False
 
         cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
         if cookie_jar:
@@ -227,7 +226,7 @@ class AZTrackerBase:
             logger.info(f"{self.tracker}: This media is not registered, please add it to the database by following this link: {self.base_url}/add/{meta.category.lower()}")
             return False
 
-        return True
+        return passed
 
     async def search_existing(self, meta: Meta) -> list[dict[str, str]]:
         duplicates: list[dict[str, str]] = []

@@ -7,7 +7,6 @@ import pycountry
 
 from src.console import logger
 from src.languages import languages_manager
-from src.manual_input import confirm_override
 from src.meta import Meta
 from src.trackers.common import Common
 from src.trackers.UNIT3D import UNIT3D
@@ -345,6 +344,7 @@ class RocketHD(UNIT3D):
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         """make sure the upload complies with the RHD rules"""
+        passed = True
         # Uploading MIC, CAM, TS, or LD releases, is prohibited.
         prohib_markers = ["MIC", "CAM", "TS", "TELESYNC", "LD", "LINE"]
         basename = self.get_basename(meta)
@@ -352,27 +352,23 @@ class RocketHD(UNIT3D):
         basename_up = [tok for tok in re.split(r"[\.\s_-]+", str(basename).upper()) if tok]
         if any(x in basename_up for x in prohib_markers):
             logger.info(f"{self.tracker}: [bold red]Uploading MIC, CAM, TS or LD releases, is prohibited[/bold red]")
-            if not await confirm_override(meta):
-                return False
+            passed = False
 
         # Uploading upscaled releases is prohibited. Exception: The release is from a group on the upscale whitelist
         if "UPSCALE" in basename_up:
             logger.info(f"{self.tracker}: [bold red]Uploading upscaled releases is prohibited, unless the group is is whitelisted {self.base_url}/wikis/17[/bold red]")
-            if not await confirm_override(meta):
-                return False
+            passed = False
 
         # Uploading SD content is not allowed. Exception: No HD version exists. Check release databases beforehand to ensure an HD version doesn't exist
         if meta.resolution in ["384p", "480p", "480i", "540p", "576p", "576i"]:
             logger.info(f"{self.tracker}: [bold red]Uploading SD releases is not allowed on {self.tracker}, unless no HD version exists.[/bold red]")
             logger.info(f"{self.tracker}: [bold red]Please check release databases beforehand to be sure.[/bold red]")
-            if not await confirm_override(meta):
-                return False
+            passed = False
 
         # Uploads must contain a German audio track. Exception: The release was requested in its original language.
         if not self._has_german_audio(meta):
             logger.info(f"{self.tracker}: [bold red]Uploads must contain a German audio track, unless the release was requested in its original language.[/bold red]")
-            if not await confirm_override(meta):
-                return False
+            passed = False
 
         # check for samples, proofs, and images in the upload directory
         filelist = meta.filelist
@@ -381,6 +377,5 @@ class RocketHD(UNIT3D):
             for file in filelist
         ):
             logger.info(f"{self.tracker}: [bold red]Uploads containing samples, proofs, and images are prohibited.[/bold red]")
-            if not await confirm_override(meta):
-                return False
-        return True
+            passed = False
+        return passed
