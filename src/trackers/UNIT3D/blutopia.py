@@ -4,7 +4,7 @@ from typing import Any
 
 from src.console import logger
 from src.get_name import build_name_components
-from src.manual_input import Question, ask, confirm_override
+from src.manual_input import Question, ask
 from src.meta import Meta
 from src.trackers.common import Common
 from src.trackers.naming import BLU_NAME_RULES, build_video_name, with_imdb_title
@@ -143,8 +143,6 @@ class Blutopia(UNIT3D):
         if meta.type in ["ENCODE", "REMUX"] and "HDR" in meta.hdr and "DV" in meta.hdr and (not meta.unattended or (meta.unattended and meta.unattended_confirm)):
             logger.info(f"{self.tracker}: [bold red]Releases using a Dolby Vision layer from a different source have specific description requirements.[/bold red]")
             logger.info(f"{self.tracker}: [bold red]See rule 12.5. You must have a correct pre-formatted description if this release has a derived layer[/bold red]")
-            if not await confirm_override(meta):
-                return False
             derived = await ask(
                 meta,
                 Question(
@@ -163,8 +161,7 @@ class Blutopia(UNIT3D):
 
         if meta.type not in ["WEBDL"] and not meta.is_disc and meta.tag in ["AOC", "CMRG", "EVO", "TERMiNAL", "ViSION"]:
             logger.info(f"{self.tracker}: [bold red]Group {meta.tag} is only allowed for raw type content[/bold red]")
-            if not await confirm_override(meta):
-                return False
+            should_continue = False
 
         if not meta.valid_mi_settings:
             logger.info(f"{self.tracker}: [bold red]No encoding settings in mediainfo, skipping {self.tracker} upload.[/bold red]")

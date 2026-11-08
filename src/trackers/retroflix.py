@@ -210,7 +210,7 @@ class RetroFlix:
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         common = Common(config=self.config)
-        if not await common.check_and_confirm_adult_media_upload(meta, self.tracker):
+        if not await common.check_adult_media_allowed(meta, self.tracker):
             return False
 
         year_value = meta.year
@@ -267,8 +267,7 @@ class RetroFlix:
                 # Calculate date exactly 10 years ago from today
                 ten_years_ago = datetime.datetime.now(datetime.UTC).date() - datetime.timedelta(days=365 * 10 + 3)  # add leeway
                 if release_date > ten_years_ago:
-                    if not meta.unattended:
-                        logger.info(f"{self.tracker}: [red]Content must be older than 10 Years to upload at RETROFLIX")
+                    logger.info(f"{self.tracker}: [red]Content must be older than 10 Years to upload at RETROFLIX")
                     return False
             except ValueError, AttributeError:
                 # If date parsing fails, fall back to year comparison
@@ -276,22 +275,19 @@ class RetroFlix:
                 if release_year.isdigit():
                     year = int(release_year)
                     if datetime.datetime.now(datetime.UTC).date().year - year <= 9:
-                        if not meta.unattended:
-                            logger.info(f"{self.tracker}: [red]Content must be older than 10 Years to upload at RETROFLIX")
+                        logger.info(f"{self.tracker}: [red]Content must be older than 10 Years to upload at RETROFLIX")
                         return False
 
         elif meta.category == "TV" and most_recent_aired_date:
             # For TV shows, use the most recent aired date for comparison if available
             ten_years_ago = datetime.datetime.now(datetime.UTC).date() - datetime.timedelta(days=365 * 10 + 3)  # add leeway
             if most_recent_aired_date > ten_years_ago:
-                if not meta.unattended:
-                    logger.info(f"{self.tracker}: [red]Content must be older than 10 Years to upload at RETROFLIX")
+                logger.info(f"{self.tracker}: [red]Content must be older than 10 Years to upload at RETROFLIX")
                 return False
 
         else:
             if year is not None and datetime.datetime.now(datetime.UTC).date().year - year <= 9:
-                if not meta.unattended:
-                    logger.info(f"{self.tracker}: [red]Content must be older than 10 Years to upload at RETROFLIX")
+                logger.info(f"{self.tracker}: [red]Content must be older than 10 Years to upload at RETROFLIX")
                 return False
         return True
 

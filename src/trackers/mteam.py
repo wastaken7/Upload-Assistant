@@ -317,12 +317,7 @@ class MTeam:
         uuid: str = meta.uuid
         if "upscale" in uuid.lower() and "upscale" not in meta.title:
             logger.info(f"{self.tracker}: Uploading upscaled files created by converting low-bitrate videos to high-bitrate versions might be prohibited.")
-            if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                user_input = await self.common.prompt_user_for_confirmation(f"{self.tracker}: Do you want to continue with the upload? (y/n): ", meta)
-                if not user_input:
-                    return False
-            else:
-                return False
+            should_continue = False
 
         # Screenshots
         if meta.screens < 3:
@@ -338,12 +333,7 @@ class MTeam:
             logger.info(
                 f"{self.tracker}: [bold yellow]LGBT content detected. Please ensure the cover photo does not contain depictions of genitalia per tracker rules.[/bold yellow]"
             )
-            if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                user_input = await self.common.prompt_user_for_confirmation(f"{self.tracker}: Do you want to continue with the upload? (y/n): ", meta)
-                if not user_input:
-                    return False
-            else:
-                return False
+            should_continue = False
 
         return should_continue
 

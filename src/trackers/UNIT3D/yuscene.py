@@ -3,7 +3,6 @@ import re
 from typing import Any
 
 from src.console import logger
-from src.manual_input import confirm_override
 from src.meta import Meta
 from src.trackers.common import Common
 from src.trackers.UNIT3D import UNIT3D
@@ -81,14 +80,14 @@ class YUSCENE(UNIT3D):
         self.common = Common(config)
 
     async def get_additional_checks(self, meta: Meta) -> bool:
+        passed = True
         genres = f"{', '.join(meta.keywords)} {meta.combined_genres}"
         adult_keywords = ["xxx", "erotic", "porn", "adult", "orgy", "hentai", "adult animation", "softcore"]
         if any(re.search(rf"(^|,\s*){re.escape(keyword)}(\s*,|$)", genres, re.IGNORECASE) for keyword in adult_keywords):
             logger.info(f"{self.tracker}: [bold red]Porn/xxx is not allowed at {self.tracker}.[/bold red]")
-            if not await confirm_override(meta):
-                return False
+            passed = False
 
-        return True
+        return passed
 
     async def get_category_id(
         self,

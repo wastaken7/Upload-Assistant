@@ -5,7 +5,6 @@ from typing import Any, cast
 
 from src.console import logger
 from src.get_name import build_name_components
-from src.manual_input import confirm_override
 from src.meta import Meta
 from src.trackers.common import Common
 from src.trackers.naming import BLU_EDITION_TERMS, VideoNameRules, add_incomplete_pack_marker, build_video_name
@@ -116,6 +115,7 @@ class OldToonsWorld(UNIT3D):
         self.common = Common(config)
 
     async def get_additional_checks(self, meta: Meta) -> bool:
+        passed = True
         combined_genres_value = meta.combined_genres
         # Normalize combined_genres to a list of individual genre strings.
         if isinstance(combined_genres_value, list):
@@ -126,8 +126,7 @@ class OldToonsWorld(UNIT3D):
 
         if not any(genre in combined_genres for genre in ["Animation", "Family"]):
             logger.info(f"{self.tracker}: [bold red]Genre does not match Animation or Family for OldToonsWorld.")
-            if not await confirm_override(meta):
-                return False
+            passed = False
 
         keywords = ", ".join(meta.keywords)
         combined_genres_text = ", ".join(combined_genres)
@@ -135,21 +134,18 @@ class OldToonsWorld(UNIT3D):
         adult_keywords = ["xxx", "erotic", "porn", "adult", "orgy", "hentai", "adult animation", "softcore"]
         if any(re.search(rf"(^|,\s*){re.escape(keyword)}(\s*,|$)", genres, re.IGNORECASE) for keyword in adult_keywords):
             logger.info(f"{self.tracker}: [bold red]Adult animation not allowed at OldToonsWorld.")
-            if not await confirm_override(meta):
-                return False
+            passed = False
 
         game_show_keywords = ["reality", "game show", "game-show", "reality tv", "reality television"]
         if any(re.search(rf"(^|,\s*){re.escape(keyword)}(\s*,|$)", genres, re.IGNORECASE) for keyword in game_show_keywords):
             logger.info(f"{self.tracker}: [bold red]Reality / Game Show content not allowed at OldToonsWorld.")
-            if not await confirm_override(meta):
-                return False
+            passed = False
 
         if meta.type not in ["WEBDL"] and not meta.is_disc and meta.tag in ["CMRG", "EVO", "TERMiNAL", "ViSION"]:
             logger.info(f"{self.tracker}: [bold red]Group {meta.tag} is only allowed for raw type content at OldToonsWorld[/bold red]")
-            if not await confirm_override(meta):
-                return False
+            passed = False
 
-        return True
+        return passed
 
     async def get_type_id(self, meta: Meta, type: str | None = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         type_id = {"DISC": "1", "REMUX": "2", "WEBDL": "4", "WEBRIP": "5", "HDTV": "6", "ENCODE": "3", "DVDRIP": "8"}

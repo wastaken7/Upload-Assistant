@@ -3,7 +3,7 @@ from typing import Any, cast
 
 from src.console import logger
 from src.languages import languages_manager
-from src.manual_input import Question, ask, choices_from, confirm_override
+from src.manual_input import Question, ask, choices_from
 from src.meta import Meta
 from src.trackers.common import Common
 from src.trackers.UNIT3D import UNIT3D
@@ -128,6 +128,7 @@ class Torrenteros(UNIT3D):
         return data
 
     async def get_additional_checks(self, meta: Meta) -> bool:
+        passed = True
         if not meta.language_checked:
             await languages_manager.process_desc_language(meta, tracker=self.tracker)
 
@@ -136,7 +137,6 @@ class Torrenteros(UNIT3D):
                 logger.info(f"{self.tracker}: [bold red]requires at least one Spanish audio or subtitle track.")
                 return False
             logger.info(f"{self.tracker}: [yellow]No Spanish audio track found, but Spanish subtitles are present.[/yellow]")
-            if not await confirm_override(meta):
-                return False
+            passed = False
 
-        return True
+        return passed

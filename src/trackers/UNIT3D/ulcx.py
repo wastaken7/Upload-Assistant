@@ -122,8 +122,7 @@ class ULCX(UNIT3D):
             return False
 
         if meta.type and "dvd" in meta.type.lower() and "rip" in meta.type.lower():
-            if not meta.unattended:
-                logger.info(f"{self.tracker}: [bold red]DVDRIPs are not allowed.[/bold red]")
+            logger.info(f"{self.tracker}: [bold red]DVDRIPs are not allowed.[/bold red]")
             return False
 
         # Section 4.3.1.1: Encodes min resolution 720p

@@ -359,6 +359,16 @@ def test_drizzy_wap_is_blocked():
     assert not asyncio.run(_adapter().get_additional_checks(meta))
 
 
+def test_blacklist_does_not_block_an_upload_the_user_approved():
+    # The blacklist only fails the tracker checks; the user decides there whether to continue.
+    meta = Meta(category="MUSIC", debug=True, music_release=_release(artist="Drizzy Wap", artists=["Drizzy Wap"]).to_dict())
+    adapter = Orpheus({"TRACKERS": {"ORPHEUS": {}}})
+
+    assert not asyncio.run(adapter.get_additional_checks(meta))
+    assert asyncio.run(adapter.upload(meta))
+    assert "debug_payload" in meta.tracker_status["ORPHEUS"]
+
+
 def test_analyzer_measures_embedded_artwork_and_id3_in_flac(tmp_path):
     flac = tmp_path / "id3.flac"
     flac.write_bytes(b"ID3" + b"\x00" * 200)

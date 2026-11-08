@@ -243,8 +243,7 @@ class HawkeUno(UNIT3D):
                             logger.debug(f"{self.tracker}: Found CRF value: {crf_match.group(1)}")
                             crf_value = float(crf_match.group(1))
                             if crf_value > 22:
-                                if not meta.unattended:
-                                    logger.info(f"{self.tracker}: CRF value too high: {crf_value} for HawkeUno")
+                                logger.info(f"{self.tracker}: CRF value too high: {crf_value} for HawkeUno")
                                 return False
                         else:
                             logger.debug(f"{self.tracker}: No CRF value found in encoding settings.")
@@ -259,8 +258,7 @@ class HawkeUno(UNIT3D):
                                     bit_rate_kbps = bit_rate_num / 1000
 
                                     if bit_rate_kbps < 3000:
-                                        if not meta.unattended:
-                                            logger.info(f"{self.tracker}: Video bitrate too low: {bit_rate_kbps:.0f} kbps for HawkeUno")
+                                        logger.info(f"{self.tracker}: Video bitrate too low: {bit_rate_kbps:.0f} kbps for HawkeUno")
                                         return False
 
         return should_continue
