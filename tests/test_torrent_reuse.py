@@ -24,8 +24,13 @@ async def test_macos_sidecar_does_not_change_single_file_torrent_layout(tmp_path
     (release / f"._{video.name}").write_bytes(b"macOS metadata")
     _, filelist = await VideoManager().get_video(str(release))
     meta = Meta(
-        base_dir=str(tmp_path), uuid=release.name, path=str(release),
-        filelist=filelist, category="MOVIE", isdir=True, mkbrr=False,
+        base_dir=str(tmp_path),
+        uuid=release.name,
+        path=str(release),
+        filelist=filelist,
+        category="MOVIE",
+        isdir=True,
+        mkbrr=False,
     )
 
     torrent_path = await TorrentCreator.create_torrent(meta, str(release), "BASE")
@@ -135,10 +140,19 @@ async def test_disc_rehash_filters_metadata_and_keeps_subtitles_separate(tmp_pat
     binary.write_bytes(b"mock binary")
     monkeypatch.setattr(TorrentCreator, "get_mkbrr_path", staticmethod(lambda _meta: str(binary)))
     meta = Meta(
-        base_dir=str(tmp_path), uuid="disc-sidecars", path=str(release),
-        filelist=[str(video), *map(str, subtitles)], subtitle_files=list(map(str, subtitles)),
-        category="MOVIE", isdir=True, is_disc="DVD", rehash=True,
-        keep_folder=keep_folder, mkbrr=backend != "torf", mkbrr_threads="0", trackers=["TEST"],
+        base_dir=str(tmp_path),
+        uuid="disc-sidecars",
+        path=str(release),
+        filelist=[str(video), *map(str, subtitles)],
+        subtitle_files=list(map(str, subtitles)),
+        category="MOVIE",
+        isdir=True,
+        is_disc="DVD",
+        rehash=True,
+        keep_folder=keep_folder,
+        mkbrr=backend != "torf",
+        mkbrr_threads="0",
+        trackers=["TEST"],
     )
 
     await TorrentCreator.rehash_torrents(meta)
@@ -261,7 +275,8 @@ def test_metadata_keeps_properties_lookup_for_explicit_infohash():
 @pytest.mark.parametrize("file_input", [False, True])
 @pytest.mark.parametrize("keep_folder", [False, True])
 @pytest.mark.parametrize("brackets", [False, True])
-async def test_base_subs_contains_external_subtitle_with_custom_torrent(tmp_path, file_input, keep_folder, brackets):
+@pytest.mark.parametrize("category", ["MOVIE", ""])
+async def test_base_subs_contains_external_subtitle_with_custom_torrent(tmp_path, file_input, keep_folder, brackets, category):
     release = tmp_path / ("Fictional.Movie.[2025]" if brackets else "Fictional.Movie.2025")
     release.mkdir()
     video = release / ("release.[GROUP].mkv" if brackets else "release.mkv")
@@ -277,7 +292,8 @@ async def test_base_subs_contains_external_subtitle_with_custom_torrent(tmp_path
             "path": str(video if file_input else release),
             "filelist": [str(video)],
             "subtitle_files": [str(subtitle)],
-            "category": "MOVIE",
+            # The early base-torrent task runs before MOVIE/TV is detected.
+            "category": category,
             "isdir": not file_input,
             "is_disc": "",
             "keep_folder": keep_folder,
@@ -336,7 +352,8 @@ async def test_base_subs_excludes_unselected_subtitles(tmp_path, file_input):
 @pytest.mark.parametrize("output_filename", ["BASE", "BASE_SUBS"])
 @pytest.mark.parametrize("nested", [False, True])
 @pytest.mark.parametrize("keep_folder", [False, True])
-async def test_season_pack_excludes_unselected_files(tmp_path, output_filename, nested, keep_folder):
+@pytest.mark.parametrize("category", ["TV", ""])
+async def test_season_pack_excludes_unselected_files(tmp_path, output_filename, nested, keep_folder, category):
     release = tmp_path / "Fictional.Show.[2025]"
     videos = [release / "S01" / "episode.mkv", release / "S02" / "episode.mkv"] if nested else [release / "E01.mkv", release / "E02.mkv"]
     subtitle = videos[0].with_suffix(".pt-BR.srt")
@@ -356,7 +373,7 @@ async def test_season_pack_excludes_unselected_files(tmp_path, output_filename, 
         path=str(release),
         filelist=[str(file) for file in videos],
         subtitle_files=[str(subtitle)],
-        category="TV",
+        category=category,
         isdir=True,
         tv_pack=True,
         keep_folder=keep_folder,
@@ -375,6 +392,7 @@ async def test_season_pack_excludes_unselected_files(tmp_path, output_filename, 
     assert sorted(file.as_posix() for file in torrent.files) == sorted(  # noqa: S101
         (release.name + "/" + file.relative_to(release).as_posix()) for file in expected_files
     )
+    meta.category = "TV"  # detected by the time the client validates the torrent
     valid, _ = await Clients({}).is_valid_torrent(meta, str(torrent_path), torrent.infohash, "qbit", {})
     assert valid  # noqa: S101
 
@@ -400,9 +418,18 @@ async def test_symlinked_season_pack_preserves_release_layout(tmp_path, output_f
             pytest.skip("Creating symlinks is unavailable")
     (release / "cover.jpg").write_bytes(b"unselected artwork")
     meta = Meta(
-        base_dir=str(tmp_path), uuid=release.name, path=str(release),
-        category="TV", isdir=True, tv_pack=True, keep_folder=keep_folder,
-        mkbrr=False, max_piece_size=1, trackers=[], edit=True, resolution="1080p",
+        base_dir=str(tmp_path),
+        uuid=release.name,
+        path=str(release),
+        category="TV",
+        isdir=True,
+        tv_pack=True,
+        keep_folder=keep_folder,
+        mkbrr=False,
+        max_piece_size=1,
+        trackers=[],
+        edit=True,
+        resolution="1080p",
     )
     prep = SimpleNamespace(
         scene_manager=SimpleNamespace(is_scene=AsyncMock(return_value=(str(videos[0]), False, 0))),
@@ -416,9 +443,7 @@ async def test_symlinked_season_pack_preserves_release_layout(tmp_path, output_f
     torrent_path = await TorrentCreator.create_torrent(meta, str(release), output_filename)
     torrent = Torrent.read(torrent_path)
     expected = [*videos, subtitle] if output_filename == "BASE_SUBS" else videos
-    assert sorted(file.as_posix() for file in torrent.files) == sorted(
-        f"{release.name}/{file.relative_to(release).as_posix()}" for file in expected
-    )
+    assert sorted(file.as_posix() for file in torrent.files) == sorted(f"{release.name}/{file.relative_to(release).as_posix()}" for file in expected)
     clients = Clients({})
     valid, _ = await clients.is_valid_torrent(meta, str(torrent_path), torrent.infohash, "qbit", {})
     assert valid

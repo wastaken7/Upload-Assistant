@@ -259,7 +259,12 @@ class TorrentCreator:
                 if is_subs and Path(path).is_file():
                     path = Path(path).parent
 
-                if meta.category not in ("MOVIE", "TV"):
+                # MOVIE and TV are detected only after the early base-torrent
+                # task starts, while every other category is set before it, so
+                # an unset category is a video release.
+                is_video = str(meta.category or "").upper() in ("", "MOVIE", "TV")
+
+                if not is_video:
                     # Music releases always keep their folder, including
                     # one-track singles (e.g. Orpheus rejects folderless music).
                     if meta.isdir and len(meta.filelist) == 1 and not meta.keep_folder and meta.category != "MUSIC":
@@ -355,7 +360,7 @@ class TorrentCreator:
                         if meta.mkbrr_threads != "0":
                             cmd.extend(["--workers", str(meta.mkbrr_threads)])
 
-                        if not meta.is_disc and meta.category in ("MOVIE", "TV"):
+                        if not meta.is_disc and is_video:
                             exclude_str = cls.build_mkbrr_exclude_string(str(path), creation_filelist, allow_subs=is_subs)
                             cmd.extend(["--exclude", exclude_str])
                         elif meta.is_disc:
