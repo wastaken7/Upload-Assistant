@@ -8,15 +8,11 @@
 
 Upload Assistant collects metadata, generates screenshots and artwork, creates torrent or NZB files, and publishes releases to the destinations you choose. Use it through a browser interface (WebUI) or the command line (CLI).
 
-<img width="3840" height="2160" alt="1" src="https://github.com/user-attachments/assets/b375a324-2925-4e70-90e6-136881099b3e" />
+<img width="1920" height="1080" alt="Upload Interface" src="https://github.com/user-attachments/assets/d0ac719b-632d-4935-aad7-34fa66f7bca7" />
 
 ---
 
-<img width="5760" height="3240" alt="2" src="https://github.com/user-attachments/assets/613b35a6-1523-431a-8a55-3884f5db48d4" />
-
----
-
-<img width="5739" height="4143" alt="3" src="https://github.com/user-attachments/assets/9164de0f-7901-4a1b-a567-10f97f3cf33b" />
+<img width="1920" height="1350" alt="Statistics Interface" src="https://github.com/user-attachments/assets/1f6c350d-3400-441f-8a42-39dbdfaafac6" />
 
 ---
 
