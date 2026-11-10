@@ -1,3 +1,4 @@
+# ruff: noqa: S101
 """Regression tests for Zenith-specific names."""
 
 import asyncio
@@ -122,3 +123,19 @@ def test_zenith_game_type_uses_platform():
     assert asyncio.run(tracker.get_type_id(Meta(category="GAME", console_game=True))) == {"type_id": "18"}
     assert asyncio.run(tracker.get_type_id(Meta(category="GAME", platform="Windows"))) == {"type_id": "17"}
     assert asyncio.run(tracker.get_type_id(Meta(category="GAME"))) == {"type_id": "16"}
+
+
+def test_zenith_description_disables_pack_multi_screens(monkeypatch):
+    captured = {}
+
+    async def fake_generator(self, meta, **_kwargs):
+        captured["multiScreens"] = self._get_int_config("multiScreens", 2, meta)
+        return ""
+
+    monkeypatch.setattr("src.get_desc.DescriptionBuilder.general_description_generator", fake_generator)
+    config = {"DEFAULT": {"multiScreens": "2"}, "TRACKERS": {"ZENITH": {"multiScreens": "4"}}}
+
+    asyncio.run(Zenith(config).get_description(Meta(category="TV")))
+
+    assert captured["multiScreens"] == 0
+    assert config["TRACKERS"]["ZENITH"]["multiScreens"] == "4"
