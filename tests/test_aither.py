@@ -229,6 +229,12 @@ def test_aither_honors_manual_year_for_tv() -> None:
     assert _name(_tv(manual_year=2015)) == "Synthetic Show 2015 S01 1080p NF WEB-DL DD+ 5.1 H.264-TESTGROUP"
 
 
+def test_aither_ignores_sonarr_year_when_tvdb_name_has_none() -> None:
+    meta = _tv(arr_year=2025, search_year="2025", year=2025, tvdb_episode_data={"series_name": "Synthetic Show"})
+
+    assert _name(meta) == "Synthetic Show S01 1080p NF WEB-DL DD+ 5.1 H.264-TESTGROUP"
+
+
 def test_aither_places_language_before_cut() -> None:
     meta = _movie(edition="Extended", repack="REPACK", audio_languages=["Japanese"], original_language="ja")
 
@@ -374,7 +380,7 @@ def _find_reports(monkeypatch: pytest.MonkeyPatch, pages: list[object]) -> tuple
         def __init__(self, **_kwargs: object) -> None:
             pass
 
-        async def __aenter__(self) -> "Client":
+        async def __aenter__(self) -> Client:
             return self
 
         async def __aexit__(self, *_args: object) -> None:
