@@ -44,7 +44,7 @@ class ComparisonManager:
                         raise ValueError("Invalid comparison data format: must be a dict of dicts")
                     saved_comparison_data = cast(ComparisonData, raw_dict)
                 elif isinstance(raw_data, list):
-                    raw_list = raw_data
+                    raw_list = cast(list[object], raw_data)
                     if not all(isinstance(item, dict) for item in raw_list):
                         raise ValueError("Invalid comparison data format: must be a list of dicts")
                     saved_comparison_data = cast(list[ComparisonGroup], raw_list)
@@ -131,7 +131,7 @@ class ComparisonManager:
 
             group = sorted(groups[second], key=lambda x: x[0])
             group_files: list[str] = [f for _, f in group]
-            custom_img_list: list[str] = [Path(comparison_path) / filename for filename in group_files]
+            custom_img_list: list[Path] = [Path(comparison_path) / filename for filename in group_files]
             upload_meta = self.meta.copy()
             logger.info(f"[cyan]Uploading comparison group {second} with files: {group_files}")
 

@@ -4,20 +4,28 @@ import json
 import re
 from functools import cache
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeIs
 
 _CATALOG_DIR = Path(__file__).resolve().parent.parent / "data" / "unit3d_catalogs"
 
 COMPACT_SECTIONS = ("regions", "distributors")
 
 
+def _is_obj_dict(val: object) -> TypeIs[dict[object, object]]:
+    return isinstance(val, dict)
+
+
 def expand_catalog_section(catalog: dict[str, Any], default: dict[str, Any], section: str) -> dict[str, str]:
     """Expand only the explicitly referenced default IDs, then apply differences."""
     entries: dict[str, str] = {}
     baseline = default.get(section, {})
-    references = catalog.get("default_ids", {}).get(section, [])
-    if not isinstance(references, list):
+    default_ids_obj: object = catalog.get("default_ids")
+    references_raw: object = []
+    if _is_obj_dict(default_ids_obj):
+        references_raw = default_ids_obj.get(section, [])
+    if not isinstance(references_raw, list):
         raise ValueError(f"default_ids.{section} must be a list")
+    references: list[object] = list(references_raw)
     for reference in references:
         match = re.fullmatch(r"([1-9]\d*)(?:-([1-9]\d*))?", str(reference))
         if not match:

@@ -111,7 +111,7 @@ def overlay_filters(defaults: Mapping[str, Any], meta: Any, seek_time: str | flo
     if fontfile:
         escaped_font = fontfile.replace("\\", "/").replace(":", "\\:").replace("'", "'\\\\\\''")
         font_setting = f":fontfile='{escaped_font}'"
-    filters = []
+    filters: list[str] = []
     for index, line in enumerate(lines):
         escaped = line.replace(":", "\\:")
         filters.append(

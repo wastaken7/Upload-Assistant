@@ -83,7 +83,7 @@ def main() -> int:
         print(f"Error: {error}", file=sys.stderr)
         return 1
 
-    catalog = {"source": TAGS_URL, "updated": datetime.now(UTC).date().isoformat(), "tags": tags}
+    catalog: dict[str, Any] = {"source": TAGS_URL, "updated": datetime.now(UTC).date().isoformat(), "tags": tags}
     temporary = args.output.with_suffix(".tmp")
     temporary.write_text(json.dumps(catalog, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     temporary.replace(args.output)

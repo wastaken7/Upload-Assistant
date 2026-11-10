@@ -367,13 +367,14 @@ class Wait:
                     if self.qbt_client is None:
                         logger.info("[bold red]qbt_client is not initialized")
                         return False
-                    torrent_list_raw = cast(Any, self.qbt_client.torrents_info(hashes=torrent_hash))
+                    torrent_list_raw: object = self.qbt_client.torrents_info(hashes=torrent_hash)
                     if torrent_list_raw is None:
                         raise Exception("qBittorrent returned no torrent info")
+                    torrent_candidates: list[Any]
                     if isinstance(torrent_list_raw, list):
-                        torrent_candidates = torrent_list_raw
+                        torrent_candidates = cast(list[Any], torrent_list_raw)
                     elif isinstance(torrent_list_raw, tuple):
-                        torrent_candidates = list(torrent_list_raw)
+                        torrent_candidates = list(cast(tuple[Any, ...], torrent_list_raw))
                     else:
                         torrent_candidates = [torrent_list_raw]
                     if not torrent_candidates:
@@ -421,13 +422,13 @@ class Wait:
                 if self.qbt_client is None:
                     logger.info("[bold red]qbt_client is not initialized")
                     return False
-                torrent_list_raw = cast(Any, self.qbt_client.torrents_info(hashes=torrent_hash))
+                torrent_list_raw = self.qbt_client.torrents_info(hashes=torrent_hash)
                 if torrent_list_raw is None:
                     raise Exception("qBittorrent returned no torrent info")
                 if isinstance(torrent_list_raw, list):
-                    torrent_candidates = torrent_list_raw
+                    torrent_candidates = cast(list[Any], torrent_list_raw)
                 elif isinstance(torrent_list_raw, tuple):
-                    torrent_candidates = list(torrent_list_raw)
+                    torrent_candidates = list(cast(tuple[Any, ...], torrent_list_raw))
                 else:
                     torrent_candidates = [torrent_list_raw]
                 if not torrent_candidates:

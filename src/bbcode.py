@@ -530,7 +530,7 @@ class BBCODE:
             spoiler_placeholders.append(spoilers[i])
 
         # Get Images from [img] tags, checking if they're wrapped in [url] tags
-        imagelist: list[dict[str, Any]] = []
+        imagelist: list[dict[str, str]] = []
 
         # First, find images wrapped in URL tags: [url=web_url][img]img_url[/img][/url]
         url_img_pattern = r"\[url=(https?://[^\]]+)\]\[img[^\]]*\](.*?)\[/img\]\[/url\]"

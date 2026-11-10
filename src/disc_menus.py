@@ -11,7 +11,7 @@ from PIL import Image
 
 from src.binaries import configured_binary
 from src.console import logger
-from src.mediainfo import MediaInfo
+from src.mediainfo import MediaInfo, MediaInfoTrack
 from src.meta import Meta
 from src.stats import record_event_async
 from src.takescreens import screenshot_par_scale_factors, should_scale_dvd_screenshots_for_par
@@ -19,7 +19,7 @@ from src.temp_paths import menu_screenshots_dir
 from src.uploadscreens import UploadScreensManager
 
 
-def select_evenly_spaced(items: list[Any], num_to_select: int) -> list[Any]:
+def select_evenly_spaced[T](items: list[T], num_to_select: int) -> list[T]:
     if len(items) <= num_to_select:
         return items
     if num_to_select <= 0:
@@ -95,15 +95,15 @@ class DiscMenus:
             max_menu_screens = int(default_section.get("max_menu_screens", 6))
         except ValueError, TypeError:
             max_menu_screens = 6
-        screenshot_config = cast(Mapping[str, Any], default_section) if isinstance(default_section, Mapping) else {}
+        screenshot_config: Mapping[str, Any] = cast(Mapping[str, Any], default_section) if isinstance(default_section, Mapping) else {}
         scale_for_par = should_scale_dvd_screenshots_for_par(screenshot_config)
 
-        captured_images = []
+        captured_images: list[str] = []
         output_dir = menu_screenshots_dir(meta.base_dir, meta.uuid)
 
         # Get ffmpeg path
         configured_ffmpeg = configured_binary("ffmpeg_path", self.config)
-        ffmpeg_path = configured_ffmpeg or "ffmpeg"
+        ffmpeg_path: str | Path = configured_ffmpeg or "ffmpeg"
         if configured_ffmpeg is None and platform.system() == "Linux":
             ff_bin_dir = Path(meta.base_dir) / "bin" / "ffmpeg"
             machine = platform.machine().lower()
@@ -132,7 +132,7 @@ class DiscMenus:
                 continue
 
             # List and filter menu files
-            menu_files = []
+            menu_files: list[tuple[str, Path]] = []
             try:
                 for file in (p.name for p in Path(disc_path).iterdir()):
                     file_lower = file.lower()
@@ -152,11 +152,12 @@ class DiscMenus:
             for file, file_path in menu_files:
                 try:
                     mi = MediaInfo.parse(file_path)
-                    video_track = None
-                    for track in mi.tracks:
-                        if track.track_type == "Video":
-                            video_track = track
-                            break
+                    video_track: MediaInfoTrack | None = None
+                    if not isinstance(mi, str):
+                        for track in mi.tracks:
+                            if track.track_type == "Video":
+                                video_track = track
+                                break
                     if not video_track:
                         logger.debug(f"Skipping {file} because it does not have a video track.")
                         continue
@@ -179,7 +180,7 @@ class DiscMenus:
                     with contextlib.suppress(ValueError, TypeError):
                         duration_sec = float(duration_ms) / 1000.0
 
-                vf_filters = []
+                vf_filters: list[str] = []
                 if duration_sec < 2.0:
                     vf_filters.append("mpdecimate")
 
@@ -201,13 +202,27 @@ class DiscMenus:
                 if duration_sec < 2.0:
                     # Static menu: extract all distinct frames up to a safety limit
                     limit = max(10, max_menu_screens)
-                    cmd = [ffmpeg_path, "-y", "-t", "5.0", "-i", str(file_path), "-vf", vf_chain, "-fps_mode", "passthrough", "-vframes", str(limit), str(image_pattern)]
+                    cmd: list[str] = [
+                        str(ffmpeg_path),
+                        "-y",
+                        "-t",
+                        "5.0",
+                        "-i",
+                        str(file_path),
+                        "-vf",
+                        vf_chain,
+                        "-fps_mode",
+                        "passthrough",
+                        "-vframes",
+                        str(limit),
+                        str(image_pattern),
+                    ]
                     logger.info(f"Extracting static menu frames from {file} (limit: {limit})...")
                 else:
                     # Motion menu: try scene detection first
                     limit = max(30, max_menu_screens * 3)
                     scene_vf_chain = ",".join(["select='gt(scene,0.25)'", *vf_filters])
-                    cmd = [ffmpeg_path, "-y", "-i", str(file_path), "-vf", scene_vf_chain, "-fps_mode", "vfr", "-vframes", str(limit), str(image_pattern)]
+                    cmd = [str(ffmpeg_path), "-y", "-i", str(file_path), "-vf", scene_vf_chain, "-fps_mode", "vfr", "-vframes", str(limit), str(image_pattern)]
                     logger.info(f"Extracting motion menu frames via scene detection from {file} (limit: {limit})...")
 
                 logger.debug(f"FFmpeg command: {' '.join(cmd)}")
@@ -230,7 +245,7 @@ class DiscMenus:
                         discard_previous_menu_capture_files(image_pattern)
 
                     # Filter out blank/black frames
-                    valid_images = []
+                    valid_images: list[str] = []
                     for img_path in found_images:
                         try:
                             with Image.open(img_path) as img:
@@ -249,8 +264,8 @@ class DiscMenus:
                     if duration_sec >= 2.0 and not found_images:
                         logger.info(f"Scene detection returned no valid frames for {file}. Falling back to interval sampling...")
                         fallback_vf_chain = ",".join(["fps=1/5", *vf_filters])
-                        cmd_fallback = [
-                            ffmpeg_path,
+                        cmd_fallback: list[str] = [
+                            str(ffmpeg_path),
                             "-y",
                             "-ss",
                             "2.0",
@@ -298,7 +313,7 @@ class DiscMenus:
                     if not found_images and duration_sec >= 2.0:
                         logger.debug(f"FFmpeg fallback/scene detection failed for {file}. Retrying from start (seek_time=0).")
                         image_path = Path(output_dir) / f"{sanitized_disc_name}-{vob_base}-001.png"
-                        cmd_retry = [ffmpeg_path, "-y", "-i", str(file_path), "-vframes", "1", "-vf", vf_chain, "-update", "1", str(image_path)]
+                        cmd_retry: list[str] = [str(ffmpeg_path), "-y", "-i", str(file_path), "-vframes", "1", "-vf", vf_chain, "-update", "1", str(image_path)]
                         process_retry = await asyncio.create_subprocess_exec(*cmd_retry, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
                         try:
                             await asyncio.wait_for(process_retry.communicate(), timeout=15.0)

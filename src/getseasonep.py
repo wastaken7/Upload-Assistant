@@ -5,7 +5,7 @@ import sys
 from collections.abc import Callable, Mapping
 from difflib import SequenceMatcher
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, TypeIs, cast
 
 import anitopy
 import cli_ui
@@ -22,6 +22,10 @@ from src.tvdb import TvdbData
 
 guessit_module: Any = cast(Any, guessit)
 GuessitFn = Callable[[str, dict[str, Any] | None], dict[str, Any]]
+
+
+def _is_obj_list(value: object) -> TypeIs[list[Any]]:
+    return isinstance(value, list)
 
 
 def guessit_fn(value: str, options: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -103,7 +107,7 @@ class SeasonEpisodeManager:
                 if len(filelist) == 1:
                     guess_data = _guessit_data(video)
                     episodes = guess_data.get("episode")
-                    if isinstance(episodes, list):
+                    if _is_obj_list(episodes):
                         episode = "".join(f"E{str(item).zfill(2)}" for item in episodes)
                         episode_int = _safe_int(episodes[0], 0) if episodes else 0
                     else:
@@ -164,9 +168,9 @@ class SeasonEpisodeManager:
                         try:
                             guess_data = _guessit_data(video)
                             episodes = parsed.get("episode_number", guess_data.get("episode", "1"))
-                            if not isinstance(episodes, list) and not str(episodes).isnumeric():
+                            if not _is_obj_list(episodes) and not str(episodes).isnumeric():
                                 episodes = guess_data.get("episode")
-                            if isinstance(episodes, list):
+                            if _is_obj_list(episodes):
                                 episodes_list = episodes
                                 episode_int = _safe_int(episodes_list[0], 1) if episodes_list else 1
                                 episode = "".join([f"E{str(_safe_int(item, 0)).zfill(2)}" for item in episodes_list])
@@ -535,7 +539,7 @@ class SeasonEpisodeManager:
         # Check if all files have the same group tag
         consistent_tags = len(tags_found) <= 1
 
-        result = {
+        result: dict[str, Any] = {
             "complete": is_complete,
             "missing_episodes": sorted(missing_episodes),
             "unexpected_episodes": sorted(unexpected_episodes),

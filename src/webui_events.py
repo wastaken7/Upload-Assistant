@@ -28,7 +28,10 @@ from collections.abc import Callable, Generator, Iterable, Mapping
 from datetime import date, datetime
 from pathlib import Path
 from threading import Lock
-from typing import Any, Literal, cast
+from typing import TYPE_CHECKING, Any, Literal, TypeIs, cast
+
+if TYPE_CHECKING:
+    from src.meta import Meta
 
 GUI_EVENT_STDOUT_PREFIX = "UA_GUI_EVENT_JSON:"
 GUI_EVENTS_ENV = "UA_WEBUI_GUI_EVENTS"
@@ -58,6 +61,12 @@ type TrackerStatus = Literal["pending", "success", "failed", "skipped", "dupe", 
 
 _stdout_lock = Lock()
 _prompt_ids = itertools.count(1)
+
+
+def _is_obj_tuple(val: object) -> TypeIs[tuple[object, ...]]:
+    return isinstance(val, tuple)
+
+
 _current_item: dict[str, Any] | None = None
 _active_stage: str | None = None
 # Stages started for the current item, so the final tracker summary knows whether uploading ran.
@@ -173,7 +182,7 @@ def begin_item(path: str, index: int, total: int) -> None:
     _emit("item", _current_item)
 
 
-def _item_artwork(meta: Mapping[str, Any]) -> dict[str, str]:
+def _item_artwork(meta: Mapping[str, Any] | Meta) -> dict[str, str]:
     """Return the release cover as a public URL or a local image file.
 
     A local ``artwork_file`` is never shown to the browser: the server swaps
@@ -194,7 +203,7 @@ def _item_artwork(meta: Mapping[str, Any]) -> dict[str, str]:
     return {}
 
 
-def update_item(*, personal_release: bool | None = None, run_options: Mapping[str, Any] | None = None, artwork: Mapping[str, Any] | None = None) -> None:
+def update_item(*, personal_release: bool | None = None, run_options: Mapping[str, Any] | Meta | None = None, artwork: Mapping[str, Any] | Meta | None = None) -> None:
     """Publish resolved release flags, bounded run settings and the release cover."""
     global _current_item
     if not enabled() or _current_item is None:
@@ -521,7 +530,7 @@ def _context_payload() -> dict[str, Any] | None:
             items = cast(list[Any], value)[:MAX_LIST_ITEMS]
             payload[name] = [
                 [plain_text(part, 300, markup=False) for part in item]
-                if isinstance(item, tuple)
+                if _is_obj_tuple(item)
                 # Option details are already plain and bounded by numbered_options.
                 else dict(cast(Mapping[str, Any], item))
                 if isinstance(item, Mapping)

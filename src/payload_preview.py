@@ -143,11 +143,12 @@ def choice(label: str, options: Mapping[Any, Any] | Iterable[Any], *, by_label: 
 
     Labels that share one value (for example 1080p and 1440p) become one option.
     """
+    pairs: list[tuple[Any, Any]]
     if isinstance(options, Mapping):
         mapping = cast(Mapping[Any, Any], options)
         pairs = [(value, name) for name, value in mapping.items()] if by_label else list(mapping.items())
     else:
-        pairs = [item if isinstance(item, tuple) else (item, item) for item in cast(Iterable[Any], options)]
+        pairs = [cast(tuple[Any, Any], item) if isinstance(item, tuple) else (item, item) for item in cast(Iterable[Any], options)]
     grouped: dict[str, tuple[Any, list[str]]] = {}
     for value, name in pairs:
         if value is None or isinstance(value, (dict, list)):
@@ -314,7 +315,7 @@ class PayloadField:
 class TrackerPreview:
     tracker: str
     name: str | None
-    fields: list[PayloadField] = field(default_factory=list)
+    fields: list[PayloadField] = field(default_factory=list[PayloadField])
 
     def find(self, key: str) -> PayloadField | None:
         return next((item for item in self.fields if item.key == key), None)

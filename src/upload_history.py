@@ -24,12 +24,17 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from hashlib import sha256
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, TypeIs, cast
 
 from src import webui_events
 from src.app_db import connect as connect_app_db
 from src.app_db import database_available, database_path
 from src.console import logger
+
+
+def _is_str_dict(val: object) -> TypeIs[dict[str, Any]]:
+    return isinstance(val, dict)
+
 
 # Files below this size (NFOs, checksums, small artwork) change without the
 # release changing, so they are left out of the fingerprint when larger ones exist.
@@ -260,10 +265,11 @@ def _tracker_link(status: Mapping[str, Any], tracker_class: Any) -> str:
     return link
 
 
-def _usenet_row(meta: Any, upload_started: bool) -> dict[str, Any] | None:
+def _usenet_row(meta: object, upload_started: bool) -> dict[str, Any] | None:
     """Return the result of an NNTP post the run asked for, which has no tracker status of its own."""
-    trackers = getattr(meta, "trackers", None) or []
-    requested = bool(getattr(meta, "usenet", False)) or "USENET" in {_tracker_key(tracker) for tracker in trackers if isinstance(tracker, str)}
+    trackers_raw: object = getattr(meta, "trackers", None)
+    trackers: list[object] = list(trackers_raw) if isinstance(trackers_raw, (list, tuple, set)) else []
+    requested = bool(getattr(meta, "usenet", False)) or "USENET" in {_tracker_key(str(tracker)) for tracker in trackers if isinstance(tracker, str)}
     if not requested:
         return None
     posted = bool(getattr(meta, "nzb_path", None))
@@ -580,8 +586,8 @@ def _read_memory(fingerprint: str, state_dir: str | Path | None = None) -> dict[
     answers = _loads(row[2])
     return {
         "category": str(row[0] or ""),
-        "ids": {str(key): str(value) for key, value in ids.items() if value} if isinstance(ids, dict) else {},
-        "answers": answers if isinstance(answers, dict) else {},
+        "ids": {str(key): str(value) for key, value in ids.items() if value} if _is_str_dict(ids) else {},
+        "answers": answers if _is_str_dict(answers) else {},
     }
 
 
@@ -714,7 +720,7 @@ def _trusted_ids(meta: Any) -> dict[str, str] | None:
     for example by a tracker check, is only trusted once an upload used it.
     """
     statuses = getattr(meta, "tracker_status", {})
-    if isinstance(statuses, Mapping) and any(isinstance(status, Mapping) and status.get("upload_success") is True for status in cast(Mapping[str, Any], statuses).values()):
+    if isinstance(statuses, Mapping) and any(_is_str_dict(status) and status.get("upload_success") is True for status in cast(Mapping[str, Any], statuses).values()):
         return external_ids(meta)
     if getattr(meta, "ids_confirmed", False) is True:
         return dict(getattr(meta, "confirmed_ids", {}) or {})
@@ -1024,7 +1030,7 @@ def list_items(
     # Outcome counts ignore the outcome filter itself, so every chip keeps its number.
     base_where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
     page_clauses = [*clauses, "outcome = ?"] if outcome else clauses
-    page_parameters = [*parameters, outcome] if outcome else parameters
+    page_parameters: list[object] = [*parameters, outcome] if outcome else parameters
     page_where = f"WHERE {' AND '.join(page_clauses)}" if page_clauses else ""
     with closing(connect_app_db(path)) as db:
         for row_outcome, count in db.execute(f"SELECT outcome, COUNT(*) FROM history_items {base_where} GROUP BY outcome", parameters):  # noqa: S608
@@ -1253,7 +1259,7 @@ def export_csv(items: list[dict[str, Any]]) -> str:
     writer = csv.writer(buffer, lineterminator="\n")
     writer.writerow(EXPORT_CSV_COLUMNS)
     for item in items:
-        flattened = {
+        flattened: dict[str, Any] = {
             **item,
             "ids": "; ".join(f"{provider}={value}" for provider, value in item["ids"].items()),
             "trackers": "; ".join(f"{tracker['tracker']}={tracker['status']}" for tracker in item["trackers"]),

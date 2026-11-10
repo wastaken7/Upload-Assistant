@@ -2,7 +2,7 @@
 import asyncio
 import re
 from collections.abc import Awaitable
-from typing import Any, cast
+from typing import Any, TypeIs, cast
 
 import httpx
 from bs4 import BeautifulSoup
@@ -16,6 +16,14 @@ from src.tvdb import TvdbData
 from src.tvmaze import tvmaze_manager
 
 
+def _is_str_dict(val: object) -> TypeIs[dict[str, Any]]:
+    return isinstance(val, dict)
+
+
+def _is_obj_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
+
+
 def _coerce_int(value: Any) -> int | None:
     try:
         return int(value)
@@ -23,16 +31,16 @@ def _coerce_int(value: Any) -> int | None:
         return None
 
 
-def _apply_tvdb_series_metadata(meta: Meta, episodes_data: Any, series_name: Any = None) -> None:
+def _apply_tvdb_series_metadata(meta: Meta, episodes_data: object, series_name: str | None = None) -> None:
     if meta.original_language == "en":
         return
 
     if series_name:
         meta.tvdb_series_name = series_name
-    if isinstance(episodes_data, dict):
+    if _is_str_dict(episodes_data):
         series_title = episodes_data.get("series_title")
         if series_title and not meta.tvdb_series_name:
-            meta.tvdb_series_name = series_title
+            meta.tvdb_series_name = str(series_title)
         series_year = episodes_data.get("series_year")
         if isinstance(series_year, (str, int)) and re.fullmatch(r"19\d\d|20[0-3]\d", str(series_year)):
             meta.tvdb_series_year = int(series_year)
@@ -231,15 +239,14 @@ async def all_ids(meta: Meta, tvdb_handler: Any, tmdb_manager: TmdbManager) -> M
             elif isinstance(tmdb_episode_data, Exception):
                 logger.info(f"[yellow]TMDb episode data retrieval failed: {tmdb_episode_data}")
 
-    elif meta.category == "TV" and meta.tv_pack and "season_int" in meta:
+    elif meta.category == "TV" and meta.tv_pack and "season_int" in meta and tmdb_task_idx is not None:
         # Process TMDb season data for TV packs
-        if tmdb_task_idx is not None:
-            tmdb_season_data = results[tmdb_task_idx]
-            if not isinstance(tmdb_season_data, Exception) and tmdb_season_data:
-                meta.tmdb_season_data = tmdb_season_data
-                meta.we_checked_tmdb = True
-            elif isinstance(tmdb_season_data, Exception):
-                logger.info(f"[yellow]TMDb season data retrieval failed: {tmdb_season_data}[/yellow]")
+        tmdb_season_data = results[tmdb_task_idx]
+        if not isinstance(tmdb_season_data, Exception) and tmdb_season_data:
+            meta.tmdb_season_data = tmdb_season_data
+            meta.we_checked_tmdb = True
+        elif isinstance(tmdb_season_data, Exception):
+            logger.info(f"[yellow]TMDb season data retrieval failed: {tmdb_season_data}[/yellow]")
 
     return meta
 
@@ -682,9 +689,10 @@ async def get_tvmaze_tvdb(
             logger.info(f"[yellow]TVDb lookup failed: {tvdb_result}[/yellow]")
             tvdb = 0
         elif isinstance(tvdb_result, tuple) and len(tvdb_result) == 2:
-            tvdb_id, tvdb_name = tvdb_result
-            tvdb = tvdb_id if tvdb_id is not None else 0
-            tvdb_name = tvdb_name if isinstance(tvdb_name, str) else ""
+            raw_id, raw_name = cast(tuple[object, object], tvdb_result)
+            coerced_id = _coerce_int(raw_id)
+            tvdb = coerced_id if coerced_id is not None else 0
+            tvdb_name = str(raw_name) if isinstance(raw_name, str) else ""
             if tvdb_name:
                 logger.debug(f"[green]Got TVDb series name: {tvdb_name}[/green]")
         elif isinstance(tvdb_result, int):
@@ -936,9 +944,8 @@ async def get_tvdb_tvmaze_tmdb_episode_data(meta: Meta, tvdb_handler: Any, tmdb_
                 meta.tvdb_episode_data = tvdb_episode_data
                 _apply_tvdb_series_metadata(meta, tvdb_episode_data, tvdb_name)
                 meta.we_checked_tvdb = True
-                if meta.debug and isinstance(tvdb_episode_data, list):
-                    tvdb_episode_list = tvdb_episode_data
-                    logger.info(f"[green]TVDb episodes list retrieved with {len(tvdb_episode_list)} episodes[/green]")
+                if meta.debug and _is_obj_list(tvdb_episode_data):
+                    logger.info(f"[green]TVDb episodes list retrieved with {len(tvdb_episode_data)} episodes[/green]")
             else:
                 logger.info(f"[yellow]Unexpected TVDb episodes result format: {tvdb_episodes_result}[/yellow]")
             if tvdb_name and meta.debug:
@@ -976,7 +983,7 @@ async def get_douban_id(meta: Meta) -> int:
 
     cache = cache_for(meta.base_dir)
     cached = await cache.get("douban", "imdb_lookup", str(imdb_id))
-    if not is_cache_miss(cached) and isinstance(cached, dict):
+    if not is_cache_miss(cached) and _is_str_dict(cached):
         return int(cached.get("id", 0) or 0)
 
     search_url = f"https://m.douban.com/search/?query={imdb_id}"

@@ -7,7 +7,7 @@ import time
 import urllib.parse
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, TypeIs, cast
 
 import cli_ui
 import httpx
@@ -19,6 +19,14 @@ from src import webui_events
 from src.console import logger, prompt_in_thread
 from src.meta import Meta
 from src.stats import record_event_async
+
+
+def _is_str_dict(value: object) -> TypeIs[dict[str, Any]]:
+    return isinstance(value, dict)
+
+
+def _is_obj_list(value: object) -> TypeIs[list[Any]]:
+    return isinstance(value, list)
 
 
 class SceneFileMismatchError(ValueError):
@@ -44,7 +52,7 @@ class SceneManager:
         if cache_file.exists():
             try:
                 cached = json.loads(await asyncio.to_thread(cache_file.read_text, encoding="utf-8"))
-                if isinstance(cached, dict):
+                if _is_str_dict(cached):
                     logger.debug(f"[cyan]SRRDB: Using cached response from {cache_file.name}")
                     return cached
             except (OSError, ValueError) as e:
@@ -55,7 +63,7 @@ class SceneManager:
             response = await self._srrdb_get(client, url, operation, 30.0)
             if response.status_code == 200:
                 payload = response.json()
-                if isinstance(payload, dict):
+                if _is_str_dict(payload):
                     if not payload.get("warnings"):
                         try:
                             await asyncio.to_thread(cache_file.parent.mkdir, parents=True, exist_ok=True)
@@ -78,9 +86,9 @@ class SceneManager:
 
     def _archived_files(self, details: dict[str, Any]) -> list[dict[str, Any]]:
         files = details.get("archived-files", [])
-        if not isinstance(files, list):
+        if not _is_obj_list(files):
             return []
-        return [file for file in files if isinstance(file, dict) and isinstance(file.get("name"), str)]
+        return [file for file in files if _is_str_dict(file) and isinstance(file.get("name"), str)]
 
     def _archived_basename(self, file: dict[str, Any]) -> str:
         return Path(file["name"].replace("\\", "/")).name
@@ -118,8 +126,8 @@ class SceneManager:
                 count = int(count)
             except ValueError:
                 return None
-            if not isinstance(candidates, list) or any(
-                not isinstance(candidate, dict) or not isinstance(candidate.get("release"), str) or not candidate["release"].strip() for candidate in candidates
+            if not _is_obj_list(candidates) or any(
+                not _is_str_dict(candidate) or not isinstance(candidate.get("release"), str) or not candidate["release"].strip() for candidate in candidates
             ):
                 return None
             # Do not guess from truncated results or fan out over broad searches.
@@ -128,9 +136,9 @@ class SceneManager:
             if not candidates:
                 continue
 
-            matches = {}
+            matches: dict[str, dict[str, Any]] = {}
             for candidate in candidates:
-                release = candidate["release"]
+                release = str(candidate["release"])
                 details = await self._release_details(client, release, details_cache_dir)
                 if details is None:
                     return None
@@ -157,7 +165,7 @@ class SceneManager:
         extension = path.suffix.lower()
         if extension in {".rar", ".zip", ".7z", ".tar", ".gz"} or re.fullmatch(r"\.r\d{2,3}", extension):
             stored = details.get("files", [])
-            archived = [file for file in stored if isinstance(file, dict) and isinstance(file.get("name"), str)] if isinstance(stored, list) else []
+            archived = [file for file in stored if _is_str_dict(file) and isinstance(file.get("name"), str)] if _is_obj_list(stored) else []
         else:
             archived = self._archived_files(details)
         matches = [file for file in archived if self._archived_basename(file).casefold() == path.name.casefold()]
@@ -258,7 +266,7 @@ class SceneManager:
             if not meta.scene and not lower:
                 # Cache file for search
                 search_cache_file = Path(search_cache_dir) / f"{quoted_base}.json"
-                response_json = await self._cached_srrdb_request(
+                response_json: dict[str, Any] | None = await self._cached_srrdb_request(
                     client,
                     f"https://api.srrdb.com/v1/search/r:{quoted_base}",
                     search_cache_file,
@@ -350,39 +358,42 @@ class SceneManager:
                         response = await self._srrdb_get(client, url, "search", 10.0)
                         response_json = response.json()
 
-                        if int(response_json.get("resultsCount", 0)) > 0:
-                            first_result = response_json["results"][0]
-                            imdb_str = first_result.get("imdbId")
-                            if imdb_str and imdb_str == str(meta.imdb_id).zfill(7) and meta.imdb_id != 0:
-                                release_name = first_result["release"]
-                                release_details_dict = await self._release_details(client, release_name, details_cache_dir)
-                                await self._confirm_file_differences(video, release_name, release_details_dict, meta)
-                                meta.scene = True
+                        results_raw = response_json.get("results") if _is_str_dict(response_json) else None
+                        results_count = int(response_json.get("resultsCount", 0)) if _is_str_dict(response_json) else 0
+                        if results_count > 0 and _is_obj_list(results_raw) and results_raw:
+                            first_result = results_raw[0]
+                            if _is_str_dict(first_result):
+                                imdb_str = first_result.get("imdbId")
+                                if imdb_str and imdb_str == str(meta.imdb_id).zfill(7) and meta.imdb_id != 0:
+                                    release_name = str(first_result.get("release") or "")
+                                    release_details_dict = await self._release_details(client, release_name, details_cache_dir)
+                                    await self._confirm_file_differences(video, release_name, release_details_dict, meta)
+                                    meta.scene = True
 
-                                if not meta.nfo and first_result.get("hasNFO") == "yes":
-                                    try:
-                                        release = first_result["release"]
-                                        release_lower = release.lower()
-                                        nfo_url = f"https://www.srrdb.com/download/file/{release}/{quoted_base}.nfo"
-                                        save_path = Path(meta.base_dir) / "tmp" / meta.uuid
-                                        Path(save_path).mkdir(parents=True, exist_ok=True)
-                                        nfo_file_path = Path(save_path) / f"{release_lower}.nfo"
+                                    if not meta.nfo and first_result.get("hasNFO") == "yes":
+                                        try:
+                                            release = str(first_result.get("release") or "")
+                                            release_lower = release.lower()
+                                            nfo_url = f"https://www.srrdb.com/download/file/{release}/{quoted_base}.nfo"
+                                            save_path = Path(meta.base_dir) / "tmp" / meta.uuid
+                                            Path(save_path).mkdir(parents=True, exist_ok=True)
+                                            nfo_file_path = Path(save_path) / f"{release_lower}.nfo"
 
-                                        if not Path(nfo_file_path).exists():
-                                            nfo_response = await self._srrdb_get(client, nfo_url, "nfo_download", 30.0)
-                                            if nfo_response.status_code == 200:
-                                                await asyncio.to_thread(Path(nfo_file_path).write_bytes, nfo_response.content)
+                                            if not Path(nfo_file_path).exists():
+                                                nfo_response = await self._srrdb_get(client, nfo_url, "nfo_download", 30.0)
+                                                if nfo_response.status_code == 200:
+                                                    await asyncio.to_thread(Path(nfo_file_path).write_bytes, nfo_response.content)
+                                                    meta.nfo = True
+                                                    meta.auto_nfo = True
+                                                    logger.info(f"[green]NFO downloaded to {nfo_file_path}")
+                                            else:
                                                 meta.nfo = True
                                                 meta.auto_nfo = True
-                                                logger.info(f"[green]NFO downloaded to {nfo_file_path}")
-                                        else:
-                                            meta.nfo = True
-                                            meta.auto_nfo = True
-                                    except Exception as e:
-                                        logger.info(f"[yellow]Failed to download NFO file: {e}")
+                                        except Exception as e:
+                                            logger.info(f"[yellow]Failed to download NFO file: {e}")
 
-                                video = release_name
-                                scene = True
+                                    video = release_name
+                                    scene = True
                         else:
                             logger.debug("[yellow]SRRDB: No match found with lower/tag search")
 

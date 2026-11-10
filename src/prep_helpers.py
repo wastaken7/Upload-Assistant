@@ -5,9 +5,10 @@ import ntpath
 import os
 import re
 import sys
+from collections.abc import Iterable
 from difflib import SequenceMatcher
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, TypeIs, cast
 from urllib.parse import urlparse
 
 import aiofiles
@@ -38,6 +39,19 @@ from src.video import video_manager
 from src.xxx_keywords import extract_xxx_keywords
 from src.xxx_lookup import lookup_xxx_metadata
 from src.xxx_platforms import XXX_PLATFORM_KEYWORDS
+
+
+def _is_str_dict(val: object) -> TypeIs[dict[str, Any]]:
+    return isinstance(val, dict)
+
+
+def _is_obj_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
+
+
+def _is_obj_iterable(val: object) -> TypeIs[Iterable[object]]:
+    return isinstance(val, (list, tuple, set))
+
 
 guessit_module: Any = cast(Any, guessit)
 
@@ -113,10 +127,10 @@ def guessit_fn(value: str, options: dict[str, Any] | None = None) -> dict[str, A
     return cast(dict[str, Any], guessit_module.guessit(value, options))
 
 
-def _normalize_search_year(value: Any) -> str | None:
+def _normalize_search_year(value: object) -> str | None:
     if value is None or value == "":
         return None
-    if isinstance(value, (list, tuple, set)):
+    if _is_obj_iterable(value):
         for candidate in value:
             normalized = _normalize_search_year(candidate)
             if normalized is not None:
@@ -915,8 +929,14 @@ async def validate_media(_prep_instance: Any, meta: Meta) -> None:
             if not meta.unattended:
                 await asyncio.sleep(2)
 
-    mediainfo_tracks = meta.mediainfo.get("media", {}).get("track") or []
-    meta.has_multiple_default_subtitle_tracks = len([track for track in mediainfo_tracks if track["@type"] == "Text" and track["Default"] == "Yes"]) > 1
+    media: dict[str, Any] = {}
+    if _is_str_dict(meta.mediainfo):
+        candidate_media = meta.mediainfo.get("media")
+        if _is_str_dict(candidate_media):
+            media = candidate_media
+    tracks_raw = media.get("track") if _is_str_dict(media) else None
+    mediainfo_tracks: list[dict[str, Any]] = [t for t in tracks_raw if _is_str_dict(t)] if _is_obj_list(tracks_raw) else []
+    meta.has_multiple_default_subtitle_tracks = len([track for track in mediainfo_tracks if track.get("@type") == "Text" and track.get("Default") == "Yes"]) > 1
 
     # Check if there's a language restriction
     if meta.has_languages:
@@ -1917,7 +1937,7 @@ async def finalize_metadata(
     if meta.category == "XXX" and not meta.audio:
         meta.audio, meta.channels, meta.has_commentary = await prep_instance.audio_manager.get_audio_v2(mi_data, meta, bdinfo)
     if meta.category == "XXX" and not meta.video_codec:
-        meta.video_encode, meta.video_codec, meta.has_encode_settings, meta.bit_depth = await video_manager.get_video_encode(mi_data, meta.type, bdinfo)
+        meta.video_encode, meta.video_codec, meta.has_encode_settings, meta.bit_depth = await video_manager.get_video_encode(mi_data, meta.type or "", bdinfo)
 
     if meta.category in ("TV", "MOVIE", "XXX"):
         meta.adult_media = prep_instance.check_adult_media(meta)
@@ -1951,9 +1971,8 @@ async def finalize_metadata(
 
     meta = await tag_override(meta)
 
-    # Automatically set personalrelease to True if detected release group matches any of the personal_release_groups tags
     personal_groups = prep_instance.config["DEFAULT"].get("personal_release_groups", [])
-    if isinstance(personal_groups, list) and meta.tag:
+    if _is_obj_list(personal_groups) and meta.tag:
         detected_group = meta.tag.lstrip("-").lower()
         personal_groups_clean = [str(g).lstrip("-").lower() for g in personal_groups if g]
         if detected_group in personal_groups_clean:
@@ -2071,10 +2090,10 @@ async def finalize_metadata(
                             continue
 
                         existing = requirements.setdefault(lang, {}).setdefault(data_type, "")
-                        merged_tags = set(filter(None, [t.strip() for t in existing.split(",") + append_to_response.split(",")]))
+                        merged_tags: set[str] = {t.strip() for t in existing.split(",") + append_to_response.split(",") if t.strip()}
                         requirements[lang][data_type] = ",".join(sorted(merged_tags))
 
-            tasks = []
+            tasks: list[tuple[str, str, Any]] = []
             for lang, types in requirements.items():
                 for data_type, append_to_response in types.items():
                     tasks.append(
@@ -2082,9 +2101,9 @@ async def finalize_metadata(
                     )
             if tasks:
                 logger.debug(f"[cyan]Pre-fetching TMDB localized data for languages: {list(requirements.keys())}[/cyan]")
-                langs_and_types = [(item[0], item[1]) for item in tasks]
+                langs_and_types: list[tuple[str, str]] = [(item[0], item[1]) for item in tasks]
                 coroutines = [item[2] for item in tasks]
-                results = await asyncio.gather(*coroutines)
+                results: list[Any] = list(await asyncio.gather(*coroutines))
 
                 meta.tmdb_localized_data = {}
                 for (lang, data_type), result in zip(langs_and_types, results, strict=True):

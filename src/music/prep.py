@@ -6,7 +6,7 @@ import asyncio
 import json
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeIs
 
 import aiofiles
 import cli_ui
@@ -23,6 +23,14 @@ from src.music.validation import MusicValidator
 from src.temp_paths import artwork_dir, music_release_snapshot_path
 
 
+def _is_str_dict(val: object) -> TypeIs[dict[str, Any]]:
+    return isinstance(val, dict)
+
+
+def _is_obj_list(val: object) -> TypeIs[list[Any]]:
+    return isinstance(val, list)
+
+
 def _image_suffix(data: bytes, mime: str = "") -> str:
     """Infer a safe suffix for extracted embedded artwork."""
     mime = mime.casefold()
@@ -37,28 +45,37 @@ def _extract_embedded_artwork(audio_paths: list[str], output_dir: Path) -> Path 
     """Extract the first front-cover image from FLAC, ID3 or MP4 tags."""
     for audio_path in audio_paths:
         try:
-            audio = mutagen.File(audio_path)
+            audio: Any = mutagen.File(audio_path)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
         except mutagen.MutagenError, OSError:
             continue
         if audio is None:
             continue
         data: bytes | None = None
         mime = ""
-        if getattr(audio, "pictures", None):
-            pictures = list(audio.pictures)
-            picture = next((item for item in pictures if getattr(item, "type", None) == 3), pictures[0])
-            data, mime = bytes(picture.data), str(getattr(picture, "mime", ""))
-        elif getattr(audio, "tags", None):
-            apics = [value for key, value in audio.tags.items() if str(key).startswith("APIC")]
-            if apics:
-                picture = next((item for item in apics if getattr(item, "type", None) == 3), apics[0])
-                data, mime = bytes(picture.data), str(getattr(picture, "mime", ""))
-        if data is None:
+        pictures: object = getattr(audio, "pictures", None)
+        if isinstance(pictures, (list, tuple)) and pictures:
+            pic_list: list[Any] = list(pictures)
+            picture: Any = next((item for item in pic_list if getattr(item, "type", None) == 3), pic_list[0])
+            pic_data: object = getattr(picture, "data", None)
+            if isinstance(pic_data, (bytes, bytearray, memoryview)):
+                data = bytes(pic_data)
+            mime = str(getattr(picture, "mime", ""))
+        else:
+            tags: Any = getattr(audio, "tags", None)
+            if tags is not None and hasattr(tags, "items"):
+                apics: list[Any] = [value for key, value in list(tags.items()) if str(key).startswith("APIC")]  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+                if apics:
+                    picture = next((item for item in apics if getattr(item, "type", None) == 3), apics[0])
+                    pic_data = getattr(picture, "data", None)
+                    if isinstance(pic_data, (bytes, bytearray, memoryview)):
+                        data = bytes(pic_data)
+                    mime = str(getattr(picture, "mime", ""))
+        if data is None and hasattr(audio, "__getitem__"):
             try:
-                covr = audio["covr"]
+                covr: Any = audio["covr"]  # pyright: ignore[reportUnknownVariableType]
             except KeyError, TypeError:
                 covr = []
-            if covr:
+            if isinstance(covr, (list, tuple)) and covr:
                 data = bytes(covr[0])
         if data:
             destination = output_dir / f"MUSIC_COVER{_image_suffix(data, mime)}"
@@ -67,7 +84,7 @@ def _extract_embedded_artwork(audio_paths: list[str], output_dir: Path) -> Path 
     return None
 
 
-async def prepare_music_cover(meta: Meta, release: Any) -> str:
+async def prepare_music_cover(meta: Meta, release: MusicRelease) -> str:
     """Resolve local or embedded artwork to a hostable temporary/local path.
 
     This phase never uploads an image and never alters source files.  Hosting is
@@ -100,7 +117,7 @@ def _music_override_year(value: Any, name: str) -> str:
     return ""
 
 
-def _apply_music_cli_overrides(meta: Meta, release: Any) -> None:
+def _apply_music_cli_overrides(meta: Meta, release: MusicRelease) -> None:
     """Apply intentional CLI values after analysis and before enrichment.
 
     This keeps embedded tags authoritative by default while ensuring an
@@ -199,7 +216,7 @@ def _apply_music_cli_overrides(meta: Meta, release: Any) -> None:
         set_user("edition", str(edition).strip())
 
 
-def _discogs_ids(meta: Meta, release: Any) -> tuple[str, str]:
+def _discogs_ids(meta: Meta, release: MusicRelease) -> tuple[str, str]:
     """Resolve explicit Discogs arguments without guessing a title search."""
     release_id = ""
     master_id = ""
@@ -229,7 +246,7 @@ def _discogs_ids(meta: Meta, release: Any) -> tuple[str, str]:
     return release_id, master_id
 
 
-async def _find_discogs_release(meta: Meta, release: Any, token: str) -> str:
+async def _find_discogs_release(meta: Meta, release: MusicRelease, token: str) -> str:
     """Find an exact Discogs pressing, never silently resolving ambiguity."""
     matches = await DiscogsEnricher(token=token, base_dir=str(meta.base_dir or "")).find_exact_releases(str(release.get("artist", "")), str(release.get("album", "")))
     filtered_matches = DiscogsEnricher.filter_releases_by_media(matches, release.get("media", ""))
@@ -288,8 +305,9 @@ async def gather_music_prep(meta: Meta, config: dict[str, Any]) -> None:
     analyzer = MusicReleaseAnalyzer()
     release = analyzer.analyze(str(meta.path or ""))
     _apply_music_cli_overrides(meta, release)
-    default_config = config.get("DEFAULT", {}) if isinstance(config.get("DEFAULT", {}), dict) else {}
-    enrichment_enabled = meta.music_enrichment if meta.music_enrichment is not None else default_config.get("music_enrichment_enabled", False)
+    raw_default = config.get("DEFAULT", {})
+    default_config = raw_default if _is_str_dict(raw_default) else {}
+    enrichment_enabled = meta.music_enrichment if meta.music_enrichment is not None else bool(default_config.get("music_enrichment_enabled", False))
     if enrichment_enabled:
         await MusicBrainzEnricher(base_dir=str(meta.base_dir or "")).enrich(release)
     issues = MusicValidator().validate(release)
@@ -326,7 +344,8 @@ async def enrich_music_from_discogs(meta: Meta, config: dict[str, Any]) -> bool:
     if meta.category != "MUSIC" or not meta.music_discogs_enabled or not isinstance(meta.music_release, dict):
         return False
     release = MusicRelease.from_dict(meta.music_release)
-    settings = config.get("DEFAULT", {}) if isinstance(config.get("DEFAULT", {}), dict) else {}
+    raw_settings = config.get("DEFAULT", {})
+    settings = raw_settings if _is_str_dict(raw_settings) else {}
     token = str(settings.get("music_discogs_token", ""))
     release_id, master_id = _discogs_ids(meta, release)
     existing_release = DiscogsEnricher.parse_reference(release.external_ids.get("discogs_release", ""), "release")
@@ -354,7 +373,8 @@ def _sync_release_to_meta(meta: Meta, release: MusicRelease) -> None:
     meta.format = str(release.get("format", meta.format))
     meta.source = str(release.get("media", meta.source or "")) or meta.source
     meta.scene = bool(release.get("scene", meta.scene))
-    meta.genres = list(release.get("genres", meta.genres)) if isinstance(release.get("genres", meta.genres), list) else meta.genres
+    raw_genres = release.get("genres", meta.genres)
+    meta.genres = list(raw_genres) if _is_obj_list(raw_genres) else meta.genres
     if meta.manual_genres:
         meta.genres = [genre.strip() for genre in meta.manual_genres.split(",") if genre.strip()]
     if meta.manual_overview:
@@ -384,12 +404,12 @@ def _set_tracker_field(release: MusicRelease, name: str, value: Any, confidence:
 
 def _orpheus_people(group: dict[str, Any], role: str) -> list[str]:
     music_info = group.get("musicInfo")
-    if not isinstance(music_info, dict):
+    if not _is_str_dict(music_info):
         return []
     people = music_info.get(role)
-    if not isinstance(people, list):
+    if not _is_obj_list(people):
         return []
-    return list(dict.fromkeys(str(person.get("name", "")).strip() for person in people if isinstance(person, dict) and str(person.get("name", "")).strip()))
+    return list(dict.fromkeys(str(person.get("name", "")).strip() for person in people if _is_str_dict(person) and str(person.get("name", "")).strip()))
 
 
 async def enrich_music_from_orpheus(meta: Meta, config: dict[str, Any]) -> bool:
@@ -406,11 +426,11 @@ async def enrich_music_from_orpheus(meta: Meta, config: dict[str, Any]) -> bool:
 
     orpheus = Orpheus(config)
     result = await orpheus.get_torrent(identifier, meta)
-    if not isinstance(result, dict):
+    if not _is_str_dict(result):
         logger.info(f"[yellow]MUSIC: Orpheus metadata was unavailable for torrent {identifier}.[/yellow]")
         return False
     group, torrent = result.get("group"), result.get("torrent")
-    if not isinstance(group, dict) or not isinstance(torrent, dict):
+    if not _is_str_dict(group) or not _is_str_dict(torrent):
         return False
 
     release = MusicRelease.from_dict(meta.music_release)
@@ -462,7 +482,7 @@ async def enrich_music_from_orpheus(meta: Meta, config: dict[str, Any]) -> bool:
     return True
 
 
-def _music_name(release: Any) -> str:
+def _music_name(release: MusicRelease) -> str:
     pieces = [str(release.get("artist", "")), "-", str(release.get("album", ""))]
     year = str(release.get("year", ""))
     if year:

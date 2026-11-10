@@ -3,15 +3,16 @@ import asyncio
 import builtins
 import contextlib
 import contextvars
+import importlib
 import io
 import logging
 import os
 import re
 import sys
 import threading
-from collections.abc import AsyncGenerator, Callable, Generator
+from collections.abc import AsyncGenerator, Callable, Generator, Mapping
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeIs
 
 from rich.console import Console
 from rich.logging import RichHandler
@@ -19,6 +20,10 @@ from rich.progress import Progress
 from rich.text import Text
 
 _original_input = builtins.input
+
+
+def _is_str_mapping(value: object) -> TypeIs[Mapping[str, Any]]:
+    return isinstance(value, Mapping)
 
 
 class PromptBlockedError(BaseException):
@@ -193,7 +198,7 @@ def progress_display(*columns: Any, **kwargs: Any) -> Generator[Progress]:
                 _shared_progress = new_progress
             progress = _shared_progress
             _shared_progress_users += 1
-    elif gated:
+    elif gate is not None and not explicitly_disabled:
         with _live_progress_lock:
             if gate.progress is None:
                 gate.progress = Progress(*columns, **kwargs)
@@ -215,7 +220,7 @@ def progress_display(*columns: Any, **kwargs: Any) -> Generator[Progress]:
                 if _shared_progress_users == 0 and _shared_progress is not None:
                     _shared_progress.stop()
                     _shared_progress = None
-        elif gated:
+        elif gate is not None and not explicitly_disabled:
             with _live_progress_lock:
                 gate.users -= 1
                 if gate.users == 0 and gate.progress is not None:
@@ -230,13 +235,18 @@ logger = logging.getLogger("UploadAssistant")
 logger.setLevel(logging.INFO)
 
 # Load configuration settings for the RichHandler
+config: Mapping[str, Any] = {}
+config_default: Mapping[str, Any] = {}
 try:
-    from data.config import config
-
-    config_default: dict[str, Any] = config.get("DEFAULT", {})
+    _data_config = importlib.import_module("data.config")
+    _raw_config = getattr(_data_config, "config", None)
+    if _is_str_mapping(_raw_config):
+        config = _raw_config
+        _raw_default = config.get("DEFAULT", {})
+        if _is_str_mapping(_raw_default):
+            config_default = _raw_default
 except ImportError:
-    config = {}
-    config_default: dict[str, Any] = {}
+    pass
 
 # RichHandler captures logs and outputs them using our shared console instance.
 # We enable markup=True to preserve Rich color formatting like [yellow], [red], etc.
@@ -345,7 +355,7 @@ class LogFileFormatter(logging.Formatter):
 
 
 class DynamicFileHandler(logging.Handler):
-    def __init__(self, formatter=None) -> None:
+    def __init__(self, formatter: logging.Formatter | None = None) -> None:
         super().__init__()
         if formatter:
             self.setFormatter(formatter)
@@ -354,9 +364,13 @@ class DynamicFileHandler(logging.Handler):
         try:
             # Check if write_log is enabled in config. Use lazy lookup to support reload
             try:
-                from data.config import config
-
-                write_log = bool(config.get("DEFAULT", {}).get("write_log", False))
+                data_config = importlib.import_module("data.config")
+                raw_cfg = getattr(data_config, "config", None)
+                write_log = False
+                if _is_str_mapping(raw_cfg):
+                    raw_def = raw_cfg.get("DEFAULT")
+                    if _is_str_mapping(raw_def):
+                        write_log = bool(raw_def.get("write_log", False))
             except Exception:
                 write_log = False
 

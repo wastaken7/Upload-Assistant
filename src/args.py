@@ -6,19 +6,17 @@ import datetime
 import re
 import sys
 import urllib.parse
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from functools import lru_cache
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TextIO
+from typing import Any, TextIO, cast
 
 import argcomplete
 
 from src.app_paths import DATA_DIR
 from src.audible import normalize_audible_url
 from src.bluray_com import normalize_bluray_url
-
-if TYPE_CHECKING:
-    from src.meta import Meta
+from src.meta import Meta
 
 MUSIC_MEDIA_CHOICES = ("cd", "web", "vinyl", "dvd", "bd", "soundboard", "sacd", "dat", "cassette")
 MUSIC_RELEASE_TYPE_CHOICES = (
@@ -56,18 +54,32 @@ def _has_configured_value(options: Mapping[str, Any]) -> bool:
     return False
 
 
+def _set_completer(action: argparse.Action, completer: object) -> None:
+    attr = "completer"
+    setattr(action, attr, completer)
+
+
+def _to_str_list(value: object) -> list[str]:
+    if isinstance(value, list):
+        items: list[object] = cast(list[object], value)
+        return [str(item) for item in items]
+    return []
+
+
 def configured_tracker_completions(config: Mapping[str, Any], cookies_dir: Path | None = None) -> dict[str, str]:
     """Return configured tracker names suitable for shell completion."""
-    trackers = config.get("TRACKERS", {})
-    if not isinstance(trackers, Mapping):
+    trackers_raw: object = config.get("TRACKERS", {})
+    if not isinstance(trackers_raw, Mapping):
         return {}
 
+    trackers_map: Mapping[str, object] = cast(Mapping[str, object], trackers_raw)
     configured: dict[str, str] = {}
-    default_trackers = trackers.get("default_trackers", "")
+    default_trackers = trackers_map.get("default_trackers", "")
+    default_names: Sequence[object]
     if isinstance(default_trackers, str):
         default_names = default_trackers.split(",")
     elif isinstance(default_trackers, Sequence):
-        default_names = default_trackers
+        default_names = cast(Sequence[object], default_trackers)
     else:
         default_names = ()
     for name in default_names:
@@ -83,10 +95,10 @@ def configured_tracker_completions(config: Mapping[str, Any], cookies_dir: Path 
     except OSError:
         cookie_files = ()
 
-    for name, options in trackers.items():
+    for raw_name, options in trackers_map.items():
         if not isinstance(options, Mapping):
             continue
-        tracker_name = str(name).strip()
+        tracker_name = str(raw_name).strip()
         if not tracker_name:
             continue
         tracker_key = tracker_name.lower()
@@ -301,17 +313,19 @@ def tracker_cli_aliases(config: Mapping[str, Any]) -> dict[str, str]:
     from src.meta import Meta
     from src.trackersetup import tracker_class_map
 
-    trackers = config.get("TRACKERS", {})
-    if not isinstance(trackers, Mapping):
+    trackers_raw: object = config.get("TRACKERS", {})
+    if not isinstance(trackers_raw, Mapping):
         return {}
 
+    trackers_map: Mapping[str, object] = cast(Mapping[str, object], trackers_raw)
     canonical_names = set(tracker_class_map) | {"MANUAL", "USENET"}
     aliases: dict[str, str] = {}
-    for name, options in trackers.items():
+    for raw_name, options in trackers_map.items():
         if not isinstance(options, Mapping):
             continue
-        canonical = str(name).upper()
-        alias_value = options.get("cli_alias")
+        options_map: Mapping[str, object] = cast(Mapping[str, object], options)
+        canonical = str(raw_name).upper()
+        alias_value = options_map.get("cli_alias")
         if not isinstance(alias_value, str) or not alias_value.strip():
             continue
         alias = alias_value.strip().upper()
@@ -343,15 +357,17 @@ class Args:
         except ValueError as error:
             parser.error(str(error))
 
-    def parse(self, argv: Sequence[str], meta: Meta) -> tuple[Meta, CustomArgumentParser, list[str]]:
+    def parse(self, argv: Sequence[str], meta: Meta | None = None) -> tuple[Meta, CustomArgumentParser, list[str]]:
         """Parse command-line arguments into ``meta``; return it with the parser and the arguments left over."""
+        if meta is None:
+            meta = Meta()
         input = list(argv)
         parser = CustomArgumentParser(
             usage="upload.py [path...] [options]",
         )
 
-        def make_dict_completer(choices_dict):
-            def completer(prefix: str, **_: Any):
+        def make_dict_completer(choices_dict: Mapping[str, str]) -> Callable[..., dict[str, str]]:
+            def completer(prefix: str, **_: Any) -> dict[str, str]:
                 return {k: v for k, v in choices_dict.items() if k.lower().startswith(prefix.lower())}
 
             return completer
@@ -556,7 +572,7 @@ class Args:
             choices=["movie", "tv", "sports", "fanres", "book", "game", "music", "xxx"],
             dest="manual_category",
         )
-        action_c.completer = category_completer
+        _set_completer(action_c, category_completer)
         parser.add_argument("--music-artist", nargs=1, required=False, help="MUSIC: main artist(s), separated by &", dest="music_artist")
         parser.add_argument("--music-album", nargs=1, required=False, help="MUSIC: album/release title", dest="music_album")
         action_music_media = parser.add_argument(
@@ -568,7 +584,7 @@ class Args:
             help="MUSIC: source medium (CD, WEB, Vinyl, DVD, BD, Soundboard, SACD, DAT, Cassette)",
             dest="music_media",
         )
-        action_music_media.completer = music_media_completer
+        _set_completer(action_music_media, music_media_completer)
         action_music_rel_type = parser.add_argument(
             "--music-release-type",
             nargs=1,
@@ -578,7 +594,7 @@ class Args:
             help="MUSIC: Orpheus release type (album, ep, single, compilation, live album, etc.)",
             dest="music_release_type",
         )
-        action_music_rel_type.completer = music_release_type_completer
+        _set_completer(action_music_rel_type, music_release_type_completer)
         parser.add_argument(
             "--music-release-year", nargs=1, required=False, help="MUSIC: concrete release/pressing year (not the original group year)", dest="music_release_year"
         )
@@ -649,7 +665,7 @@ class Args:
             choices=["disc", "remux", "encode", "webdl", "web-dl", "webrip", "hdtv", "dvdrip"],
             dest="manual_type",
         )
-        action_t.completer = type_completer
+        _set_completer(action_t, type_completer)
         action_source = parser.add_argument(
             "--source",
             nargs=1,
@@ -658,7 +674,7 @@ class Args:
             choices=["Blu-ray", "BluRay", "DVD", "DVD5", "DVD9", "HDDVD", "WEB", "HDTV", "UHDTV", "LaserDisc", "DCP"],
             dest="manual_source",
         )
-        action_source.completer = source_completer
+        _set_completer(action_source, source_completer)
         action_res = parser.add_argument(
             "-res",
             "--resolution",
@@ -667,7 +683,7 @@ class Args:
             help="Resolution [2160p, 1080p, 1080i, 720p, 576p, 576i, 480p, 480i, 8640p, 4320p, OTHER]",
             choices=["2160p", "1080p", "1080i", "720p", "576p", "576i", "480p", "480i", "8640p", "4320p", "other"],
         )
-        action_res.completer = resolution_completer
+        _set_completer(action_res, resolution_completer)
         parser.add_argument("-tmdb", "--tmdb", nargs=1, required=False, help="TMDb ID (use movie/ or tv/ prefix)", type=str, dest="tmdb_manual")
         imdb_group = parser.add_mutually_exclusive_group()
         imdb_group.add_argument("-imdb", "--imdb", nargs=1, required=False, help="IMDb ID", type=str, dest="imdb_manual")
@@ -825,7 +841,7 @@ class Args:
             choices=["pc", "ps5", "ps4", "ps3", "ps2", "xbox", "x360", "xone", "xsx", "switch", "switch2", "ns2", "3ds", "nds", "wiiu", "wii", "mac", "linux"],
             dest="manual_platform",
         )
-        action_plat.completer = platform_completer
+        _set_completer(action_plat, platform_completer)
         parser.add_argument("--game-title", nargs="*", required=False, help="GAME title (overrides auto-detected value)", dest="game_title")
         parser.add_argument("--developer", nargs="*", required=False, help="GAME developer (overrides auto-detected value)", dest="game_developer")
         parser.add_argument(
@@ -854,7 +870,7 @@ class Args:
             choices=["full_game", "full_game_dlc", "dlc", "update"],
             dest="game_subcategory",
         )
-        action_gsc.completer = game_subcategory_completer
+        _set_completer(action_gsc, game_subcategory_completer)
         parser.add_argument(
             "-mc", "--commentary", dest="manual_commentary", action="store_true", required=False, help="Manually indicate whether commentary tracks are included"
         )
@@ -990,7 +1006,7 @@ class Args:
                 "lostimg",
             ],
         )
-        action_ih.completer = imghost_completer
+        _set_completer(action_ih, imghost_completer)
         parser.add_argument("-siu", "--skip-imagehost-upload", dest="skip_imghost_upload", action="store_true", required=False, help="Skip Uploading to an image host")
         parser.add_argument("-th", "--torrenthash", nargs=1, required=False, help="Torrent Hash to re-use from your client's session directory")
         parser.add_argument("-nfo", "--nfo", action="store_true", required=False, help="Use .nfo in directory for description")
@@ -1060,7 +1076,7 @@ class Args:
             help="Set max piece size allowed in MiB for default torrent creation (default 128 MiB)",
             choices=["1", "2", "4", "8", "16", "32", "64", "128"],
         )
-        action_mps.completer = max_piece_size_completer
+        _set_completer(action_mps, max_piece_size_completer)
         parser.add_argument("-nh", "--nohash", action="store_true", required=False, help="Don't hash .torrent")
         parser.add_argument("-rh", "--rehash", action="store_true", required=False, help="DO hash .torrent")
         parser.add_argument("-mkbrr", "--mkbrr", action="store_true", required=False, help="Use mkbrr for torrent hashing")
@@ -1116,7 +1132,7 @@ class Args:
             choices=["concurrent", "usenet", "tracker"],
             help="Set the upload order when both torrent trackers and Usenet are selected ('concurrent', 'usenet', 'tracker')",
         )
-        action_uo.completer = upload_order_completer
+        _set_completer(action_uo, upload_order_completer)
         parser.add_argument("-rtl", "--rtorrent-label", dest="rtorrent_label", nargs=1, required=False, help="Add to rtorrent with this label")
 
         def _tracker_completer(prefix: str, **_: Any) -> dict[str, str]:
@@ -1128,7 +1144,7 @@ class Args:
             return {t: desc for t, desc in configured.items() if t.startswith(prefix.lower())}
 
         tk_action = parser.add_argument("-tk", "--trackers", nargs=1, required=False, help="Upload to these trackers, comma separated (--trackers blu,bhd) including manual")
-        tk_action.completer = _tracker_completer
+        _set_completer(tk_action, _tracker_completer)
 
         rtk_action = parser.add_argument(
             "-rtk",
@@ -1138,7 +1154,7 @@ class Args:
             required=False,
             help="Remove these trackers when processing default trackers, comma separated (--trackers-remove blu,bhd)",
         )
-        rtk_action.completer = _tracker_completer
+        _set_completer(rtk_action, _tracker_completer)
         parser.add_argument(
             "-tpc",
             "--trackers-pass",
@@ -1229,7 +1245,7 @@ class Args:
             dest="usenet_episodes_only",
             default=None,
         )
-        episodes_only_action.completer = _tracker_completer
+        _set_completer(episodes_only_action, _tracker_completer)
         parser.add_argument(
             "--archive-password",
             nargs=1,
@@ -1245,7 +1261,9 @@ class Args:
         parsed_args: dict[str, Any] = vars(parsed_args_ns)
         # console.print(args)
 
-        if any(str(value).strip().lower() == "help" for value in parsed_args.get("answer") or []):
+        raw_answer: object = parsed_args.get("answer")
+        answer_list: Sequence[object] = cast(Sequence[object], raw_answer) if isinstance(raw_answer, Sequence) and not isinstance(raw_answer, (str, bytes)) else ()
+        if any(str(value).strip().lower() == "help" for value in answer_list):
             from src.manual_questions import answer_help
 
             logger.info(answer_help(), extra={"markup": False})
@@ -1286,10 +1304,10 @@ class Args:
             if carried_asin != new_asin:
                 meta.audible_url = ""
         for key in parsed_args:
-            value = parsed_args[key]
+            value: object = parsed_args[key]
             if value not in (None, []):
                 if isinstance(value, list):
-                    value_list = [str(item) for item in value]
+                    value_list = _to_str_list(value)
                     value2 = self.list_to_string(value_list)
                     if key == "manual_type":
                         meta.manual_type = value2.upper().replace("-", "")
@@ -1393,7 +1411,7 @@ class Args:
                     meta[key] = value
             if key == "site_upload":
                 if isinstance(value, list):
-                    value_list = [str(item) for item in value]
+                    value_list = _to_str_list(value)
                     if len(value_list) == 1:
                         meta[key] = (value_list[0]).upper()  # Extract the tracker acronym and normalize it
                     elif value_list:
@@ -1401,12 +1419,12 @@ class Args:
                     else:
                         meta[key] = None
                 elif value is not None:
-                    meta[key] = (value).upper()
+                    meta[key] = str(value).upper()
                 else:
                     meta[key] = None
             if key == "manual_year":
                 if isinstance(value, list):
-                    value_list = [str(item) for item in value]
+                    value_list = _to_str_list(value)
                     if len(value_list) == 1 and value_list[0] != "":
                         try:
                             meta[key] = int(value_list[0])
@@ -1423,7 +1441,7 @@ class Args:
                     meta[key] = 0
             if key in ("manual_edition"):
                 if isinstance(value, list):
-                    value_list = [str(item) for item in value]
+                    value_list = _to_str_list(value)
                     if len(value_list) == 1:
                         meta[key] = value_list[0]
                     else:
@@ -1432,7 +1450,7 @@ class Args:
                     meta[key] = value
             if key in ("manual_dvds"):
                 if isinstance(value, list):
-                    value_list = [str(item) for item in value]
+                    value_list = _to_str_list(value)
                     if len(value_list) == 1:
                         meta[key] = value_list[0]
                     elif value_list:
@@ -1445,7 +1463,7 @@ class Args:
                     meta[key] = ""
             if key == "dupe_size_difference_tolerance":
                 if isinstance(value, list):
-                    value_list = [str(item) for item in value]
+                    value_list = _to_str_list(value)
                     if len(value_list) == 1 and value_list[0] != "":
                         try:
                             meta[key] = float(value_list[0])
@@ -1462,7 +1480,7 @@ class Args:
                     meta[key] = None
             if key in ("freeleech", "freeleech_until", "double_upload_until"):
                 if isinstance(value, list):
-                    value_list = [str(item) for item in value]
+                    value_list = _to_str_list(value)
                     if len(value_list) == 1 and value_list[0] != "":
                         try:
                             parsed_int = int(value_list[0])
@@ -1483,7 +1501,7 @@ class Args:
                 meta[key] = ""
             if key in ["tvmaze_manual"]:
                 if isinstance(value, list):
-                    value_list = [str(item) for item in value]
+                    value_list = _to_str_list(value)
                     if len(value_list) == 1:
                         meta[key] = value_list[0]
                     else:
@@ -1494,24 +1512,26 @@ class Args:
                 if value:
                     aliases = self.tracker_cli_aliases(parser)
                     # Extract from list if it's a single-item list (from nargs=1)
+                    tracker_value: object
                     if isinstance(value, list):
-                        value_list = value
-                        tracker_value: Any = value_list[0] if len(value_list) == 1 else value_list
+                        raw_tracker_list: list[object] = cast(list[object], value)
+                        tracker_value = raw_tracker_list[0] if len(raw_tracker_list) == 1 else raw_tracker_list
                     else:
                         tracker_value = value
 
                     if isinstance(tracker_value, str):
-                        tracker_value = tracker_value.strip("\"'")
+                        clean_tracker = tracker_value.strip("\"'")
 
                         # Split by comma if present
-                        if "," in tracker_value:
-                            meta[key] = [(t).upper() for t in tracker_value.split(",")]
+                        if "," in clean_tracker:
+                            meta[key] = [(t).upper() for t in clean_tracker.split(",")]
                         else:
-                            meta[key] = [(tracker_value).upper()]
+                            meta[key] = [(clean_tracker).upper()]
                     elif isinstance(tracker_value, list):
                         # Handle list of strings
                         expanded: list[str] = []
-                        for t in tracker_value:
+                        tracker_sublist: list[object] = cast(list[object], tracker_value)
+                        for t in tracker_sublist:
                             t_str = str(t)
                             if "," in t_str:
                                 expanded.extend([(x).upper() for x in t_str.split(",")])

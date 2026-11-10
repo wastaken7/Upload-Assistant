@@ -52,6 +52,7 @@ class DiscInfoManager:
                 discs, bdinfo = await self._parser.get_bdinfo(meta, meta.discs, meta.uuid, meta.base_dir, meta.discs)
             if not isinstance(bdinfo, dict):
                 raise RuntimeError("BDInfo did not produce a report for this Blu-ray disc. Check the BDInfo messages above, or set bdinfo_path in the config.")
+            bdinfo = cast(dict[str, Any], bdinfo)
         elif is_disc == "DVD":
             discs = cast(list[Disc], await cast(Any, self._parser).get_dvdinfo(discs))
         elif is_disc == "HDDVD":

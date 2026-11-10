@@ -58,11 +58,11 @@ def check_dependencies() -> None:
 
     # Try importing packaging to use robust specifier matching
     try:
-        import packaging.requirements
+        from packaging.requirements import Requirement
 
-        has_packaging = True
+        requirement_cls = Requirement
     except ImportError:
-        has_packaging = False
+        requirement_cls = None
         # If packaging is missing, we list it as missing since it's in requirements.txt
         missing_packages.append("  - packaging: not installed (required by Upload Assistant)")
 
@@ -76,7 +76,7 @@ def check_dependencies() -> None:
                     continue
 
                 # Simple check if packaging is not available
-                if not has_packaging:
+                if requirement_cls is None:
                     parts = line.split("==")
                     req_name = parts[0].strip()
                     req_version = parts[1].strip() if len(parts) > 1 else None
@@ -95,15 +95,14 @@ def check_dependencies() -> None:
 
                 # If packaging is available, use it for parsing
                 try:
-                    if has_packaging:
-                        req = packaging.requirements.Requirement(line)
-                        if req.marker is not None and not req.marker.evaluate():
-                            continue
-                        installed_version = installed_versions.get(_normalize_name(req.name))
-                        if installed_version is None:
-                            missing_packages.append(f"  - {req.name}: not installed (required: {line})")
-                        elif not req.specifier.contains(installed_version, prereleases=True):
-                            mismatched_versions.append(f"  - {req.name}: installed {installed_version}, required {req.specifier}")
+                    req = requirement_cls(line)
+                    if req.marker is not None and not req.marker.evaluate():
+                        continue
+                    installed_version = installed_versions.get(_normalize_name(req.name))
+                    if installed_version is None:
+                        missing_packages.append(f"  - {req.name}: not installed (required: {line})")
+                    elif not req.specifier.contains(installed_version, prereleases=True):
+                        mismatched_versions.append(f"  - {req.name}: installed {installed_version}, required {req.specifier}")
                 except Exception as exc:
                     # Ignore lines with parsing errors (e.g. custom URLs, local paths)
                     logger.debug(f"Failed to parse requirement line '{line}': {exc}", exc_info=True)

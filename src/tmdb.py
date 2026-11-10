@@ -307,7 +307,7 @@ async def get_tmdb_from_imdb(
     async def _tmdb_find_by_external_source(external_id: str | int, source: str) -> dict[str, Any]:
         """Helper function to find a movie or TV show on TMDb by external ID."""
         url = f"{TMDB_BASE_URL}/find/{external_id}"
-        params = {"api_key": tmdb_api_key, "external_source": source}
+        params: dict[str, Any] = {"api_key": tmdb_api_key, "external_source": source}
 
         async with httpx.AsyncClient() as client:
             response: httpx.Response | None = None
@@ -446,7 +446,7 @@ async def get_tmdb_id(
                 if category == "MOVIE":
                     logger.debug(f"[green]Searching TMDb for movie:[/] [cyan]{filename}[/cyan] (Year: {search_year})")
 
-                    params = {"api_key": tmdb_api_key, "query": filename, "language": "en-US", "include_adult": "true"}
+                    params: dict[str, Any] = {"api_key": tmdb_api_key, "query": filename, "language": "en-US", "include_adult": "true"}
 
                     if search_year:
                         params["year"] = str(search_year)
@@ -461,7 +461,7 @@ async def get_tmdb_id(
                 elif category == "TV":
                     logger.debug(f"[green]Searching TMDb for TV show:[/] [cyan]{filename}[/cyan] (Year: {search_year})")
 
-                    params = {"api_key": tmdb_api_key, "query": filename, "language": "en-US", "include_adult": "true"}
+                    params: dict[str, Any] = {"api_key": tmdb_api_key, "query": filename, "language": "en-US", "include_adult": "true"}
 
                     if search_year:
                         params["first_air_date_year"] = str(search_year)
@@ -1072,8 +1072,9 @@ async def tmdb_other_meta(
 
         cache_key = json.dumps({"category": category, "id": tmdb_id}, sort_keys=True)
         cached_media = await cache.get("tmdb", "main", cache_key)
+        media_data: dict[str, Any]
         if not is_cache_miss(cached_media) and isinstance(cached_media, dict):
-            media_data = cached_media
+            media_data = typing_cast(dict[str, Any], cached_media)
         else:
             response = await client.get(main_url, params={"api_key": tmdb_api_key})
             try:
@@ -1245,14 +1246,19 @@ async def tmdb_other_meta(
                 logger.info("[bold red]Failed to process keywords[/bold red]")
                 keywords = []
 
-        origin_country = list(media_data.get("origin_country", []))
+        origin_country_raw = media_data.get("origin_country")
+        origin_country: list[str] = [str(c) for c in typing_cast(list[object], origin_country_raw)] if isinstance(origin_country_raw, list) else []
 
         # Process credits
-        creators = []
-        for each in media_data.get("created_by", []):
-            name = each.get("original_name") or each.get("name")
-            if name:
-                creators.append(name)
+        creators: list[str] = []
+        created_by_list = media_data.get("created_by")
+        if isinstance(created_by_list, list):
+            for each_raw in typing_cast(list[object], created_by_list):
+                if isinstance(each_raw, dict):
+                    each = typing_cast(dict[str, Any], each_raw)
+                    name = each.get("original_name") or each.get("name")
+                    if name:
+                        creators.append(str(name))
         # Limit to the first 5 unique names
         creators = list(dict.fromkeys(creators))[:5]
 
@@ -1519,7 +1525,12 @@ async def _get_arm_mal_id(meta: Meta, season: int | None) -> int:
             await cache.set("arm", "tv_mappings", key, mappings, negative=not bool(mappings))
         if not isinstance(mappings, list):
             return 0
-        candidates = [item for item in mappings if isinstance(item, dict) and type(item.get("themoviedb-season")) is int and item["themoviedb-season"] == season]
+        candidates: list[dict[str, Any]] = []
+        for item in typing_cast(list[object], mappings):
+            if isinstance(item, dict):
+                item_dict = typing_cast(dict[str, Any], item)
+                if type(item_dict.get("themoviedb-season")) is int and item_dict["themoviedb-season"] == season:
+                    candidates.append(item_dict)
         if len(candidates) != 1:
             return 0
         candidate = candidates[0]
@@ -1619,10 +1630,11 @@ async def get_romaji(tmdb_name: str, mal: int | None, meta: Meta) -> tuple[str, 
         anilist_key = json.dumps({"search": variables["search"], "mode": "mal" if mal not in (None, 0) else "title"}, sort_keys=True)
         cached_anilist = await anilist_cache.get("anilist", "media", anilist_key)
         if not is_cache_miss(cached_anilist) and isinstance(cached_anilist, dict):
-            cached_media = cached_anilist.get("media")
+            cached_anilist_dict = typing_cast(dict[str, Any], cached_anilist)
+            cached_media = cached_anilist_dict.get("media")
             if isinstance(cached_media, list):
                 media = typing_cast(list[dict[str, Any]], cached_media)
-                demographic = str(cached_anilist.get("demographic", demographic))
+                demographic = str(cached_anilist_dict.get("demographic", demographic))
                 if media:
                     break
                 continue
@@ -2146,7 +2158,7 @@ async def get_tmdb_localized_data(meta: Meta, data_type: str, language: str, app
         endpoint = f"/tv/{meta.tmdb}/season/{season}/episode/{episode}"
 
     url = f"{TMDB_BASE_URL}{endpoint}"
-    params = {"api_key": tmdb_api_key, "language": language}
+    params: dict[str, Any] = {"api_key": tmdb_api_key, "language": language}
     if append_to_response:
         params.update({"append_to_response": append_to_response})
 
@@ -2162,16 +2174,17 @@ async def get_tmdb_localized_data(meta: Meta, data_type: str, language: str, app
     cache_key = json.dumps({"id": meta.tmdb, "category": meta.category, "type": data_type, "language": language, "append": append_to_response}, sort_keys=True)
     cached_result = await cache.get("tmdb", "localized", cache_key)
     if not is_cache_miss(cached_result) and isinstance(cached_result, dict):
-        return cached_result
+        return typing_cast(dict[str, Any], cached_result)
 
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.get(url, params=params)
             if response.status_code == 200:
-                tmdb_data = response.json()
-                if isinstance(tmdb_data, dict):
-                    await cache.set("tmdb", "localized", cache_key, tmdb_data)
-                    return tmdb_data
+                tmdb_data_raw = response.json()
+                if isinstance(tmdb_data_raw, dict):
+                    tmdb_data_dict = typing_cast(dict[str, Any], tmdb_data_raw)
+                    await cache.set("tmdb", "localized", cache_key, tmdb_data_dict)
+                    return tmdb_data_dict
             logger.info(f"[red]Request failed for {url}: Status code {response.status_code}[/red]")
     except httpx.RequestError as e:
         logger.info(f"[red]Request failed for {url}: {e}[/red]")
