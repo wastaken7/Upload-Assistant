@@ -1,6 +1,6 @@
 # Upload Assistant © 2026 Audionut & wastaken7 — Licensed under UAPL v1.0
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeIs
 
 import aiofiles
 import httpx
@@ -18,6 +18,10 @@ from src.trackers.USENET.search_helpers import (
 )
 
 Config = dict[str, Any]
+
+
+def _is_str_dict(val: object) -> TypeIs[dict[str, object]]:
+    return isinstance(val, dict)
 
 
 class NzbNest:
@@ -153,8 +157,8 @@ class NzbNest:
                 status_dict["status_message"] = f"data error: HTTP {response.status_code} - {response.text}"
                 return False
 
-            response_data = response.json()
-            guid = response_data.get("guid") if isinstance(response_data, dict) else None
+            response_data: object = response.json()
+            guid: object = response_data.get("guid") if _is_str_dict(response_data) else None
             if not guid:
                 status_dict["status_message"] = "data error: NzbNest did not return a release guid."
                 return False

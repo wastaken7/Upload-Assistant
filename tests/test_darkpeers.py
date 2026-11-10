@@ -1,6 +1,7 @@
 """Regression tests for DarkPeers-specific BOOK and MUSIC title rules."""
 
 import asyncio
+from pathlib import Path
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
@@ -263,11 +264,11 @@ def test_darkpeers_game_requires_scene_rars_nfo_and_instructions():
         category="GAME",
         unattended=True,
         scene=True,
-        scene_nfo_file="release.nfo",
+        scene_nfo_file=Path("release.nfo"),
         filelist=["release.r00", "release.rar"],
         description="Installation instructions: mount and install.",
     )
-    iso = Meta(category="GAME", unattended=True, scene=True, scene_nfo_file="release.nfo", filelist=["release.iso"], description="Installation instructions")
+    iso = Meta(category="GAME", unattended=True, scene=True, scene_nfo_file=Path("release.nfo"), filelist=["release.iso"], description="Installation instructions")
 
     assert _additional_checks(valid_game) is True
     assert _additional_checks(iso) is False

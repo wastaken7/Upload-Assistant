@@ -854,7 +854,7 @@ class UNIT3D:
 
             if post_succeeded:
                 # Download is outside the retry loop — a POST timeout/error cannot cause re-submission
-                await self.common.download_tracker_torrent(meta, self.tracker, headers=headers, downurl=download_url)
+                await self.common.download_tracker_torrent(meta, self.tracker, headers=headers, downurl=download_url or "")
                 return True
         else:
             logger.info(f"{self.tracker}: Request Data:")

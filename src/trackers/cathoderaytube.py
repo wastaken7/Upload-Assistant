@@ -4,7 +4,7 @@ import datetime
 import platform
 import re
 from pathlib import Path
-from typing import Any, ClassVar, cast
+from typing import Any, ClassVar, TypeIs, cast
 from urllib.parse import parse_qs, urlparse
 
 import aiofiles
@@ -23,6 +23,10 @@ from src.takescreens import download_artwork_from_meta
 from src.temp_paths import artwork_dir
 from src.tracker_images import ImageCollection, get_tracker_image_collection
 from src.trackers.common import Common
+
+
+def _is_str_dict(val: object) -> TypeIs[dict[str, object]]:
+    return isinstance(val, dict)
 
 
 class CathodeRayTube:
@@ -332,7 +336,7 @@ class CathodeRayTube:
         return [
             image
             for image in get_tracker_image_collection(meta, self.tracker, collection)
-            if isinstance(image, dict) and isinstance(image.get("raw_url"), str) and image["raw_url"]
+            if _is_str_dict(image) and isinstance(image.get("raw_url"), str) and image["raw_url"]
         ]
 
     async def generate_description(self, meta: Meta) -> str:

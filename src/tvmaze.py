@@ -1,6 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import json
-from typing import Any, cast
+from typing import Any, TypeIs, cast
 
 import cli_ui
 import httpx
@@ -9,6 +9,14 @@ from src import webui_events
 from src.console import logger
 from src.meta import Meta
 from src.metadata_cache import cache_for, is_cache_miss
+
+
+def _is_obj_dict(val: object) -> TypeIs[dict[str, object]]:
+    return isinstance(val, dict)
+
+
+def _is_obj_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
 
 
 class TvmazeManager:
@@ -171,11 +179,11 @@ class TvmazeManager:
             async with httpx.AsyncClient(follow_redirects=True) as client:
                 resp = await client.get(url, params=params, timeout=10)
                 if resp.status_code == 200:
-                    data: Any = resp.json()
-                    if isinstance(data, dict):
+                    data: object = resp.json()
+                    if _is_obj_dict(data):
                         await cache.set("tvmaze", "response", cache_key, data)
                         return cast(dict[str, Any], data)
-                    if isinstance(data, list):
+                    if _is_obj_list(data):
                         result = [cast(dict[str, Any], item) for item in data if isinstance(item, dict)]
                         await cache.set("tvmaze", "response", cache_key, result, negative=not bool(result))
                         return result

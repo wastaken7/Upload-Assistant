@@ -3,9 +3,10 @@ import asyncio
 import json
 import re
 import traceback
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, ClassVar, cast
+from typing import Any, ClassVar, TypeIs, cast
 from urllib.parse import urlparse
 
 import aiofiles
@@ -24,6 +25,14 @@ from src.tracker_images import get_tracker_image_collection
 from src.trackers.common import Common
 
 Config = dict[str, Any]
+
+
+def _is_str_dict(val: object) -> TypeIs[dict[str, Any]]:
+    return isinstance(val, dict)
+
+
+def _is_obj_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
 
 
 class TVChaosUK:
@@ -956,20 +965,21 @@ class TVChaosUK:
         Returns a BBCode string with icon links (for multi-block layout).
         No [center] tags or extra newlines - caller handles layout.
         """
-        parts = []
+        parts: list[str] = []
 
-        link_configs = [
-            ("imdb_id", lambda m: m.get("imdb_info", {}).get("imdb_url", ""), "imdb_75"),
-            ("tmdb_id", lambda m: f"https://www.themoviedb.org/{m.get('category', '').lower()}/{m['tmdb_id']}", "tmdb_75"),
-            ("tvdb_id", lambda m: f"https://www.thetvdb.com/?id={m['tvdb_id']}&tab=series", "tvdb_75"),
-            ("tvmaze_id", lambda m: f"https://www.tvmaze.com/shows/{m['tvmaze_id']}", "tvmaze_75"),
-            ("mal_id", lambda m: f"https://myanimelist.net/anime/{m['mal_id']}", "mal_75"),
+        link_configs: list[tuple[str, Callable[[Meta], str], str]] = [
+            ("imdb_id", lambda m: m.imdb_info.get("imdb_url", "") if isinstance(m.imdb_info, dict) else "", "imdb_75"),
+            ("tmdb_id", lambda m: f"https://www.themoviedb.org/{str(m.category).lower()}/{m.tmdb_id}", "tmdb_75"),
+            ("tvdb_id", lambda m: f"https://www.thetvdb.com/?id={m.tvdb_id}&tab=series", "tvdb_75"),
+            ("tvmaze_id", lambda m: f"https://www.tvmaze.com/shows/{m.tvmaze_id}", "tvmaze_75"),
+            ("mal_id", lambda m: f"https://myanimelist.net/anime/{m.mal_id}", "mal_75"),
         ]
 
         for id_key, url_func, img_key in link_configs:
             if meta.get(id_key, 0):
                 url = url_func(meta)
-                img = self.config.get("IMAGES", {}).get(img_key, "")
+                images = self.config.get("IMAGES")
+                img = str(images.get(img_key, "")) if _is_str_dict(images) else ""
                 if url and img:
                     parts.append(f"[URL={url}][img]{img}[/img][/URL] ")
 
@@ -985,12 +995,9 @@ class TVChaosUK:
     def get_subs_info(self, meta: Meta, mi: dict[str, Any]) -> None:
         subs = ""
         subs_num = 0
-        media = cast(dict[str, Any], mi.get("media") or {})
-        tracks_raw: list[Any] = []
-        raw_tracks = media.get("track")
-        if isinstance(raw_tracks, list):
-            tracks_raw = raw_tracks
-        tracks = cast(list[dict[str, Any]], tracks_raw)
+        media = mi.get("media")
+        raw_tracks = media.get("track") if _is_str_dict(media) else None
+        tracks: list[dict[str, Any]] = [t for t in raw_tracks if _is_str_dict(t)] if _is_obj_list(raw_tracks) else []
 
         # Count subtitle tracks
         for s in tracks:

@@ -3,7 +3,7 @@ import asyncio
 import json
 import re
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, TypeIs, cast
 
 import aiofiles
 import cli_ui
@@ -21,6 +21,14 @@ from src.exceptions import *  # noqa F403
 from src.meta import Meta
 from src.screenshot_manifest import files as manifest_files
 from src.trackers.common import Common
+
+
+def _is_str_dict(val: object) -> TypeIs[dict[str, Any]]:
+    return isinstance(val, dict)
+
+
+def _is_obj_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
 
 
 class FileList:
@@ -179,12 +187,12 @@ class FileList:
             try:
                 with path.open("r", encoding="utf-8") as f:
                     data = json.load(f)
-                if isinstance(data, dict):
+                if _is_str_dict(data):
                     if data:
-                        first_val = next(iter(data.values()))
-                        if isinstance(first_val, dict) and "value" in first_val:
-                            return {name: str(item.get("value", "")) for name, item in data.items()}
-                    return {name: str(val) for name, val in data.items()}
+                        first_val: object = next(iter(data.values()))
+                        if _is_str_dict(first_val) and "value" in first_val:
+                            return {str(name): str(item.get("value", "")) for name, item in data.items() if _is_str_dict(item)}
+                    return {str(name): str(val) for name, val in data.items()}
             except Exception as e:
                 logger.error(f"{self.tracker}: [yellow]Warning: Error parsing cookie file: {e}[/yellow]")
             return {}
@@ -334,6 +342,7 @@ class FileList:
         search_url = f"{self.base_url}/browse.php"
 
         imdb_id_value = str(meta.imdb_id if meta.imdb_id is not None else "0")
+        params: dict[str, Any]
         if imdb_id_value.isdigit() and int(imdb_id_value) != 0:
             params = {"search": meta.imdb, "cat": await self.get_category_id(meta), "searchin": "3"}
         else:
@@ -490,38 +499,28 @@ class FileList:
         has_ro_audio = has_ro_sub = False
         if meta.is_disc != "BDMV":
             mi = meta.mediainfo
-            if isinstance(mi, dict):
-                mi_dict = mi
-                media = mi_dict.get("media")
-                if isinstance(media, dict):
-                    media_dict = cast(dict[str, Any], media)
-                    tracks = media_dict.get("track")
-                    if isinstance(tracks, list):
-                        tracks_list = tracks
-                        for track in tracks_list:
-                            if not isinstance(track, dict):
+            if _is_str_dict(mi):
+                media = mi.get("media")
+                if _is_str_dict(media):
+                    tracks = media.get("track")
+                    if _is_obj_list(tracks):
+                        for track in tracks:
+                            if not _is_str_dict(track):
                                 continue
-                            track_dict = cast(dict[str, Any], track)
-                            if track_dict.get("@type") == "Text" and track_dict.get("Language") == "ro":
+                            if track.get("@type") == "Text" and track.get("Language") == "ro":
                                 has_ro_sub = True
-                            if track_dict.get("@type") == "Audio" and track_dict.get("Audio") == "ro":
+                            if track.get("@type") == "Audio" and track.get("Audio") == "ro":
                                 has_ro_audio = True
         else:
             bdinfo = meta.bdinfo
-            if isinstance(bdinfo, dict):
-                bdinfo_dict = bdinfo
-                subtitles = bdinfo_dict.get("subtitles")
-                if isinstance(subtitles, list) and "Romanian" in subtitles:
+            if _is_str_dict(bdinfo):
+                subtitles = bdinfo.get("subtitles")
+                if _is_obj_list(subtitles) and "Romanian" in subtitles:
                     has_ro_sub = True
-                audio_tracks = bdinfo_dict.get("audio")
-                if isinstance(audio_tracks, list):
-                    audio_tracks_list = audio_tracks
-                    for audio_track in audio_tracks_list:
-                        if isinstance(audio_track, dict):
-                            audio_track_dict = cast(dict[str, Any], audio_track)
-                        else:
-                            continue
-                        if audio_track_dict.get("language") == "Romanian":
+                audio_tracks = bdinfo.get("audio")
+                if _is_obj_list(audio_tracks):
+                    for audio_track in audio_tracks:
+                        if _is_str_dict(audio_track) and audio_track.get("language") == "Romanian":
                             has_ro_audio = True
                             break
         return has_ro_audio, has_ro_sub

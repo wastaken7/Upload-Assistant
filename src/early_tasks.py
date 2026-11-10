@@ -5,7 +5,7 @@ import os
 import time
 from collections.abc import Awaitable, Mapping
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, TypeIs, cast
 
 from src.clients import Clients
 from src.console import CliProgressGate, logger, suppress_cli_progress
@@ -130,10 +130,14 @@ def needs_usenet_archive(meta: Meta) -> bool:
     )
 
 
+def _is_str_mapping(value: object) -> TypeIs[Mapping[str, Any]]:
+    return isinstance(value, Mapping)
+
+
 async def prepare_usenet_archive_early(meta: Meta, config: Mapping[str, Any]) -> None:
     """Create archive/PAR2 files before duplicate confirmation, never post them."""
     usenet_cfg = config.get("USENET", {})
-    if not needs_usenet_archive(meta) or not isinstance(usenet_cfg, Mapping) or usenet_cfg.get("skip_archive", False):
+    if not needs_usenet_archive(meta) or not _is_str_mapping(usenet_cfg) or bool(usenet_cfg.get("skip_archive", False)):
         return
     try:
         from src.usenetcreate import prepare_and_upload_usenet

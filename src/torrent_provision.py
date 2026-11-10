@@ -7,7 +7,7 @@ import os
 import threading
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, TypeIs, cast
 
 from src.console import logger
 from src.meta import Meta
@@ -17,6 +17,10 @@ from src.torrentcreate import TorrentCreator
 
 _locks: dict[str, asyncio.Lock] = {}
 _locks_guard = threading.Lock()
+
+
+def _is_str_mapping(val: object) -> TypeIs[Mapping[str, Any]]:
+    return isinstance(val, Mapping)
 
 
 def _variant_lock(meta: Meta, layout: TorrentLayout, policy: TorrentPolicy) -> asyncio.Lock:
@@ -41,8 +45,8 @@ async def provision_tracker_torrents(
     """Prepare manifest selections and return trackers blocked by constraints."""
     manifest = TorrentManifest(meta.base_dir, meta.uuid)
     blocked: dict[str, str] = {}
-    tracker_configs = config.get("TRACKERS", {})
-    tracker_configs = tracker_configs if isinstance(tracker_configs, Mapping) else {}
+    raw_tracker_configs: object = config.get("TRACKERS", {})
+    tracker_configs: Mapping[str, Any] = raw_tracker_configs if _is_str_mapping(raw_tracker_configs) else {}
 
     for raw_tracker in trackers:
         tracker = str(raw_tracker).strip().upper()
@@ -50,8 +54,8 @@ async def provision_tracker_torrents(
             factory = tracker_class_map.get(tracker)
             if factory is None or getattr(factory, "is_usenet", False):
                 continue
-            tracker_settings = tracker_configs.get(tracker, {})
-            allow_subs = isinstance(tracker_settings, Mapping) and bool(tracker_settings.get("allow_ext_subtitles", False))
+            tracker_settings: object = tracker_configs.get(tracker, {})
+            allow_subs = _is_str_mapping(tracker_settings) and bool(tracker_settings.get("allow_ext_subtitles", False))
             layout: TorrentLayout = "base_subs" if allow_subs and manifest.default_path("base_subs") is not None else "base"
             policy = cast(TorrentPolicy | None, getattr(factory, "torrent_policy", None))
             if manifest.select(tracker, layout, policy) is not None:

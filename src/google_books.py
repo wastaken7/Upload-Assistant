@@ -1,6 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import re
-from typing import Any
+from typing import Any, TypeIs
 
 import httpx
 
@@ -9,6 +9,10 @@ from src.console import logger
 from src.metadata_cache import cache_for, is_cache_miss
 
 google_color_str = "[#4285f4]G[/#4285f4][#ea4335]o[/#ea4335][#fbbc05]o[/#fbbc05][#4285f4]g[/#4285f4][#34a853]l[/#34a853][#ea4335]e[/#ea4335] [#4285f4]Books[/#4285f4]"
+
+
+def _is_str_dict(val: object) -> TypeIs[dict[str, Any]]:
+    return isinstance(val, dict)
 
 
 class GoogleBooksManager:
@@ -106,7 +110,7 @@ class GoogleBooksManager:
 
         cache = cache_for(base_dir)
         cached_data = await cache.get("google_books", "isbn", clean_isbn)
-        if not is_cache_miss(cached_data) and isinstance(cached_data, dict):
+        if not is_cache_miss(cached_data) and _is_str_dict(cached_data):
             if cached_data.get("not_found"):
                 logger.info(f"{google_color_str}: ISBN match not found (cached): {clean_isbn}")
                 return None

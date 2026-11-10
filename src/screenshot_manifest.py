@@ -8,13 +8,18 @@ meaning from a filename.
 import json
 import threading
 import uuid
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeIs
 
 from src.temp_paths import release_temp_dir, screenshots_dir
 
 _locks: dict[str, threading.RLock] = {}
 _locks_guard = threading.Lock()
+
+
+def _is_str_dict(val: object) -> TypeIs[dict[str, Any]]:
+    return isinstance(val, dict)
 
 
 def _lock(base_dir: str | Path | None, release_id: str) -> threading.RLock:
@@ -29,10 +34,10 @@ def _path(base_dir: str | Path | None, release_id: str) -> Path:
 
 def _load(base_dir: str | Path, release_id: str) -> dict[str, Any]:
     try:
-        value = json.loads(_path(base_dir, release_id).read_text(encoding="utf-8"))
+        value: object = json.loads(_path(base_dir, release_id).read_text(encoding="utf-8"))
     except OSError, json.JSONDecodeError:
         value = {}
-    return value if isinstance(value, dict) else {}
+    return value if _is_str_dict(value) else {}
 
 
 def _save(base_dir: str | Path, release_id: str, value: dict[str, Any]) -> None:
@@ -46,7 +51,7 @@ def _save(base_dir: str | Path, release_id: str, value: dict[str, Any]) -> None:
 def register(
     base_dir: str | Path,
     release_id: str,
-    paths: list[str | Path],
+    paths: Sequence[str | Path],
     group: str,
     *,
     timestamps: dict[str, float] | None = None,
@@ -56,8 +61,8 @@ def register(
     """Publish capture files under UUID names and return their new paths."""
     with _lock(base_dir, release_id):
         manifest = _load(base_dir, release_id)
-        entries = manifest.setdefault("screenshots", {})
-        if not isinstance(entries, dict):
+        entries: object = manifest.setdefault("screenshots", {})
+        if not _is_str_dict(entries):
             entries = manifest["screenshots"] = {}
         result: list[Path] = []
         for value in paths:
@@ -86,12 +91,12 @@ def register(
 def files(base_dir: str | Path, release_id: str, group: str | None = None) -> list[Path]:
     """Return active screenshots in registration order, optionally by group."""
     directory = screenshots_dir(base_dir, release_id)
-    entries = _load(base_dir, release_id).get("screenshots", {})
-    if not isinstance(entries, dict):
+    entries: object = _load(base_dir, release_id).get("screenshots", {})
+    if not _is_str_dict(entries):
         return []
-    result = []
+    result: list[Path] = []
     for screenshot_id, value in entries.items():
-        if not isinstance(value, dict) or (group is not None and value.get("group") != group):
+        if not _is_str_dict(value) or (group is not None and value.get("group") != group):
             continue
         path = directory / str(value.get("file", f"{screenshot_id}.png"))
         if path.is_file():
@@ -102,12 +107,12 @@ def files(base_dir: str | Path, release_id: str, group: str | None = None) -> li
 def capture_timestamps(base_dir: str | Path, release_id: str, group: str, *, original_slots: bool = False) -> list[float]:
     """Return active capture times, optionally preferring original sampling slots."""
     directory = screenshots_dir(base_dir, release_id)
-    entries = _load(base_dir, release_id).get("screenshots", {})
-    if not isinstance(entries, dict):
+    entries: object = _load(base_dir, release_id).get("screenshots", {})
+    if not _is_str_dict(entries):
         return []
-    result = []
+    result: list[float] = []
     for value in entries.values():
-        if not isinstance(value, dict) or value.get("group") != group:
+        if not _is_str_dict(value) or value.get("group") != group:
             continue
         timestamp = value.get("slot_timestamp", value.get("timestamp")) if original_slots else value.get("timestamp")
         if isinstance(timestamp, (int, float)) and (directory / str(value.get("file", ""))).is_file():
@@ -118,13 +123,13 @@ def capture_timestamps(base_dir: str | Path, release_id: str, group: str, *, ori
 def capture_pages(base_dir: str | Path, release_id: str, group: str) -> set[int]:
     """Return the book pages behind the active screenshots of one group."""
     directory = screenshots_dir(base_dir, release_id)
-    entries = _load(base_dir, release_id).get("screenshots", {})
-    if not isinstance(entries, dict):
+    entries: object = _load(base_dir, release_id).get("screenshots", {})
+    if not _is_str_dict(entries):
         return set()
     return {
         value["page"]
         for value in entries.values()
-        if isinstance(value, dict) and value.get("group") == group and isinstance(value.get("page"), int) and (directory / str(value.get("file", ""))).is_file()
+        if _is_str_dict(value) and value.get("group") == group and isinstance(value.get("page"), int) and (directory / str(value.get("file", ""))).is_file()
     }
 
 
@@ -132,11 +137,11 @@ def set_page(base_dir: str | Path, release_id: str, path: Path, page: int) -> No
     """Record the book page now shown by an existing screenshot file."""
     with _lock(base_dir, release_id):
         manifest = _load(base_dir, release_id)
-        entries = manifest.get("screenshots")
-        if not isinstance(entries, dict):
+        entries: object = manifest.get("screenshots")
+        if not _is_str_dict(entries):
             return
         for value in entries.values():
-            if isinstance(value, dict) and value.get("file") == path.name:
+            if _is_str_dict(value) and value.get("file") == path.name:
                 value["page"] = page
         _save(base_dir, release_id, manifest)
 
@@ -145,12 +150,12 @@ def clear_group(base_dir: str | Path, release_id: str, group: str) -> None:
     """Delete the active files and manifest entries for one capture group."""
     with _lock(base_dir, release_id):
         manifest = _load(base_dir, release_id)
-        entries = manifest.get("screenshots")
-        if not isinstance(entries, dict):
+        entries: object = manifest.get("screenshots")
+        if not _is_str_dict(entries):
             return
         directory = screenshots_dir(base_dir, release_id)
         for screenshot_id, value in list(entries.items()):
-            if not isinstance(value, dict) or value.get("group") != group:
+            if not _is_str_dict(value) or value.get("group") != group:
                 continue
             path = directory / str(value.get("file", f"{screenshot_id}.png"))
             path.unlink(missing_ok=True)
@@ -160,10 +165,10 @@ def clear_group(base_dir: str | Path, release_id: str, group: str) -> None:
 
 def group_for(base_dir: str | Path, release_id: str, path: Path) -> str:
     """Return the logical capture group for a local screenshot."""
-    entries = _load(base_dir, release_id).get("screenshots", {})
-    if isinstance(entries, dict):
+    entries: object = _load(base_dir, release_id).get("screenshots", {})
+    if _is_str_dict(entries):
         for value in entries.values():
-            if isinstance(value, dict) and value.get("file") == path.name:
+            if _is_str_dict(value) and value.get("file") == path.name:
                 group = value.get("group")
                 if isinstance(group, str) and group:
                     return group
@@ -174,10 +179,10 @@ def forget_file(base_dir: str | Path, release_id: str, path: Path) -> None:
     """Remove a transient capture entry after it has been atomically moved."""
     with _lock(base_dir, release_id):
         manifest = _load(base_dir, release_id)
-        entries = manifest.get("screenshots")
-        if not isinstance(entries, dict):
+        entries: object = manifest.get("screenshots")
+        if not _is_str_dict(entries):
             return
         for screenshot_id, value in list(entries.items()):
-            if isinstance(value, dict) and value.get("file") == path.name:
+            if _is_str_dict(value) and value.get("file") == path.name:
                 entries.pop(screenshot_id)
         _save(base_dir, release_id, manifest)

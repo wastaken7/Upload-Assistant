@@ -8,7 +8,15 @@ import re
 from dataclasses import asdict, dataclass
 from difflib import SequenceMatcher
 from enum import StrEnum
-from typing import Any
+from typing import Any, TypeIs
+
+
+def _is_obj_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
+
+
+def _is_str_dict(val: object) -> TypeIs[dict[str, object]]:
+    return isinstance(val, dict)
 
 
 class TrackerDescriptionMode(StrEnum):
@@ -59,14 +67,16 @@ class DescriptionCandidate:
 
 def description_fingerprint(meta: Any, tracker: str) -> str:
     """Hash inputs which change a generated tracker description."""
-    images = meta.get("image_list", []) if hasattr(meta, "get") else getattr(meta, "image_list", [])
-    payload = {
+    images_raw: object = meta.get("image_list", []) if hasattr(meta, "get") else getattr(meta, "image_list", [])
+    images: list[object] = images_raw if _is_obj_list(images_raw) else []
+    image_urls: list[object] = [image.get("raw_url", image.get("img_url", "")) for image in images if _is_str_dict(image)]
+    payload: dict[str, object] = {
         "version": 1,
         "tracker": tracker.upper(),
         "category": getattr(meta, "category", ""),
         "name": getattr(meta, "name", ""),
         "description": getattr(meta, "description", ""),
-        "images": [image.get("raw_url", image.get("img_url", "")) for image in images if isinstance(image, dict)],
+        "images": image_urls,
         "mediainfo": getattr(meta, "mediainfo", {}),
         "bdinfo": getattr(meta, "bdinfo", {}),
     }

@@ -51,7 +51,7 @@ The lookup tries, in this order:
 2. a JAV product code (`ABC-123`) on ThePornDB's JAV catalogue;
 3. the file hash (OSHASH) of a single-video release on ThePornDB, which identifies the exact scene;
 4. for dated scenes (`Studio.YY.MM.DD.…`, `Studio YY.MM.DD …` or `[Site.com] YY.MM.DD …`, as BitPorn uploads are named): the full name, then every scene of that site and day, then the first words of the title;
-5. for other names: the site and title of `[Site.com] Performer - Title 2026` names, movies and scenes by title (movie-like names, such as `DVDRip`, `Vol. 3` or a year in brackets, search movies first), and the part after ` - ` in `Studio - Title` names;
+5. for other names: the site and title of `[Site.com] Performer - Title 2026` names, movies and scenes by title (movie-like names, such as `DVDRip`, `Vol. 3` or a year in brackets, search movies first), and the part after `-` in `Studio - Title` names;
 6. a BLVCKOUT movie search, when ThePornDB found nothing plausible.
 
 A result is used without asking only when it is clearly the release, with nothing that contradicts it (another date, another studio, a very different runtime):
@@ -75,15 +75,15 @@ Values given on the command line (`--publisher`, `--year`, `--overview`, `--cast
 
 Use these arguments when automatic metadata needs correction:
 
-| Argument                       | Purpose                                                |
-| ------------------------------ | ------------------------------------------------------ |
-| `--tpdb scenes/ID`             | Use this ThePornDB scene (`movies/ID` for a movie).    |
-| `--blvckout ID`                | Use this BLVCKOUT movie.                               |
-| `--name "RELEASE_NAME"`        | Override the generated upload name or title.           |
-| `--cast "Name One,Name Two"`   | Supply a comma-separated performer list.               |
-| `--publisher "Studio"`         | Override the detected studio/publisher.                |
-| `--year YYYY`                  | Override the detected year.                            |
-| `--keywords "tag one,tag two"` | Add keywords to those detected from the name.          |
+| Argument                       | Purpose                                             |
+| ------------------------------ | --------------------------------------------------- |
+| `--tpdb scenes/ID`             | Use this ThePornDB scene (`movies/ID` for a movie). |
+| `--blvckout ID`                | Use this BLVCKOUT movie.                            |
+| `--name "RELEASE_NAME"`        | Override the generated upload name or title.        |
+| `--cast "Name One,Name Two"`   | Supply a comma-separated performer list.            |
+| `--publisher "Studio"`         | Override the detected studio/publisher.             |
+| `--year YYYY`                  | Override the detected year.                         |
+| `--keywords "tag one,tag two"` | Add keywords to those detected from the name.       |
 
 ## Contact sheets and artwork
 

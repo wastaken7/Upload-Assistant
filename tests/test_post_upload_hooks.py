@@ -86,6 +86,13 @@ def test_timeout_terminates_hook_child_processes(tmp_path, monkeypatch):
     assert time.monotonic() - started < 5  # noqa: S101
     child_pid = int(child_pid_file.read_text(encoding="utf-8"))
     deadline = time.monotonic() + 2
-    while psutil.pid_exists(child_pid) and time.monotonic() < deadline:
+
+    def _is_running(pid: int) -> bool:
+        try:
+            return psutil.pid_exists(pid) and psutil.Process(pid).status() != psutil.STATUS_ZOMBIE
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            return False
+
+    while _is_running(child_pid) and time.monotonic() < deadline:
         time.sleep(0.05)
-    assert not psutil.pid_exists(child_pid)  # noqa: S101
+    assert not _is_running(child_pid)  # noqa: S101

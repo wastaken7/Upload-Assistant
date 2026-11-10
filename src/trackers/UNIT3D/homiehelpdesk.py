@@ -1,6 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import re
-from typing import Any, ClassVar
+from typing import Any, ClassVar, TypeIs
 from urllib.parse import urlsplit
 
 from src.console import logger
@@ -10,6 +10,10 @@ from src.trackers.common import Common
 from src.trackers.UNIT3D import UNIT3D
 
 Config = dict[str, Any]
+
+
+def _is_str_dict(val: object) -> TypeIs[dict[str, Any]]:
+    return isinstance(val, dict)
 
 
 class HomieHelpDesk(UNIT3D):
@@ -112,9 +116,9 @@ class HomieHelpDesk(UNIT3D):
     @staticmethod
     def _music_upload_data(meta: Meta) -> dict[str, str]:
         """Build HomieHelpDesk's music-specific external-ID payload."""
-        release = meta.music_release if isinstance(meta.music_release, dict) else {}
-        external_ids = release.get("external_ids", {})
-        external_ids = external_ids if isinstance(external_ids, dict) else {}
+        release = meta.music_release if _is_str_dict(meta.music_release) else {}
+        external_ids_raw = release.get("external_ids")
+        external_ids = external_ids_raw if _is_str_dict(external_ids_raw) else {}
 
         musicbrainz = str(external_ids.get("musicbrainz_release") or external_ids.get("musicbrainz_release_group") or "").strip()
         if re.fullmatch(r"[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}", musicbrainz, re.IGNORECASE):
@@ -272,11 +276,12 @@ class HomieHelpDesk(UNIT3D):
         if meta.category == "GAME":
             resolved_type = "CONSOLE" if meta.console_game else meta.platform.upper()
         elif meta.category == "MUSIC":
-            release = meta.music_release if isinstance(meta.music_release, dict) else {}
-            fields = release.get("fields", {})
-            music_format = fields.get("format", {}) if isinstance(fields, dict) else {}
-            resolved_type = music_format.get("value", meta.format) if isinstance(music_format, dict) else meta.format
-            resolved_type = str(resolved_type or "").upper()
+            release = meta.music_release if _is_str_dict(meta.music_release) else {}
+            fields_raw = release.get("fields")
+            fields = fields_raw if _is_str_dict(fields_raw) else {}
+            music_format_raw = fields.get("format")
+            music_format = music_format_raw if _is_str_dict(music_format_raw) else {}
+            resolved_type = str(music_format.get("value") or meta.format or "").upper()
 
         return {"type_id": type_id.get(str(resolved_type), "0")}
 

@@ -6,7 +6,7 @@ import shutil
 import time
 import urllib.parse
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, TypeIs, cast
 
 import defusedxml.xmlrpc
 import httpx
@@ -22,6 +22,15 @@ from src.torrent_clients.qbittorrent import QbitAccess, qui_request
 from src.torrent_manifest import TorrentManifest
 from src.torrent_policy import HDBITS_POLICY, TorrentStats, generic_reuse_allowed
 from src.torrentcreate import DISC_EXCLUDE_GLOBS, SUBTITLE_EXTENSIONS
+
+
+def _is_str_dict(val: object) -> TypeIs[dict[str, Any]]:
+    return isinstance(val, dict)
+
+
+def _is_obj_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
+
 
 # Secure XML-RPC client using defusedxml to prevent XML attacks
 defusedxml.xmlrpc.monkey_patch()
@@ -253,10 +262,14 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
         By waiting before injection, this function helps ensure proper tracker
         synchronization and more reliable peer discovery.
         """
-        tracker_cfg = self.config.get("TRACKERS", {}).get(tracker, {})
+        trackers = self.config.get("TRACKERS")
+        tracker_cfg = trackers.get(tracker) if _is_str_dict(trackers) else None
         # None retains the setting while inheriting DEFAULT; 0 still disables it.
-        has_tracker_delay = isinstance(tracker_cfg, dict) and tracker_cfg.get("inject_delay") is not None
-        inject_delay = tracker_cfg.get("inject_delay") if has_tracker_delay else self.config["DEFAULT"].get("inject_delay", 0)
+        has_tracker_delay = _is_str_dict(tracker_cfg) and tracker_cfg.get("inject_delay") is not None
+        default_cfg = self.config.get("DEFAULT")
+        inject_delay = (
+            tracker_cfg.get("inject_delay") if has_tracker_delay and _is_str_dict(tracker_cfg) else (default_cfg.get("inject_delay", 0) if _is_str_dict(default_cfg) else 0)
+        )
         if inject_delay is None or (isinstance(inject_delay, str) and not inject_delay.strip()):
             return
 
@@ -288,9 +301,10 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
         if isinstance(requested, str) and requested != "none":
             client_names = [requested]
         else:
-            configured = self.config["DEFAULT"].get("searching_client_list", [])
-            client_names = [str(name) for name in configured if str(name) and str(name) != "none"] if isinstance(configured, list) else []
-            default = str(self.config["DEFAULT"].get("default_torrent_client", "none"))
+            default_cfg = self.config.get("DEFAULT")
+            configured: object = default_cfg.get("searching_client_list", []) if _is_str_dict(default_cfg) else []
+            client_names: list[str] = [str(name) for name in configured if str(name) and str(name) != "none"] if _is_obj_list(configured) else []
+            default = str(default_cfg.get("default_torrent_client", "none")) if _is_str_dict(default_cfg) else "none"
             if not client_names and default != "none":
                 client_names = [default]
 
@@ -361,7 +375,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
         # Determine piece size preferences
         piece_limit = bool(self.config["DEFAULT"].get("prefer_max_16_torrent", False))
         prefer_small_pieces = piece_limit
-        best_match = None  # Track the best match for fallback if prefer_small_pieces is enabled
+        best_match: dict[str, Any] | None = None  # Track the best match for fallback if prefer_small_pieces is enabled
         video_only_fallback: tuple[str, str] | None = None
 
         default_torrent_client = cast(str, self.config["DEFAULT"]["default_torrent_client"])
@@ -407,7 +421,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                     ):
                         video_only_fallback = (candidate_path, client_name)
                     continue
-                if isinstance(result, dict):
+                if _is_str_dict(result):
                     # Got a valid torrent but not ideal piece size
                     best_match = {**result, "client_name": client_name}
                     # If prefer_small_pieces is False, we don't care about piece size optimization
@@ -421,7 +435,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                     # Got a path - this means we found a torrent with ideal piece size
                     logger.debug(f"[green]Found valid torrent with preferred piece size in client '{client_name}', stopping search[/green]")
                     meta.reuse_torrent_client = client_name
-                    return result
+                    return result if isinstance(result, str) else None
 
         if prefer_small_pieces and best_match:
             logger.info(f"[yellow]Using best match torrent with hash: [bold yellow]{best_match['torrenthash']}[/bold yellow]")
@@ -532,6 +546,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
 
         # Search the client if no pre-specified hash matches
         if torrent_client == "qbit" and client.get("enable_search"):
+            found: list[str] | str | None = None
             qbt_session: httpx.AsyncClient | None = None
             try:
                 proxy_url = client.get("qui_proxy_url")
@@ -604,7 +619,10 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                                     active_qbt = qbt_client
                                     try:
                                         torrent_file_content = await self.retry_qbt_operation(
-                                            lambda qbt_client=active_qbt, found_hash=found_hash: asyncio.to_thread(qbt_client.torrents_export, torrent_hash=found_hash),
+                                            lambda qbt_client=active_qbt, found_hash=found_hash: asyncio.to_thread(
+                                                qbt_client.torrents_export,
+                                                torrent_hash=found_hash,  # pyright: ignore[reportUnknownMemberType]
+                                            ),
                                             f"Export torrent {found_hash}",
                                         )
                                     except (TimeoutError, qbittorrentapi.APIError) as e:
@@ -658,8 +676,9 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
             return candidates
         return best_match
 
-    async def is_valid_torrent(self, meta: Meta, torrent_path: str, torrenthash: str, torrent_client: str, _client: dict[str, Any]) -> tuple[bool, str]:
+    async def is_valid_torrent(self, meta: Meta, torrent_path: str | Path, torrenthash: str, torrent_client: str, client: dict[str, Any]) -> tuple[bool, str]:
         """Validate a candidate torrent against files, layout, and piece limits."""
+        _ = client
         torrent_path = str(torrent_path)
         valid = False
         filelist = cast(list[str], meta.filelist)
@@ -835,15 +854,15 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
 
     async def get_ptp_from_hash(self, meta: Meta, pathed: bool = False, client_name: str | None = None) -> Meta:
         """Fetch PTP metadata through the configured torrent client when available."""
-        default_config = self.config.get("DEFAULT", {})
-        clients_config = self.config.get("TORRENT_CLIENTS", {})
-        default_torrent_client = client_name or (default_config.get("default_torrent_client") if isinstance(default_config, dict) else None)
-        if not isinstance(default_torrent_client, str) or not default_torrent_client:
+        default_config = self.config.get("DEFAULT")
+        clients_config = self.config.get("TORRENT_CLIENTS")
+        default_torrent_client = client_name or (str(default_config.get("default_torrent_client", "")) if _is_str_dict(default_config) else "")
+        if not default_torrent_client:
             logger.debug("[yellow]Skipping torrent metadata lookup: no default torrent client configured.[/yellow]")
             return meta
 
-        client = clients_config.get(default_torrent_client) if isinstance(clients_config, dict) else None
-        if not isinstance(client, dict):
+        client = clients_config.get(default_torrent_client) if _is_str_dict(clients_config) else None
+        if not _is_str_dict(client):
             logger.debug(f"[yellow]Skipping torrent metadata lookup: client '{default_torrent_client}' is not configured.[/yellow]")
             return meta
 

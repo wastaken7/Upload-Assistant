@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import importlib
 import json
 import os
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeIs
 
 from src.stats import record_event
 
@@ -18,11 +19,15 @@ _MISSING = object()
 _RUN_DISABLED = False
 
 
+def _is_str_dict(value: object) -> TypeIs[dict[str, Any]]:
+    return isinstance(value, dict)
+
+
 def _default_config() -> dict[str, Any]:
     try:
-        from data.config import config
-
-        return config if isinstance(config, dict) else {}
+        config_module = importlib.import_module("data.config")
+        config = getattr(config_module, "config", None)
+        return config if _is_str_dict(config) else {}
     except ImportError, ModuleNotFoundError:
         return {}
 
@@ -30,8 +35,7 @@ def _default_config() -> dict[str, Any]:
 def _project_root() -> Path:
     """Locate the configured Upload-Assistant checkout independently of cwd."""
     try:
-        import data.config as config_module
-
+        config_module = importlib.import_module("data.config")
         config_file = getattr(config_module, "__file__", None)
         if config_file:
             return Path(config_file).resolve().parent.parent
@@ -49,8 +53,8 @@ class MetadataCache:
 
     def __init__(self, base_dir: str | Path, config: dict[str, Any] | None = None) -> None:
         config = config or _default_config()
-        default = config.get("DEFAULT", config) if isinstance(config, dict) else {}
-        default = default if isinstance(default, dict) else {}
+        default_obj: object = config.get("DEFAULT", config) if _is_str_dict(config) else None
+        default = default_obj if _is_str_dict(default_obj) else {}
         self.enabled = bool(default.get("metadata_cache_enabled", True))
         configured_dir = str(default.get("metadata_cache_dir", "data/cache/metadata")).strip()
         root = Path(base_dir) if base_dir else _project_root()
@@ -65,11 +69,11 @@ class MetadataCache:
         except TypeError, ValueError:
             self.negative_ttl = 60 * 60
         services = default.get("metadata_cache_services", {})
-        self.services = services if isinstance(services, dict) else {}
+        self.services: dict[str, Any] = services if _is_str_dict(services) else {}
 
     def _service_settings(self, provider: str) -> dict[str, Any]:
         value = self.services.get(provider, {})
-        return value if isinstance(value, dict) else {}
+        return value if _is_str_dict(value) else {}
 
     def is_enabled(self, provider: str) -> bool:
         return not _RUN_DISABLED and self.enabled and bool(self._service_settings(provider).get("enabled", True))
@@ -101,7 +105,7 @@ class MetadataCache:
         try:
             raw = await asyncio.to_thread(path.read_text, encoding="utf-8")
             entry = json.loads(raw)
-            if isinstance(entry, dict) and entry.get("version") == _VERSION and float(entry.get("expires_at", 0)) >= time.time():
+            if _is_str_dict(entry) and entry.get("version") == _VERSION and float(entry.get("expires_at", 0)) >= time.time():
                 outcome = "hit"
                 value = entry.get("value", _MISSING)
         except OSError, ValueError, TypeError:
@@ -116,7 +120,7 @@ class MetadataCache:
         if ttl <= 0:
             return
         path = self._path(provider, resource, key)
-        entry = {"version": _VERSION, "fetched_at": time.time(), "expires_at": time.time() + ttl, "value": value}
+        entry: dict[str, Any] = {"version": _VERSION, "fetched_at": time.time(), "expires_at": time.time() + ttl, "value": value}
         try:
             serialized = json.dumps(entry, ensure_ascii=False, indent=2)
         except TypeError, ValueError:
@@ -156,9 +160,9 @@ def set_run_disabled(disabled: bool) -> None:
 
 def tracker_metadata_cache_for(base_dir: str | Path, config: dict[str, Any]) -> MetadataCache:
     """Create the separately configured cache for explicit tracker torrent IDs."""
-    default_value = config.get("DEFAULT", {}) if isinstance(config, dict) else {}
-    default = default_value if isinstance(default_value, dict) else {}
-    cache_config = {
+    default_obj: object = config.get("DEFAULT") if _is_str_dict(config) else None
+    default = default_obj if _is_str_dict(default_obj) else {}
+    cache_config: dict[str, Any] = {
         "DEFAULT": {
             "stats_enabled": default.get("stats_enabled", False),
             "metadata_cache_enabled": default.get("tracker_metadata_cache_enabled", True),

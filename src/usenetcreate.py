@@ -433,7 +433,7 @@ def _redact_command(cmd: list[str], sensitive_options: set[str] | frozenset[str]
     Handles separate values (``-p secret``), ``--option=secret`` and the
     attached 7z/RAR password form (``-psecret``).
     """
-    redacted_cmd = []
+    redacted_cmd: list[str] = []
     skip_next = False
     for i, arg in enumerate(cmd):
         if skip_next:
@@ -474,16 +474,17 @@ async def run_command_with_logging(cmd: list[str], description: str) -> None:
         raise RuntimeError(f"Failed to execute command '{redacted_str}': {e}") from e
 
 
-def format_byte_size(value: int) -> str:
+def format_byte_size(value: int | float) -> str:
     """Return a compact binary byte-size string for progress details."""
+    current_size = float(value)
     for unit in ("B", "KiB", "MiB", "GiB", "TiB"):
-        if value < 1024 or unit == "TiB":
-            return f"{value:.1f} {unit}" if unit != "B" else f"{value} B"
-        value /= 1024
+        if current_size < 1024 or unit == "TiB":
+            return f"{current_size:.1f} {unit}" if unit != "B" else f"{int(current_size)} B"
+        current_size /= 1024
     return "0 B"
 
 
-async def run_7z_with_progress(cmd: list[str], usenet_dir: str, safe_name: str, _volume_size: str | None, total_size: int) -> None:
+async def run_7z_with_progress(cmd: list[str], usenet_dir: str | Path, safe_name: str, _volume_size: str | None, total_size: int) -> None:
     """Execute 7z archiving/splitting with byte-based real-time progress monitoring."""
     redacted_str = _redact_command(cmd)
 
@@ -630,7 +631,7 @@ async def run_par2_with_progress(cmd: list[str], cwd: str | None = None) -> None
         publish_progress(progress_id, progress_label, current=0, total=100, detail="Starting PAR2 generation", group="media")
         process = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT, cwd=cwd)
 
-        stdout_accum = []
+        stdout_accum: list[str] = []
 
         if process.stdout is None:
             raise RuntimeError("Process stdout is None")
@@ -718,7 +719,7 @@ async def run_nyuu_with_progress(cmd: list[str], cwd: str | None = None) -> None
         publish_progress("nyuu-upload", "Posting to Usenet", current=0, total=100, detail="Starting nyuu upload")
         process = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT, cwd=cwd)
 
-        stdout_accum = []
+        stdout_accum: list[str] = []
         total_articles = 0
 
         if process.stdout is None:
@@ -813,7 +814,7 @@ async def run_pesto_with_progress(cmd: list[str], cwd: str | None = None, env: d
             env=env,
         )
 
-        stderr_accum = []
+        stderr_accum: list[str] = []
         check_missing_count = 0
         check_checked_total = 0
         check_reposted_total = 0
@@ -1078,15 +1079,16 @@ async def run_pesto_with_progress(cmd: list[str], cwd: str | None = None, env: d
         raise RuntimeError(f"Failed to execute command '{redacted_str}': {e}") from e
 
 
-async def is_valid_nzb(path: str) -> bool:
+async def is_valid_nzb(path: str | Path) -> bool:
     """Check if an NZB file exists, is non-empty, and ends with proper XML/NZB closing tag."""
-    if not await aiofiles.ospath.isfile(path):
+    path_str = str(path)
+    if not await aiofiles.ospath.isfile(path_str):
         return False
     try:
-        size = await aiofiles.ospath.getsize(path)
+        size = await aiofiles.ospath.getsize(path_str)
         if size < 100:
             return False
-        async with aiofiles.open(path, "rb") as f:
+        async with aiofiles.open(path_str, "rb") as f:
             if size > 1024:
                 await f.seek(size - 1024)
                 chunk = await f.read(1024)
@@ -1098,12 +1100,13 @@ async def is_valid_nzb(path: str) -> bool:
         return False
 
 
-async def inject_nzb_password(nzb_path: str, password: str) -> None:
+async def inject_nzb_password(nzb_path: str | Path, password: str) -> None:
     """Inject <meta type="password">password</meta> into the NZB's <head> section."""
-    if not await aiofiles.ospath.exists(nzb_path):
+    nzb_str = str(nzb_path)
+    if not await aiofiles.ospath.exists(nzb_str):
         return
     try:
-        async with aiofiles.open(nzb_path, encoding="utf-8", errors="ignore") as f:
+        async with aiofiles.open(nzb_str, encoding="utf-8", errors="ignore") as f:
             content = await f.read()
 
         head_match = re.search(r"<head\b[^>]*>", content, re.IGNORECASE)
@@ -1119,15 +1122,16 @@ async def inject_nzb_password(nzb_path: str, password: str) -> None:
             else:
                 return
 
-        async with aiofiles.open(nzb_path, "w", encoding="utf-8") as f:
+        async with aiofiles.open(nzb_str, "w", encoding="utf-8") as f:
             await f.write(new_content)
     except Exception as e:
         logger.error(f"[red]Error injecting password into NZB file: {e}[/red]")
 
 
-async def verify_nzb_has_password(nzb_path: str) -> bool:
+async def verify_nzb_has_password(nzb_path: str | Path) -> bool:
     """Verify that the NZB file contains a password tag inside the head section."""
-    if not await aiofiles.ospath.isfile(nzb_path):
+    nzb_str = str(nzb_path)
+    if not await aiofiles.ospath.isfile(nzb_str):
         return False
     with contextlib.suppress(Exception):
         # Read the first 4096 bytes (the head section is always at the beginning)
@@ -1142,7 +1146,7 @@ async def verify_nzb_has_password(nzb_path: str) -> bool:
     return False
 
 
-async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepare_only: bool = False) -> str | None:
+async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepare_only: bool = False) -> Path | str | None:
     """
     Prepare files (7z + PAR2) and upload them to Usenet via nyuu or pesto.
     Returns the absolute path to the generated NZB file if successful.
@@ -1373,9 +1377,11 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
     upload_root = usenet_dir
     cleanup_upload_root = True
     upload_files: list[Path] = []
-    prepared_files = meta.get("usenet_prepared_files", [])
-    use_prepared_files = not skip_archive and isinstance(prepared_files, list) and bool(prepared_files) and all(Path(str(file_path)).is_file() for file_path in prepared_files)
+    prepared_files = meta.usenet_prepared_files
+    use_prepared_files = not skip_archive and bool(prepared_files) and all(Path(file_path).is_file() for file_path in prepared_files)
 
+    season_entries: dict[str, Path] = {}
+    season_nzb_dir = Path(tmp_base) / uuid / "season-nzbs"
     episode_labels: list[str] | None = None
     if pesto_season_upload:
         # Pesto must see the season directory itself so it can treat each
@@ -1390,7 +1396,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
             volume_size = get_dynamic_volume_size(total_size)
         logger.info("[cyan]Pesto season mode enabled; posting episodes individually and building a season NZB...[/cyan]")
     elif use_prepared_files:
-        upload_files = [Path(str(file_path)) for file_path in prepared_files]
+        upload_files = [Path(file_path) for file_path in prepared_files]
         logger.debug("[cyan]Reusing prepared Usenet archive and PAR2 files.[/cyan]")
     elif skip_archive:
         if archive_password:
@@ -1524,7 +1530,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
     # 6. Collect files to upload
     nzb_file = Path(tmp_base) / uuid / f"{safe_nzb_name}.nzb"
 
-    all_upload_files = []
+    all_upload_files: list[str] = []
     if pesto_season_upload:
         all_upload_files = [str(Path(input_path).resolve())]
     else:
@@ -1551,19 +1557,6 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
     )
 
     async def cleanup_temp_upload_dir() -> None:
-        # 7. Cleanup compressed volumes (7z parts + PAR2 recovery files) from
-        # the temp staging dir. Called both from each upload branch's failure
-        # path below (right before it re-raises) and, on success, from its
-        # original spot after the if/else — run_pesto_with_progress and
-        # run_nyuu_with_progress raise on failure (non-zero exit, or pesto's
-        # own post-check giving up on articles it couldn't confirm after
-        # every repost attempt), and upload.py's caller catches that
-        # exception and moves on to other trackers rather than crashing the
-        # whole run, so a run that hit this never looked like a failure
-        # overall — it just silently skipped this cleanup and left the temp
-        # files behind. That's the actual bug behind reports of "files
-        # aren't deleted after upload": the case people wouldn't call a
-        # failure is exactly the intermittent-missing-article one.
         cleanup_path = upload_root if cleanup_upload_root else usenet_dir
         try:
             if await aiofiles.ospath.exists(cleanup_path):
@@ -1577,7 +1570,6 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
 
     if use_pesto:
         # 6a. Upload via pesto
-        season_nzb_dir = Path(tmp_base) / uuid / "season-nzbs"
         pesto_env = os.environ.copy()
         pesto_config_root = usenet_dir / "pesto-config"
         pesto_nzb_archive_dir = pesto_config_root / "pesto" / "nzb"
@@ -1586,30 +1578,24 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
             pesto_env["APPDATA"] = str(pesto_config_root)
         else:
             pesto_env["XDG_CONFIG_HOME"] = str(pesto_config_root)
-        cmd_pesto = [
-            path_pesto or "pesto",
+        cmd_pesto: list[str] = [
+            str(path_pesto or "pesto"),
             "-s",
-            usenet_cfg.get("host"),
+            str(usenet_cfg.get("host", "")),
             "-P",
             str(usenet_cfg.get("port", 563)),
             "-u",
-            usenet_cfg.get("username"),
+            str(usenet_cfg.get("username", "")),
             "--auth-password",
-            usenet_cfg.get("password"),
+            str(usenet_cfg.get("password", "")),
             "-n",
             str(usenet_cfg.get("connections", 20)),
             "-g",
-            usenet_cfg.get("newsgroups"),
+            str(usenet_cfg.get("newsgroups", "")),
             "--par2",
             str(par2_percentage),
             "--output-format",
             "json",
-            # Upload-Assistant submits to trackers itself with full metadata
-            # (title, TMDB id, category, screenshots) right after this call.
-            # Any user-configured pesto post-upload hook (~/.config/pesto/hooks/)
-            # would otherwise fire first and auto-submit the same NZB with
-            # little to no metadata, getting registered before UA's own
-            # submission and causing it to be rejected as a duplicate.
             "--no-hooks",
         ]
 
@@ -1649,7 +1635,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
             cmd_pesto.append("--no-ssl")
 
         if not random_poster:
-            cmd_pesto.extend(["-f", poster])
+            cmd_pesto.extend(["-f", str(poster)])
 
         if obscure_subject and not custom_subject:
             cmd_pesto.append(f"--obfuscate={pesto_obfuscation_mode}")
@@ -1659,7 +1645,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
         # --password/--compress, which UA never passes here). Real protection
         # still comes from the 7z step above, so gate this the same way.
         if archive_password and not skip_archive:
-            cmd_pesto.extend(["--nzb-password", archive_password])
+            cmd_pesto.extend(["--nzb-password", str(archive_password)])
 
         # External IDs (pesto >=0.3.62): written as structured <meta type=
         # "tmdbid"/"imdbid"/"tvdbid"/"malid"> tags in the NZB itself, so any
@@ -1754,24 +1740,24 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
         nyuu_check_enabled = usenet_cfg.get("nyuu_check", True)
         post_connections, check_connections = compute_nyuu_connections(total_connections, nyuu_check_enabled, usenet_cfg.get("nyuu_check_connections"))
 
-        cmd_nyuu = [
-            path_nyuu or "nyuu",
+        cmd_nyuu: list[str] = [
+            str(path_nyuu or "nyuu"),
             "-h",
-            usenet_cfg.get("host"),
+            str(usenet_cfg.get("host", "")),
             "-P",
             str(usenet_cfg.get("port", 563)),
             "-u",
-            usenet_cfg.get("username"),
+            str(usenet_cfg.get("username", "")),
             "-p",
-            usenet_cfg.get("password"),
+            str(usenet_cfg.get("password", "")),
             "-n",
             str(post_connections),
             "-g",
-            usenet_cfg.get("newsgroups"),
+            str(usenet_cfg.get("newsgroups", "")),
             "-f",
-            poster,
+            str(poster),
             "-s",
-            subject,
+            str(subject),
             "-o",
             str(nzb_file),
             "--progress",
@@ -1895,7 +1881,8 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
         for relocated_nzb in relocated_nzbs:
             variant = "pack" if Path(relocated_nzb).name == expected_pack_name else "episode"
             await record_event_async("artifact", service="nzb", operation="created", outcome="success", category=variant)
-        return Path(meta.usenet_pack_nzb_path or relocated_nzbs[0]) if relocated_nzbs else None
+        chosen_nzb = meta.usenet_pack_nzb_path or (relocated_nzbs[0] if relocated_nzbs else None)
+        return Path(chosen_nzb) if chosen_nzb else None
 
     if await aiofiles.ospath.exists(nzb_file):
         try:

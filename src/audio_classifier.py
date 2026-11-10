@@ -99,7 +99,7 @@ class AudioCategoryResult:
     category: str  # "BOOK", "MUSIC", "AMBIGUOUS", or "NONE"
     is_audiobook: bool = False
     confidence: float = 0.0
-    evidence: list[str] = field(default_factory=list)
+    evidence: list[str] = field(default_factory=lambda: [])
 
 
 def _inspect_audio_file(filepath: Path) -> dict[str, Any]:
@@ -125,11 +125,12 @@ def _inspect_audio_file(filepath: Path) -> dict[str, Any]:
         "raw_tag_text": "",
     }
 
+    _mutagen: Any = mutagen
     with contextlib.suppress(Exception):
-        easy_audio = mutagen.File(str(filepath), easy=True)
+        easy_audio: Any = _mutagen.File(str(filepath), easy=True)
         if easy_audio and easy_audio.tags:
             for key in ("genre",):
-                vals = easy_audio.tags.get(key, [])
+                vals: list[Any] = easy_audio.tags.get(key, [])
                 info_dict["genres"].extend([str(v).strip() for v in vals if v])
             for key in ("title", "artist", "album", "albumartist"):
                 vals = easy_audio.tags.get(key, [])
@@ -137,13 +138,14 @@ def _inspect_audio_file(filepath: Path) -> dict[str, Any]:
                     info_dict[key] = str(vals[0]).strip()
 
     with contextlib.suppress(Exception):
-        audio = mutagen.File(str(filepath))
+        audio: Any = _mutagen.File(str(filepath))
         if audio is not None:
-            if hasattr(audio, "info") and audio.info:
-                info_dict["channels"] = getattr(audio.info, "channels", 0) or 0
-                info_dict["bitrate"] = getattr(audio.info, "bitrate", 0) or 0
-                info_dict["sample_rate"] = getattr(audio.info, "sample_rate", 0) or 0
-                info_dict["length"] = getattr(audio.info, "length", 0.0) or 0.0
+            audio_info: Any = getattr(audio, "info", None)
+            if audio_info:
+                info_dict["channels"] = getattr(audio_info, "channels", 0) or 0
+                info_dict["bitrate"] = getattr(audio_info, "bitrate", 0) or 0
+                info_dict["sample_rate"] = getattr(audio_info, "sample_rate", 0) or 0
+                info_dict["length"] = getattr(audio_info, "length", 0.0) or 0.0
 
             tags = getattr(audio, "tags", None)
             if tags:

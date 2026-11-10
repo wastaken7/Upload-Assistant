@@ -1,6 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import re
-from typing import Any
+from typing import Any, TypeIs
 
 from src.console import logger
 from src.meta import Meta
@@ -11,6 +11,16 @@ from src.trackers.UNIT3D import UNIT3D
 from src.trump_reports import TrumpPlan, TrumpSupport, is_exact_trump
 
 Config = dict[str, Any]
+
+
+def _is_str_dict(val: object) -> TypeIs[dict[str, Any]]:
+    return isinstance(val, dict)
+
+
+def _is_obj_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
+
+
 # The LST templates have no Edition slot, not even for full discs.
 
 
@@ -72,7 +82,7 @@ class LST(UNIT3D):
         resolved_category = category if category is not None and category != "" else meta.category
         return {"category_id": category_id.get(resolved_category, "0")}
 
-    async def get_type_id(self, meta: Meta, media_type: str | None = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
+    async def get_type_id(self, meta: Meta, type: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         type_id = {
             "DISC": "1",
             "REMUX": "2",
@@ -97,7 +107,7 @@ class LST(UNIT3D):
         if reverse:
             return {v: k for k, v in type_id.items()}
 
-        resolved_type = media_type if media_type is not None and media_type != "" else meta.type
+        resolved_type = type if type is not None and type != "" else meta.type
 
         if meta.category == "MUSIC" and not resolved_type:
             resolved_type = meta.format.upper()
@@ -205,8 +215,11 @@ class LST(UNIT3D):
     def _release_field(release: dict[str, Any], name: str, default: Any = "") -> Any:
         """Read a JSON-serialized MusicRelease field without its provenance."""
         fields = release.get("fields", {})
-        value = fields.get(name, {}) if isinstance(fields, dict) else {}
-        return value.get("value", default) if isinstance(value, dict) else default
+        if _is_str_dict(fields):
+            value = fields.get(name, {})
+            if _is_str_dict(value):
+                return value.get("value", default)
+        return default
 
     @staticmethod
     def _codec(value: Any) -> str:
@@ -245,13 +258,14 @@ class LST(UNIT3D):
     @classmethod
     def _music_name(cls, meta: Meta) -> str:
         """Format music using LST's Discogs-based naming convention."""
-        release = meta.music_release if isinstance(meta.music_release, dict) else {}
+        release = meta.music_release if _is_str_dict(meta.music_release) else {}
         artist = cls._release_field(release, "artist", meta.artist)
         title = cls._release_field(release, "album", meta.title)
         year = cls._release_field(release, "release_year", cls._release_field(release, "year", meta.year))
         source = cls._source(cls._release_field(release, "media", meta.source))
-        tracks = release.get("tracks", []) if isinstance(release.get("tracks"), list) else []
-        first_track = tracks[0] if tracks and isinstance(tracks[0], dict) else {}
+        tracks_raw = release.get("tracks", [])
+        tracks: list[dict[str, Any]] = [t for t in tracks_raw if _is_str_dict(t)] if _is_obj_list(tracks_raw) else []
+        first_track: dict[str, Any] = tracks[0] if tracks else {}
         codec = cls._codec(first_track.get("codec") or first_track.get("format") or meta.format or meta.type)
         parts = [str(artist), "-", str(title), str(year), source, codec]
 
@@ -277,7 +291,11 @@ class LST(UNIT3D):
             source = cls._source(meta.source)
             parts = [author, "-", title, year, source, codec]
             if codec in {"FLAC", "ALAC"}:
-                audio = next((track for track in meta.mediainfo.get("media", {}).get("track", []) if track.get("@type") == "Audio"), {})
+                media = meta.mediainfo.get("media") if _is_str_dict(meta.mediainfo) else None
+                mi_tracks_raw = media.get("track") if _is_str_dict(media) else None
+                mi_tracks: list[dict[str, Any]] = [t for t in mi_tracks_raw if _is_str_dict(t)] if _is_obj_list(mi_tracks_raw) else []
+                empty_audio: dict[str, Any] = {}
+                audio = next((t for t in mi_tracks if t.get("@type") == "Audio"), empty_audio)
                 depth = audio.get("BitDepth") or audio.get("BitDepth_String")
                 rate = audio.get("SamplingRate") or audio.get("SamplingRate_String")
                 if depth:

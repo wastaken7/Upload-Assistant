@@ -10,6 +10,7 @@ import secrets
 from collections.abc import Sequence
 from functools import lru_cache
 from pathlib import Path
+from typing import Any, TypeIs
 
 ROOTS_ENV = "UA_WEBUI_ALLOWED_ROOTS"
 QUEUE_ENV = "UA_WEBUI_QUEUE_PATH"
@@ -17,6 +18,14 @@ QUEUE_HASH_ENV = "UA_WEBUI_QUEUE_SHA256"
 MAX_UPLOAD_PATHS = 1000
 # Keep this set local to one validation phase; later phases must inspect again.
 type InspectedDirectories = set[tuple[str, tuple[str, ...]]]
+
+
+def _is_str_dict(val: object) -> TypeIs[dict[str, Any]]:
+    return isinstance(val, dict)
+
+
+def _is_obj_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
 
 
 def generated_queue_name(queue_hash: str) -> str:
@@ -62,24 +71,33 @@ def validate_argument_paths(args: Sequence[str], roots: Sequence[str], *, inspec
         raise ValueError("Torrent reuse is only available in CLI mode")
     if options.queue and (len(options.queue[0]) > 128 or any(char in options.queue[0] for char in "/\\:") or options.queue[0] in {".", ".."}):
         raise ValueError("Queue name must be a simple name, not a path")
-    for value in [*(options.description_file or []), *(options.comparison or [])]:
-        validate_content_path(value, roots, allow_queue_file=True, inspected_directories=inspected_directories)
+    desc_files: list[object] = list(options.description_file or [])
+    comparison_files: list[object] = list(options.comparison or [])
+    for value in [*desc_files, *comparison_files]:
+        validate_content_path(str(value), roots, allow_queue_file=True, inspected_directories=inspected_directories)
     for values in (options.explicit_poster, options.explicit_banner):
         if values and not values[0].lower().startswith(("https://", "http://")):
             validate_content_path(values[0], roots, allow_queue_file=True, inspected_directories=inspected_directories)
-    for value in options.path_to_menu_screenshots or []:
-        if value.lower() != "auto":
-            validate_content_path(value, roots, allow_queue_file=True, inspected_directories=inspected_directories)
+    menu_screenshots: list[object] = list(options.path_to_menu_screenshots or [])
+    for value in menu_screenshots:
+        val_str = str(value)
+        if val_str.lower() != "auto":
+            validate_content_path(val_str, roots, allow_queue_file=True, inspected_directories=inspected_directories)
 
 
 def subprocess_roots() -> list[str] | None:
     raw = os.environ.get(ROOTS_ENV)
     if raw is None:
         return None  # Ordinary CLI execution is unchanged.
-    roots = json.loads(raw)
-    if not isinstance(roots, list) or not roots or not all(isinstance(root, str) and root for root in roots):
+    roots_obj: object = json.loads(raw)
+    if not _is_obj_list(roots_obj) or not roots_obj:
         raise ValueError("Upload roots are not configured")
-    return roots
+    roots_list: list[str] = []
+    for root in roots_obj:
+        if not isinstance(root, str) or not root:
+            raise ValueError("Upload roots are not configured")
+        roots_list.append(root)
+    return roots_list
 
 
 def validate_content_path(path: str, roots: Sequence[str], *, allow_queue_file: bool = False, inspected_directories: InspectedDirectories | None = None) -> str:
@@ -159,14 +177,19 @@ def validate_subprocess_queue(queue: Sequence[object]) -> None:
     inspected_directories: InspectedDirectories = set()
     for number, item in enumerate(queue, 1):
         try:
-            path = item.get("path") if isinstance(item, dict) else item
+            if _is_str_dict(item):
+                path = item.get("path")
+                args_raw = item.get("args")
+                args = [str(v) for v in args_raw] if _is_obj_list(args_raw) and args_raw and all(isinstance(v, str) for v in args_raw) else None
+                if args is None:
+                    raise ValueError("Invalid queue arguments")
+            else:
+                path = item
+                args = None
             if not isinstance(path, str):
                 raise ValueError("Invalid upload path")
             validate_content_path(path, roots, inspected_directories=inspected_directories)
-            if isinstance(item, dict):
-                args = item.get("args", [])
-                if not isinstance(args, list) or not args or not all(isinstance(value, str) for value in args):
-                    raise ValueError("Invalid queue arguments")
+            if args is not None:
                 validate_argument_paths(args[1:], roots, inspected_directories=inspected_directories)
         except ValueError as error:
             raise ValueError(f"Invalid queue item {number}: {error}") from error

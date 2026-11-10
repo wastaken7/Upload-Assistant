@@ -4,9 +4,10 @@ import importlib
 import json
 import re
 import sys
+from collections.abc import Iterator, KeysView
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, TypeIs, cast
 from urllib.parse import urlparse
 
 import aiofiles
@@ -22,12 +23,20 @@ from src.meta import Meta
 from src.trackers.common import Common
 
 
-class LazyTrackerDict(dict):
-    def __init__(self, modules):
-        self._modules = modules
+def _is_str_dict(val: object) -> TypeIs[dict[str, Any]]:
+    return isinstance(val, dict)
+
+
+def _is_obj_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
+
+
+class LazyTrackerDict(dict[str, Any]):
+    def __init__(self, modules: dict[str, tuple[str, str]]) -> None:
+        self._modules: dict[str, tuple[str, str]] = modules
         super().__init__()
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: str) -> Any:
         if key in self._modules:
             if not super().__contains__(key):
                 mod_name, cls_name = self._modules[key]
@@ -36,35 +45,35 @@ class LazyTrackerDict(dict):
             return super().__getitem__(key)
         raise KeyError(key)
 
-    def __contains__(self, key):
+    def __contains__(self, key: object) -> bool:
         return key in self._modules or super().__contains__(key)
 
-    def get(self, key, default=None):
+    def get(self, key: str, default: Any = None) -> Any:
         try:
             return self[key]
         except KeyError:
             return default
 
-    def items(self):
+    def items(self) -> Iterator[tuple[str, Any]]:  # type: ignore[override]
         for key in self._modules:
             yield key, self[key]
 
-    def keys(self):
+    def keys(self) -> KeysView[str]:  # type: ignore[override]
         return self._modules.keys()
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[str]:
         return iter(self._modules)
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self._modules)
 
-    def values(self):
+    def values(self) -> Iterator[Any]:  # type: ignore[override]
         for key in self._modules:
             yield self[key]
 
 
 # Static auth types to prevent loading all trackers at startup
-STATIC_AUTH_TYPES = {
+STATIC_AUTH_TYPES: dict[str, str | None] = {
     "1PTBA": "cookies",
     "AITHER": "unit3d_api",
     "ALPHARATIO": "cookies",
@@ -276,7 +285,7 @@ class TrackerSetup:
 
         return valid_trackers
 
-    async def get_banned_groups(self, meta: Meta, tracker: str) -> str | None:
+    async def get_banned_groups(self, meta: Meta, tracker: str) -> str | Path | None:
         file_path = Path(meta.base_dir) / "data" / "banned" / f"{tracker}_banned_groups.json"
 
         tracker_instance = self._create_tracker_instance(tracker)
@@ -371,7 +380,7 @@ class TrackerSetup:
 
         return file_path
 
-    async def write_banned_groups_to_file(self, file_path: str, json_data: list[Any]) -> None:
+    async def write_banned_groups_to_file(self, file_path: str | Path, json_data: list[Any]) -> None:
         try:
             Path(file_path).parent.mkdir(parents=True, exist_ok=True)
 
@@ -390,7 +399,7 @@ class TrackerSetup:
         except Exception as e:
             logger.info(f"An error occurred: {e}")
 
-    async def sync_trash_groups(self, file_path: str) -> None:
+    async def sync_trash_groups(self, file_path: str | Path) -> None:
         """Fetch TRaSH guide JSON and extract release group names to ban file.
 
         This downloads the TRaSH LQ release-group specifications, extracts
@@ -452,12 +461,12 @@ class TrackerSetup:
 
         await self.write_banned_groups_to_file(file_path, json_data)
 
-    def _write_file(self, file_path: str, data: JsonDict) -> None:
+    def _write_file(self, file_path: str | Path, data: JsonDict) -> None:
         """Blocking file write operation, runs in a background thread"""
         with Path(file_path).open("w", encoding="utf-8") as file:
             json.dump(data, file, indent=4)
 
-    async def should_update(self, file_path: str) -> bool:
+    async def should_update(self, file_path: str | Path) -> bool:
         try:
             content = await asyncio.to_thread(self._read_file, file_path)
             data = cast(JsonDict, json.loads(content))
@@ -469,7 +478,7 @@ class TrackerSetup:
             logger.info(f"Error reading file: {e}")
             return True
 
-    def _read_file(self, file_path: str) -> str:
+    def _read_file(self, file_path: str | Path) -> str:
         """Helper function to read the file in a blocking thread"""
         with Path(file_path).open(encoding="utf-8") as file:
             return file.read()
@@ -547,7 +556,7 @@ class TrackerSetup:
 
         return False
 
-    async def write_internal_claims_to_file(self, file_path: str, data: list[JsonDict]) -> None:
+    async def write_internal_claims_to_file(self, file_path: str | Path, data: list[JsonDict]) -> None:
         try:
             Path(file_path).parent.mkdir(parents=True, exist_ok=True)
 
@@ -745,10 +754,12 @@ class TrackerSetup:
                         return requests
                     data_dict = cast(JsonDict, data)
                     results_list: list[Any] = []
-                    if "data" in data_dict and isinstance(data_dict["data"], list):
-                        results_list.extend([item for item in data_dict["data"] if isinstance(item, dict)])
-                    elif "results" in data_dict and isinstance(data_dict["results"], list):
-                        results_list.extend([item for item in data_dict["results"] if isinstance(item, dict)])
+                    data_val = data_dict.get("data")
+                    results_val = data_dict.get("results")
+                    if _is_obj_list(data_val):
+                        results_list.extend([item for item in data_val if _is_str_dict(item)])
+                    elif _is_obj_list(results_val):
+                        results_list.extend([item for item in results_val if _is_str_dict(item)])
                     else:
                         logger.info("[bold red]Unexpected response format[/bold red]")
                         return requests
@@ -804,10 +815,12 @@ class TrackerSetup:
                         return requests
                     data_dict = cast(JsonDict, data)
                     results_list: list[Any] = []
-                    if "data" in data_dict and isinstance(data_dict["data"], list):
-                        results_list.extend([item for item in data_dict["data"] if isinstance(item, dict)])
-                    elif "results" in data_dict and isinstance(data_dict["results"], list):
-                        results_list.extend([item for item in data_dict["results"] if isinstance(item, dict)])
+                    data_val = data_dict.get("data")
+                    results_val = data_dict.get("results")
+                    if _is_obj_list(data_val):
+                        results_list.extend([item for item in data_val if _is_str_dict(item)])
+                    elif _is_obj_list(results_val):
+                        results_list.extend([item for item in results_val if _is_str_dict(item)])
                     else:
                         logger.info("[bold red]Unexpected response format[/bold red]")
                         return requests
@@ -1294,22 +1307,23 @@ def get_tracker_comment_hosts(config: dict[str, Any]) -> dict[str, tuple[str, ..
         return parsed.hostname.lower() if parsed.hostname else None
 
     trackers_config = config.get("TRACKERS", {})
-    tracker_config_map = trackers_config if isinstance(trackers_config, dict) else {}
+    tracker_config_map = trackers_config if _is_str_dict(trackers_config) else {}
     tracker_hosts: dict[str, tuple[str, ...]] = {}
 
     for tracker_name, tracker_class in tracker_class_map.items():
         domains = [resolved_host for value in (getattr(tracker_class, "base_url", ""),) if (resolved_host := hostname(value))]
 
         for attribute_name in ("comment_hosts", "tracker_urls"):
-            values = getattr(tracker_class, attribute_name, ())
+            values: object = getattr(tracker_class, attribute_name, ())
             if isinstance(values, str):
                 values = (values,)
-            if isinstance(values, tuple | list):
-                domains.extend(resolved_host for value in values if (resolved_host := hostname(value)))
+            if isinstance(values, (tuple, list)):
+                seq_values: list[object] = list(values)
+                domains.extend(resolved_host for value in seq_values if (resolved_host := hostname(value)))
 
-        tracker_config = tracker_config_map.get(tracker_name, {})
-        if isinstance(tracker_config, dict):
-            domains.extend(resolved_host for key in ("base_url", "announce_url") if (resolved_host := hostname(tracker_config.get(key, ""))))
+        tracker_config_raw = tracker_config_map.get(tracker_name, {})
+        if _is_str_dict(tracker_config_raw):
+            domains.extend(resolved_host for key in ("base_url", "announce_url") if (resolved_host := hostname(tracker_config_raw.get(key, ""))))
 
         if domains:
             tracker_hosts[tracker_name] = tuple(dict.fromkeys(domains))

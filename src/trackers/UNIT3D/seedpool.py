@@ -97,7 +97,7 @@ class Seedpool(UNIT3D):
 
         return any(re.search(pattern, release_title, re.IGNORECASE) for pattern in patterns)
 
-    async def get_type_id(self, meta: Meta, media_type: str | None = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
+    async def get_type_id(self, meta: Meta, type: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         type_id = {
             "DISC": "1",
             "REMUX": "2",
@@ -143,8 +143,8 @@ class Seedpool(UNIT3D):
         def normalise(value: object) -> str:
             return str(value or "").upper().strip().lstrip(".")
 
-        if media_type:
-            return {"type_id": type_id.get(normalise(media_type), "0")}
+        if type:
+            return {"type_id": type_id.get(normalise(type), "0")}
 
         if meta.category == "GAME":
             platform = normalise(meta.platform)

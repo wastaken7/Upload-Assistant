@@ -4,7 +4,7 @@ import sys
 import time
 import traceback
 from collections.abc import Mapping, Sequence
-from typing import Any, cast
+from typing import Any, TypeIs, cast
 
 import cli_ui
 from rich.markup import escape
@@ -29,6 +29,10 @@ from src.trackers.GAZELLE.passthepopcorn import PassThePopcorn
 from src.trackersetup import TrackerSetup
 
 type StatusDict = dict[str, Any]
+
+
+def _is_str_dict(val: object) -> TypeIs[dict[str, object]]:
+    return isinstance(val, dict)
 
 
 async def process_trackers(
@@ -115,7 +119,7 @@ async def process_trackers(
             tracker_label = f"{tracker.ljust(tracker_label_width)}:"
             message: str | None = None
             if is_success:
-                result_parts = []
+                result_parts: list[str] = []
                 status_message = str(status.get("status_message", ""))
                 has_status_message = bool(status_message) and "data error" not in status_message
                 link_url = ""
@@ -208,7 +212,7 @@ async def process_trackers(
 
                         def is_in_initial(dupe: Any) -> bool:
                             for initial_dupe in initial_dupes:
-                                if isinstance(dupe, dict) and isinstance(initial_dupe, dict):
+                                if _is_str_dict(dupe) and _is_str_dict(initial_dupe):
                                     if dupe.get("name") == initial_dupe.get("name") and dupe.get("size") == initial_dupe.get("size"):
                                         return True
                                 elif isinstance(dupe, str) and isinstance(initial_dupe, str) and dupe == initial_dupe:

@@ -11,7 +11,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
-from typing import Any
+from typing import cast
 
 from src.app_paths import CODE_DIR, STATE_DIR
 
@@ -72,16 +72,20 @@ def fetch_release_history(url: str = RELEASES_API_URL) -> list[dict[str, object]
             },
         )
         with urllib.request.urlopen(request, timeout=10) as response:  # noqa: S310 -- validated HTTPS URL
-            payload = json.loads(response.read().decode("utf-8"))
+            payload_raw: object = json.loads(response.read().decode("utf-8"))
     except OSError, UnicodeError, ValueError, urllib.error.URLError, json.JSONDecodeError:
         return None
 
-    if not isinstance(payload, list):
+    if not isinstance(payload_raw, list):
         return None
 
+    payload_list = cast(list[object], payload_raw)
     releases: list[dict[str, object]] = []
-    for release in payload:
-        if not isinstance(release, dict) or release.get("draft") is True:
+    for release_raw in payload_list:
+        if not isinstance(release_raw, dict):
+            continue
+        release = cast(dict[str, object], release_raw)
+        if release.get("draft") is True:
             continue
         version = release.get("tag_name")
         if not isinstance(version, str) or not version.strip():
@@ -156,25 +160,29 @@ def fetch_unreleased_changes(
             },
         )
         with urllib.request.urlopen(request, timeout=10) as response:  # noqa: S310 -- fixed HTTPS origin
-            payload = json.loads(response.read().decode("utf-8"))
+            payload_raw: object = json.loads(response.read().decode("utf-8"))
     except OSError, UnicodeError, ValueError, urllib.error.URLError, json.JSONDecodeError:
         return None
 
-    if not isinstance(payload, dict):
+    if not isinstance(payload_raw, dict):
         return None
+    payload = cast(dict[str, object], payload_raw)
 
     commits: list[dict[str, object]] = []
     raw_commits = payload.get("commits")
     if isinstance(raw_commits, list):
-        for commit in raw_commits:
-            if not isinstance(commit, dict):
+        raw_commits_list = cast(list[object], raw_commits)
+        for commit_raw in raw_commits_list:
+            if not isinstance(commit_raw, dict):
                 continue
+            commit = cast(dict[str, object], commit_raw)
             sha = commit.get("sha")
             if not isinstance(sha, str) or not re.fullmatch(r"[0-9a-fA-F]{7,40}", sha):
                 continue
-            commit_details = commit.get("commit")
-            if not isinstance(commit_details, dict):
+            commit_details_raw = commit.get("commit")
+            if not isinstance(commit_details_raw, dict):
                 continue
+            commit_details = cast(dict[str, object], commit_details_raw)
             message = commit_details.get("message")
             if not isinstance(message, str) or not message.strip():
                 continue
@@ -190,19 +198,31 @@ def fetch_unreleased_changes(
                 commit_url = f"{expected_commit_prefix}{sha}"
 
             author = ""
-            github_author = commit.get("author")
-            if isinstance(github_author, dict) and isinstance(github_author.get("login"), str):
-                author = github_author["login"].strip()
-            author_details = commit_details.get("author")
-            if not author and isinstance(author_details, dict) and isinstance(author_details.get("name"), str):
-                author = author_details["name"].strip()
+            github_author_raw = commit.get("author")
+            if isinstance(github_author_raw, dict):
+                github_author = cast(dict[str, object], github_author_raw)
+                login = github_author.get("login")
+                if isinstance(login, str):
+                    author = login.strip()
+            author_details_raw = commit_details.get("author")
+            if not author and isinstance(author_details_raw, dict):
+                author_details = cast(dict[str, object], author_details_raw)
+                name = author_details.get("name")
+                if isinstance(name, str):
+                    author = name.strip()
 
             committed_at = ""
-            committer_details = commit_details.get("committer")
-            if isinstance(committer_details, dict) and isinstance(committer_details.get("date"), str):
-                committed_at = committer_details["date"].strip()
-            elif isinstance(author_details, dict) and isinstance(author_details.get("date"), str):
-                committed_at = author_details["date"].strip()
+            committer_details_raw = commit_details.get("committer")
+            if isinstance(committer_details_raw, dict):
+                committer_details = cast(dict[str, object], committer_details_raw)
+                date_str = committer_details.get("date")
+                if isinstance(date_str, str):
+                    committed_at = date_str.strip()
+            if not committed_at and isinstance(author_details_raw, dict):
+                author_details = cast(dict[str, object], author_details_raw)
+                date_str = author_details.get("date")
+                if isinstance(date_str, str):
+                    committed_at = date_str.strip()
 
             commits.append(
                 {
@@ -263,10 +283,13 @@ def _changelog_cache_path(state_dir: Path) -> Path:
 
 def _read_cache(state_dir: Path, cache_hours: float) -> tuple[str, str, float] | None:
     try:
-        cached: Any = json.loads(_cache_path(state_dir).read_text(encoding="utf-8"))
-        checked_at = cached["checked_at"]
-        remote_version = cached["remote_version"]
-        remote_content = cached["remote_content"]
+        cached_raw: object = json.loads(_cache_path(state_dir).read_text(encoding="utf-8"))
+        if not isinstance(cached_raw, dict):
+            return None
+        cached = cast(dict[str, object], cached_raw)
+        checked_at = cached.get("checked_at")
+        remote_version = cached.get("remote_version")
+        remote_content = cached.get("remote_content")
         if not isinstance(checked_at, (int, float)) or not isinstance(remote_version, str) or not isinstance(remote_content, str):
             return None
         if time.time() - checked_at >= cache_hours * 3600:
@@ -300,17 +323,20 @@ def _read_changelog_cache(
     cache_hours: float | None,
 ) -> tuple[list[dict[str, object]], dict[str, object] | None, float] | None:
     try:
-        cached: Any = json.loads(_changelog_cache_path(state_dir).read_text(encoding="utf-8"))
-        checked_at = cached["checked_at"]
-        releases = cached["releases"]
-        unreleased = cached.get("unreleased")
+        cached_raw: object = json.loads(_changelog_cache_path(state_dir).read_text(encoding="utf-8"))
+        if not isinstance(cached_raw, dict):
+            return None
+        cached = cast(dict[str, object], cached_raw)
+        checked_at = cached.get("checked_at")
+        releases = cached.get("releases")
+        unreleased_raw = cached.get("unreleased")
         if not isinstance(checked_at, (int, float)) or not isinstance(releases, list):
             return None
-        if unreleased is not None and not isinstance(unreleased, dict):
-            unreleased = None
+        unreleased: dict[str, object] | None = cast(dict[str, object], unreleased_raw) if isinstance(unreleased_raw, dict) else None
         if cache_hours is not None and time.time() - checked_at >= cache_hours * 3600:
             return None
-        safe_releases = [release for release in releases if isinstance(release, dict)]
+        releases_list = cast(list[object], releases)
+        safe_releases: list[dict[str, object]] = [cast(dict[str, object], release) for release in releases_list if isinstance(release, dict)]
         return safe_releases[:MAX_CHANGELOG_RELEASES], unreleased, float(checked_at)
     except OSError, TypeError, ValueError, KeyError, json.JSONDecodeError:
         return None
