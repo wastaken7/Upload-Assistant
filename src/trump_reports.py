@@ -16,10 +16,12 @@ existing reports).
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass, field
 from enum import Enum
+from pathlib import Path
 from typing import Any, cast
 
 import cli_ui
 import httpx
+from rich.markup import escape
 
 from src import webui_events
 from src.console import logger, prompt_in_thread
@@ -151,6 +153,18 @@ def _season_pack_episode(meta: Meta, tracker: str) -> dict[str, Any] | None:
     return episodes[0]
 
 
+def _same_files(meta: Meta, entry: Mapping[str, Any]) -> bool:
+    """Whether the torrent holds exactly the upload's files (by file name)."""
+    local = sorted(Path(str(path)).name.lower() for path in (meta.filelist or []) if path)
+    raw: Any = entry.get("files") or []
+    items = [str(item) for item in cast(list[Any], raw)] if isinstance(raw, list) else [str(raw)]
+    # Some sites send the file list as one comma-separated string.
+    if len(items) == 1 and "," in items[0]:
+        items = items[0].split(",")
+    remote = sorted(Path(item.strip()).name.lower() for item in items if item.strip())
+    return bool(local) and local == remote
+
+
 def find_candidates(meta: Meta, tracker: str, dupes: Sequence[Any], slot_decision: SlotDecision | None) -> list[TrumpCandidate]:
     """Torrents on ``tracker`` the upload may replace, each listed once with its strongest reason."""
     found: list[TrumpCandidate] = []
@@ -167,8 +181,11 @@ def find_candidates(meta: Meta, tracker: str, dupes: Sequence[Any], slot_decisio
     entries = [cast(dict[str, Any], entry) for entry in dupes if isinstance(entry, dict)]
     if meta.filename_match and meta.file_count_match:
         for entry in entries:
-            if f"{entry.get('name')} = {entry.get('link', None)}" == meta.filename_match:
+            if f"{entry.get('name')} = {entry.get('link', None)}" == meta.filename_match and _same_files(meta, entry):
                 add(entry, EXACT_MATCH)
+    if found:
+        # Uploading the same files again is only allowed as the trump of that torrent.
+        return found
     for entry in entries:
         if entry.get("trump_target"):
             add(entry, TRUMPABLE)
@@ -224,10 +241,11 @@ async def _choose(candidates: list[TrumpCandidate], tracker: str, describe: Call
 
     labels = [f"{candidate.name} ({REASON_LABELS[candidate.reason]})" for candidate in candidates]
     for number, label in enumerate(labels, start=1):
-        logger.info(f"  {number}. {label}", extra={"highlighter": None})
+        logger.info(f"  {number}. {escape(label)}", extra={"highlighter": None})
     with webui_events.numbered_options(labels, actions=[("", "Not trumping")], hint=f"Pick the torrent your upload replaces on {tracker}."):
         answer = await _ask_string("Enter the number of the release you are trumping, or press Enter if you are not trumping:")
-    if answer.isdigit() and 1 <= int(answer) <= len(candidates):
+    # isdecimal, not isdigit: int() rejects digits such as "²".
+    if answer.isdecimal() and 1 <= int(answer) <= len(candidates):
         return candidates[int(answer) - 1]
     return None
 
@@ -251,12 +269,17 @@ async def _proceed_despite_reports(tracker_instance: Any, tracker: str, candidat
         trumping: list[dict[str, Any]] = [cast(dict[str, Any], torrent) for torrent in cast(list[Any], report.get("trumping_torrent") or []) if isinstance(torrent, dict)]
         names = ", ".join(str(torrent.get("name", "Unknown")) for torrent in trumping)
         title = str(report.get("title") or "")
-        logger.info(f"  [cyan]Report ID:[/cyan] {report.get('id')} - [cyan]Title:[/cyan] {title}")
+        solved = bool(report.get("solved"))
+        # Titles and names come from the site: print them as plain text, not Rich markup.
+        logger.info(f"  [cyan]Report ID:[/cyan] {escape(str(report.get('id')))} - [cyan]Title:[/cyan] {escape(title)}{' [dim](solved)[/dim]' if solved else ''}")
         if names:
-            logger.info(f"  [bold green]Already being trumped by:[/bold green] {names}")
+            logger.info(f"  [bold green]Already being trumped by:[/bold green] {escape(names)}")
+        elif solved:
+            logger.info("  [yellow]This report is already solved.[/yellow]")
         else:
             logger.info("  [yellow]The trumping torrent for this report seems to be in the moderation queue.[/yellow]")
-        summary[f"Report {report.get('id')}"] = f"{title} (trumped by: {names})" if names else (title or "In moderation queue")
+        status = "Solved" if solved else "In moderation queue"
+        summary[f"Report {report.get('id')}"] = f"{title} (trumped by: {names})" if names else (f"{title} ({status.lower()})" if title else status)
     with webui_events.field_prompt("Existing trump reports", summary, hint=f"Found {len(reports)} existing trump report(s) on {tracker} for this release."):
         return await _ask_yes_no("Do you want to proceed with the upload anyway?", default=False)
 
@@ -352,7 +375,7 @@ async def review(
         return ReviewOutcome.DECLINED
 
     meta.trump_plans[tracker] = plan.to_dict()
-    logger.info(f"[green]{tracker}: a trump report for {plan.reported_name} will be sent after the upload.[/green]")
+    logger.info(f"[green]{tracker}: a trump report for {escape(plan.reported_name)} will be sent after the upload.[/green]")
     return ReviewOutcome.PLANNED
 
 

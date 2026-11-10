@@ -199,6 +199,22 @@ async def test_slot_override_and_two_trump_questions_count_once_per_tracker(gui,
 
 
 @pytest.mark.asyncio
+async def test_slot_trump_without_a_reportable_release_is_not_a_review(gui, monkeypatch, capsys):
+    """A slot trump whose releases have no torrent ID asks nothing, so it adds no review."""
+    helper = helper_with_answers(monkeypatch)
+    helper.tracker_class_map = {**helper.tracker_class_map, "SECOND": lambda **_kwargs: TrumpTracker()}
+    slot = SlotDecision(Verdict.ALLOW, "Replaces", "SECOND", date(2026, 10, 15), conflicts=[{"name": "Release without an ID"}], trump=True)
+    with webui_events.dupe_review_scope(["SECOND"]):
+        is_dupe, _meta = await helper.dupe_check([], Meta(category="MOVIE", name="Example"), "SECOND", slot)
+        webui_events.dupe_review_ready("SECOND", finished=True)
+    output = events(capsys)
+    assert is_dupe is False
+    assert not [event for event in output if event["kind"] == "prompt" and event["action"] == "open"]
+    # Never counted, not even until the check finished.
+    assert all(event["trackers"] == [] for event in output if event["kind"] == "dupe_review")
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("debug", [False, True])
 async def test_bdinfo_questions_name_their_tracker_and_keep_the_same_review_index(gui, monkeypatch, capsys, debug):
     """BDInfo and upload follow-ups stay identifiable within one review per tracker."""

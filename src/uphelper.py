@@ -369,7 +369,7 @@ class UploadHelper:
                     # Slot rules found a release the upload replaces: the trump question is a review.
                     if prepared_tracker is None:
                         prepared_tracker = cast(Callable[..., Any], self.tracker_class_map[tracker_name])(config=self.config)
-                    needs_review = trump_reports.support(prepared_tracker) is not None
+                    needs_review = trump_reports.support(prepared_tracker) is not None and bool(trump_reports.find_candidates(meta, tracker_name, [], slot_decision))
             webui_events.dupe_review_ready(tracker_name, needs_review=bool(interactive and needs_review))
         async with prompt_session():
             with webui_events.prompt_context(kind="dupes", tracker=tracker_name):

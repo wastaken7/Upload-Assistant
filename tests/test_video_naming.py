@@ -220,6 +220,9 @@ def test_lst_formats_dvdrip_and_drops_disc_editions() -> None:
 def test_lst_appends_trump_marker() -> None:
     plan = {"tracker": "LST", "reported_id": "7", "reported_name": "Older release", "reason": "exact_match"}
     assert _tracker_name(LST, _meta(trump_plans={"LST": plan})) == "Synthetic Feature 2024 1080p AMZN WEB-DL DD+ 5.1 H.264-TESTGROUP - TRUMP"
+    # Only LST's own exact-files trump renames the LST upload.
+    assert _tracker_name(LST, _meta(trump_plans={"AITHER": {**plan, "tracker": "AITHER"}})) == "Synthetic Feature 2024 1080p AMZN WEB-DL DD+ 5.1 H.264-TESTGROUP"
+    assert _tracker_name(LST, _meta(trump_plans={"LST": {**plan, "reason": "slot_rules"}})) == "Synthetic Feature 2024 1080p AMZN WEB-DL DD+ 5.1 H.264-TESTGROUP"
 
 
 @pytest.mark.parametrize(

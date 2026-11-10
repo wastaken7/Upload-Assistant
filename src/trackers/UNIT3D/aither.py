@@ -169,6 +169,7 @@ class Aither(UNIT3D):
         headers = {"Authorization": f"Bearer {self.api_key}", "Accept": "application/json"}
         params: dict[str, str] = {"reported_torrent_id": str(reported_id)}
         reports: list[dict[str, Any]] = []
+        requested_cursors: set[str] = set()
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 while True:
@@ -178,7 +179,8 @@ class Aither(UNIT3D):
                         return None
                     data: Any = response.json()
                     body = cast(dict[str, Any], data) if isinstance(data, dict) else {}
-                    page: Any = body.get("data") or body.get("results")
+                    # An empty "data" list is a valid answer: no reports.
+                    page: Any = body.get("data") if isinstance(body.get("data"), list) else body.get("results")
                     if not isinstance(page, list):
                         logger.info(f"[bold red]{self.tracker}: unexpected trump report search response.[/bold red]")
                         return None
@@ -194,6 +196,11 @@ class Aither(UNIT3D):
                     next_cursor = cast(dict[str, Any], meta_info).get("next_cursor") if isinstance(meta_info, dict) else None
                     if not next_cursor:
                         return reports
+                    if str(next_cursor) in requested_cursors:
+                        # The site keeps sending the same page: treat it as a failed search instead of looping.
+                        logger.info(f"[bold red]{self.tracker}: the trump report search repeated a page.[/bold red]")
+                        return None
+                    requested_cursors.add(str(next_cursor))
                     params["cursor"] = str(next_cursor)
                     await asyncio.sleep(1)
         except (httpx.HTTPError, ValueError) as e:

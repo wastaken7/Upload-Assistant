@@ -735,8 +735,9 @@ class DupeChecker:
                 season_episode_match, is_season = await DupeChecker.is_season_episode_match(normalized, target_season, target_episode)
                 logger.debug(f"[debug] Season/Episode match result: {season_episode_match}")
                 logger.debug(f"[debug] is_season: {is_season}")
-                # AITHER episode trumping logic
-                if is_season and tracker_name in ["AITHER", "LST"]:
+                # Season pack upload: episodes of the same season are trump targets.
+                # season_episode_match is False only for episodes here (an existing season pack matches).
+                if is_tv_pack and is_season and not season_episode_match and tracker_name in ["AITHER", "LST"]:
                     # Null-safe normalization for comparisons
                     target_source_lower = (target_source or "").lower()
                     type_id_lower = (type_id or "").lower()
@@ -753,9 +754,9 @@ class DupeChecker:
                             is_internal = False
                             if entry.get("internal", 0) == 1:
                                 trackers_section: dict[str, Any] = cast(dict[str, Any], self.config.get("TRACKERS", {}))
-                                aither_settings: dict[str, Any] = trackers_section.get("AITHER", {})
-                                if aither_settings.get("internal") is True:
-                                    internal_groups = aither_settings.get("internal_groups", [])
+                                tracker_settings: dict[str, Any] = trackers_section.get(tracker_name, {})
+                                if tracker_settings.get("internal") is True:
+                                    internal_groups = tracker_settings.get("internal_groups", [])
                                     if isinstance(internal_groups, list):
                                         tag_without_prefix = tag[1:] if tag else ""
                                         if tag_without_prefix in internal_groups and tag_without_prefix.lower() in normalized:

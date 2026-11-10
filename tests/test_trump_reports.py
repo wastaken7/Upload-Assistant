@@ -3,7 +3,7 @@
 
 import asyncio
 from datetime import date
-from typing import Any
+from typing import Any, ClassVar
 
 import pytest
 
@@ -19,7 +19,8 @@ from src.trump_reports import ReviewOutcome, TrumpCandidate, TrumpPlan, TrumpSup
 from src.uphelper import UploadHelper
 
 CONFIG: dict[str, Any] = {"DEFAULT": {}, "TRACKERS": {"AITHER": {"api_key": "fake-key"}, "LST": {"api_key": "fake-key"}}}
-OLD = {"name": "Fictional Feature 2020 1080p WEB-DL H.264-OLDGRP", "id": 11, "link": "https://example.invalid/torrents/11", "size": 100}
+OLD_FILES = ["Fictional.Feature.2020.1080p.WEB-DL.H.264-OLDGRP.mkv", "Fictional.Feature.2020.1080p.WEB-DL.H.264-OLDGRP.srt"]
+OLD = {"name": "Fictional Feature 2020 1080p WEB-DL H.264-OLDGRP", "id": 11, "link": "https://example.invalid/torrents/11", "size": 100, "files": OLD_FILES}
 
 
 def answers(monkeypatch: pytest.MonkeyPatch, yes_no: list[bool] | None = None, strings: list[str] | None = None) -> list[str]:
@@ -70,14 +71,48 @@ def review(meta: Meta, tracker: Any, candidates: list[TrumpCandidate], name: str
 # --- candidates -------------------------------------------------------------
 
 
+def exact_meta(**fields: Any) -> Meta:
+    """An upload whose files are exactly those of ``OLD``."""
+    return Meta(filename_match=f"{OLD['name']} = {OLD['link']}", file_count_match=2, filelist=[f"/data/{name}" for name in OLD_FILES], **fields)
+
+
 def test_candidates_keep_the_strongest_reason_once_per_torrent() -> None:
-    meta = Meta(filename_match=f"{OLD['name']} = {OLD['link']}", file_count_match=1)
     other = {"name": "Fictional Feature 2020 1080p WEB-DL H.264-SECOND", "id": 12, "trump_target": True}
     slot = SlotDecision(Verdict.ALLOW, "Replaces", "AITHER", date(2026, 1, 1), why="DV/HDR takes priority.", conflicts=[{**OLD, "trump_target": True}, other], trump=True)
 
-    found = trump_reports.find_candidates(meta, "AITHER", [{**OLD, "trump_target": True}, other], slot)
+    found = trump_reports.find_candidates(Meta(), "AITHER", [{**OLD, "trump_target": True}, other], slot)
 
-    assert [(item.torrent_id, item.reason) for item in found] == [("11", trump_reports.EXACT_MATCH), ("12", trump_reports.TRUMPABLE)]
+    assert [(item.torrent_id, item.reason) for item in found] == [("11", trump_reports.TRUMPABLE), ("12", trump_reports.TRUMPABLE)]
+
+
+def test_an_exact_match_is_the_only_candidate() -> None:
+    """Uploading the same files again can only trump that torrent, not another one."""
+    other = {"name": "Fictional Feature 2020 1080p WEB-DL H.264-SECOND", "id": 12, "trump_target": True}
+
+    found = trump_reports.find_candidates(exact_meta(), "AITHER", [{**OLD, "trump_target": True}, other], None)
+
+    assert [(item.torrent_id, item.reason) for item in found] == [("11", trump_reports.EXACT_MATCH)]
+
+
+@pytest.mark.parametrize(
+    "files",
+    [
+        ["Fictional.Feature.2020.1080p.WEB-DL.H.264-OLDGRP.mkv", "Fictional.Feature.2020.1080p.WEB-DL.H.264-OLDGRP.eng.srt"],
+        ["Fictional.Feature.2020.1080p.WEB-DL.H.264-OLDGRP.mkv"],
+        [],
+    ],
+)
+def test_an_exact_match_needs_the_same_complete_file_list(files: list[str]) -> None:
+    """A shared video file is not enough: different extra files are a different release."""
+    found = trump_reports.find_candidates(exact_meta(), "AITHER", [{**OLD, "files": files, "trump_target": True}], None)
+
+    assert [(item.torrent_id, item.reason) for item in found] == [("11", trump_reports.TRUMPABLE)]
+
+
+def test_an_exact_match_accepts_a_comma_separated_file_list() -> None:
+    (found,) = trump_reports.find_candidates(exact_meta(), "AITHER", [{**OLD, "files": [", ".join(reversed(OLD_FILES))]}], None)
+
+    assert found.reason == trump_reports.EXACT_MATCH
 
 
 def test_candidates_need_a_torrent_id() -> None:
@@ -134,6 +169,42 @@ def test_filter_marks_trumpable_releases_in_the_upload_resolution() -> None:
     assert {entry["id"]: bool(entry.get("trump_target")) for entry in result} == {1: True, 2: False}
 
 
+def test_filter_does_not_mark_trumpable_releases_in_another_resolution() -> None:
+    """The resolution check keeps a site-marked 2160p release out of a 1080p trump."""
+    meta = Meta(name="Fictional Feature 2020 1080p WEB-DL HDR H.265-NEWGRP", category="MOVIE", resolution="1080p", type="WEBDL", source="WEB", tag="-NEWGRP", hdr="HDR")
+    # The name also says 1080p so the basic resolution filter keeps it; only ``res`` differs.
+    other_res = {"name": "Fictional Feature 2020 1080p WEB-DL HDR H.265-OLDGRP", "id": 3, "res": "2160p", "trumpable": True, "files": []}
+
+    result = asyncio.run(DupeChecker(CONFIG).filter_dupes([other_res], meta, "AITHER"))
+
+    assert [(entry["id"], bool(entry.get("trump_target"))) for entry in result] == [(3, False)]
+
+
+def season_pack_dupes(tracker: str, config: dict[str, Any] | None = None, **episode_fields: Any) -> tuple[list[Any], Meta]:
+    """Filter one same-season episode and one existing season pack for a season pack upload."""
+    meta = Meta(name="Fictional Show S01 1080p WEB-DL H.264-NEWGRP", category="TV", tv_pack=1, season="S01", episode="", resolution="1080p", type="WEBDL", source="WEB", tag="-NEWGRP")
+    episode = {"name": "Fictional Show S01E02 1080p WEB-DL H.264-OLDGRP", "id": 21, "link": "https://example.invalid/torrents/21", "res": "1080p", "type": "WEB-DL", "files": [], **episode_fields}
+    pack = {"name": "Fictional Show S01 1080p WEB-DL H.264-OTHER", "id": 22, "link": "https://example.invalid/torrents/22", "res": "1080p", "type": "WEB-DL", "files": []}
+    result = asyncio.run(DupeChecker(config or CONFIG).filter_dupes([episode, pack], meta, tracker))
+    return list(result), meta
+
+
+def test_season_pack_trump_targets_are_episodes_only() -> None:
+    """An existing season pack stays a dupe; it is never listed as an episode to trump."""
+    result, meta = season_pack_dupes("AITHER")
+
+    assert [entry["id"] for entry in meta["AITHER_matched_episode_ids"]] == [21]
+    assert {entry["id"] for entry in result} == {21, 22}
+
+
+def test_season_pack_internal_episodes_follow_the_trackers_own_settings() -> None:
+    config = {"DEFAULT": {}, "TRACKERS": {"AITHER": {"internal": False}, "LST": {"internal": True, "internal_groups": ["newgrp"]}}}
+
+    _result, meta = season_pack_dupes("LST", config, name="Fictional Show S01E02 1080p WEB-DL H.264-NEWGRP", internal=1)
+
+    assert [entry["id"] for entry in meta["LST_matched_episode_ids"]] == [21]
+
+
 # --- review -----------------------------------------------------------------
 
 
@@ -161,6 +232,15 @@ def test_review_asks_which_release_when_there_are_several(monkeypatch: pytest.Mo
     assert meta.trump_plans["AITHER"]["reported_id"] == "12"
 
 
+@pytest.mark.parametrize("answer", ["\u00b2", "0", "3", "x"])
+def test_review_ignores_an_answer_that_is_not_a_listed_number(monkeypatch: pytest.MonkeyPatch, answer: str) -> None:
+    answers(monkeypatch, strings=[answer])
+    meta = Meta()
+
+    assert review(meta, SearchableTracker(reports=[]), [candidate(), candidate(trump_reports.SLOT_RULES, id=12, name="Second")]) is ReviewOutcome.DECLINED
+    assert meta.trump_plans == {}
+
+
 def test_review_collects_comparison_links(monkeypatch: pytest.MonkeyPatch) -> None:
     answers(monkeypatch, yes_no=[True], strings=["L", "https://img.invalid/a, https://img.invalid/b", "https://img.invalid/c"])
     meta = Meta()
@@ -182,7 +262,14 @@ def test_review_without_a_comparison_sends_no_report(monkeypatch: pytest.MonkeyP
     assert meta.trump_plans == {}
 
 
-@pytest.mark.parametrize("reports", [None, [{"id": 3, "title": "Older report", "trumping_torrent": [{"name": "Other upload"}]}]])
+@pytest.mark.parametrize(
+    "reports",
+    [
+        None,
+        [{"id": 3, "title": "Older report", "trumping_torrent": [{"name": "Other upload"}]}],
+        [{"id": 4, "title": "Broken [/markup] title", "solved": True, "trumping_torrent": [{"name": "Name with [/b] tag"}]}],
+    ],
+)
 def test_review_existing_or_unknown_reports_can_skip_the_upload(monkeypatch: pytest.MonkeyPatch, reports: list[dict[str, Any]] | None) -> None:
     asked = answers(monkeypatch, yes_no=[True, False])
     meta = Meta()
@@ -250,11 +337,34 @@ def test_declined_trump_falls_back_to_the_dupe_question(monkeypatch: pytest.Monk
 
 def test_declined_exact_trump_is_not_uploaded(monkeypatch: pytest.MonkeyPatch) -> None:
     asked = answers(monkeypatch, yes_no=[False])
-    meta = Meta(name="New", filename_match=f"{OLD['name']} = {OLD['link']}", file_count_match=1)
+    meta = exact_meta(name="New")
 
     is_dupe, meta = dupe_check(meta, [OLD], SearchableTracker(reports=[]))
 
     assert asked == ["Are you trumping this release on AITHER?"]
+    assert is_dupe is True
+
+
+def test_exact_dupe_cannot_be_approved_by_trumping_another_release(monkeypatch: pytest.MonkeyPatch) -> None:
+    """With an exact dupe on the site, the only trump offered is that dupe."""
+    asked = answers(monkeypatch, yes_no=[True], strings=["d"])
+    other = {"name": "Fictional Feature 2020 1080p WEB-DL H.264-SECOND", "id": 12, "trump_target": True}
+
+    is_dupe, meta = dupe_check(exact_meta(name="New"), [OLD, other], SearchableTracker(reports=[]))
+
+    assert asked[0] == "Are you trumping this release on AITHER?"
+    assert is_dupe is False
+    assert (meta.trump_plans["AITHER"]["reported_id"], meta.trump_plans["AITHER"]["reason"]) == ("11", trump_reports.EXACT_MATCH)
+
+
+def test_declined_season_pack_trump_keeps_an_existing_season_pack_as_a_dupe(monkeypatch: pytest.MonkeyPatch) -> None:
+    asked = answers(monkeypatch, yes_no=[False, False])
+    dupes, meta = season_pack_dupes("AITHER")
+    meta.name = "New"
+
+    is_dupe, meta = dupe_check(meta, dupes, SearchableTracker(reports=[]))
+
+    assert asked == ["Are you trumping this release on AITHER?", "Upload to AITHER anyway?"]
     assert is_dupe is True
 
 
@@ -300,7 +410,7 @@ class FakeResponse:
 
 
 class FakeClient:
-    posts: list[tuple[str, dict[str, Any], dict[str, str]]] = []
+    posts: ClassVar[list[tuple[str, dict[str, Any], dict[str, str]]]] = []
     status_code = 201
 
     def __init__(self, **_kwargs: Any) -> None:
@@ -384,3 +494,71 @@ def test_lst_refuses_a_non_numeric_torrent_id(fake_http: type[FakeClient]) -> No
 
     assert submitted(meta)["LST"] is False
     assert [url for url, _payload, _headers in fake_http.posts] == ["https://aither.cc/api/trumping-reports/create"]
+
+
+# --- manager to submission ------------------------------------------------------
+
+
+def test_a_plan_made_in_the_tracker_check_is_submitted_after_the_upload(monkeypatch: pytest.MonkeyPatch, fake_http: type[FakeClient]) -> None:
+    """The plan made on the per-tracker copy of meta reaches the shared meta and the report."""
+    from src import trackerstatus
+
+    class Setup:
+        def __init__(self, config: dict[str, Any]) -> None:
+            del config
+
+        def filter_unsupported_trackers(self, meta: Meta) -> Meta:
+            return meta
+
+        async def check_banned_group(self, *_args: Any) -> bool:
+            return False
+
+        async def get_torrent_claims(self, *_args: Any) -> bool:
+            return False
+
+    class Router:
+        def __init__(self, *_args: Any) -> None:
+            pass
+
+        async def apply(self, meta: Meta) -> Meta:
+            return meta
+
+    class Filter:
+        def __init__(self, _config: dict[str, Any]) -> None:
+            pass
+
+        async def filter_dupes(self, dupes: list[Any], *_args: Any) -> list[Any]:
+            return dupes
+
+    class Helper:
+        def __init__(self, _config: dict[str, Any]) -> None:
+            pass
+
+        async def dupe_check(self, _dupes: list[Any], local_meta: Meta, tracker: str, _slot: Any) -> tuple[bool, Meta]:
+            local_meta.trump_plans[tracker] = TrumpPlan(tracker, "11", OLD["name"], trump_reports.TRUMPABLE, comparison="description").to_dict()
+            return False, local_meta
+
+    class Tracker(Aither):
+        async def search_existing(self, _meta: Meta) -> list[Any]:
+            return [{**OLD, "trump_target": True}]
+
+    async def no_slots(*_args: Any) -> None:
+        return None
+
+    monkeypatch.setattr(trackerstatus, "TrackerSetup", Setup)
+    monkeypatch.setattr(trackerstatus, "AvistaZNetworkRouter", Router)
+    monkeypatch.setattr(trackerstatus, "DupeChecker", Filter)
+    monkeypatch.setattr(trackerstatus, "UploadHelper", Helper)
+    monkeypatch.setattr(trackerstatus, "evaluate_slots", no_slots)
+    monkeypatch.setattr(trackerstatus, "tracker_class_map", {"AITHER": Tracker})
+    meta = Meta(name="New", ua_name="Upload Assistant", trackers=["AITHER"], tracker_status={}, unattended=True, imdb_id=1)
+
+    assert asyncio.run(trackerstatus.TrackerStatusManager(CONFIG).process_all_trackers(meta)) == 1
+    assert meta.trump_plans["AITHER"]["reported_id"] == "11"
+
+    meta.tracker_status["AITHER"]["torrent_id"] = 501  # what a finished upload records
+    assert asyncio.run(trump_reports.submit_reports(meta, CONFIG, {"AITHER": Aither})) == {"AITHER": True}
+    ((url, payload, _headers),) = fake_http.posts
+    assert url == "https://aither.cc/api/trumping-reports/create"
+    assert payload["reported_torrent_id"] == "11"
+    assert payload["trumping_torrent_id"] == 501
