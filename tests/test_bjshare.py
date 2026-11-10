@@ -133,14 +133,16 @@ class FakeCookieValidator:
         return None
 
 
-def audio_search(category, upload_audio, header_html, *, season=1, tv_pack=True):
+def audio_search(category, upload_audio, header_html, *, season=1, tv_pack=True, episode=2, unattended=True, torrent_rows=None):
     tracker = object.__new__(BJShare)
     response = FakeResponse()
+    if torrent_rows is None:
+        torrent_rows = (
+            '<tr id="torrent123" data-torrentname="Fictional.Adventure.S01.1080p-Example"><td class="number_column nobr">1 GiB</td></tr>'
+        )
     response.text = (
         '<a href="logout.php?auth=abcdef"></a><div class="main_column">'
-        f'<table class="torrent_table details">{header_html}'
-        '<tr id="torrent123" data-torrentname="Fictional.Adventure.S01.1080p-Example">'
-        '<td class="number_column nobr">1 GiB</td></tr></table></div>'
+        f'<table class="torrent_table details">{header_html}{torrent_rows}</table></div>'
     )
     tracker.session = FakeSession(response)
     tracker.cookie_validator = FakeCookieValidator()
@@ -160,8 +162,10 @@ def audio_search(category, upload_audio, header_html, *, season=1, tv_pack=True)
         is_disc="",
         season_int=season,
         tv_pack=tv_pack,
-        episode_int=0 if tv_pack else 2,
+        episode_int=0 if tv_pack else episode,
         skipping=None,
+        unattended=unattended,
+        unattended_confirm=False,
     )
     return tracker, meta
 
@@ -216,6 +220,81 @@ def test_search_existing_audio_rules_normalize_case_and_whitespace(category):
     label = "Dual Áudio" if category == "TV" else "Torrents Dual Áudios"
     header = audio_header(category, "Dual Áudio").replace(label, "  " + "\n  ".join(label.upper().split()) + "  ")
     tracker, meta = audio_search(category, "Legendado", header)
+
+    assert asyncio.run(tracker.search_existing(meta)) == []  # noqa: S101
+    assert meta.skipping == "BJSHARE"  # noqa: S101
+
+
+def series_release(release, audios, *, torrent_id, season_class="season_01"):
+    """Rows as a series page lists one release: the release cell spans all of its audio versions."""
+    rows = ""
+    for index, audio in enumerate(audios):
+        release_cell = f'<td rowspan="{2 * len(audios)}" class="{season_class}"><div class="year">2026</div><a href="#">{release}</a></td>' if index == 0 else ""
+        rows += (
+            f'<tr>{release_cell}<td colspan="5" class="edition_info audio_header {season_class}"><strong>{audio}</strong></td></tr>'
+            f'<tr id="torrent{torrent_id + index}" class="torrent_row group_torrent {season_class}" data-torrentname="Fictional.Adventure.{release}.1080p-Example">'
+            '<td>➟ [MKV]</td><td class="number_column nobr">1 GiB</td></tr>'
+        )
+    return rows
+
+
+SERIES_SEASON_HEADER = '<tr class="group_torrent season_header"><td class="edition_info season_header">Temporada 01</td></tr>'
+
+
+@pytest.mark.parametrize("episode, blocked", [(1, True), (2, False), (3, False)])
+def test_search_existing_audio_rules_match_episode_on_series_page(episode, blocked):
+    rows = SERIES_SEASON_HEADER + series_release("S01E02", ["Legendado"], torrent_id=200) + series_release("S01E01", ["Dual Áudio", "Legendado"], torrent_id=100)
+    tracker, meta = audio_search("TV", "Legendado", "", tv_pack=False, episode=episode, torrent_rows=rows)
+
+    dupes = asyncio.run(tracker.search_existing(meta))
+
+    assert meta.skipping == ("BJSHARE" if blocked else None)  # noqa: S101
+    assert bool(dupes) is not blocked  # noqa: S101
+
+
+def test_search_existing_audio_rules_season_pack_covers_episode_upload():
+    rows = SERIES_SEASON_HEADER + series_release("Temporada 1", ["Dual Áudio"], torrent_id=100)
+    tracker, meta = audio_search("TV", "Legendado", "", tv_pack=False, episode=5, torrent_rows=rows)
+
+    assert asyncio.run(tracker.search_existing(meta)) == []  # noqa: S101
+    assert meta.skipping == "BJSHARE"  # noqa: S101
+
+
+@pytest.mark.parametrize("existing_release, blocked", [("S01E01", False), ("Temporada 1", True)])
+def test_search_existing_audio_rules_season_pack_upload_ignores_episodes(existing_release, blocked):
+    rows = SERIES_SEASON_HEADER + series_release(existing_release, ["Dual Áudio"], torrent_id=100)
+    tracker, meta = audio_search("TV", "Legendado", "", tv_pack=True, torrent_rows=rows)
+
+    asyncio.run(tracker.search_existing(meta))
+
+    assert meta.skipping == ("BJSHARE" if blocked else None)  # noqa: S101
+
+
+@pytest.mark.parametrize("answer", [True, False])
+def test_search_existing_audio_conflict_asks_attended_user(monkeypatch, answer):
+    questions: list[str] = []
+
+    async def fake_prompt(_func, question, **_kwargs):
+        questions.append(question)
+        return answer
+
+    monkeypatch.setattr("src.trackers.GAZELLE.bjshare.prompt_in_thread", fake_prompt)
+    monkeypatch.setattr("sys.stdin", SimpleNamespace(closed=False))
+    tracker, meta = audio_search("TV", "Legendado", audio_header("TV", "Dual Áudio"), unattended=False)
+
+    dupes = asyncio.run(tracker.search_existing(meta))
+
+    assert len(questions) == 1  # noqa: S101
+    assert meta.skipping == (None if answer else "BJSHARE")  # noqa: S101
+    assert bool(dupes) is answer  # noqa: S101
+
+
+def test_search_existing_audio_conflict_does_not_ask_unattended(monkeypatch):
+    async def fail_prompt(*_args, **_kwargs):
+        raise AssertionError("unattended runs must not prompt")
+
+    monkeypatch.setattr("src.trackers.GAZELLE.bjshare.prompt_in_thread", fail_prompt)
+    tracker, meta = audio_search("TV", "Legendado", audio_header("TV", "Dual Áudio"), unattended=True)
 
     assert asyncio.run(tracker.search_existing(meta)) == []  # noqa: S101
     assert meta.skipping == "BJSHARE"  # noqa: S101

@@ -2,6 +2,7 @@
 import asyncio
 import platform
 import re
+import sys
 import time
 from datetime import UTC, datetime
 from io import BytesIO
@@ -10,6 +11,7 @@ from typing import Any, ClassVar, cast
 from urllib.parse import urlparse
 
 import aiofiles
+import cli_ui
 import httpx
 import langcodes
 import pycountry
@@ -19,14 +21,14 @@ from langcodes.tag_parser import LanguageTagError
 from PIL import Image
 from unidecode import unidecode
 
-from src import language_names, payload_preview
+from src import language_names, payload_preview, webui_events
 from src.bbcode import BBCODE
 from src.book_extractors import normalize_book_title_separators
-from src.console import logger
+from src.console import logger, prompt_in_thread
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder
 from src.languages import languages_manager
-from src.manual_input import Question, ask
+from src.manual_input import Question, ask, is_interactive, prompt_session
 from src.manual_questions import game_platform, game_subcategory
 from src.meta import Meta
 from src.screenshot_manifest import files as manifest_files
@@ -1064,6 +1066,77 @@ class BJShare:
             file_name = file_names[0] if len(file_names) == 1 else file_names[:5]
         return tmdb_id, imdb_id, 0, 0, description, None, None, imagelist, file_name
 
+    @staticmethod
+    def _release_unit(cell: Tag) -> int | str | None:
+        """Read the episode number, or "pack", from a series page's release cell."""
+        text = cell.get_text(" ", strip=True)
+        if match := re.search(r"\bS\d+E(\d+)\b", text, re.IGNORECASE):
+            return int(match.group(1))
+        if re.search(r"\bTemporada\s*\d+\b|^S\d+$", text, re.IGNORECASE):
+            return "pack"
+        return None
+
+    def get_existing_audio(self, details: Tag, meta: Meta, category: str) -> set[str]:
+        """Collect the audio versions on the details page that cover the release being uploaded.
+
+        Series pages list every episode of a season, each under its own audio header, and only
+        the first header of an episode carries the episode cell (it spans the following rows).
+        An episode is covered by the same episode or a season pack; a pack only by another pack.
+        Headers without a recognisable release cell still count, as before.
+        """
+        audio_labels = (
+            {"dual áudio": "Dual Áudio", "legendado": "Legendado", "dublado": "Dublado"}
+            if category == "TV"
+            else {"torrents dual áudios": "Dual Áudio", "torrents legendados": "Legendado", "torrents dublados": "Dublado"}
+        )
+        season = getattr(meta, "season_int", None)
+        if category == "TV" and (not isinstance(season, int) or season < 0):
+            return set()
+        episode = getattr(meta, "episode_int", 0)
+        upload_episode = episode if not getattr(meta, "tv_pack", False) and isinstance(episode, int) and episode > 0 else None
+
+        existing_audio: set[str] = set()
+        release_unit: int | str | None = None
+        for table in details.select("table.torrent_table"):
+            for row in table.find_all("tr"):
+                cells = [cell for cell in row.find_all("td", recursive=False) if isinstance(cell, Tag)]
+                header = next((cell for cell in cells if "audio_header" in (cell.get("class") or ())), None)
+                if category == "TV":
+                    unit_cell = next(
+                        (cell for cell in cells if cell is not header and any(re.fullmatch(r"season_\d+", str(css_class)) for css_class in (cell.get("class") or ()))),
+                        None,
+                    )
+                    if unit_cell is not None:
+                        release_unit = self._release_unit(unit_cell)
+                    elif any("season_header" in (cell.get("class") or ()) for cell in cells):
+                        release_unit = None
+                if header is None:
+                    continue
+                if category == "TV":
+                    if not any((match := re.fullmatch(r"season_(\d+)", str(css_class))) and int(match.group(1)) == season for css_class in (header.get("class") or ())):
+                        continue
+                    if release_unit is not None and release_unit != "pack" and release_unit != upload_episode:
+                        continue
+                label = " ".join(header.get_text(" ", strip=True).split()).casefold()
+                if label in audio_labels:
+                    existing_audio.add(audio_labels[label])
+        return existing_audio
+
+    async def confirm_audio_conflict(self, meta: Meta, upload_audio: str, existing: str) -> bool:
+        """Let an attended user upload anyway when the tracker seems to have a better audio version."""
+        message = f"{self.tracker}: A {existing} version of this release seems to exist, so a {upload_audio} upload may not be allowed."
+        if is_interactive(meta) and not sys.stdin.closed:
+            logger.info(f"[yellow]{message}[/yellow]")
+            try:
+                with webui_events.prompt_context(tracker=self.tracker, check_messages=[message]):
+                    async with prompt_session():
+                        if await prompt_in_thread(cli_ui.ask_yes_no, f"{self.tracker}: Do you want to proceed with the {upload_audio} upload anyway?", default=False):
+                            return True
+            except EOFError:
+                pass
+        logger.info(f"{self.tracker}: Skipping {upload_audio} upload because a {existing} version already exists.")
+        return False
+
     async def search_existing(self, meta: Meta) -> list[dict[str, str | list[str]]]:
         dupes: list[dict[str, str | list[str]]] = []
         category = meta.category
@@ -1160,23 +1233,7 @@ class BJShare:
 
         if torrent_details_table:
             if category in ("TV", "MOVIE"):
-                audio_labels = (
-                    {"dual áudio": "Dual Áudio", "legendado": "Legendado", "dublado": "Dublado"}
-                    if category == "TV"
-                    else {"torrents dual áudios": "Dual Áudio", "torrents legendados": "Legendado", "torrents dublados": "Dublado"}
-                )
-                existing_audio: set[str] = set()
-                for header in torrent_details_table.select("table.torrent_table td.audio_header"):
-                    if category == "TV":
-                        season = getattr(meta, "season_int", None)
-                        if not isinstance(season, int) or season < 0:
-                            continue
-                        if not any((match := re.fullmatch(r"season_(\d+)", str(css_class))) and int(match.group(1)) == season for css_class in (header.get("class") or ())):
-                            continue
-                    label = " ".join(header.get_text(" ", strip=True).split()).casefold()
-                    if label in audio_labels:
-                        existing_audio.add(audio_labels[label])
-
+                existing_audio = self.get_existing_audio(torrent_details_table, meta, category)
                 if existing_audio:
                     upload_audio = await self.get_audio(meta)
                     incompatible_audio = {
@@ -1185,9 +1242,10 @@ class BJShare:
                     }
                     for existing in incompatible_audio.get(upload_audio, ()):
                         if existing in existing_audio:
-                            logger.info(f"{self.tracker}: Skipping {upload_audio} upload because a {existing} version already exists.")
-                            meta.skipping = self.tracker
-                            return dupes
+                            if not await self.confirm_audio_conflict(meta, upload_audio, existing):
+                                meta.skipping = self.tracker
+                                return dupes
+                            break
 
             BJShare.already_has_the_info = True
             BJShare.database_title = self.get_database_title(soup)
