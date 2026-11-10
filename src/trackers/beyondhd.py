@@ -2,7 +2,7 @@
 import platform
 import re
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, TypeIs, cast
 
 import aiofiles
 import httpx
@@ -16,6 +16,10 @@ from src.meta import Meta
 from src.rehostimages import ImageHostPolicy, RehostImagesManager
 from src.tracker_images import get_tracker_image_collection
 from src.trackers.common import Common
+
+
+def _is_str_dict(val: object) -> TypeIs[dict[str, Any]]:
+    return isinstance(val, dict)
 
 
 class BEYONDHD:
@@ -185,7 +189,7 @@ class BEYONDHD:
         async with aiofiles.open(torrent_file_path, "rb") as f:
             torrent_bytes = await f.read()
 
-        files = {
+        files: dict[str, Any] = {
             "mediainfo": mi_dump,
             "file": ("torrent.torrent", torrent_bytes, "application/x-bittorrent"),
         }
@@ -314,7 +318,7 @@ class BEYONDHD:
             if not isinstance(original_images, list) or not isinstance(rehosted_images, list):
                 continue
             for original, rehosted in zip(original_images, rehosted_images, strict=False):
-                if not isinstance(original, dict) or not isinstance(rehosted, dict):
+                if not _is_str_dict(original) or not _is_str_dict(rehosted):
                     continue
                 original_url = original.get("raw_url")
                 rehosted_url = rehosted.get("raw_url")
@@ -520,7 +524,7 @@ class BEYONDHD:
                 if each.get("hdr10") == 1 or each.get("hdr10+") == 1:
                     flags.append("HDR")
 
-                result = {
+                result: dict[str, Any] = {
                     "name": each["name"],
                     "link": each["url"],
                     "size": each["size"],

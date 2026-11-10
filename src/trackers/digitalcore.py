@@ -53,9 +53,12 @@ class DigitalCore:
         self.common = Common(config)
         tracker_config = self.config["TRACKERS"][self.tracker]
         force_rehost = str(tracker_config.get("force_rehost_images", False)).strip().lower() in {"1", "true", "yes"}
-        image_config = config
+        image_config: Config = config
         if force_rehost:
-            image_config = {**config, "DEFAULT": {**config.get("DEFAULT", {}), "img_host_1": "sharex"}}
+            image_config = config.copy()
+            default_config: dict[str, Any] = dict(config.get("DEFAULT", {}))
+            default_config["img_host_1"] = "sharex"
+            image_config["DEFAULT"] = default_config
             self.image_host_policy = ImageHostPolicy(self.image_host_policy.url_host_mapping, ("sharex",))
         self.rehost_images_manager = RehostImagesManager(image_config)
         self.api_key = tracker_config.get("api_key")
@@ -146,15 +149,15 @@ class DigitalCore:
         if imdb_id:
             search_params = {"searchText": imdb_id}
 
-        search_results: list[Any] = []
+        search_results: list[object] = []
         dupes: list[dict[str, Any]] = []
         response = await self.session.get(self.api_base_url, params=search_params, headers=self.session.headers, timeout=15)
         response.raise_for_status()
 
         if response.text and response.text != "[]":
-            json_data = response.json()
+            json_data: object = response.json()
             if isinstance(json_data, list):
-                search_results = json_data
+                search_results = list(json_data)
             for each in search_results:
                 if not isinstance(each, dict):
                     continue

@@ -172,10 +172,9 @@ class AsianCinema(UNIT3D):
             # ugly fix to remove the extra space in the title
             aka = aka + " "
             name = name.replace(aka, f" / {original_title} {chr(int('202A', 16))}")
-        elif aka == "":
-            if meta.title != original_title:
-                # name = f'{name[:name.find(year)]}/ {original_title} {chr(int("202A", 16))}{name[name.find(year):]}'
-                name = name.replace(meta.title, f"{meta.title} / {original_title} {chr(int('202A', 16))}")
+        elif aka == "" and meta.title != original_title:
+            # name = f'{name[:name.find(year)]}/ {original_title} {chr(int("202A", 16))}{name[name.find(year):]}'
+            name = name.replace(meta.title, f"{meta.title} / {original_title} {chr(int('202A', 16))}")
         if "AAC" in audio:
             name = name.replace(audio.strip().replace("  ", " "), audio.replace("AAC ", "AAC"))
         name = name.replace("DD+ ", "DD+")

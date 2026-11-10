@@ -255,8 +255,9 @@ class Nebulance:
                             error_data = cast(dict[str, Any], response.json())
                         except json.JSONDecodeError:
                             error_data = {}
-                        error = error_data.get("error", {})
-                        message = str(error.get("message", "")) if isinstance(error, dict) else ""
+                        error: object = error_data.get("error")
+                        error_dict: dict[str, Any] = cast(dict[str, Any], error) if isinstance(error, dict) else {}
+                        message = str(error_dict.get("message", ""))
                         if "out of range" in message.lower() and "valid pages" in message.lower():
                             break
                     response.raise_for_status()
@@ -278,7 +279,7 @@ class Nebulance:
                         file_list_value = each.get("file_list", [])
                         file_list = cast(list[Any], file_list_value) if isinstance(file_list_value, list) else []
                         files_str = ", ".join(str(item) for item in file_list) if file_list else str(cast(Any, file_list_value))
-                        result = {
+                        dupe_result: dict[str, Any] = {
                             "name": str(each.get("rls_name", "")),
                             "files": files_str,
                             "size": int(each.get("size", 0)),
@@ -286,7 +287,7 @@ class Nebulance:
                             "file_count": len(file_list) if file_list else 1,
                             "download": str(each.get("download", "")),
                         }
-                        dupes.append(result)
+                        dupes.append(dupe_result)
 
         return dupes
 

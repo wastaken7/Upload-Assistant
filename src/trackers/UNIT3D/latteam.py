@@ -187,7 +187,7 @@ class LatTeam(UNIT3D):
             title = meta.title.strip()
             fmt = str(meta.type).strip().upper()
 
-            extra_info = []
+            extra_info: list[str] = []
 
             # If it's comic/manga/magazine/newspaper, we can add volume, issue/number info if available
             volume = str(meta.manual_season or meta.season or "").strip()

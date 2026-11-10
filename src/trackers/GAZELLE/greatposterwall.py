@@ -2,7 +2,7 @@
 import re
 import unicodedata
 from pathlib import Path
-from typing import Any, ClassVar, cast
+from typing import Any, ClassVar, TypeIs, cast
 from urllib.parse import urlparse
 
 import aiofiles
@@ -25,6 +25,14 @@ from src.tracker_images import get_tracker_image_collection, set_tracker_image_c
 from src.trackers.common import Common
 
 
+def _is_str_dict(val: object) -> TypeIs[dict[str, Any]]:
+    return isinstance(val, dict)
+
+
+def _is_obj_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
+
+
 class GreatPosterWall:
     """
     GPW Private Torrent Tracker
@@ -37,7 +45,6 @@ class GreatPosterWall:
     source_flag = "GreatPosterWall"
     base_url = "https://greatposterwall.com"
     auth_token = None
-    tmdb_data: ClassVar[dict[str, Any]] = {}
     banned_groups = (
         "ALT",
         "aXXo",
@@ -122,6 +129,7 @@ class GreatPosterWall:
         self.tracker_config: dict[str, Any] = self.config["TRACKERS"].get(self.tracker, {})
         self.announce = self.tracker_config.get("announce_url", "")
         self.api_key = self.tracker_config.get("api_key", "")
+        self.tmdb_data: dict[str, Any] = {}
 
     async def load_cookies(self, meta: Meta) -> Any:
         from src.cookie_auth import find_cookie_file
@@ -270,12 +278,16 @@ class GreatPosterWall:
                         params={"action": "img_upload", "api_key": self.api_key},
                         data={"urls[]": raw_url},
                     )
-                    response_data = response.json()
-                    response_body = response_data.get("response", {})
-                    files = response_body.get("files", []) if isinstance(response_body, dict) else []
-                    hosted_url = files[0].get("name") if files else None
+                    response_data: dict[str, Any] = response.json()
+                    response_body_raw = response_data.get("response")
+                    response_body = response_body_raw if _is_str_dict(response_body_raw) else {}
+                    files_raw = response_body.get("files")
+                    files = files_raw if _is_obj_list(files_raw) else []
+                    first_file_raw = files[0] if files else None
+                    first_file = first_file_raw if _is_str_dict(first_file_raw) else {}
+                    hosted_url: Any = first_file.get("name") if first_file else None
                     if response.status_code != 200 or response_data.get("status") != 200 or not isinstance(hosted_url, str):
-                        error = response_body.get("Error", "no image URL returned") if isinstance(response_body, dict) else "no image URL returned"
+                        error: Any = response_body.get("Error", "no image URL returned")
                         logger.warning(f"[yellow]GREATPOSTERWALL: could not rehost {raw_url}: {error}[/yellow]")
                         rehosted_images.append(image)
                         continue
@@ -298,7 +310,7 @@ class GreatPosterWall:
             self.tracker,
             url_host_mapping=self.url_host_mapping,
             img_host_index=1,
-            approved_image_hosts=self.approved_image_hosts,
+            approved_image_hosts=list(self.approved_image_hosts),
         )
         return
 
@@ -319,12 +331,10 @@ class GreatPosterWall:
     def get_trailer(self, meta: Meta) -> str:
         video_results: list[dict[str, Any]] = []
         videos = self.tmdb_data.get("videos")
-        if isinstance(videos, dict):
-            videos_dict = cast(dict[str, Any], videos)
-            results = videos_dict.get("results")
-            if isinstance(results, list):
-                results_list = results
-                video_results.extend(cast(dict[str, Any], result) for result in results_list if isinstance(result, dict))
+        if _is_str_dict(videos):
+            results = videos.get("results")
+            if _is_obj_list(results):
+                video_results.extend(result for result in results if _is_str_dict(result))
 
         youtube = ""
 
@@ -379,8 +389,8 @@ class GreatPosterWall:
 
         return True
 
-    async def search_existing(self, meta: Meta) -> list[dict[str, str]]:
-        dupes: list[dict[str, str]] = []
+    async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
+        dupes: list[dict[str, Any]] = []
 
         group_id = await self.get_groupid(meta)
         if not group_id:
@@ -457,7 +467,7 @@ class GreatPosterWall:
                 match = re.search(r"torrentid=(\d+)", href_text)
                 torrent_link = f"{self.torrent_url}{match.group(1)}" if match else None
 
-                dupe_entry = {"name": name, "size": size, "link": torrent_link}
+                dupe_entry: dict[str, Any] = {"name": name, "size": size, "link": torrent_link}
 
                 found_items.append(dupe_entry)
 
@@ -616,9 +626,8 @@ class GreatPosterWall:
         director_entries: list[str] = []
 
         imdb_directors = dict(meta.imdb_info).get("directors")
-        if isinstance(imdb_directors, list):
-            imdb_directors_list = imdb_directors
-            director_entries.extend(name for name in imdb_directors_list if isinstance(name, str))
+        if _is_obj_list(imdb_directors):
+            director_entries.extend(name for name in imdb_directors if isinstance(name, str))
 
         tmdb_directors = meta.tmdb_directors
         if isinstance(tmdb_directors, list):
@@ -724,7 +733,7 @@ class GreatPosterWall:
             data_source = "manual"
             identifier = ""
 
-        data = {
+        data: dict[str, Any] = {
             "data_source": data_source,
             "identifier": identifier,
             "desc": self.tmdb_data.get("overview", ""),
@@ -764,12 +773,14 @@ class GreatPosterWall:
         if imdb_identifier:
             movie_info_raw = await self._fetch_gpw_movie_info(meta, "imdb", imdb_identifier)
             movie_info = movie_info_raw
-            if isinstance(movie_info_raw, dict) and isinstance(movie_info_raw.get("response"), dict):
-                movie_info = cast(dict[str, Any], movie_info_raw.get("response"))
-            if isinstance(movie_info, dict):
+            if _is_str_dict(movie_info_raw):
+                resp = movie_info_raw.get("response")
+                if _is_str_dict(resp):
+                    movie_info = resp
+            if _is_str_dict(movie_info):
                 full_credits_value = movie_info.get("FullCredits") or movie_info.get("fullCredits")
-                if isinstance(full_credits_value, list):
-                    full_credits = [item for item in full_credits_value if isinstance(item, dict)]
+                if _is_obj_list(full_credits_value):
+                    full_credits = [item for item in full_credits_value if _is_str_dict(item)]
                     seen_director_ids: set[str] = set()
                     seen_writer_ids: set[str] = set()
                     seen_star_ids: set[str] = set()
@@ -814,8 +825,8 @@ class GreatPosterWall:
             raw_stars = imdb_info.get("stars", [])
             raw_stars_id = imdb_info.get("stars_id", [])
 
-            def valid_credit_pairs(raw_names: Any, raw_ids: Any) -> tuple[list[str], list[str]]:
-                if not isinstance(raw_names, list) or not isinstance(raw_ids, list):
+            def valid_credit_pairs(raw_names: object, raw_ids: object) -> tuple[list[str], list[str]]:
+                if not _is_obj_list(raw_names) or not _is_obj_list(raw_ids):
                     return [], []
                 pairs = [
                     (name.strip(), person_id.strip())
@@ -987,17 +998,19 @@ class GreatPosterWall:
                 payload: Any = response.json()
                 if not isinstance(payload, dict):
                     continue
-                status_value = str(payload.get("status", "")).strip().lower()
-                if status_value in {"success", "ok", "200"} or payload.get("status") == 200:
-                    response_data = payload.get("response")
+                payload_dict: dict[str, Any] = payload
+                status_value = str(payload_dict.get("status", "")).strip().lower()
+                if status_value in {"success", "ok", "200"} or payload_dict.get("status") == 200:
+                    response_data = payload_dict.get("response")
                     if isinstance(response_data, dict):
-                        full_credits_value = response_data.get("FullCredits") or response_data.get("fullCredits")
+                        response_data_dict: dict[str, Any] = response_data
+                        full_credits_value = response_data_dict.get("FullCredits") or response_data_dict.get("fullCredits")
                         score = len(full_credits_value) if isinstance(full_credits_value, list) else 0
                         if score > best_score:
-                            best_response = response_data
+                            best_response = response_data_dict
                             best_score = score
                         if score >= 10:
-                            return response_data
+                            return response_data_dict
             except (ValueError, KeyError, TypeError, IndexError) as e:
                 logger.debug(f"{self.tracker}: Failed to process response payload on {self.tracker}: {escape(str(e))}", exc_info=True)
                 continue
@@ -1205,7 +1218,7 @@ class GreatPosterWall:
             return False
 
         if not meta.debug:
-            response_data = ""
+            response_data: Any = ""
             torrent_id = ""
             upload_url = f"{self.base_url}/api.php?api_key={self.api_key}&action=upload"
             torrent_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}].torrent"
@@ -1217,13 +1230,13 @@ class GreatPosterWall:
             try:
                 async with httpx.AsyncClient(timeout=30) as client:
 
-                    def _extract_torrent_id(payload: Any) -> str:
-                        if isinstance(payload, dict):
+                    def _extract_torrent_id(payload: object) -> str:
+                        if _is_str_dict(payload):
                             torrent_id_value = payload.get("torrent_id")
                             return str(torrent_id_value) if torrent_id_value is not None else ""
-                        if isinstance(payload, list) and payload:
+                        if _is_obj_list(payload) and payload:
                             first_item = payload[0]
-                            if isinstance(first_item, dict):
+                            if _is_str_dict(first_item):
                                 torrent_id_value = first_item.get("torrent_id")
                                 return str(torrent_id_value) if torrent_id_value is not None else ""
                         return ""
@@ -1235,12 +1248,13 @@ class GreatPosterWall:
                         logger.info(f"{self.tracker}: Failed to decode JSON response: {e}")
                         return False
 
-                    if not isinstance(response_data, dict):
+                    if not _is_str_dict(response_data):
                         meta.tracker_status[self.tracker]["status_message"] = f"data error: Invalid API response: {response_data}"
                         return False
 
-                    status_value = str(response_data.get("status", "")).strip().lower()
-                    response_payload = response_data.get("response")
+                    response_dict: dict[str, Any] = response_data
+                    status_value = str(response_dict.get("status", "")).strip().lower()
+                    response_payload = response_dict.get("response")
                     torrent_id_from_payload = _extract_torrent_id(response_payload)
 
                     success_status = status_value in ("success", "ok", "200")
@@ -1251,7 +1265,7 @@ class GreatPosterWall:
                         await self.common.create_torrent_ready_to_seed(meta, self.tracker, self.source_flag, self.announce, self.torrent_url + torrent_id)
                         return True
 
-                    error_message = str(response_data.get("error") or response_data.get("message") or "Upload failed")
+                    error_message = str(response_dict.get("error") or response_dict.get("message") or "Upload failed")
                     duplicate_phrase = "the exact same torrent file already exists on the site"
                     if duplicate_phrase in error_message.lower():
                         meta.tracker_status[self.tracker]["status_message"] = "data error: Torrent already exists on GREATPOSTERWALL (duplicate file)."

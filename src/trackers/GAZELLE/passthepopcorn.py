@@ -7,7 +7,7 @@ import platform
 import re
 from dataclasses import replace
 from pathlib import Path
-from typing import Any, ClassVar, cast
+from typing import Any, ClassVar, TypeIs, cast
 from urllib.parse import urlparse
 
 import aiofiles
@@ -36,6 +36,15 @@ from src.torrent_policy import PASSTHEPOPCORN_POLICY
 from src.tracker_images import get_tracker_image_collection
 from src.trackers.common import Common
 from src.uploadscreens import UploadScreensManager
+
+
+def _is_str_dict(val: object) -> TypeIs[dict[str, object]]:
+    return isinstance(val, dict)
+
+
+def _is_obj_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
+
 
 TRUMPABLE_LABELS = {
     "hc_full": "English Hardcoded Subs (Full)",
@@ -92,7 +101,7 @@ class PassThePopcorn:
         "LAMA",
         "WORLD",
     )
-    approved_image_hosts = ("pixhost", "imgbb", "onlyimage", "ptscreens", "passtheimage")
+    approved_image_hosts: tuple[str, ...] = ("pixhost", "imgbb", "onlyimage", "ptscreens", "passtheimage")
     image_host_policy = ImageHostPolicy(
         {
             "pixhost.to": "pixhost",
@@ -206,14 +215,14 @@ class PassThePopcorn:
         _search_file_folder: str,
         _meta: dict[str, Any],
     ) -> tuple[int | None, int | str | None, str | None]:
-        headers = {
+        headers: dict[str, str] = {
             "ApiUser": self.api_user,
             "ApiKey": self.api_key,
             "User-Agent": self.user_agent,
         }
         url = f"{self.base_url}/torrents.php"
         search_value = search_term or _search_file_folder
-        params = {
+        params: dict[str, str] = {
             "searchstr": search_value,
             "json": "noredirect",
         }
@@ -263,8 +272,8 @@ class PassThePopcorn:
             return None, None, None
 
     async def get_imdb_from_torrent_id(self, ptp_torrent_id: int | str) -> tuple[int | None, str | None]:
-        params = {"torrentid": ptp_torrent_id, "json": "noredirect"}
-        headers = {"ApiUser": self.api_user, "ApiKey": self.api_key, "User-Agent": self.user_agent}
+        params: dict[str, Any] = {"torrentid": ptp_torrent_id, "json": "noredirect"}
+        headers: dict[str, str] = {"ApiUser": self.api_user, "ApiKey": self.api_key, "User-Agent": self.user_agent}
         url = f"{self.base_url}/torrents.php"
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             response = await client.get(url, params=params, headers=headers)
@@ -289,8 +298,8 @@ class PassThePopcorn:
             return None, None
 
     async def get_ptp_description(self, ptp_torrent_id: int | str, meta: Meta, is_disc: str) -> list[Any]:
-        params = {"id": ptp_torrent_id, "action": "get_description"}
-        headers = {"ApiUser": self.api_user, "ApiKey": self.api_key, "User-Agent": self.user_agent}
+        params: dict[str, Any] = {"id": ptp_torrent_id, "action": "get_description"}
+        headers: dict[str, str] = {"ApiUser": self.api_user, "ApiKey": self.api_key, "User-Agent": self.user_agent}
         url = f"{self.base_url}/torrents.php"
         logger.info(f"{self.tracker}: [yellow]Requesting description from {url} with ID {ptp_torrent_id}")
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
@@ -341,11 +350,11 @@ class PassThePopcorn:
         return imagelist if meta.keep_images else []
 
     async def get_group_by_imdb(self, imdb: int | str) -> str | None:
-        params = {
+        params: dict[str, Any] = {
             "imdb": imdb,
             "json": "noredirect",
         }
-        headers = {"ApiUser": self.api_user, "ApiKey": self.api_key, "User-Agent": self.user_agent}
+        headers: dict[str, str] = {"ApiUser": self.api_user, "ApiKey": self.api_key, "User-Agent": self.user_agent}
         url = f"{self.base_url}/torrents.php"
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             response = await client.get(url=url, headers=headers, params=params)
@@ -431,13 +440,13 @@ class PassThePopcorn:
         return None
 
     async def get_torrent_info(self, imdb: int | str, meta: Meta) -> dict[str, Any]:
-        params = {"imdb": imdb, "action": "torrent_info", "fast": 1}
-        headers = {"ApiUser": self.api_user, "ApiKey": self.api_key, "User-Agent": self.user_agent}
+        params: dict[str, Any] = {"imdb": imdb, "action": "torrent_info", "fast": 1}
+        headers: dict[str, str] = {"ApiUser": self.api_user, "ApiKey": self.api_key, "User-Agent": self.user_agent}
         url = f"{self.base_url}/ajax.php"
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             response = await client.get(url=url, params=params, headers=headers)
         await asyncio.sleep(1)
-        tinfo = {}
+        tinfo: dict[str, Any] = {}
         with contextlib.suppress(Exception):
             response = response.json()
             # console.print(f"[blue]Raw info API Response: {response}[/blue]")
@@ -449,7 +458,7 @@ class PassThePopcorn:
         return tinfo
 
     async def get_torrent_info_tmdb(self, meta: Meta) -> dict[str, Any]:
-        tinfo = {
+        tinfo: dict[str, Any] = {
             "title": meta.title,
             "year": meta.year,
             "album_desc": meta.overview,
@@ -497,11 +506,12 @@ class PassThePopcorn:
             "western",
         ]
 
-        check_against_list = check_against if isinstance(check_against, list) else [check_against]
+        check_against_list: list[object] = list(check_against) if isinstance(check_against, (list, tuple)) else [check_against]
         normalized_check_against: list[str] = []
         for item in check_against_list:
-            if isinstance(item, list):
-                normalized_check_against.extend(x.lower().replace(" ", "").replace("-", "") for x in item if isinstance(x, str) and x.strip())
+            if isinstance(item, (list, tuple)):
+                item_seq: list[object] = list(item)
+                normalized_check_against.extend(str(x).lower().replace(" ", "").replace("-", "") for x in item_seq if isinstance(x, str) and x.strip())
             elif isinstance(item, str) and item.strip():
                 normalized_check_against.extend(x.strip().lower().replace(" ", "").replace("-", "") for x in item.split(",") if x.strip())
         for each in ptp_tags:
@@ -522,12 +532,12 @@ class PassThePopcorn:
             quality = "Ultra High Definition"
 
         # Prepare request parameters and headers
-        params = {
+        params: dict[str, Any] = {
             "id": group_id,
             "json": "1",
             "jsontrumpable": "1",
         }
-        headers = {"ApiUser": self.api_user, "ApiKey": self.api_key, "User-Agent": self.user_agent}
+        headers: dict[str, str] = {"ApiUser": self.api_user, "ApiKey": self.api_key, "User-Agent": self.user_agent}
         url = f"{self.base_url}/torrents.php"
 
         async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
@@ -559,7 +569,7 @@ class PassThePopcorn:
         if not selected_host:
             return False
         hostname = (urlparse(image_url).hostname or "").lower()
-        host_aliases = {
+        host_aliases: dict[str, tuple[str, ...]] = {
             "imgbb": ("ibb.co", "imgbb.com"),
             "imgbox": ("imgbox.com",),
             "pixhost": ("pixhost.to",),
@@ -735,19 +745,26 @@ class PassThePopcorn:
         if meta.is_disc != "BDMV":
             mi = meta.mediainfo
             if meta.is_disc == "DVD":
-                mi = json.loads(MediaInfo.parse(meta.discs[0]["ifo"], output="JSON"))
-            for track in mi["media"]["track"]:
-                if track["@type"] == "Text":
-                    language = track.get("Language_String2", track.get("Language"))
-                    if language == "en":
-                        if track.get("Forced", "") == "Yes":
-                            language = "en (Forced)"
-                        title = track.get("Title", "")
-                        if isinstance(title, str) and "intertitles" in title.lower():
-                            language = "en (Intertitles)"
-                    for lang, sub_id in sub_lang_map.items():
-                        if language in lang and sub_id not in sub_langs:
-                            sub_langs.append(sub_id)
+                raw_ifo = meta.discs[0]["ifo"] if meta.discs and isinstance(meta.discs[0], dict) else ""
+                parsed_mi = MediaInfo.parse(raw_ifo, output="JSON")
+                mi = json.loads(str(parsed_mi))
+            if _is_str_dict(mi) and "media" in mi:
+                media_dict = mi.get("media")
+                if _is_str_dict(media_dict):
+                    raw_tracks = media_dict.get("track")
+                    tracks_list: list[object] = raw_tracks if _is_obj_list(raw_tracks) else [raw_tracks] if _is_str_dict(raw_tracks) else []
+                    for track in tracks_list:
+                        if _is_str_dict(track) and track.get("@type") == "Text":
+                            language = track.get("Language_String2") or track.get("Language")
+                            if language == "en":
+                                if track.get("Forced", "") == "Yes":
+                                    language = "en (Forced)"
+                                title = track.get("Title", "")
+                                if isinstance(title, str) and "intertitles" in title.lower():
+                                    language = "en (Intertitles)"
+                            for lang, sub_id in sub_lang_map.items():
+                                if isinstance(language, str) and language in lang and sub_id not in sub_langs:
+                                    sub_langs.append(sub_id)
         else:
             for language in meta.bdinfo["subtitles"]:
                 for lang, sub_id in sub_lang_map.items():
@@ -759,30 +776,28 @@ class PassThePopcorn:
         return sub_langs
 
     async def get_trumpable(self, meta: Meta, sub_langs: list[int]) -> tuple[list[int] | None, list[int]]:
-        trumpable_values = {
+        trumpable_values: dict[str, int | str | None] = {
             "hc_full": 4,
             "hc_forced": 50,
             "no_english_subs": 14,
             "softsubs_mislabeled": None,
             "hc_non_english": "OTHER",
         }
-        opts = (
-            await ask(
-                meta,
-                Question(
-                    key="passthepopcorn.trumpable",
-                    kind="multi_choice",
-                    prompt="Please select any/all applicable options:",
-                    title="Trumpable options",
-                    choices=choices_from(TRUMPABLE_LABELS),
-                    summary={"Tracker": self.tracker, "Release": meta.name or meta.title},
-                    tracker=self.tracker,
-                    unattended="fail",
-                    empty_ok=True,
-                ),
-            )
-            or []
+        raw_opts = await ask(
+            meta,
+            Question(
+                key="passthepopcorn.trumpable",
+                kind="multi_choice",
+                prompt="Please select any/all applicable options:",
+                title="Trumpable options",
+                choices=choices_from(TRUMPABLE_LABELS),
+                summary={"Tracker": self.tracker, "Release": meta.name or meta.title},
+                tracker=self.tracker,
+                unattended="fail",
+                empty_ok=True,
+            ),
         )
+        opts: list[str] = [str(x) for x in raw_opts] if _is_obj_list(raw_opts) else []
         trumpable_list: list[int] = []
         for opt in opts:
             v = trumpable_values.get(opt)
@@ -948,9 +963,12 @@ class PassThePopcorn:
         image-host rules. A group is reused only when enough of its images are
         on hosts PTP accepts.
         """
-        images = meta.get(image_key) or []
+        raw_images = meta.get(image_key)
+        images = raw_images if _is_obj_list(raw_images) else []
         mapping = self.image_host_policy.url_host_mapping
-        approved = [image for image in images if isinstance(image, dict) and _image_host(str(image.get("raw_url", "")), mapping) in self.approved_image_hosts]
+        approved: list[dict[str, Any]] = [
+            dict(image) for image in images if _is_str_dict(image) and _image_host(str(image.get("raw_url", "")), mapping) in self.approved_image_hosts
+        ]
         return approved if len(approved) >= required else []
 
     def _description_image_limit(self, meta: Meta, screenshot_limit: int) -> int:
@@ -1133,7 +1151,7 @@ class PassThePopcorn:
                         uploaded_images: list[dict[str, Any]] = []
                         if new_screens and not meta.skip_imghost_upload:
                             uploaded_images, _ = await self.uploadscreens_manager.upload_screens(
-                                meta, multi_screens, 1, 0, multi_screens, new_screens, {new_images_key: meta[new_images_key]}, allowed_hosts=self.approved_image_hosts
+                                meta, multi_screens, 1, 0, multi_screens, new_screens, {new_images_key: meta[new_images_key]}, allowed_hosts=list(self.approved_image_hosts)
                             )
                             if uploaded_images and not meta.skip_imghost_upload:
                                 await self.save_image_links(meta, new_images_key, uploaded_images)
@@ -1204,7 +1222,7 @@ class PassThePopcorn:
                         uploaded_images: list[dict[str, Any]] = []
                         if new_screens and not meta.skip_imghost_upload:
                             uploaded_images, _ = await self.uploadscreens_manager.upload_screens(
-                                meta, multi_screens, 1, 0, multi_screens, new_screens, {new_images_key: meta[new_images_key]}, allowed_hosts=self.approved_image_hosts
+                                meta, multi_screens, 1, 0, multi_screens, new_screens, {new_images_key: meta[new_images_key]}, allowed_hosts=list(self.approved_image_hosts)
                             )
                         if uploaded_images and not meta.skip_imghost_upload:
                             await self.save_image_links(meta, new_images_key, uploaded_images)
@@ -1266,7 +1284,7 @@ class PassThePopcorn:
                             uploaded_images: list[dict[str, Any]] = []
                             if new_screens and not meta.skip_imghost_upload:
                                 uploaded_images, _ = await self.uploadscreens_manager.upload_screens(
-                                    meta, multi_screens, 1, 0, multi_screens, new_screens, {new_images_key: meta[new_images_key]}, allowed_hosts=self.approved_image_hosts
+                                    meta, multi_screens, 1, 0, multi_screens, new_screens, {new_images_key: meta[new_images_key]}, allowed_hosts=list(self.approved_image_hosts)
                                 )
                             if uploaded_images and not meta.skip_imghost_upload:
                                 await self.save_image_links(meta, new_images_key, uploaded_images)
@@ -1355,7 +1373,7 @@ class PassThePopcorn:
                     mi_dump = MediaInfo.parse(file, output="STRING", full=False)
                     temp_mi_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/TEMP_PTP_MEDIAINFO.txt"
                     async with aiofiles.open(temp_mi_path, "w", newline="", encoding="utf-8") as f:
-                        await f.write(mi_dump.replace(file, Path(file).name))
+                        await f.write(str(mi_dump).replace(file, Path(file).name))
                     async with aiofiles.open(temp_mi_path, encoding="utf-8") as mi_file:
                         mi_dump = await mi_file.read()
                     desc.write(f"[mediainfo]{mi_dump}[/mediainfo]\n")
@@ -1388,7 +1406,7 @@ class PassThePopcorn:
                         new_screens = [f.name for f in manifest_files(meta.base_dir, meta.uuid, f"FILE_{i}")]
                         if new_screens and not meta.skip_imghost_upload:
                             uploaded_images, _ = await self.uploadscreens_manager.upload_screens(
-                                meta, multi_screens, 1, 0, multi_screens, new_screens, {new_images_key: meta[new_images_key]}, allowed_hosts=self.approved_image_hosts
+                                meta, multi_screens, 1, 0, multi_screens, new_screens, {new_images_key: meta[new_images_key]}, allowed_hosts=list(self.approved_image_hosts)
                             )
                             if uploaded_images and not meta.skip_imghost_upload:
                                 await self.save_image_links(meta, new_images_key, uploaded_images)
@@ -1443,7 +1461,7 @@ class PassThePopcorn:
 
         # Add new images to the specific key
         for idx, img in enumerate(image_list):
-            image_entry = {
+            image_entry: dict[str, Any] = {
                 "index": cast(dict[str, Any], keys[image_key]).get("count", 0) + idx,
                 "raw_url": str(img.get("raw_url", "")),
                 "web_url": str(img.get("web_url", "")),
@@ -1499,7 +1517,7 @@ class PassThePopcorn:
         if not passkey_match:
             raise LoginError("Failed to extract passkey from PassThePopcorn announce URL.")  # noqa F405
         pass_key = passkey_match.group(1)
-        data = {
+        data: dict[str, str] = {
             "username": self.username,
             "password": self.password,
             "passkey": pass_key,
@@ -1521,7 +1539,8 @@ class PassThePopcorn:
                         focus="2FA code",
                         hint="Enter your PassThePopcorn 2FA code to log in.",
                     ):
-                        data["TfaCode"] = await prompt_in_thread(cli_ui.ask_string, "2FA Required: Please enter PassThePopcorn 2FA code")
+                        tfa_code = await prompt_in_thread(cli_ui.ask_string, "2FA Required: Please enter PassThePopcorn 2FA code")
+                        data["TfaCode"] = str(tfa_code or "")
                     loginresponse = await client.post(f"{self.base_url}/ajax.php?action=login", data=data, headers=headers)
                     await asyncio.sleep(2)
                     resp = loginresponse.json()
@@ -1721,7 +1740,7 @@ class PassThePopcorn:
                     meta.skipping = self.tracker
                     raise UploadError(f"{self.tracker}: A cover is required.")
                 cover = await self.rehost_poster_to_selected_host(meta, cover_input)
-            new_data = {
+            new_data: dict[str, object] = {
                 "title": tinfo.get("title", meta.imdb_info.get("title", meta.title)),
                 "year": tinfo.get("year", meta.imdb_info.get("year", meta.year)),
                 "image": cover,

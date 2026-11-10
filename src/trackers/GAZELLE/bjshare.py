@@ -13,7 +13,8 @@ import aiofiles
 import httpx
 import langcodes
 import pycountry
-from bs4 import BeautifulSoup, NavigableString, Tag
+from bs4 import BeautifulSoup, Tag
+from bs4.element import NavigableString
 from langcodes.tag_parser import LanguageTagError
 from PIL import Image
 from unidecode import unidecode
@@ -57,7 +58,8 @@ def _bbcode_from_html(node: Any) -> str:
         return ""
 
     name = node.name
-    classes = node.get("class") or []
+    classes_raw = node.get("class")
+    classes: list[str] = [classes_raw] if isinstance(classes_raw, str) else list(classes_raw) if classes_raw else []
     style = str(node.get("style") or "")
     if name in ("script", "style", "iframe", "input", "textarea"):
         return ""
@@ -906,7 +908,7 @@ class BJShare:
             return ""
 
         for bq in desc_box.find_all("blockquote"):
-            if bq.find("iframe") or "center" in bq.get("class", []):
+            if bq.find("iframe") or "center" in (bq.get("class") or ()):
                 continue
             text = bq.get_text(strip=True)
             if text:
@@ -1163,13 +1165,13 @@ class BJShare:
                     if category == "TV"
                     else {"torrents dual áudios": "Dual Áudio", "torrents legendados": "Legendado", "torrents dublados": "Dublado"}
                 )
-                existing_audio = set()
+                existing_audio: set[str] = set()
                 for header in torrent_details_table.select("table.torrent_table td.audio_header"):
                     if category == "TV":
                         season = getattr(meta, "season_int", None)
                         if not isinstance(season, int) or season < 0:
                             continue
-                        if not any((match := re.fullmatch(r"season_(\d+)", str(css_class))) and int(match.group(1)) == season for css_class in header.get("class", [])):
+                        if not any((match := re.fullmatch(r"season_(\d+)", str(css_class))) and int(match.group(1)) == season for css_class in (header.get("class") or ())):
                             continue
                     label = " ".join(header.get_text(" ", strip=True).split()).casefold()
                     if label in audio_labels:
@@ -1424,7 +1426,7 @@ class BJShare:
         }
         try:
             with Image.open(BytesIO(image_bytes)) as image:
-                image_format = image.format
+                image_format = image.format or ""
                 if image_format == "WEBP":
                     converted = BytesIO()
                     image.save(converted, format="PNG")
@@ -1523,7 +1525,7 @@ class BJShare:
         supported_suffixes = {".pjp", ".jfif", ".jpe", ".pjpeg", ".jpeg", ".jpg", ".png", ".gif", ".webp"}
         local_files = [path for path in manifest_files(meta.base_dir, meta.uuid, "main") if path.suffix.casefold() in supported_suffixes]
 
-        disc_menu_links = [img.get("raw_url") for img in meta.menu_images if img.get("raw_url")][:3]
+        disc_menu_links = [str(img.get("raw_url")) for img in meta.menu_images if img.get("raw_url")][:3]
 
         async def upload_local_file(path: Path):
             async with aiofiles.open(path, "rb") as f:

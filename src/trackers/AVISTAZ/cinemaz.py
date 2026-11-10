@@ -279,7 +279,7 @@ class CinemaZ(AZTrackerBase):
 
         origin_countries_codes = meta.origin_country
         try:
-            year = int(meta.year)
+            year = int(meta.year) if meta.year is not None else 0
         except TypeError, ValueError:
             year = 0
         is_older_than_50_years = False
@@ -339,7 +339,7 @@ class CinemaZ(AZTrackerBase):
         if "hybrid" in str(meta.edition or "").lower() or bool(meta.webdv):
             warnings.append("HYBRID releases require substantially improved, perfectly synchronized audio or video streams; verify this manually before uploading.")
 
-        bitrate_thresholds = {
+        bitrate_thresholds: dict[str, dict[str | int, int]] = {
             "x264": {"sd": 1000, 720: 1500, 1080: 3000, 2160: 12000},
             "x265": {720: 1000, 1080: 2000, 2160: 8000},
         }
