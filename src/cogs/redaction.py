@@ -33,10 +33,10 @@ SENSITIVE_KEYS: set[str] = {
 class PathAwareEncoder(json.JSONEncoder):
     """JSON encoder that converts pathlib.Path objects to strings."""
 
-    def default(self, obj: Any) -> Any:
-        if isinstance(obj, Path):
-            return str(obj)
-        return super().default(obj)
+    def default(self, o: Any) -> Any:
+        if isinstance(o, Path):
+            return str(o)
+        return super().default(o)
 
 
 class Redaction:

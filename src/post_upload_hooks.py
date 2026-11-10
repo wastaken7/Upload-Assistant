@@ -11,7 +11,7 @@ import subprocess
 import sys
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeIs
 
 from src.app_paths import STATE_DIR
 from src.cogs.redaction import PathAwareEncoder
@@ -22,9 +22,13 @@ HOOKS_DIR = STATE_DIR / "custom_hooks"
 DEFAULT_TIMEOUT_SECONDS = 30.0
 
 
+def _is_obj_seq(value: object) -> TypeIs[Sequence[object]]:
+    return isinstance(value, Sequence) and not isinstance(value, str)
+
+
 def _configured_hook_names(config: Mapping[str, Any], setting: str) -> list[str]:
     configured = config.get("DEFAULT", {}).get(setting, [])
-    if not isinstance(configured, Sequence) or isinstance(configured, str):
+    if not _is_obj_seq(configured):
         logger.warning(f"{setting} must be a list of script names; ignoring it.")
         return []
     return [name for name in configured if isinstance(name, str) and name.strip()]

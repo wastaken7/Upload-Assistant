@@ -9,7 +9,7 @@ import threading
 from contextlib import closing
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeIs
 
 from src.app_db import connect as connect_app_db
 from src.app_db import database_available, database_path
@@ -22,6 +22,10 @@ WARNING_DAYS = 14
 _OMITTED_HEADER_MEANS_NO_EXPIRY = {"LST"}
 _warned: set[str] = set()
 _warning_lock = threading.Lock()
+
+
+def _is_str_dict(value: object) -> TypeIs[dict[str, object]]:
+    return isinstance(value, dict)
 
 
 def _date(value: object) -> datetime | None:
@@ -94,17 +98,17 @@ def record_api_key_expiry(
         return None
     headers = {str(key).lower(): value for key, value in getattr(response, "headers", {}).items()}
     header = "x-api-key-expires-at"
-    credential = payload.get("api_key") if isinstance(payload, dict) else None
+    credential = payload.get("api_key") if _is_str_dict(payload) else None
     if header in headers:
         expiry = _date(headers[header])
         if expiry is None:
             return None
-    elif isinstance(credential, dict) and "expires_at" in credential:
+    elif _is_str_dict(credential) and "expires_at" in credential:
         raw = credential["expires_at"]
         expiry = _date(raw)
         if raw is not None and expiry is None:
             return None
-    elif tracker.upper() in _OMITTED_HEADER_MEANS_NO_EXPIRY and isinstance(payload, dict):
+    elif tracker.upper() in _OMITTED_HEADER_MEANS_NO_EXPIRY and _is_str_dict(payload):
         expiry = None
     else:
         return None

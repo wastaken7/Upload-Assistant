@@ -5,12 +5,16 @@ import json
 from contextlib import suppress
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeIs
 
 from web_ui.auth import write_private_text
 
 DEFAULT_LEVEL = "access_denied"  # default: log only failed/denied attempts
 VALID_LEVELS = {"access_denied", "access", "disabled"}
+
+
+def _is_str_dict(val: object) -> TypeIs[dict[str, Any]]:
+    return isinstance(val, dict)
 
 
 class AccessLogger:
@@ -25,10 +29,10 @@ class AccessLogger:
         with contextlib.suppress(Exception):
             if self.user_file.exists():
                 try:
-                    doc = json.loads(self.user_file.read_text(encoding="utf-8"))
+                    doc: object = json.loads(self.user_file.read_text(encoding="utf-8"))
                 except Exception:
                     doc = None
-                if isinstance(doc, dict):
+                if _is_str_dict(doc):
                     txt = doc.get("access_log_level")
                     if isinstance(txt, str) and txt in VALID_LEVELS:
                         return txt
@@ -42,11 +46,10 @@ class AccessLogger:
             data: dict[str, object] = {}
             if self.user_file.exists():
                 try:
-                    data = json.loads(self.user_file.read_text(encoding="utf-8")) or {}
+                    loaded: object = json.loads(self.user_file.read_text(encoding="utf-8")) or {}
+                    data = loaded if _is_str_dict(loaded) else {}
                 except Exception:
                     return False
-            if not isinstance(data, dict):
-                data = {}
             data["access_log_level"] = level
             # write back safely
             write_private_text(self.user_file, json.dumps(data, ensure_ascii=False, indent=2))
@@ -175,10 +178,12 @@ class AccessLogger:
             with Path(self.log_file).open(encoding="utf-8") as f:
                 lines = f.read().splitlines()
             lines = lines[-n:]
-            out = []
+            out: list[dict[str, Any]] = []
             for ln in lines:
                 with suppress(Exception):
-                    out.append(json.loads(ln))
+                    parsed: object = json.loads(ln)
+                    if _is_str_dict(parsed):
+                        out.append(parsed)
             return out
         except Exception:
             return []

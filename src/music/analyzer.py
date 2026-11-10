@@ -9,12 +9,17 @@ import re
 import unicodedata
 from collections import Counter
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, TypeIs, cast
 
 import mutagen
 
 from src.media_extensions import ARTWORK_EXTENSIONS, AUDIO_EXTENSIONS
 from src.music.models import AudioTrack, MetadataSource, MusicRelease
+
+
+def _is_obj_list(val: object) -> TypeIs[list[Any]]:
+    return isinstance(val, list)
+
 
 LINEAGE_NAMES = ("lineage", "equipment", "transfer", "rip", "source")
 DISC_RE = re.compile(r"(?:^|[ _.-])(?:cd|disc|disk)[ _.-]?(\d{1,2})(?:$|[ _.-])", re.I)
@@ -99,7 +104,7 @@ def _number(value: str) -> int | None:
     return int(match.group()) if match else None
 
 
-def _format_for(path: Path, audio: Any) -> tuple[str, str]:
+def _format_for(path: Path, audio: object) -> tuple[str, str]:
     ext = path.suffix.lower()
     class_name = audio.__class__.__name__.lower()
     if ext == ".flac" or "flac" in class_name:
@@ -199,18 +204,19 @@ class MusicReleaseAnalyzer:
 
     def _read_track(self, path: Path, root: Path) -> AudioTrack | None:
         try:
-            audio = mutagen.File(path, easy=True)
-            technical = mutagen.File(path)
+            audio: object = mutagen.File(path, easy=True)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+            technical: object = mutagen.File(path)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
         except mutagen.MutagenError, OSError:
             return None
         if audio is None and technical is None:
             return None
-        source = audio or technical
+        source: object = audio if audio is not None else technical  # pyright: ignore[reportUnknownVariableType]
         if source is None:
             return None
         tags: dict[str, list[str]] = {}
-        for key, value in (getattr(audio, "tags", None) or {}).items():
-            values = value if isinstance(value, list) else [value]
+        raw_tags: dict[str, Any] = getattr(audio, "tags", None) or {}
+        for key, value in raw_tags.items():
+            values: list[Any] = value if _is_obj_list(value) else [value]
             tags[str(key)] = [_clean(item) for item in values if _clean(item)]
 
         info = getattr(technical or source, "info", None)
@@ -484,7 +490,14 @@ class MusicReleaseAnalyzer:
                 release.set_field("artist", match.group(1).strip(), MetadataSource.DIRECTORY, 0.55)
                 release.set_field("album", match.group(2).strip(), MetadataSource.DIRECTORY, 0.55)
         upper = normalized.upper()
-        for media, markers in {"WEB": ("WEB", "DIGITAL"), "CD": (" CD", "CD-", "EAC"), "Vinyl": ("VINYL", "LP"), "SACD": ("SACD",), "BD": ("BLURAY", "BLU-RAY")}.items():
+        media_markers: dict[str, tuple[str, ...]] = {
+            "WEB": ("WEB", "DIGITAL"),
+            "CD": (" CD", "CD-", "EAC"),
+            "Vinyl": ("VINYL", "LP"),
+            "SACD": ("SACD",),
+            "BD": ("BLURAY", "BLU-RAY"),
+        }
+        for media, markers in media_markers.items():
             if any(marker in upper for marker in markers):
                 release.set_field("media", media, MetadataSource.DIRECTORY, 0.45)
                 break

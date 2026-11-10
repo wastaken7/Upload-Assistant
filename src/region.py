@@ -2,9 +2,18 @@
 import importlib
 import re
 from collections.abc import Callable
-from typing import Any
+from typing import Any, TypeIs
 
 from src.meta import Meta
+
+
+def _is_str_dict(val: object) -> TypeIs[dict[str, Any]]:
+    return isinstance(val, dict)
+
+
+def _is_obj_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
+
 
 GuessitFn = Callable[[str, dict[str, Any] | None], dict[str, Any]]
 _guessit_module = importlib.import_module("guessit")
@@ -3222,23 +3231,27 @@ async def get_mediainfo_service(meta: Meta) -> tuple[str, str]:
     """Conservative fallback for the known Amazon 1080p WEB signature."""
     if meta.service or meta.is_disc or meta.resolution != "1080p" or meta.type not in ("WEBDL", "WEBRIP"):
         return "", ""
-    if not isinstance(meta.mediainfo, dict):
+    if not _is_str_dict(meta.mediainfo):
         return "", ""
     media = meta.mediainfo.get("media", {})
-    tracks = media.get("track", []) if isinstance(media, dict) else []
-    if not isinstance(tracks, list):
+    if not _is_str_dict(media):
+        return "", ""
+    tracks = media.get("track", [])
+    if not _is_obj_list(tracks):
         return "", ""
     video_match = audio_match = False
     for track in tracks:
-        if not isinstance(track, dict):
+        if not _is_str_dict(track):
             continue
         if track.get("@type") == "Video":
             if track.get("Encoded_Library_Settings"):
                 return "", ""
             nominal = track.get("BitRate_Nominal") or track.get("NominalBitRate")
-            video_match |= track.get("BitRate_Mode") == "CBR" and _mediainfo_number(nominal) == 10000000
+            video_match = bool(video_match | (track.get("BitRate_Mode") == "CBR" and _mediainfo_number(nominal) == 10000000))
         elif track.get("@type") == "Audio" and track.get("Format") == "E-AC-3":
-            audio_match |= (_mediainfo_number(track.get("Channels")), _mediainfo_number(track.get("BitRate"))) in ((2, 224000), (6, 640000))
+            channels_num = _mediainfo_number(track.get("Channels"))
+            bitrate_num = _mediainfo_number(track.get("BitRate"))
+            audio_match = bool(audio_match | ((channels_num, bitrate_num) in ((2, 224000), (6, 640000))))
     if video_match and audio_match:
         service = await get_service("Example.1080p.AMZN.WEB-DL")
         if isinstance(service, tuple):

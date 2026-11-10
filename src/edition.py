@@ -2,7 +2,7 @@
 import re
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, TypeIs, cast
 
 import cli_ui
 import guessit
@@ -16,6 +16,10 @@ guessit_module: Any = cast(Any, guessit)
 GuessitFn = Callable[[str, dict[str, Any] | None], dict[str, Any]]
 
 RELEASE_TOKEN_RE = re.compile(r"(?<![A-Z0-9])(?:(?:REPACK|PROPER)[2-9]?|RERIP)(?![A-Z0-9])", re.IGNORECASE)
+
+
+def _is_obj_list(value: object) -> TypeIs[list[object]]:
+    return isinstance(value, list)
 
 
 def guessit_fn(value: str, options: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -70,7 +74,7 @@ async def get_edition(video: str, bdinfo: dict[str, Any] | None, filelist: list[
 
                         if difference <= leeway_seconds:
                             attributes = edition_info.get("attributes")
-                            attributes_list = attributes if isinstance(attributes, list) else []
+                            attributes_list: list[object] = attributes if _is_obj_list(attributes) else []
                             has_attributes = bool(attributes_list)
                             logger.debug(
                                 f"[green]Potential match: {edition_info.get('display_name', '')} - duration {edition_formatted}, difference: {format_duration(difference)}[/green]"
@@ -180,7 +184,7 @@ async def get_edition(video: str, bdinfo: dict[str, Any] | None, filelist: list[
                         if difference <= leeway_seconds:
                             # Store the complete edition info
                             attributes = edition_info.get("attributes")
-                            attributes_list = attributes if isinstance(attributes, list) else []
+                            attributes_list: list[object] = attributes if _is_obj_list(attributes) else []
                             if attributes_list:
                                 edition_name = " ".join(smart_title(str(attr)) for attr in attributes_list)
                             else:
@@ -338,7 +342,7 @@ async def get_edition(video: str, bdinfo: dict[str, Any] | None, filelist: list[
         guess: Any = guessit_fn(video)
 
         tag_value: Any = guess.get("release_group", "NOGROUP")
-        tag = " ".join(str(t) for t in tag_value) if isinstance(tag_value, list) else str(tag_value)
+        tag = " ".join(str(t) for t in tag_value) if _is_obj_list(tag_value) else str(tag_value)
         repack = ""
 
         if bdinfo is not None:

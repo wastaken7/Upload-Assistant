@@ -5,7 +5,7 @@ import contextlib
 import html
 import json
 import re
-from typing import Any
+from typing import Any, TypeIs
 from urllib.parse import urlsplit
 
 import httpx
@@ -16,6 +16,14 @@ from src.metadata_cache import cache_for, is_cache_miss
 
 _ASIN_RE = re.compile(r"^[A-Z0-9]{10}$", re.IGNORECASE)
 _AUDIBLE_HOST_RE = re.compile(r"^(?:www\.)?audible\.[a-z]{2,3}(?:\.[a-z]{2})?$", re.IGNORECASE)
+
+
+def _is_str_dict(val: object) -> TypeIs[dict[str, Any]]:
+    return isinstance(val, dict)
+
+
+def _is_obj_list(val: object) -> TypeIs[list[Any]]:
+    return isinstance(val, list)
 
 
 def normalize_audible_domain(value: str) -> str:
@@ -81,21 +89,21 @@ def _clean_text(value: Any) -> str:
 
 
 def _names(value: Any) -> str:
-    if isinstance(value, dict):
+    if _is_str_dict(value):
         value = [value]
-    if not isinstance(value, list):
+    if not _is_obj_list(value):
         return ""
-    return ", ".join(name for item in value if isinstance(item, dict) if (name := _clean_text(item.get("name"))))
+    return ", ".join(name for item in value if _is_str_dict(item) if (name := _clean_text(item.get("name"))))
 
 
 def _authors(value: Any) -> list[dict[str, str]]:
-    if isinstance(value, dict):
+    if _is_str_dict(value):
         value = [value]
-    if not isinstance(value, list):
+    if not _is_obj_list(value):
         return []
-    authors = []
+    authors: list[dict[str, str]] = []
     for item in value:
-        if not isinstance(item, dict) or not (name := _clean_text(item.get("name"))):
+        if not _is_str_dict(item) or not (name := _clean_text(item.get("name"))):
             continue
         asin = str(item.get("asin") or "").strip().upper()
         authors.append({"name": name, "asin": asin if _ASIN_RE.fullmatch(asin) else ""})
@@ -103,7 +111,7 @@ def _authors(value: Any) -> list[dict[str, str]]:
 
 
 def _parse_product(product: Any, asin: str) -> dict[str, Any] | None:
-    if not isinstance(product, dict) or str(product.get("asin", "")).upper() != asin or not _clean_text(product.get("title")):
+    if not _is_str_dict(product) or str(product.get("asin", "")).upper() != asin or not _clean_text(product.get("title")):
         return None
     result: dict[str, Any] = {
         "title": _clean_text(product.get("title")),
@@ -119,13 +127,13 @@ def _parse_product(product: Any, asin: str) -> dict[str, Any] | None:
     if isinstance(date, str) and re.match(r"^\d{4}", date):
         result["year"] = int(date[:4])
     images = product.get("product_images")
-    if isinstance(images, dict):
+    if _is_str_dict(images):
         available_images = ((int(size), url) for size, url in images.items() if str(size).isdigit() and isinstance(url, str) and url)
         result["artwork_url"] = max(available_images, default=(0, ""))[1]
     series = product.get("series")
-    if isinstance(series, list) and series:
+    if _is_obj_list(series) and series:
         first = series[0]
-        if isinstance(first, dict):
+        if _is_str_dict(first):
             result["book_series"] = _clean_text(first.get("title") or first.get("name"))
             sequence = first.get("sequence")
             if isinstance(sequence, (str, int, float)) and not isinstance(sequence, bool):
@@ -137,8 +145,8 @@ def _parse_product(product: Any, asin: str) -> dict[str, Any] | None:
     if isinstance(minutes, int) and minutes > 0:
         result["runtime_minutes"] = minutes
     rating = product.get("rating")
-    distribution = rating.get("overall_distribution", {}) if isinstance(rating, dict) else {}
-    if isinstance(distribution, dict):
+    distribution: Any = rating.get("overall_distribution", {}) if _is_str_dict(rating) else {}
+    if _is_str_dict(distribution):
         count = distribution.get("num_ratings")
         average = distribution.get("average_rating")
         if isinstance(count, int) and count > 0 and isinstance(average, (int, float)) and 0 < average <= 5:
@@ -155,14 +163,14 @@ def _parse_page(markup: str, asin: str) -> dict[str, Any] | None:
             data = json.loads(script.string or script.get_text())
         except TypeError, ValueError:
             continue
-        structured_items.extend(item for item in (data if isinstance(data, list) else [data]) if isinstance(item, dict))
+        structured_items.extend(item for item in (data if _is_obj_list(data) else [data]) if _is_str_dict(item))
     if not any(item.get("@type") == "Product" and str(item.get("productID", "")).upper() == asin for item in structured_items):
         return None
     for item in structured_items:
         if item.get("@type") != "Audiobook":
             continue
         rating = item.get("aggregateRating", {})
-        product = {
+        product: dict[str, Any] = {
             "asin": asin,
             "title": item.get("name"),
             "authors": item.get("author"),
@@ -176,7 +184,7 @@ def _parse_page(markup: str, asin: str) -> dict[str, Any] | None:
         duration = item.get("duration")
         if isinstance(duration, str) and (match := re.fullmatch(r"PT(?:(\d+)H)?(?:(\d+)M)?", duration)):
             product["runtime_length_min"] = int(match.group(1) or 0) * 60 + int(match.group(2) or 0)
-        if isinstance(rating, dict):
+        if _is_str_dict(rating):
             with contextlib.suppress(KeyError, TypeError, ValueError):
                 product["rating"] = {"overall_distribution": {"average_rating": float(rating["ratingValue"]), "num_ratings": int(rating["ratingCount"])}}
         return _parse_product(product, asin)
@@ -195,7 +203,7 @@ async def fetch_audible_metadata(asin: str, domain: str, base_dir: str) -> dict[
     cache = cache_for(base_dir)
     cache_key = f"v2:{domain}:{asin}"
     cached = await cache.get("audible", "product", cache_key)
-    if not is_cache_miss(cached) and isinstance(cached, dict):
+    if not is_cache_miss(cached) and _is_str_dict(cached):
         return None if cached.get("not_found") else cached
     params = {
         "response_groups": "contributors,media,product_attrs,product_desc,product_details,product_extended_attrs,rating,series",
@@ -209,7 +217,7 @@ async def fetch_audible_metadata(asin: str, domain: str, base_dir: str) -> dict[
             api_status = response.status_code
             if response.status_code == 200:
                 payload = response.json()
-                result = _parse_product(payload.get("product"), asin) if isinstance(payload, dict) else None
+                result = _parse_product(payload.get("product"), asin) if _is_str_dict(payload) else None
                 if result:
                     await cache.set("audible", "product", cache_key, result)
                     return result

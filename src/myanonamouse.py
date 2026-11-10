@@ -2,7 +2,7 @@
 import html
 import json
 import re
-from typing import Any
+from typing import Any, TypeIs
 
 import httpx
 
@@ -11,6 +11,10 @@ from src.console import logger
 from src.metadata_cache import cache_for, is_cache_miss
 
 mam_color = "[#eac117]MyAnonamouse[/#eac117]"
+
+
+def _is_str_dict(val: object) -> TypeIs[dict[str, Any]]:
+    return isinstance(val, dict)
 
 
 class MyAnonamouseManager:
@@ -28,9 +32,10 @@ class MyAnonamouseManager:
         author_info = item.get("author_info")
         if author_info:
             try:
+                author_dict: dict[str, Any]
                 if isinstance(author_info, str):
                     author_dict = json.loads(author_info)
-                elif isinstance(author_info, dict):
+                elif _is_str_dict(author_info):
                     author_dict = author_info
                 else:
                     author_dict = {}
@@ -44,9 +49,10 @@ class MyAnonamouseManager:
         narrator_info = item.get("narrator_info")
         if narrator_info:
             try:
+                narrator_dict: dict[str, Any]
                 if isinstance(narrator_info, str):
                     narrator_dict = json.loads(narrator_info)
-                elif isinstance(narrator_info, dict):
+                elif _is_str_dict(narrator_info):
                     narrator_dict = narrator_info
                 else:
                     narrator_dict = {}
@@ -137,7 +143,7 @@ class MyAnonamouseManager:
 
         cache = cache_for(base_dir)
         cached_data = await cache.get("myanonamouse", "torrent", clean_id)
-        if not is_cache_miss(cached_data) and isinstance(cached_data, dict):
+        if not is_cache_miss(cached_data) and _is_str_dict(cached_data):
             if cached_data.get("not_found"):
                 return None
             logger.info(f"{mam_color}: ID match found (cached): {clean_id}")
@@ -148,7 +154,7 @@ class MyAnonamouseManager:
             return None
 
         url = "https://www.myanonamouse.net/tor/js/loadSearchJSONbasic.php"
-        payload = {"tor": {"id": int(clean_id)}, "description": "", "isbn": ""}
+        payload: dict[str, object] = {"tor": {"id": int(clean_id)}, "description": "", "isbn": ""}
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             "Content-Type": "application/json",

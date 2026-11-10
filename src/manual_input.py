@@ -26,7 +26,7 @@ import re
 import weakref
 from collections.abc import AsyncGenerator, Awaitable, Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Literal, cast
+from typing import Any, Literal, TypeIs, cast
 
 import cli_ui
 
@@ -41,6 +41,14 @@ Validator = Callable[[Any], str | Awaitable[str | None] | None]
 _YES = frozenset({"y", "yes", "true", "1", "s", "sim"})
 _NO = frozenset({"n", "no", "false", "0", "nao", "não"})
 _LIST_SEPARATOR = re.compile(r"[,;]")
+
+
+def _is_obj_list(value: object) -> TypeIs[list[object]]:
+    return isinstance(value, list)
+
+
+def _is_str_mapping(value: Iterable[str] | Mapping[str, str]) -> TypeIs[Mapping[str, str]]:
+    return isinstance(value, Mapping)
 
 
 @dataclass(frozen=True)
@@ -215,14 +223,15 @@ def _ask_cli(question: Question) -> Any:
     if question.kind == "confirm":
         return cli_ui.ask_yes_no(question.prompt, default=bool(question.default))
     if question.kind in ("text", "list"):
-        default = ", ".join(cast(list[str], question.default)) if isinstance(question.default, list) else question.default
+        raw_default = question.default
+        default = ", ".join(str(item) for item in raw_default) if _is_obj_list(raw_default) else raw_default
         answer = str(cli_ui.ask_string(question.prompt, default=default) or "").strip()
         return split_list(answer) if question.kind == "list" else answer
     labels = [choice.display for choice in question.choices]
     if question.kind == "choice":
         picked = cli_ui.ask_choice(question.prompt, choices=labels, sort=False)
         return question.choices[labels.index(picked)].value if picked is not None else None
-    picked_many = cli_ui.select_choices(question.prompt, choices=labels, sort=False) or []
+    picked_many: list[str] = cli_ui.select_choices(question.prompt, choices=labels, sort=False) or []
     return [question.choices[labels.index(label)].value for label in picked_many]
 
 
@@ -279,9 +288,9 @@ def _describe(question: Question, value: Any) -> str:
     if isinstance(value, bool):
         return "Yes" if value else "No"
     labels = {choice.value: choice.display for choice in question.choices}
-    if isinstance(value, list):
-        return ", ".join(labels.get(item, item) for item in value) or "None"
-    return labels.get(value, value) or "None"
+    if _is_obj_list(value):
+        return ", ".join(labels.get(str(item), str(item)) for item in value) or "None"
+    return str(labels.get(str(value), value) or "None")
 
 
 def _unattended(meta: Meta, question: Question) -> Any:
@@ -317,6 +326,6 @@ async def confirm_override(meta: Meta | None, question: str = "Do you want to up
 
 def choices_from(values: Iterable[str] | Mapping[str, str]) -> tuple[Choice, ...]:
     """Build choices from values, or from a ``{value: label}`` mapping."""
-    if isinstance(values, Mapping):
+    if _is_str_mapping(values):
         return tuple(Choice(value, label) for value, label in values.items())
     return tuple(Choice(value) for value in values)

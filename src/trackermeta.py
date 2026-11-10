@@ -521,51 +521,50 @@ async def update_metadata_from_tracker(
                         else:
                             meta.description = description
                             meta.saved_description = True
-                    elif meta.bhd_nfo:
-                        if not meta.skipit:
-                            nfo_file_path = Path(meta.base_dir) / "tmp" / meta.uuid / "bhd.nfo"
-                            if Path(nfo_file_path).exists():
-                                nfo_content = await asyncio.to_thread(Path(nfo_file_path).read_text, encoding="utf-8")
-                                logger.info("[bold green]Successfully grabbed FraMeSToR description")
-                                logger.info(f"Description content:\n{nfo_content[:1000]}...", extra={"markup": False})
-                                logger.info("[cyan]Do you want to discard or keep the description?[/cyan]")
-                                question, buttons = webui_events.letter_prompt([("d", "discard")], "keep it as is")
-                                with webui_events.field_prompt(
-                                    "Tracker description",
-                                    {"Tracker": tracker_name, "Description": nfo_content[:1000]},
-                                    focus="Description",
-                                    hint="Do you want to discard or keep the description?",
-                                    actions=buttons,
-                                ):
-                                    edit_choice = cli_ui.ask_string(question)
+                    elif meta.bhd_nfo and not meta.skipit:
+                        nfo_file_path = Path(meta.base_dir) / "tmp" / meta.uuid / "bhd.nfo"
+                        if Path(nfo_file_path).exists():
+                            nfo_content = await asyncio.to_thread(Path(nfo_file_path).read_text, encoding="utf-8")
+                            logger.info("[bold green]Successfully grabbed FraMeSToR description")
+                            logger.info(f"Description content:\n{nfo_content[:1000]}...", extra={"markup": False})
+                            logger.info("[cyan]Do you want to discard or keep the description?[/cyan]")
+                            question, buttons = webui_events.letter_prompt([("d", "discard")], "keep it as is")
+                            with webui_events.field_prompt(
+                                "Tracker description",
+                                {"Tracker": tracker_name, "Description": nfo_content[:1000]},
+                                focus="Description",
+                                hint="Do you want to discard or keep the description?",
+                                actions=buttons,
+                            ):
+                                edit_choice = cli_ui.ask_string(question)
 
-                                if (edit_choice or "").lower() == "d":
-                                    meta.description = ""
-                                    meta.image_list = []
-                                    nfo_file_path = Path(meta.base_dir) / "tmp" / meta.uuid / "bhd.nfo"
+                            if (edit_choice or "").lower() == "d":
+                                meta.description = ""
+                                meta.image_list = []
+                                nfo_file_path = Path(meta.base_dir) / "tmp" / meta.uuid / "bhd.nfo"
 
-                                    try:
-                                        import gc
+                                try:
+                                    import gc
 
-                                        gc.collect()  # Force garbage collection to close any lingering handles
-                                        for attempt in range(3):
-                                            try:
-                                                nfo_file_path.unlink()
-                                                logger.info("[yellow]NFO file successfully deleted.[/yellow]")
-                                                break
-                                            except Exception as e:
-                                                if attempt < 2:
-                                                    logger.info(f"[yellow]Attempt {attempt + 1}: Could not delete file, retrying in 1 second...[/yellow]")
-                                                    await asyncio.sleep(1)
-                                                else:
-                                                    logger.error(f"[red]Failed to delete BEYONDHD NFO file after 3 attempts: {e}[/red]")
-                                    except Exception as e:
-                                        logger.error(f"[red]Error during file cleanup: {e}[/red]")
-                                    meta.nfo = False
-                                    meta.bhd_nfo = False
-                                    logger.info("[yellow]Description discarded.[/yellow]")
-                                else:
-                                    logger.info("[green]Keeping the original description.[/green]")
+                                    gc.collect()  # Force garbage collection to close any lingering handles
+                                    for attempt in range(3):
+                                        try:
+                                            nfo_file_path.unlink()
+                                            logger.info("[yellow]NFO file successfully deleted.[/yellow]")
+                                            break
+                                        except Exception as e:
+                                            if attempt < 2:
+                                                logger.info(f"[yellow]Attempt {attempt + 1}: Could not delete file, retrying in 1 second...[/yellow]")
+                                                await asyncio.sleep(1)
+                                            else:
+                                                logger.error(f"[red]Failed to delete BEYONDHD NFO file after 3 attempts: {e}[/red]")
+                                except Exception as e:
+                                    logger.error(f"[red]Error during file cleanup: {e}[/red]")
+                                meta.nfo = False
+                                meta.bhd_nfo = False
+                                logger.info("[yellow]Description discarded.[/yellow]")
+                            else:
+                                logger.info("[green]Keeping the original description.[/green]")
 
                     image_list = cast(Sequence[ImageDict] | None, meta.image_list)
                     if image_list:

@@ -597,8 +597,8 @@ def bloated_check(meta: Meta, audio_languages: Sequence[str] | str, is_eng_origi
 
         # Separate trackers that don't allow bloat at all vs those that just warn
         # Only remove trackers if this is an English original with English and non-English tracks
-        not_allowed_trackers = []
-        warning_trackers = []
+        not_allowed_trackers: list[str] = []
+        warning_trackers: list[str] = []
 
         if is_eng_original_with_non_eng:
             for tracker in trackers_to_warn:
@@ -646,8 +646,8 @@ def bloated_check(meta: Meta, audio_languages: Sequence[str] | str, is_eng_origi
 
 
 def dts_core_additional_check(meta: Meta) -> None:
-    mediainfo_tracks = meta.mediainfo.get("media", {}).get("track") or []
-    audio_tracks = [track for track in mediainfo_tracks if track.get("@type") == "Audio"]
+    mediainfo_tracks = cast(list[dict[str, Any]], meta.mediainfo.get("media", {}).get("track") or [])
+    audio_tracks: list[dict[str, Any]] = [track for track in mediainfo_tracks if track.get("@type") == "Audio"]
     warned_once = False
     # Iterate pairs once (i < j) to avoid duplicate comparisons
     n = len(audio_tracks)

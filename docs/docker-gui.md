@@ -121,6 +121,7 @@ Ready-made templates live in [`deploy/`](../deploy):
   ```
 
   Then open **Docker**, then **Add Container**, and choose **upload-assistant** in the **Template** list.
+
 - **ZimaOS / CasaOS:** [`deploy/zimaos/docker-compose.yml`](../deploy/zimaos/docker-compose.yml). Until it is in the App Store, import it with **App Store**, then **Custom Install**, then **Import**.
 
 Both templates keep everything, including the WebUI login, in one appdata folder mounted at `/state`, and set `XDG_CONFIG_HOME=/state/config` for that. On the first start, read the one-time setup code from the container log.

@@ -29,7 +29,7 @@ from datetime import datetime, timedelta, UTC
 from functools import wraps
 from types import ModuleType
 from pathlib import Path
-from typing import Any, Literal, Protocol, TypedDict, cast
+from typing import Any, Literal, Protocol, TypedDict, TypeIs, TypeVar, cast, overload
 from collections import deque
 from collections.abc import Callable, Iterable, Iterator
 from collections.abc import Mapping, Sequence
@@ -50,6 +50,27 @@ from src.version import __version__
 from src.update_checker import get_changelog_history, get_update_status
 
 APP_VERSION = __version__
+_T = TypeVar("_T")
+
+
+def _is_str_dict(val: object) -> TypeIs[dict[str, Any]]:
+    return isinstance(val, dict)
+
+
+def _is_obj_dict(val: object) -> TypeIs[dict[object, object]]:
+    return isinstance(val, dict)
+
+
+def _is_str_mapping(val: object) -> TypeIs[Mapping[str, object]]:
+    return isinstance(val, Mapping)
+
+
+def _is_obj_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
+
+
+def _is_obj_sequence(val: object) -> TypeIs[Sequence[object]]:
+    return isinstance(val, Sequence) and not isinstance(val, (str, bytes, bytearray))
 
 
 def _module_name(*parts: str) -> str:
@@ -71,12 +92,27 @@ class _HeadersLike(Protocol):
     def items(self) -> Sequence[tuple[str, str]]: ...
 
 
+class _ArgsLike(Protocol):
+    @overload
+    def get(self, key: str) -> str | None: ...
+    @overload
+    def get(self, key: str, default: str) -> str: ...
+    @overload
+    def get(self, key: str, default: _T) -> str | _T: ...
+    def get(self, key: str, default: object = None) -> object: ...
+    def getlist(self, key: str) -> list[str]: ...
+    def __getitem__(self, key: str) -> str: ...
+    def __iter__(self) -> Iterator[str]: ...
+    def __len__(self) -> int: ...
+
+
 class _RequestLike(Protocol):
     headers: _HeadersLike
     form: Mapping[str, str]
-    args: Mapping[str, str]
+    args: _ArgsLike
     cookies: Mapping[str, str]
     authorization: _AuthLike | None
+    endpoint: str | None
     method: str
     path: str
     host: str
@@ -93,6 +129,7 @@ class _RequestLike(Protocol):
 
 class _ResponseLike(Protocol):
     status_code: int
+    headers: dict[str, str]
 
     def set_cookie(self, key: str, value: str, max_age: int | None = None, httponly: bool = False, secure: bool = False, samesite: str | None = None) -> None: ...
     def delete_cookie(self, key: str) -> None: ...
@@ -179,11 +216,11 @@ flask_session = _dynamic_import(_module_name("flask", "_session"))
 Flask: Callable[[str], object] = flask.Flask
 Response: Callable[..., _ResponseLike] = flask.Response
 g: _GLike = flask.g
-jsonify: Callable[..., object] = flask.jsonify
+jsonify: Callable[..., _ResponseLike] = flask.jsonify
 redirect: Callable[..., _ResponseLike] = flask.redirect
 render_template: Callable[..., object] = flask.render_template
 request: _RequestLike = flask.request
-send_file: Callable[..., object] = flask.send_file
+send_file: Callable[..., _ResponseLike] = flask.send_file
 session: _SessionLike = flask.session
 url_for: Callable[..., str] = flask.url_for
 CORS: Callable[..., object] = flask_cors.CORS
@@ -242,12 +279,12 @@ def _load_argument_presets() -> list[dict[str, str]]:
             read_path = LEGACY_ARGUMENT_PRESETS_PATH
         if not read_path.exists():
             return []
-        raw = json.loads(read_path.read_text(encoding="utf-8"))
-        if not isinstance(raw, list):
+        raw: object = json.loads(read_path.read_text(encoding="utf-8"))
+        if not _is_obj_list(raw):
             return []
         presets: list[dict[str, str]] = []
         for item in raw:
-            if not isinstance(item, dict):
+            if not _is_str_mapping(item):
                 continue
             name = item.get("name")
             arguments = item.get("arguments")
@@ -1529,7 +1566,8 @@ def _terminate_process_tree(process: _WebUIProcess, timeout: float = 2.0) -> boo
 
     with contextlib.suppress(subprocess.TimeoutExpired):
         process.wait(timeout=0)
-    return process.poll() is not None and not alive
+    truly_alive = [p for p in alive if p.is_running() and p.status() != psutil.STATUS_ZOMBIE]
+    return process.poll() is not None and not truly_alive
 
 
 def _debug_process_snapshot(session_id: str | None = None) -> dict[str, object]:
@@ -1584,7 +1622,7 @@ def _set_process_awaiting_input(session_id: str, waiting: bool, input_type: str 
 def _set_process_awaiting_input_if_current(session_id: str, process_state: Mapping[str, object], waiting: bool, input_type: str = "text") -> None:
     with active_processes_lock:
         current_state = active_processes.get(session_id)
-        if current_state is not process_state:
+        if current_state is None or current_state is not process_state:
             return
         run_token = process_state.get("run_token")
         if run_token and current_state.get("run_token") == run_token:
@@ -1622,7 +1660,7 @@ def _apply_progress_event(process_info: ProcessInfo, event: Mapping[str, object]
 def _set_process_progress_if_current(session_id: str, process_state: Mapping[str, object], event: Mapping[str, object]) -> None:
     with active_processes_lock:
         current_state = active_processes.get(session_id)
-        if current_state is not process_state:
+        if current_state is None or current_state is not process_state:
             return
         run_token = process_state.get("run_token")
         if not (run_token and current_state.get("run_token") == run_token):
@@ -1634,9 +1672,9 @@ def _progress_items_for_process(process_info: Mapping[str, object]) -> list[dict
     items: list[dict[str, object]] = []
     with active_processes_lock:
         progress_map_obj = process_info.get("progress")
-        if not isinstance(progress_map_obj, dict):
+        if not _is_str_dict(progress_map_obj):
             return []
-        items.extend(dict(value) for value in progress_map_obj.values() if isinstance(value, dict))
+        items.extend(dict(value) for value in progress_map_obj.values() if _is_str_dict(value))
     items.sort(key=lambda item: (0 if str(item.get("status", "")) == "running" else 1, str(item.get("id", ""))))
     return items
 
@@ -1717,7 +1755,7 @@ def set_execution_preview_target(session_id: str, expected_run_token: str, path:
 def _session_state_is_current(session_id: str, process_state: Mapping[str, object]) -> bool:
     with active_processes_lock:
         current_state = active_processes.get(session_id)
-        if current_state is not process_state:
+        if current_state is None or current_state is not process_state:
             return False
         run_token = process_state.get("run_token")
         return bool(run_token and current_state.get("run_token") == run_token)
@@ -1726,7 +1764,7 @@ def _session_state_is_current(session_id: str, process_state: Mapping[str, objec
 def _discard_session_state(session_id: str, process_state: Mapping[str, object]) -> None:
     with active_processes_lock:
         current_state = active_processes.get(session_id)
-        if current_state is not process_state:
+        if current_state is None or current_state is not process_state:
             return
         run_token = process_state.get("run_token")
         if run_token and current_state.get("run_token") == run_token:
@@ -1740,9 +1778,9 @@ def _string_list_preview_values(value: object) -> list[str]:
         if cleaned:
             results.append(cleaned)
         return results
-    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+    if _is_obj_sequence(value):
         for item in value:
-            label = _stringify_preview_value(item.get("name")) if isinstance(item, Mapping) else _stringify_preview_value(item)
+            label = _stringify_preview_value(item.get("name")) if _is_str_mapping(item) else _stringify_preview_value(item)
             if label:
                 results.append(label)
     return results
@@ -1750,6 +1788,8 @@ def _string_list_preview_values(value: object) -> list[str]:
 
 def _format_preview_size(value: object) -> str:
     """Return a compact binary size for a positive byte count."""
+    if isinstance(value, bool) or not isinstance(value, (int, float, str, bytes, bytearray)):
+        return ""
     try:
         size = int(value)
     except TypeError, ValueError:
@@ -1767,14 +1807,14 @@ def _format_preview_size(value: object) -> str:
 
 
 def _preview_mapping_values(value: object) -> str:
-    if not isinstance(value, Mapping):
+    if not _is_str_mapping(value):
         return ""
     return ", ".join(
         f"{_stringify_preview_value(key)}: {_stringify_preview_value(item)}" for key, item in value.items() if _stringify_preview_value(key) and _stringify_preview_value(item)
     )
 
 
-def _preview_detail_item(key: str, label: str, value: object) -> dict[str, str] | None:
+def _preview_detail_item(key: str, label: str, value: object) -> PreviewDetailItem | None:
     if isinstance(value, Mapping):
         text = _preview_mapping_values(value)
     elif isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
@@ -1786,21 +1826,21 @@ def _preview_detail_item(key: str, label: str, value: object) -> dict[str, str] 
     return {"key": key, "label": label, "value": text}
 
 
-def _preview_detail_section(key: str, label: str, rows: Sequence[tuple[str, str, object]]) -> dict[str, object] | None:
+def _preview_detail_section(key: str, label: str, rows: Sequence[tuple[str, str, object]]) -> PreviewDetailSection | None:
     items = [item for item_key, item_label, value in rows if (item := _preview_detail_item(item_key, item_label, value))]
     if not items:
         return None
     return {"key": key, "label": label, "items": items}
 
 
-def _extract_preview_detail_sections(meta_data: Mapping[str, object], music: Mapping[str, object]) -> list[dict[str, object]]:
+def _extract_preview_detail_sections(meta_data: Mapping[str, object], music: Mapping[str, object]) -> list[PreviewDetailSection]:
     """Build ordered, display-safe detail groups for the execution preview."""
     category = _stringify_preview_value(meta_data.get("category")).upper()
     filelist = meta_data.get("filelist")
     file_count = len(filelist) if isinstance(filelist, Sequence) and not isinstance(filelist, (str, bytes, bytearray)) else 0
     video_codec = _stringify_preview_value(meta_data.get("video_codec")) or _stringify_preview_value(meta_data.get("video_encode"))
 
-    sections: list[dict[str, object]] = []
+    sections: list[PreviewDetailSection] = []
     media_section = _preview_detail_section(
         "media",
         "Media",
@@ -1963,9 +2003,9 @@ def _extract_preview_detail_sections(meta_data: Mapping[str, object], music: Map
 
 def _book_cover_from_meta(meta_data: Mapping[str, object], preview_session_id: str) -> str:
     covers_value = meta_data.get("covers")
-    if isinstance(covers_value, Sequence) and not isinstance(covers_value, (str, bytes, bytearray)):
+    if _is_obj_sequence(covers_value):
         for item in covers_value:
-            if not isinstance(item, Mapping):
+            if not _is_str_mapping(item):
                 continue
             for key in ("raw_url", "img_url", "web_url"):
                 candidate = _stringify_preview_value(item.get(key))
@@ -2145,10 +2185,10 @@ def _subprocess_progress_event(chunk: str) -> dict[str, object] | None:
     if not payload.startswith(PROGRESS_STDOUT_PREFIX):
         return None
     try:
-        event = json.loads(payload.removeprefix(PROGRESS_STDOUT_PREFIX))
+        event: object = json.loads(payload.removeprefix(PROGRESS_STDOUT_PREFIX))
     except json.JSONDecodeError:
         return None
-    return event if isinstance(event, dict) else None
+    return event if _is_str_dict(event) else None
 
 
 def _subprocess_gui_event(chunk: str) -> dict[str, object] | None:
@@ -2166,12 +2206,12 @@ def _subprocess_gui_event(chunk: str) -> dict[str, object] | None:
     if len(body) > MAX_EVENT_BYTES:
         return {}
     try:
-        event = json.loads(body)
+        event: object = json.loads(body)
     except json.JSONDecodeError:
         return {}
-    if not isinstance(event, dict) or event.get("kind") not in GUI_EVENT_KINDS:
+    if not _is_str_dict(event) or event.get("kind") not in GUI_EVENT_KINDS:
         return {}
-    return cast(dict[str, object], event)
+    return event
 
 
 def _is_blank_output(chunk: str) -> bool:
@@ -2363,14 +2403,14 @@ def _extract_metadata_sources(meta_data: Mapping[str, object]) -> list[MetadataS
         from src.music.sources import DiscogsEnricher
 
         music_release = meta_data.get("music_release")
-        fields = music_release.get("fields", {}) if isinstance(music_release, Mapping) else {}
-        external_ids = music_release.get("external_ids", {}) if isinstance(music_release, Mapping) else {}
+        fields: object = music_release.get("fields") if _is_str_mapping(music_release) else None
+        external_ids: object = music_release.get("external_ids") if _is_str_mapping(music_release) else None
         musicbrainz_release = ""
-        if isinstance(fields, Mapping):
-            musicbrainz_entry = fields.get("musicbrainz_release", {})
-            if isinstance(musicbrainz_entry, Mapping):
+        if _is_str_mapping(fields):
+            musicbrainz_entry: object = fields.get("musicbrainz_release")
+            if _is_str_mapping(musicbrainz_entry):
                 musicbrainz_release = _stringify_preview_value(musicbrainz_entry.get("value"))
-        if not musicbrainz_release and isinstance(external_ids, Mapping):
+        if not musicbrainz_release and _is_str_mapping(external_ids):
             musicbrainz_release = _stringify_preview_value(external_ids.get("musicbrainz_release"))
         if musicbrainz_release:
             _append_metadata_source(
@@ -2382,8 +2422,8 @@ def _extract_metadata_sources(meta_data: Mapping[str, object]) -> list[MetadataS
                 f"https://musicbrainz.org/release/{quote(musicbrainz_release)}",
             )
 
-        if isinstance(external_ids, Mapping):
-            discogs_references = (
+        if _is_str_mapping(external_ids):
+            discogs_references: tuple[tuple[str, object], ...] = (
                 ("release", external_ids.get("discogs_release")),
                 ("master", external_ids.get("discogs_master")),
             )
@@ -2406,23 +2446,28 @@ def _extract_metadata_sources(meta_data: Mapping[str, object]) -> list[MetadataS
 def _music_preview_from_meta(meta_data: Mapping[str, object]) -> dict[str, object]:
     """Extract display-safe MUSIC data from the normalized release snapshot."""
     release = meta_data.get("music_release")
-    if not isinstance(release, Mapping):
+    if not _is_str_mapping(release):
         return {}
-    fields = release.get("fields", {}) if isinstance(release.get("fields"), Mapping) else {}
-    tracks = release.get("tracks", []) if isinstance(release.get("tracks"), Sequence) else []
-    auxiliary = release.get("auxiliary", {}) if isinstance(release.get("auxiliary"), Mapping) else {}
-    warnings = release.get("warnings", []) if isinstance(release.get("warnings"), Sequence) else []
-    conflicts = release.get("conflicts", {}) if isinstance(release.get("conflicts"), Mapping) else {}
+    raw_fields = release.get("fields")
+    fields: Mapping[str, object] = raw_fields if _is_str_mapping(raw_fields) else {}
+    raw_tracks = release.get("tracks")
+    tracks: Sequence[object] = raw_tracks if _is_obj_sequence(raw_tracks) else []
+    raw_auxiliary = release.get("auxiliary")
+    auxiliary: Mapping[str, object] = raw_auxiliary if _is_str_mapping(raw_auxiliary) else {}
+    raw_warnings = release.get("warnings")
+    warnings: Sequence[object] = raw_warnings if _is_obj_sequence(raw_warnings) else []
+    raw_conflicts = release.get("conflicts")
+    conflicts: Mapping[str, object] = raw_conflicts if _is_str_mapping(raw_conflicts) else {}
 
     def field_value(name: str, fallback: object = "") -> object:
-        entry = fields.get(name, {}) if isinstance(fields, Mapping) else {}
-        if isinstance(entry, Mapping) and entry.get("value") not in (None, "", [], {}):
+        entry = fields.get(name)
+        if _is_str_mapping(entry) and entry.get("value") not in (None, "", [], {}):
             return entry["value"]
         return fallback
 
     def source(name: str) -> str:
-        entry = fields.get(name, {}) if isinstance(fields, Mapping) else {}
-        raw = _stringify_preview_value(entry.get("source")) if isinstance(entry, Mapping) else ""
+        entry = fields.get(name)
+        raw = _stringify_preview_value(entry.get("source")) if _is_str_mapping(entry) else ""
         return {
             "file_tag": "File tags",
             "auxiliary": "Auxiliary files",
@@ -2435,16 +2480,21 @@ def _music_preview_from_meta(meta_data: Mapping[str, object]) -> dict[str, objec
 
     def text(name: str, fallback: object = "") -> str:
         value = field_value(name, fallback)
-        if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+        if _is_obj_sequence(value):
             return " & ".join(_stringify_preview_value(item) for item in value if _stringify_preview_value(item))
         return _stringify_preview_value(value)
 
+    def _as_int(value: object) -> int:
+        if isinstance(value, (int, float, str, bytes, bytearray)):
+            return int(value)
+        return int(str(value))
+
     def technical_values(key: str, formatter: Callable[[object], str]) -> str:
-        values = {track.get(key) for track in tracks if isinstance(track, Mapping) and track.get(key) not in (None, "")}
+        values = {track.get(key) for track in tracks if _is_str_mapping(track) and track.get(key) not in (None, "")}
         if not values:
             return ""
         try:
-            ordered = sorted(values)
+            ordered: list[object] = sorted(cast(Iterable[Any], values))
         except TypeError:
             ordered = sorted(values, key=str)
         rendered = [formatter(value) for value in ordered]
@@ -2455,18 +2505,18 @@ def _music_preview_from_meta(meta_data: Mapping[str, object]) -> dict[str, objec
     if formats.casefold() == codecs.casefold():
         codecs = ""
     bit_depth = technical_values("bit_depth", lambda value: f"{value}-bit")
-    sample_rate = technical_values("sample_rate", lambda value: f"{int(value) / 1000:g} kHz")
+    sample_rate = technical_values("sample_rate", lambda value: f"{_as_int(value) / 1000:g} kHz")
     channels = technical_values(
         "channels",
-        lambda value: {1: "Mono", 2: "Stereo"}.get(int(value), f"{value} channels"),
+        lambda value: {1: "Mono", 2: "Stereo"}.get(_as_int(value), f"{value} channels"),
     )
-    bitrate = technical_values("bitrate", lambda value: f"{round(int(value) / 1000)} kbps")
+    bitrate = technical_values("bitrate", lambda value: f"{round(_as_int(value) / 1000)} kbps")
     technical = " / ".join(item for item in (formats or text("format", meta_data.get("format")), codecs, bit_depth, sample_rate, channels, bitrate) if item)
 
     sidecars: list[str] = []
     for label, key in (("log", "logs"), ("cue", "cues"), ("NFO", "nfos"), ("playlist", "playlists"), ("SFV", "sfvs"), ("artwork", "artwork"), ("scan", "scans")):
-        items = auxiliary.get(key, []) if isinstance(auxiliary, Mapping) else []
-        count = len(items) if isinstance(items, Sequence) and not isinstance(items, (str, bytes, bytearray)) else 0
+        items = auxiliary.get(key, [])
+        count = len(items) if _is_obj_sequence(items) else 0
         if count:
             sidecars.append(f"{count} {label}{'' if count == 1 else 's'}")
 
@@ -2531,22 +2581,22 @@ def _extract_preview_media_tracks(
     mediainfo = meta_data.get("mediainfo")
     raw_tracks: list[Mapping[str, object]] = []
 
-    if isinstance(mediainfo, Mapping):
+    if _is_str_mapping(mediainfo):
         media = mediainfo.get("media")
-        if isinstance(media, Mapping):
+        if _is_str_mapping(media):
             tracks = media.get("track")
-            if isinstance(tracks, Sequence) and not isinstance(tracks, (str, bytes, bytearray)):
-                raw_tracks.extend(track for track in tracks if isinstance(track, Mapping))
+            if _is_obj_sequence(tracks):
+                raw_tracks.extend(track for track in tracks if _is_str_mapping(track))
 
         if not raw_tracks:
             for key in ("tracks", "track"):
                 tracks = mediainfo.get(key)
-                if isinstance(tracks, Sequence) and not isinstance(tracks, (str, bytes, bytearray)):
-                    raw_tracks.extend(track for track in tracks if isinstance(track, Mapping))
+                if _is_obj_sequence(tracks):
+                    raw_tracks.extend(track for track in tracks if _is_str_mapping(track))
                     if raw_tracks:
                         break
-    elif isinstance(mediainfo, Sequence) and not isinstance(mediainfo, (str, bytes, bytearray)):
-        raw_tracks.extend(track for track in mediainfo if isinstance(track, Mapping))
+    elif _is_obj_sequence(mediainfo):
+        raw_tracks.extend(track for track in mediainfo if _is_str_mapping(track))
 
     audio_tracks: list[dict[str, object]] = []
     subtitle_tracks: list[dict[str, object]] = []
@@ -2646,7 +2696,7 @@ def _extract_execution_preview(meta_data: Mapping[str, object], fallback_path: s
         poster_url = tmdb_poster if tmdb_poster.startswith("http") else f"https://image.tmdb.org/t/p/w500{tmdb_poster}"
     music = _music_preview_from_meta(meta_data)
     detail_sections = _extract_preview_detail_sections(meta_data, music)
-    genres = _string_list_preview_values(meta_data.get("genres")) or list(music.get("genres", []))
+    genres = _string_list_preview_values(meta_data.get("genres")) or _string_list_preview_values(music.get("genres"))
     networks = _string_list_preview_values(meta_data.get("networks"))
     audiobook_bitrate = _stringify_preview_value(meta_data.get("audiobook_bitrate"))
     if audiobook_bitrate.isdigit():
@@ -2714,9 +2764,11 @@ def _find_execution_preview(session_id: str) -> ExecutionPreview | None:
         return None
 
     execution_name = Path(execution_path).name
+    raw_input_type = process_info.get("input_type")
+    input_type = raw_input_type if isinstance(raw_input_type, str) else None
     if resolved_meta_file is not None and resolved_meta is not None:
         try:
-            meta_data = resolved_meta
+            meta_data: Mapping[str, object] = resolved_meta
             if _stringify_preview_value(meta_data.get("category")) == "BOOK":
                 current_poster = _stringify_preview_value(meta_data.get("poster"))
                 if not _is_http_url(current_poster):
@@ -2730,12 +2782,13 @@ def _find_execution_preview(session_id: str) -> ExecutionPreview | None:
                 meta_data = {**meta_data, "webui_session_id": session_id}
             preview = _extract_execution_preview(meta_data, execution_path, session_id)
             preview["awaiting_input"] = bool(process_info.get("awaiting_input"))
-            preview["input_type"] = process_info.get("input_type")
+            preview["input_type"] = input_type
             preview["progress"] = _progress_items_for_process(process_info)
             return preview
         except Exception:  # noqa: S110
             pass
 
+    empty_music: dict[str, object] = {}
     return {
         "path": execution_path,
         "filename": execution_name,
@@ -2781,10 +2834,10 @@ def _find_execution_preview(session_id: str) -> ExecutionPreview | None:
         "game_region": "",
         "game_system": "",
         "developer": "",
-        "music": {},
+        "music": empty_music,
         "detail_sections": [],
         "awaiting_input": bool(process_info.get("awaiting_input")),
-        "input_type": process_info.get("input_type"),
+        "input_type": input_type,
         "progress": _progress_items_for_process(process_info),
     }
 
@@ -2897,10 +2950,10 @@ def _screenshot_capture_supported(meta_data: Mapping[str, object]) -> bool:
     if category == "BOOK":
         # The early snapshot may still point at the release folder; pages need the resolved book file.
         filelist = meta_data.get("filelist")
-        candidates = [*(filelist if isinstance(filelist, list) else []), meta_data.get("path")]
+        candidates: list[object] = [*(filelist if _is_obj_list(filelist) else []), meta_data.get("path")]
         has_source = any(isinstance(candidate, str) and candidate and Path(candidate).is_file() for candidate in candidates)
         image_list = meta_data.get("image_list")
-        return has_source and not meta_data.get("audiobook") and not (isinstance(image_list, list) and image_list)
+        return has_source and not meta_data.get("audiobook") and not (_is_obj_list(image_list) and image_list)
     is_disc = meta_data.get("is_disc")
     return not is_disc or is_disc == "BDMV"
 
@@ -2924,7 +2977,7 @@ def _screenshot_review_meta(temp_dir: Path, meta_data: Mapping[str, object]) -> 
         cached = _json_load_dict((temp_dir / "image_data.json").read_text(encoding="utf-8"))
     except Exception:
         cached = None
-    if cached and isinstance(cached.get("image_list"), list):
+    if cached and _is_obj_list(cached.get("image_list")):
         result["image_list"] = cached["image_list"]
     return result
 
@@ -3026,7 +3079,7 @@ class ExecutionPreview(TypedDict, total=False):
     detail_sections: list[PreviewDetailSection]
     awaiting_input: bool
     input_type: str | None
-    progress: list[ProgressItem]
+    progress: list[ProgressItem] | list[dict[str, object]]
 
 
 class ConfigItem(TypedDict, total=False):
@@ -3453,7 +3506,7 @@ def _write_audit_log(action: str, path: list[str], old_value: Any, new_value: An
         path_is_sensitive = any(_is_sensitive_key(component) for component in path)
         redacted_old_value = "[REDACTED]" if path_is_sensitive and old_value not in (None, "") else _redact_sensitive(old_value)
         redacted_new_value = "[REDACTED]" if path_is_sensitive and new_value not in (None, "") else _redact_sensitive(new_value)
-        audit = {
+        audit: dict[str, object] = {
             "timestamp": datetime.now(UTC).isoformat(),
             "user": user,
             "remote_addr": request.remote_addr,
@@ -3764,7 +3817,7 @@ def _is_release_group_override_path(path: list[str]) -> bool:
 
 def _validate_release_group_overrides(value: object) -> None:
     """Reject malformed maps and names that collide under description matching."""
-    if not isinstance(value, dict):
+    if not _is_obj_dict(value):
         raise ValueError("Release group overrides must be a dictionary.")
     seen: set[str] = set()
     for name, fields in value.items():
@@ -3774,7 +3827,7 @@ def _validate_release_group_overrides(value: object) -> None:
         if normalized_name in seen:
             raise ValueError(f"Duplicate release group: {name}. Names are matched without case or leading hyphens.")
         seen.add(normalized_name)
-        if not isinstance(fields, dict):
+        if not _is_obj_dict(fields):
             raise ValueError(f"Overrides for {name} must be a dictionary.")
         for field, field_val in fields.items():
             if not isinstance(field, str) or not field:
@@ -4244,7 +4297,7 @@ def _resolve_user_path(
                     candidate_norm = os.path.normpath(check_root)
                     break
 
-                joined = safe_join(check_root, rel)
+                joined: str | Path | None = safe_join(check_root, rel)
 
                 # Windows fallback: safe_join uses posixpath internally and returns
                 # None for Windows backslash paths. Fall back to os.path.join on
@@ -4252,6 +4305,9 @@ def _resolve_user_path(
                 # below provides additional symlink-escape protection.
                 if sys.platform == "win32" and joined is None:
                     joined = Path(check_root) / rel
+
+                if joined is None:
+                    continue
 
                 matched_root = check_root
                 candidate_norm = os.path.normpath(joined)
@@ -4272,7 +4328,7 @@ def _resolve_user_path(
             except ValueError as err:
                 raise ValueError("Browsing this path is not allowed") from err
 
-            joined = safe_join(matched_root, sanitized_expanded)
+            joined: str | Path | None = safe_join(matched_root, sanitized_expanded)
 
             # Windows fallback: safe_join uses posixpath internally and returns
             # None for Windows backslash paths. Fall back to manual validation
@@ -4283,7 +4339,8 @@ def _resolve_user_path(
                     raise ValueError("Browsing this path is not allowed")
                 joined = Path(matched_root) / expanded_norm
 
-            candidate_norm = os.path.normpath(joined)
+            if joined is not None:
+                candidate_norm = os.path.normpath(joined)
 
     if not matched_root or not candidate_norm:
         raise ValueError("Browsing this path is not allowed")
@@ -4658,14 +4715,28 @@ def stats_api():
     try:
         config = _load_config_from_file(STATE_DIR / "data" / "config.py") or {}
         enabled = stats_collection_enabled(config)
-        stats_kwargs = {
-            "date_from": date_from,
-            "date_to": date_to,
-            "tracker": tracker,
-            "time_basis": time_basis,
-            "local_date": local_date,
-        }
-        payload = get_stats(period, mode, STATE_DIR, **stats_kwargs) if enabled else get_empty_stats(period, mode, **stats_kwargs)
+        payload = (
+            get_stats(
+                period,
+                mode,
+                STATE_DIR,
+                date_from=date_from,
+                date_to=date_to,
+                tracker=tracker,
+                time_basis=time_basis,
+                local_date=local_date,
+            )
+            if enabled
+            else get_empty_stats(
+                period,
+                mode,
+                date_from=date_from,
+                date_to=date_to,
+                tracker=tracker,
+                time_basis=time_basis,
+                local_date=local_date,
+            )
+        )
         _add_stats_destination_display_names(payload)
         payload["enabled"] = enabled
         return jsonify(payload), 200 if payload["success"] else 500
@@ -4875,9 +4946,9 @@ def external_tools_status():
         return jsonify({"success": False, "error": "CSRF/Origin validation failed"}), 403
 
     payload = request.get_json(silent=True)
-    payload_map = cast(Mapping[str, object], payload) if isinstance(payload, Mapping) else {}
+    payload_map: Mapping[str, object] = payload if _is_str_mapping(payload) else {}
     raw_paths = payload_map.get("paths", {})
-    if not isinstance(raw_paths, Mapping):
+    if not _is_str_mapping(raw_paths):
         return jsonify({"success": False, "error": "Invalid external tool paths"}), 400
 
     user_config = _load_config_from_file(STATE_DIR / "data" / "config.py") or {}
@@ -5332,7 +5403,7 @@ def _configured_torrent_client_names(
         value = default_section.get(key)
         if isinstance(value, str):
             referenced.update(name.strip().casefold() for name in value.split(",") if name.strip())
-        elif isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+        elif _is_obj_sequence(value):
             referenced.update(str(name).strip().casefold() for name in value if str(name).strip())
 
     configured: list[str] = []
@@ -5509,12 +5580,12 @@ def _configured_tracker_names(
     configured: set[str] = set()
     cookie_tracker_names = {str(name).upper() for name in (cookie_trackers or set())}
 
-    tracker_configs = {str(name).upper(): value for name, value in trackers_section.items() if isinstance(value, Mapping)}
-    example_configs = {str(name).upper(): value for name, value in example_trackers.items() if isinstance(value, Mapping)}
+    tracker_configs: dict[str, Mapping[str, object]] = {str(name).upper(): value for name, value in trackers_section.items() if _is_str_mapping(value)}
+    example_configs: dict[str, Mapping[str, object]] = {str(name).upper(): value for name, value in example_trackers.items() if _is_str_mapping(value)}
 
     # Older configurations stored the BroadcasTheNet API key in DEFAULT.
-    default_section = user_config.get("DEFAULT", {}) if user_config else {}
-    legacy_btn_api = default_section.get("btn_api") if isinstance(default_section, Mapping) else None
+    default_section_raw: object = user_config.get("DEFAULT") if user_config else None
+    legacy_btn_api: object = default_section_raw.get("btn_api") if _is_str_mapping(default_section_raw) else None
     if isinstance(legacy_btn_api, str):
         legacy_btn_api = legacy_btn_api.strip()
 
@@ -5573,12 +5644,16 @@ def _tracker_destination_type(tracker_class: Any) -> str:
 
 def _tracker_supported_categories(tracker_class: Any) -> list[str]:
     """Return normalized upload categories declared by a tracker class."""
-    categories = getattr(tracker_class, "supported_categories", ()) or ()
+    categories: object = getattr(tracker_class, "supported_categories", ()) or ()
     if isinstance(categories, str):
-        categories = (categories,)
-    if not isinstance(categories, (list, tuple, set)):
+        categories_list: list[object] = [categories]
+    elif _is_obj_sequence(categories):
+        categories_list = list(categories)
+    elif isinstance(categories, set):
+        categories_list = list(cast(set[object], categories))
+    else:
         return []
-    return list(dict.fromkeys(str(category).strip().upper() for category in categories if str(category).strip()))
+    return list(dict.fromkeys(str(category).strip().upper() for category in categories_list if str(category).strip()))
 
 
 def _tracker_status_from_http_code(status_code: int) -> tuple[str, str]:
@@ -5619,7 +5694,7 @@ def _probe_tracker_url(tracker_name: str, base_url: str) -> dict[str, Any]:
             # that the service can answer an HTTP request.
             status_code = int(response.status_code)
         state, message = _tracker_status_from_http_code(status_code)
-        result = {
+        result: dict[str, Any] = {
             "name": tracker_name,
             "state": state,
             "message": message,
@@ -5711,7 +5786,7 @@ def refresh_tracker_status():
 
     data = _request_json_dict()
     requested = data.get("trackers")
-    if not isinstance(requested, list):
+    if not _is_obj_list(requested):
         return jsonify({"success": False, "error": "Trackers must be provided as a list"}), 400
 
     tracker_names = list(dict.fromkeys(str(name).strip().upper() for name in requested[:100] if str(name).strip()))
@@ -5820,10 +5895,10 @@ def get_trackers():
     trackers_section_raw = user_config.get("TRACKERS", {})
     trackers_section = cast(dict[str, Any], trackers_section_raw) if isinstance(trackers_section_raw, Mapping) else {}
     default_trackers_val = trackers_section.get("default_trackers", "")
-    default_trackers_list = []
+    default_trackers_list: list[str] = []
     if isinstance(default_trackers_val, str):
         default_trackers_list = [t.strip().upper() for t in default_trackers_val.split(",") if t.strip()]
-    elif isinstance(default_trackers_val, list):
+    elif _is_obj_list(default_trackers_val):
         default_trackers_list = [str(t).strip().upper() for t in default_trackers_val if str(t).strip()]
     default_trackers_list = [Meta.canonical_tracker_name(name) for name in default_trackers_list]
 
@@ -5855,7 +5930,7 @@ def get_trackers():
         user_config,
     )
 
-    trackers_data = []
+    trackers_data: list[dict[str, Any]] = []
     from src.api_key_expiry import get_api_key_expiry
 
     for tracker_name, tracker_class in tracker_class_map.items():
@@ -5867,7 +5942,7 @@ def get_trackers():
         supported_categories = _tracker_supported_categories(tracker_class)
         expiry_supported = bool(getattr(tracker_class, "api_key_expiry_supported", False))
         tracker_config = trackers_section.get(tracker_name, {})
-        api_key = str(tracker_config.get("api_key") or "").strip() if isinstance(tracker_config, dict) else ""
+        api_key = str(tracker_config.get("api_key") or "").strip() if _is_str_mapping(tracker_config) else ""
         favicon_url = ""
         static_dir = Path(__file__).parent / "static"
         for ext in ["png", "svg", "ico"]:
@@ -5895,7 +5970,7 @@ def get_trackers():
             }
         )
 
-    trackers_data.sort(key=lambda x: x["display_name"].lower())
+    trackers_data.sort(key=lambda x: str(x["display_name"]).lower())
 
     aliases = Meta.tracker_name_aliases()
     alias_error = ""
@@ -5932,8 +6007,8 @@ def tracker_api_key_status():
         api_key = data["api_key"]
     else:
         trackers_config = config.get("TRACKERS")
-        tracker_config = trackers_config.get(tracker) if isinstance(trackers_config, Mapping) else None
-        api_key = tracker_config.get("api_key", "") if isinstance(tracker_config, Mapping) else ""
+        tracker_config = trackers_config.get(tracker) if _is_str_mapping(trackers_config) else None
+        api_key = tracker_config.get("api_key", "") if _is_str_mapping(tracker_config) else ""
     if not isinstance(api_key, str) or "\r" in api_key or "\n" in api_key:
         return jsonify({"success": False, "error": "Enter a valid API key"}), 400
     api_key = api_key.strip()
@@ -5966,7 +6041,7 @@ def tracker_api_key_status():
             )
             response.raise_for_status()
             payload = response.json()
-        if not isinstance(payload, dict) or payload.get("success") is False:
+        if not _is_str_dict(payload) or payload.get("success") is False:
             return jsonify({"success": False, "error": "The tracker returned an unsuccessful API response"}), 400
         observed = record_api_key_expiry(tracker, api_key, base_url, response, STATE_DIR, payload=payload)
     except httpx.HTTPStatusError as error:
@@ -6142,8 +6217,8 @@ def _apply_config_update(source: str, example_config: dict[str, Any], data: dict
     prior_config = _parse_config_source(source)
     path_raw = data.get("path", [])
     path: list[str] = []
-    if isinstance(path_raw, list) and all(isinstance(part, str) and part for part in path_raw):
-        path = list(path_raw)
+    if _is_obj_list(path_raw) and all(isinstance(part, str) and part for part in path_raw):
+        path = [str(part) for part in path_raw]
     raw_value = data.get("value")
 
     if not path:
@@ -6199,7 +6274,7 @@ def _apply_config_update(source: str, example_config: dict[str, Any], data: dict
         # The runtime accepts fractional minutes even though the example is 60.
         example_value = 60.0
     coerced_value = None if inherit_tracker_override else _coerce_config_value(raw_value, example_value)
-    if is_webui_prompt_timeout and (not math.isfinite(coerced_value) or coerced_value < 0):
+    if is_webui_prompt_timeout and (not isinstance(coerced_value, (int, float)) or not math.isfinite(coerced_value) or coerced_value < 0):
         raise ValueError("Unattended prompt timeout must be a finite number of minutes greater than or equal to 0")
     overlay_choices = {"overlay_position": {"left", "right"}, "overlay_layout": {"stacked", "single_line"}}
     if path[:1] == ["DEFAULT"] and len(path) == 2 and key in overlay_choices and (not isinstance(coerced_value, str) or coerced_value not in overlay_choices[key]):
@@ -6263,7 +6338,7 @@ def config_update():
     data = _request_json_dict()
     is_batch = "updates" in data
     updates = data.get("updates") if is_batch else [data]
-    if not isinstance(updates, list) or not 1 <= len(updates) <= 1000 or not all(isinstance(update, dict) for update in updates):
+    if not _is_obj_list(updates) or not 1 <= len(updates) <= 1000 or not all(_is_str_dict(update) for update in updates):
         return jsonify({"success": False, "error": "Provide between 1 and 1000 configuration updates"}), 400
 
     config_path = STATE_DIR / "data" / "config.py"
@@ -6454,7 +6529,7 @@ def config_rename_torrent_client():
             next_value: object = current_value
             if isinstance(current_value, str) and current_value.casefold() == actual_old_name.casefold():
                 next_value = new_name
-            elif isinstance(current_value, list):
+            elif _is_obj_list(current_value):
                 next_value = [new_name if isinstance(value, str) and value.casefold() == actual_old_name.casefold() else value for value in current_value]
             if next_value != current_value:
                 updated = _replace_config_value_in_source(updated, ["DEFAULT", key], _python_literal(next_value))
@@ -7058,8 +7133,8 @@ def browse_search():
 def execution_preview():
     """Return the current media preview for an active execution session."""
 
-    def no_store(response: object) -> object:
-        response.headers["Cache-Control"] = "no-store, max-age=0"  # type: ignore[attr-defined]
+    def no_store(response: _ResponseLike) -> _ResponseLike:
+        response.headers["Cache-Control"] = "no-store, max-age=0"
         return response
 
     session_id = str(request.args.get("session_id", "")).strip()
@@ -7145,7 +7220,7 @@ def execution_item_cover():
 
     with active_processes_lock:
         covers = active_processes.get(session_id, {}).get("item_covers")
-        cover_file = covers.get(int(item)) if isinstance(covers, dict) else None
+        cover_file = covers.get(int(item)) if _is_obj_dict(covers) else None
     if not isinstance(cover_file, Path) or not cover_file.is_file():
         return jsonify({"success": False, "error": "Cover not found"}), 404
 
@@ -7374,7 +7449,7 @@ def execution_screenshot_image(screenshot_id: str):
     if screenshot is None or screenshot.path is None:
         return jsonify({"success": False, "error": "Screenshot not found"}), 404
     response = send_file(screenshot.path, mimetype="image/png", conditional=True, max_age=0)
-    response.headers["Cache-Control"] = "no-store, max-age=0"  # type: ignore[attr-defined]
+    response.headers["Cache-Control"] = "no-store, max-age=0"
     return response
 
 
@@ -7448,7 +7523,7 @@ def mutate_execution_screenshot(screenshot_id: str, action: str):
 def _save_queue_created_file(response: _ResponseLike) -> bool:
     """Only issued queue files count against the quota, not path validation."""
     data = response.get_json(silent=True)
-    return isinstance(data, dict) and data.get("queued") is True
+    return _is_str_dict(data) and data.get("queued") is True
 
 
 @app.route("/api/save_queue", methods=["POST"])
@@ -7473,7 +7548,7 @@ def save_queue():
     try:
         data = _as_dict(request.get_json(silent=True)) or {}
         items = data.get("items")
-        if not isinstance(items, list):
+        if not _is_obj_list(items):
             return jsonify({"error": "Items must be a list", "success": False}), 400
 
         if not items:
@@ -7492,7 +7567,7 @@ def save_queue():
         claimed_paths: dict[str, int] = {}
         claimed_parents: dict[str, int] = {}
         for number, item in enumerate(items, 1):
-            if not isinstance(item, dict):
+            if not _is_str_dict(item):
                 return jsonify({"error": f"Invalid queue item {number}", "success": False, "item": number}), 400
             path = item.get("path")
             args = item.get("args", "")
@@ -8184,6 +8259,8 @@ def execute_command():
 
         def generate():
             handed_off = False
+            validated_path: str = ""
+            process_state: dict[str, object] | None = None
             try:
                 # Build command to run upload.py directly
                 validated_path = _validate_execution_path(path)
@@ -8336,10 +8413,10 @@ def execute_command():
                 if not handed_off:
                     yield _sse({"type": "error", "data": "Execution error"})
                     with contextlib.suppress(Exception):
-                        if "process_state" in locals():
-                            _discard_session_state(session_id, cast(Mapping[str, object], process_state))
+                        if process_state is not None:
+                            _discard_session_state(session_id, process_state)
             finally:
-                if not handed_off and "validated_path" in locals() and validated_path:
+                if not handed_off and validated_path:
                     _remove_session_queue_file(validated_path)
 
         return Response(generate(), mimetype="text/event-stream")

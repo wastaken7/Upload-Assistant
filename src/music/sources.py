@@ -8,12 +8,20 @@ import json
 import re
 import time
 from pathlib import Path
-from typing import Any, ClassVar, cast
+from typing import Any, ClassVar, TypeIs
 
 import httpx
 
 from src.console import logger
 from src.music.models import MetadataSource, MusicRelease
+
+
+def _is_str_dict(val: object) -> TypeIs[dict[str, Any]]:
+    return isinstance(val, dict)
+
+
+def _is_obj_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
 
 
 def _music_cache_path(base_dir: str, provider: str, kind: str, key: str) -> Path | None:
@@ -72,7 +80,7 @@ class MusicBrainzEnricher:
             return
         release.external_ids["musicbrainz_release"] = str(result.get("id", ""))
         release_group_raw = result.get("release-group", {})
-        release_group = cast(dict[str, Any], release_group_raw) if isinstance(release_group_raw, dict) else {}
+        release_group = release_group_raw if _is_str_dict(release_group_raw) else {}
         if release_group.get("id"):
             release.external_ids["musicbrainz_release_group"] = str(release_group["id"])
         release.set_field("musicbrainz_release", result.get("id"), MetadataSource.EXTERNAL, 0.9)
@@ -93,7 +101,7 @@ class MusicBrainzEnricher:
             return self._cache[key]
         cache_path = _music_cache_path(self.base_dir, "musicbrainz", "release_search", "\x1f".join(map(str, key)))
         cached = await _read_music_cache(cache_path)
-        if isinstance(cached, dict):
+        if _is_str_dict(cached):
             if cached.get("not_found") is True:
                 self._cache[key] = None
                 return None
@@ -103,7 +111,7 @@ class MusicBrainzEnricher:
             if key in self._cache:
                 return self._cache[key]
             cached = await _read_music_cache(cache_path)
-            if isinstance(cached, dict):
+            if _is_str_dict(cached):
                 if cached.get("not_found") is True:
                     self._cache[key] = None
                     return None
@@ -112,8 +120,8 @@ class MusicBrainzEnricher:
             delay = 1.0 - (time.monotonic() - type(self)._last_request)
             if delay > 0:
                 await asyncio.sleep(delay)
+            request_succeeded = False
             try:
-                request_succeeded = False
                 async with httpx.AsyncClient(timeout=httpx.Timeout(5.0), headers={"User-Agent": self.user_agent}) as client:
                     barcode = self._barcode(catalogue_number)
                     query = f"barcode:{barcode}" if barcode else f'artist:"{artist}" AND release:"{album}"'
@@ -139,10 +147,10 @@ class MusicBrainzEnricher:
         unrelated single into metadata for a local album.  When local tracks
         are available, require the candidate's total track count too.
         """
-        if not isinstance(releases, list):
+        if not _is_obj_list(releases):
             return None
         normalised_album = MusicBrainzEnricher._normalise_title(album)
-        candidates = [item for item in releases if isinstance(item, dict) and MusicBrainzEnricher._normalise_title(item.get("title", "")) == normalised_album]
+        candidates = [item for item in releases if _is_str_dict(item) and MusicBrainzEnricher._normalise_title(item.get("title", "")) == normalised_album]
         if track_count:
             candidates = [item for item in candidates if MusicBrainzEnricher._track_count(item) == track_count]
         if media:
@@ -165,12 +173,12 @@ class MusicBrainzEnricher:
         barcode = MusicBrainzEnricher._barcode(value)
         if barcode and MusicBrainzEnricher._barcode(result.get("barcode", "")) == barcode:
             return True
-        return any(isinstance(info, dict) and str(info.get("catalog-number", "")).strip().casefold() == expected for info in result.get("label-info", []))
+        return any(_is_str_dict(info) and str(info.get("catalog-number", "")).strip().casefold() == expected for info in result.get("label-info", []))
 
     @staticmethod
     def _has_compatible_media(result: dict[str, Any], media: str) -> bool:
         expected = {"web": "digital media"}.get(str(media).strip().casefold(), str(media).strip().casefold())
-        formats = [str(item.get("format", "")).strip().casefold() for item in result.get("media", []) if isinstance(item, dict)]
+        formats = [str(item.get("format", "")).strip().casefold() for item in result.get("media", []) if _is_str_dict(item)]
         return any(candidate == expected or (expected == "vinyl" and "vinyl" in candidate) for candidate in formats)
 
     @staticmethod
@@ -180,8 +188,8 @@ class MusicBrainzEnricher:
     @staticmethod
     def _track_count(result: dict[str, Any]) -> int:
         media = result.get("media", [])
-        if isinstance(media, list):
-            counts = [int(item.get("track-count", 0) or 0) for item in media if isinstance(item, dict)]
+        if _is_obj_list(media):
+            counts = [int(item.get("track-count", 0) or 0) for item in media if _is_str_dict(item)]
             if any(counts):
                 return sum(counts)
         try:
@@ -208,10 +216,10 @@ class MusicBrainzEnricher:
     def _artists(result: dict[str, Any]) -> list[str]:
         artists: list[str] = []
         for credit in result.get("artist-credit", []):
-            if not isinstance(credit, dict):
+            if not _is_str_dict(credit):
                 continue
             artist = credit.get("artist", {})
-            name = artist.get("name", "") if isinstance(artist, dict) else credit.get("name", "")
+            name = artist.get("name", "") if _is_str_dict(artist) else credit.get("name", "")
             if str(name).strip() and str(name) not in artists:
                 artists.append(str(name))
         return artists
@@ -297,40 +305,43 @@ class DiscogsEnricher:
             return list(result.get("results", [])) if result else []
         cache_path = _music_cache_path(self.base_dir, "discogs", "release_search", key[1])
         cached = await _read_music_cache(cache_path)
-        if isinstance(cached, list):
-            self._cache[key] = {"results": cached}
-            return list(cached)
+        if _is_obj_list(cached):
+            cached_matches = [item for item in cached if _is_str_dict(item)]
+            self._cache[key] = {"results": cached_matches}
+            return cached_matches
         async with self._lock:
             if key in self._cache:
                 result = self._cache[key]
                 return list(result.get("results", [])) if result else []
             cached = await _read_music_cache(cache_path)
-            if isinstance(cached, list):
-                self._cache[key] = {"results": cached}
-                return list(cached)
+            if _is_obj_list(cached):
+                cached_matches = [item for item in cached if _is_str_dict(item)]
+                self._cache[key] = {"results": cached_matches}
+                return cached_matches
             delay = 1.0 - (time.monotonic() - type(self)._last_request)
             if delay > 0:
                 await asyncio.sleep(delay)
             headers = {"User-Agent": self.user_agent}
             if self.token:
                 headers["Authorization"] = f"Discogs token={self.token}"
+            request_succeeded = False
             try:
-                request_succeeded = False
                 async with httpx.AsyncClient(timeout=httpx.Timeout(8.0), headers=headers) as client:
                     response = await client.get(
                         "https://api.discogs.com/database/search",
                         params={"artist": artist, "release_title": album, "type": "release", "per_page": 100},
                     )
                     response.raise_for_status()
-                    payload = response.json()
-                    results = payload.get("results", []) if isinstance(payload, dict) else []
-                    matches = [item for item in results if isinstance(item, dict) and self._is_exact_release(item, artist, album)]
+                    payload: object = response.json()
+                    raw_results = payload.get("results") if _is_str_dict(payload) else None
+                    results = raw_results if _is_obj_list(raw_results) else []
+                    matches = [item for item in results if _is_str_dict(item) and self._is_exact_release(item, artist, album)]
                     request_succeeded = True
             except httpx.HTTPError, ValueError:
                 matches = []
             type(self)._last_request = time.monotonic()
-            cached = {"results": matches}
-            type(self)._cache[key] = cached
+            cached_entry: dict[str, Any] = {"results": matches}
+            type(self)._cache[key] = cached_entry
             if request_succeeded:
                 await _write_music_cache(cache_path, matches)
             return list(matches)
@@ -395,7 +406,7 @@ class DiscogsEnricher:
         filtered: list[dict[str, Any]] = []
         for release in releases:
             formats = release.get("format", [])
-            formats = formats if isinstance(formats, list) else [formats]
+            formats = formats if _is_obj_list(formats) else [formats]
             recognised = {str(value).casefold() for value in formats} & known
             if not recognised or recognised & target:
                 filtered.append(release)
@@ -420,14 +431,14 @@ class DiscogsEnricher:
             return self._cache[key]
         cache_path = _music_cache_path(self.base_dir, "discogs", resource, identifier)
         cached = await _read_music_cache(cache_path)
-        if isinstance(cached, dict):
+        if _is_str_dict(cached):
             self._cache[key] = cached
             return cached
         async with self._lock:
             if key in self._cache:
                 return self._cache[key]
             cached = await _read_music_cache(cache_path)
-            if isinstance(cached, dict):
+            if _is_str_dict(cached):
                 self._cache[key] = cached
                 return cached
             delay = 1.0 - (time.monotonic() - type(self)._last_request)
@@ -440,9 +451,8 @@ class DiscogsEnricher:
                 async with httpx.AsyncClient(timeout=httpx.Timeout(8.0), headers=headers) as client:
                     response = await client.get(f"https://api.discogs.com/{resource}/{identifier}")
                     response.raise_for_status()
-                    result = response.json()
-                    if not isinstance(result, dict):
-                        result = None
+                    raw_result = response.json()
+                    result: dict[str, Any] | None = raw_result if _is_str_dict(raw_result) else None
             except httpx.HTTPError, ValueError:
                 result = None
             type(self)._last_request = time.monotonic()
@@ -531,10 +541,10 @@ class DiscogsEnricher:
     @staticmethod
     def _first_label(result: dict[str, Any]) -> tuple[str, str] | None:
         labels = result.get("labels", [])
-        if not isinstance(labels, list):
+        if not _is_obj_list(labels):
             return None
         for label in labels:
-            if isinstance(label, dict):
+            if _is_str_dict(label):
                 name, catno = str(label.get("name", "")).strip(), str(label.get("catno", "")).strip()
                 if name or catno:
                     return name, "" if catno.casefold() in {"none", "n/a", "na"} else catno
@@ -543,11 +553,11 @@ class DiscogsEnricher:
     @staticmethod
     def _artists(result: dict[str, Any]) -> list[str]:
         values = result.get("artists", [])
-        if not isinstance(values, list):
+        if not _is_obj_list(values):
             return []
         artists: list[str] = []
         for value in values:
-            if not isinstance(value, dict):
+            if not _is_str_dict(value):
                 continue
             name = re.sub(r"\s+\(\d+\)$", "", str(value.get("name", "")).strip())
             if name and name not in artists:
@@ -569,7 +579,7 @@ class DiscogsEnricher:
         styles = result.get("styles", [])
         output: list[str] = []
         for group in (values, styles):
-            if not isinstance(group, list):
+            if not _is_obj_list(group):
                 continue
             for value in group:
                 text = str(value).strip()
@@ -579,18 +589,18 @@ class DiscogsEnricher:
 
     @staticmethod
     def _media(formats: Any) -> str:
-        if not isinstance(formats, list):
+        if not _is_obj_list(formats):
             return ""
-        names = {str(item.get("name", "")).casefold() for item in formats if isinstance(item, dict)}
+        names = {str(item.get("name", "")).casefold() for item in formats if _is_str_dict(item)}
         mapping = {"cd": "CD", "file": "WEB", "vinyl": "Vinyl", "cassette": "Cassette", "sacd": "SACD", "dat": "DAT", "dvd": "DVD", "blu-ray": "BD"}
         mapped = {mapping[name] for name in names if name in mapping}
         return next(iter(mapped)) if len(mapped) == 1 else ""
 
     @staticmethod
     def _release_type(formats: Any) -> str:
-        if not isinstance(formats, list):
+        if not _is_obj_list(formats):
             return ""
-        descriptions = {str(description).casefold() for item in formats if isinstance(item, dict) for description in item.get("descriptions", [])}
+        descriptions = {str(description).casefold() for item in formats if _is_str_dict(item) for description in item.get("descriptions", [])}
         for name, needle in (("EP", "ep"), ("Single", "single"), ("Compilation", "compilation"), ("Live album", "live"), ("Album", "album")):
             if needle in descriptions:
                 return name
