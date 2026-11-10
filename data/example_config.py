@@ -3656,6 +3656,7 @@ config: dict[str, Any] = {
             "screens_per_row": "",
             "episode_overview": True,
             "tonemapped_header": "[note]Screenshots have been adapted for SDR viewing, for reference only.[/note]",
+            # Ignored: Zenith does not allow extra screenshots for each episode or disc in packs.
             "multiScreens": "",
             "pack_thumb_size": "",
             "charLimit": "",

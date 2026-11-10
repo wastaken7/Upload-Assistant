@@ -4,6 +4,7 @@ from typing import Any, cast
 
 from src.book_prep import extract_first_author as _primary_name
 from src.console import logger
+from src.get_desc import DescriptionBuilder
 from src.meta import Meta
 from src.trackers.common import Common
 from src.trackers.UNIT3D import UNIT3D, ParamsList
@@ -388,6 +389,13 @@ class Zenith(UNIT3D):
         name = " ".join(part for part in title_parts if part)
         name = " ".join(name.split())
         return f"{name}{str(meta.tag or '').strip()}"
+
+    async def get_description(self, meta: Meta) -> dict[str, str]:
+        builder = DescriptionBuilder(self.tracker, self.config)
+        # Zenith staff asked for no per-episode/per-disc screenshots in packs.
+        # Keep the override local so other trackers retain the user's setting.
+        builder.tracker_config = {**builder.tracker_config, "multiScreens": 0}
+        return {"description": await builder.general_description_generator(meta, mediainfo=False, nfo=False)}
 
     async def get_category_id(self, meta: Meta, category: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         category_id = {
