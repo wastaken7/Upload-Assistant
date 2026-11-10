@@ -111,6 +111,7 @@ class SlotRules:
         *,
         slot: str = "",
         why: str = "",
+        trump: bool = False,
     ) -> SlotDecision:
         page = RULES_PAGES.get(self.TRACKER)
         return SlotDecision(
@@ -123,6 +124,7 @@ class SlotRules:
             conflicts=[dict(conflict.entry) for conflict in conflicts],
             notes=list(notes),
             rules_url=page.url if page else "",
+            trump=trump,
         )
 
     def evaluate(self, upload: ReleaseProfile, existing: Sequence[ReleaseProfile]) -> SlotDecision | None:
@@ -239,6 +241,7 @@ class SlotRules:
             notes,
             slot=label,
             why=reasons,
+            trump=True,
         )
 
     @staticmethod

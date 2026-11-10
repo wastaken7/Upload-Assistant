@@ -12,7 +12,7 @@ import aiofiles
 import cli_ui
 from rich.markup import escape
 
-from src import confirm_options, payload_preview, upload_history, webui_events
+from src import confirm_options, payload_preview, trump_reports, upload_history, webui_events
 from src.audible import resolve_audible_url
 from src.bdinfo_comparator import compare_bdinfo, has_bdinfo_content
 from src.cleanup import cleanup_manager
@@ -24,6 +24,7 @@ from src.meta import Meta
 from src.prompt_sound import play_prompt_sound
 from src.slot_rules.models import SlotDecision, Verdict
 from src.trackersetup import tracker_class_map
+from src.trump_reports import ReviewOutcome, TrumpCandidate
 
 DupeEntry = dict[str, Any]
 
@@ -364,6 +365,11 @@ class UploadHelper:
             needs_review = bool(dupes) and not season_pack_skip and (meta.dupe is False or (meta.filename_match and meta.file_count_match))
             if not dupes and slot_decision is not None:
                 needs_review = meta.dupe is False and (slot_decision.verdict is Verdict.BLOCK or (slot_decision.verdict is Verdict.REVIEW and bool(slot_decision.conflicts)))
+                if not needs_review and meta.dupe is False and trump_reports.slot_trumps(slot_decision):
+                    # Slot rules found a release the upload replaces: the trump question is a review.
+                    if prepared_tracker is None:
+                        prepared_tracker = cast(Callable[..., Any], self.tracker_class_map[tracker_name])(config=self.config)
+                    needs_review = trump_reports.support(prepared_tracker) is not None and bool(trump_reports.find_candidates(meta, tracker_name, [], slot_decision))
             webui_events.dupe_review_ready(tracker_name, needs_review=bool(interactive and needs_review))
         async with prompt_session():
             with webui_events.prompt_context(kind="dupes", tracker=tracker_name):
@@ -517,9 +523,26 @@ class UploadHelper:
 
         dupes_list: list[DupeEntry | str] = dupes
         upload: bool = False
-        meta.were_trumping = False
+        # A trump plan only comes from this review.
+        meta.trump_plans.pop(tracker_name, None)
         slot_verdict = slot_decision.verdict if slot_decision is not None else None
         interactive = (not meta.unattended or (meta.unattended and meta.unattended_confirm)) and not meta.ask_dupe
+
+        def get_tracker() -> Any:
+            nonlocal tracker_class
+            if tracker_class is None:
+                tracker_class_factory = cast(Callable[..., Any], self.tracker_class_map[tracker_name])
+                tracker_class = tracker_class_factory(config=self.config)
+            return tracker_class
+
+        def trump_candidates(entries: list[DupeEntry | str]) -> list[TrumpCandidate]:
+            """Releases the user may report as trumped; only asked in interactive runs."""
+            if not interactive or trump_reports.support(get_tracker()) is None:
+                return []
+            candidates = trump_reports.find_candidates(meta, tracker_name, entries, slot_decision)
+            # When dupes are allowed anyway, only an exact match still needs the trump question.
+            return candidates if meta.dupe is False else [candidate for candidate in candidates if candidate.reason == trump_reports.EXACT_MATCH]
+
         if not dupes_list:
             needs_answer = slot_verdict is Verdict.BLOCK or (slot_verdict is Verdict.REVIEW and bool(slot_decision and slot_decision.conflicts))
             if slot_decision is not None and needs_answer:
@@ -544,11 +567,13 @@ class UploadHelper:
                 return (not upload), meta
             if slot_decision is not None and slot_decision.conflicts:
                 self._show_slot_decision(slot_decision, meta)
+            # Slot rules may find a release the upload replaces even when the basic check finds no dupes.
+            slot_candidates = trump_candidates([]) if trump_reports.slot_trumps(slot_decision) else []
+            if slot_candidates and await self._review_trump(meta, tracker_name, get_tracker(), slot_candidates, _format_dupe) is ReviewOutcome.SKIP_UPLOAD:
+                return True, meta
             logger.debug(f"[green]No dupes found at[/green] [yellow]{tracker_name}[/yellow]")
             return False, meta
-        if tracker_class is None:
-            tracker_class_factory = cast(Callable[..., Any], self.tracker_class_map[tracker_name])
-            tracker_class = tracker_class_factory(config=self.config)
+        tracker_class = get_tracker()
         try:
             tracker_rename = await tracker_class.get_name(meta)
         except Exception:
@@ -570,41 +595,6 @@ class UploadHelper:
         # Show naming change before dupe prompts so user knows what the final name will be
         pass
 
-        trumpable_text = None
-        if meta.trumpable_id or (meta.season_pack_contains_episode and meta.get(f"{tracker_name}_matched_episode_ids", [])):
-            trumpable_dupes = [entry for entry in dupes_list if isinstance(entry, dict) and entry.get("trumpable")]
-            if trumpable_dupes:
-                trumpable_text = _format_dupes_list(trumpable_dupes)
-                logger.info("[bold red]Trumpable found![/bold red]", extra={"ua_gui": False})
-                webui_events.dupes(tracker_name, trumpable_dupes, source_size=meta.source_size, trumpable=True)
-            elif meta.season_pack_contains_episode and meta.get(f"{tracker_name}_matched_episode_ids", []):
-                matched_episodes = cast(list[DupeEntry], meta.get(f"{tracker_name}_matched_episode_ids", []))
-                user_tag = meta.tag.lstrip("-").lower() if meta.tag else ""  # Remove leading dash for comparison
-
-                # Try to find a release with matching tag
-                selected_match = None
-                tag_matched = False
-                if user_tag:
-                    for ep in matched_episodes:
-                        ep_name = str(ep.get("name", "")).lower()
-                        # Tag typically appears at end of name like "H.265-ETHEL"
-                        if ep_name.endswith(user_tag) or f"-{user_tag}" in ep_name:
-                            selected_match = ep
-                            tag_matched = True
-                            break
-
-                # Fall back to first match if no tag match found
-                if not selected_match:
-                    selected_match = matched_episodes[0]
-
-                trumpable_text = _format_dupe(selected_match)
-                logger.info("[bold red]Trumpable found based on episode matching![/bold red]", extra={"ua_gui": False})
-                match_note = f"No release found with matching tag '{meta.tag}'. Selected release may be from a different group." if user_tag and not tag_matched else None
-                webui_events.dupes(tracker_name, [selected_match], source_size=meta.source_size, trumpable=True, note=match_note or "")
-
-                if user_tag and not tag_matched:
-                    logger.info(f"[yellow]Note: No release found with matching tag '{meta.tag}'. Selected release may be from a different group.[/yellow]")
-
         if slot_decision is not None:
             self._show_slot_decision(slot_decision, meta)
         else:
@@ -612,65 +602,38 @@ class UploadHelper:
 
         if interactive:
             dupe_text = _format_dupes_list(dupes_list)
+            candidates = trump_candidates(dupes_list)
+            trump_outcome = ReviewOutcome.DECLINED
+            if candidates:
+                trump_outcome = await self._review_trump(meta, tracker_name, tracker_class, candidates, _format_dupe)
+                if trump_outcome is ReviewOutcome.DECLINED and meta.tv_pack:
+                    # Episodes inside the season pack are only listed for trumping; they never match the pack itself.
+                    episodes = [cast(DupeEntry, episode) for episode in cast(list[Any], meta.get(f"{tracker_name}_matched_episode_ids") or []) if isinstance(episode, dict)]
+                    matched_ids: set[Any] = {episode.get("id") for episode in episodes if episode.get("id")}
+                    dupes_list = [d for d in dupes_list if not (isinstance(d, dict) and d.get("id") in matched_ids)]
+                    meta[f"{tracker_name}_matched_episode_ids"] = []
 
-            if trumpable_text and (meta.trumpable_id or (meta.season_pack_contains_episode and meta.get(f"{tracker_name}_matched_episode_ids", []))):
-                logger.info(f"[bold cyan]{trumpable_text}[/bold cyan]")
-                logger.info("[yellow]Please check the trumpable entries above to see if you want to upload[/yellow]")
-                logger.info("[yellow]You will have the option to report the trumpable torrent if you upload.[/yellow]")
-                if meta.dupe is False:
-                    try:
-                        upload = await self.prompt_yes_no(f"Are you trumping this release on {tracker_name}?", default=False)
-                        if upload:
-                            meta.we_asked = True
-                            meta.were_trumping = True
-                            if not meta.get(f"{tracker_name}_trumpable_id"):
-                                meta[f"{tracker_name}_trumpable_id"] = meta.get(f"{tracker_name}_matched_id", None)
-                            if meta.filename_match and meta.file_count_match:
-                                meta.trump_reason = "exact_match"
-                            else:
-                                meta.trump_reason = "trumpable_release"
-                            logger.debug(f"[bold green]Trump reason: {meta.trump_reason} on {tracker_name}[/bold green]")
-                        else:
-                            # For season packs: individual episodes are only in dupes for trumping purposes.
-                            # If user declines to trump, filter them out so they aren't shown as "potential dupes"
-                            # (they wouldn't match season/episode anyway).
-                            if meta.tv_pack and meta.season_pack_contains_episode and meta.get(f"{tracker_name}_matched_episode_ids", []):
-                                matched_ids = {ep.get("id") for ep in meta.get(f"{tracker_name}_matched_episode_ids", []) if ep.get("id")}
-                                dupes_list = [d for d in dupes_list if not (isinstance(d, dict) and d.get("id") in matched_ids)]
-                                # Clear tracker-specific matched_episode_ids since we're not trumping
-                                meta[f"{tracker_name}_matched_episode_ids"] = []
-                    except EOFError:
-                        logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")
-                        await cleanup_manager.cleanup()
-                        cleanup_manager.reset_terminal()
-                        sys.exit(1)
-
-            if not meta.were_trumping:
+            if trump_outcome is not ReviewOutcome.DECLINED:
+                upload = trump_outcome is ReviewOutcome.PLANNED
+                meta.we_asked = True
+            else:
                 if meta.filename_match and meta.file_count_match:
                     logger.info(f"[bold red]Exact match found! - {meta.filename_match}[/bold red]", extra={"ua_gui": False})
                     exact_dupes = [entry for entry in dupes_list if isinstance(entry, dict) and f"{entry.get('name')} = {entry.get('link', None)}" == meta.filename_match]
-                    exact_note = "Exact match: this release is already on the site."
-                    if tracker_name in ["AITHER", "LST"]:
-                        exact_note += f" {tracker_name} supports automatic trumping of exact matches, if the file is allowed to be trumped."
-                    webui_events.dupes(tracker_name, exact_dupes or dupes_list, source_size=meta.source_size, note=exact_note)
-                    try:
-                        if tracker_name in ["AITHER", "LST"]:
-                            logger.info(f"[yellow]{tracker_name} supports automatic trumping of exact matches, if the file is allowed to be trumped.[/yellow]")
-                            upload = await self.prompt_yes_no(f"Are you trumping this exact match on {tracker_name}?", default=False)
-                            if upload:
-                                meta.we_asked = True
-                                meta.were_trumping = True
-                                meta.trump_reason = "exact_match"
-                                if not meta.get(f"{tracker_name}_trumpable_id"):
-                                    meta[f"{tracker_name}_trumpable_id"] = meta.get(f"{tracker_name}_matched_id", None)
-                        else:
+                    webui_events.dupes(tracker_name, exact_dupes or dupes_list, source_size=meta.source_size, note="Exact match: this release is already on the site.")
+                    if any(candidate.reason == trump_reports.EXACT_MATCH for candidate in candidates):
+                        # On a tracker that takes trump reports, an exact match is only uploaded as a trump.
+                        logger.info(f"[bold red]{tracker_name}: not uploading the exact match without a trump report.[/bold red]")
+                        upload = False
+                    else:
+                        try:
                             upload = await self.prompt_yes_no(f"Upload to {tracker_name} anyway?", default=False)
                             meta.we_asked = True
-                    except EOFError:
-                        logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")
-                        await cleanup_manager.cleanup()
-                        cleanup_manager.reset_terminal()
-                        sys.exit(1)
+                        except EOFError:
+                            logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")
+                            await cleanup_manager.cleanup()
+                            cleanup_manager.reset_terminal()
+                            sys.exit(1)
                 elif dupes_list:
                     # Rebuild dupe_text in case dupes was filtered after trump decline
                     dupe_text = _format_dupes_list(dupes_list)
@@ -774,6 +737,23 @@ class UploadHelper:
                 meta.name = f"{meta.name} DUPE?"
 
         return False, meta
+
+    @staticmethod
+    async def _review_trump(
+        meta: Meta,
+        tracker_name: str,
+        tracker_class: Any,
+        candidates: list[TrumpCandidate],
+        describe: Callable[[DupeEntry], str],
+    ) -> ReviewOutcome:
+        """Ask the trump report questions; Ctrl+C exits like the other review questions."""
+        try:
+            return await trump_reports.review(meta, tracker_name, tracker_class, candidates, lambda entry: describe(dict(entry)))
+        except EOFError:
+            logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")
+            await cleanup_manager.cleanup()
+            cleanup_manager.reset_terminal()
+            sys.exit(1)
 
     async def ask_bdinfo_comparison(self, meta: Meta, dupes: list[DupeEntry | str], tracker_name: str) -> None:
         """

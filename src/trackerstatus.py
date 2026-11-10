@@ -173,6 +173,10 @@ class TrackerStatusManager:
         async def process_single_tracker(tracker_name: str, shared_meta: Meta) -> tuple[str, dict[str, Any], str | None, Any]:
             """Check one isolated metadata copy and return its authoritative tracker result."""
             local_meta = copy.deepcopy(shared_meta)  # Ensure each task gets its own copy of meta
+            # A trump plan only survives the duplicate review that makes it.
+            async with meta_lock:
+                meta.trump_plans.pop(tracker_name, None)
+            local_meta.trump_plans.pop(tracker_name, None)
             local_tracker_status: dict[str, Any] = {"banned": False, "skipped": False, "dupe": False, "upload": False, "other": False}
             display_name = None
             tracker_class = None
@@ -318,31 +322,16 @@ class TrackerStatusManager:
                         if is_dupe:
                             local_tracker_status["dupe"] = True
 
-                        matched_episode_ids = local_meta.get(f"{tracker_name}_matched_episode_ids", [])
-                        trumpable_id = local_meta.get("trumpable_id")
                         cross_seed_key = f"{tracker_name}_cross_seed"
                         cross_seed_value = local_meta.get(cross_seed_key) if cross_seed_key in local_meta else None
+                        trump_plan = local_meta.trump_plans.get(tracker_name)
 
                         # Only shared-state writes go under the lock
                         async with meta_lock:
-                            if matched_episode_ids:
-                                meta[f"{tracker_name}_matched_episode_ids"] = matched_episode_ids
-                            if trumpable_id:
-                                meta.trumpable_id = trumpable_id
                             if cross_seed_key in local_meta and cross_seed_value:
                                 meta[cross_seed_key] = cross_seed_value
-
-                        if tracker_name in ["AITHER", "LST"]:
-                            were_trumping = local_meta.get("were_trumping", False)
-                            trump_reason = local_meta.get("trump_reason")
-                            trumpable_id_after_dupe_check = local_meta.get(f"{tracker_name}_trumpable_id")
-                            async with meta_lock:
-                                if were_trumping:
-                                    meta.were_trumping = were_trumping
-                                if trump_reason:
-                                    meta.trump_reason = trump_reason
-                                if trumpable_id_after_dupe_check:
-                                    meta[f"{tracker_name}_trumpable_id"] = trumpable_id_after_dupe_check
+                            if trump_plan and not is_dupe:
+                                meta.trump_plans[tracker_name] = trump_plan
 
                     elif "skipping" in local_meta:
                         local_tracker_status["skipped"] = True
