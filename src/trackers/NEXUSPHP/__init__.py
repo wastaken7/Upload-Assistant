@@ -1,7 +1,7 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
 import platform
-from typing import Any, ClassVar
+from typing import Any, ClassVar, TypeIs
 
 import aiofiles
 import httpx
@@ -16,6 +16,14 @@ from src.tmdb import TmdbManager
 from src.trackers.common import Common
 
 Config = dict[str, Any]
+
+
+def _is_str_dict(val: object) -> TypeIs[dict[str, Any]]:
+    return isinstance(val, dict)
+
+
+def _is_obj_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
 
 
 class NEXUSPHP:
@@ -58,16 +66,18 @@ class NEXUSPHP:
         # Normalize announce_url: must be a non-empty string after stripping
         raw_announce = self.tracker_config.get("announce_url")
         self.announce_url = raw_announce.strip() if isinstance(raw_announce, str) else ""
+        self.tmdb_data: dict[str, Any] = {}
 
         self.session = httpx.AsyncClient(headers={"User-Agent": f"Upload-Assistant ({platform.system()} {platform.release()})"}, timeout=60.0)
 
     async def load_localized_data(self, meta: Meta) -> None:
         data = meta.tmdb_localized_data
         zh_cn_data = data.get("zh-cn")
-        if not zh_cn_data or not zh_cn_data.get("main"):
+        if not _is_str_dict(zh_cn_data) or not zh_cn_data.get("main"):
             raise RuntimeError(f"{self.tracker}: Missing TMDB localized data (zh-cn).")
 
-        self.tmdb_data = zh_cn_data.get("main") or {}
+        main_data = zh_cn_data.get("main")
+        self.tmdb_data = main_data if _is_str_dict(main_data) else {}
         return
 
     async def search_existing(self, meta: Meta) -> list[dict[str, str]]:
@@ -115,7 +125,7 @@ class NEXUSPHP:
             return []
 
         rows = table.find_all("tr")[1:]  # Skip header row
-        results = []
+        results: list[dict[str, str]] = []
         for row in rows:
             name_link = row.find("table", class_="torrentname")
             if not name_link:
@@ -133,7 +143,7 @@ class NEXUSPHP:
                 if isinstance(href, str):
                     torrent_id = href.split("id=")[1].split("&")[0]
                     link = f"{self.base_url}/details.php?id={torrent_id}"
-                    base_entry = {"name": name, "link": link}
+                    base_entry: dict[str, str] = {"name": name, "link": link}
 
                     if meta.is_disc == "BDMV":
                         bdinfo = await self.get_dupe_bdinfo(torrent_id)
@@ -171,7 +181,7 @@ class NEXUSPHP:
         return False
 
     async def standard_desc(self, meta: Meta) -> str:
-        data = getattr(self, "tmdb_data", {})
+        data = self.tmdb_data
         if not data:
             return ""
 
@@ -189,9 +199,11 @@ class NEXUSPHP:
         # Season info for TV
         season_num = meta.season
         is_tv = meta.category == "TV"
+        seasons_raw = data.get("seasons")
+        seasons = seasons_raw if _is_obj_list(seasons_raw) else []
 
         if is_tv and season_num:
-            season_info = next((s for s in data.get("seasons", []) if s.get("season_number") == season_num), {})
+            season_info = next((s for s in seasons if _is_str_dict(s) and s.get("season_number") == season_num), {})
             season_name = season_info.get("name", "")
             if not season_name or season_name == f"第 {season_num} 季":
                 if f"第 {season_num} 季" not in name:
@@ -202,7 +214,7 @@ class NEXUSPHP:
 
         desc_parts.append(f"◎片　　名　{name}")
 
-        aka = []
+        aka: list[str] = []
         if original_name and original_name != name:
             aka.append(original_name)
         if aka:
@@ -253,7 +265,7 @@ class NEXUSPHP:
 
         if is_tv:
             if season_num:
-                season_info = next((s for s in data.get("seasons", []) if s.get("season_number") == season_num), {})
+                season_info = next((s for s in seasons if _is_str_dict(s) and s.get("season_number") == season_num), {})
                 ep_count = season_info.get("episode_count")
                 if ep_count:
                     desc_parts.append(f"◎集　　数　{ep_count}")

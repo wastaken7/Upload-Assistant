@@ -236,8 +236,13 @@ class InfinityHD(TmdbTvNaming, UNIT3D):
         if len(lang_str) == 2:
             return lang_str
         try:
-            lang_obj = pycountry.languages.get(name=lang_str.title()) or pycountry.languages.get(alpha_2=lang_str) or pycountry.languages.get(alpha_3=lang_str)
-            return lang_obj.alpha_2.lower() if lang_obj else lang_str
+            lang_obj: object = (  # pyright: ignore[reportUnknownVariableType]
+                pycountry.languages.get(name=lang_str.title())  # pyright: ignore[reportUnknownMemberType]
+                or pycountry.languages.get(alpha_2=lang_str)  # pyright: ignore[reportUnknownMemberType]
+                or pycountry.languages.get(alpha_3=lang_str)  # pyright: ignore[reportUnknownMemberType]
+            )
+            alpha_2: object = getattr(lang_obj, "alpha_2", None) if lang_obj else None
+            return alpha_2.lower() if isinstance(alpha_2, str) else lang_str
         except AttributeError, KeyError, LookupError:
             return lang_str
 

@@ -1,6 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import re
-from typing import Any
+from typing import Any, TypeIs
 
 from src.languages import languages_manager
 from src.meta import Meta
@@ -8,6 +8,10 @@ from src.trackers.common import Common
 from src.trackers.UNIT3D import UNIT3D
 
 Config = dict[str, Any]
+
+
+def _is_str_dict(val: object) -> TypeIs[dict[str, Any]]:
+    return isinstance(val, dict)
 
 
 class MidnightScene(UNIT3D):
@@ -177,9 +181,11 @@ class MidnightScene(UNIT3D):
             else:
                 val = "9"  # PC
         elif meta.category == "MUSIC":
-            release = meta.music_release if isinstance(meta.music_release, dict) else {}
-            fields = release.get("fields", {}) if isinstance(release.get("fields"), dict) else {}
-            format_field = fields.get("format", {}) if isinstance(fields.get("format"), dict) else {}
+            release = meta.music_release if _is_str_dict(meta.music_release) else {}
+            fields_raw = release.get("fields")
+            fields = fields_raw if _is_str_dict(fields_raw) else {}
+            format_field_raw = fields.get("format")
+            format_field = format_field_raw if _is_str_dict(format_field_raw) else {}
             music_format = str(meta.format or format_field.get("value", "") or meta.type or "").upper().strip().lstrip(".")
             val = type_id.get(music_format, "0")
         else:
@@ -195,7 +201,7 @@ class MidnightScene(UNIT3D):
 
         return {"type_id": val}
 
-    async def get_name(self, meta: Meta):
+    async def get_name(self, meta: Meta) -> dict[str, str]:
         if meta.manual_name is not None:
             return {"name": meta.manual_name.strip()}
 
@@ -207,11 +213,13 @@ class MidnightScene(UNIT3D):
                 if scene_name:
                     return {"name": scene_name.replace("_", " ")}
 
-            release = meta.music_release if isinstance(meta.music_release, dict) else {}
-            fields = release.get("fields", {}) if isinstance(release.get("fields"), dict) else {}
+            release = meta.music_release if _is_str_dict(meta.music_release) else {}
+            fields_raw = release.get("fields")
+            fields = fields_raw if _is_str_dict(fields_raw) else {}
 
             def release_field(name: str, fallback: Any = "") -> str:
-                field = fields.get(name, {}) if isinstance(fields.get(name), dict) else {}
+                field_raw = fields.get(name)
+                field = field_raw if _is_str_dict(field_raw) else {}
                 return str(field.get("value", fallback) or "").strip()
 
             artist = release_field("artist", meta.artist)

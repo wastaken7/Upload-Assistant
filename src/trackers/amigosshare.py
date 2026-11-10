@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from io import BytesIO
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, TypeIs, cast
 from urllib.parse import unquote, urljoin, urlparse
 
 import aiofiles
@@ -35,6 +35,15 @@ from src.trackers.common import Common
 
 type Page = dict[str, Any]
 type Profile = dict[str, Any]
+
+
+def _is_str_dict(val: object) -> TypeIs[dict[str, object]]:
+    return isinstance(val, dict)
+
+
+def _is_obj_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
+
 
 # Parent categories of the upload form; the profile of each one lists the fields it asks for.
 CATEGORY_IDS = {"series": 3, "filmes": 4, "ebook": 5, "jogos": 7, "adultos": 2, "anime": 11}
@@ -626,16 +635,19 @@ class AmigosShare:
         """Screenshots are stored by the site before the form is sent; the form lists their paths."""
         paths: list[str] = []
         for name, content, content_type in images:
+            response: httpx.Response | None = None
             for _attempt in range(5):
                 response = await self.session.post(f"{self.base_url}/torrents/screenshots", files={"image": (name, content, content_type)}, headers=self.ajax_headers())
                 if response.status_code != 429:
                     break
                 await asyncio.sleep(retry_after_seconds(response.headers.get("Retry-After")))
+            if response is None:
+                continue
             try:
-                body: Any = response.json()
+                body: object = response.json()
             except ValueError:
                 body = None
-            path = cast(dict[str, Any], body).get("path") if isinstance(body, dict) else None
+            path = body.get("path") if _is_str_dict(body) else None
             if response.is_success and path:
                 paths.append(str(path))
             else:
@@ -826,7 +838,8 @@ class AmigosShare:
             torrents = cast(dict[str, Any], cast(dict[str, Any], page.get("props") or {}).get("torrents") or {})
             for item in cast(list[dict[str, Any]], torrents.get("data") or []):
                 # Titles are the work's name, so the badges (resolution, source, codec, HDR) stand in for the release name.
-                badges = [cast(dict[str, Any], badge) for badge in item.get("badges") or [] if isinstance(badge, dict)]
+                raw_badges: object = item.get("badges")
+                badges = [badge for badge in raw_badges if _is_str_dict(badge)] if _is_obj_list(raw_badges) else []
                 labels = ["2160p" if str(badge.get("label", "")).upper() == "4K" else str(badge.get("label", "")) for badge in badges]
                 duplicates.append(
                     {

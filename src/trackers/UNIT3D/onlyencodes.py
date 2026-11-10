@@ -1,6 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 from dataclasses import replace
-from typing import Any
+from typing import Any, TypeIs
 
 from src.console import logger
 from src.get_desc import DescriptionBuilder
@@ -15,6 +15,10 @@ from src.trackers.UNIT3D import UNIT3D
 Config = dict[str, Any]
 # OnlyEncodes adds the audio language after the season/episode when no English audio exists.
 ONLYENCODES_NAME_RULES = replace(BLU_NAME_RULES, language_slot="before_cut")
+
+
+def _is_str_dict(val: object) -> TypeIs[dict[str, object]]:
+    return isinstance(val, dict)
 
 
 class OnlyEncodes(UNIT3D):
@@ -203,7 +207,7 @@ class OnlyEncodes(UNIT3D):
 
     async def get_description(self, meta: Meta) -> dict[str, str]:
         screenshots = get_tracker_image_collection(meta, self.tracker, "screenshots") or []
-        linked_screenshots = [image for image in screenshots if isinstance(image, dict) and image.get("web_url") and (image.get("raw_url") or image.get("img_url"))]
+        linked_screenshots = [image for image in screenshots if _is_str_dict(image) and image.get("web_url") and (image.get("raw_url") or image.get("img_url"))]
         if len(linked_screenshots) < 3:
             raise ValueError(f"{self.tracker}: At least 3 hosted, linked screenshots are required")
 

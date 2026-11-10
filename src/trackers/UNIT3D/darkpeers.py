@@ -3,7 +3,7 @@ import re
 import unicodedata
 from contextlib import suppress
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import Any, ClassVar, TypeIs
 
 import langcodes
 from langcodes.tag_parser import LanguageTagError
@@ -18,6 +18,14 @@ from src.music.validation import MusicValidator, ValidationLevel
 from src.tmdb import TmdbManager
 from src.trackers.naming import TmdbTvNaming, add_incomplete_pack_marker
 from src.trackers.UNIT3D import UNIT3D
+
+
+def _is_str_dict(val: object) -> TypeIs[dict[str, Any]]:
+    return isinstance(val, dict)
+
+
+def _is_obj_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
 
 
 class DarkPeers(TmdbTvNaming, UNIT3D):
@@ -338,14 +346,15 @@ class DarkPeers(TmdbTvNaming, UNIT3D):
         format_name = str(meta.type or meta.format or "").upper().strip()
         if not meta.audiobook or format_name not in {"M4A", "OGG", "WAV"}:
             return format_name
-        media = (meta.mediainfo if isinstance(meta.mediainfo, dict) else {}).get("media")
-        raw_tracks = (media if isinstance(media, dict) else {}).get("track")
-        tracks = raw_tracks if isinstance(raw_tracks, list) else []
-        audio_text = " ".join(
+        media = meta.mediainfo.get("media") if _is_str_dict(meta.mediainfo) else None
+        raw_tracks = media.get("track") if _is_str_dict(media) else None
+        tracks = raw_tracks if _is_obj_list(raw_tracks) else []
+        audio_parts = [
             str(track.get("Format") or track.get("format") or track.get("CodecID") or track.get("codec") or "")
-            for track_value in tracks
-            if (track := track_value if isinstance(track_value, dict) else {}) and str(track.get("@type") or track.get("type") or "").casefold() == "audio"
-        ).casefold()
+            for track in tracks
+            if _is_str_dict(track) and str(track.get("@type") or track.get("type") or "").casefold() == "audio"
+        ]
+        audio_text = " ".join(audio_parts).casefold()
         if format_name == "M4A":
             return "ALAC" if "alac" in audio_text else "AAC" if "aac" in audio_text else format_name
         if format_name == "OGG":
@@ -475,37 +484,42 @@ class DarkPeers(TmdbTvNaming, UNIT3D):
         return " ".join(name.split())
 
     @classmethod
-    def _release_field(cls, release: dict[str, Any], name: str, default: Any = "") -> Any:
+    def _release_field(cls, release: dict[str, Any], name: str, default: object = "") -> object:
         """Read a value from the serialized music release model."""
-        fields = release.get("fields") if isinstance(release, dict) else {}
-        value = fields.get(name) if isinstance(fields, dict) else {}
-        return value.get("value", default) if isinstance(value, dict) else default
+        fields = release.get("fields")
+        if not _is_str_dict(fields):
+            return default
+        value = fields.get(name)
+        if not _is_str_dict(value):
+            return default
+        val = value.get("value")
+        return default if val is None else val
 
     @classmethod
     def _music_name(cls, meta: Meta) -> str:
         """Format music as ``Artist - Album (Year) - Format`` for DarkPeers."""
-        release = meta.music_release if isinstance(meta.music_release, dict) else {}
-        artist = str(cls._release_field(release, "artist", meta.artist)).strip()
-        album = str(cls._release_field(release, "album", meta.title)).strip()
+        release = meta.music_release if _is_str_dict(meta.music_release) else {}
+        artist = str(cls._release_field(release, "artist", meta.artist or "")).strip()
+        album = str(cls._release_field(release, "album", meta.title or "")).strip()
         year = str(cls._release_field(release, "release_year", cls._release_field(release, "year", meta.year or ""))).strip()
-        media = str(cls._release_field(release, "media", meta.source)).strip()
+        media = str(cls._release_field(release, "media", meta.source or "")).strip()
         raw_tracks = release.get("tracks")
-        tracks = raw_tracks if isinstance(raw_tracks, list) else []
-        first_track = tracks[0] if tracks and isinstance(tracks[0], dict) else {}
-        codec = str(first_track.get("codec") or first_track.get("format") or meta.format or meta.type).upper().strip()
+        tracks = raw_tracks if _is_obj_list(raw_tracks) else []
+        first_track = tracks[0] if tracks and _is_str_dict(tracks[0]) else {}
+        codec = str(first_track.get("codec") or first_track.get("format") or meta.format or meta.type or "").upper().strip()
 
         format_parts = [media, codec]
         if codec in {"FLAC", "ALAC", "PCM"}:
-            depth = first_track.get("bit_depth") or cls._release_field(release, "nfo_bit_depth")
-            rate = first_track.get("sample_rate") or cls._release_field(release, "nfo_sample_rate")
+            depth: object = first_track.get("bit_depth") or cls._release_field(release, "nfo_bit_depth")
+            rate: object = first_track.get("sample_rate") or cls._release_field(release, "nfo_sample_rate")
             if depth is not None and rate is not None:
                 with suppress(TypeError, ValueError):
-                    format_parts.append(f"{int(depth)}-{int(rate) / 1000:g}")
+                    format_parts.append(f"{int(float(str(depth)))}-{int(float(str(rate))) / 1000:g}")
         elif codec in {"MP3", "AAC", "OPUS", "VORBIS"}:
-            bitrate = first_track.get("bitrate") or meta.audio_bitrate
+            bitrate: object = first_track.get("bitrate") or meta.audio_bitrate
             if bitrate is not None:
                 with suppress(TypeError, ValueError):
-                    b = int(bitrate)
+                    b = int(float(str(bitrate)))
                     bitrate_kbps = b // 1000 if b >= 1000 else b
                     format_parts.append(str(bitrate_kbps))
             bitrate_mode = str(first_track.get("bitrate_mode") or "").upper().strip()

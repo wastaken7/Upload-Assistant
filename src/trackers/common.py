@@ -8,10 +8,10 @@ import re
 import secrets
 import sys
 import unicodedata
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import Any, cast
+from typing import Any, TypeIs, cast
 
 import aiofiles
 import bencodepy
@@ -38,6 +38,10 @@ from src.torrent_manifest import TorrentManifest
 from src.unit3d_catalogs import region_id as resolve_region_id
 from src.unit3d_catalogs import region_name as resolve_region_name
 from src.usenetcreate import verify_nzb_has_password
+
+
+def _is_obj_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
 
 
 class Common:
@@ -107,11 +111,12 @@ class Common:
                 alias_lookup[value] = set(normalized_group)
         return alias_lookup
 
-    def _coerce_language_values(self, values: Any) -> list[str]:
+    def _coerce_language_values(self, values: object) -> list[str]:
         if isinstance(values, str):
             return [values]
         if isinstance(values, list):
-            return [value for value in values if isinstance(value, str)]
+            items: list[object] = list(values)
+            return [value for value in items if isinstance(value, str)]
         return []
 
     def _expand_language_candidates(self, language: str, alias_lookup: dict[str, set[str]]) -> set[str]:
@@ -244,15 +249,13 @@ class Common:
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, lambda p, e: Path(p).mkdir(parents=True, exist_ok=e), path, exist_ok)
 
-    async def get_torrent_filename(self, meta: Meta, tracker_config: Any) -> str:
+    async def get_torrent_filename(self, meta: Meta, tracker_config: Mapping[str, Any] | None) -> str:
         """
         Decide which torrent filename/prefix to use (BASE or BASE_SUBS) depending on
         the allow_ext_subtitles setting and presence of the subtitles torrent.
         """
         torrent_filename = "BASE"
-        allow_ext_subtitles = False
-        if isinstance(tracker_config, dict):
-            allow_ext_subtitles = tracker_config.get("allow_ext_subtitles", False)
+        allow_ext_subtitles = bool(tracker_config.get("allow_ext_subtitles", False)) if tracker_config else False
         if allow_ext_subtitles:
             subs_path = TorrentManifest(meta.base_dir, meta.uuid).default_path("base_subs")
             if subs_path is not None:
@@ -462,7 +465,7 @@ class Common:
             info = encode(info_value)
             return hashlib.sha1(info, usedforsecurity=False).hexdigest()  # SHA1 required for torrent info hash
 
-    async def save_image_links(self, meta: Meta, image_key: str, image_list: list[dict[str, str]] | None) -> str | None:
+    async def save_image_links(self, meta: Meta, image_key: str, image_list: list[dict[str, str]] | None) -> Path | None:
         if image_list is None:
             logger.info("[yellow]No image links to save.[/yellow]")
             return None
@@ -1409,7 +1412,7 @@ class Common:
         # Split by separators (like :, -, (, ), [, ]) so each segment is capitalized independently
         parts = re.split(r"([:\-\(\)\[\]])", title)
 
-        formatted_parts = []
+        formatted_parts: list[str] = []
         for part in parts:
             if not part:
                 formatted_parts.append("")
@@ -1420,7 +1423,7 @@ class Common:
 
             # For this text segment, split into words and spaces
             tokens = re.split(r"(\s+)", part)
-            formatted_tokens = []
+            formatted_tokens: list[str] = []
             word_count = 0
 
             for token in tokens:
@@ -1562,7 +1565,7 @@ class Common:
             return ""
 
         # Final fallback: ask user
-        genres = await ask(
+        genres: object = await ask(
             meta,
             Question(
                 key="genres.ptbr",
@@ -1576,5 +1579,6 @@ class Common:
                 tracker=tracker,
             ),
         )
-        raw_list = [unidecode(t).replace(" ", ".") for t in genres or []]
+        genres_items: list[str] = [str(item) for item in genres] if _is_obj_list(genres) else []
+        raw_list = [unidecode(t).replace(" ", ".") for t in genres_items]
         return ", ".join(raw_list[:5])
