@@ -1176,6 +1176,8 @@ async def search_metadata(
         meta.category = meta.category.upper()
 
     ids = None
+    # A confirmation edit prepares the same meta again; drop the previous pass's Arr year.
+    meta.arr_year = 0
     if not meta.skip_trackers:
         if meta.category == "TV" and use_sonarr and meta.tvdb_id == 0:
             ids = await prep_instance.sonarr_manager.get_sonarr_data(filename=meta.path, title=meta.filename)
