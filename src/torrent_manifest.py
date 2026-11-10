@@ -6,7 +6,7 @@ import json
 import threading
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Literal, cast
+from typing import Any, Literal, TypeIs, cast
 
 from torf import TorfError, Torrent
 
@@ -14,6 +14,10 @@ from src.temp_paths import release_temp_dir
 from src.torrent_policy import TorrentPolicy, TorrentStats
 
 TorrentLayout = Literal["base", "base_subs"]
+
+
+def _is_str_dict(val: object) -> TypeIs[dict[str, Any]]:
+    return isinstance(val, dict)
 
 
 @dataclass(frozen=True)
@@ -57,13 +61,13 @@ class TorrentManifest:
 
     def _load(self) -> dict[str, Any]:
         try:
-            value = json.loads(self.path.read_text(encoding="utf-8"))
+            value: object = json.loads(self.path.read_text(encoding="utf-8"))
         except OSError, json.JSONDecodeError:
             return self._empty()
-        if not isinstance(value, dict) or value.get("version") != self.VERSION:
+        if not _is_str_dict(value) or value.get("version") != self.VERSION:
             return self._empty()
         for key in ("torrents", "defaults", "selections"):
-            if not isinstance(value.get(key), dict):
+            if not _is_str_dict(value.get(key)):
                 value[key] = {}
         return value
 
@@ -125,10 +129,11 @@ class TorrentManifest:
             torrents = cast(dict[str, Any], manifest["torrents"])
             # Re-registering a managed base must retain its original client
             # identity, rather than treating the normalized hash as a client hash.
-            previous = torrents.get(entry_id)
-            if Path(source).resolve() == output and isinstance(previous, dict):
+            previous: object = torrents.get(entry_id)
+            if Path(source).resolve() == output and _is_str_dict(previous):
                 origin = str(previous.get("origin", origin))
-                client_infohash = previous.get("client_infohash")
+                prev_hash = previous.get("client_infohash")
+                client_infohash = prev_hash if isinstance(prev_hash, str) else None
             output.parent.mkdir(parents=True, exist_ok=True)
             temporary = output.with_suffix(".tmp")
             Torrent.copy(torrent).write(temporary, overwrite=True)
@@ -157,7 +162,7 @@ class TorrentManifest:
         manifest = self._load()
         result: list[TorrentEntry] = []
         for value in cast(dict[str, Any], manifest["torrents"]).values():
-            if not isinstance(value, dict):
+            if not _is_str_dict(value):
                 continue
             try:
                 entry = TorrentEntry(**value)
@@ -204,8 +209,10 @@ class TorrentManifest:
     def selected_path(self, tracker: str) -> Path | None:
         manifest = self._load()
         entry_id = cast(dict[str, Any], manifest["selections"]).get(tracker.upper())
-        value = cast(dict[str, Any], manifest["torrents"]).get(entry_id)
-        if not isinstance(value, dict):
+        if not isinstance(entry_id, str):
+            return None
+        value: object = cast(dict[str, Any], manifest["torrents"]).get(entry_id)
+        if not _is_str_dict(value):
             return None
         try:
             entry = TorrentEntry(**value)
@@ -217,8 +224,10 @@ class TorrentManifest:
     def default_path(self, layout: TorrentLayout = "base") -> Path | None:
         manifest = self._load()
         entry_id = cast(dict[str, Any], manifest["defaults"]).get(layout)
-        value = cast(dict[str, Any], manifest["torrents"]).get(entry_id)
-        if not isinstance(value, dict):
+        if not isinstance(entry_id, str):
+            return None
+        value: object = cast(dict[str, Any], manifest["torrents"]).get(entry_id)
+        if not _is_str_dict(value):
             return None
         try:
             path = self.entry_path(TorrentEntry(**value))

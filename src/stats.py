@@ -16,11 +16,24 @@ from contextlib import closing
 from contextvars import ContextVar
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, TypeIs, cast
 
 from src.app_db import connect as connect_app_db
 from src.app_db import database_available, database_path
 from src.content_duration import content_duration_category, existing_content_duration, prepared_content_duration
+
+
+def _is_str_dict(val: object) -> TypeIs[dict[str, Any]]:
+    return isinstance(val, dict)
+
+
+def _is_str_mapping(val: object) -> TypeIs[Mapping[str, Any]]:
+    return isinstance(val, Mapping)
+
+
+def _is_obj_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
+
 
 _PERIOD_DAYS = {"7d": 7, "30d": 30, "90d": 90, "1y": 365}
 _DIMENSION_RE = re.compile(r"[^A-Za-z0-9_.:-]+")
@@ -165,20 +178,21 @@ def _audio_codec_bucket(value: object) -> str:
 
 def _primary_video_track(meta: Any) -> Mapping[str, Any]:
     mediainfo = getattr(meta, "mediainfo", {})
-    if not isinstance(mediainfo, Mapping):
+    if not _is_str_mapping(mediainfo):
         return {}
     media = mediainfo.get("media", {})
-    if not isinstance(media, Mapping):
+    if not _is_str_mapping(media):
         return {}
     tracks = media.get("track", [])
-    if not isinstance(tracks, list):
+    if not _is_obj_list(tracks):
         return {}
-    return next((track for track in tracks if isinstance(track, Mapping) and track.get("@type") == "Video"), {})
+    empty: Mapping[str, Any] = {}
+    return next((track for track in tracks if _is_str_mapping(track) and track.get("@type") == "Video"), empty)
 
 
 def _hdr_bucket(value: object) -> str:
     meta = value if not isinstance(value, (str, bytes)) else None
-    track = _primary_video_track(meta) if meta is not None else {}
+    track: Mapping[str, Any] = _primary_video_track(meta) if meta is not None else {}
     raw_hdr = getattr(meta, "hdr", "") or getattr(meta, "HDR", "") if meta is not None else value
     profile = str(track.get("HDR_Format_Profile", "") or "")
     compatibility = " ".join(str(track.get(key, "") or "") for key in ("HDR_Format_Compatibility", "HDR_Format_String", "HDR_Format"))
@@ -628,11 +642,11 @@ async def record_completed_item_stats_async(meta: Any, tracker_class_map: Mappin
     if not _enabled:
         return
     raw_statuses = getattr(meta, "tracker_status", {})
-    statuses = raw_statuses if isinstance(raw_statuses, Mapping) else {}
+    statuses = raw_statuses if _is_str_mapping(raw_statuses) else {}
     routes: list[tuple[str, Mapping[str, Any], str]] = []
     for raw_name, raw_status in statuses.items():
         destination = _dimension(str(raw_name).replace(" ", "").upper())
-        if not destination or destination in {"MANUAL", "USENET"} or not isinstance(raw_status, Mapping):
+        if not destination or destination in {"MANUAL", "USENET"} or not _is_str_mapping(raw_status):
             continue
         tracker_type = tracker_class_map.get(destination)
         destination_type = "usenet_indexer" if tracker_type and getattr(tracker_type, "is_usenet", False) else "torrent_tracker"
@@ -732,7 +746,8 @@ async def record_completed_item_stats_async(meta: Any, tracker_class_map: Mappin
                 )
         else:
             nzb_paths = getattr(meta, "usenet_nzb_paths", [])
-            nzb_count = sum(1 for path in nzb_paths if Path(str(path)).is_file()) if isinstance(nzb_paths, list) else 0
+            nzb_paths_list: list[object] = nzb_paths if _is_obj_list(nzb_paths) else []
+            nzb_count = sum(1 for path in nzb_paths_list if Path(str(path)).is_file())
             if nzb_count:
                 await record_event_async(
                     "artifact",
@@ -1223,7 +1238,7 @@ def get_stats(
     fallbacks_from: defaultdict[str, int] = defaultdict(int)
     for (from_host, _to_host), value in fallbacks.items():
         fallbacks_from[from_host] += value
-    image_hosts = [
+    image_hosts: list[dict[str, Any]] = [
         {
             "host": service,
             "uploads": values["success"],
@@ -1237,17 +1252,18 @@ def get_stats(
         if operation == "image_upload"
     ]
     payload["image_hosts"] = {
-        "hosts": sorted(image_hosts, key=lambda row: (-(row["uploads"] + row["failures"]), row["host"])),
+        "hosts": sorted(image_hosts, key=lambda row: (-(int(row["uploads"]) + int(row["failures"])), str(row["host"]))),
         "fallbacks": [{"from": from_host, "to": to_host, "count": value} for (from_host, to_host), value in sorted(fallbacks.items(), key=lambda item: (-item[1], item[0]))],
     }
-    post_rows = [
+    post_rows: list[dict[str, Any]] = [
         {"destination": name, **{key: values[key] for key in ("cross_seeds", "requests_exact", "requests_partial", "trump_reports", "trump_report_errors")}}
         for name, values in post_upload.items()
     ]
     payload["post_upload"] = {
-        **{key: sum(row[key] for row in post_rows) for key in ("cross_seeds", "requests_exact", "requests_partial", "trump_reports", "trump_report_errors")},
+        **{key: sum(int(row[key]) for row in post_rows) for key in ("cross_seeds", "requests_exact", "requests_partial", "trump_reports", "trump_report_errors")},
         "by_destination": sorted(
-            post_rows, key=lambda row: (-(row["cross_seeds"] + row["requests_exact"] + row["requests_partial"] + row["trump_reports"]), row["destination"])
+            post_rows,
+            key=lambda row: (-(int(row["cross_seeds"]) + int(row["requests_exact"]) + int(row["requests_partial"]) + int(row["trump_reports"])), str(row["destination"])),
         ),
     }
     payload["media"]["categories"] = sorted({category for category, _dimension_name, _value in media_dimensions if category})

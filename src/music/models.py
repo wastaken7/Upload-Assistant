@@ -10,7 +10,11 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from enum import StrEnum
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeIs
+
+
+def _is_str_dict(val: object) -> TypeIs[dict[str, Any]]:
+    return isinstance(val, dict)
 
 
 class MetadataSource(StrEnum):
@@ -51,9 +55,9 @@ class AudioTrack:
     date: str = ""
     label: str = ""
     catalogue_number: str = ""
-    genre: list[str] = field(default_factory=list)
+    genre: list[str] = field(default_factory=list[str])
     isrc: str = ""
-    tags: dict[str, list[str]] = field(default_factory=dict)
+    tags: dict[str, list[str]] = field(default_factory=dict[str, list[str]])
     # Encoder evidence (LAME header for MP3) used to label presets such as V0.
     encoder_info: str = ""
     encoder_settings: str = ""
@@ -66,26 +70,26 @@ class AudioTrack:
 
 @dataclass
 class AuxiliaryFiles:
-    logs: list[str] = field(default_factory=list)
-    cues: list[str] = field(default_factory=list)
-    nfos: list[str] = field(default_factory=list)
-    sfvs: list[str] = field(default_factory=list)
-    playlists: list[str] = field(default_factory=list)
-    artwork: list[str] = field(default_factory=list)
-    scans: list[str] = field(default_factory=list)
-    lineage: list[str] = field(default_factory=list)
-    other: list[str] = field(default_factory=list)
+    logs: list[str] = field(default_factory=list[str])
+    cues: list[str] = field(default_factory=list[str])
+    nfos: list[str] = field(default_factory=list[str])
+    sfvs: list[str] = field(default_factory=list[str])
+    playlists: list[str] = field(default_factory=list[str])
+    artwork: list[str] = field(default_factory=list[str])
+    scans: list[str] = field(default_factory=list[str])
+    lineage: list[str] = field(default_factory=list[str])
+    other: list[str] = field(default_factory=list[str])
 
 
 @dataclass
 class MusicRelease:
     root: str
-    tracks: list[AudioTrack] = field(default_factory=list)
+    tracks: list[AudioTrack] = field(default_factory=list[AudioTrack])
     auxiliary: AuxiliaryFiles = field(default_factory=AuxiliaryFiles)
-    fields: dict[str, MetadataValue] = field(default_factory=dict)
-    conflicts: dict[str, list[str]] = field(default_factory=dict)
-    warnings: list[str] = field(default_factory=list)
-    external_ids: dict[str, str] = field(default_factory=dict)
+    fields: dict[str, MetadataValue] = field(default_factory=dict[str, MetadataValue])
+    conflicts: dict[str, list[str]] = field(default_factory=dict[str, list[str]])
+    warnings: list[str] = field(default_factory=list[str])
+    external_ids: dict[str, str] = field(default_factory=dict[str, str])
 
     @staticmethod
     def _source_tier(source: MetadataSource) -> int:
@@ -140,7 +144,7 @@ class MusicRelease:
         release.tracks = [AudioTrack(**track) for track in data.get("tracks", [])]
         release.auxiliary = AuxiliaryFiles(**data.get("auxiliary", {}))
         for key, value in data.get("fields", {}).items():
-            if isinstance(value, dict):
+            if _is_str_dict(value):
                 release.fields[key] = MetadataValue(
                     value=value.get("value"),
                     source=MetadataSource(value.get("source", "inferred")),

@@ -1,7 +1,7 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import re
 from dataclasses import replace
-from typing import Any
+from typing import Any, TypeIs
 
 import aiofiles
 
@@ -14,6 +14,14 @@ from src.trackers.UNIT3D import UNIT3D
 
 Config = dict[str, Any]
 ULCX_NAME_RULES = replace(BLU_NAME_RULES, hybrid_on_webdl=False)
+
+
+def _is_str_dict(val: object) -> TypeIs[dict[str, Any]]:
+    return isinstance(val, dict)
+
+
+def _is_obj_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
 
 
 class ULCX(UNIT3D):
@@ -146,11 +154,12 @@ class ULCX(UNIT3D):
                 return False
 
         # Section 4.2.1, 4.3.1.5, 6.3, 6.6, 6.8, 6.9, 6.12: Audio & Subtitle Mediainfo Checks
-        if meta.mediainfo:
-            media_tracks = meta.mediainfo.get("media", {}).get("track", [])
-            if isinstance(media_tracks, list):
-                audio_tracks = [t for t in media_tracks if t.get("@type") == "Audio"]
-                sub_tracks = [t for t in media_tracks if t.get("@type") in ("Text", "Subtitle")]
+        if _is_str_dict(meta.mediainfo):
+            media = meta.mediainfo.get("media")
+            tracks_raw = media.get("track") if _is_str_dict(media) else None
+            if _is_obj_list(tracks_raw):
+                audio_tracks: list[dict[str, Any]] = [t for t in tracks_raw if _is_str_dict(t) and t.get("@type") == "Audio"]
+                sub_tracks: list[dict[str, Any]] = [t for t in tracks_raw if _is_str_dict(t) and t.get("@type") in ("Text", "Subtitle")]
 
                 # Section 6.8: No LPCM on non-disc
                 if not meta.is_disc:

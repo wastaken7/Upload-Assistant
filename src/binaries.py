@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
+import importlib
 import os
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeIs
+
+
+def _is_str_mapping(value: object) -> TypeIs[Mapping[str, Any]]:
+    return isinstance(value, Mapping)
 
 
 def configured_binary(key: str, config: Mapping[str, Any] | None = None) -> str | None:
@@ -15,12 +20,16 @@ def configured_binary(key: str, config: Mapping[str, Any] | None = None) -> str 
     longer points at a file instead of silently running a different binary.
     """
     if config is None:
-        from data import config as data_config
+        data_config = importlib.import_module("data.config")
+        raw_config: object = getattr(data_config, "config", None)
+        config = raw_config if _is_str_mapping(raw_config) else {}
 
-        config = data_config.config
-
-    default = config.get("DEFAULT", {}) if isinstance(config, Mapping) else {}
-    value = default.get(key, "") if isinstance(default, Mapping) else ""
+    default: Mapping[str, Any] = {}
+    if _is_str_mapping(config):
+        default_obj = config.get("DEFAULT")
+        if _is_str_mapping(default_obj):
+            default = default_obj
+    value = default.get(key, "")
     path_text = str(value or "").strip()
     if not path_text:
         if key == "ffmpeg_path":

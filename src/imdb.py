@@ -7,7 +7,7 @@ import unicodedata
 from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
 from difflib import SequenceMatcher
-from typing import Any, cast
+from typing import Any, TypeIs, cast
 
 import anitopy
 import cli_ui
@@ -23,6 +23,10 @@ anitopy_parse_fn: Any = cast(Any, anitopy).parse
 guessit_module: Any = cast(Any, guessit)
 GuessitFn = Callable[[str, dict[str, Any] | None], dict[str, Any]]
 IMDB_GRAPHQL_HEADERS = {"Content-Type": "application/json", "Referer": "https://www.imdb.com/"}
+
+
+def _is_str_dict(value: object) -> TypeIs[dict[str, Any]]:
+    return isinstance(value, dict)
 
 
 def _normalized_title(value: str) -> str:
@@ -53,7 +57,7 @@ def imdb_match_rejection(category: str, year: int | str | None, titles: list[str
         return None
 
     imdb_titles = [imdb_info.get("title"), imdb_info.get("aka")]
-    imdb_titles.extend(aka.get("title") for aka in imdb_info.get("akas", []) if isinstance(aka, dict))
+    imdb_titles.extend(aka.get("title") for aka in imdb_info.get("akas", []) if _is_str_dict(aka))
     normalized_expected = [_normalized_title(title) for title in titles if isinstance(title, str) and title.strip()]
     normalized_imdb = [_normalized_title(title) for title in imdb_titles if isinstance(title, str) and title.strip()]
     if (
@@ -101,7 +105,7 @@ class ImdbManager:
         cache = cache_for(base_dir, config)
         cache_key = f"{imdb_id_str}|{manual_language!s}"
         cached_info = await cache.get("imdb", "title", cache_key)
-        if not is_cache_miss(cached_info) and isinstance(cached_info, dict):
+        if not is_cache_miss(cached_info) and _is_str_dict(cached_info):
             return cached_info
 
         query = {
@@ -454,7 +458,7 @@ class ImdbManager:
                 season_info = self.safe_get(series_info, ["displayableSeason"], {})
                 episode_number_info = self.safe_get(series_info, ["episodeNumber"], {})
 
-                episode_info = {
+                episode_info: dict[str, Any] = {
                     "id": self.safe_get(node, ["id"], ""),
                     "title": self.safe_get(node, ["titleText", "text"], "Unknown Title"),
                     "release_year": self.safe_get(node, ["releaseYear", "year"], "Unknown Year"),
@@ -489,7 +493,7 @@ class ImdbManager:
             seasons_summary: list[dict[str, Any]] = []
             for season_num in sorted(seasons_data.keys()):
                 years = sorted(seasons_data[season_num])
-                season_entry = {"season": season_num, "year": years[0], "year_range": f"{years[0]}" if len(years) == 1 else f"{years[0]}-{years[-1]}"}
+                season_entry: dict[str, Any] = {"season": season_num, "year": years[0], "year_range": f"{years[0]}" if len(years) == 1 else f"{years[0]}-{years[-1]}"}
                 seasons_summary.append(season_entry)
 
             imdb_info["seasons_summary"] = seasons_summary
@@ -780,7 +784,7 @@ class ImdbManager:
 
                 results_with_similarity.append((r, similarity))
 
-            valid_results = []
+            valid_results: list[tuple[dict[str, Any], float]] = []
             for result, similarity in results_with_similarity:
                 title = self.safe_get(result, ["node", "title"], {})
                 candidate = {

@@ -5,7 +5,7 @@ import json
 import re
 import urllib.parse
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, TypeIs, cast
 
 import aiofiles
 import httpx
@@ -20,6 +20,10 @@ from src.manual_input import Question, ask
 from src.mediainfo import MediaInfo
 from src.meta import Meta
 from src.trackers.common import Common
+
+
+def _is_obj_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
 
 
 class AlphaRatio:
@@ -291,7 +295,7 @@ class AlphaRatio:
 
             for res in results:
                 if "groupName" in res:
-                    dupe = {
+                    dupe: dict[str, Any] = {
                         "name": res["groupName"],
                         "size": res["size"],
                         "files": res["groupName"],
@@ -347,9 +351,9 @@ class AlphaRatio:
     @staticmethod
     def get_tags(meta: Meta) -> str:
         # Tag Compilation
-        genres_raw = meta.genres
+        genres_raw: object = meta.genres
         genres = ""
-        if isinstance(genres_raw, list):
+        if _is_obj_list(genres_raw):
             tags_parts = [str(item).strip() for item in genres_raw if str(item).strip()]
             genres = ", ".join(tags_parts)
         elif isinstance(genres_raw, str) and genres_raw.strip():
@@ -489,7 +493,8 @@ class AlphaRatio:
     async def parse_mediainfo_async(self, video_path: str, template_path: str) -> str:
         """Parse MediaInfo asynchronously using thread executor"""
         loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(None, lambda: MediaInfo.parse(video_path, output="STRING", full=False, mediainfo_options={"inform": f"file://{template_path}"}))
+        result = await loop.run_in_executor(None, lambda: MediaInfo.parse(video_path, output="STRING", full=False, mediainfo_options={"inform": f"file://{template_path}"}))
+        return str(result)
 
     async def get_name(self, meta: Meta) -> str:
         # must use scene name if scene release

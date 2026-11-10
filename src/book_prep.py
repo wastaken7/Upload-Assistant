@@ -15,7 +15,7 @@ import os
 import re
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeIs
 from urllib.parse import urlparse, urlsplit
 
 import langcodes
@@ -64,6 +64,15 @@ BOOK_SERVICES = {
     "tocalivros": "Tocalivros",
     "ubook": "Ubook",
 }
+
+
+def _is_str_dict(val: object) -> TypeIs[dict[str, Any]]:
+    return isinstance(val, dict)
+
+
+def _is_obj_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
+
 
 # ---------------------------------------------------------------------------
 # File-list resolution
@@ -200,8 +209,10 @@ def _mi_extra(general_track: dict[str, Any], name: str) -> str:
     extra = general_track.get("extra")
     if not isinstance(extra, dict):
         return ""
-    for key, val in extra.items():
-        if key.lower() == name.lower() and val and not isinstance(val, dict):
+    name_lower = name.lower()
+    extra_items: list[tuple[object, object]] = list(extra.items())
+    for key, val in extra_items:
+        if str(key).lower() == name_lower and val and not isinstance(val, dict):
             text = str(val).strip()
             if text:
                 return text
@@ -221,62 +232,7 @@ def _is_chapter_title(value: str | None) -> bool:
     return bool(value and re.fullmatch(r"(?:cap[ií]tulo|chapter)\s+\d+(?:\.\d+)?", value.strip(), re.IGNORECASE))
 
 
-async def gather_book_prep(
-    meta: Meta,
-    videopath: str,
-    base_dir: str,
-    config: dict[str, Any] | None = None,
-) -> None:
-    """Set up BOOK/Audiobook category fields and extract embedded MediaInfo metadata.
-
-    Sets ``meta.category``, ``meta.resolution``, ``meta.search_year``,
-    ``meta.hfr``, ``meta.sd``, and ``meta.mediainfo``, then attempts
-    to populate title, author, narrator, publisher, ISBN, overview, year,
-    keywords, and language from the file's embedded tags.
-    """
-    meta.category = "BOOK"
-    meta.search_year = ""
-    meta.resolution = "Other"
-    meta.hfr = False
-    meta.sd = 0
-    meta.valid_mi_settings = True
-
-    if meta.book_narrator:
-        meta.narrator = meta.book_narrator.strip()
-    if meta.manual_genres:
-        meta.genres = [genre.strip() for genre in meta.manual_genres.split(",") if genre.strip()]
-
-    # Warn if Google Books API key is missing
-    api_key = ""
-    if config and "DEFAULT" in config:
-        api_key = config["DEFAULT"].get("google_books_api_key", "").strip()
-    if not api_key:
-        logger.warning("[bold red]Warning: Google Books API key is not configured. Book metadata searches will be limited and incomplete.[/bold red]")
-
-    # Check if the file format is CBR or CBZ and automatically set comic to True
-    file_ext = Path(videopath).suffix.lstrip(".").upper()
-    if file_ext in ("CBR", "CBZ"):
-        meta.comic = True
-
-    # Identify CLI overrides at the very start
-    cli_overrides = {
-        "title": bool(meta.book_title),
-        "author": bool(meta.book_author),
-        "narrator": bool(meta.book_narrator),
-        "genres": bool(meta.manual_genres),
-        "publisher": bool(meta.book_publisher),
-        "isbn": bool(meta.book_isbn),
-        "asin": bool(meta.book_asin),
-        "book_language": bool(meta.book_language),
-        "year": "manual_year" in meta and (meta.manual_year or 0) > 0,
-        "keywords": bool(meta.keywords),
-        "overview": bool(meta.overview),
-    }
-    recorded_year: int | None = None
-    release_name = meta.basename_no_ext or Path(meta.path or videopath).name
-    release_year_match = re.search(r"(?:^|[-_. ])((?:18|19|20)\d{2})[-_. ]+AUDIOBOOK(?=[-_. ]|$)", release_name, re.IGNORECASE) if meta.audiobook else None
-    release_year = int(release_year_match.group(1)) if release_year_match else None
-
+def _extract_document_file_metadata(videopath: str, meta: Meta) -> None:
     # Extract EPUB metadata directly if the file is an EPUB
     if videopath.lower().endswith(".epub") and Path(videopath).is_file():
         meta.epubmeta_output = _get_epubmeta_output(videopath)
@@ -346,6 +302,227 @@ async def gather_book_prep(
             meta.isbn = pdf_isbn
             logger.debug(f"[cyan]PDF ISBN extracted: {pdf_isbn}[/cyan]")
 
+
+def _extract_mediainfo_tags(
+    general_track: dict[str, Any],
+    tracks: list[dict[str, Any]],
+    meta: Meta,
+    cli_overrides: dict[str, bool],
+) -> int | None:
+    recorded_year: int | None = None
+    # 1. Title/Album
+    album = _unescape_meta_val(general_track.get("Album") or general_track.get("album"))
+    track_name = _unescape_meta_val(general_track.get("Track_name") or general_track.get("track_name"))
+    title_tag = _unescape_meta_val(general_track.get("Title") or general_track.get("title"))
+    if _is_chapter_title(title_tag) and album and not _is_chapter_title(album):
+        title_tag = album
+
+    # Detect if the audiobook is Unabridged or Abridged from file metadata
+    detected_edition = None
+    for val in (title_tag, track_name, album):
+        if val:
+            match = re.search(r"\b(unabridged|abridged)\b", val, re.IGNORECASE)
+            if match:
+                detected_edition = match.group(1).capitalize()
+                break
+    if detected_edition and not meta.edition:
+        meta.edition = detected_edition
+
+    if not meta.title:
+        meta.title = title_tag or track_name or album or ""
+
+    # Clean the edition from the title if it's not a CLI override
+    if not cli_overrides["title"] and meta.title:
+        original_title = meta.title
+        # Remove brackets like [...] and their content
+        cleaned_title = re.sub(r"\s*\[[^\]]*\]", "", original_title)
+        cleaned_title = re.sub(r"\s*[\(\[\{-]?\s*\b(unabridged|abridged)\b\s*[\)\]\}]?\s*", " ", cleaned_title, flags=re.IGNORECASE)
+        cleaned_title = re.sub(r"\s+", " ", cleaned_title).strip()
+        cleaned_title = cleaned_title.strip("-").strip()
+        meta.title = cleaned_title
+
+    # 2. Author
+    performer = _unescape_meta_val(general_track.get("Performer") or general_track.get("performer"))
+    album_performer = _unescape_meta_val(general_track.get("Album_Performer") or general_track.get("album_performer"))
+    if not meta.author:
+        if performer:
+            meta.author = performer
+        elif album_performer:
+            meta.author = album_performer
+
+    # 3. Narrator
+    composer = _unescape_meta_val(general_track.get("Composer") or general_track.get("composer"))
+    if composer and not meta.narrator:
+        meta.narrator = composer
+
+    # 4. Publisher
+    publisher = _unescape_meta_val(general_track.get("Publisher") or general_track.get("publisher"))
+    if publisher and not meta.publisher:
+        meta.publisher = publisher
+
+    # 5. ISBN
+    isbn_val = general_track.get("ISBN") or general_track.get("isbn")
+    if not isbn_val and isinstance(general_track.get("extra"), dict):
+        isbn_val = general_track["extra"].get("ISBN") or general_track["extra"].get("isbn")
+    isbn_val = _unescape_meta_val(isbn_val)
+    if isbn_val and not meta.isbn:
+        meta.isbn = isbn_val
+
+    # 5b. ASIN
+    asin_val = general_track.get("ASIN") or general_track.get("asin")
+    if not asin_val and isinstance(general_track.get("extra"), dict):
+        asin_val = general_track["extra"].get("ASIN") or general_track["extra"].get("asin")
+    asin_val = _unescape_meta_val(asin_val)
+    if asin_val and not meta.asin:
+        meta.asin = asin_val
+
+    # Series from extra.SERIES / extra.SERIESPART
+    if not meta.book_series:
+        series_val = _mi_extra(general_track, "SERIES")
+        if series_val:
+            meta.book_series = series_val
+            part_val = _mi_extra(general_track, "SERIESPART")
+            if part_val and not meta.book_series_index:
+                meta.book_series_index = _normalize_series_index(part_val)
+
+    if not cli_overrides["title"] and meta.title:
+        original_title = meta.title
+        parsed_title, parsed_series, parsed_index = _extract_audiobook_series_from_title(original_title)
+        if parsed_series:
+            meta.title = parsed_title
+            localized_history_series = re.search(r":\s*Hist[oó]ria\s+\d+(?:\.\d+)?\s+de\s+.+$", original_title, re.IGNORECASE)
+            if localized_history_series or not meta.book_series:
+                meta.book_series = parsed_series
+            if parsed_index and (localized_history_series or not meta.book_series_index):
+                meta.book_series_index = parsed_index
+
+    # 6. Overview/Comment
+    comment = _unescape_meta_val(general_track.get("Comment") or general_track.get("comment"))
+    description = _unescape_meta_val(general_track.get("Description") or general_track.get("description"))
+    if not meta.overview:
+        if comment:
+            meta.overview = comment
+        elif description:
+            meta.overview = description
+
+    # 7. Year (extract 4-digit number)
+    rec_date = _unescape_meta_val(general_track.get("Recorded_Date") or general_track.get("recorded_date"))
+    if rec_date:
+        match = re.search(r"\b(?:18|19|20)\d{2}\b", rec_date)
+        if match:
+            recorded_year = int(match.group(0))
+            if not meta.audiobook and not meta.year:
+                meta.year = recorded_year
+                meta.search_year = recorded_year
+
+    # 8. Genre -> Keywords
+    genre = _unescape_meta_val(general_track.get("Genre") or general_track.get("genre"))
+    if genre:
+        cleaned_words = map_audiobook_keywords(genre)
+        if cleaned_words:
+            existing_keywords = meta.keywords
+            existing_list: list[str] = []
+            if existing_keywords:
+                # existing_keywords is guaranteed to be a list of strings
+                existing_list.extend([x.strip().lower() for x in existing_keywords if x.strip()])
+            for cw in cleaned_words:
+                if cw not in existing_list:
+                    existing_list.append(cw)
+            meta.keywords = existing_list
+
+    # 9. Language
+    if not meta.book_language:
+        lang_val = _unescape_meta_val(general_track.get("Language") or general_track.get("language"))
+        if lang_val:
+            full, iso3 = resolve_book_language(lang_val)
+            if is_valid_book_language(full, iso3):
+                meta.book_language = full
+                meta.book_language_iso = iso3
+
+    if not meta.book_language:
+        # Fallback: Audio track language (audiobooks)
+        for t in tracks:
+            if t.get("@type") == "Audio":
+                lang_val = _unescape_meta_val(t.get("Language") or t.get("language"))
+                if lang_val:
+                    full, iso3 = resolve_book_language(lang_val)
+                    if is_valid_book_language(full, iso3):
+                        meta.book_language = full
+                        meta.book_language_iso = iso3
+                        break
+
+    if not meta.book_language:
+        # Fallback: Text track language (ebooks like PDF/EPUB)
+        for t in tracks:
+            if t.get("@type") == "Text":
+                lang_val = _unescape_meta_val(t.get("Language") or t.get("language"))
+                if lang_val:
+                    full, iso3 = resolve_book_language(lang_val)
+                    if is_valid_book_language(full, iso3):
+                        meta.book_language = full
+                        meta.book_language_iso = iso3
+                        break
+    return recorded_year
+
+
+async def gather_book_prep(
+    meta: Meta,
+    videopath: str,
+    base_dir: str,
+    config: dict[str, Any] | None = None,
+) -> None:
+    """Set up BOOK/Audiobook category fields and extract embedded MediaInfo metadata.
+
+    Sets ``meta.category``, ``meta.resolution``, ``meta.search_year``,
+    ``meta.hfr``, ``meta.sd``, and ``meta.mediainfo``, then attempts
+    to populate title, author, narrator, publisher, ISBN, overview, year,
+    keywords, and language from the file's embedded tags.
+    """
+    meta.category = "BOOK"
+    meta.search_year = ""
+    meta.resolution = "Other"
+    meta.hfr = False
+    meta.sd = 0
+    meta.valid_mi_settings = True
+
+    if meta.book_narrator:
+        meta.narrator = meta.book_narrator.strip()
+    if meta.manual_genres:
+        meta.genres = [genre.strip() for genre in meta.manual_genres.split(",") if genre.strip()]
+
+    # Warn if Google Books API key is missing
+    api_key = ""
+    if config and "DEFAULT" in config:
+        api_key = config["DEFAULT"].get("google_books_api_key", "").strip()
+    if not api_key:
+        logger.warning("[bold red]Warning: Google Books API key is not configured. Book metadata searches will be limited and incomplete.[/bold red]")
+
+    # Check if the file format is CBR or CBZ and automatically set comic to True
+    file_ext = Path(videopath).suffix.lstrip(".").upper()
+    if file_ext in ("CBR", "CBZ"):
+        meta.comic = True
+
+    # Identify CLI overrides at the very start
+    cli_overrides = {
+        "title": bool(meta.book_title),
+        "author": bool(meta.book_author),
+        "narrator": bool(meta.book_narrator),
+        "genres": bool(meta.manual_genres),
+        "publisher": bool(meta.book_publisher),
+        "isbn": bool(meta.book_isbn),
+        "asin": bool(meta.book_asin),
+        "book_language": bool(meta.book_language),
+        "year": "manual_year" in meta and (meta.manual_year or 0) > 0,
+        "keywords": bool(meta.keywords),
+        "overview": bool(meta.overview),
+    }
+    recorded_year: int | None = None
+    release_name = meta.basename_no_ext or Path(meta.path or videopath).name
+    release_year_match = re.search(r"(?:^|[-_. ])((?:18|19|20)\d{2})[-_. ]+AUDIOBOOK(?=[-_. ]|$)", release_name, re.IGNORECASE) if meta.audiobook else None
+    release_year = int(release_year_match.group(1)) if release_year_match else None
+
+    _extract_document_file_metadata(videopath, meta)
+
     if not meta.edit:
         try:
             mi = await export_info(
@@ -364,165 +541,12 @@ async def gather_book_prep(
 
     if meta.mediainfo:
         try:
-            tracks = meta.mediainfo.get("media", {}).get("track", [])
-            if not isinstance(tracks, list):
-                tracks = []
-            # Filter to only dictionary entries to prevent errors when calling .get() later
-            tracks = [t for t in tracks if isinstance(t, dict)]
+            media_obj: object = meta.mediainfo.get("media") if _is_str_dict(meta.mediainfo) else None
+            tracks_raw: object = media_obj.get("track") if _is_str_dict(media_obj) else None
+            tracks: list[dict[str, Any]] = [t for t in tracks_raw if _is_str_dict(t)] if _is_obj_list(tracks_raw) else []
             general_track = next((t for t in tracks if t.get("@type") == "General"), None)
             if general_track:
-                # 1. Title/Album
-                album = _unescape_meta_val(general_track.get("Album") or general_track.get("album"))
-                track_name = _unescape_meta_val(general_track.get("Track_name") or general_track.get("track_name"))
-                title_tag = _unescape_meta_val(general_track.get("Title") or general_track.get("title"))
-                if _is_chapter_title(title_tag) and album and not _is_chapter_title(album):
-                    title_tag = album
-
-                # Detect if the audiobook is Unabridged or Abridged from file metadata
-                detected_edition = None
-                for val in (title_tag, track_name, album):
-                    if val:
-                        match = re.search(r"\b(unabridged|abridged)\b", val, re.IGNORECASE)
-                        if match:
-                            detected_edition = match.group(1).capitalize()
-                            break
-                if detected_edition and not meta.edition:
-                    meta.edition = detected_edition
-
-                if not meta.title:
-                    meta.title = title_tag or track_name or album or ""
-
-                # Clean the edition from the title if it's not a CLI override
-                if not cli_overrides["title"] and meta.title:
-                    original_title = meta.title
-                    # Remove brackets like [...] and their content
-                    cleaned_title = re.sub(r"\s*\[[^\]]*\]", "", original_title)
-                    cleaned_title = re.sub(r"\s*[\(\[\{-]?\s*\b(unabridged|abridged)\b\s*[\)\]\}]?\s*", " ", cleaned_title, flags=re.IGNORECASE)
-                    cleaned_title = re.sub(r"\s+", " ", cleaned_title).strip()
-                    cleaned_title = cleaned_title.strip("-").strip()
-                    meta.title = cleaned_title
-
-                # 2. Author
-                performer = _unescape_meta_val(general_track.get("Performer") or general_track.get("performer"))
-                album_performer = _unescape_meta_val(general_track.get("Album_Performer") or general_track.get("album_performer"))
-                if not meta.author:
-                    if performer:
-                        meta.author = performer
-                    elif album_performer:
-                        meta.author = album_performer
-
-                # 3. Narrator
-                composer = _unescape_meta_val(general_track.get("Composer") or general_track.get("composer"))
-                if composer and not meta.narrator:
-                    meta.narrator = composer
-
-                # 4. Publisher
-                publisher = _unescape_meta_val(general_track.get("Publisher") or general_track.get("publisher"))
-                if publisher and not meta.publisher:
-                    meta.publisher = publisher
-
-                # 5. ISBN
-                isbn_val = general_track.get("ISBN") or general_track.get("isbn")
-                if not isbn_val and isinstance(general_track.get("extra"), dict):
-                    isbn_val = general_track["extra"].get("ISBN") or general_track["extra"].get("isbn")
-                isbn_val = _unescape_meta_val(isbn_val)
-                if isbn_val and not meta.isbn:
-                    meta.isbn = isbn_val
-
-                # 5b. ASIN
-                asin_val = general_track.get("ASIN") or general_track.get("asin")
-                if not asin_val and isinstance(general_track.get("extra"), dict):
-                    asin_val = general_track["extra"].get("ASIN") or general_track["extra"].get("asin")
-                asin_val = _unescape_meta_val(asin_val)
-                if asin_val and not meta.asin:
-                    meta.asin = asin_val
-
-                # Series from extra.SERIES / extra.SERIESPART
-                if not meta.book_series:
-                    series_val = _mi_extra(general_track, "SERIES")
-                    if series_val:
-                        meta.book_series = series_val
-                        part_val = _mi_extra(general_track, "SERIESPART")
-                        if part_val and not meta.book_series_index:
-                            meta.book_series_index = _normalize_series_index(part_val)
-
-                if not cli_overrides["title"] and meta.title:
-                    original_title = meta.title
-                    parsed_title, parsed_series, parsed_index = _extract_audiobook_series_from_title(original_title)
-                    if parsed_series:
-                        meta.title = parsed_title
-                        localized_history_series = re.search(r":\s*Hist[oó]ria\s+\d+(?:\.\d+)?\s+de\s+.+$", original_title, re.IGNORECASE)
-                        if localized_history_series or not meta.book_series:
-                            meta.book_series = parsed_series
-                        if parsed_index and (localized_history_series or not meta.book_series_index):
-                            meta.book_series_index = parsed_index
-
-                # 6. Overview/Comment
-                comment = _unescape_meta_val(general_track.get("Comment") or general_track.get("comment"))
-                description = _unescape_meta_val(general_track.get("Description") or general_track.get("description"))
-                if not meta.overview:
-                    if comment:
-                        meta.overview = comment
-                    elif description:
-                        meta.overview = description
-
-                # 7. Year (extract 4-digit number)
-                rec_date = _unescape_meta_val(general_track.get("Recorded_Date") or general_track.get("recorded_date"))
-                if rec_date:
-                    match = re.search(r"\b(?:18|19|20)\d{2}\b", rec_date)
-                    if match:
-                        recorded_year = int(match.group(0))
-                        if not meta.audiobook and not meta.year:
-                            meta.year = recorded_year
-                            meta.search_year = recorded_year
-
-                # 8. Genre -> Keywords
-                genre = _unescape_meta_val(general_track.get("Genre") or general_track.get("genre"))
-                if genre:
-                    cleaned_words = map_audiobook_keywords(genre)
-                    if cleaned_words:
-                        existing_keywords = meta.keywords
-                        existing_list: list[str] = []
-                        if existing_keywords:
-                            # existing_keywords is guaranteed to be a list of strings
-                            existing_list.extend([x.strip().lower() for x in existing_keywords if x.strip()])
-                        for cw in cleaned_words:
-                            if cw not in existing_list:
-                                existing_list.append(cw)
-                        meta.keywords = existing_list
-
-                # 9. Language
-                if not meta.book_language:
-                    lang_val = _unescape_meta_val(general_track.get("Language") or general_track.get("language"))
-                    if lang_val:
-                        full, iso3 = resolve_book_language(lang_val)
-                        if is_valid_book_language(full, iso3):
-                            meta.book_language = full
-                            meta.book_language_iso = iso3
-
-                if not meta.book_language:
-                    # Fallback: Audio track language (audiobooks)
-                    for t in tracks:
-                        if t.get("@type") == "Audio":
-                            lang_val = _unescape_meta_val(t.get("Language") or t.get("language"))
-                            if lang_val:
-                                full, iso3 = resolve_book_language(lang_val)
-                                if is_valid_book_language(full, iso3):
-                                    meta.book_language = full
-                                    meta.book_language_iso = iso3
-                                    break
-
-                if not meta.book_language:
-                    # Fallback: Text track language (ebooks like PDF/EPUB)
-                    for t in tracks:
-                        if t.get("@type") == "Text":
-                            lang_val = _unescape_meta_val(t.get("Language") or t.get("language"))
-                            if lang_val:
-                                full, iso3 = resolve_book_language(lang_val)
-                                if is_valid_book_language(full, iso3):
-                                    meta.book_language = full
-                                    meta.book_language_iso = iso3
-                                    break
+                recorded_year = _extract_mediainfo_tags(general_track, tracks, meta, cli_overrides)
         except Exception as ex:
             logger.debug(f"[yellow]Warning: Error extracting embedded book metadata: {ex}[/yellow]")
 
@@ -575,10 +599,12 @@ async def gather_book_prep(
 
             is_mam = _is_mam_host(trackers)
             if not is_mam and comment_data.get("tracker_urls"):
-                for tu in comment_data["tracker_urls"]:
-                    if (isinstance(tu, dict) and _is_mam_host(str(tu.get("url", "")))) or (isinstance(tu, str) and _is_mam_host(tu)):
-                        is_mam = True
-                        break
+                tracker_urls_raw: object = comment_data["tracker_urls"]
+                if _is_obj_list(tracker_urls_raw):
+                    for tu in tracker_urls_raw:
+                        if (_is_str_dict(tu) and _is_mam_host(str(tu.get("url", "")))) or (isinstance(tu, str) and _is_mam_host(tu)):
+                            is_mam = True
+                            break
 
             if is_mam:
                 match = re.search(r"\bMID=(\d+)", comment)
@@ -966,6 +992,8 @@ async def get_audiobook_duration(filelist: list[str]) -> tuple[float, str]:
             if not Path(file_path).is_file():
                 return 0.0
             media_info = MediaInfo.parse(file_path)
+            if isinstance(media_info, str):
+                return 0.0
             for track in media_info.tracks:
                 if track.track_type == "General":
                     duration_ms = track.duration
@@ -1004,10 +1032,12 @@ async def get_audiobook_bitrate(filelist: list[str]) -> int | None:
             if not Path(file_path).is_file():
                 return None
             media_info = MediaInfo.parse(file_path)
+            if isinstance(media_info, str):
+                return None
             for track in media_info.tracks:
                 if track.track_type == "Audio":
                     track_data = track.to_data()
-                    br = track_data.get("bit_rate") or track_data.get("BitRate")
+                    br: Any = track_data.get("bit_rate") or track_data.get("BitRate")
                     if br is not None:
                         match = re.search(r"\d+", str(br))
                         if match:
@@ -1180,7 +1210,7 @@ def clean_translator_from_author(author: str) -> tuple[str, str]:
         normalized = normalized.replace(" ", "_")
 
     # Format the translator list as a comma-separated string
-    unique_translators = []
+    unique_translators: list[str] = []
     for t in translators:
         t_clean = t.strip()
         t_clean = re.sub(r"\s*[,;/&]+\s*$", "", t_clean)

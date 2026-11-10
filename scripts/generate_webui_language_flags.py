@@ -30,63 +30,71 @@ REPRESENTATIVES = {
 
 
 def main() -> None:
-    locales = [Locale(name) for name in ("en", "pt", "fr")]
-    likely = get_global("likely_subtags")
-    languages = []
-    supported = set()
-    for language in sorted(pycountry.languages, key=lambda item: item.alpha_3):
-        code = getattr(language, "alpha_2", language.alpha_3)
+    locales: list[Locale] = [Locale(name) for name in ("en", "pt", "fr")]
+    likely: dict[str, str] = dict(get_global("likely_subtags"))
+    languages: list[list[str]] = []
+    supported: set[str] = set()
+    for language in sorted(pycountry.languages, key=lambda item: str(item.alpha_3)):  # pyright: ignore[reportUnknownArgumentType,reportUnknownLambdaType,reportUnknownVariableType,reportUnknownMemberType]
+        alpha_3 = str(language.alpha_3)  # pyright: ignore[reportUnknownArgumentType,reportUnknownMemberType]
+        code = str(getattr(language, "alpha_2", alpha_3))  # pyright: ignore[reportUnknownArgumentType]
         parsed = langcodes.get(code)
         canonical = parsed.language
         # Language families, special codes and constructed languages have no
         # single representative country. Never maximize an unknown code.
-        if language.scope not in {"I", "M"} or language.type == "C":
+        scope = getattr(language, "scope", None)  # pyright: ignore[reportUnknownArgumentType]
+        lang_type = getattr(language, "type", None)  # pyright: ignore[reportUnknownArgumentType]
+        if scope not in {"I", "M"} or lang_type == "C":
             continue
-        if code not in locales[0].languages and language.alpha_3 not in locales[0].languages and code not in REPRESENTATIVES and not parsed.territory:
+        en_languages: dict[str, str] = dict(locales[0].languages)
+        if code not in en_languages and alpha_3 not in en_languages and code not in REPRESENTATIVES and not parsed.territory:
             continue
-        territory = (parsed.territory or (likely.get(canonical) or likely.get(code) or "").split("_")[-1]).lower()
+        territory = (parsed.territory or (likely.get(canonical or "") or likely.get(code) or "").split("_")[-1]).lower()
         flag = REPRESENTATIVES.get(code, territory)
         if not (FLAGS / f"{flag}.svg").is_file():
             continue
-        aliases = {code, language.alpha_3, language.name}
+        lang_name = str(language.name)  # pyright: ignore[reportUnknownArgumentType,reportUnknownMemberType]
+        aliases: set[str] = {code, alpha_3, lang_name}
         # A regional language must not override its broader language's alias
         # (e.g. Dari/prs -> fa-AF must not replace Persian/fa -> Iran).
-        if not parsed.territory:
+        if not parsed.territory and canonical:
             aliases.add(canonical)
         for key in ("bibliographic", "common_name", "inverted_name"):
-            if value := getattr(language, key, None):
-                aliases.add(value)
+            if value := getattr(language, key, None):  # pyright: ignore[reportUnknownArgumentType]
+                aliases.add(str(value))
         for locale in locales:
-            if name := locale.languages.get(code) or locale.languages.get(language.alpha_3):
+            loc_languages: dict[str, str] = dict(locale.languages)
+            if name := loc_languages.get(code) or loc_languages.get(alpha_3):
                 aliases.add(name)
         try:
             native = Locale.parse(code)
-            if name := native.languages.get(code):
+            native_languages: dict[str, str] = dict(native.languages)
+            if name := native_languages.get(code):
                 aliases.add(name)
         except ValueError, LookupError, UnknownLocaleError:
             pass
         languages.append([code, flag, *sorted(aliases)])
         supported.add(code)
 
-    regions = []
+    regions: list[list[str]] = []
     for country in sorted(pycountry.countries, key=lambda item: item.alpha_2):
         code = country.alpha_2.lower()
         aliases = {code, country.name}
         for key in ("common_name", "official_name"):
             if value := getattr(country, key, None):
-                aliases.add(value)
+                aliases.add(str(value))
         for locale in locales:
-            if name := locale.territories.get(country.alpha_2):
+            loc_territories: dict[str, str] = dict(locale.territories)
+            if name := loc_territories.get(country.alpha_2):
                 aliases.add(name)
         regions.append([code, *sorted(aliases)])
     regions.append(["xk", "xk", "Kosovo"])
-    scripts = []
+    scripts: list[list[str]] = []
     for tag, expanded in sorted(likely.items()):
         parts = tag.split("_")
         flag = expanded.split("_")[-1].lower()
         if len(parts) == 2 and len(parts[1]) == 4 and parts[0] in supported and (FLAGS / f"{flag}.svg").is_file():
             scripts.append([tag.replace("_", "-").lower(), flag])
-    data = {"languages": languages, "regions": regions, "scripts": scripts}
+    data: dict[str, list[list[str]]] = {"languages": languages, "regions": regions, "scripts": scripts}
     OUTPUT.write_text(
         "// Generated by scripts/generate_webui_language_flags.py; do not edit.\n"
         "// CLDR data: Unicode license in static/img/flags/UNICODE-LICENSE.\n"

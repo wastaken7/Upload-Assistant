@@ -7,7 +7,7 @@ import re
 import shlex
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, TypeIs, cast
 
 import cli_ui
 import click
@@ -17,21 +17,25 @@ from src.console import logger
 from src.meta import Meta
 from src.webui_paths import QUEUE_HASH_ENV, generated_queue_name, is_generated_queue_path, read_generated_queue, subprocess_roots
 
-type QueueItem = dict[str, Any]
+type QueueItem = dict[str, object]
 type QueueList = list[str] | list[QueueItem]
 
 
-async def _read_json_file(path: str) -> Any:
+def _is_str_dict(val: object) -> TypeIs[dict[str, Any]]:
+    return isinstance(val, dict)
+
+
+async def _read_json_file(path: str | Path) -> Any:
     content = await asyncio.to_thread(Path(path).read_text, encoding="utf-8")
     return json.loads(content)
 
 
-async def _write_json_file(path: str, data: Any, indent: int = 4) -> None:
+async def _write_json_file(path: str | Path, data: Any, indent: int = 4) -> None:
     content = json.dumps(data, indent=indent)
     await asyncio.to_thread(Path(path).write_text, content, encoding="utf-8")
 
 
-async def _read_text_lines(path: str) -> list[str]:
+async def _read_text_lines(path: str | Path) -> list[str]:
     content = await asyncio.to_thread(Path(path).read_text, encoding="utf-8")
     return content.splitlines()
 
@@ -84,14 +88,14 @@ class QueueManager:
 
         if queue:
             # Display the queue
-            paths_only = [item["path"] for item in queue]
+            paths_only = [str(item["path"]) for item in queue]
             md_text = "\n - ".join(paths_only)
             logger.info("\n[bold green]Queuing these files for site upload:[/bold green]")
             logger.info(f"- {md_text.rstrip()}\n\n")
             logger.info(f"[yellow]Tracker: {site_upload}[/yellow]")
             logger.info("\n\n")
 
-        return queue, processed_files_log
+        return queue, str(processed_files_log)
 
     @staticmethod
     async def process_site_upload_item(queue_item: Mapping[str, Any], meta: Meta) -> str:
@@ -131,7 +135,7 @@ class QueueManager:
         Returns the path to the log file for the given base directory and queue name.
         """
         safe_queue_name = queue_name.replace(" ", "_")
-        return Path(base_dir) / "tmp" / f"{safe_queue_name}_processed_files.log"
+        return str(Path(base_dir) / "tmp" / f"{safe_queue_name}_processed_files.log")
 
     @staticmethod
     async def load_processed_files(log_file: str) -> set[str]:
@@ -219,7 +223,7 @@ class QueueManager:
         return entry_paths
 
     @staticmethod
-    async def should_include_directory(dir_path: str, allowed_extensions: Sequence[str] | None = None) -> bool:
+    async def should_include_directory(dir_path: str | Path, allowed_extensions: Sequence[str] | None = None) -> bool:
         """
         Check if a directory should be included in the queue.
         Returns True if the directory contains:
@@ -350,10 +354,10 @@ class QueueManager:
         save_to_log: bool = True,
     ) -> None:
         """Displays the queued files in markdown format and optionally saves them to a log file in the tmp directory."""
-        paths_or_lines = []
+        paths_or_lines: list[str] = []
         for item in queue:
-            if isinstance(item, dict):
-                paths_or_lines.append(item.get("line") or item.get("path", ""))
+            if _is_str_dict(item):
+                paths_or_lines.append(str(item.get("line") or item.get("path", "")))
             else:
                 paths_or_lines.append(str(item))
 
@@ -403,7 +407,7 @@ class QueueManager:
             logger.info(f"[yellow]No unprocessed items found for {meta.site_upload} upload[/yellow]")
             return [], None
 
-        log_file = Path(base_dir) / "tmp" / f"{(meta.queue if meta.queue is not None else 'default')}_queue.log"
+        log_file = str(Path(base_dir) / "tmp" / f"{(meta.queue if meta.queue is not None else 'default')}_queue.log")
 
         if path.endswith(".txt") and not meta.unit3d:
             logger.info(f"[bold yellow]Detected a text file for queue input: {path}[/bold yellow]")
@@ -427,7 +431,7 @@ class QueueManager:
 
                     try:
                         args_list = shlex.split(line_stripped, posix=generated_queue)
-                        cleaned_args = []
+                        cleaned_args: list[str] = []
                         for arg in args_list:
                             if not generated_queue and ((arg.startswith('"') and arg.endswith('"')) or (arg.startswith("'") and arg.endswith("'"))):
                                 arg = arg[1:-1]

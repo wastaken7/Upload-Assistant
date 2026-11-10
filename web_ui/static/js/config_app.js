@@ -1209,7 +1209,8 @@ const INLINE_FIELD_HELP = {
     linkOnNewLine: true,
   },
   blvckout_api_key: {
-    description: "A BLVCKOUT API key with read permission, for XXX movie metadata.",
+    description:
+      "A BLVCKOUT API key with read permission, for XXX movie metadata.",
   },
   twitch_client_id: {
     description:

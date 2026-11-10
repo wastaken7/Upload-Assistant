@@ -11,7 +11,7 @@ import re
 import time
 import urllib.parse
 from collections import deque
-from typing import Any
+from typing import Any, TypeIs
 
 import httpx
 
@@ -19,6 +19,14 @@ from src.console import logger
 from src.metadata_cache import cache_for, is_cache_miss
 
 GGN_COLOR = "[#399cff]GazelleGames[/#399cff]"
+
+
+def _is_str_dict(val: object) -> TypeIs[dict[str, Any]]:
+    return isinstance(val, dict)
+
+
+def _is_obj_list(val: object) -> TypeIs[list[Any]]:
+    return isinstance(val, list)
 
 
 def _monotonic() -> float:
@@ -38,12 +46,12 @@ def _collection_names(group: dict[str, Any], collection_type: str) -> str:
 
 def _collection_name_list(group: dict[str, Any], collection_type: str) -> list[str]:
     collections = group.get("specialCollections")
-    if not isinstance(collections, dict):
+    if not _is_str_dict(collections):
         return []
     entries = collections.get(collection_type, [])
-    if not isinstance(entries, list):
+    if not _is_obj_list(entries):
         return []
-    names = [str(name).strip() for entry in entries if isinstance(entry, dict) and (name := entry.get("Name")) is not None and str(name).strip()]
+    names = [str(name).strip() for entry in entries if _is_str_dict(entry) and (name := entry.get("Name")) is not None and str(name).strip()]
     return list(dict.fromkeys(names))
 
 
@@ -68,10 +76,11 @@ def _normalized_age_rating(value: Any) -> dict[str, str]:
 
 
 def _normalized_rating(value: Any, *, maximum: int) -> dict[str, Any] | None:
-    if not isinstance(value, dict):
+    if not _is_str_dict(value):
         return None
+    raw_score: Any = value.get("score")
     try:
-        score = float(value.get("score"))
+        score = float(raw_score)
     except TypeError, ValueError:
         return None
     if not math.isfinite(score) or score < 0 or score > maximum:
@@ -96,14 +105,14 @@ class GazelleGamesManager:
     @staticmethod
     def extract_torrent_id(torrent_comments: Any) -> str | None:
         """Return a GGN torrent ID only from a canonical torrent details URL."""
-        if not isinstance(torrent_comments, list):
+        if not _is_obj_list(torrent_comments):
             return None
         for entry in torrent_comments:
-            if not isinstance(entry, dict):
+            if not _is_str_dict(entry):
                 continue
             comment = str(entry.get("comment", "") or "")
             for candidate in re.findall(r"https?://[^\s\"'<>]+", comment, flags=re.IGNORECASE):
-                parsed = urllib.parse.urlparse(candidate.rstrip("),.;]"))
+                parsed = urllib.parse.urlparse(str(candidate).rstrip("),.;]"))
                 host = (parsed.hostname or "").lower().rstrip(".")
                 if host != "gazellegames.net" and not host.endswith(".gazellegames.net"):
                     continue
@@ -142,13 +151,13 @@ class GazelleGamesManager:
                 logger.info(f"{GGN_COLOR}: [red]API returned HTTP {response.status_code}.[/red]")
                 return None
             payload = response.json()
-            if not isinstance(payload, dict) or payload.get("status") != "success":
+            if not _is_str_dict(payload) or payload.get("status") != "success":
                 logger.debug(f"{GGN_COLOR}: API returned an invalid or unsuccessful response")
                 return None
             response_data = payload.get("response")
             if response_data == []:
                 return {}
-            if not isinstance(response_data, dict):
+            if not _is_str_dict(response_data):
                 logger.debug(f"{GGN_COLOR}: API returned an invalid response body")
                 return None
             return response_data
@@ -162,14 +171,14 @@ class GazelleGamesManager:
             return None
         cache = cache_for(base_dir, config)
         cached = await cache.get(self.provider, "group", clean_id)
-        if not is_cache_miss(cached) and isinstance(cached, dict):
+        if not is_cache_miss(cached) and _is_str_dict(cached):
             return None if cached.get("not_found") else cached
 
         response = await self._request({"request": "torrentgroup", "id": clean_id}, api_key)
         if response is None:
             return None
-        group = response.get("group") if isinstance(response, dict) else None
-        if isinstance(group, dict) and group:
+        group = response.get("group") if _is_str_dict(response) else None
+        if _is_str_dict(group) and group:
             await cache.set(self.provider, "group", clean_id, group)
             return group
         await cache.set(self.provider, "group", clean_id, {"not_found": True}, negative=True)
@@ -181,21 +190,21 @@ class GazelleGamesManager:
             return None
         cache = cache_for(base_dir, config)
         cached = await cache.get(self.provider, "torrent", clean_id)
-        if not is_cache_miss(cached) and isinstance(cached, dict):
+        if not is_cache_miss(cached) and _is_str_dict(cached):
             return None if cached.get("not_found") else cached
 
         response = await self._request({"request": "torrent", "id": clean_id}, api_key)
         if response is None:
             return None
-        basic_group = response.get("group") if isinstance(response, dict) else None
-        torrent = response.get("torrent") if isinstance(response, dict) else None
-        if not isinstance(basic_group, dict) or not isinstance(torrent, dict):
+        basic_group = response.get("group") if _is_str_dict(response) else None
+        torrent = response.get("torrent") if _is_str_dict(response) else None
+        if not _is_str_dict(basic_group) or not _is_str_dict(torrent):
             await cache.set(self.provider, "torrent", clean_id, {"not_found": True}, negative=True)
             return None
 
         group_id = basic_group.get("id")
         detailed_group = await self.fetch_group(group_id, base_dir=base_dir, api_key=api_key, config=config) if group_id else None
-        result = {"group": detailed_group or basic_group, "torrent": torrent}
+        result: dict[str, Any] = {"group": detailed_group or basic_group, "torrent": torrent}
         if detailed_group or not group_id:
             await cache.set(self.provider, "torrent", clean_id, result)
         return result
@@ -224,28 +233,29 @@ class GazelleGamesManager:
         cache_key = json.dumps(params, sort_keys=True)
         cache = cache_for(base_dir, config)
         cached = await cache.get(self.provider, "search", cache_key)
-        if not is_cache_miss(cached) and isinstance(cached, list):
-            return [entry for entry in cached if isinstance(entry, dict)]
+        if not is_cache_miss(cached) and _is_obj_list(cached):
+            return [entry for entry in cached if _is_str_dict(entry)]
 
         response = await self._request(params, api_key)
         if response is None:
             return []
-        results = [entry for entry in response.values() if isinstance(entry, dict) and str(entry.get("CategoryID", entry.get("categoryid", ""))) == "1"] if response else []
+        results = [entry for entry in response.values() if _is_str_dict(entry) and str(entry.get("CategoryID", entry.get("categoryid", ""))) == "1"] if response else []
         await cache.set(self.provider, "search", cache_key, results, negative=not results)
         return results
 
     @staticmethod
     def normalize_metadata(payload: dict[str, Any], *, exact_torrent: bool) -> dict[str, Any]:
         """Map GGN's group/torrent response into Upload Assistant game fields."""
-        group = payload.get("group") if isinstance(payload.get("group"), dict) else payload
-        if not isinstance(group, dict):
+        raw_group = payload.get("group")
+        group = raw_group if _is_str_dict(raw_group) else payload
+        if not _is_str_dict(group):
             return {}
         metadata: dict[str, Any] = {}
 
         title = str(group.get("name") or group.get("Name") or "").strip()
         if title:
             metadata["title"] = title
-        year = group.get("year") or group.get("Year")
+        year: Any = group.get("year") or group.get("Year")
         try:
             normalized_year = int(year)
         except TypeError, ValueError:
@@ -255,9 +265,7 @@ class GazelleGamesManager:
             metadata["search_year"] = normalized_year
         platform = str(group.get("platform") or "").strip()
         artists = group.get("Artists", [])
-        artist_platforms = (
-            [str(item.get("name", "")).strip() for item in artists if isinstance(item, dict) and str(item.get("name", "")).strip()] if isinstance(artists, list) else []
-        )
+        artist_platforms = [str(item.get("name", "")).strip() for item in artists if _is_str_dict(item) and str(item.get("name", "")).strip()] if _is_obj_list(artists) else []
         if not platform and artist_platforms:
             platform = artist_platforms[0]
         if platform:
@@ -267,13 +275,13 @@ class GazelleGamesManager:
         overview = str(group.get("wikiBody") or group.get("bbWikiBody") or "").strip()
         if overview:
             metadata["overview"] = overview
-        raw_genres = group.get("TagList") or []
-        genre_tags = raw_genres.split() if isinstance(raw_genres, str) else raw_genres if isinstance(raw_genres, list) else []
+        raw_genres: Any = group.get("TagList") or []
+        genre_tags: list[Any] = raw_genres.split() if isinstance(raw_genres, str) else raw_genres if _is_obj_list(raw_genres) else []
         genres = [str(tag).replace(".", " ").replace("_", " ").strip().title() for tag in genre_tags if str(tag).strip()]
         if genres:
             metadata["genres"] = list(dict.fromkeys(genres))
-        raw_tags = group.get("tags") or group.get("FullTagList") or raw_genres or []
-        tags = raw_tags.replace("|", " ").split() if isinstance(raw_tags, str) else raw_tags if isinstance(raw_tags, list) else []
+        raw_tags: Any = group.get("tags") or group.get("FullTagList") or raw_genres or []
+        tags: list[Any] = raw_tags.replace("|", " ").split() if isinstance(raw_tags, str) else raw_tags if _is_obj_list(raw_tags) else []
         keywords = [str(tag).replace(".", " ").replace("_", " ").strip().title() for tag in tags if str(tag).strip()]
         if keywords:
             metadata["keywords"] = list(dict.fromkeys(keywords))
@@ -285,9 +293,10 @@ class GazelleGamesManager:
         if publisher:
             metadata["publisher"] = publisher
 
-        game_info = group.get("gameInfo") if isinstance(group.get("gameInfo"), dict) else group
+        raw_game_info = group.get("gameInfo")
+        game_info = raw_game_info if _is_str_dict(raw_game_info) else group
         aliases = group.get("aliases")
-        if isinstance(aliases, list):
+        if _is_obj_list(aliases):
             metadata["game_aliases"] = list(dict.fromkeys(str(alias).strip() for alias in aliases if str(alias).strip()))
 
         rating = game_info.get("rating") or group.get("rating") or group.get("Rating")
@@ -295,7 +304,7 @@ class GazelleGamesManager:
         if age_ratings:
             metadata["game_age_ratings"] = age_ratings
 
-        rating_sources = {
+        rating_sources: dict[str, tuple[Any, int]] = {
             "Metacritic": (game_info.get("metaRating") or group.get("metaRating"), 100),
             "IGN": (game_info.get("ignRating") or group.get("ignRating"), 10),
             "GameSpot": (game_info.get("gamespotRating") or group.get("gamespotRating"), 10),
@@ -316,8 +325,8 @@ class GazelleGamesManager:
             if values:
                 metadata[field] = values
 
-        links = game_info.get("weblinks", {}) if isinstance(game_info, dict) else {}
-        if isinstance(links, dict):
+        links: object = game_info.get("weblinks") if _is_str_dict(game_info) else None
+        if _is_str_dict(links):
             steam_url = _decoded_url(links.get("Steam"))
             if steam_url.startswith(("http://", "https://")):
                 metadata["steam_url"] = steam_url
@@ -332,7 +341,7 @@ class GazelleGamesManager:
             return metadata
 
         torrent = payload.get("torrent")
-        if not isinstance(torrent, dict):
+        if not _is_str_dict(torrent):
             return metadata
         version = str(torrent.get("gameDOXVersion") or torrent.get("GameDOXVers") or "").strip()
         if version and version.casefold() not in {"unknown", "n/a", "none", "0"}:

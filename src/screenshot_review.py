@@ -15,7 +15,7 @@ import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeIs
 
 from src.meta import Meta
 from src.screenshot_manifest import capture_pages, forget_file, group_for, set_page
@@ -27,13 +27,21 @@ _review_locks: dict[str, threading.Lock] = {}
 _review_locks_guard = threading.Lock()
 
 
+def _is_str_dict(val: object) -> TypeIs[dict[str, object]]:
+    return isinstance(val, dict)
+
+
+def _is_any_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
+
+
 @dataclass(frozen=True)
 class ReviewedScreenshot:
     id: str
     path: Path | None
     index: int
     source: str = "local"
-    remote_image: dict[str, Any] | None = None
+    remote_image: dict[str, object] | None = None
     group: str = "main"
 
 
@@ -47,15 +55,15 @@ def _review_file(temp_dir: Path) -> Path:
     return temp_dir / "screenshot_review.json"
 
 
-def _load_review(temp_dir: Path) -> dict[str, Any]:
+def _load_review(temp_dir: Path) -> dict[str, object]:
     try:
         payload = json.loads(_review_file(temp_dir).read_text(encoding="utf-8"))
     except OSError, json.JSONDecodeError:
         return {}
-    return payload if isinstance(payload, dict) else {}
+    return payload if _is_str_dict(payload) else {}
 
 
-def _save_review(temp_dir: Path, review: Mapping[str, Any]) -> None:
+def _save_review(temp_dir: Path, review: Mapping[str, object]) -> None:
     output = _review_file(temp_dir)
     temporary = output.with_suffix(".tmp")
     temporary.write_text(json.dumps(dict(review), indent=2), encoding="utf-8")
@@ -88,8 +96,10 @@ def list_review_items(temp_dir: Path, meta_data: Mapping[str, object]) -> list[R
     """Return local frames plus remotely hosted frames retained for this run."""
     remote_images = _remote_images(meta_data)
     review = _load_review(temp_dir)
-    replacements = review.get("remote_replacements") if isinstance(review.get("remote_replacements"), dict) else {}
-    additions = review.get("remote_additions") if isinstance(review.get("remote_additions"), list) else []
+    raw_replacements = review.get("remote_replacements")
+    replacements: dict[str, object] = raw_replacements if _is_str_dict(raw_replacements) else {}
+    raw_additions = review.get("remote_additions")
+    additions: list[object] = raw_additions if _is_any_list(raw_additions) else []
     if not remote_images:
         return list_screenshots(temp_dir, meta_data)
 
@@ -106,7 +116,7 @@ def list_review_items(temp_dir: Path, meta_data: Mapping[str, object]) -> list[R
             local_path = None
         items.append(ReviewedScreenshot(item_id, local_path, index, "replacement" if local_path else "remote", image))
     for offset, value in enumerate(additions):
-        if not isinstance(value, dict):
+        if not _is_str_dict(value):
             continue
         item_id = _string(value.get("id"))
         filename = _string(value.get("file"))
@@ -115,9 +125,10 @@ def list_review_items(temp_dir: Path, meta_data: Mapping[str, object]) -> list[R
             items.append(ReviewedScreenshot(item_id, path, len(remote_images) + offset, "addition"))
     # Keep local disc/playlist frames visible alongside hosted images.
     if _string(meta_data.get("is_disc")):
-        staged_names = {str(name) for name in [*replacements.values(), *(_string(value.get("file")) for value in additions if isinstance(value, dict))]}
+        staged_names = {str(name) for name in replacements.values()} | {_string(value.get("file")) for value in additions if _is_str_dict(value)}
+        staged_names.discard("")
         for local in list_screenshots(temp_dir, meta_data):
-            if local.path.name in staged_names:
+            if local.path is not None and local.path.name in staged_names:
                 continue
             items.append(ReviewedScreenshot(local.id, local.path, len(items), "local", group=local.group))
     return items
@@ -131,6 +142,8 @@ def target_count(temp_dir: Path, fallback: int, allow_empty: bool = False) -> in
     unless the release may legitimately have none (books).
     """
     value = _load_review(temp_dir).get("target_count")
+    if not isinstance(value, (int, float, str)):
+        return fallback
     try:
         count = max(0, int(value))
     except TypeError, ValueError:
@@ -141,10 +154,11 @@ def target_count(temp_dir: Path, fallback: int, allow_empty: bool = False) -> in
 def image_version(temp_dir: Path, screenshot_id: str, fallback: int) -> int:
     """Return a monotonic cache-busting version for a reviewed image."""
     generations = _load_review(temp_dir).get("generations")
-    if isinstance(generations, dict):
+    if _is_str_dict(generations):
         try:
-            if screenshot_id in generations:
-                return int(generations[screenshot_id])
+            val = generations.get(screenshot_id)
+            if val is not None:
+                return int(str(val))
         except TypeError, ValueError:
             pass
     return fallback
@@ -159,20 +173,20 @@ def delete_screenshot(temp_dir: Path, meta_data: Mapping[str, object], screensho
         if screenshot_id.startswith("remote-add-"):
             review = _load_review(temp_dir)
             additions = review.get("remote_additions")
-            if not isinstance(additions, list):
+            if not _is_any_list(additions):
                 raise FileNotFoundError("Pending screenshot addition not found")
-            addition_index = next((index for index, value in enumerate(additions) if isinstance(value, dict) and _string(value.get("id")) == screenshot_id), None)
+            addition_index = next((index for index, value in enumerate(additions) if _is_str_dict(value) and _string(value.get("id")) == screenshot_id), None)
             if addition_index is None:
                 raise FileNotFoundError("Pending screenshot addition not found")
             addition = additions.pop(addition_index)
-            filename = _string(addition.get("file"))
+            filename = _string(addition.get("file")) if _is_str_dict(addition) else ""
             addition_file = temp_dir / "screenshots" / filename
             if addition_file.is_file():
                 addition_file.unlink()
             forget_file(temp_dir.parent.parent, temp_dir.name, addition_file)
             for key in ("replacement_times", "generations"):
                 values = review.get(key)
-                if isinstance(values, dict):
+                if _is_str_dict(values):
                     values.pop(screenshot_id, None)
                     if not values:
                         review.pop(key, None)
@@ -185,6 +199,8 @@ def delete_screenshot(temp_dir: Path, meta_data: Mapping[str, object], screensho
 
         items = list_screenshots(temp_dir, meta_data)
         target = _find_item(items, screenshot_id)
+        if target.path is None:
+            raise FileNotFoundError("Screenshot not found")
         target.path.unlink()
         forget_file(temp_dir.parent.parent, temp_dir.name, target.path)
 
@@ -210,9 +226,12 @@ async def add_screenshot(temp_dir: Path, meta_data: Mapping[str, object], group:
                     review["target_count"] = len(manifest_files(temp_dir.parent.parent, temp_dir.name, "main"))
                     _save_review(temp_dir, review)
                 return captured
+            if captured.path is None:
+                raise RuntimeError("Disc capture did not produce a screenshot")
             _unregister_staged_frame(temp_dir, captured.path)
             review = _load_review(temp_dir)
-            additions = review.get("remote_additions") if isinstance(review.get("remote_additions"), list) else []
+            raw_additions = review.get("remote_additions")
+            additions: list[Any] = raw_additions if _is_any_list(raw_additions) else []
             item_id = f"remote-add-{uuid.uuid4().hex}"
             additions.append({"id": item_id, "file": captured.path.name})
             review["remote_additions"] = additions
@@ -220,7 +239,8 @@ async def add_screenshot(temp_dir: Path, meta_data: Mapping[str, object], group:
             return ReviewedScreenshot(item_id, captured.path, len(remote_images) + len(additions) - 1, "addition")
         if _remote_images(meta_data):
             review = _load_review(temp_dir)
-            additions = review.get("remote_additions") if isinstance(review.get("remote_additions"), list) else []
+            raw_additions = review.get("remote_additions")
+            additions = raw_additions if _is_any_list(raw_additions) else []
             item_id = f"remote-add-{uuid.uuid4().hex}"
             filename = f"review-{item_id}.png"
             target = ReviewedScreenshot(item_id, temp_dir / "screenshots" / filename, len(_remote_images(meta_data)) + len(additions), "addition")
@@ -254,9 +274,12 @@ async def replace_screenshot(temp_dir: Path, meta_data: Mapping[str, object], sc
                 if match is None or int(match.group(1)) >= len(remote_images):
                     raise FileNotFoundError("Screenshot not found")
                 captured = await _capture_disc_review_frame(temp_dir, meta_data, group="main")
+                if captured.path is None:
+                    raise RuntimeError("Disc capture did not produce a screenshot")
                 _unregister_staged_frame(temp_dir, captured.path)
                 review = _load_review(temp_dir)
-                replacements = review.get("remote_replacements") if isinstance(review.get("remote_replacements"), dict) else {}
+                raw_replacements = review.get("remote_replacements")
+                replacements: dict[str, Any] = raw_replacements if _is_str_dict(raw_replacements) else {}
                 replacements[screenshot_id] = captured.path.name
                 review["remote_replacements"] = replacements
                 _save_review(temp_dir, review)
@@ -274,7 +297,8 @@ async def replace_screenshot(temp_dir: Path, meta_data: Mapping[str, object], sc
             target = ReviewedScreenshot(screenshot_id, temp_dir / "screenshots" / filename, index, "replacement", remote_images[index])
             timestamp = await _capture_fresh_frame(temp_dir, meta_data, target)
             review = _load_review(temp_dir)
-            replacements = review.get("remote_replacements") if isinstance(review.get("remote_replacements"), dict) else {}
+            raw_replacements = review.get("remote_replacements")
+            replacements = raw_replacements if _is_str_dict(raw_replacements) else {}
             replacements[screenshot_id] = filename
             review["remote_replacements"] = replacements
             _record_capture(temp_dir, screenshot_id, len(remote_images), timestamp, review)
@@ -307,11 +331,12 @@ def _unregister_staged_frame(temp_dir: Path, path: Path) -> None:
     forget_file(temp_dir.parent.parent, temp_dir.name, path)
 
 
-def _drop_remote_replacement(temp_dir: Path, review: dict[str, Any], screenshot_id: str) -> bool:
+def _drop_remote_replacement(temp_dir: Path, review: dict[str, object], screenshot_id: str) -> bool:
     """Remove a pending replacement frame from ``review``; return whether one existed."""
-    replacements = review.get("remote_replacements")
-    if not isinstance(replacements, dict):
+    raw_replacements = review.get("remote_replacements")
+    if not _is_str_dict(raw_replacements):
         return False
+    replacements = dict(raw_replacements)
     filename = replacements.pop(screenshot_id, None)
     if not isinstance(filename, str):
         return False
@@ -336,10 +361,13 @@ def _discard_remote_image(temp_dir: Path, meta_data: Mapping[str, object], scree
     review["discarded_remote_urls"] = sorted(_discarded_urls(review) | {_remote_key(remote_images[index])})
     _drop_remote_replacement(temp_dir, review, screenshot_id)
     for key in ("replacement_times", "generations"):
-        values = review.get(key)
-        if isinstance(values, dict):
+        raw_values = review.get(key)
+        if _is_str_dict(raw_values):
+            values = dict(raw_values)
             values.pop(screenshot_id, None)
-            if not values:
+            if values:
+                review[key] = values
+            else:
                 review.pop(key, None)
     _save_review(temp_dir, review)
 
@@ -356,6 +384,8 @@ async def _capture_fresh_frame(temp_dir: Path, meta_data: Mapping[str, object], 
     if meta.frame_overlay:
         meta.frame_info_map = {str(timestamp): await get_frame_info(source, timestamp, meta)}
 
+    if target.path is None:
+        raise ValueError("Target path cannot be None")
     staged = target.path.with_name(f".{target.path.stem}.capture-{secrets.token_hex(4)}.png")
     hdr_tonemap = await determine_tonemapping(w_sar, h_sar, width, height, source, str(timestamp), str(staged), "verbose" if meta.ffdebug else "quiet", meta)
     try:
@@ -409,6 +439,8 @@ async def _add_book_page(temp_dir: Path, meta_data: Mapping[str, object]) -> Rev
 async def _replace_book_page(temp_dir: Path, meta_data: Mapping[str, object], screenshot_id: str) -> ReviewedScreenshot:
     items = list_screenshots(temp_dir, meta_data)
     target = _find_item(items, screenshot_id)
+    if target.path is None:
+        raise ValueError("Target path cannot be None")
     # Keep the file name (and so the screenshot ID and order) by writing the new page in the same format.
     staged_stem = target.path.with_name(f".{target.path.stem}.capture-{secrets.token_hex(4)}")
     staged, page = await _capture_book_page(temp_dir, meta_data, staged_stem, target.path.suffix.lower())
@@ -422,16 +454,16 @@ async def _replace_book_page(temp_dir: Path, meta_data: Mapping[str, object], sc
     return target
 
 
-def _record_capture(temp_dir: Path, screenshot_id: str, count: int, timestamp: float, review: dict[str, Any] | None = None) -> None:
+def _record_capture(temp_dir: Path, screenshot_id: str, count: int, timestamp: float, review: dict[str, object] | None = None) -> None:
     review = review if review is not None else _load_review(temp_dir)
-    timestamps = review.get("replacement_times")
-    if not isinstance(timestamps, dict):
-        timestamps = {}
-    generations = review.get("generations")
-    if not isinstance(generations, dict):
-        generations = {}
+    raw_times = review.get("replacement_times")
+    timestamps: dict[str, object] = dict(raw_times) if _is_str_dict(raw_times) else {}
+    raw_gens = review.get("generations")
+    generations: dict[str, object] = dict(raw_gens) if _is_str_dict(raw_gens) else {}
     timestamps[screenshot_id] = round(timestamp, 3)
-    generations[screenshot_id] = int(generations.get(screenshot_id, 0) or 0) + 1
+    raw_gen = generations.get(screenshot_id, 0)
+    gen_val = int(raw_gen) if isinstance(raw_gen, (int, str, float)) else 0
+    generations[screenshot_id] = gen_val + 1
     review.update({"target_count": count, "replacement_times": timestamps, "generations": generations})
     _save_review(temp_dir, review)
 
@@ -487,8 +519,10 @@ def staged_remote_uploads(temp_dir: Path, image_list: list[dict[str, Any]]) -> l
     """Return replacement/addition files that must be hosted with the normal upload."""
     with _lock_for(temp_dir):
         review = _load_review(temp_dir)
-        replacements = review.get("remote_replacements") if isinstance(review.get("remote_replacements"), dict) else {}
-        additions = review.get("remote_additions") if isinstance(review.get("remote_additions"), list) else []
+        raw_replacements = review.get("remote_replacements")
+        replacements = raw_replacements if _is_str_dict(raw_replacements) else {}
+        raw_additions = review.get("remote_additions")
+        additions = raw_additions if _is_any_list(raw_additions) else []
         pending: list[tuple[int | None, Path]] = []
         for item_id, filename in replacements.items():
             match = re.fullmatch(r"remote-(\d+)", str(item_id))
@@ -496,7 +530,7 @@ def staged_remote_uploads(temp_dir: Path, image_list: list[dict[str, Any]]) -> l
             if match and path.is_file() and int(match.group(1)) < len(image_list):
                 pending.append((int(match.group(1)), path))
         for value in additions:
-            if isinstance(value, dict):
+            if _is_str_dict(value):
                 path = temp_dir / "screenshots" / _string(value.get("file"))
                 if path.is_file():
                     pending.append((None, path))
@@ -533,12 +567,14 @@ def apply_staged_remote_uploads(
             result[index] = image
     with _lock_for(temp_dir):
         review = _load_review(temp_dir)
-        replacements = review.get("remote_replacements") if isinstance(review.get("remote_replacements"), dict) else {}
-        additions = review.get("remote_additions") if isinstance(review.get("remote_additions"), list) else []
+        raw_replacements = review.get("remote_replacements")
+        replacements = raw_replacements if _is_str_dict(raw_replacements) else {}
+        raw_additions = review.get("remote_additions")
+        additions = raw_additions if _is_any_list(raw_additions) else []
         # Match by file name: pending indices may have been remapped past discarded images.
         uploaded_files = {path.name for _index, path in pending}
         replacements = {item_id: filename for item_id, filename in replacements.items() if filename not in uploaded_files}
-        remaining_additions = [value for value in additions if not isinstance(value, dict) or _string(value.get("file")) not in uploaded_files]
+        remaining_additions = [value for value in additions if not _is_str_dict(value) or _string(value.get("file")) not in uploaded_files]
         if replacements:
             review["remote_replacements"] = replacements
         else:
@@ -551,20 +587,32 @@ def apply_staged_remote_uploads(
     return result
 
 
-def _remote_images(meta_data: Mapping[str, object]) -> list[dict[str, Any]]:
+def _remote_images(meta_data: Mapping[str, object]) -> list[dict[str, object]]:
     value = meta_data.get("image_list")
-    if not isinstance(value, list):
+    if not _is_any_list(value):
         return []
-    return [dict(image) for image in value if isinstance(image, Mapping) and _string(image.get("raw_url") or image.get("img_url"))]
+    res: list[dict[str, object]] = []
+    for image in value:
+        if _is_str_dict(image):
+            url = _string(image.get("raw_url")) or _string(image.get("img_url"))
+            if url:
+                res.append(dict(image))
+    return res
 
 
-def _remote_key(image: Mapping[str, Any]) -> str:
+def _remote_key(image: Mapping[str, object]) -> str:
     return _string(image.get("raw_url")) or _string(image.get("img_url"))
 
 
-def _discarded_urls(review: Mapping[str, Any]) -> set[str]:
+def _discarded_urls(review: Mapping[str, object]) -> set[str]:
     value = review.get("discarded_remote_urls")
-    return {url for url in value if isinstance(url, str) and url} if isinstance(value, list) else set()
+    if not _is_any_list(value):
+        return set()
+    result: set[str] = set()
+    for item in value:
+        if isinstance(item, str) and item:
+            result.add(item)
+    return result
 
 
 def _source_video(meta: Meta) -> str:
@@ -587,7 +635,7 @@ def _video_properties(temp_dir: Path) -> tuple[float, float, float, float, float
 
     def number(value: object, fallback: float) -> float:
         try:
-            return float(value)
+            return float(str(value))
         except TypeError, ValueError:
             return fallback
 

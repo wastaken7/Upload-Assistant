@@ -8,7 +8,7 @@ sys.path.append(str(Path(__file__).resolve().parent))
 from generate_icons import draw_logo
 
 
-def draw_social_preview():
+def draw_social_preview() -> Image.Image:
     # 1. Canvas: 1280x640, transparent/RGBA
     img = Image.new("RGBA", (1280, 640), (0, 0, 0, 255))
     draw = ImageDraw.Draw(img)
@@ -101,7 +101,16 @@ def draw_social_preview():
     draw.line([(x_start, divider_y), (x_start + left_column_w, divider_y)], fill=(41, 37, 36, 255), width=divider_h)
 
     # 7. Badges (Left Column)
-    def draw_badge(x, y, w, h, bg_color, border_color, text, text_color):
+    def draw_badge(
+        x: float,
+        y: float,
+        w: float,
+        h: float,
+        bg_color: tuple[int, int, int, int],
+        border_color: tuple[int, int, int, int],
+        text: str,
+        text_color: tuple[int, int, int, int],
+    ) -> None:
         badge_layer = Image.new("RGBA", (1280, 640), (0, 0, 0, 0))
         b_draw = ImageDraw.Draw(badge_layer)
         # Background
@@ -136,7 +145,7 @@ def draw_social_preview():
     return img
 
 
-def main():
+def main() -> None:
     print("Generating GitHub Social Preview PNG...")
     base_dir = Path(__file__).resolve().parent.parent
 

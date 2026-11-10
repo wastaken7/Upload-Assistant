@@ -175,7 +175,7 @@ def _write_supported_original(source: Path | bytes, destination: Path) -> Path |
         if len(content) > MAX_ARTWORK_BYTES or not is_valid_image_bytes(content):
             return None
         with Image.open(BytesIO(content)) as image:
-            suffix = {"JPEG": ".jpg", "PNG": ".png"}.get(image.format)
+            suffix = {"JPEG": ".jpg", "PNG": ".png"}.get(image.format or "")
         if suffix is None:
             return None
         target = destination.with_suffix(suffix)

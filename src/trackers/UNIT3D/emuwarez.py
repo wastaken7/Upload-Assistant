@@ -1,6 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import re
-from typing import Any, ClassVar, cast
+from typing import Any, ClassVar, TypeIs, cast
 
 import cloudscraper
 
@@ -8,6 +8,14 @@ from src.languages import languages_manager
 from src.meta import Meta
 from src.tmdb import TmdbManager
 from src.trackers.UNIT3D import UNIT3D
+
+
+def _is_str_dict(val: object) -> TypeIs[dict[str, Any]]:
+    return isinstance(val, dict)
+
+
+def _is_obj_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
 
 
 class Emuwarez(UNIT3D):
@@ -103,19 +111,18 @@ class Emuwarez(UNIT3D):
         imdb_info_raw = meta.imdb_info
         imdb_info: dict[str, Any] = cast(dict[str, Any], imdb_info_raw) if isinstance(imdb_info_raw, dict) else {}
         akas_raw = imdb_info.get("akas", [])
-        akas: list[Any] = akas_raw if isinstance(akas_raw, list) else []
+        akas: list[object] = akas_raw if _is_obj_list(akas_raw) else []
 
         country_match = None
         language_match = None
 
         for aka in akas:
-            if isinstance(aka, dict):
-                aka_dict = cast(dict[str, Any], aka)
-                if aka_dict.get("country") in ["Spain", "ES"]:
-                    country_match = aka_dict.get("title")
+            if _is_str_dict(aka):
+                if aka.get("country") in ["Spain", "ES"]:
+                    country_match = aka.get("title")
                     break  # Country match takes priority
-                if aka_dict.get("language") in ["Spain", "Spanish", "ES"] and not language_match:
-                    language_match = aka_dict.get("title")
+                if aka.get("language") in ["Spain", "Spanish", "ES"] and not language_match:
+                    language_match = aka.get("title")
 
         spanish_title = country_match or language_match
 
@@ -213,16 +220,14 @@ class Emuwarez(UNIT3D):
         if not original_lang:
             imdb_info_raw = meta.imdb_info
             imdb_info: dict[str, Any] = cast(dict[str, Any], imdb_info_raw) if isinstance(imdb_info_raw, dict) else {}
-            imdb_lang: Any = imdb_info.get("language")
+            imdb_lang: object = imdb_info.get("language")
 
-            if isinstance(imdb_lang, list):
-                imdb_lang_list = imdb_lang
-                imdb_lang = imdb_lang_list[0] if imdb_lang_list else ""
+            if _is_obj_list(imdb_lang):
+                imdb_lang = imdb_lang[0] if imdb_lang else ""
 
             if imdb_lang:
-                if isinstance(imdb_lang, dict):
-                    imdb_lang_dict = cast(dict[str, Any], imdb_lang)
-                    imdb_lang_text = imdb_lang_dict.get("text", "")
+                if _is_str_dict(imdb_lang):
+                    imdb_lang_text = imdb_lang.get("text", "")
                     original_lang = str(imdb_lang_text).strip()
                 elif isinstance(imdb_lang, str):
                     original_lang = imdb_lang.strip()
@@ -303,27 +308,17 @@ class Emuwarez(UNIT3D):
             return []
 
         media_info = meta.mediainfo
-        if not isinstance(media_info, dict):
+        if not _is_str_dict(media_info):
             return []
-        media_info_dict = media_info
-        media = media_info_dict.get("media")
-        if not isinstance(media, dict):
-            return []
-
-        media_dict = cast(dict[str, Any], media)
-        tracks = media_dict.get("track", [])
-        if not isinstance(tracks, list):
+        media = media_info.get("media")
+        if not _is_str_dict(media):
             return []
 
-        audio_tracks: list[dict[str, Any]] = []
-        tracks_list = tracks
-        for track in tracks_list:
-            if isinstance(track, dict):
-                track_dict = cast(dict[str, Any], track)
-                if track_dict.get("@type") == "Audio":
-                    audio_tracks.append(track_dict)
+        tracks = media.get("track", [])
+        if not _is_obj_list(tracks):
+            return []
 
-        return audio_tracks
+        return [track for track in tracks if _is_str_dict(track) and track.get("@type") == "Audio"]
 
     def _extract_audio_languages(self, audio_tracks: list[dict[str, Any]], meta: Meta) -> list[str]:
         """Extract and normalize audio languages"""
@@ -475,27 +470,23 @@ class Emuwarez(UNIT3D):
         if "mediainfo" not in meta or "media" not in meta.mediainfo:
             return False
         media_info = meta.mediainfo
-        if not isinstance(media_info, dict):
+        if not _is_str_dict(media_info):
             return False
-        media_info_dict = media_info
-        media = media_info_dict.get("media")
-        if not isinstance(media, dict):
+        media = media_info.get("media")
+        if not _is_str_dict(media):
             return False
-        media_dict = cast(dict[str, Any], media)
-        tracks = media_dict.get("track", [])
-        if not isinstance(tracks, list):
+        tracks = media.get("track", [])
+        if not _is_obj_list(tracks):
             return False
 
-        tracks_list = tracks
-        for track in tracks_list:
-            if not isinstance(track, dict):
+        for track in tracks:
+            if not _is_str_dict(track):
                 continue
-            track_dict = cast(dict[str, Any], track)
-            if track_dict.get("@type") == "Text":
-                lang = track_dict.get("Language", "")
+            if track.get("@type") == "Text":
+                lang = track.get("Language", "")
                 lang = lang.lower() if isinstance(lang, str) else ""
 
-                title = track_dict.get("Title", "")
+                title = track.get("Title", "")
                 title = title.lower() if isinstance(title, str) else ""
 
                 if lang in ["es", "spa", "spanish", "es-es", "español"]:
@@ -587,48 +578,42 @@ class Emuwarez(UNIT3D):
 
         response.raise_for_status()
         data = response.json()
-        if isinstance(data, dict):
-            data_dict = cast(dict[str, Any], data)
-            data_items_raw = data_dict.get("data")
-            if isinstance(data_items_raw, list):
-                data_items = data_items_raw
+        if _is_str_dict(data):
+            data_items = data.get("data")
+            if _is_obj_list(data_items):
                 for torrent in data_items:
-                    if not isinstance(torrent, dict):
+                    if not _is_str_dict(torrent):
                         continue
-                    torrent_dict = cast(dict[str, Any], torrent)
-                    attributes = torrent_dict.get("attributes")
-                    if not isinstance(attributes, dict):
-                        continue
-                    attributes_dict = cast(dict[str, Any], attributes)
-                    if "name" not in attributes_dict:
+                    attributes = torrent.get("attributes")
+                    if not _is_str_dict(attributes) or "name" not in attributes:
                         continue
 
-                    files_value = attributes_dict.get("files", [])
-                    files_list: list[Any] = files_value if isinstance(files_value, list) else []
+                    files_value = attributes.get("files", [])
+                    files_list: list[object] = files_value if _is_obj_list(files_value) else []
                     file_names: list[str] = []
                     for file in files_list:
-                        if not isinstance(file, dict):
+                        if not _is_str_dict(file):
                             continue
-                        file_dict = cast(dict[str, Any], file)
-                        name = file_dict.get("name")
+                        name = file.get("name")
                         if isinstance(name, str):
                             file_names.append(name)
 
+                    result: dict[str, Any]
                     if not meta.is_disc:
                         result = {
-                            "name": attributes_dict["name"],
-                            "size": attributes_dict.get("size"),
+                            "name": attributes["name"],
+                            "size": attributes.get("size"),
                             "files": file_names,
                             "file_count": len(files_list),
-                            "trumpable": attributes_dict.get("trumpable", False),
-                            "link": attributes_dict.get("details_link", None),
+                            "trumpable": attributes.get("trumpable", False),
+                            "link": attributes.get("details_link", None),
                         }
                     else:
                         result = {
-                            "name": attributes_dict["name"],
-                            "size": attributes_dict.get("size"),
-                            "trumpable": attributes_dict.get("trumpable", False),
-                            "link": attributes_dict.get("details_link", None),
+                            "name": attributes["name"],
+                            "size": attributes.get("size"),
+                            "trumpable": attributes.get("trumpable", False),
+                            "link": attributes.get("details_link", None),
                         }
                     dupes.append(result)
 

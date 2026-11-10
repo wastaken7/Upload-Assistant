@@ -982,7 +982,8 @@ class Orpheus:
         if not isinstance(decoded, dict) or b"info" not in decoded:
             logger.warning(f"{self.tracker}: [yellow]Orpheus did not return a torrent file; seeding the local torrent.[/yellow]")
             return False
-        comment = decoded.get(b"comment", b"")
+        decoded_dict = cast(dict[bytes, object], decoded)
+        comment = decoded_dict.get(b"comment", b"")
         status["torrent_link"] = comment.decode("utf-8", "replace") if isinstance(comment, bytes) and comment else f"{self.torrent_url}{torrent_id}"
         status["torrent_source"] = "site"
         return True

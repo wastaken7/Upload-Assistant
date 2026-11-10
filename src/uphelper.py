@@ -6,7 +6,7 @@ import sys
 from collections.abc import Callable, Mapping
 from difflib import SequenceMatcher
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, TypeIs, cast
 
 import aiofiles
 import cli_ui
@@ -28,6 +28,14 @@ from src.trackersetup import tracker_class_map
 DupeEntry = dict[str, Any]
 
 
+def _is_str_dict(val: object) -> TypeIs[dict[str, object]]:
+    return isinstance(val, dict)
+
+
+def _is_obj_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
+
+
 def _missing_with_hint(missing_warning: str, hint: str) -> str:
     return f"{missing_warning} [yellow][italic]{hint}[/italic][/yellow]"
 
@@ -44,22 +52,27 @@ def _music_confirmation_lines(meta: Meta, missing_warning: str) -> list[tuple[st
     should expose the important parts of that analysis without printing local
     paths, complete tags, or an unbounded list of warnings.
     """
-    release = meta.music_release if isinstance(meta.music_release, dict) else {}
-    fields = release.get("fields", {}) if isinstance(release.get("fields"), dict) else {}
-    tracks = release.get("tracks", []) if isinstance(release.get("tracks"), list) else []
-    auxiliary = release.get("auxiliary", {}) if isinstance(release.get("auxiliary"), dict) else {}
-    warnings = release.get("warnings", []) if isinstance(release.get("warnings"), list) else []
-    conflicts = release.get("conflicts", {}) if isinstance(release.get("conflicts"), dict) else {}
+    release = meta.music_release if _is_str_dict(meta.music_release) else {}
+    raw_fields = release.get("fields")
+    fields: dict[str, object] = raw_fields if _is_str_dict(raw_fields) else {}
+    raw_tracks = release.get("tracks")
+    tracks: list[object] = raw_tracks if _is_obj_list(raw_tracks) else []
+    raw_aux = release.get("auxiliary")
+    auxiliary: dict[str, object] = raw_aux if _is_str_dict(raw_aux) else {}
+    raw_warn = release.get("warnings")
+    warnings: list[object] = raw_warn if _is_obj_list(raw_warn) else []
+    raw_conflicts = release.get("conflicts")
+    conflicts: dict[str, object] = raw_conflicts if _is_str_dict(raw_conflicts) else {}
 
-    def value(name: str, fallback: Any = "") -> Any:
-        entry = fields.get(name, {})
-        if isinstance(entry, dict) and entry.get("value") not in (None, "", [], {}):
+    def value(name: str, fallback: object = "") -> object:
+        entry = fields.get(name) if _is_str_dict(fields) else None
+        if _is_str_dict(entry) and entry.get("value") not in (None, "", [], {}):
             return entry["value"]
         return fallback
 
     def source(name: str) -> str:
-        entry = fields.get(name, {})
-        source_name = entry.get("source", "") if isinstance(entry, dict) else ""
+        entry = fields.get(name) if _is_str_dict(fields) else None
+        source_name = entry.get("source", "") if _is_str_dict(entry) else ""
         return {
             "file_tag": "tags",
             "auxiliary": "auxiliary files",
@@ -70,18 +83,24 @@ def _music_confirmation_lines(meta: Meta, missing_warning: str) -> list[tuple[st
             "inferred": "inferred",
         }.get(str(source_name), "")
 
-    def display(name: str, fallback: Any = "") -> str:
+    def display(name: str, fallback: object = "") -> str:
         item = value(name, fallback)
         if item is None:
             item = ""
-        if isinstance(item, list):
+        if _is_obj_list(item):
             item = " & ".join(str(part) for part in item)
         text = str(item).strip()
         provenance = source(name)
         return escape(text) + (f" [dim]({provenance})[/dim]" if text and provenance else "")
 
-    def technical_values(key: str, formatter: Callable[[Any], str]) -> str:
-        values = sorted({track.get(key) for track in tracks if isinstance(track, dict) and track.get(key) not in (None, "")})
+    def technical_values(key: str, formatter: Callable[[object], str]) -> str:
+        unique_vals: set[str] = set()
+        for track in tracks:
+            if _is_str_dict(track):
+                val = track.get(key)
+                if val not in (None, ""):
+                    unique_vals.add(str(val))
+        values = sorted(unique_vals)
         if not values:
             return ""
         rendered = [formatter(item) for item in values]
@@ -96,9 +115,9 @@ def _music_confirmation_lines(meta: Meta, missing_warning: str) -> list[tuple[st
     formats = technical_values("format", str)
     codecs = technical_values("codec", str)
     bit_depth = technical_values("bit_depth", lambda item: f"{item}-bit")
-    sample_rate = technical_values("sample_rate", lambda item: f"{int(item) / 1000:g} kHz")
-    channels = technical_values("channels", lambda item: {1: "Mono", 2: "Stereo"}.get(int(item), f"{item} channels"))
-    bitrate = technical_values("bitrate", lambda item: f"{round(int(item) / 1000)} kbps")
+    sample_rate = technical_values("sample_rate", lambda item: f"{int(str(item)) / 1000:g} kHz")
+    channels = technical_values("channels", lambda item: {1: "Mono", 2: "Stereo"}.get(int(str(item)), f"{item} channels"))
+    bitrate = technical_values("bitrate", lambda item: f"{round(int(str(item)) / 1000)} kbps")
     # Container and codec are commonly both "FLAC"; repeating them adds no
     # review value, while different values (for example M4A / AAC) stay clear.
     if formats.casefold() == codecs.casefold():
@@ -142,20 +161,21 @@ def _music_confirmation_lines(meta: Meta, missing_warning: str) -> list[tuple[st
         artwork = "not found (optional for Orpheus)"
     lines.append(("Artwork", artwork))
 
-    sidecars = []
+    sidecars: list[str] = []
     for label, key in (("log", "logs"), ("cue", "cues"), ("NFO", "nfos"), ("playlist", "playlists"), ("SFV", "sfvs"), ("artwork", "artwork"), ("scan", "scans")):
-        count = len(auxiliary.get(key, [])) if isinstance(auxiliary.get(key, []), list) else 0
+        aux_val = auxiliary.get(key) if _is_str_dict(auxiliary) else None
+        count = len(aux_val) if isinstance(aux_val, list) else 0
         if count:
             sidecars.append(f"{count} {label}{'' if count == 1 else 's'}")
     if sidecars:
         lines.append(("Auxiliary", ", ".join(sidecars)))
 
     if conflicts:
-        names = ", ".join(str(name).replace("_", " ") for name in sorted(conflicts)[:5])
+        names = ", ".join(str(name).replace("_", " ") for name in sorted(conflicts.keys())[:5])
         extra = f" (+{len(conflicts) - 5})" if len(conflicts) > 5 else ""
         lines.append(("Metadata conflicts", f"[yellow]{escape(names)}{extra}[/yellow]"))
     if warnings:
-        preview = "; ".join(str(item) for item in warnings[:3])
+        preview = "; ".join(str(item_obj) for item_obj in warnings[:3])
         extra = f" (+{len(warnings) - 3} more)" if len(warnings) > 3 else ""
         lines.append(("Music validation", f"[yellow]{escape(preview)}{extra}[/yellow]"))
     return lines
@@ -388,7 +408,7 @@ class UploadHelper:
             rules_url=decision.rules_url,
             source_size=meta.source_size,
         )
-        gui_off = {"highlighter": None, "ua_gui": False}
+        gui_off: dict[str, object] = {"highlighter": None, "ua_gui": False}
 
         def line(markup: str = "") -> None:
             logger.info(f"{bar} {markup}" if markup else bar, extra=gui_off)
@@ -484,13 +504,14 @@ class UploadHelper:
 
         def _format_dupes_list(entries: list[Any]) -> str:
             seen: set[str] = set()
-            formatted = []
+            formatted: list[str] = []
             for entry in entries:
-                if isinstance(entry, dict) and entry.get("link"):
+                if _is_str_dict(entry):
                     link = entry.get("link")
-                    if link in seen:
-                        continue
-                    seen.add(link)
+                    if isinstance(link, str) and link:
+                        if link in seen:
+                            continue
+                        seen.add(link)
                 formatted.append(_format_dupe(entry))
             return "\n".join(formatted)
 
@@ -579,7 +600,7 @@ class UploadHelper:
                 trumpable_text = _format_dupe(selected_match)
                 logger.info("[bold red]Trumpable found based on episode matching![/bold red]", extra={"ua_gui": False})
                 match_note = f"No release found with matching tag '{meta.tag}'. Selected release may be from a different group." if user_tag and not tag_matched else None
-                webui_events.dupes(tracker_name, [selected_match], source_size=meta.source_size, trumpable=True, note=match_note)
+                webui_events.dupes(tracker_name, [selected_match], source_size=meta.source_size, trumpable=True, note=match_note or "")
 
                 if user_tag and not tag_matched:
                     logger.info(f"[yellow]Note: No release found with matching tag '{meta.tag}'. Selected release may be from a different group.[/yellow]")
@@ -797,7 +818,7 @@ class UploadHelper:
         """Publish resolved release flags and review metadata before continuing."""
         # Changes from an earlier answer would no longer match this release's previews.
         meta.payload_edits = {}
-        webui_events.update_item(personal_release=meta.personalrelease is True, run_options=meta, artwork=meta)
+        webui_events.update_item(personal_release=meta.personalrelease is True, run_options=dict(meta), artwork=dict(meta))
         confirm: bool = False
         lines: list[str | tuple[str, str]] = []
         missing_warning = "[bold red]⚠️ Missing[/bold red]"
@@ -889,8 +910,6 @@ class UploadHelper:
             poster = "Found" if bool(meta.artwork_url or meta.artwork_path) else _missing_with_hint(missing_warning, "Use --poster.")
             igdb_id = meta.igdb_id or "0"
             steam_url = meta.steam_url
-            languages = len(meta.languages) if meta.languages else _missing_with_hint(missing_warning, "Check game metadata or use --igdb.")
-
             lines.append(("Subcategory", game_subcategory))
             lines.append(("Version", version))
             if notes:
@@ -903,14 +922,19 @@ class UploadHelper:
                 lines.append(("IGDB", str(igdb_id)))
             if steam_url:
                 lines.append(("Steam", steam_url))
-            if languages:
-                if isinstance(languages, dict):
-                    lang_summary = ", ".join(f"{lang} ({'/'.join(supports)})" for lang, supports in languages.items())
-                elif isinstance(languages, list):
-                    lang_summary = ", ".join(languages)
+            if meta.languages:
+                if isinstance(meta.languages, dict):
+                    lang_items: list[str] = []
+                    for lang, supports in meta.languages.items():
+                        lang_items.append(f"{lang} ({'/'.join(supports)})")
+                    lang_summary = ", ".join(lang_items)
+                elif isinstance(meta.languages, list):
+                    lang_summary = ", ".join(meta.languages)
                 else:
-                    lang_summary = str(languages)
+                    lang_summary = str(meta.languages)
                 lines.append(("Languages", lang_summary))
+            else:
+                lines.append(("Languages", _missing_with_hint(missing_warning, "Check game metadata or use --igdb.")))
 
         elif meta.category == "XXX":
             source = ""
@@ -1119,7 +1143,7 @@ class UploadHelper:
             changed = confirm_options.apply(meta, run_options, option_values)
             if changed:
                 logger.info(f"[green]Options changed in the Web UI:[/green] {escape(', '.join(changed))}")
-                webui_events.update_item(personal_release=meta.personalrelease is True, run_options=meta)
+                webui_events.update_item(personal_release=meta.personalrelease is True, run_options=dict(meta))
         if confirm and payload_edits:
             # Applied at upload time, after the options above, so they win for that tracker.
             for change in payload_preview.accept_edits(meta, payload_previews, payload_edits):

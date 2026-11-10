@@ -1,12 +1,16 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import uuid
-from typing import Any, cast
+from typing import Any, TypeIs
 
 import httpx
 
 from src.bbcode import BBCODE
 from src.console import logger
 from src.meta import Meta
+
+
+def _is_str_dict(value: object) -> TypeIs[dict[str, Any]]:
+    return isinstance(value, dict)
 
 
 class BtnIdManager:
@@ -20,7 +24,7 @@ class BtnIdManager:
             return 0, 0
         logger.debug("Fetching BTN data...", extra={"markup": False})
         post_query_url = api_url
-        post_data = {"id": (await BtnIdManager.generate_guid())[:8], "method": "getTorrentById", "params": {"key": btn_api, "id": str(btn_id).strip()}}
+        post_data: dict[str, Any] = {"id": (await BtnIdManager.generate_guid())[:8], "method": "getTorrentById", "params": {"key": btn_api, "id": str(btn_id).strip()}}
         headers = {"Content-Type": "application/json"}
 
         try:
@@ -37,13 +41,13 @@ class BtnIdManager:
             logger.info(f"[ERROR] Failed to fetch BTN data: {e}", extra={"markup": False})
             return 0, 0
 
-        if not isinstance(data, dict):
+        if not _is_str_dict(data):
             logger.info("[ERROR] BTN API response is empty or invalid.", extra={"markup": False})
             return 0, 0
 
         error = data.get("error")
-        if isinstance(error, dict):
-            error_map = cast(dict[str, Any], error)
+        if _is_str_dict(error):
+            error_map = error
             code = error_map.get("code", "unknown")
             message = str(error_map.get("message", "Unknown BTN API error"))
             if code == -32004:
@@ -57,7 +61,7 @@ class BtnIdManager:
         logger.debug(f"[green]BTN data fetched successfully for BTN ID {data.get('id')}[/green]")
 
         result = data.get("result")
-        if isinstance(result, dict):
+        if _is_str_dict(result):
             try:
                 return int(result.get("ImdbID") or 0), int(result.get("TvdbID") or 0)
             except TypeError, ValueError:
@@ -81,7 +85,7 @@ class BtnIdManager:
         logger.debug("Fetching BEYONDHD data...", extra={"markup": False})
         post_query_url = f"https://beyond-hd.me/api/torrents/{bhd_api}"
 
-        post_data = {"action": "details", "torrent_id": torrent_id} if torrent_id is not None else {"action": "search", "rsskey": bhd_rss_key}
+        post_data: dict[str, Any] = {"action": "details", "torrent_id": torrent_id} if torrent_id is not None else {"action": "search", "rsskey": bhd_rss_key}
 
         if info_hash:
             post_data["info_hash"] = info_hash
@@ -135,7 +139,7 @@ class BtnIdManager:
         # Check if description is just "1" indicating we need to fetch it separately
         description_value = first_result.get("description")
         if description_value == 1 or description_value == "1":
-            desc_post_data = {
+            desc_post_data: dict[str, Any] = {
                 "action": "description",
                 "torrent_id": torrent_id,
             }

@@ -1,7 +1,7 @@
 """Tracker-scoped image collections used during concurrent uploads."""
 
 from collections.abc import Sequence
-from typing import Any, Literal
+from typing import Any, Literal, TypeIs
 
 from src.meta import Meta
 
@@ -9,9 +9,17 @@ ImageCollection = Literal["screenshots", "menu_images", "spectrograms_images", "
 ImageDict = dict[str, Any]
 
 
-def normalize_image_tags(value: Any) -> list[str]:
+def _is_str_dict(val: object) -> TypeIs[dict[str, Any]]:
+    return isinstance(val, dict)
+
+
+def _is_obj_collection(val: object) -> TypeIs[list[object] | tuple[object, ...] | set[object]]:
+    return isinstance(val, (list, tuple, set))
+
+
+def normalize_image_tags(value: object) -> list[str]:
     """Return stable, case-insensitive image tags without duplicates."""
-    if not isinstance(value, (list, tuple, set)):
+    if not _is_obj_collection(value):
         return []
     result: list[str] = []
     for tag in value:
@@ -35,18 +43,21 @@ def image_tags(meta: Meta, *, custom: bool = False) -> list[str]:
     return tags
 
 
-def image_tag_policy(config: Any, tracker: str, required_tags: Any = None) -> tuple[list[str], list[str]]:
+def image_tag_policy(config: object, tracker: str, required_tags: object = None) -> tuple[list[str], list[str]]:
     """Read a tracker's optional image tag whitelist and blacklist."""
-    if not isinstance(config, dict):
+    if not _is_str_dict(config):
         return [], []
-    tracker_config = config.get("TRACKERS", {}).get(tracker, {})
-    if not isinstance(tracker_config, dict):
+    trackers_raw = config.get("TRACKERS", {})
+    if not _is_str_dict(trackers_raw):
         return [], []
-    whitelist = normalize_image_tags(tracker_config.get("image_tag_whitelist"))
+    tracker_config_raw = trackers_raw.get(tracker, {})
+    if not _is_str_dict(tracker_config_raw):
+        return [], []
+    whitelist = normalize_image_tags(tracker_config_raw.get("image_tag_whitelist"))
     for tag in normalize_image_tags(required_tags):
         if tag not in whitelist:
             whitelist.append(tag)
-    return whitelist, normalize_image_tags(tracker_config.get("image_tag_blacklist"))
+    return whitelist, normalize_image_tags(tracker_config_raw.get("image_tag_blacklist"))
 
 
 def image_matches_tag_policy(image: ImageDict, whitelist: list[str], blacklist: list[str]) -> bool:
@@ -59,21 +70,20 @@ def image_matches_tag_policy(image: ImageDict, whitelist: list[str], blacklist: 
     return set(whitelist).issubset(tags) and not tags.intersection(blacklist)
 
 
-_BASE_COLLECTION_FIELDS: dict[ImageCollection, str] = {
-    "screenshots": "image_list",
-    "menu_images": "menu_images",
-    "spectrograms_images": "spectrograms_images",
-    "dynamic_hdr_plot_images": "dynamic_hdr_plot_images",
-}
-
-
-def get_tracker_image_collection(meta: Meta, tracker: str, collection: ImageCollection) -> list[Any]:
+def get_tracker_image_collection(meta: Meta, tracker: str, collection: ImageCollection) -> list[ImageDict]:
     """Return a tracker override or the release-wide collection as fallback."""
     tracker_collections = meta.tracker_image_collections.get(tracker, {})
     if collection in tracker_collections:
         return tracker_collections[collection]
-    images = getattr(meta, _BASE_COLLECTION_FIELDS[collection])
-    return images if isinstance(images, list) else []
+    if collection == "screenshots":
+        return meta.image_list
+    if collection == "menu_images":
+        return meta.menu_images
+    if collection == "spectrograms_images":
+        return meta.spectrograms_images
+    if collection == "dynamic_hdr_plot_images":
+        return meta.dynamic_hdr_plot_images
+    return []
 
 
 def has_tracker_image_collection(meta: Meta, tracker: str, collection: ImageCollection) -> bool:

@@ -6,16 +6,6 @@ import time
 from pathlib import Path
 from typing import Any, BinaryIO
 
-try:
-    import fcntl
-except ImportError:
-    fcntl = None
-
-try:
-    import msvcrt
-except ImportError:
-    msvcrt = None
-
 from defusedxml import ElementTree
 
 from src.meta import Meta
@@ -154,24 +144,27 @@ def _get_api_hit_counter_lock_path(base_dir: str, tracker: str) -> Path:
 
 
 def _lock_api_hit_counter_file(lock_file: BinaryIO) -> None:
-    if msvcrt is not None:
+    if os.name == "nt":
+        import msvcrt
+
         lock_file.seek(0)
         msvcrt.locking(lock_file.fileno(), msvcrt.LK_NBLCK, 1)
         return
-    if fcntl is not None:
-        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)  # type: ignore
-        return
-    raise RuntimeError("No supported file locking mechanism is available")
+    import fcntl
+
+    fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
 
 
 def _unlock_api_hit_counter_file(lock_file: BinaryIO) -> None:
-    if msvcrt is not None:
+    if os.name == "nt":
+        import msvcrt
+
         lock_file.seek(0)
         msvcrt.locking(lock_file.fileno(), msvcrt.LK_UNLCK, 1)
         return
-    if fcntl is not None:
-        fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)  # type: ignore
-        return
+    import fcntl
+
+    fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
 
 
 def _acquire_api_hit_counter_lock(lock_path: Path) -> BinaryIO:

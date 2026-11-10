@@ -137,7 +137,7 @@ async def export_info(
             if is_dvd and track_type in ("Audio", "Text") and is_unmapped_dvd_track(track):
                 continue
             if track_type == "General":
-                general_track = {
+                general_track: dict[str, Any] = {
                     "@type": track_type,
                     "UniqueID": track.get("UniqueID", {}),
                     "VideoCount": track.get("VideoCount", {}),
