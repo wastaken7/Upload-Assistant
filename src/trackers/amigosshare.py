@@ -704,7 +704,7 @@ class AmigosShare:
     def title_case_from_release(self, meta: Meta, title: str) -> str:
         """The derived title with the case of the release name.
 
-        The site lowercases articles it reads from the file names (``City.of.God.The…`` becomes ``the``) and then
+        The site lowercases articles it reads from the file names (``Harbor.of.Ash.The…`` becomes ``the``) and then
         refuses those same files because they no longer match the name."""
         words = title.split()
         match = re.search(r"[. ]".join(map(re.escape, words)), str(meta.uuid), re.IGNORECASE) if words else None
@@ -736,10 +736,18 @@ class AmigosShare:
         if status != 200 or not _is_str_dict(checked):
             tracker_status["status_message"] = f"data error - The site could not name the release: {error_text(checked, f'HTTP {status}')}"
             return None
-        analysis = cast(dict[str, Any], checked.get("analysis") or {})
-        findings = cast(list[dict[str, Any]], analysis.get("findings") or [])
+        analysis: object = checked.get("analysis") or {}
+        findings: object = (analysis.get("findings") or []) if _is_str_dict(analysis) else None
+        problems: object = checked.get("problems") or {}
+        attributes: object = checked.get("attributes") or {}
+        if not (
+            _is_str_dict(analysis) and _is_obj_list(findings) and all(_is_str_dict(finding) for finding in findings) and _is_str_dict(problems) and _is_str_dict(attributes)
+        ):
+            tracker_status["status_message"] = "data error - The site could not name the release: unexpected response from the name check."
+            return None
+        findings = cast(list[dict[str, Any]], findings)
         blocking = [str(finding.get("message")) for finding in findings if finding.get("severity") == "bloqueio"]
-        blocking = blocking or [str(message) for message in cast(dict[str, Any], checked.get("problems") or {}).values()]
+        blocking = blocking or [str(message) for message in problems.values()]
         for finding in findings:
             if finding.get("severity") != "bloqueio":
                 logger.info(f"{self.tracker}: {finding.get('message')}", extra={"markup": False})

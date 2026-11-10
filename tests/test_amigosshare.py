@@ -212,7 +212,13 @@ def test_search_existing_turns_badges_into_release_terms(tmp_path: Path) -> None
     props = {
         "torrents": {
             "data": [
-                {"id": 7, "name": "Fictional Film (Original Film)", "year": 2001, "size": 1000, "badges": [{"kind": "resolution", "label": "4K"}, {"kind": "source", "label": "WEB-DL"}]}
+                {
+                    "id": 7,
+                    "name": "Fictional Film (Original Film)",
+                    "year": 2001,
+                    "size": 1000,
+                    "badges": [{"kind": "resolution", "label": "4K"}, {"kind": "source", "label": "WEB-DL"}],
+                }
             ],
             "next_page_url": None,
         }
@@ -323,7 +329,9 @@ def _multipart(request: httpx.Request) -> dict[str, str]:
     return fields
 
 
-def _upload_handler(final: httpx.Response, *, fields: dict[str, Any] | None = None, findings: list[dict[str, str]] | None = None, name_checks: list[dict[str, str]] | None = None) -> Any:
+def _upload_handler(
+    final: httpx.Response, *, fields: dict[str, Any] | None = None, findings: list[dict[str, str]] | None = None, name_checks: list[dict[str, str]] | None = None
+) -> Any:
     lookup = {
         "type": "movie",
         "imdbId": "tt1234567",
@@ -460,7 +468,13 @@ def test_debug_mode_does_not_upload_images_or_the_form(tmp_path: Path, monkeypat
 
     assert asyncio.run(tracker.upload(meta)) is True
     # The name check only previews the name; nothing is stored on the site.
-    assert [request.url.path for request in requests] == ["/torrents/upload", "/torrents/lookup", "/torrents/mediainfo", "/torrents/upload/video/name", "/torrents/upload/video/name"]
+    assert [request.url.path for request in requests] == [
+        "/torrents/upload",
+        "/torrents/lookup",
+        "/torrents/mediainfo",
+        "/torrents/upload/video/name",
+        "/torrents/upload/video/name",
+    ]
 
 
 def test_lookup_of_a_series_is_refused_for_a_movie(tmp_path: Path) -> None:
@@ -499,7 +513,7 @@ def test_requests_are_read_from_the_requests_page(tmp_path: Path) -> None:
 def test_series_send_their_own_season_and_episode(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, episode: str, tv_pack: bool, expected: tuple[str, str]) -> None:
     """The site read S01E01 off the first file of a season pack."""
     checks: list[dict[str, str]] = []
-    fields = {**NAME_FIELDS, "title": "City of God the Fight Rages On", "season": 1, "episode": "01"}
+    fields = {**NAME_FIELDS, "title": "Harbor of Ash the Long Night", "season": 1, "episode": "01"}
     tracker, _requests = _tracker(_upload_handler(httpx.Response(302, headers={"Location": "https://amigos-share.club/torrents/123"}), fields=fields, name_checks=checks))
     meta = _prepare_upload(tmp_path, monkeypatch, tracker)
     meta.category, meta.season, meta.episode, meta.tv_pack = "TV", "S01", episode, tv_pack
@@ -507,21 +521,21 @@ def test_series_send_their_own_season_and_episode(tmp_path: Path, monkeypatch: p
 
     lookup = {"type": "series", "imdbId": "tt1234567", "title": "Fictional Show", "year": 2001, "genres": ["Drama"], "language": "Inglês"}
     monkeypatch.setattr(tracker, "lookup_imdb", AsyncMock(return_value=lookup))
-    monkeypatch.setattr(asc_module.AmigosShare, "title_case_from_release", lambda _self, _meta, _title: "City of God The Fight Rages On")
+    monkeypatch.setattr(asc_module.AmigosShare, "title_case_from_release", lambda _self, _meta, _title: "Harbor of Ash The Long Night")
 
     assert asyncio.run(tracker.get_data(meta)) is not None
     assert "release[season]" not in checks[0]
     assert (checks[1]["release[season]"], checks[1]["release[episode]"]) == expected
     assert checks[1]["release[year]"] == "2001"
-    assert checks[1]["release[title]"] == "City of God The Fight Rages On"
+    assert checks[1]["release[title]"] == "Harbor of Ash The Long Night"
 
 
 @pytest.mark.parametrize(
     ("title", "uuid", "expected"),
     [
-        ("City of God the Fight Rages On", "City.of.God.The.Fight.Rages.On.S01.2160p.HMAX.WEB-DL-FRNcR", "City of God The Fight Rages On"),
+        ("Harbor of Ash the Long Night", "Harbor.of.Ash.The.Long.Night.S01.2160p.HMAX.WEB-DL-FAKEGRP", "Harbor of Ash The Long Night"),
         ("Fictional Film", "Fictional.Film.2001.1080p.WEB-DL-FAKEGRP.mkv", "Fictional Film"),
-        ("Cidade de Deus", "City.of.God.S01.2160p-FRNcR", "Cidade de Deus"),
+        ("Porto das Cinzas", "Harbor.of.Ash.S01.2160p-FAKEGRP", "Porto das Cinzas"),
         ("", "Anything", ""),
     ],
 )
@@ -537,6 +551,33 @@ def test_a_blocked_name_stops_before_screenshots_and_the_form(tmp_path: Path, mo
 
     assert asyncio.run(tracker.upload(meta)) is False
     assert meta.tracker_status["AMIGOSSHARE"]["status_message"] == "data error - The site blocks the release name: Informe o grupo do release."
+    assert not {"/torrents/screenshots", "/torrents/upload/video"} & {request.url.path for request in requests}
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"analysis": ["blocked"]},
+        {"analysis": {"blocked": False, "findings": {"severity": "bloqueio"}}},
+        {"analysis": {"blocked": False, "findings": ["bloqueio"]}},
+        {"problems": ["x"]},
+        {"attributes": ["x"]},
+    ],
+)
+def test_a_malformed_name_check_is_a_data_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, changes: dict[str, Any]) -> None:
+    base = _upload_handler(httpx.Response(500))
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        response = base(request)
+        if request.url.path == "/torrents/upload/video/name":
+            return httpx.Response(200, json={**response.json(), **changes})
+        return response
+
+    tracker, requests = _tracker(handler)
+    meta = _prepare_upload(tmp_path, monkeypatch, tracker)
+
+    assert asyncio.run(tracker.upload(meta)) is False
+    assert meta.tracker_status["AMIGOSSHARE"]["status_message"] == "data error - The site could not name the release: unexpected response from the name check."
     assert not {"/torrents/screenshots", "/torrents/upload/video"} & {request.url.path for request in requests}
 
 
