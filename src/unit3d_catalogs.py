@@ -21,6 +21,8 @@ def expand_catalog_section(catalog: dict[str, Any], default: dict[str, Any], sec
     baseline = default.get(section, {})
     default_ids_obj: object = catalog.get("default_ids")
     references_raw: object = []
+    if default_ids_obj is not None and not _is_obj_dict(default_ids_obj):
+        raise ValueError("default_ids must be an object")
     if _is_obj_dict(default_ids_obj):
         references_raw = default_ids_obj.get(section, [])
     if not isinstance(references_raw, list):

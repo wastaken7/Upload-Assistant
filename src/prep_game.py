@@ -704,7 +704,7 @@ def _igdb_multiplayer_modes(items: Any) -> dict[str, list[str]]:
             capabilities.append(f"Online co-op (up to {maximum})" if isinstance(maximum, int) and maximum > 0 else "Online co-op")
         online_max = item_dict.get("onlinemax")
         if isinstance(online_max, int) and online_max > 0:
-            capabilities.append(f"Offline multiplayer (up to {online_max})")
+            capabilities.append(f"Online multiplayer (up to {online_max})")
         if item_dict.get("splitscreen"):
             capabilities.append("Split-screen")
         if item_dict.get("splitscreenonline"):

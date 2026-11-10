@@ -1617,7 +1617,7 @@ class DescriptionBuilder:
             "external_ids": "External IDs" if not use_pt_br else "IDs Externos",
         }
         text.update(get_labels(MUSIC_LABELS, self.language))
-        external_id_labels: dict[str, str] = text["external_id_labels"] if isinstance(text.get("external_id_labels"), dict) else {}
+        external_id_labels = cast(dict[str, str], text["external_id_labels"])
 
         def musicbrainz_link(kind: str, identifier: Any) -> str:
             """Return a safe MusicBrainz BBCode link for a canonical UUID."""
