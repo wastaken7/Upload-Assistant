@@ -4,3 +4,4 @@ venv/
 .venv/
 web_ui/static/js/node_modules/
 web_ui/static/js/web_ui/
+web_ui/static/js/vendor/
