@@ -1197,8 +1197,8 @@ async def search_metadata(
                     meta.tvmaze_id = ids["tvmaze_id"]
                 if meta.tmdb_id == 0 and ids["tmdb_id"] is not None:
                     meta.tmdb_id = ids["tmdb_id"]
-                if meta.manual_year == 0 and ids["year"] is not None:
-                    meta.manual_year = ids["year"]
+                if ids["year"] is not None:
+                    meta.arr_year = ids["year"]
             else:
                 ids = None
 
@@ -1214,8 +1214,8 @@ async def search_metadata(
                     meta.imdb_id = ids["imdb_id"]
                 if meta.tmdb_id == 0 and ids["tmdb_id"] is not None:
                     meta.tmdb_id = ids["tmdb_id"]
-                if meta.manual_year == 0 and ids["year"] is not None:
-                    meta.manual_year = ids["year"]
+                if ids["year"] is not None:
+                    meta.arr_year = ids["year"]
             else:
                 ids = None
 
@@ -1253,8 +1253,8 @@ async def search_metadata(
                     meta.tvmaze_id = ids["tvmaze_id"]
                 if meta.tmdb_id == 0 and ids["tmdb_id"] is not None:
                     meta.tmdb_id = ids["tmdb_id"]
-                if meta.manual_year == 0 and ids["year"] is not None:
-                    meta.manual_year = ids["year"]
+                if ids["year"] is not None:
+                    meta.arr_year = ids["year"]
             else:
                 ids = None
 
@@ -1270,8 +1270,8 @@ async def search_metadata(
                     meta.imdb_id = ids["imdb_id"]
                 if meta.tmdb_id == 0 and ids["tmdb_id"] is not None:
                     meta.tmdb_id = ids["tmdb_id"]
-                if meta.manual_year == 0 and ids["year"] is not None:
-                    meta.manual_year = ids["year"]
+                if ids["year"] is not None:
+                    meta.arr_year = ids["year"]
             else:
                 ids = None
 
@@ -1340,7 +1340,8 @@ async def search_metadata(
 
     # run a search to find tmdb and imdb ids if we don't have them
     if int(meta.tmdb_id or 0) == 0 and int(meta.imdb_id or 0) == 0 and meta.category not in ("BOOK", "GAME", "XXX"):
-        year = meta.manual_year or meta.search_year or meta.year if meta.category == "TV" else meta.manual_year or meta.year or meta.search_year
+        detected_year = meta.search_year or meta.year if meta.category == "TV" else meta.year or meta.search_year
+        year = meta.manual_year or meta.arr_year or detected_year
         year_value = _normalize_search_year(year)
         category_pref = meta.category or ""
         tmdb_task: asyncio.Task[tuple[int, str]] = asyncio.create_task(

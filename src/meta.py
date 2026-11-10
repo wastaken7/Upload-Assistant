@@ -328,6 +328,8 @@ class Meta:
     manual_source: str | None = None
     manual_type: str | None = None
     manual_year: int = 0
+    # Series/movie year reported by Sonarr/Radarr; a search hint only, unlike --year (manual_year).
+    arr_year: int = 0
     manual: bool = False
     matched_episode_ids: int | None = None
     matched_tracker: str = ""
