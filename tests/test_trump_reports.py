@@ -15,10 +15,11 @@ from src.slot_rules.models import SlotDecision, Verdict
 from src.slot_rules.profile import ReleaseProfile
 from src.trackers.UNIT3D.aither import Aither
 from src.trackers.UNIT3D.lst import LST
+from src.trackers.UNIT3D.ulcx import ULCX
 from src.trump_reports import ReviewOutcome, TrumpCandidate, TrumpPlan, TrumpSupport
 from src.uphelper import UploadHelper
 
-CONFIG: dict[str, Any] = {"DEFAULT": {}, "TRACKERS": {"AITHER": {"api_key": "fake-key"}, "LST": {"api_key": "fake-key"}}}
+CONFIG: dict[str, Any] = {"DEFAULT": {}, "TRACKERS": {"AITHER": {"api_key": "fake-key"}, "LST": {"api_key": "fake-key"}, "ULCX": {"api_key": "fake-key"}}}
 OLD_FILES = ["Fictional.Feature.2020.1080p.WEB-DL.H.264-OLDGRP.mkv", "Fictional.Feature.2020.1080p.WEB-DL.H.264-OLDGRP.srt"]
 OLD = {"name": "Fictional Feature 2020 1080p WEB-DL H.264-OLDGRP", "id": 11, "link": "https://example.invalid/torrents/11", "size": 100, "files": OLD_FILES}
 
@@ -494,6 +495,32 @@ def test_lst_refuses_a_non_numeric_torrent_id(fake_http: type[FakeClient]) -> No
 
     assert submitted(meta)["LST"] is False
     assert [url for url, _payload, _headers in fake_http.posts] == ["https://aither.cc/api/trumping-reports/create"]
+
+
+@pytest.mark.parametrize(
+    ("reason", "category"),
+    [(trump_reports.SEASON_PACK, "season_pack_trump"), (trump_reports.SLOT_RULES, "trump_quality"), (trump_reports.TRUMPABLE, "trump_quality")],
+)
+def test_ulcx_reports_the_trumped_torrent_with_a_link_to_the_upload(fake_http: type[FakeClient], reason: str, category: str) -> None:
+    plan = TrumpPlan("ULCX", "31", OLD["name"], reason, note="Better encode")
+    meta = Meta({"ua_name": "Upload Assistant", "trump_plans": {"ULCX": plan.to_dict()}, "tracker_status": {"ULCX": {"upload": True, "torrent_id": 701}}})
+
+    assert asyncio.run(trump_reports.submit_reports(meta, CONFIG, {"ULCX": ULCX})) == {"ULCX": True}
+
+    ((url, payload, headers),) = fake_http.posts
+    assert url == "https://upload.cx/api/torrents/31/reports"
+    assert payload["category"] == category
+    assert payload["link"] == "https://upload.cx/torrents/701"
+    assert payload["message"].endswith(" - Better encode")
+    assert headers["Authorization"] == "Bearer fake-key"
+
+
+def test_ulcx_refuses_a_non_numeric_torrent_id(fake_http: type[FakeClient]) -> None:
+    plan = TrumpPlan("ULCX", "None", OLD["name"], trump_reports.TRUMPABLE)
+    meta = Meta({"trump_plans": {"ULCX": plan.to_dict()}, "tracker_status": {"ULCX": {"upload": True, "torrent_id": 701}}})
+
+    assert asyncio.run(trump_reports.submit_reports(meta, CONFIG, {"ULCX": ULCX})) == {"ULCX": False}
+    assert fake_http.posts == []
 
 
 # --- manager to submission ------------------------------------------------------

@@ -11,6 +11,7 @@ from src.get_name import build_name_components
 from src.meta import Meta
 from src.trackers.naming import BLU_NAME_RULES, add_incomplete_pack_marker, build_video_name, with_imdb_title
 from src.trackers.UNIT3D import UNIT3D
+from src.trump_reports import SEASON_PACK, TrumpPlan, TrumpSupport
 
 Config = dict[str, Any]
 ULCX_NAME_RULES = replace(BLU_NAME_RULES, hybrid_on_webdl=False)
@@ -33,13 +34,17 @@ class ULCX(UNIT3D):
     display_name = "ULCX"
     reject_english_original_bloat = True
     base_url = "https://upload.cx"
+    # Fallback when the blocked groups API cannot be reached.
     banned_groups = (
         "4K4U",
         "Alcaide_Kira",
         "AROMA",
+        "BiTOR",
         "d3g",
+        "EDGE2020",
         "EMBER",
         "FGT",
+        "Flights",
         "FnP",
         "FRDS",
         "Grym",
@@ -55,13 +60,16 @@ class ULCX(UNIT3D):
         "NAHOM",
         "Niblets",
         "nikt0",
+        "NuBz",
         "OFT",
         "PHOCiS",
         "PiRaTeS",
         "QxR",
         "R&H",
+        "Ralphy",
         "RARBG",
         "seedpool",
+        "SeeNoEvil",
         "Sicario",
         "SM737",
         "SPDVD",
@@ -78,17 +86,29 @@ class ULCX(UNIT3D):
         "x0r",
         "YIFY",
     )
+    banned_url = f"{base_url}/api/blocked-groups"
     id_url = f"{base_url}/api/torrents/"
     upload_url = f"{base_url}/api/torrents/upload"
     requests_url = f"{base_url}/api/requests/filter"
     search_url = f"{base_url}/api/torrents/filter"
     torrent_url = f"{base_url}/torrents/"
+    # ULCX cannot list existing reports; a trump_quality report needs a reason, so the user can add one.
+    trump_support = TrumpSupport(note=True)
     supported_categories = ("TV", "MOVIE")
     tracker_urls = ("upload.cx",)
 
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name="ULCX")
         self.config = config
+
+    def trump_report_request(self, plan: TrumpPlan, trumping_id: Any, message: str) -> tuple[str, dict[str, Any]]:
+        """POST /api/torrents/:id/reports (wiki 48: Reports & Blocked Groups API)."""
+        reported_id = str(plan.reported_id).strip()
+        if not reported_id.isdigit():
+            raise ValueError(f"invalid reported torrent ID {plan.reported_id!r}")
+        category = "season_pack_trump" if plan.reason == SEASON_PACK else "trump_quality"
+        payload = {"category": category, "link": f"{self.torrent_url}{trumping_id}", "message": message}
+        return f"{self.id_url}{int(reported_id)}/reports", payload
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         keywords = [k.lower() for k in (meta.keywords or [])]
