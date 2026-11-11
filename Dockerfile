@@ -4,10 +4,7 @@ FROM python:3.15
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     git \
-    g++ \
-    cargo \
     ffmpeg \
-    rustc \
     nano \
     ca-certificates \
     curl \
@@ -24,7 +21,7 @@ ENV PYTHONDONTWRITEBYTECODE=1
 RUN python -m venv /venv
 ENV PATH="/venv/bin:$PATH"
 
-RUN pip install --no-cache-dir --upgrade pip==25.3 wheel==0.45.1 requests==2.32.5
+RUN pip install --no-cache-dir --upgrade pip==25.3 wheel==0.45.1
 
 # ── Application setup ────────────────────────────────────────────────
 WORKDIR /Upload-Assistant
@@ -87,7 +84,7 @@ EXPOSE 5000
 # Let Docker send SIGTERM for graceful shutdown (Python handles it in upload.py)
 STOPSIGNAL SIGTERM
 
-# Health check for WebUI mode — ignored when running CLI
+# Health check for WebUI mode — CLI runs report unhealthy; ignore it there
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD curl -sf http://localhost:5000/api/health || exit 1
 

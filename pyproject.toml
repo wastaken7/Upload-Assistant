@@ -72,7 +72,7 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://github.com/wastaken7/Upload-Assistant"
-Documentation = "https://github.com/wastaken7/Upload-Assistant/tree/master/docs"
+Documentation = "https://github.com/wastaken7/Upload-Assistant/tree/development/docs"
 Issues = "https://github.com/wastaken7/Upload-Assistant/issues"
 Source = "https://github.com/wastaken7/Upload-Assistant"
 
