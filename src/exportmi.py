@@ -400,7 +400,7 @@ def validate_mediainfo(meta: Meta, settings: bool = False) -> bool:
         track_names = [str(track.get("@type", "Unknown")) for track in tracks]
         logger.debug(f"[cyan]MediaInfo tracks: {', '.join(track_names)}[/cyan]")
         # A preallocated or partly downloaded file has no readable header, so MediaInfo reports only General.
-        if not any(track.get("@type", "") != "General" for track in tracks):
+        if not any(track.get("@type", "") in ("Video", "Audio") for track in tracks):
             raise UnreadableMediaError(
                 "MediaInfo found no video or audio streams. The file may still be downloading, be preallocated by the torrent client, or be unreadable from this machine."
             )

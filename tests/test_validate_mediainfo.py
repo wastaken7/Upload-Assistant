@@ -27,6 +27,11 @@ def test_general_only_report_is_unreadable_not_no_audio() -> None:
         validate_mediainfo(_meta([{"@type": "General", "UniqueID": "123"}]))
 
 
+def test_subtitles_and_chapters_without_streams_are_unreadable() -> None:
+    with pytest.raises(UnreadableMediaError):
+        validate_mediainfo(_meta([{"@type": "General", "UniqueID": "123"}, {"@type": "Text"}, {"@type": "Menu"}]))
+
+
 def test_video_without_audio_still_reports_no_audio() -> None:
     with pytest.raises(NoAudioMediaError):
         validate_mediainfo(_meta([{"@type": "General", "UniqueID": "123"}, {"@type": "Video"}]))
