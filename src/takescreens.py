@@ -2117,6 +2117,10 @@ async def screenshots(
     try:
         mi_text = await asyncio.to_thread(Path(f"{base_dir}{'/' + 'tmp' + '/'}{folder_id}/MediaInfo.json").read_text, encoding="utf-8")
         mi = json.loads(mi_text)
+        mi_tracks = mi.get("media", {}).get("track", []) if isinstance(mi.get("media"), dict) else []
+        if len(mi_tracks) < 2:
+            logger.error("[red]MediaInfo found no video stream, so screenshots were skipped. The file may be incomplete or unreadable.[/red]")
+            return None
         video_track = mi["media"]["track"][1]
 
         def safe_float(value: Any, default: float = 0.0, field_name: str = "") -> float:
