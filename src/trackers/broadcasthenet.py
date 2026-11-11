@@ -847,6 +847,16 @@ class BroadcasTheNet:
                             if year.isdigit():
                                 return year
 
+        for episode_data in (meta.tmdb_episode_data, meta.tvmaze_episode_data):
+            if isinstance(episode_data, dict):
+                air_date = str(cast(dict[str, Any], episode_data).get("air_date") or "")
+                if len(air_date) >= 4 and air_date[:4].isdigit():
+                    return air_date[:4]
+
+        # The series premiere year only matches the first season; for later
+        # seasons an unknown year is better than a wrong one.
+        if season_int > 1:
+            return ""
         return str(meta.year or meta.get("search_year") or "").strip()
 
     def _verify_autofill(self, data: dict[str, str], meta: Meta, expected_series: str, upload_type: str) -> list[str]:
