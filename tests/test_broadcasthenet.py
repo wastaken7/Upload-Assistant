@@ -430,6 +430,20 @@ def test_btn_verify_autofill_uses_episode_air_date_without_season_data() -> None
     assert btn._verify_autofill(data, meta, "Paper Street Works", "Episode") == []  # noqa: S101
 
 
+def test_btn_verify_autofill_ignores_air_date_of_another_episode() -> None:
+    btn = tracker()
+    # TMDb data still describes the episode requested before TVDb renumbered it
+    meta = Meta(
+        season_int=4,
+        episode_int=3,
+        year=2004,
+        tmdb_episode_data={"air_date": "2010-02-10", "season_number": 1, "episode_number": 40},
+    )
+
+    data = {"artist": "Paper Street Works", "title": "S04E03", "year": "2026"}
+    assert btn._verify_autofill(data, meta, "Paper Street Works", "Episode") == []  # noqa: S101
+
+
 def test_btn_verify_autofill_skips_series_year_for_later_seasons() -> None:
     btn = tracker()
     # Nothing season-specific is known, so the 2004 premiere year must not be enforced for S04
