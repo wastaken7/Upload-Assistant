@@ -588,6 +588,7 @@
     "ptp",
     "ptskit",
     "retroflix",
+    "simurg",
     "speedapp",
     "swarmazon",
     "torrentleech",

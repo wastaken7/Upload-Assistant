@@ -151,7 +151,7 @@ def _clean_description_text(value: Any) -> str:
     return text.replace(r"\"", '"').replace(r"\/", "/")
 
 
-def _book_overview_to_bbcode(value: str) -> str:
+def book_overview_to_bbcode(value: str) -> str:
     """Preserve useful HTML formatting in book synopses from any source."""
     soup = BeautifulSoup(_clean_description_text(value), "html.parser")
 
@@ -1067,7 +1067,7 @@ class DescriptionBuilder:
         str_year = labels["year"]
 
         if overview:
-            overview = _book_overview_to_bbcode(overview)
+            overview = book_overview_to_bbcode(overview)
 
         audible_url = ""
         if asin:

@@ -73,6 +73,10 @@ QUESTION_KEYS: dict[str, KeyInfo] = {
     "passthepopcorn.type": KeyInfo("Release type", ("Feature Film", "Short Film", "Miniseries", "Stand-up Comedy", "Concert", "Movie Collection")),
     "shareisland.distributor": KeyInfo("Disc distributor"),
     "shareisland.region": KeyInfo("Disc region code, e.g. USA"),
+    "simurg.audiobook_type": KeyInfo("Audiobook type", ("Unabridged", "Abridged", "Dramatized")),
+    "simurg.comic_type": KeyInfo("Comic type", ("Comic", "Graphic Novel", "Manga", "Manhwa", "Manhua", "Webtoon")),
+    "simurg.destination": KeyInfo("Publication for the Release: new, a Publication ID, or release:<ID> to add a format to that Release"),
+    "simurg.source": KeyInfo("Source label: Retail, Scan, OCR, Convert or Other (audiobooks: Retail, Scene, WEB, Scan or Other)"),
     "torrenteros.spanish_variant": KeyInfo("Spanish variant of the Spanish track", ("Castellano", "Latino", "Castellano Latino")),
 }
 
