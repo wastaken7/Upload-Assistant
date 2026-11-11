@@ -46,5 +46,9 @@ class NoAudioMediaError(Exception):
     pass
 
 
+class UnreadableMediaError(Exception):
+    """MediaInfo returned no streams, so the file is incomplete or cannot be read."""
+
+
 class UnsupportedSiteCheckError(Exception):
     """The release cannot be checked in site_check mode, so it is skipped."""

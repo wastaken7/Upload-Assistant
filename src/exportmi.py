@@ -7,7 +7,7 @@ from typing import Any, cast
 import aiofiles
 
 from src.console import logger
-from src.exceptions import NoAudioMediaError
+from src.exceptions import NoAudioMediaError, UnreadableMediaError
 from src.mediainfo import MediaInfo
 from src.meta import Meta
 
@@ -399,6 +399,11 @@ def validate_mediainfo(meta: Meta, settings: bool = False) -> bool:
         tracks = mediainfo_data["media"]["track"]
         track_names = [str(track.get("@type", "Unknown")) for track in tracks]
         logger.debug(f"[cyan]MediaInfo tracks: {', '.join(track_names)}[/cyan]")
+        # A preallocated or partly downloaded file has no readable header, so MediaInfo reports only General.
+        if not any(track.get("@type", "") != "General" for track in tracks):
+            raise UnreadableMediaError(
+                "MediaInfo found no video or audio streams. The file may still be downloading, be preallocated by the torrent client, or be unreadable from this machine."
+            )
         has_audio = any(track.get("@type", "") == "Audio" for track in tracks)
 
         if not has_audio:
