@@ -63,7 +63,7 @@ def test_rehosting_discovers_registered_screenshots_after_capture(tmp_path, is_d
         filelist=["source.mkv"],
         is_disc=is_disc,
         category="XXX" if is_contact_sheet else "MOVIE",
-        image_list=[{key: f"https://imgbox.com/{screenshot.name}" for key in ("img_url", "raw_url", "web_url")}],
+        image_list=[dict.fromkeys(("img_url", "raw_url", "web_url"), f"https://imgbox.com/{screenshot.name}")],
     )
     result, retry, _reuploaded = asyncio.run(
         _handle_image_upload(

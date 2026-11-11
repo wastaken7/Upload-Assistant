@@ -120,7 +120,9 @@ def test_candidates_need_a_torrent_id() -> None:
 
 
 def test_slot_rules_candidates_carry_the_rule() -> None:
-    slot = SlotDecision(Verdict.ALLOW, "Replaces", "LST", date(2026, 1, 1), why="DV/HDR takes priority.", conflicts=[OLD], rules_url="https://example.invalid/rules", trump=True)
+    slot = SlotDecision(
+        Verdict.ALLOW, "Replaces", "LST", date(2026, 1, 1), why="DV/HDR takes priority.", conflicts=[OLD], rules_url="https://example.invalid/rules", trump=True
+    )
 
     (found,) = trump_reports.find_candidates(Meta(), "LST", [], slot)
 
@@ -182,8 +184,18 @@ def test_filter_does_not_mark_trumpable_releases_in_another_resolution() -> None
 
 def season_pack_dupes(tracker: str, config: dict[str, Any] | None = None, **episode_fields: Any) -> tuple[list[Any], Meta]:
     """Filter one same-season episode and one existing season pack for a season pack upload."""
-    meta = Meta(name="Fictional Show S01 1080p WEB-DL H.264-NEWGRP", category="TV", tv_pack=1, season="S01", episode="", resolution="1080p", type="WEBDL", source="WEB", tag="-NEWGRP")
-    episode = {"name": "Fictional Show S01E02 1080p WEB-DL H.264-OLDGRP", "id": 21, "link": "https://example.invalid/torrents/21", "res": "1080p", "type": "WEB-DL", "files": [], **episode_fields}
+    meta = Meta(
+        name="Fictional Show S01 1080p WEB-DL H.264-NEWGRP", category="TV", tv_pack=1, season="S01", episode="", resolution="1080p", type="WEBDL", source="WEB", tag="-NEWGRP"
+    )
+    episode = {
+        "name": "Fictional Show S01E02 1080p WEB-DL H.264-OLDGRP",
+        "id": 21,
+        "link": "https://example.invalid/torrents/21",
+        "res": "1080p",
+        "type": "WEB-DL",
+        "files": [],
+        **episode_fields,
+    }
     pack = {"name": "Fictional Show S01 1080p WEB-DL H.264-OTHER", "id": 22, "link": "https://example.invalid/torrents/22", "res": "1080p", "type": "WEB-DL", "files": []}
     result = asyncio.run(DupeChecker(config or CONFIG).filter_dupes([episode, pack], meta, tracker))
     return list(result), meta
@@ -441,7 +453,15 @@ def submitted(meta: Meta) -> dict[str, bool]:
 
 
 def planned_meta(**overrides: Any) -> Meta:
-    aither = TrumpPlan("AITHER", "11", OLD["name"], trump_reports.SLOT_RULES, detail="DV/HDR takes priority.", reported_screenshots=["https://img.invalid/a"], trumping_screenshots=["https://img.invalid/b"])
+    aither = TrumpPlan(
+        "AITHER",
+        "11",
+        OLD["name"],
+        trump_reports.SLOT_RULES,
+        detail="DV/HDR takes priority.",
+        reported_screenshots=["https://img.invalid/a"],
+        trumping_screenshots=["https://img.invalid/b"],
+    )
     lst = TrumpPlan("LST", "21", OLD["name"], trump_reports.TRUMPABLE, note="Broken audio")
     fields: dict[str, Any] = {
         "ua_name": "Upload Assistant",

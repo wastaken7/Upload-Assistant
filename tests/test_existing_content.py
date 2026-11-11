@@ -13,11 +13,11 @@ from torf import Torrent
 from src.clients import Clients
 from src.meta import Meta
 from src.torrent_clients.existing_content import (
+    MAX_CANDIDATES,
     ExistingContentMatch,
     existing_content_mode,
     join_client_path,
     match_content_layout,
-    MAX_CANDIDATES,
     select_candidates,
     torrent_file_entries,
 )
@@ -110,8 +110,7 @@ def test_select_candidates_keeps_complete_torrents_of_a_compatible_size() -> Non
 
 def test_select_candidates_checks_same_name_copies_before_the_limit() -> None:
     crowd = [
-        {"hash": f"other{i}", "name": f"Other.{i}", "save_path": "/data", "total_size": 10 * GIB + i, "progress": 1, "state": "stalledUP"}
-        for i in range(MAX_CANDIDATES + 5)
+        {"hash": f"other{i}", "name": f"Other.{i}", "save_path": "/data", "total_size": 10 * GIB + i, "progress": 1, "state": "stalledUP"} for i in range(MAX_CANDIDATES + 5)
     ]
     # Our copy also holds a sample, so it is bigger than every unrelated torrent.
     copy = {"hash": "mine", "name": "Fictional", "save_path": "/data", "total_size": 10 * GIB + 200 * 1024**2, "progress": 1, "state": "stalledUP"}
@@ -235,9 +234,7 @@ async def test_require_skips_a_client_without_a_copy(tmp_path: Path) -> None:
     init, add_patch, report = _qbit_patches(clients, add, object())
 
     with init, add_patch, report, patch.object(clients, "_find_existing_content", AsyncMock(return_value=None)):
-        result = await clients.qbittorrent(
-            str(release), torrent, str(tmp_path), str(tmp_path), {"match_existing_content": "require"}, "", meta.filelist, meta, "EXAMPLE"
-        )
+        result = await clients.qbittorrent(str(release), torrent, str(tmp_path), str(tmp_path), {"match_existing_content": "require"}, "", meta.filelist, meta, "EXAMPLE")
 
     assert result is None
     add.assert_not_awaited()
@@ -253,9 +250,7 @@ async def test_prefer_falls_back_to_the_path_mapping(tmp_path: Path) -> None:
     init, add_patch, report = _qbit_patches(clients, add, qbit)
 
     with init, add_patch, report, patch.object(clients, "_find_existing_content", AsyncMock(return_value=None)):
-        result = await clients.qbittorrent(
-            str(release), torrent, str(tmp_path), "/remote", {"match_existing_content": "prefer"}, "", meta.filelist, meta, "EXAMPLE"
-        )
+        result = await clients.qbittorrent(str(release), torrent, str(tmp_path), "/remote", {"match_existing_content": "prefer"}, "", meta.filelist, meta, "EXAMPLE")
 
     assert result is True
     assert add.call_args.args[2]["save_path"] == "/remote/"
@@ -297,9 +292,7 @@ async def test_added_torrent_state_warns_about_missing_files(states: list[str], 
 
 def test_skipped_client_is_neither_counted_nor_failed(tmp_path: Path) -> None:
     qbit = {"torrent_client": "qbit"}
-    clients = Clients(
-        {"DEFAULT": {"injecting_client_list": ["local", "seedbox"]}, "TRACKERS": {"TEST": {}}, "TORRENT_CLIENTS": {"local": qbit, "seedbox": dict(qbit)}}
-    )
+    clients = Clients({"DEFAULT": {"injecting_client_list": ["local", "seedbox"]}, "TRACKERS": {"TEST": {}}, "TORRENT_CLIENTS": {"local": qbit, "seedbox": dict(qbit)}})
     meta = Meta(base_dir=str(tmp_path), uuid="fictional-release", path=str(tmp_path / "video.mkv"), client=None)
     torrent_path = tmp_path / "tmp" / meta.uuid / "[TEST].torrent"
     torrent_path.parent.mkdir(parents=True)

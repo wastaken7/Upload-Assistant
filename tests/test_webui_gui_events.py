@@ -88,7 +88,11 @@ def test_personal_release_flag_updates_the_current_item_and_resets_for_the_next(
 
     started, updated, other = _events(capsys.readouterr().out)
     assert {key: value for key, value in updated.items() if key != "ts"} == {
-        "kind": "item", "index": 1, "total": 2, "name": "Personal.mkv", "personal_release": True,
+        "kind": "item",
+        "index": 1,
+        "total": 2,
+        "name": "Personal.mkv",
+        "personal_release": True,
     }
     assert "personal_release" not in started
     assert "personal_release" not in other
@@ -616,4 +620,3 @@ async def test_bdinfo_comparison_emits_tracker_notices_for_gui_dupe_prompt(gui_e
         ("FAKE", "Audio track count differs on Fictional.Film.2020"),
         ("FAKE", "Playlist length matches: 01:45:00"),
     ]
-

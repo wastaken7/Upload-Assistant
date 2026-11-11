@@ -35,8 +35,10 @@ def test_detects_distinctive_competition_release(competition, field) -> None:
 @pytest.mark.parametrize("competition", DISTINCTIVE_COMPETITIONS)
 def test_competition_in_subject_metadata_does_not_identify_sports(competition) -> None:
     meta = Meta(
-        category="TV", title="Example Family Story",
-        keywords=[competition], overview=f"An example family watches the {competition}.",
+        category="TV",
+        title="Example Family Story",
+        keywords=[competition],
+        overview=f"An example family watches the {competition}.",
     )
 
     assert not detect_sports(meta)
@@ -47,18 +49,22 @@ def test_distinctive_competition_requires_token_boundaries() -> None:
 
 
 @pytest.mark.parametrize("competition", ["Formula 1", "Formula One", "NBA", "UFC", "Grand Prix", *DISTINCTIVE_COMPETITIONS])
-@pytest.mark.parametrize("template", [
-    "{competition}",
-    "{competition} 2099",
-    "{competition} Example Story",
-    "{competition} Round Table Story",
-    "Example: The Impossible {competition} Story",
-    "Example Story About {competition} Round 2",
-])
+@pytest.mark.parametrize(
+    "template",
+    [
+        "{competition}",
+        "{competition} 2099",
+        "{competition} Example Story",
+        "{competition} Round Table Story",
+        "Example: The Impossible {competition} Story",
+        "Example Story About {competition} Round 2",
+    ],
+)
 def test_competition_names_require_event_release_structure(competition, template) -> None:
     title = template.format(competition=competition)
     meta = Meta(
-        category="TV", title=title,
+        category="TV",
+        title=title,
         name=f"{title.replace(' ', '.')}.S01.2099.1080p.WEB-DL-GROUP",
     )
 
@@ -81,14 +87,17 @@ def test_epl_matchup_is_sports() -> None:
     assert detect_sports(Meta(name="EPL.2099.01.02.Team.A.vs.Team.B.1080p.WEB-GROUP"))
 
 
-@pytest.mark.parametrize("title", [
-    "07.F1.2099.Round.08.Example.Race",
-    "Example Formula 1 Grand Prix Story",
-    "EPL Example Grand Prix Story",
-    "F1 Example Grand Prixes Story",
-    "F100 Round 2",
-    "EPLExample Team A vs Team B",
-])
+@pytest.mark.parametrize(
+    "title",
+    [
+        "07.F1.2099.Round.08.Example.Race",
+        "Example Formula 1 Grand Prix Story",
+        "EPL Example Grand Prix Story",
+        "F1 Example Grand Prixes Story",
+        "F100 Round 2",
+        "EPLExample Team A vs Team B",
+    ],
+)
 def test_new_sports_matches_remain_conservative(title) -> None:
     assert not detect_sports(Meta(category="TV", title=title))
 
@@ -127,14 +136,17 @@ def test_detects_sports_from_explicit_category() -> None:
 
 
 @pytest.mark.parametrize("category", ["TV", "MOVIE"])
-@pytest.mark.parametrize("metadata", [
-    {"genres": ["Sport"]},
-    {"genres": ["Esportes"]},
-    {"keywords": ["baseball", "sport", "wrestling"]},
-    {"combined_genres": "Animation, Comedy, Sport"},
-    {"overview": "An example family attends a sports event and dreams of the Olympics."},
-    {"production_companies": [{"name": "Ultimate Fighting Championship"}]},
-])
+@pytest.mark.parametrize(
+    "metadata",
+    [
+        {"genres": ["Sport"]},
+        {"genres": ["Esportes"]},
+        {"keywords": ["baseball", "sport", "wrestling"]},
+        {"combined_genres": "Animation, Comedy, Sport"},
+        {"overview": "An example family attends a sports event and dreams of the Olympics."},
+        {"production_companies": [{"name": "Ultimate Fighting Championship"}]},
+    ],
+)
 def test_sports_subject_matter_does_not_override_regular_categories(category, metadata) -> None:
     meta = Meta(category=category, title="Example Story", **metadata)
 
@@ -154,16 +166,19 @@ def test_generic_event_phrase_does_not_identify_sports() -> None:
 
 
 @pytest.mark.parametrize("category", ["TV", "MOVIE"])
-@pytest.mark.parametrize("title", [
-    "The Wimbledon Example Mystery",
-    "The Wimbledon Example Crime",
-    "Wimbledon Example Mystery",
-    "The World Cup Example Mystery",
-    "Tour de France Example Mystery",
-    "The Australian Open Example Mystery",
-    "Australian Open Example Mystery",
-    "Australian Open",
-])
+@pytest.mark.parametrize(
+    "title",
+    [
+        "The Wimbledon Example Mystery",
+        "The Wimbledon Example Crime",
+        "Wimbledon Example Mystery",
+        "The World Cup Example Mystery",
+        "Tour de France Example Mystery",
+        "The Australian Open Example Mystery",
+        "Australian Open Example Mystery",
+        "Australian Open",
+    ],
+)
 def test_event_mentions_in_story_titles_do_not_identify_sports(category, title) -> None:
     meta = Meta(
         category=category,

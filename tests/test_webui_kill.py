@@ -69,7 +69,7 @@ def test_kill_endpoint_stops_upload_controller_and_worker(monkeypatch) -> None:
         def _is_running(pid: int) -> bool:
             try:
                 return psutil.pid_exists(pid) and psutil.Process(pid).status() != psutil.STATUS_ZOMBIE
-            except (psutil.NoSuchProcess, psutil.AccessDenied):
+            except psutil.NoSuchProcess, psutil.AccessDenied:
                 return False
 
         while _is_running(worker_pid) and time.monotonic() < deadline:

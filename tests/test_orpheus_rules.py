@@ -733,7 +733,12 @@ def test_upload_title_drops_a_marker_that_repeats_the_release_type():
 def test_dupe_search_ignores_a_trailing_type_marker():
     release = _release(album="Paper Boat EP", release_type="EP", release_year="2019")
     meta = Meta(category="MUSIC", music_release=release.to_dict())
-    existing = {"groupId": 3, "groupName": "Paper Boat", "artist": "Fictional Band", "torrents": [{"torrentId": 8, "remasterYear": 2019, "media": "WEB", "format": "FLAC", "encoding": "Lossless"}]}
+    existing = {
+        "groupId": 3,
+        "groupName": "Paper Boat",
+        "artist": "Fictional Band",
+        "torrents": [{"torrentId": 8, "remasterYear": 2019, "media": "WEB", "format": "FLAC", "encoding": "Lossless"}],
+    }
     calls: list[dict[str, str]] = []
 
     async def fake_get(_self: Orpheus, _meta: Meta, params: dict[str, str], _timeout_seconds: float, _purpose: str) -> dict[str, Any]:

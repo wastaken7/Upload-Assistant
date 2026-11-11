@@ -63,7 +63,12 @@ def test_values_the_parser_would_reject_are_left_empty() -> None:
             ("--resolution", "--igdb", "--book-narrator"),
         ),
         (
-            Meta(category="MUSIC", artist="Fictional Band", title="Paper Moons", music_release={"fields": {"media": {"value": "WEB"}, "release_label": {"value": "Example Records"}}}),
+            Meta(
+                category="MUSIC",
+                artist="Fictional Band",
+                title="Paper Moons",
+                music_release={"fields": {"media": {"value": "WEB"}, "release_label": {"value": "Example Records"}}},
+            ),
             {"--music-artist": "Fictional Band", "--music-album": "Paper Moons", "--music-media": "web", "--music-label": "Example Records"},
             ("--resolution", "--tmdb", "--tag"),
         ),

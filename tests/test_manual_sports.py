@@ -14,15 +14,18 @@ from src.trackers.UNIT3D.aither import Aither
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("title,flags,override,is_sports", [
-    ("Example Tournament", [], None, False),
-    ("Example Tournament", ["--category", "sports"], "sports", True),
-    ("Example Boxing Event", [], None, False),
-    ("UFC 123 Example Event", [], None, True),
-    ("UFC 123 Example Event", ["--category", "tv"], "tv", False),
-    ("UFC 123 Example Event", ["--category", "movie"], "movie", False),
-    ("Example The Impossible Formula 1 Story", [], None, False),
-])
+@pytest.mark.parametrize(
+    "title,flags,override,is_sports",
+    [
+        ("Example Tournament", [], None, False),
+        ("Example Tournament", ["--category", "sports"], "sports", True),
+        ("Example Boxing Event", [], None, False),
+        ("UFC 123 Example Event", [], None, True),
+        ("UFC 123 Example Event", ["--category", "tv"], "tv", False),
+        ("UFC 123 Example Event", ["--category", "movie"], "movie", False),
+        ("Example The Impossible Formula 1 Story", [], None, False),
+    ],
+)
 async def test_cli_sports_override_reaches_aither_payload(tmp_path, monkeypatch, title, flags, override, is_sports):
     video = tmp_path / "Example.Release.S01E03.mkv"
     video.touch()
@@ -67,12 +70,15 @@ async def test_sports_override_allows_movie_metadata_detection(tmp_path):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("manual_category,base_category,tracker_category,expected", [
-    ("sports", "", "TV", "TV"),
-    ("sports", "", "MOVIE", "MOVIE"),
-    ("tv", "TV", "MOVIE", "TV"),
-    ("movie", "MOVIE", "TV", "MOVIE"),
-])
+@pytest.mark.parametrize(
+    "manual_category,base_category,tracker_category,expected",
+    [
+        ("sports", "", "TV", "TV"),
+        ("sports", "", "MOVIE", "MOVIE"),
+        ("tv", "TV", "MOVIE", "TV"),
+        ("movie", "MOVIE", "TV", "MOVIE"),
+    ],
+)
 async def test_sports_override_allows_tracker_media_category(manual_category, base_category, tracker_category, expected):
     meta = Meta(manual_category=manual_category, category=base_category, tracker_description_mode="ids")
     tracker_data = (None, None, None, None, None, tracker_category, None, [], None)

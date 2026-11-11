@@ -62,7 +62,7 @@ def test_asset_names_apply_upstream_version_formats() -> None:
 def test_runtime_and_docker_paths_share_version_pins() -> None:
     assert inspect.signature(PestoBinaryManager.ensure_pesto_binary).parameters["version"].default == DEPENDENCY_VERSIONS["pesto"]
     assert inspect.signature(BDInfoBinaryManager.ensure_bdinfo_binary).parameters["version"].default == DEPENDENCY_VERSIONS["bdinfo"]
-    assert BDINFO_VERSION == DEPENDENCY_VERSIONS["bdinfo"]
+    assert DEPENDENCY_VERSIONS["bdinfo"] == BDINFO_VERSION
     assert inspect.signature(MkbrrBinaryManager.ensure_mkbrr_binary).parameters["version"].default == DEPENDENCY_VERSIONS["mkbrr"]
     assert inspect.signature(MkbrrBinaryManager.download_mkbrr_for_docker).parameters["version"].default == DEPENDENCY_VERSIONS["mkbrr"]
 
@@ -147,7 +147,7 @@ async def test_mkbrr_android_download_selects_linux_build(tmp_path: Path, monkey
         pass
 
     class Client:
-        async def __aenter__(self) -> "Client":
+        async def __aenter__(self) -> Client:
             return self
 
         async def __aexit__(self, *_args: object) -> None:

@@ -991,9 +991,7 @@ def test_image_hosts_report_reliability_and_fallbacks(tmp_path):
 
     image_hosts = stats.get_stats("all", "real", tmp_path)["image_hosts"]
 
-    assert image_hosts["hosts"] == [
-        {"host": "fictionalhost", "uploads": 3, "failures": 1, "success_rate": 75.0, "average_duration_ms": 100, "bytes": 900, "fallbacks_from": 1}
-    ]
+    assert image_hosts["hosts"] == [{"host": "fictionalhost", "uploads": 3, "failures": 1, "success_rate": 75.0, "average_duration_ms": 100, "bytes": 900, "fallbacks_from": 1}]
     assert image_hosts["fallbacks"] == [{"from": "fictionalhost", "to": "imaginaryhost", "count": 1}]
 
 

@@ -160,9 +160,7 @@ async def test_animated_xxx_contact_sheet_stops_when_a_tile_fails(tmp_path, monk
 async def test_animated_xxx_contact_sheet_skips_single_input_stacks(tmp_path, monkeypatch, rows, columns):
     video = tmp_path / "Studio.Clip.mp4"
     video.write_bytes(b"video")
-    takescreens._apply_config(
-        {"DEFAULT": {"xxx_contact_sheet_rows": rows, "xxx_contact_sheet_columns": columns, "xxx_contact_sheet_animated_webp": True}}
-    )
+    takescreens._apply_config({"DEFAULT": {"xxx_contact_sheet_rows": rows, "xxx_contact_sheet_columns": columns, "xxx_contact_sheet_animated_webp": True}})
     commands = []
 
     def fake_probe(_path):

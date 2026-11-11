@@ -116,7 +116,7 @@ def test_safe_game_field_strips_html_after_decoding_entities():
 
 
 def test_clean_description_text_removes_serialization_escapes():
-    value = r'\"It did not take long to make this journey.\" Extracted from the book \/My formation\/'
+    value = r"\"It did not take long to make this journey.\" Extracted from the book \/My formation\/"
 
     assert _clean_description_text(value) == '"It did not take long to make this journey." Extracted from the book /My formation/'  # noqa: S101
 
@@ -128,18 +128,18 @@ def test_clean_description_text_decodes_json_string_literals():
 
 
 def test_clean_description_text_preserves_entity_encoded_quotes():
-    value = '&quot;The title&quot; is shown in the overview.'
+    value = "&quot;The title&quot; is shown in the overview."
 
     assert _clean_description_text(value) == '"The title" is shown in the overview.'  # noqa: S101
 
 
 def test_game_description_cleans_escaped_overview():
-    meta = Meta(category="GAME", overview=r'\"A story \/with quotes\"')
+    meta = Meta(category="GAME", overview=r"\"A story \/with quotes\"")
 
     description = _builder()._build_game_desc_section(meta)
 
     assert '"A story /with quotes"' in description  # noqa: S101
-    assert r'\"' not in description  # noqa: S101
+    assert r"\"" not in description  # noqa: S101
 
 
 def test_game_requirements_render_steam_english_data_in_three_columns():

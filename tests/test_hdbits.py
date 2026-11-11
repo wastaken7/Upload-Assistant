@@ -7,14 +7,17 @@ pytestmark = pytest.mark.asyncio
 
 
 def make_meta(**overrides):
-    return Meta({
-        "name": "Example Title 2015 1080p WEB-DL DD+ 5.1 H.264-GROUP",
-        "title": "Example Title",
-        "category": "MOVIE",
-        "audio": "DD+ 5.1",
-        "year": 2015,
-        "type": "WEBDL",
-    }, **overrides)
+    return Meta(
+        {
+            "name": "Example Title 2015 1080p WEB-DL DD+ 5.1 H.264-GROUP",
+            "title": "Example Title",
+            "category": "MOVIE",
+            "audio": "DD+ 5.1",
+            "year": 2015,
+            "type": "WEBDL",
+        },
+        **overrides,
+    )
 
 
 async def test_hdbits_preserves_title_spacing_without_service():
@@ -32,12 +35,15 @@ async def test_hdbits_preserves_custom_title_ellipsis(custom_name):
     assert name == custom_name  # noqa: S101
 
 
-@pytest.mark.parametrize("custom_name,expected_name", [
-    ("Example Title", "Original Title"),
-    ("Example Title 2015 1080p", "Original Title 2015 1080p"),
-    ("Example Titles 2015 1080p", "Example Titles 2015 1080p"),
-    ("Example Title... 2015 1080p", "Example Title... 2015 1080p"),
-])
+@pytest.mark.parametrize(
+    "custom_name,expected_name",
+    [
+        ("Example Title", "Original Title"),
+        ("Example Title 2015 1080p", "Original Title 2015 1080p"),
+        ("Example Titles 2015 1080p", "Example Titles 2015 1080p"),
+        ("Example Title... 2015 1080p", "Example Title... 2015 1080p"),
+    ],
+)
 async def test_hdbits_requires_complete_title_prefix(custom_name, expected_name):
     meta = make_meta(name=custom_name, imdb_info={"aka": "Original Title"})
 
@@ -63,10 +69,13 @@ async def test_hdbits_preserves_title_commas(use_imdb_title):
     assert name == f"{expected_title} S01 2160p WEB-DL AAC2.0 H.264"  # noqa: S101
 
 
-@pytest.mark.parametrize("title", [
-    "Przykładowy świat: Dokąd? / 架空示例",
-    'Example "Story" (Part II) — What\'s Next...?!',
-])
+@pytest.mark.parametrize(
+    "title",
+    [
+        "Przykładowy świat: Dokąd? / 架空示例",
+        'Example "Story" (Part II) — What\'s Next...?!',
+    ],
+)
 async def test_hdbits_preserves_imdb_original_title(title):
     meta = make_meta(imdb_info={"aka": title, "title": "Localized Title"})
 
@@ -75,10 +84,13 @@ async def test_hdbits_preserves_imdb_original_title(title):
     assert name == f"{title} 2015 1080p WEB-DL DD+5.1 H.264-GROUP"  # noqa: S101
 
 
-@pytest.mark.parametrize("imdb_info,expected_title", [
-    ({"aka": "", "title": "IMDb's Display Title?"}, "IMDb's Display Title?"),
-    ({"type": "movie"}, "Example Title"),
-])
+@pytest.mark.parametrize(
+    "imdb_info,expected_title",
+    [
+        ({"aka": "", "title": "IMDb's Display Title?"}, "IMDb's Display Title?"),
+        ({"type": "movie"}, "Example Title"),
+    ],
+)
 async def test_hdbits_title_fallback(imdb_info, expected_title):
     meta = make_meta(imdb_info=imdb_info)
 
@@ -103,14 +115,17 @@ async def test_hdbits_formats_only_release_details():
 
 
 @pytest.mark.parametrize("imdb_type", ["tvMiniSeries", "tv mini series"])
-@pytest.mark.parametrize("numbering,expected_numbering", [
-    ("S01", "2019"),
-    ("2015 S01", "2019"),
-    ("2019 S01", "2019"),
-    ("2019", "2019"),
-    ("S010", "2019 S010"),
-    ("S01-S02", "2019 S01-S02"),
-])
+@pytest.mark.parametrize(
+    "numbering,expected_numbering",
+    [
+        ("S01", "2019"),
+        ("2015 S01", "2019"),
+        ("2019 S01", "2019"),
+        ("2019", "2019"),
+        ("S010", "2019 S010"),
+        ("S01-S02", "2019 S01-S02"),
+    ],
+)
 async def test_hdbits_miniseries_uses_imdb_year(imdb_type, numbering, expected_numbering):
     meta = make_meta(
         category="TV",
@@ -129,11 +144,14 @@ async def test_hdbits_miniseries_uses_imdb_year(imdb_type, numbering, expected_n
 
 
 @pytest.mark.parametrize("imdb_type", ["tvMiniSeries", "tv mini series"])
-@pytest.mark.parametrize("numbering,expected_numbering", [
-    ("S01E02", "S01E02"),
-    ("2015 S01E02", "2019 S01E02"),
-    ("2019 S01E02", "2019 S01E02"),
-])
+@pytest.mark.parametrize(
+    "numbering,expected_numbering",
+    [
+        ("S01E02", "S01E02"),
+        ("2015 S01E02", "2019 S01E02"),
+        ("2019 S01E02", "2019 S01E02"),
+    ],
+)
 async def test_hdbits_miniseries_loose_episode_keeps_season(imdb_type, numbering, expected_numbering):
     meta = make_meta(
         category="TV",
@@ -164,10 +182,13 @@ async def test_hdbits_other_imdb_types_keep_season(imdb_type):
     assert name == "Example Series S01 1080p WEB-DL DD+5.1 H.264"  # noqa: S101
 
 
-@pytest.mark.parametrize("meta_year,expected", [
-    (2015, "2015"),
-    (None, "S01"),
-])
+@pytest.mark.parametrize(
+    "meta_year,expected",
+    [
+        (2015, "2015"),
+        (None, "S01"),
+    ],
+)
 async def test_hdbits_miniseries_with_missing_year(meta_year, expected):
     meta = make_meta(
         category="TV",

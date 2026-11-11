@@ -137,13 +137,8 @@ def audio_search(category, upload_audio, header_html, *, season=1, tv_pack=True,
     tracker = object.__new__(BJShare)
     response = FakeResponse()
     if torrent_rows is None:
-        torrent_rows = (
-            '<tr id="torrent123" data-torrentname="Fictional.Adventure.S01.1080p-Example"><td class="number_column nobr">1 GiB</td></tr>'
-        )
-    response.text = (
-        '<a href="logout.php?auth=abcdef"></a><div class="main_column">'
-        f'<table class="torrent_table details">{header_html}{torrent_rows}</table></div>'
-    )
+        torrent_rows = '<tr id="torrent123" data-torrentname="Fictional.Adventure.S01.1080p-Example"><td class="number_column nobr">1 GiB</td></tr>'
+    response.text = f'<a href="logout.php?auth=abcdef"></a><div class="main_column"><table class="torrent_table details">{header_html}{torrent_rows}</table></div>'
     tracker.session = FakeSession(response)
     tracker.cookie_validator = FakeCookieValidator()
     meta = SimpleNamespace(

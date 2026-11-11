@@ -25,24 +25,29 @@ def gui(monkeypatch):
 def events(capsys):
     """Read the structured events while ignoring ordinary console output."""
     prefix = webui_events.event_prefix("check-feedback-test")
-    return [json.loads(line[len(prefix):]) for line in capsys.readouterr().out.splitlines() if line.startswith(prefix)]
+    return [json.loads(line[len(prefix) :]) for line in capsys.readouterr().out.splitlines() if line.startswith(prefix)]
 
 
 def answering(answer=False):
     """Provide a mock decision that still announces the prompt and its context."""
+
     async def prompt(question, **kwargs):
         """Open and close a GUI prompt without reading stdin."""
         prompt_id = webui_events.prompt_open("yes_no", question, **kwargs)
         webui_events.prompt_close(prompt_id)
         return answer
+
     return SimpleNamespace(prompt_yes_no=AsyncMock(side_effect=prompt))
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("tracker_class,reason", [
-    (RetroMoviesClub, "Only movies released in 2000 or earlier are allowed."),
-    (SkipTheCommercials, "Only TV and documentary movie uploads are allowed at SKIPTHECOMMERCIALS."),
-])
+@pytest.mark.parametrize(
+    "tracker_class,reason",
+    [
+        (RetroMoviesClub, "Only movies released in 2000 or earlier are allowed."),
+        (SkipTheCommercials, "Only TV and documentary movie uploads are allowed at SKIPTHECOMMERCIALS."),
+    ],
+)
 @pytest.mark.parametrize("answer", [False, True])
 async def test_real_tracker_reasons_are_shown_before_deciding_and_retained_only_when_skipped(gui, capsys, tracker_class, reason, answer):
     """Real RMC/STC checks explain the decision and retain reasons only when declined."""
@@ -93,6 +98,7 @@ async def test_concurrent_checks_keep_their_own_messages_and_restore_handlers(gu
 
     async def run(name):
         """Run a check that overlaps with another check before its final explanation."""
+
         async def check(_meta):
             """Interleave task and thread logging to exercise context propagation."""
             nonlocal started
@@ -103,6 +109,7 @@ async def test_concurrent_checks_keep_their_own_messages_and_restore_handlers(gu
             await both_started.wait()
             await asyncio.to_thread(logger.info, f"{name}: {name} final reason")
             return False
+
         meta = Meta()
         await trackerstatus.TrackerStatusManager({})._run_additional_checks(name, SimpleNamespace(get_additional_checks=check), meta, answering())
         return meta
@@ -159,7 +166,7 @@ def test_capture_is_disabled_for_console_only_runs(gui, monkeypatch):
 def test_explicit_skip_reason_does_not_turn_into_a_dupe_status(gui, capsys):
     """An explicit skip takes precedence over words such as duplicate in its reason."""
     webui_events.publish_tracker_statuses({"FAKE": {"skipped": True, "status_message": "Duplicate sources are not permitted by this rule"}}, final=True)
-    result, = events(capsys)
+    (result,) = events(capsys)
     assert result["status"] == "skipped"
     assert result["message"] == "Duplicate sources are not permitted by this rule"
 
@@ -167,19 +174,23 @@ def test_explicit_skip_reason_does_not_turn_into_a_dupe_status(gui, capsys):
 @pytest.mark.asyncio
 async def test_real_checks_and_claim_reasons_reach_final_results(gui, monkeypatch, capsys):
     """RMC/STC rejections and a claim match retain their reasons through result merging."""
+
     async def claimed(meta, name):
         """Simulate a claim match without contacting a tracker."""
         if name != "AITHER":
             return False
         meta.tracker_status[name]["status_message"] = "Claimed match found: Synthetic Show, Season: 1, TMDB ID: 123"
         return True
+
     setup = SimpleNamespace(filter_unsupported_trackers=lambda _meta: None, check_banned_group=AsyncMock(return_value=False), get_torrent_claims=claimed)
     monkeypatch.setattr(trackerstatus, "TrackerSetup", lambda **_kwargs: setup)
     monkeypatch.setattr(trackerstatus, "AvistaZNetworkRouter", lambda *_args: SimpleNamespace(apply=AsyncMock()))
     monkeypatch.setattr(trackerstatus, "UploadHelper", lambda _config: answering())
     trackers = [RetroMoviesClub.__new__(RetroMoviesClub), SkipTheCommercials.__new__(SkipTheCommercials), SimpleNamespace(tracker="AITHER", banned_groups=[])]
     monkeypatch.setattr(trackerstatus, "tracker_class_map", {tracker.tracker: (lambda tracker=tracker, **_kwargs: tracker) for tracker in trackers})
-    meta = Meta(name="Synthetic Feature", title="Synthetic Feature", category="MOVIE", year=2026, genres=["Crime"], imdb_id=123, trackers=[tracker.tracker for tracker in trackers])
+    meta = Meta(
+        name="Synthetic Feature", title="Synthetic Feature", category="MOVIE", year=2026, genres=["Crime"], imdb_id=123, trackers=[tracker.tracker for tracker in trackers]
+    )
     assert await trackerstatus.TrackerStatusManager({}).process_all_trackers(meta) == 0
     webui_events.publish_tracker_statuses(meta.tracker_status, final=True)
     results = {event["tracker"]: event for event in events(capsys) if event["kind"] == "tracker"}
@@ -215,12 +226,16 @@ async def test_ptp_failed_checks_keep_the_reason_in_final_results(gui, monkeypat
         return False
 
     tracker = SimpleNamespace(
-        tracker="PASSTHEPOPCORN", banned_groups=[], get_additional_checks=check,
-        get_group_by_imdb=AsyncMock(), search_existing=AsyncMock(),
+        tracker="PASSTHEPOPCORN",
+        banned_groups=[],
+        get_additional_checks=check,
+        get_group_by_imdb=AsyncMock(),
+        search_existing=AsyncMock(),
     )
     setup = SimpleNamespace(
         filter_unsupported_trackers=lambda _meta: None,
-        check_banned_group=AsyncMock(return_value=False), get_torrent_claims=AsyncMock(return_value=False),
+        check_banned_group=AsyncMock(return_value=False),
+        get_torrent_claims=AsyncMock(return_value=False),
     )
     helper = answering() if mode != "eof" else SimpleNamespace(prompt_yes_no=AsyncMock(side_effect=EOFError))
     monkeypatch.setattr(trackerstatus, "TrackerSetup", lambda **_kwargs: setup)

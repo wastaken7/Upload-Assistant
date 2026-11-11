@@ -14,7 +14,10 @@ from src.trackers.UNIT3D.rockethd import RocketHD
 
 def _meta(episodes, **kwargs):
     return Meta(
-        category="TV", tv_pack=True, season="S03", season_int=3,
+        category="TV",
+        tv_pack=True,
+        season="S03",
+        season_int=3,
         filelist=[f"Example.Show.S03E{episode:02d}.NORDiC.1080p.DSNP.WEB-DL.H.264-TESTGROUP.mkv" for episode in episodes],
         **kwargs,
     )
@@ -28,13 +31,16 @@ def manager(monkeypatch):
     return result
 
 
-@pytest.mark.parametrize("episodes,missing", [
-    (range(2, 11), [(3, 1)]),
-    ([1, 2, 4], [(3, 3)]),
-    (range(5, 8), [(3, 1), (3, 2), (3, 3), (3, 4)]),
-    ([0], [(3, 1)]),
-    (range(1, 11), []),
-])
+@pytest.mark.parametrize(
+    "episodes,missing",
+    [
+        (range(2, 11), [(3, 1)]),
+        ([1, 2, 4], [(3, 3)]),
+        (range(5, 8), [(3, 1), (3, 2), (3, 3), (3, 4)]),
+        ([0], [(3, 1)]),
+        (range(1, 11), []),
+    ],
+)
 def test_local_numbering_requires_episode_one_and_continuity(manager, episodes, missing):
     result = asyncio.run(manager.check_season_pack_detail(_meta(episodes)))
     assert result["missing_episodes"] == missing

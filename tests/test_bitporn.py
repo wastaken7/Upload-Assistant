@@ -112,7 +112,6 @@ def test_bitporn_category_uses_who_is_in_the_scene_not_the_acts() -> None:
     assert _category(acts_only) == "Uncategorized"  # noqa: S101
 
 
-
 def test_bitporn_category_review_cases() -> None:
     # A word ending in "vr" is not a VR site.
     assert _category(Meta(category="XXX", basename_no_ext="Lavr Scene")) == "Uncategorized"  # noqa: S101

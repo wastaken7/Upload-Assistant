@@ -61,14 +61,19 @@ def test_failed_later_page_does_not_return_partial_episode_count(monkeypatch):
     assert len(requests) == 2
 
 
-@pytest.mark.parametrize("response", [
-    401, 503, _payload([]),
-    {"data": {"episodes": [{"seasonNumber": 3}]}, "links": {"next": None}},
-    {"data": {"episodes": ["bad record"]}, "links": {"next": None}},
-    {"data": {"episodes": []}},
-    {"data": None, "links": {"next": None}},
-    _payload([], "?page=1"),
-])
+@pytest.mark.parametrize(
+    "response",
+    [
+        401,
+        503,
+        _payload([]),
+        {"data": {"episodes": [{"seasonNumber": 3}]}, "links": {"next": None}},
+        {"data": {"episodes": ["bad record"]}, "links": {"next": None}},
+        {"data": {"episodes": []}},
+        {"data": None, "links": {"next": None}},
+        _payload([], "?page=1"),
+    ],
+)
 def test_unavailable_or_malformed_data_is_not_a_complete_season(monkeypatch, response):
     result, _ = _fetch(monkeypatch, [response])
     assert result is None
@@ -91,7 +96,8 @@ def test_existing_episode_api_still_returns_data_only(monkeypatch):
         client.token = "test-token"
         payload = _payload([1, 2])
         client._client = httpx.AsyncClient(
-            base_url="https://api4.thetvdb.com/v4", transport=httpx.MockTransport(lambda request: httpx.Response(200, json=payload)),
+            base_url="https://api4.thetvdb.com/v4",
+            transport=httpx.MockTransport(lambda request: httpx.Response(200, json=payload)),
         )
         try:
             assert await client.get_series_episodes(123) == payload["data"]

@@ -24,11 +24,7 @@ class CompletedProcess:
 
 
 def _sse_events(response) -> list[dict[str, object]]:
-    return [
-        json.loads(line.removeprefix("data: "))
-        for line in response.get_data(as_text=True).splitlines()
-        if line.startswith("data: ")
-    ]
+    return [json.loads(line.removeprefix("data: ")) for line in response.get_data(as_text=True).splitlines() if line.startswith("data: ")]
 
 
 def test_execute_preserves_shell_punctuation_in_path_and_option_value(tmp_path, monkeypatch) -> None:

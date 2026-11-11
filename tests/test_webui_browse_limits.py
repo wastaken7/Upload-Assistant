@@ -9,7 +9,6 @@ import pytest
 
 import web_ui.server as server
 
-
 BROWSE_ROUTES = [
     ("/api/browse_roots", {}),
     ("/api/browse", {"path": ""}),
@@ -127,14 +126,10 @@ def test_invalid_basic_credentials_are_counted_before_html_redirect(browser, mon
     monkeypatch.setattr(server.auth_mod, "verify_password", reject_password)
     anonymous = server.app.test_client()
     for _ in range(5):
-        response = anonymous.get(
-            "/api/browse_roots", auth=("browse-user", "incorrect"), headers={"Accept": "text/html"}
-        )
+        response = anonymous.get("/api/browse_roots", auth=("browse-user", "incorrect"), headers={"Accept": "text/html"})
         assert response.status_code == 302
         assert response.headers["Location"].endswith("/login")
-    blocked = anonymous.get(
-        "/api/browse_roots", auth=("browse-user", "incorrect"), headers={"Accept": "text/html"}
-    )
+    blocked = anonymous.get("/api/browse_roots", auth=("browse-user", "incorrect"), headers={"Accept": "text/html"})
     assert blocked.status_code == 403
     assert verified_passwords == [("test-only-hash", "incorrect")] * 5
 

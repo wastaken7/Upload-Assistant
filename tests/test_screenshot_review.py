@@ -364,9 +364,7 @@ def test_discarding_remote_images_keeps_ids_stable_in_any_order(tmp_path: Path) 
 
 def test_discarding_replaced_remote_image_drops_pending_replacement(release_dir):
     replacement = _register_images(release_dir, ["replacement.png"])[0]
-    (release_dir / "screenshot_review.json").write_text(
-        json.dumps({"remote_replacements": {"remote-0": replacement.name}, "generations": {"remote-0": 1}}), encoding="utf-8"
-    )
+    (release_dir / "screenshot_review.json").write_text(json.dumps({"remote_replacements": {"remote-0": replacement.name}, "generations": {"remote-0": 1}}), encoding="utf-8")
     meta_data = {"image_list": _hosted("one", "two")}
 
     remaining = delete_screenshot(release_dir, meta_data, "remote-0")

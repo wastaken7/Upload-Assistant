@@ -64,9 +64,7 @@ def test_cross_seed_counts_once_per_tracker_across_clients(tmp_path: Path, cross
     watch_folder = tmp_path / "watch"
     watch_folder.mkdir()
     watcher = {"torrent_client": "watch", "watch_folder": str(watch_folder)}
-    clients = Clients(
-        {"DEFAULT": {"injecting_client_list": ["first", "second"]}, "TRACKERS": {"TEST": {}}, "TORRENT_CLIENTS": {"first": watcher, "second": watcher}}
-    )
+    clients = Clients({"DEFAULT": {"injecting_client_list": ["first", "second"]}, "TRACKERS": {"TEST": {}}, "TORRENT_CLIENTS": {"first": watcher, "second": watcher}})
     meta = Meta(base_dir=str(tmp_path), uuid="fictional-release", path=str(tmp_path / "video.mkv"), client=None)
     torrent_path = tmp_path / "tmp" / meta.uuid / ("[TEST_cross].torrent" if cross else "[TEST].torrent")
     torrent_path.parent.mkdir(parents=True)

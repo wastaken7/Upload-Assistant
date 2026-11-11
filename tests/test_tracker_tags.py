@@ -32,4 +32,3 @@ def test_get_tags_limits_to_maximum_5_tags(tracker_name):
 
     tag_list = [t.strip() for t in tags.split(",") if t.strip()]
     assert len(tag_list) == 5  # noqa: S101
-

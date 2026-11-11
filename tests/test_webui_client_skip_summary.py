@@ -1,4 +1,5 @@
 """Client skips in the final GUI summary reflect actual per-item removals."""
+
 import json
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
@@ -21,23 +22,37 @@ def gui(monkeypatch):
 def emitted(capsys):
     """Read only the structured events emitted by this test run."""
     prefix = webui_events.event_prefix("client-skip-test")
-    return [json.loads(line[len(prefix):]) for line in capsys.readouterr().out.splitlines() if line.startswith(prefix)]
+    return [json.loads(line[len(prefix) :]) for line in capsys.readouterr().out.splitlines() if line.startswith(prefix)]
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("selected,matched,debug,manual_remove,remaining,reported", [
-    (["AITHER", "BLUTOPIA"], ["AITHER"], False, "", ["BLUTOPIA"], ["AITHER"]),
-    (["AITHER", "BLUTOPIA"], ["AITHER", "AITHER", "UNSELECTED"], False, "", ["BLUTOPIA"], ["AITHER"]),
-    (["AITHER", "BLUTOPIA"], ["UNSELECTED"], False, "", ["AITHER", "BLUTOPIA"], []),
-    (["AITHER", "BLUTOPIA"], ["AITHER"], True, "", ["AITHER", "BLUTOPIA"], []),
-    (["AITHER", "BLUTOPIA"], False, False, "", ["AITHER", "BLUTOPIA"], []),
-    (["AITHER", "BLUTOPIA"], ["AITHER"], False, "AITHER", ["BLUTOPIA"], []),
-    (["AITHER"], ["AITHER"], False, "", [], ["AITHER"]),
-])
+@pytest.mark.parametrize(
+    "selected,matched,debug,manual_remove,remaining,reported",
+    [
+        (["AITHER", "BLUTOPIA"], ["AITHER"], False, "", ["BLUTOPIA"], ["AITHER"]),
+        (["AITHER", "BLUTOPIA"], ["AITHER", "AITHER", "UNSELECTED"], False, "", ["BLUTOPIA"], ["AITHER"]),
+        (["AITHER", "BLUTOPIA"], ["UNSELECTED"], False, "", ["AITHER", "BLUTOPIA"], []),
+        (["AITHER", "BLUTOPIA"], ["AITHER"], True, "", ["AITHER", "BLUTOPIA"], []),
+        (["AITHER", "BLUTOPIA"], False, False, "", ["AITHER", "BLUTOPIA"], []),
+        (["AITHER", "BLUTOPIA"], ["AITHER"], False, "AITHER", ["BLUTOPIA"], []),
+        (["AITHER"], ["AITHER"], False, "", [], ["AITHER"]),
+    ],
+)
 async def test_only_actual_client_removals_reach_the_summary(gui, tmp_path, monkeypatch, selected, matched, debug, manual_remove, remaining, reported):
     """Run real removal logic while stopping before tracker checks or uploads."""
-    meta = Meta(base_dir=str(tmp_path), uuid="synthetic", path=str(tmp_path / "Synthetic.mkv"), category="MOVIE", title="Synthetic", imghost="ptscreens",
-                trackers=list(selected), remove_trackers=matched, debug=debug, trackers_remove=manual_remove, client_skipped_trackers=["STALE_PREVIOUS_ITEM"])
+    meta = Meta(
+        base_dir=str(tmp_path),
+        uuid="synthetic",
+        path=str(tmp_path / "Synthetic.mkv"),
+        category="MOVIE",
+        title="Synthetic",
+        imghost="ptscreens",
+        trackers=list(selected),
+        remove_trackers=matched,
+        debug=debug,
+        trackers_remove=manual_remove,
+        client_skipped_trackers=["STALE_PREVIOUS_ITEM"],
+    )
 
     class ReachedTrackerChecks(Exception):
         """Stop after the removal stage without contacting any tracker."""
@@ -69,8 +84,11 @@ async def test_only_actual_client_removals_reach_the_summary(gui, tmp_path, monk
 @pytest.mark.parametrize("client_skips", [[], ["AITHER", "HOMIEHELPDESK"], [f"CLIENT_TRACKER_{index:03d}" for index in range(40)]])
 async def test_final_confirmation_keeps_client_skips_separate_from_tracker_checks(gui, monkeypatch, capsys, answer, client_skips):
     """The real final prompt preserves group membership, complete lists and decisions."""
-    setup = SimpleNamespace(filter_unsupported_trackers=lambda _meta: None, check_banned_group=AsyncMock(return_value=False),
-                            get_torrent_claims=AsyncMock(side_effect=lambda _meta, name: name == "RULE"))
+    setup = SimpleNamespace(
+        filter_unsupported_trackers=lambda _meta: None,
+        check_banned_group=AsyncMock(return_value=False),
+        get_torrent_claims=AsyncMock(side_effect=lambda _meta, name: name == "RULE"),
+    )
     monkeypatch.setattr(trackerstatus, "TrackerSetup", lambda **_kwargs: setup)
     monkeypatch.setattr(trackerstatus, "AvistaZNetworkRouter", lambda *_args: SimpleNamespace(apply=AsyncMock()))
     monkeypatch.setattr(trackerstatus, "evaluate_slots", AsyncMock(return_value=None))
@@ -88,8 +106,12 @@ async def test_final_confirmation_keeps_client_skips_separate_from_tracker_check
 
     monkeypatch.setattr(trackerstatus, "UploadHelper", lambda _config: SimpleNamespace(dupe_check=dupe_check, prompt_yes_no=prompt))
     names = ["FIRST", "SECOND", "RULE", "DUPE"]
-    trackers = {name: SimpleNamespace(tracker=name, banned_groups=[], get_name=AsyncMock(return_value="Synthetic"),
-                                     search_existing=AsyncMock(return_value=["Existing release"] if name == "DUPE" else [])) for name in names}
+    trackers = {
+        name: SimpleNamespace(
+            tracker=name, banned_groups=[], get_name=AsyncMock(return_value="Synthetic"), search_existing=AsyncMock(return_value=["Existing release"] if name == "DUPE" else [])
+        )
+        for name in names
+    }
     monkeypatch.setattr(trackerstatus, "tracker_class_map", {name: (lambda name=name, **_kwargs: trackers[name]) for name in names})
     meta = Meta(category="MOVIE", name="Synthetic", imdb_id=1, trackers=names, client_skipped_trackers=list(client_skips))
     webui_events.begin_item("Synthetic.mkv", 1, 1)

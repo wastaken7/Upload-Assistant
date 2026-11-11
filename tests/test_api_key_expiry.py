@@ -1,6 +1,6 @@
+import sqlite3
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
-import sqlite3
 
 import httpx
 import pytest
@@ -73,8 +73,10 @@ def test_failed_response_preserves_cache_and_cache_failure_is_advisory(tmp_path,
     original = expiry.record_api_key_expiry("LST", "key", LST.base_url, response("2027-08-22T00:00:00Z"), tmp_path)
     assert expiry.record_api_key_expiry("LST", "key", LST.base_url, response(status=500), tmp_path, payload={}) is None
     assert expiry.get_api_key_expiry("LST", "key", LST.base_url, tmp_path) == original
+
     def fail(*args, **kwargs):
         raise sqlite3.OperationalError("unavailable")
+
     monkeypatch.setattr(expiry.sqlite3, "connect", fail)
     assert expiry.get_api_key_expiry("LST", "key", LST.base_url, tmp_path)["state"] == "unknown"
     assert expiry.record_api_key_expiry("LST", "key", LST.base_url, response("2027-08-22T00:00:00Z"), tmp_path)["expires_at"] == original["expires_at"]
@@ -83,6 +85,7 @@ def test_failed_response_preserves_cache_and_cache_failure_is_advisory(tmp_path,
 def test_concurrent_observations_do_not_lose_other_trackers(tmp_path):
     def write(number):
         expiry.record_api_key_expiry(f"TRACKER{number}", "key", "https://tracker.test", response("2027-08-22T00:00:00Z"), tmp_path)
+
     with ThreadPoolExecutor(max_workers=4) as pool:
         list(pool.map(write, range(12)))
     for number in range(12):
@@ -139,16 +142,21 @@ def test_web_check_requires_session_csrf_and_same_origin(web, monkeypatch, guard
 
 def fake_client(monkeypatch, result):
     requests = []
+
     class Client:
         def __init__(self, **kwargs):
             assert kwargs["follow_redirects"] is False
+
         def __enter__(self):
             return self
+
         def __exit__(self, *args):
             pass
+
         def get(self, url, **kwargs):
             requests.append((url, kwargs))
             return result
+
     monkeypatch.setattr(httpx, "Client", Client)
     return requests
 
@@ -211,7 +219,9 @@ def test_web_check_rejects_explicit_null_key_without_using_saved_key(web, monkey
 
 def test_web_check_uses_prowlarr_only_for_missing_key(web, monkeypatch):
     monkeypatch.setattr(server, "_load_config_from_file", lambda _path: {"DEFAULT": {"prowlarr_url": "https://prowlarr.test", "prowlarr_api_key": "prowlarr-secret"}})
-    monkeypatch.setattr(prowlarr, "fetch_prowlarr_credentials", lambda *_args: prowlarr.ProwlarrCredentialReport(credentials={"LST": prowlarr.ProwlarrCredential(api_key="remote-secret")}))
+    monkeypatch.setattr(
+        prowlarr, "fetch_prowlarr_credentials", lambda *_args: prowlarr.ProwlarrCredentialReport(credentials={"LST": prowlarr.ProwlarrCredential(api_key="remote-secret")})
+    )
     calls = fake_client(monkeypatch, response("2027-08-22T00:00:00Z"))
     result = web.post("/api/tracker_api_key_status", json={"tracker": "LST", "api_key": "", "refresh": True})
     assert result.json["credential_source"] == "prowlarr"
@@ -242,12 +252,16 @@ async def test_unit3d_search_captures_header(tmp_path, monkeypatch):
     class Client:
         def __init__(self, **kwargs):
             pass
+
         async def __aenter__(self):
             return self
+
         async def __aexit__(self, *args):
             pass
+
         async def get(self, **kwargs):
             return response("2027-08-22T00:00:00Z")
+
     monkeypatch.setattr(httpx, "AsyncClient", Client)
     tracker = Aither({"TRACKERS": {"AITHER": {"api_key": "key"}}})
     await tracker.search_existing(Meta(base_dir=str(tmp_path), category="TV", tmdb=123, season="S01", resolution="1080p", type="WEBDL"))

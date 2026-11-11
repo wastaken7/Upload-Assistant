@@ -1,5 +1,5 @@
-from copy import deepcopy
 from concurrent.futures import ThreadPoolExecutor
+from copy import deepcopy
 from pathlib import Path
 from threading import Event
 
@@ -102,12 +102,15 @@ def test_66_overrides_use_one_rate_limit_slot_and_one_file_write(batch_config, m
     assert config_path.read_bytes() == before
 
 
-@pytest.mark.parametrize("invalid", [
-    {"path": ["TRACKERS", "UNKNOWN", "add_logo"], "value": None},
-    {"path": ["DEFAULT", "screens"], "value": "invalid-number"},
-    {"path": ["DEFAULT", None, "screens"], "value": 8},
-    {"path": ["TRACKERS", "AITHER", "tag_overrides"], "value": {"Group": "invalid-group"}},
-])
+@pytest.mark.parametrize(
+    "invalid",
+    [
+        {"path": ["TRACKERS", "UNKNOWN", "add_logo"], "value": None},
+        {"path": ["DEFAULT", "screens"], "value": "invalid-number"},
+        {"path": ["DEFAULT", None, "screens"], "value": 8},
+        {"path": ["TRACKERS", "AITHER", "tag_overrides"], "value": {"Group": "invalid-group"}},
+    ],
+)
 def test_invalid_later_field_leaves_entire_batch_unsaved(batch_config, invalid):
     config_path, _, _, records = batch_config
     before = config_path.read_bytes()
@@ -171,7 +174,8 @@ def test_batch_creates_missing_torrent_client_parents(batch_config, user):
     assert config_path.read_bytes() == before
     assert post_updates(updates)[1] == 200
     assert server._load_config_from_file(config_path) == {
-        **user, "TORRENT_CLIENTS": {"qbittorrent": {"torrent_client": "qbit", "host": "localhost"}},
+        **user,
+        "TORRENT_CLIENTS": {"qbittorrent": {"torrent_client": "qbit", "host": "localhost"}},
     }
 
 
@@ -261,6 +265,7 @@ def test_external_edit_during_save_is_preserved_and_reported(batch_config, monke
 
 def test_failed_temp_file_flush_keeps_original_and_cleans_temp(batch_config, monkeypatch):
     import src.config_sync as config_sync
+
     config_path, _, _, _ = batch_config
     original = config_path.read_bytes()
 
@@ -273,13 +278,16 @@ def test_failed_temp_file_flush_keeps_original_and_cleans_temp(batch_config, mon
     assert list(config_path.parent.glob(".config.py.*.tmp")) == []
 
 
-@pytest.mark.parametrize("endpoint,payload", [
-    ("config_update", {"updates": [{"path": ["DEFAULT", "screens"], "value": 8}]}),
-    ("config_set_tracker_overrides", {"tracker": "AITHER", "enabled": False}),
-    ("config_remove_subsection", {"path": ["TRACKERS", "AITHER"]}),
-    ("config_add_torrent_client", {"name": "another", "template": "qbittorrent"}),
-    ("config_rename_torrent_client", {"old_name": "seedbox", "new_name": "renamed"}),
-])
+@pytest.mark.parametrize(
+    "endpoint,payload",
+    [
+        ("config_update", {"updates": [{"path": ["DEFAULT", "screens"], "value": 8}]}),
+        ("config_set_tracker_overrides", {"tracker": "AITHER", "enabled": False}),
+        ("config_remove_subsection", {"path": ["TRACKERS", "AITHER"]}),
+        ("config_add_torrent_client", {"name": "another", "template": "qbittorrent"}),
+        ("config_rename_torrent_client", {"old_name": "seedbox", "new_name": "renamed"}),
+    ],
+)
 def test_all_config_writers_wait_for_shared_lock_and_read_latest_file(batch_config, endpoint, payload):
     config_path, example_path, _, _ = batch_config
     for path, name in ((config_path, "seedbox"), (example_path, "qbittorrent")):
@@ -323,10 +331,12 @@ def prepare_aliases(batch_config):
 def test_invalid_alias_save_rejects_entire_batch(batch_config, alias):
     config_path = prepare_aliases(batch_config)
     original = config_path.read_bytes()
-    result, status = post_updates([
-        {"path": ["DEFAULT", "screens"], "value": 8},
-        {"path": ["TRACKERS", "AITHER", "cli_alias"], "value": alias},
-    ])
+    result, status = post_updates(
+        [
+            {"path": ["DEFAULT", "screens"], "value": 8},
+            {"path": ["TRACKERS", "AITHER", "cli_alias"], "value": alias},
+        ]
+    )
     assert status == 400, result
     assert "cli_alias" in result["error"]
     assert config_path.read_bytes() == original
@@ -334,10 +344,15 @@ def test_invalid_alias_save_rejects_entire_batch(batch_config, alias):
 
 def test_alias_swap_is_validated_against_final_batch(batch_config):
     config_path = prepare_aliases(batch_config)
-    assert post_updates([
-        {"path": ["TRACKERS", "AITHER", "cli_alias"], "value": "LION"},
-        {"path": ["TRACKERS", "LST", "cli_alias"], "value": "ATH"},
-    ])[1] == 200
+    assert (
+        post_updates(
+            [
+                {"path": ["TRACKERS", "AITHER", "cli_alias"], "value": "LION"},
+                {"path": ["TRACKERS", "LST", "cli_alias"], "value": "ATH"},
+            ]
+        )[1]
+        == 200
+    )
     saved = server._load_config_from_file(config_path)
     assert server.tracker_cli_aliases(saved) == {"LION": "AITHER", "ATH": "LST"}
     assert post_updates([{"path": ["TRACKERS", "AITHER", "cli_alias"], "value": ""}])[1] == 200
