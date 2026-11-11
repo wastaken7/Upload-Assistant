@@ -150,3 +150,15 @@ async def test_ulcx_falls_back_to_the_built_in_list_when_the_api_fails(tmp_path,
 
     assert await setup.check_banned_group("ULCX", ["FakeGrp"], Meta(base_dir=str(tmp_path), tag="-FakeGrp", unattended=True)) is True
     assert await setup.check_banned_group("ULCX", ["FakeGrp"], Meta(base_dir=str(tmp_path), tag="-OtherGrp", unattended=True)) is False
+
+
+@pytest.mark.asyncio
+async def test_ulcx_falls_back_to_the_built_in_list_when_the_cache_cannot_be_read(tmp_path, monkeypatch: pytest.MonkeyPatch):
+    async def unwritten_cache(_meta: Meta, _tracker: str) -> Any:
+        return tmp_path / "missing.json"
+
+    setup = TrackerSetup({"TRACKERS": {"ULCX": {"api_key": "test-token"}}})
+    monkeypatch.setattr(setup, "get_banned_groups", unwritten_cache)
+
+    assert await setup.check_banned_group("ULCX", ["FakeGrp"], Meta(base_dir=str(tmp_path), tag="-FakeGrp", unattended=True)) is True
+    assert await setup.check_banned_group("ULCX", [], Meta(base_dir=str(tmp_path), tag="-FakeGrp", unattended=True)) is False

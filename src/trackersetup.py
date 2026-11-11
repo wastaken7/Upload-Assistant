@@ -519,12 +519,13 @@ class TrackerSetup:
                     elif banned_groups:
                         banned_group_list = banned_groups.split(", ")
 
-            except FileNotFoundError:
-                logger.info(f"[bold red]Banned group file for '{tracker}' not found.")
-                return False
-            except json.JSONDecodeError:
-                logger.info(f"[bold red]Failed to parse banned group file for '{tracker}'.")
-                return False
+            except (FileNotFoundError, json.JSONDecodeError) as e:
+                problem = "not found" if isinstance(e, FileNotFoundError) else "could not be parsed"
+                if not banned_group_list:
+                    logger.info(f"[bold red]Banned group file for '{tracker}' {problem}.")
+                    return False
+                # The cache may not have been written: keep checking against the built-in list.
+                logger.info(f"[bold yellow]Banned group file for '{tracker}' {problem}, using the built-in list.")
 
         banned_note = ""
         for tag in banned_group_list:

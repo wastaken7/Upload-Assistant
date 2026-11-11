@@ -415,16 +415,18 @@ def test_a_new_review_drops_an_older_plan(monkeypatch: pytest.MonkeyPatch) -> No
 
 
 class FakeResponse:
-    def __init__(self, status_code: int) -> None:
+    def __init__(self, status_code: int, body: dict[str, Any] | None = None) -> None:
         self.status_code = status_code
+        self.body = body or {}
 
     def json(self) -> dict[str, Any]:
-        return {}
+        return self.body
 
 
 class FakeClient:
     posts: ClassVar[list[tuple[str, dict[str, Any], dict[str, str]]]] = []
     status_code = 201
+    body: ClassVar[dict[str, Any]] = {}
 
     def __init__(self, **_kwargs: Any) -> None:
         pass
@@ -437,13 +439,14 @@ class FakeClient:
 
     async def post(self, url: str, headers: dict[str, str], json: dict[str, Any]) -> FakeResponse:
         FakeClient.posts.append((url, json, headers))
-        return FakeResponse(FakeClient.status_code)
+        return FakeResponse(FakeClient.status_code, FakeClient.body)
 
 
 @pytest.fixture
 def fake_http(monkeypatch: pytest.MonkeyPatch) -> type[FakeClient]:
     FakeClient.posts = []
     FakeClient.status_code = 201
+    FakeClient.body = {}
     monkeypatch.setattr("src.trump_reports.httpx.AsyncClient", FakeClient)
     monkeypatch.setattr("src.api_key_expiry.observe_tracker_response", lambda *_args, **_kwargs: None)
     return FakeClient
@@ -507,6 +510,18 @@ def test_a_refused_report_is_an_error(fake_http: type[FakeClient]) -> None:
     fake_http.status_code = 422
 
     assert submitted(planned_meta()) == {"AITHER": False, "LST": False}
+
+
+def test_a_refused_report_shows_the_sites_message(fake_http: type[FakeClient], monkeypatch: pytest.MonkeyPatch) -> None:
+    fake_http.status_code = 422
+    fake_http.body = {"message": "You already have an open report [on] this torrent."}
+    logged: list[str] = []
+    monkeypatch.setattr("src.trump_reports.logger.info", lambda message, *_args, **_kwargs: logged.append(str(message)))
+    plan = TrumpPlan("ULCX", "31", OLD["name"], trump_reports.TRUMPABLE)
+    meta = Meta({"trump_plans": {"ULCX": plan.to_dict()}, "tracker_status": {"ULCX": {"upload": True, "torrent_id": 701}}})
+
+    assert asyncio.run(trump_reports.submit_reports(meta, CONFIG, {"ULCX": ULCX})) == {"ULCX": False}
+    assert any("You already have an open report \[on] this torrent." in line for line in logged)
 
 
 def test_lst_refuses_a_non_numeric_torrent_id(fake_http: type[FakeClient]) -> None:
