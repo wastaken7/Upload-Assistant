@@ -1416,6 +1416,7 @@ const trackerNameMap = {
   SAMARITANO: "Samaritano",
   SEEDPOOL: "seedpool",
   SHAREISLAND: "ShareIsland",
+  SIMURG: "Simurg",
   SKIPTHECOMMERCIALS: "SkipTheCommercials",
   SPEEDAPP: "SpeedApp",
   SWARMAZON: "Swarmazon",
