@@ -430,4 +430,12 @@ async def _send(meta: Meta, config: dict[str, Any], tracker: str, tracker_instan
         logger.info(f"[bold green]Successfully created trump report on {tracker}[/bold green]")
         return True
     logger.info(f"[bold red]{tracker}: failed to create the trump report. HTTP Status: {response.status_code}[/bold red]")
+    try:
+        body: Any = response.json()
+    except ValueError:
+        body = None
+    site_message = cast(dict[str, Any], body).get("message") if isinstance(body, dict) else None
+    if site_message:
+        # e.g. ULCX answers 422 when an open report already exists for the torrent.
+        logger.info(f"[red]{tracker} said: {escape(str(site_message))}[/red]")
     return False

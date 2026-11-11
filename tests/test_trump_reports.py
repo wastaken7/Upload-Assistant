@@ -15,10 +15,11 @@ from src.slot_rules.models import SlotDecision, Verdict
 from src.slot_rules.profile import ReleaseProfile
 from src.trackers.UNIT3D.aither import Aither
 from src.trackers.UNIT3D.lst import LST
+from src.trackers.UNIT3D.ulcx import ULCX
 from src.trump_reports import ReviewOutcome, TrumpCandidate, TrumpPlan, TrumpSupport
 from src.uphelper import UploadHelper
 
-CONFIG: dict[str, Any] = {"DEFAULT": {}, "TRACKERS": {"AITHER": {"api_key": "fake-key"}, "LST": {"api_key": "fake-key"}}}
+CONFIG: dict[str, Any] = {"DEFAULT": {}, "TRACKERS": {"AITHER": {"api_key": "fake-key"}, "LST": {"api_key": "fake-key"}, "ULCX": {"api_key": "fake-key"}}}
 OLD_FILES = ["Fictional.Feature.2020.1080p.WEB-DL.H.264-OLDGRP.mkv", "Fictional.Feature.2020.1080p.WEB-DL.H.264-OLDGRP.srt"]
 OLD = {"name": "Fictional Feature 2020 1080p WEB-DL H.264-OLDGRP", "id": 11, "link": "https://example.invalid/torrents/11", "size": 100, "files": OLD_FILES}
 
@@ -414,16 +415,18 @@ def test_a_new_review_drops_an_older_plan(monkeypatch: pytest.MonkeyPatch) -> No
 
 
 class FakeResponse:
-    def __init__(self, status_code: int) -> None:
+    def __init__(self, status_code: int, body: dict[str, Any] | None = None) -> None:
         self.status_code = status_code
+        self.body = body or {}
 
     def json(self) -> dict[str, Any]:
-        return {}
+        return self.body
 
 
 class FakeClient:
     posts: ClassVar[list[tuple[str, dict[str, Any], dict[str, str]]]] = []
     status_code = 201
+    body: ClassVar[dict[str, Any]] = {}
 
     def __init__(self, **_kwargs: Any) -> None:
         pass
@@ -436,13 +439,14 @@ class FakeClient:
 
     async def post(self, url: str, headers: dict[str, str], json: dict[str, Any]) -> FakeResponse:
         FakeClient.posts.append((url, json, headers))
-        return FakeResponse(FakeClient.status_code)
+        return FakeResponse(FakeClient.status_code, FakeClient.body)
 
 
 @pytest.fixture
 def fake_http(monkeypatch: pytest.MonkeyPatch) -> type[FakeClient]:
     FakeClient.posts = []
     FakeClient.status_code = 201
+    FakeClient.body = {}
     monkeypatch.setattr("src.trump_reports.httpx.AsyncClient", FakeClient)
     monkeypatch.setattr("src.api_key_expiry.observe_tracker_response", lambda *_args, **_kwargs: None)
     return FakeClient
@@ -508,12 +512,50 @@ def test_a_refused_report_is_an_error(fake_http: type[FakeClient]) -> None:
     assert submitted(planned_meta()) == {"AITHER": False, "LST": False}
 
 
+def test_a_refused_report_shows_the_sites_message(fake_http: type[FakeClient], monkeypatch: pytest.MonkeyPatch) -> None:
+    fake_http.status_code = 422
+    fake_http.body = {"message": "You already have an open report [on] this torrent."}
+    logged: list[str] = []
+    monkeypatch.setattr("src.trump_reports.logger.info", lambda message, *_args, **_kwargs: logged.append(str(message)))
+    plan = TrumpPlan("ULCX", "31", OLD["name"], trump_reports.TRUMPABLE)
+    meta = Meta({"trump_plans": {"ULCX": plan.to_dict()}, "tracker_status": {"ULCX": {"upload": True, "torrent_id": 701}}})
+
+    assert asyncio.run(trump_reports.submit_reports(meta, CONFIG, {"ULCX": ULCX})) == {"ULCX": False}
+    assert any("You already have an open report \[on] this torrent." in line for line in logged)
+
+
 def test_lst_refuses_a_non_numeric_torrent_id(fake_http: type[FakeClient]) -> None:
     meta = planned_meta()
     meta.trump_plans["LST"]["reported_id"] = "None"
 
     assert submitted(meta)["LST"] is False
     assert [url for url, _payload, _headers in fake_http.posts] == ["https://aither.cc/api/trumping-reports/create"]
+
+
+@pytest.mark.parametrize(
+    ("reason", "category"),
+    [(trump_reports.SEASON_PACK, "season_pack_trump"), (trump_reports.SLOT_RULES, "trump_quality"), (trump_reports.TRUMPABLE, "trump_quality")],
+)
+def test_ulcx_reports_the_trumped_torrent_with_a_link_to_the_upload(fake_http: type[FakeClient], reason: str, category: str) -> None:
+    plan = TrumpPlan("ULCX", "31", OLD["name"], reason, note="Better encode")
+    meta = Meta({"ua_name": "Upload Assistant", "trump_plans": {"ULCX": plan.to_dict()}, "tracker_status": {"ULCX": {"upload": True, "torrent_id": 701}}})
+
+    assert asyncio.run(trump_reports.submit_reports(meta, CONFIG, {"ULCX": ULCX})) == {"ULCX": True}
+
+    ((url, payload, headers),) = fake_http.posts
+    assert url == "https://upload.cx/api/torrents/31/reports"
+    assert payload["category"] == category
+    assert payload["link"] == "https://upload.cx/torrents/701"
+    assert payload["message"].endswith(" - Better encode")
+    assert headers["Authorization"] == "Bearer fake-key"
+
+
+def test_ulcx_refuses_a_non_numeric_torrent_id(fake_http: type[FakeClient]) -> None:
+    plan = TrumpPlan("ULCX", "None", OLD["name"], trump_reports.TRUMPABLE)
+    meta = Meta({"trump_plans": {"ULCX": plan.to_dict()}, "tracker_status": {"ULCX": {"upload": True, "torrent_id": 701}}})
+
+    assert asyncio.run(trump_reports.submit_reports(meta, CONFIG, {"ULCX": ULCX})) == {"ULCX": False}
+    assert fake_http.posts == []
 
 
 # --- manager to submission ------------------------------------------------------
