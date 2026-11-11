@@ -1000,6 +1000,8 @@ config: dict[str, Any] = {
             "link_dir_name": "",
             "use_for_search": False,
             "api_key": "",
+            # Optional. When set, replaces the announce URL in the torrent downloaded from BTN
+            # after upload (e.g. https://landof.tv/<passkey>/announce). Leave empty to keep BTN's.
             "announce_url": "",
             # Optional override for BTN's JSON-RPC endpoint.
             "api_url": "https://api.broadcasthe.net/",
