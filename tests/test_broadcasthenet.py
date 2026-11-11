@@ -267,6 +267,35 @@ def test_btn_rejects_bencoded_error_instead_of_seeding_it() -> None:
         tracker()._registered_torrent(b"d5:error14:login requirede")
 
 
+def _btn_torrent(announce: str, with_list: bool = False) -> bytes:
+    from torf import Torrent
+
+    torrent = Torrent(trackers=[announce], private=True, source="BTN")
+    torrent.metainfo["info"].update({"name": "Fictional.Show.S01E01.1080p.WEB-DL-NOGRP.mkv", "length": 3, "piece length": 16384, "pieces": b"\0" * 20})
+    if not with_list:
+        torrent.metainfo.pop("announce-list", None)
+    else:
+        torrent.metainfo["announce-list"] = [[announce]]
+    return torrent.dump(validate=False)
+
+
+def test_btn_registered_torrent_keeps_tracker_announce_without_config() -> None:
+    content = _btn_torrent("http://landof.tv/abc/announce")
+    assert tracker()._registered_torrent(content) == content
+
+
+@pytest.mark.parametrize("with_list", [False, True])
+def test_btn_registered_torrent_uses_configured_announce_and_keeps_hash(with_list: bool) -> None:
+    from torf import Torrent
+
+    content = _btn_torrent("http://landof.tv/abc/announce", with_list)
+    rewritten = tracker()._registered_torrent(content, "https://landof.tv/abc/announce")
+    original, result = Torrent.read_stream(content), Torrent.read_stream(rewritten)
+    assert result.infohash == original.infohash
+    assert result.metainfo["announce"] == "https://landof.tv/abc/announce"
+    assert result.metainfo.get("announce-list", [["https://landof.tv/abc/announce"]]) == [["https://landof.tv/abc/announce"]]
+
+
 def test_btn_get_name_uses_disambiguation_from_btn_series_name(monkeypatch) -> None:
     btn = tracker()
 

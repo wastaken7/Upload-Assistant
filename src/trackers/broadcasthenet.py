@@ -16,6 +16,7 @@ from typing import Any, ClassVar, cast
 from urllib.parse import parse_qs, urlparse
 
 import aiofiles
+import bencodepy
 import httpx
 from torf import TorfError, Torrent
 
@@ -726,12 +727,24 @@ class BroadcasTheNet:
         return (match.group(1), "") if match else ("", "")
 
     @staticmethod
-    def _registered_torrent(content: bytes) -> bytes:
+    def _registered_torrent(content: bytes, announce_url: str = "") -> bytes:
         try:
             Torrent.read_stream(content)
         except (TorfError, ValueError) as exc:
             raise UploadError("BTN returned an invalid torrent after upload", "red") from exc
-        return content
+        if not announce_url:
+            return content
+        # Swap only the top-level tracker URLs; the info dict, and so the info hash, must stay BTN's.
+        bencode_module = cast(Any, bencodepy)
+        metainfo = cast(dict[bytes, Any], bencode_module.decode(content))
+        if bencode_module.encode(metainfo) != content:
+            # Re-encoding a non-canonical file could alter the info dict bytes and break seeding.
+            logger.warning("BTN: kept the tracker's announce URL because the torrent cannot be rewritten safely.")
+            return content
+        metainfo[b"announce"] = announce_url.encode()
+        if b"announce-list" in metainfo:
+            metainfo[b"announce-list"] = [[announce_url.encode()]]
+        return cast(bytes, bencode_module.encode(metainfo))
 
     @staticmethod
     def _mapping(meta: Meta) -> tuple[str, str, str, str]:
@@ -1035,7 +1048,7 @@ class BroadcasTheNet:
                 download = await client.get(f"{self.base_url}/torrents.php?action=download&id={torrent_id}")
                 download.raise_for_status()
                 async with aiofiles.open(torrent_path, "wb") as handle:
-                    await handle.write(self._registered_torrent(download.content))
+                    await handle.write(self._registered_torrent(download.content, str(self.settings.get("announce_url") or "").strip()))
         except (httpx.HTTPError, OSError, UploadError) as exc:
             meta.tracker_status[self.tracker]["status_message"] = f"data error: {exc}"
             logger.info(f"{self.tracker}: [red]{exc}[/red]")
