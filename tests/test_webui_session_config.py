@@ -1,4 +1,5 @@
 """WebUI prompt timeouts keep their documented numeric semantics when saved."""
+
 import pytest
 
 import web_ui.server as server

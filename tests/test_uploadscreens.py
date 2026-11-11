@@ -126,7 +126,9 @@ def test_upload_screens_manager_attributes_a_fallback_chain_to_each_host() -> No
             patch("src.uploadscreens.record_event_async", new=recorder),
         ):
             await UploadScreensManager({"DEFAULT": {"img_host_1": "fictionalhost"}}).upload_screens(meta, 3, 1, 0, 3, [], {})
-        events = [(call.args[0], call.kwargs["service"], call.kwargs.get("operation"), call.kwargs["outcome"], call.kwargs.get("count", 1)) for call in recorder.await_args_list]
+        events = [
+            (call.args[0], call.kwargs["service"], call.kwargs.get("operation"), call.kwargs["outcome"], call.kwargs.get("count", 1)) for call in recorder.await_args_list
+        ]
         assert events == [
             ("api", "fictionalhost", "image_upload", "success", 1),
             ("api", "fictionalhost", "image_upload", "error", 2),

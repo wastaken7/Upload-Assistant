@@ -9,7 +9,6 @@ from src.meta import Meta
 from src.trackers.NEXUSPHP.zmpt import ZmPT
 from src.trackersetup import get_tracker_framework, http_trackers, tracker_class_map
 
-
 pytestmark = pytest.mark.asyncio
 
 

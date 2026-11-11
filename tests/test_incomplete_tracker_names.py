@@ -9,19 +9,45 @@ from src.trackers.naming import add_incomplete_pack_marker
 from src.trackersetup import tracker_class_map
 
 TRACKERS = (
-    "LST", "AITHER", "HDBITS", "ULCX", "HAWKEUNO", "YUSCENE", "OLDTOONSWORLD",
-    "ONLYENCODES", "PRIVATEHD", "CINEMAZ", "AVISTAZ", "HDTORRENTS", "RASTASTUGAN",
-    "DARKPEERS", "IPTORRENTS", "HDSPACE", "TORRENTLEECH",
+    "LST",
+    "AITHER",
+    "HDBITS",
+    "ULCX",
+    "HAWKEUNO",
+    "YUSCENE",
+    "OLDTOONSWORLD",
+    "ONLYENCODES",
+    "PRIVATEHD",
+    "CINEMAZ",
+    "AVISTAZ",
+    "HDTORRENTS",
+    "RASTASTUGAN",
+    "DARKPEERS",
+    "IPTORRENTS",
+    "HDSPACE",
+    "TORRENTLEECH",
 )
 
 
 def make_meta(**overrides):
     fields = dict(
-        category="TV", tv_pack=True, season_pack_incomplete=True, season="S03", season_int=3,
-        title="Example Show", name="Example Show S03 1080p DSNP WEB-DL DDP 5.1 H.264-TESTGROUP",
+        category="TV",
+        tv_pack=True,
+        season_pack_incomplete=True,
+        season="S03",
+        season_int=3,
+        title="Example Show",
+        name="Example Show S03 1080p DSNP WEB-DL DDP 5.1 H.264-TESTGROUP",
         clean_name="Example.Show.S03.1080p.DSNP.WEB-DL.DDP.5.1.H.264-TESTGROUP",
-        type="WEBDL", source="Web", resolution="1080p", video_codec="H.264", video_encode="H.264",
-        audio="DDP 5.1", tag="-TESTGROUP", service="DSNP", language_checked=True,
+        type="WEBDL",
+        source="Web",
+        resolution="1080p",
+        video_codec="H.264",
+        video_encode="H.264",
+        audio="DDP 5.1",
+        tag="-TESTGROUP",
+        service="DSNP",
+        language_checked=True,
     )
     fields.update(overrides)
     return Meta(**fields)
@@ -57,16 +83,19 @@ async def test_requested_tracker_marks_only_confirmed_packs(tracker_name, confir
             await session.aclose()
 
 
-@pytest.mark.parametrize("name,expected", [
-    ("Show S03 1080p", "Show S03 INCOMPLETE 1080p"),
-    ("Show.S03.1080p", "Show.S03.INCOMPLETE.1080p"),
-    ("Show S03 INCOMPLETE 1080p", "Show S03 INCOMPLETE 1080p"),
-    ("Show S03 incomplete INCOMPLETE 1080p", "Show S03 INCOMPLETE 1080p"),
-    ("Show.S03.INCOMPLETE.1080p", "Show.S03.INCOMPLETE.1080p"),
-    ("Show S030 1080p", "Show S030 1080p"),
-    ("Show S03E02 1080p", "Show S03E02 1080p"),
-    ("Show 1080p", "Show 1080p"),
-])
+@pytest.mark.parametrize(
+    "name,expected",
+    [
+        ("Show S03 1080p", "Show S03 INCOMPLETE 1080p"),
+        ("Show.S03.1080p", "Show.S03.INCOMPLETE.1080p"),
+        ("Show S03 INCOMPLETE 1080p", "Show S03 INCOMPLETE 1080p"),
+        ("Show S03 incomplete INCOMPLETE 1080p", "Show S03 INCOMPLETE 1080p"),
+        ("Show.S03.INCOMPLETE.1080p", "Show.S03.INCOMPLETE.1080p"),
+        ("Show S030 1080p", "Show S030 1080p"),
+        ("Show S03E02 1080p", "Show S03E02 1080p"),
+        ("Show 1080p", "Show 1080p"),
+    ],
+)
 def test_marker_placement_boundaries_and_idempotence(name, expected):
     meta = make_meta()
     result = add_incomplete_pack_marker(name, meta, "LST")
@@ -86,11 +115,14 @@ def test_unlisted_tracker_is_unchanged():
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("overrides, expected", [
-    ({}, "Example.Show.S03.INCOMPLETE.1080p.DSNP.WEB-DL.DDP.5.1.H.264-TESTGROUP"),
-    ({"scene_name": "Example Show S03 1080p-Bluebird", "scene": True}, "Example Show S03 INCOMPLETE 1080p-BB [NO RAR]"),
-    ({"manual_name": "  Custom Show S03 WEBRip-Bluebird  "}, "Custom Show S03 WEBRip-Bluebird"),
-])
+@pytest.mark.parametrize(
+    "overrides, expected",
+    [
+        ({}, "Example.Show.S03.INCOMPLETE.1080p.DSNP.WEB-DL.DDP.5.1.H.264-TESTGROUP"),
+        ({"scene_name": "Example Show S03 1080p-Bluebird", "scene": True}, "Example Show S03 INCOMPLETE 1080p-BB [NO RAR]"),
+        ({"manual_name": "  Custom Show S03 WEBRip-Bluebird  "}, "Custom Show S03 WEBRip-Bluebird"),
+    ],
+)
 async def test_iptorrents_post_upload_edit_preserves_release_name(overrides, expected):
     tracker = make_tracker("IPTORRENTS")
     await tracker.session.aclose()

@@ -101,7 +101,9 @@ def test_recursive_discovery_collects_videos_from_subfolders(tmp_path):
 
     video, filelist = asyncio.run(VideoManager().get_video(str(root), recursive=True))
 
-    expected = sorted(str(root / relative) for relative in ("Root.Scene_1080p.mp4", "Part 1/Alpha.Scene_1080p.mp4", "Part 2/Beta.Scene_1080p.mp4", "Part 2/Deeper/Gamma.Scene_1080p.mp4"))
+    expected = sorted(
+        str(root / relative) for relative in ("Root.Scene_1080p.mp4", "Part 1/Alpha.Scene_1080p.mp4", "Part 2/Beta.Scene_1080p.mp4", "Part 2/Deeper/Gamma.Scene_1080p.mp4")
+    )
     assert filelist == expected
     assert video == expected[0]
 
@@ -143,7 +145,9 @@ def test_xxx_pack_keeps_every_nested_video_in_the_file_list(tmp_path):
     with pytest.raises(RuntimeError, match="stop after discovery"):
         asyncio.run(process_media_files(prep, meta, str(root), {}))
 
-    assert meta.filelist == sorted(str(root / relative) for relative in ("Root.Scene_1080p.mp4", "Part 1/Alpha.Scene_1080p.mp4", "Part 2/Beta.Scene_1080p.mp4", "Part 2/Deeper/Gamma.Scene_1080p.mp4"))
+    assert meta.filelist == sorted(
+        str(root / relative) for relative in ("Root.Scene_1080p.mp4", "Part 1/Alpha.Scene_1080p.mp4", "Part 2/Beta.Scene_1080p.mp4", "Part 2/Deeper/Gamma.Scene_1080p.mp4")
+    )
 
 
 def test_recursive_discovery_stops_when_a_subfolder_cannot_be_read(tmp_path, monkeypatch):

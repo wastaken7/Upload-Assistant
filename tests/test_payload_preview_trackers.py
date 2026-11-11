@@ -65,7 +65,15 @@ def make_meta(tracker: str) -> Meta:
         cast=["Fictional Actor"],
     )
     meta.tmdb_localized_data = {"zh-cn": localized, "pt-BR": localized}
-    meta.imdb_info = {"imdb_url": "https://www.imdb.com/title/tt7654321", "title": "Fictional Film", "year": 2001, "type": "movie", "directors": ["Fictional Director"], "stars": ["Fictional Actor"], "rating": 7.1}
+    meta.imdb_info = {
+        "imdb_url": "https://www.imdb.com/title/tt7654321",
+        "title": "Fictional Film",
+        "year": 2001,
+        "type": "movie",
+        "directors": ["Fictional Director"],
+        "stars": ["Fictional Actor"],
+        "rating": 7.1,
+    }
     meta.mediainfo = {
         "media": {
             "track": [
@@ -106,7 +114,7 @@ def test_preview_sends_nothing_beyond_the_name_lookup(name: str, monkeypatch: py
         with prompts_blocked():
             try:
                 return await asyncio.wait_for(getattr(tracker, step)(make_meta(name)), 30)
-            except (Exception, PromptBlockedError):
+            except Exception, PromptBlockedError:
                 # Missing fictional data may stop a preview; the GUI then shows only the name.
                 return None
 

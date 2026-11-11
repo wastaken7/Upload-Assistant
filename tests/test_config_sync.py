@@ -195,8 +195,7 @@ def test_sync_leaves_user_managed_sections_byte_for_byte_unchanged(tmp_path: Pat
     original = f"config = {user!r}\n"
     config_path.write_text(original, encoding="utf-8")
     example_path.write_text(
-        f"config = {{'DEFAULT': {{'screens_per_row': 1}}, {section!r}: "
-        "{'FICTIONAL': {'screens_per_row': 1, 'custom_signature': ''}, 'REMOVED': {'enabled': True}}}\n",
+        f"config = {{'DEFAULT': {{'screens_per_row': 1}}, {section!r}: {{'FICTIONAL': {{'screens_per_row': 1, 'custom_signature': ''}}, 'REMOVED': {{'enabled': True}}}}}}\n",
         encoding="utf-8",
     )
 

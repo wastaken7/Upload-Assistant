@@ -11,9 +11,7 @@ def test_remote_version_rejects_non_https_url(monkeypatch) -> None:
     monkeypatch.setattr(
         update_checker.urllib.request,
         "urlopen",
-        lambda *_args, **_kwargs: (_ for _ in ()).throw(
-            AssertionError("Non-HTTPS URLs must not be opened")
-        ),
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("Non-HTTPS URLs must not be opened")),
     )
 
     assert update_checker.fetch_remote_version("http://example.com/version.py") == (None, None)
@@ -60,9 +58,7 @@ def test_fetch_unreleased_changes_returns_safe_latest_first_commits(monkeypatch)
     assert [commit["short_sha"] for commit in result["commits"]] == ["bbbbbbb", "aaaaaaa"]
     assert result["commits"][0]["author"] == "Second Author"
     assert result["commits"][1]["summary"] == "feat(core): first change"
-    assert result["commits"][1]["commit_url"] == (
-        "https://github.com/wastaken7/Upload-Assistant/commit/aaaaaaaa"
-    )
+    assert result["commits"][1]["commit_url"] == ("https://github.com/wastaken7/Upload-Assistant/commit/aaaaaaaa")
 
 
 def test_update_status_reuses_cli_compatible_cache(tmp_path, monkeypatch) -> None:

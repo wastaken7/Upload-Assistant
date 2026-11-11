@@ -215,7 +215,9 @@ def test_invalid_image_sizes_do_not_modify_config(config_files, field, value):
     assert config_path.read_bytes() == original
 
 
-@pytest.mark.parametrize("field,minimum", [("thumbnail_size", 1), ("pack_thumb_size", 1), ("logo_size", 1), ("bluray_image_size", 1), ("screens_per_row", 0), ("multiScreens", 0)])
+@pytest.mark.parametrize(
+    "field,minimum", [("thumbnail_size", 1), ("pack_thumb_size", 1), ("logo_size", 1), ("bluray_image_size", 1), ("screens_per_row", 0), ("multiScreens", 0)]
+)
 def test_numeric_bounds_match_editor_and_allow_minimum(config_files, field, minimum):
     _, config_path = config_files
     for value in (minimum, str(minimum), None):

@@ -470,7 +470,13 @@ def test_site_and_day_search_finds_a_scene_the_full_name_misses(tmp_path: Path, 
 
     _mock(monkeypatch, handler)
     # The name lists the performers and a different title than the site uses.
-    meta = _meta(tmp_path, "ExampleStudio.26.08.21.Jane.Example.And.Mary.Sample.Lazy.Day.XXX.1080p.MP4-GRP", publisher="ExampleStudio", release_date="2026-08-21", title="Jane Example And Mary Sample Lazy Day")
+    meta = _meta(
+        tmp_path,
+        "ExampleStudio.26.08.21.Jane.Example.And.Mary.Sample.Lazy.Day.XXX.1080p.MP4-GRP",
+        publisher="ExampleStudio",
+        release_date="2026-08-21",
+        title="Jane Example And Mary Sample Lazy Day",
+    )
 
     asyncio.run(lookup_xxx_metadata(meta, CONFIG))
 
@@ -738,7 +744,12 @@ def test_several_videos_never_get_one_scene(tmp_path: Path, monkeypatch: pytest.
 def test_match_answer_none_skips_even_a_confident_result(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     requests = _mock(monkeypatch, lambda _request: httpx.Response(200, json={"data": [_scene()]}))
     meta = _meta(
-        tmp_path, "ExampleStudio.26.08.21.Sunny.Afternoon.XXX.MP4-GRP", publisher="ExampleStudio", release_date="2026-08-21", title="Sunny Afternoon", answers={"xxx.match": "none"}
+        tmp_path,
+        "ExampleStudio.26.08.21.Sunny.Afternoon.XXX.MP4-GRP",
+        publisher="ExampleStudio",
+        release_date="2026-08-21",
+        title="Sunny Afternoon",
+        answers={"xxx.match": "none"},
     )
 
     asyncio.run(lookup_xxx_metadata(meta, CONFIG))
@@ -838,7 +849,6 @@ def test_restored_blvckout_id_is_looked_up(tmp_path: Path, monkeypatch: pytest.M
 
     assert len(requests) == 1
     assert (meta.blvckout_id, meta.publisher) == ("4242", "Example Pictures")
-
 
 
 @pytest.mark.parametrize("name", ["ExampleStudio.Sunny.Afternoon.Vol-2", "ExampleStudio.2026-08-21"])

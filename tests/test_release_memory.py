@@ -376,7 +376,6 @@ def test_confirmed_xxx_metadata_ids_are_reused(tmp_path):
     assert applied == ["ThePornDB scenes/00000000-0000-4000-8000-000000000001", "BLVCKOUT 4242"]
 
 
-
 def test_a_confirmed_xxx_category_is_restored_before_preparation(tmp_path):
     release = _release(tmp_path, "clip_0001")
     meta = _confirm(Meta(path=str(release), category="XXX", tpdb_id="scenes/1"))
@@ -394,7 +393,6 @@ def test_a_confirmed_xxx_category_is_restored_before_preparation(tmp_path):
     skipped = _load(release, no_saved_ids=True)
     upload_history.apply_saved_ids(skipped)
     assert skipped.category == ""
-
 
 
 def test_a_given_id_keeps_the_saved_xxx_category_from_being_restored(tmp_path):

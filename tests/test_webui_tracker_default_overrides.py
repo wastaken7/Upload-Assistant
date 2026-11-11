@@ -122,7 +122,8 @@ def test_disable_save_sync_reload_keeps_keys_and_follows_default_changes(tracker
     saved = server._load_config_from_file(config_path)
     assert saved["DEFAULT"]["new_option"] is True
     assert saved["TRACKERS"]["AITHER"] == {
-        **original["TRACKERS"]["AITHER"], **dict.fromkeys(keys),
+        **original["TRACKERS"]["AITHER"],
+        **dict.fromkeys(keys),
     }
     items = server._build_config_items(example["TRACKERS"]["AITHER"], saved["TRACKERS"]["AITHER"], {}, {}, ["TRACKERS", "AITHER"])
     for item in items:
@@ -172,8 +173,7 @@ def test_bulk_disable_can_save_inheritance_for_an_unsaved_tracker(tracker_config
 def test_inheritance_retains_the_setting_in_config_source(tracker_config):
     config_path, _, _ = tracker_config
     config_path.write_text(
-        'config = {\n    "TRACKERS": {\n        "AITHER": {\n'
-        '            "add_logo": True,\n        },\n    },\n}\n',
+        'config = {\n    "TRACKERS": {\n        "AITHER": {\n            "add_logo": True,\n        },\n    },\n}\n',
         encoding="utf-8",
     )
     assert update(["TRACKERS", "AITHER", "add_logo"], None)[1] == 200

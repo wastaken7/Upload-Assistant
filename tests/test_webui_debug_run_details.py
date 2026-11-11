@@ -1,4 +1,5 @@
 """GUI debug details reflect parsed skip flags without exposing unrelated settings."""
+
 import json
 from pathlib import Path
 
@@ -21,7 +22,7 @@ def gui(monkeypatch):
 def item_events(capsys):
     """Read item updates while ignoring ordinary console output."""
     prefix = webui_events.event_prefix("debug-details-test")
-    return [event for line in capsys.readouterr().out.splitlines() if line.startswith(prefix) and (event := json.loads(line[len(prefix):]))["kind"] == "item"]
+    return [event for line in capsys.readouterr().out.splitlines() if line.startswith(prefix) and (event := json.loads(line[len(prefix) :]))["kind"] == "item"]
 
 
 @pytest.mark.parametrize("no_seed", [False, True])
@@ -43,8 +44,18 @@ async def test_unattended_confirmation_refreshes_options_and_prep_folder(gui, tm
     """Resolved preparation details are available even without a confirmation prompt."""
     webui_events.begin_item("Example.mkv", 1, 1)
     webui_events.update_item(personal_release=True, run_options=Meta(debug=True))
-    meta = Meta(category="MOVIE", unattended=True, debug=True, personalrelease=True, no_seed=True,
-                skip_imghost_upload=True, nohash=True, ffdebug=True, base_dir=str(tmp_path), uuid="prepared-release")
+    meta = Meta(
+        category="MOVIE",
+        unattended=True,
+        debug=True,
+        personalrelease=True,
+        no_seed=True,
+        skip_imghost_upload=True,
+        nohash=True,
+        ffdebug=True,
+        base_dir=str(tmp_path),
+        uuid="prepared-release",
+    )
     assert await UploadHelper({"DEFAULT": {}}).get_confirmation(meta)
     first, early, prepared = item_events(capsys)
     assert "run_options" not in first
@@ -76,6 +87,7 @@ def test_run_options_do_no_work_outside_gui(monkeypatch, capsys):
 
     class Unreadable(dict):
         """Detect accidental metadata reads outside GUI mode."""
+
         def get(self, *args, **kwargs):
             """Fail if the no-op helper inspects metadata."""
             raise AssertionError("metadata read outside GUI mode")

@@ -90,7 +90,7 @@ def test_timeout_terminates_hook_child_processes(tmp_path, monkeypatch):
     def _is_running(pid: int) -> bool:
         try:
             return psutil.pid_exists(pid) and psutil.Process(pid).status() != psutil.STATUS_ZOMBIE
-        except (psutil.NoSuchProcess, psutil.AccessDenied):
+        except psutil.NoSuchProcess, psutil.AccessDenied:
             return False
 
     while _is_running(child_pid) and time.monotonic() < deadline:

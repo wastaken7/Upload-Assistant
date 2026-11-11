@@ -13,7 +13,6 @@ from src.screenshot_manifest import register
 from src.temp_paths import screenshots_dir
 from src.trackers.hdbits import HDBits
 
-
 BBCODE = "[url=https://images.example/screenshot][img]https://images.example/screenshot.png[/img][/url]"
 
 

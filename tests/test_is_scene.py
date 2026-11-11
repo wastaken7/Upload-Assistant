@@ -121,7 +121,9 @@ class _RoutedClient(_FakeAsyncClient):
 @pytest.mark.asyncio
 @pytest.mark.parametrize("operation,url", [("search", _SEARCH_URL), ("details", _DETAILS_URL)])
 async def test_warning_response_is_returned_without_caching_and_can_be_retried(
-    tmp_path: Path, operation: str, url: str,
+    tmp_path: Path,
+    operation: str,
+    url: str,
 ) -> None:
     warning_payload = {"warnings": ["Request could not be completed"]}
     client = _RoutedClient({url: _Response(warning_payload)})
@@ -142,18 +144,25 @@ async def test_warning_response_is_returned_without_caching_and_can_be_retried(
 @pytest.mark.parametrize("cached_miss", [False, True])
 @pytest.mark.parametrize("count", [1, "1"])
 async def test_archived_filename_fallback_restores_release_and_reuses_cache(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, cached_miss: bool, count: int | str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    cached_miss: bool,
+    count: int | str,
 ) -> None:
     nfo_url = f"https://www.srrdb.com/download/file/{_RELEASE}/{_BASENAME}.nfo"
-    client = _RoutedClient({
-        f"https://api.srrdb.com/v1/search/r:{_BASENAME}": _Response(_EMPTY_SEARCH),
-        _SEARCH_URL: _Response({"resultsCount": count, "results": [_RESULT]}),
-        _DETAILS_URL: _Response({
-            "archived-files": [{"name": f"{_BASENAME}.mkv"}],
-            "files": [{"name": f"{_BASENAME}.nfo"}],
-        }),
-        nfo_url: _Response(content=b"generic scene nfo"),
-    })
+    client = _RoutedClient(
+        {
+            f"https://api.srrdb.com/v1/search/r:{_BASENAME}": _Response(_EMPTY_SEARCH),
+            _SEARCH_URL: _Response({"resultsCount": count, "results": [_RESULT]}),
+            _DETAILS_URL: _Response(
+                {
+                    "archived-files": [{"name": f"{_BASENAME}.mkv"}],
+                    "files": [{"name": f"{_BASENAME}.nfo"}],
+                }
+            ),
+            nfo_url: _Response(content=b"generic scene nfo"),
+        }
+    )
     events: list[tuple[str, str, str]] = []
 
     async def record_event(family: str, **kwargs: Any) -> None:
@@ -192,7 +201,9 @@ async def test_archived_filename_fallback_restores_release_and_reuses_cache(
 @pytest.mark.asyncio
 @pytest.mark.parametrize("case", ["no_candidates", "wrong_filename", "stored_file_only", "ambiguous", "details_error", "truncated", "overly_broad", "warnings"])
 async def test_archived_filename_fallback_does_not_guess(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, case: str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    case: str,
 ) -> None:
     candidate_search = {"resultsCount": 1, "results": [_RESULT]}
     details = {"archived-files": [{"name": f"{_BASENAME}.mkv"}]}
@@ -231,19 +242,34 @@ async def test_archived_filename_fallback_does_not_guess(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("payload", [
-    {},
-    {"results": [_RESULT]},
-    *[{"resultsCount": count, "results": [_RESULT]} for count in (None, "invalid", "1.5", [], {}, True, 1.0, -1)],
-    {"resultsCount": 0},
-    *[{"resultsCount": 0, "results": results} for results in (None, {}, "")],
-    *[{"resultsCount": 1, "results": [candidate]} for candidate in (
-        None, "release", [], {}, {"release": None}, {"release": 123}, {"release": ""}, {"release": "   "},
-    )],
-    {"resultsCount": 2, "results": [_RESULT, {"release": None}]},
-])
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {},
+        {"results": [_RESULT]},
+        *[{"resultsCount": count, "results": [_RESULT]} for count in (None, "invalid", "1.5", [], {}, True, 1.0, -1)],
+        {"resultsCount": 0},
+        *[{"resultsCount": 0, "results": results} for results in (None, {}, "")],
+        *[
+            {"resultsCount": 1, "results": [candidate]}
+            for candidate in (
+                None,
+                "release",
+                [],
+                {},
+                {"release": None},
+                {"release": 123},
+                {"release": ""},
+                {"release": "   "},
+            )
+        ],
+        {"resultsCount": 2, "results": [_RESULT, {"release": None}]},
+    ],
+)
 async def test_archived_filename_fallback_rejects_malformed_payloads(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, payload: dict[str, Any],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    payload: dict[str, Any],
 ) -> None:
     exact_url = f"https://api.srrdb.com/v1/search/r:{_BASENAME}"
     client = _RoutedClient({exact_url: _Response(_EMPTY_SEARCH), _SEARCH_URL: _Response(payload)})
@@ -258,12 +284,14 @@ async def test_archived_filename_fallback_rejects_malformed_payloads(
 @pytest.mark.asyncio
 async def test_archived_filename_fallback_checks_all_candidates(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     other = {**_RESULT, "release": "Generic-Title.2024.1080p.BluRay.x264-OTHERGROUP"}
-    client = _RoutedClient({
-        f"https://api.srrdb.com/v1/search/r:{_BASENAME}": _Response(_EMPTY_SEARCH),
-        _SEARCH_URL: _Response({"resultsCount": 2, "results": [other, {**_RESULT, "hasNFO": "no"}]}),
-        f"https://api.srrdb.com/v1/details/{other['release']}": _Response({"archived-files": [{"name": "other.mkv"}]}),
-        _DETAILS_URL: _Response({"archived-files": [{"name": f"Folder\\{_BASENAME.upper()}.MKV"}]}),
-    })
+    client = _RoutedClient(
+        {
+            f"https://api.srrdb.com/v1/search/r:{_BASENAME}": _Response(_EMPTY_SEARCH),
+            _SEARCH_URL: _Response({"resultsCount": 2, "results": [other, {**_RESULT, "hasNFO": "no"}]}),
+            f"https://api.srrdb.com/v1/details/{other['release']}": _Response({"archived-files": [{"name": "other.mkv"}]}),
+            _DETAILS_URL: _Response({"archived-files": [{"name": f"Folder\\{_BASENAME.upper()}.MKV"}]}),
+        }
+    )
     monkeypatch.setattr("src.is_scene.httpx.AsyncClient", lambda: client)
     meta = Meta(base_dir=str(tmp_path), uuid="scene-test", category="MOVIE")
     assert await SceneManager({"DEFAULT": {}}).is_scene(f"{_BASENAME}.mkv", meta) == (f"{_RELEASE}.mkv", True, 1234567)
@@ -271,12 +299,17 @@ async def test_archived_filename_fallback_checks_all_candidates(tmp_path: Path, 
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("filename", [
-    "examplegroup-generic.series.s03e01.episode-title.avi",
-    "Generic Title [2024]-EXAMPLEGROUP.iso",
-])
+@pytest.mark.parametrize(
+    "filename",
+    [
+        "examplegroup-generic.series.s03e01.episode-title.avi",
+        "Generic Title [2024]-EXAMPLEGROUP.iso",
+    ],
+)
 async def test_filename_match_does_not_need_sample_search(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, filename: str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    filename: str,
 ) -> None:
     release = "Generic.Series.S03E01.DVDRip.XviD-EXAMPLEGROUP"
     quoted_base = urllib.parse.quote(Path(filename).stem, safe="")
@@ -284,11 +317,13 @@ async def test_filename_match_does_not_need_sample_search(
     exact_url = f"https://api.srrdb.com/v1/search/r:{quoted_base}"
     filename_url = f"https://api.srrdb.com/v1/search/store-real-filename:{quoted_filename}"
     details_url = f"https://api.srrdb.com/v1/details/{release}"
-    client = _RoutedClient({
-        exact_url: _Response(_EMPTY_SEARCH),
-        filename_url: _Response({"resultsCount": 1, "results": [{"release": release, "hasNFO": "no", "imdbId": None}]}),
-        details_url: _Response({"archived-files": [{"name": filename}]}),
-    })
+    client = _RoutedClient(
+        {
+            exact_url: _Response(_EMPTY_SEARCH),
+            filename_url: _Response({"resultsCount": 1, "results": [{"release": release, "hasNFO": "no", "imdbId": None}]}),
+            details_url: _Response({"archived-files": [{"name": filename}]}),
+        }
+    )
     monkeypatch.setattr("src.is_scene.httpx.AsyncClient", lambda: client)
     meta = Meta(base_dir=str(tmp_path), uuid="scene-test")
     assert await SceneManager({"DEFAULT": {}}).is_scene(filename, meta) == (f"{release}.mkv", True, None)
@@ -304,33 +339,46 @@ async def test_filename_search_miss_stops_after_sample_guesses(tmp_path: Path, m
     video = f"{_BASENAME}.mkv"
     assert await SceneManager({"DEFAULT": {}}).is_scene(video, meta) == (video, False, None)
     assert client.requested_urls == [exact_url, _SEARCH_URL] + [
-        f"https://api.srrdb.com/v1/search/store-real-filename:{name}" for name in [
-            f"{_BASENAME}.sample.mkv", f"{_BASENAME}-sample.mkv", f"sample-{_BASENAME}.mkv", f"sample.{_BASENAME}.mkv",
-            "generic-title.2024.1080p.bluray.sample-examplegroup.mkv", "generic-title.2024.1080p.bluray-sample-examplegroup.mkv",
+        f"https://api.srrdb.com/v1/search/store-real-filename:{name}"
+        for name in [
+            f"{_BASENAME}.sample.mkv",
+            f"{_BASENAME}-sample.mkv",
+            f"sample-{_BASENAME}.mkv",
+            f"sample.{_BASENAME}.mkv",
+            "generic-title.2024.1080p.bluray.sample-examplegroup.mkv",
+            "generic-title.2024.1080p.bluray-sample-examplegroup.mkv",
         ]
     ]
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(("filename", "sample"), [
-    ("examplegroup-generic.series.s03e01.episode-title.avi", "examplegroup-generic.series.s03e01.episode-title.sample.avi"),
-    ("examplegroup-generic.series.s03e01.episode-title.avi", "examplegroup-generic.series.s03e01.episode-title-sample.avi"),
-    ("examplegroup-generic.series.s03e01.episode-title.avi", "sample-examplegroup-generic.series.s03e01.episode-title.avi"),
-    ("examplegroup-generic.series.s03e01.episode-title.avi", "sample.examplegroup-generic.series.s03e01.episode-title.avi"),
-    (f"{_BASENAME}.mkv", "generic-title.2024.1080p.bluray.sample-examplegroup.mkv"),
-    (f"{_BASENAME}.mkv", "generic-title.2024.1080p.bluray-sample-examplegroup.mkv"),
-    ("Generic Title [2024]-EXAMPLEGROUP.iso", "generic title [2024]-examplegroup.sample.m2ts"),
-])
+@pytest.mark.parametrize(
+    ("filename", "sample"),
+    [
+        ("examplegroup-generic.series.s03e01.episode-title.avi", "examplegroup-generic.series.s03e01.episode-title.sample.avi"),
+        ("examplegroup-generic.series.s03e01.episode-title.avi", "examplegroup-generic.series.s03e01.episode-title-sample.avi"),
+        ("examplegroup-generic.series.s03e01.episode-title.avi", "sample-examplegroup-generic.series.s03e01.episode-title.avi"),
+        ("examplegroup-generic.series.s03e01.episode-title.avi", "sample.examplegroup-generic.series.s03e01.episode-title.avi"),
+        (f"{_BASENAME}.mkv", "generic-title.2024.1080p.bluray.sample-examplegroup.mkv"),
+        (f"{_BASENAME}.mkv", "generic-title.2024.1080p.bluray-sample-examplegroup.mkv"),
+        ("Generic Title [2024]-EXAMPLEGROUP.iso", "generic title [2024]-examplegroup.sample.m2ts"),
+    ],
+)
 async def test_sample_search_verifies_archived_filename_and_reuses_cache(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, filename: str, sample: str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    filename: str,
+    sample: str,
 ) -> None:
     exact_url = f"https://api.srrdb.com/v1/search/r:{urllib.parse.quote(Path(filename).stem, safe='')}"
     sample_url = f"https://api.srrdb.com/v1/search/store-real-filename:{urllib.parse.quote(sample, safe='')}"
-    client = _RoutedClient({
-        exact_url: _Response(_EMPTY_SEARCH),
-        sample_url: _Response({"resultsCount": 1, "results": [_RESULT]}),
-        _DETAILS_URL: _Response({"archived-files": [{"name": filename}]}),
-    })
+    client = _RoutedClient(
+        {
+            exact_url: _Response(_EMPTY_SEARCH),
+            sample_url: _Response({"resultsCount": 1, "results": [_RESULT]}),
+            _DETAILS_URL: _Response({"archived-files": [{"name": filename}]}),
+        }
+    )
     monkeypatch.setattr("src.is_scene.httpx.AsyncClient", lambda: client)
     manager = SceneManager({"DEFAULT": {}})
     for _ in range(2):
@@ -354,7 +402,9 @@ async def test_scene_match_preserves_manual_imdb(tmp_path: Path, monkeypatch: py
 @pytest.mark.asyncio
 @pytest.mark.parametrize("operation", ["mkdir", "write_text"])
 async def test_cache_failure_preserves_successful_lookup(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, operation: str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    operation: str,
 ) -> None:
     client = _FakeAsyncClient()
     monkeypatch.setattr("src.is_scene.httpx.AsyncClient", lambda: client)
@@ -377,7 +427,11 @@ async def test_cache_failure_preserves_successful_lookup(
 @pytest.mark.parametrize("lower", [False, True])
 @pytest.mark.parametrize("debug", [False, True])
 async def test_scene_match_requires_confirmation_for_file_differences(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, case: str, lower: bool, debug: bool,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    case: str,
+    lower: bool,
+    debug: bool,
 ) -> None:
     filename = f"{_RELEASE}.mkv" if case in {"renamed", "renamed_and_size", "multiple_files"} else f"{_BASENAME}.mkv"
     if case == "case_only":
@@ -389,14 +443,13 @@ async def test_scene_match_requires_confirmation_for_file_differences(
         archived[0].pop("size")
     if case == "multiple_files":
         archived.append({"name": "another-file.mkv", "size": 20})
-    search_url = (
-        "https://api.srrdb.com/v1/search/start:Generic.Title/group:EXAMPLEGROUP" if lower
-        else f"https://api.srrdb.com/v1/search/r:{Path(filename).stem}"
+    search_url = "https://api.srrdb.com/v1/search/start:Generic.Title/group:EXAMPLEGROUP" if lower else f"https://api.srrdb.com/v1/search/r:{Path(filename).stem}"
+    client = _RoutedClient(
+        {
+            search_url: _Response({"resultsCount": 1, "results": [_RESULT]}),
+            _DETAILS_URL: _Response({"archived-files": archived}),
+        }
     )
-    client = _RoutedClient({
-        search_url: _Response({"resultsCount": 1, "results": [_RESULT]}),
-        _DETAILS_URL: _Response({"archived-files": archived}),
-    })
     monkeypatch.setattr("src.is_scene.httpx.AsyncClient", lambda: client)
     warnings = []
     monkeypatch.setattr("src.is_scene.logger.warning", warnings.append)
@@ -431,18 +484,20 @@ async def test_scene_match_requires_confirmation_for_file_differences(
 @pytest.mark.parametrize("lower", [False, True])
 @pytest.mark.parametrize("mode", ["declined", "eof", "unattended", "unattended_confirm_yes", "unattended_confirm_no"])
 async def test_unapproved_file_differences_stop_processing(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, lower: bool, mode: str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    lower: bool,
+    mode: str,
 ) -> None:
     video = tmp_path / f"{_RELEASE}.mkv"
     video.write_bytes(b"data")
-    search_url = (
-        "https://api.srrdb.com/v1/search/start:Generic.Title/group:EXAMPLEGROUP" if lower
-        else f"https://api.srrdb.com/v1/search/r:{_RELEASE}"
+    search_url = "https://api.srrdb.com/v1/search/start:Generic.Title/group:EXAMPLEGROUP" if lower else f"https://api.srrdb.com/v1/search/r:{_RELEASE}"
+    client = _RoutedClient(
+        {
+            search_url: _Response({"resultsCount": 1, "results": [{**_RESULT, "hasNFO": "no"}]}),
+            _DETAILS_URL: _Response({"archived-files": [{"name": f"{_BASENAME}.mkv", "size": 8}]}),
+        }
     )
-    client = _RoutedClient({
-        search_url: _Response({"resultsCount": 1, "results": [{**_RESULT, "hasNFO": "no"}]}),
-        _DETAILS_URL: _Response({"archived-files": [{"name": f"{_BASENAME}.mkv", "size": 8}]}),
-    })
     monkeypatch.setattr("src.is_scene.httpx.AsyncClient", lambda: client)
     prompts = []
 
@@ -455,8 +510,14 @@ async def test_unapproved_file_differences_stop_processing(
 
     monkeypatch.setattr("src.is_scene.cli_ui.ask_yes_no", respond)
     meta = Meta(
-        base_dir=str(tmp_path), uuid="scene-test", filename="Generic Title", tag="-EXAMPLEGROUP", imdb_id=1234567,
-        debug=True, unattended=mode.startswith("unattended"), unattended_confirm=mode.startswith("unattended_confirm"),
+        base_dir=str(tmp_path),
+        uuid="scene-test",
+        filename="Generic Title",
+        tag="-EXAMPLEGROUP",
+        imdb_id=1234567,
+        debug=True,
+        unattended=mode.startswith("unattended"),
+        unattended_confirm=mode.startswith("unattended_confirm"),
     )
     manager = SceneManager({"DEFAULT": {"check_predb": True}})
 
@@ -543,7 +604,9 @@ async def test_directory_is_not_compared_to_an_archived_file(tmp_path: Path, mon
     warnings = []
     monkeypatch.setattr("src.is_scene.logger.warning", warnings.append)
     await SceneManager({"DEFAULT": {}})._warn_file_differences(
-        str(video), _RELEASE, {"archived-files": [{"name": f"{_BASENAME}.mkv", "size": 1}]},
+        str(video),
+        _RELEASE,
+        {"archived-files": [{"name": f"{_BASENAME}.mkv", "size": 1}]},
     )
     assert not warnings
 

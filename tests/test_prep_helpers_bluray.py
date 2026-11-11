@@ -50,7 +50,9 @@ def test_link_lookup_requires_disc_and_imdb_and_skips_site_checks(meta):
     assert not _should_fetch_bluray_info(meta, True, True)
 
 
-@pytest.mark.parametrize("default, override, expected", [(True, None, True), (True, False, False), (False, True, True), (False, "true", True), (True, "false", False), (True, "", True)])
+@pytest.mark.parametrize(
+    "default, override, expected", [(True, None, True), (True, False, False), (False, True, True), (False, "true", True), (True, "false", False), (True, "", True)]
+)
 @pytest.mark.parametrize("trackers", [["AITHER"], "aither"])
 def test_link_lookup_respects_tracker_configuration(default, override, expected, trackers):
     config = {"DEFAULT": {"add_bluray_link": default}, "TRACKERS": {"AITHER": {"add_bluray_link": override}}}

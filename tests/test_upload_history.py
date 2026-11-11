@@ -224,9 +224,7 @@ def test_detail_events_reach_the_history_without_the_web_ui(monkeypatch):
     webui_events.request_match("FICT", "Fictional request", link="https://fictional.example/requests/1")
 
     assert upload_history._item is not None
-    assert list(upload_history._item.requests.values()) == [
-        {"tracker": "FICT", "name": "Fictional request", "exact": False, "link": "https://fictional.example/requests/1"}
-    ]
+    assert list(upload_history._item.requests.values()) == [{"tracker": "FICT", "name": "Fictional request", "exact": False, "link": "https://fictional.example/requests/1"}]
 
 
 def _tracker(tracker, status, **values):
@@ -323,7 +321,14 @@ def _titles(state_dir, search):
 def test_search_finds_entries_by_their_external_ids(history_on):
     _record(history_on, title="Fictional Movie", ids={"imdb": "tt0123456", "tmdb": "movie/42", "tvdb": "2020"})
     _record(history_on, name="Fictional Show S01", path="/media/show", title="Fictional Show", category="TV", ids={"tmdb": "tv/42", "tvdb": "777"})
-    _record(history_on, name="Fictional Book", path="/media/book", title="Fictional Book", category="BOOK", ids={"isbn": "978-0-00-000000-1", "asin": "B000FICT01", "openlibrary": "OL1W"})
+    _record(
+        history_on,
+        name="Fictional Book",
+        path="/media/book",
+        title="Fictional Book",
+        category="BOOK",
+        ids={"isbn": "978-0-00-000000-1", "asin": "B000FICT01", "openlibrary": "OL1W"},
+    )
     _record(history_on, name="Fictional Album FLAC", path="/media/album", title="Fictional Album", category="MUSIC", ids={"discogs_release": "123", "discogs_master": "45"})
     state_dir = history_on.parent.parent
 
@@ -447,7 +452,7 @@ def test_export_includes_every_matching_entry_with_its_details(history_on):
 
 
 def test_csv_export_flattens_details_and_neutralizes_formulas(history_on):
-    _record(history_on, name="=HYPERLINK(\"https://fictional.example\")", trackers=[_tracker("FICT", "failed", message="-1 error")])
+    _record(history_on, name='=HYPERLINK("https://fictional.example")', trackers=[_tracker("FICT", "failed", message="-1 error")])
 
     text = upload_history.export_csv(upload_history.export_items(history_on.parent.parent))
     header, row = text.splitlines()
@@ -542,7 +547,9 @@ async def test_bracketed_names_openlibrary_ids_and_published_links_are_kept(tmp_
     assert _rows(history_on, "SELECT link, torrent_id FROM history_trackers") == [("https://fictional.example/details/9", "9")]
 
 
-@pytest.mark.parametrize(("nzb_path", "upload_started", "expected"), [("/out/fictional.nzb", False, ("success", "Posted to Usenet")), ("", True, ("failed", "Usenet upload failed"))])
+@pytest.mark.parametrize(
+    ("nzb_path", "upload_started", "expected"), [("/out/fictional.nzb", False, ("success", "Posted to Usenet")), ("", True, ("failed", "Usenet upload failed"))]
+)
 def test_a_requested_usenet_post_has_its_own_result(tmp_path, nzb_path, upload_started, expected):
     upload_history.begin_item()
     if upload_started:

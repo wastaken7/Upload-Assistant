@@ -172,9 +172,7 @@ def test_default_client_lists_are_grouped_with_client_selection() -> None:
         "searching_client_list": ["qbittorrent_searching"],
     }
 
-    prepared = server._prepare_default_webui_section(
-        example_section, comments, subsections
-    )
+    prepared = server._prepare_default_webui_section(example_section, comments, subsections)
     items = server._build_config_items(prepared, user_section, comments, subsections, ["DEFAULT"])
     client_selection = next(item for item in items if item["key"] == "CLIENT SELECTION")
 
@@ -185,10 +183,7 @@ def test_default_client_lists_are_grouped_with_client_selection() -> None:
     ]
     assert client_selection["children"][1]["value"] == ["qbittorrent", "rtorrent"]
     assert client_selection["children"][1]["source"] == "config"
-    assert all(
-        item["key"] not in {"injecting_client_list", "searching_client_list"}
-        for item in items
-    )
+    assert all(item["key"] not in {"injecting_client_list", "searching_client_list"} for item in items)
 
 
 def test_default_arr_fields_expose_all_supported_optional_instances() -> None:
@@ -201,9 +196,7 @@ def test_default_arr_fields_expose_all_supported_optional_instances() -> None:
         "radarr_api_key": "",
     }
     comments = {}
-    subsections = {
-        f"DEFAULT/{key}": "ARR INTEGRATION" for key in example_section
-    }
+    subsections = {f"DEFAULT/{key}": "ARR INTEGRATION" for key in example_section}
 
     prepared = server._prepare_default_webui_section(example_section, comments, subsections)
 
@@ -231,13 +224,9 @@ def test_default_arr_fields_expose_all_supported_optional_instances() -> None:
     ]
     assert prepared["sonarr_url_2"] == ""
     assert prepared["radarr_api_key_3"] == ""
-    assert comments["DEFAULT/sonarr_url_1"][0] == (
-        "Settings for Sonarr instance 2."
-    )
+    assert comments["DEFAULT/sonarr_url_1"][0] == ("Settings for Sonarr instance 2.")
     assert subsections["DEFAULT/sonarr_url_3"] == "ARR INTEGRATION"
-    assert comments["DEFAULT/radarr_api_key_2"][0] == (
-        "Settings for Radarr instance 3."
-    )
+    assert comments["DEFAULT/radarr_api_key_2"][0] == ("Settings for Radarr instance 3.")
 
 
 def test_config_update_removes_all_optional_arr_instance_keys(
@@ -249,14 +238,12 @@ def test_config_update_removes_all_optional_arr_instance_keys(
     (code_dir / "data").mkdir(parents=True)
     (state_dir / "data").mkdir(parents=True)
     (code_dir / "data" / "example_config.py").write_text(
-        "config = {'DEFAULT': {'sonarr_url_1': 'http://second:8989', "
-        "'sonarr_api_key_1': ''}}\n",
+        "config = {'DEFAULT': {'sonarr_url_1': 'http://second:8989', 'sonarr_api_key_1': ''}}\n",
         encoding="utf-8",
     )
     config_path = state_dir / "data" / "config.py"
     config_path.write_text(
-        "config = {'DEFAULT': {'sonarr_url_1': 'http://configured:8989', "
-        "'sonarr_api_key_1': ''}}\n",
+        "config = {'DEFAULT': {'sonarr_url_1': 'http://configured:8989', 'sonarr_api_key_1': ''}}\n",
         encoding="utf-8",
     )
     monkeypatch.setattr(server, "CODE_DIR", code_dir)
@@ -295,9 +282,7 @@ def test_config_update_accepts_dvd_par_boolean(tmp_path: Path, monkeypatch) -> N
     monkeypatch.setattr(server, "_write_audit_log", lambda *_args, **_kwargs: None)
 
     for value, expected in ((True, True), (False, False)):
-        with server.app.test_request_context(
-            "/api/config_update", method="POST", json={"path": ["DEFAULT", "scale_dvd_screenshots_for_par"], "value": value}
-        ):
+        with server.app.test_request_context("/api/config_update", method="POST", json={"path": ["DEFAULT", "scale_dvd_screenshots_for_par"], "value": value}):
             response = server.config_update()
         assert response.get_json()["success"] is True
         assert server._load_config_from_file(config_path)["DEFAULT"]["scale_dvd_screenshots_for_par"] is expected
@@ -346,9 +331,7 @@ def test_custom_torrent_clients_inherit_template_fields_and_help() -> None:
     )
 
     assert prepared["seedbox_qbit"] == example_clients["qbittorrent"]
-    assert comments["TORRENT_CLIENTS/seedbox_qbit/qbit_url"] == [
-        "qBittorrent WebUI URL."
-    ]
+    assert comments["TORRENT_CLIENTS/seedbox_qbit/qbit_url"] == ["qBittorrent WebUI URL."]
 
 
 def test_config_writer_supports_annotated_config_assignments() -> None:
@@ -367,13 +350,7 @@ config: dict[str, Any] = {
         repr({"torrent_client": "qbit"}),
     )
     tree = ast.parse(updated)
-    config_assignment = next(
-        node
-        for node in tree.body
-        if isinstance(node, ast.AnnAssign)
-        and isinstance(node.target, ast.Name)
-        and node.target.id == "config"
-    )
+    config_assignment = next(node for node in tree.body if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.target.id == "config")
     loaded = ast.literal_eval(config_assignment.value)
 
     assert loaded["TORRENT_CLIENTS"]["seedbox"] == {"torrent_client": "qbit"}
@@ -397,9 +374,7 @@ def test_untouched_torrent_client_templates_are_not_configured_clients() -> None
         },
     }
 
-    assert server._configured_torrent_client_names(user_config, example_config) == [
-        "seedbox"
-    ]
+    assert server._configured_torrent_client_names(user_config, example_config) == ["seedbox"]
 
 
 def test_referenced_or_edited_torrent_client_templates_remain_visible() -> None:
