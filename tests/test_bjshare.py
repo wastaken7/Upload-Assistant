@@ -161,6 +161,28 @@ def test_description_links_animated_sheets_above_the_signature(tmp_path: Path, m
     assert generated[0]["ua_signature"] is False  # noqa: S101
 
 
+def test_debug_description_file_holds_the_linked_sheets(tmp_path: Path, monkeypatch) -> None:
+    tracker = _bjshare_for_description(monkeypatch, [])
+    sheet = _register_sheet(tmp_path, "sheet.webp")
+    meta = Meta(
+        {
+            "base_dir": str(tmp_path),
+            "uuid": "release",
+            "category": "XXX",
+            "debug": True,
+            "ua_name": "Upload Assistant",
+            "current_version": "v1",
+            "image_list": [{"raw_url": "https://common.example/sheet.webp", "source_file": sheet.name}],
+        }
+    )
+
+    description = asyncio.run(tracker.build_description(meta))
+
+    saved = (tmp_path / "tmp" / "release" / "[BJSHARE]DESCRIPTION.txt").read_text(encoding="utf-8")
+    assert saved == description  # noqa: S101
+    assert "[img]https://common.example/sheet.webp[/img]" in saved  # noqa: S101
+
+
 @pytest.mark.parametrize(("category", "sheet_name"), [("XXX", "sheet.png"), ("MOVIE", "sheet.webp")])
 def test_description_is_unchanged_without_an_animated_xxx_sheet(tmp_path: Path, monkeypatch, category: str, sheet_name: str) -> None:
     generated: list[dict] = []

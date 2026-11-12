@@ -830,7 +830,12 @@ class BJShare:
             return description
         images = "\n".join(f"[img]{link}[/img]" for link in sheet_links)
         sheets = f"[align=center]{images}[/align]"
-        return "\n".join(part for part in (description, sheets, signature) if part.strip())
+        description = "\n".join(part for part in (description, sheets, signature) if part.strip())
+        if meta.debug:
+            # The generator saved the description before the sheets and signature were added.
+            async with aiofiles.open(Path(meta.base_dir) / "tmp" / meta.uuid / f"[{self.tracker}]DESCRIPTION.txt", "w", encoding="utf-8") as description_file:
+                await description_file.write(description)
+        return description
 
     def get_animated_sheet_links(self, meta: Meta) -> list[str]:
         """Return the hosted links of animated XXX contact sheets.
