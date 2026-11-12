@@ -3628,6 +3628,15 @@ async def process_cross_seeds(meta: Meta) -> None:
     # Filter to only trackers with cross-seed data
     valid_trackers = [tracker for tracker in all_trackers if meta.get(f"{tracker}_cross_seed", None) is not None]
 
+    # A tracker that just received this upload already has its torrent in the
+    # client. The match found there is the release it sits beside or replaces
+    # (a trump), so adding it as a cross-seed would seed the same data twice.
+    tracker_status = cast(dict[str, dict[str, Any]], meta.tracker_status or {})
+    uploaded_trackers = [tracker for tracker in valid_trackers if tracker_status.get(tracker, {}).get("upload_success") is True]
+    if uploaded_trackers:
+        logger.debug(f"[yellow]Skipping cross-seed for trackers uploaded to in this run: {uploaded_trackers}[/yellow]")
+        valid_trackers = [tracker for tracker in valid_trackers if tracker not in uploaded_trackers]
+
     if not valid_trackers:
         logger.debug("[yellow]No trackers found with cross-seed data[/yellow]")
         return
