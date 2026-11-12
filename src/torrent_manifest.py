@@ -11,7 +11,7 @@ from typing import Any, Literal, TypeIs, cast
 from torf import TorfError, Torrent
 
 from src.temp_paths import release_temp_dir
-from src.torrent_policy import TorrentPolicy, TorrentStats
+from src.torrent_policy import PIECE_SIZE_MAX, TorrentPolicy, TorrentStats
 
 TorrentLayout = Literal["base", "base_subs"]
 
@@ -195,7 +195,9 @@ class TorrentManifest:
         return next((entry for entry in self.entries() if self.entry_path(entry).resolve() == resolved), None)
 
     def select(self, tracker: str, layout: TorrentLayout, policy: TorrentPolicy | None = None) -> TorrentEntry | None:
-        candidates = [entry for entry in self.entries(layout) if policy is None or policy.accepts(entry.stats)]
+        # Without a tracker policy the largest supported piece size still
+        # applies, so a variant libtorrent 1.x clients cannot load is never selected.
+        candidates = [entry for entry in self.entries(layout) if (policy.accepts(entry.stats) if policy is not None else entry.piece_size <= PIECE_SIZE_MAX)]
         if not candidates:
             return None
         candidates.sort(key=lambda entry: (entry.piece_size, entry.metainfo_size, entry.id))

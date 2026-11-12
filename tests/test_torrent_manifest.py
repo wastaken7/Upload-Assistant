@@ -260,3 +260,82 @@ def test_torrent_at_the_largest_piece_size_is_reused_despite_its_piece_count(tmp
 
     # Rehashing cannot reduce the piece count any further at 128 MiB.
     assert generic_reuse_allowed(TorrentStats(128 * MIB, 12089, 128 * MIB * 12089, 270 * 1024), meta)
+
+
+@pytest.mark.parametrize("max_piece_size", [None, 128])
+def test_client_torrent_above_the_largest_supported_piece_size_is_not_reused(tmp_path, max_piece_size):
+    meta = _default_meta(tmp_path, max_piece_size=max_piece_size)
+
+    assert not generic_reuse_allowed(TorrentStats(256 * MIB, 6045, 256 * MIB * 6045, 160 * 1024), meta)
+    assert generic_reuse_allowed(TorrentStats(128 * MIB, 6045, 128 * MIB * 6045, 160 * 1024), meta)
+
+
+def test_tracker_policies_reject_piece_sizes_above_the_largest_supported_one():
+    assert not TorrentPolicy().accepts(TorrentStats(256 * MIB, 1, 256 * MIB, 100))
+    assert TorrentPolicy().accepts(TorrentStats(128 * MIB, 1, 128 * MIB, 100))
+
+
+def test_selection_never_returns_a_variant_above_the_largest_supported_piece_size(tmp_path):
+    oversized = tmp_path / "oversized.torrent"
+    usable = tmp_path / "usable.torrent"
+    write_torrent(oversized, 256 * MIB, 512 * MIB)
+    write_torrent(usable, 32 * MIB, 512 * MIB)
+    manifest = TorrentManifest(tmp_path, "release")
+    manifest.register(oversized, "base", "client:first")
+    usable_entry = manifest.register(usable, "base", "client:second")
+
+    selected = manifest.select("TEST", "base")
+
+    assert selected == usable_entry
+
+
+class _TrackerWithoutPolicy:
+    pass
+
+
+@pytest.mark.asyncio
+async def test_provision_hashes_a_new_torrent_when_only_an_oversized_variant_exists(tmp_path, monkeypatch):
+    from src.meta import Meta
+
+    oversized = tmp_path / "oversized.torrent"
+    write_torrent(oversized, 256 * MIB, 512 * MIB)
+    manifest = TorrentManifest(tmp_path, "release")
+    manifest.register(oversized, "base", "client:first")
+    media = tmp_path / "release.mkv"
+    media.touch()
+    meta = Meta(base_dir=str(tmp_path), uuid="release", path=str(media), filelist=[str(media)], trackers=["TEST"])
+    created: list[int] = []
+
+    async def create_torrent(_hash_meta, _path, _output, **kwargs):
+        created.append(kwargs["piece_size"])
+        generated = tmp_path / "generated.torrent"
+        write_torrent(generated, 64 * MIB, 512 * MIB)
+        manifest.register(generated, "base", "generated")
+
+    monkeypatch.setattr(TorrentCreator, "create_torrent", create_torrent)
+
+    blocked = await provision_tracker_torrents(meta, {"TRACKERS": {"TEST": {}}}, ["TEST"], {"TEST": _TrackerWithoutPolicy})
+
+    assert blocked == set()
+    assert len(created) == 1
+    selected = manifest.selected_path("TEST")
+    assert selected is not None
+    assert Torrent.read(selected).piece_size == 64 * MIB
+
+
+@pytest.mark.asyncio
+async def test_provision_blocks_a_tracker_when_only_an_oversized_variant_exists_and_hashing_is_off(tmp_path):
+    from src.meta import Meta
+
+    oversized = tmp_path / "oversized.torrent"
+    write_torrent(oversized, 256 * MIB, 512 * MIB)
+    manifest = TorrentManifest(tmp_path, "release")
+    manifest.register(oversized, "base", "client:first")
+    media = tmp_path / "release.mkv"
+    media.touch()
+    meta = Meta(base_dir=str(tmp_path), uuid="release", path=str(media), filelist=[str(media)], trackers=["TEST"], nohash=True)
+
+    blocked = await provision_tracker_torrents(meta, {"TRACKERS": {"TEST": {}}}, ["TEST"], {"TEST": _TrackerWithoutPolicy})
+
+    assert blocked == {"TEST"}
+    assert manifest.selected_path("TEST") is None

@@ -53,7 +53,7 @@ class TorrentPolicy:
     piece_size_selector: PieceSizeSelector | None = None
 
     def accepts(self, stats: TorrentStats) -> bool:
-        if stats.piece_size < PIECE_SIZE_MIN:
+        if stats.piece_size < PIECE_SIZE_MIN or stats.piece_size > PIECE_SIZE_MAX:
             return False
         if self.max_piece_size is not None and stats.piece_size > self.max_piece_size:
             return False
@@ -94,6 +94,8 @@ def _hdbits_validator(stats: TorrentStats) -> bool:
     return hdbits_pieces_allowed(stats.piece_size, stats.piece_count, stats.content_size)
 
 
+# Limits that hold for every tracker, used where a tracker declares no policy.
+GENERIC_POLICY = TorrentPolicy()
 HDBITS_POLICY = TorrentPolicy(validator=_hdbits_validator, piece_size_selector=hdbits_piece_size)
 PASSTHEPOPCORN_POLICY = TorrentPolicy(max_piece_size=16 * MIB)
 ANTHELION_POLICY = TorrentPolicy(max_metainfo_size=250 * KIB, required_piece_size=128 * MIB)
@@ -101,12 +103,14 @@ ANTHELION_POLICY = TorrentPolicy(max_metainfo_size=250 * KIB, required_piece_siz
 
 def generic_reuse_allowed(stats: TorrentStats, meta: Meta) -> bool:
     """Preserve the historical client-reuse thresholds in one responsible layer."""
+    # Pieces above the largest supported size cannot be loaded by libtorrent 1.x
+    # clients, so such a torrent is never reused, whatever was requested.
+    if stats.piece_size < PIECE_SIZE_MIN or stats.piece_size > PIECE_SIZE_MAX:
+        return False
     max_piece_size = meta.max_piece_size
     if stats.piece_count >= 5000 and stats.piece_size < 4_294_304 and (max_piece_size is None or max_piece_size >= 4):
         return False
     if stats.piece_count >= 8000 and stats.piece_size < 8_488_608 and (max_piece_size is None or max_piece_size >= 8) and not meta.prefer_small_pieces:
-        return False
-    if stats.piece_size < PIECE_SIZE_MIN:
         return False
     # The remaining limits ask for a rehash with larger pieces. They apply only
     # when no maximum was requested, and never to a torrent already at the
