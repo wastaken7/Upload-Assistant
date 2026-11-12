@@ -20,8 +20,8 @@ from src.torrent_clients import DelugeClientMixin, QbittorrentClientMixin, Rtorr
 from src.torrent_clients.path_utils import coerce_str_list, is_path_under
 from src.torrent_clients.qbittorrent import QbitAccess, qui_request
 from src.torrent_manifest import TorrentManifest
-from src.torrent_policy import HDBITS_POLICY, TorrentStats, generic_reuse_allowed
-from src.torrentcreate import DISC_EXCLUDE_GLOBS, SUBTITLE_EXTENSIONS
+from src.torrent_policy import HDBITS_POLICY, PIECE_SIZE_MAX, PIECE_SIZE_MIN, TorrentStats, generic_reuse_allowed
+from src.torrentcreate import DISC_EXCLUDE_GLOBS, SUBTITLE_EXTENSIONS, TorrentCreator
 
 
 def _is_str_dict(val: object) -> TypeIs[dict[str, Any]]:
@@ -361,11 +361,22 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
             entries = [entry for entry in entries if entry.layout == "base_subs"]
         if self.config["DEFAULT"].get("prefer_max_16_torrent", False):
             entries.sort(key=lambda entry: entry.piece_size)
+        else:
+            # Prefer the variant closest to the piece size a new torrent would
+            # get for this content. The sort is stable, so equally close
+            # variants keep the order in which the clients returned them.
+            entries.sort(key=lambda entry: self._piece_size_distance(entry.piece_size, entry.content_size, meta))
         chosen = entries[0]
         if chosen.origin.startswith("client:"):
             meta.reuse_torrent_client = chosen.origin.removeprefix("client:")
         meta.reuse_torrent_infohash = chosen.client_infohash
         return str(manifest.entry_path(chosen))
+
+    @staticmethod
+    def _piece_size_distance(piece_size: int, content_size: int, meta: Meta) -> int:
+        """Return how many doublings separate a piece size from the recommended one."""
+        recommended = TorrentCreator.calculate_piece_size(content_size, PIECE_SIZE_MIN, PIECE_SIZE_MAX, meta, piece_size=meta.max_piece_size)
+        return abs(max(1, piece_size).bit_length() - max(1, recommended).bit_length())
 
     async def _find_existing_torrent(self, meta: Meta) -> str | None:
         """Find a reusable torrent matching the prepared metadata."""
