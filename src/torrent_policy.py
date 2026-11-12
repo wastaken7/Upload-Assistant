@@ -106,8 +106,11 @@ def generic_reuse_allowed(stats: TorrentStats, meta: Meta) -> bool:
         return False
     if stats.piece_count >= 8000 and stats.piece_size < 8_488_608 and (max_piece_size is None or max_piece_size >= 8) and not meta.prefer_small_pieces:
         return False
-    if "max_piece_size" not in meta and stats.piece_count >= 12000:
-        return False
     if stats.piece_size < PIECE_SIZE_MIN:
         return False
-    return not ("max_piece_size" not in meta and stats.metainfo_size > 250 * KIB)
+    # The remaining limits ask for a rehash with larger pieces. They apply only
+    # when no maximum was requested, and never to a torrent already at the
+    # largest piece size, which a rehash could not improve.
+    if max_piece_size is not None or stats.piece_size >= PIECE_SIZE_MAX:
+        return True
+    return stats.piece_count < 12000 and stats.metainfo_size <= 250 * KIB

@@ -6,7 +6,7 @@ import pytest
 from torf import Torrent
 
 from src.torrent_manifest import TorrentEntry, TorrentManifest
-from src.torrent_policy import ANTHELION_POLICY, MIB, PASSTHEPOPCORN_POLICY, TorrentPolicy, TorrentStats
+from src.torrent_policy import ANTHELION_POLICY, MIB, PASSTHEPOPCORN_POLICY, TorrentPolicy, TorrentStats, generic_reuse_allowed
 from src.torrent_provision import provision_tracker_torrents
 from src.torrentcreate import TorrentCreator
 from src.trackers.common import Common
@@ -221,3 +221,42 @@ async def test_create_torrent_for_upload_rejects_missing_manifest_base(tmp_path)
 
     with pytest.raises(FileNotFoundError, match="TEST: no selected base torrent"):
         await Common({"TRACKERS": {"TEST": {}}}).create_torrent_for_upload(meta, "TEST", "TEST")
+
+
+def _default_meta(tmp_path, **overrides):
+    from src.meta import Meta
+
+    return Meta(base_dir=str(tmp_path), uuid="release", path=str(tmp_path / "release.mkv"), **overrides)
+
+
+@pytest.mark.parametrize(
+    ("piece_size", "pieces", "metainfo_size", "expected"),
+    [
+        (4 * MIB, 5000, 100 * 1024, False),  # 5000+ pieces at 4 MiB or below
+        (4 * MIB, 4999, 100 * 1024, True),
+        (8 * MIB, 8000, 163 * 1024, False),  # 8000+ pieces at 8 MiB or below
+        (8 * MIB, 7999, 163 * 1024, True),
+        (16 * MIB, 12000, 240 * 1024, False),  # 12000+ pieces
+        (16 * MIB, 11999, 240 * 1024, True),
+        (16 * MIB, 100, 250 * 1024 + 1, False),  # metainfo above 250 KiB
+        (16 * MIB, 100, 250 * 1024, True),
+    ],
+)
+def test_generic_reuse_limits_apply_when_no_max_piece_size_was_requested(tmp_path, piece_size, pieces, metainfo_size, expected):
+    meta = _default_meta(tmp_path)
+
+    assert generic_reuse_allowed(TorrentStats(piece_size, pieces, piece_size * pieces, metainfo_size), meta) is expected
+
+
+def test_requested_max_piece_size_lifts_the_piece_count_and_metainfo_limits(tmp_path):
+    meta = _default_meta(tmp_path, max_piece_size=16)
+
+    assert generic_reuse_allowed(TorrentStats(16 * MIB, 12001, 16 * MIB * 12001, 300 * 1024), meta)
+    assert not generic_reuse_allowed(TorrentStats(2 * MIB, 5000, 2 * MIB * 5000, 100 * 1024), meta)
+
+
+def test_torrent_at_the_largest_piece_size_is_reused_despite_its_piece_count(tmp_path):
+    meta = _default_meta(tmp_path)
+
+    # Rehashing cannot reduce the piece count any further at 128 MiB.
+    assert generic_reuse_allowed(TorrentStats(128 * MIB, 12089, 128 * MIB * 12089, 270 * 1024), meta)

@@ -273,7 +273,7 @@ class TorrentCreator:
 
             try:
                 if not piece_size:
-                    piece_size = meta.max_piece_size
+                    piece_size = meta.max_piece_size or 0
                 tracker_url = tracker_url or None
                 include: list[str] = []
                 exclude: list[str] = []
