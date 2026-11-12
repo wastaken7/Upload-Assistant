@@ -77,6 +77,134 @@ def test_get_screenshots_falls_back_to_common_host_for_failed_local_upload(tmp_p
     assert sorted(result) == ["https://common.example/second.png", "https://tracker.example/first.png"]  # noqa: S101
 
 
+def test_get_screenshots_falls_back_by_the_hosted_source_file_name(tmp_path: Path) -> None:
+    screenshots = tmp_path / "tmp" / "release" / "screenshots"
+    screenshots.mkdir(parents=True)
+    path = screenshots / "Example-0.png"
+    Image.new("RGB", (2, 2), "red").save(path, format="PNG")
+    (registered,) = register(tmp_path, "release", [path], "main")
+    tracker = object.__new__(BJShare)
+    tracker.tracker = "BJSHARE"
+
+    async def failing_img_host(_image_bytes: bytes, _filename: str) -> None:
+        return None
+
+    tracker.img_host = failing_img_host
+    meta = Meta(
+        {
+            "base_dir": str(tmp_path),
+            "uuid": "release",
+            # Main screenshot hosting records the file name as source_file.
+            "image_list": [{"raw_url": "https://common.example/other.png"}, {"raw_url": "https://common.example/same.png", "source_file": registered.name}],
+        }
+    )
+
+    assert asyncio.run(tracker.get_screenshots(meta)) == ["https://common.example/same.png"]  # noqa: S101
+
+
+def _bjshare_for_description(monkeypatch, generated: list[dict]) -> BJShare:
+    tracker = object.__new__(BJShare)
+    tracker.tracker = "BJSHARE"
+    tracker.config = {"DEFAULT": {}, "TRACKERS": {"BJSHARE": {}}}
+    tracker.preview_only = False
+    tracker.episode_tmdb_data = {}
+
+    async def fake_generator(_self, _meta, **kwargs):
+        generated.append(kwargs)
+        signature = kwargs["signature"] if kwargs.get("ua_signature", True) else ""
+        return "\n".join(part for part in ("Ficha técnica", signature) if part)
+
+    monkeypatch.setattr("src.trackers.GAZELLE.bjshare.DescriptionBuilder.general_description_generator", fake_generator)
+    return tracker
+
+
+def _register_sheet(tmp_path: Path, name: str) -> Path:
+    screenshots = tmp_path / "tmp" / "release" / "screenshots"
+    screenshots.mkdir(parents=True, exist_ok=True)
+    path = screenshots / name
+    path.write_bytes(b"sheet")
+    (registered,) = register(tmp_path, "release", [path], "main", details={str(path): {"kind": "xxx_contact_sheet"}})
+    return registered
+
+
+def test_description_links_animated_sheets_above_the_signature(tmp_path: Path, monkeypatch) -> None:
+    generated: list[dict] = []
+    tracker = _bjshare_for_description(monkeypatch, generated)
+    sheet = _register_sheet(tmp_path, "sheet.webp")
+    second_sheet = _register_sheet(tmp_path, "second.webp")
+    frame = tmp_path / "tmp" / "release" / "screenshots" / "frame.webp"
+    frame.write_bytes(b"frame")
+    (frame,) = register(tmp_path, "release", [frame], "main")
+    meta = Meta(
+        {
+            "base_dir": str(tmp_path),
+            "uuid": "release",
+            "category": "XXX",
+            "ua_name": "Upload Assistant",
+            "current_version": "v1",
+            "image_list": [
+                {"raw_url": "https://common.example/frame.webp", "source_file": frame.name},
+                {"raw_url": "https://common.example/sheet.webp", "source_file": sheet.name},
+                {"raw_url": "https://common.example/second.webp", "source_file": second_sheet.name},
+            ],
+        }
+    )
+
+    description = asyncio.run(tracker.build_description(meta))
+
+    lines = description.splitlines()
+    assert lines[0] == "Ficha técnica"  # noqa: S101
+    # One centered block holds every sheet.
+    assert lines[1:3] == ["[align=center][img]https://common.example/sheet.webp[/img]", "[img]https://common.example/second.webp[/img][/align]"]  # noqa: S101
+    assert lines[3].startswith("[align=right][url=https://github.com/wastaken7/Upload-Assistant]")  # noqa: S101
+    assert "frame.webp" not in description  # noqa: S101
+    assert generated[0]["ua_signature"] is False  # noqa: S101
+
+
+def test_debug_description_file_holds_the_linked_sheets(tmp_path: Path, monkeypatch) -> None:
+    tracker = _bjshare_for_description(monkeypatch, [])
+    sheet = _register_sheet(tmp_path, "sheet.webp")
+    meta = Meta(
+        {
+            "base_dir": str(tmp_path),
+            "uuid": "release",
+            "category": "XXX",
+            "debug": True,
+            "ua_name": "Upload Assistant",
+            "current_version": "v1",
+            "image_list": [{"raw_url": "https://common.example/sheet.webp", "source_file": sheet.name}],
+        }
+    )
+
+    description = asyncio.run(tracker.build_description(meta))
+
+    saved = (tmp_path / "tmp" / "release" / "[BJSHARE]DESCRIPTION.txt").read_text(encoding="utf-8")
+    assert saved == description  # noqa: S101
+    assert "[img]https://common.example/sheet.webp[/img]" in saved  # noqa: S101
+
+
+@pytest.mark.parametrize(("category", "sheet_name"), [("XXX", "sheet.png"), ("MOVIE", "sheet.webp")])
+def test_description_is_unchanged_without_an_animated_xxx_sheet(tmp_path: Path, monkeypatch, category: str, sheet_name: str) -> None:
+    generated: list[dict] = []
+    tracker = _bjshare_for_description(monkeypatch, generated)
+    sheet = _register_sheet(tmp_path, sheet_name)
+    meta = Meta(
+        {
+            "base_dir": str(tmp_path),
+            "uuid": "release",
+            "category": category,
+            "ua_name": "Upload Assistant",
+            "current_version": "v1",
+            "image_list": [{"raw_url": f"https://common.example/{sheet_name}", "source_file": sheet.name}],
+        }
+    )
+
+    description = asyncio.run(tracker.build_description(meta))
+
+    assert "[img]" not in description  # noqa: S101
+    assert generated[0]["ua_signature"] is True  # noqa: S101
+
+
 def test_get_screenshots_keeps_common_host_links_when_rehosting_fails(tmp_path: Path) -> None:
     class FailingSession:
         async def get(self, _url, **_kwargs):

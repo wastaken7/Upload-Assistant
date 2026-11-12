@@ -33,7 +33,9 @@ from src.manual_questions import game_platform, game_subcategory
 from src.meta import Meta
 from src.screenshot_manifest import files as manifest_files
 from src.stats import record_event_async
+from src.takescreens import is_xxx_contact_sheet
 from src.tmdb import TmdbManager
+from src.tracker_images import get_tracker_image_collection
 from src.trackers.common import Common
 
 Config = dict[str, Any]
@@ -810,14 +812,60 @@ class BJShare:
             return payload_preview.Later(payload_preview.DESCRIPTION_NOTE)
         builder = DescriptionBuilder(self.tracker, self.config, "pt-BR")
         meta.episode_tmdb_data = self.episode_tmdb_data
+        signature = (
+            f"[align=right][url=https://github.com/wastaken7/Upload-Assistant][size=1]Compartilhado com {meta.ua_name} {meta.current_version} (fork)[/size][/url][/align]"
+        )
+        sheet_links = self.get_animated_sheet_links(meta)
 
-        return await builder.general_description_generator(
+        description = await builder.general_description_generator(
             meta,
             menu_screenshots=False,
             nfo=False,
             screenshots=False,
-            signature=f"[align=right][url=https://github.com/wastaken7/Upload-Assistant][size=1]Compartilhado com {meta.ua_name} {meta.current_version} (fork)[/size][/url][/align]",
+            # The animated sheets go above the signature, so it is added below.
+            ua_signature=not sheet_links,
+            signature=signature,
         )
+        if not sheet_links:
+            return description
+        images = "\n".join(f"[img]{link}[/img]" for link in sheet_links)
+        sheets = f"[align=center]{images}[/align]"
+        description = "\n".join(part for part in (description, sheets, signature) if part.strip())
+        if meta.debug:
+            # The generator saved the description before the sheets and signature were added.
+            async with aiofiles.open(Path(meta.base_dir) / "tmp" / meta.uuid / f"[{self.tracker}]DESCRIPTION.txt", "w", encoding="utf-8") as description_file:
+                await description_file.write(description)
+        return description
+
+    def get_animated_sheet_links(self, meta: Meta) -> list[str]:
+        """Return the hosted links of animated XXX contact sheets.
+
+        BJ-Share's own image host only keeps a PNG frame of an animated WebP,
+        so the description links the animation from the app's image host.
+        """
+        if meta.category != "XXX":
+            return []
+        sheets = [
+            path for path in manifest_files(meta.base_dir, meta.uuid, "main") if path.suffix.casefold() == ".webp" and is_xxx_contact_sheet(meta.base_dir, meta.uuid, path)
+        ]
+        if not sheets:
+            return []
+
+        hosted: dict[str, str] = {}
+        for image in get_tracker_image_collection(meta, self.tracker, "screenshots"):
+            raw_url = str(image.get("raw_url") or "")
+            # Hosting records the screenshot it uploaded under one of these keys.
+            source = str(image.get("source_file") or "") or Path(str(image.get("local_file_path") or "")).name
+            if raw_url.startswith("http") and source:
+                hosted.setdefault(source, raw_url)
+
+        links = [hosted[path.name] for path in sheets if path.name in hosted]
+        if len(links) < len(sheets):
+            logger.warning(
+                f"{self.tracker}: [yellow]{len(sheets) - len(links)} animated contact sheet(s) were not uploaded to an image host, "
+                "so their animation is not linked in the description.[/yellow]"
+            )
+        return links
 
     def get_trailer(self, meta: Meta) -> str:
         video_results: list[dict[str, Any]] = dict(self.main_tmdb_data.get("videos", {})).get("results", [])
@@ -1639,7 +1687,7 @@ class BJShare:
                 if not raw_url:
                     continue
                 local_path = img.get("local_file_path")
-                name = Path(str(local_path)).name if local_path else ""
+                name = str(img.get("source_file") or "") or (Path(str(local_path)).name if local_path else "")
                 if name in selected_names:
                     hosted_by_name.setdefault(name, str(raw_url))
                 else:
