@@ -43,9 +43,13 @@ def parse_duration(value: object) -> int:
 
 
 def _local_instants(wall_time: datetime) -> list[datetime]:
-    """Return the local instants for a naive wall time, earliest first (two during a repeated DST hour)."""
+    """Return the local instants for a naive wall time, earliest first.
+
+    A repeated DST hour has two; a time skipped by a DST change has none.
+    """
     instants = {wall_time.replace(fold=fold).astimezone() for fold in (0, 1)}
-    return sorted(instants, key=lambda instant: instant.timestamp())
+    existing = [instant for instant in instants if instant.replace(tzinfo=None) == wall_time]
+    return sorted(existing, key=lambda instant: instant.timestamp())
 
 
 def resolve_upload_at(value: str, now: datetime | None = None) -> datetime:
@@ -63,7 +67,8 @@ def resolve_upload_at(value: str, now: datetime | None = None) -> datetime:
         if hour > 23 or minute > 59 or second > 59:
             raise ValueError(f"invalid time '{value}'")
         today = datetime.fromtimestamp(now_ts).astimezone().replace(hour=hour, minute=minute, second=second, microsecond=0, tzinfo=None)
-        for day in (today, today + timedelta(days=1)):
+        # A third day covers a time that DST skips tomorrow after it passed today.
+        for day in (today + timedelta(days=offset) for offset in range(3)):
             for instant in _local_instants(day):
                 if instant.timestamp() > now_ts:
                     return instant
@@ -75,7 +80,13 @@ def resolve_upload_at(value: str, now: datetime | None = None) -> datetime:
         target = datetime.fromisoformat(text)
     except ValueError:
         raise ValueError(f"invalid upload time '{value}': use HH:MM or 'YYYY-MM-DD HH:MM'") from None
-    target = _local_instants(target)[0] if target.tzinfo is None else target.astimezone()
+    if target.tzinfo is None:
+        instants = _local_instants(target)
+        if not instants:
+            raise ValueError(f"upload time '{value}' does not exist in the local timezone (skipped by a DST change)")
+        target = instants[0]
+    else:
+        target = target.astimezone()
     if target.timestamp() <= now_ts:
         raise ValueError(f"upload time '{value}' is in the past")
     return target

@@ -87,6 +87,13 @@ async def recheck_dupes_after_wait(meta: Meta, config: dict[str, Any], tracker_n
         logger.info(f"[red]{tracker_name}: a release that fills this slot appeared during the wait. Automatically skipping upload.[/red]")
         return False
     if not real_new_dupes:
+        # The first check asks about a REVIEW conflict in interactive runs and keeps
+        # the basic result in unattended ones. Nobody may be present after a wait,
+        # so a conflict that would have been asked about skips the upload instead.
+        interactive = (not meta.unattended or meta.unattended_confirm) and not meta.ask_dupe
+        if slot_decision is not None and slot_decision.verdict is Verdict.REVIEW and slot_decision.conflicts and meta.dupe is False and interactive:
+            logger.info(f"[red]{tracker_name}: a release that needs a slot review appeared during the wait. Automatically skipping upload.[/red]")
+            return False
         return True
     dupe_checker = DupeChecker(config)
     real_new_dupes = cast(list[Any], await dupe_checker.filter_dupes(real_new_dupes, meta, tracker_name))

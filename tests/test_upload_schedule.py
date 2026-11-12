@@ -69,6 +69,15 @@ def test_repeated_dst_hour_uses_the_second_occurrence(new_york_time):
     assert target.timestamp() - now.timestamp() == 45 * 60
 
 
+def test_time_skipped_by_dst_is_rejected_or_moves_to_the_next_day(new_york_time):
+    # 02:30 does not exist on the night clocks go forward.
+    now = datetime(2026, 3, 8, 1, 0).astimezone()
+
+    with pytest.raises(ValueError, match="does not exist"):
+        resolve_upload_at("2026-03-08 02:30", now)
+    assert _wall(resolve_upload_at("02:30", now)) == datetime(2026, 3, 9, 2, 30)
+
+
 @pytest.mark.parametrize("value", ["2026-03-09 23:00", "2026-03-12", "24:00", "12:60", "tomorrow", "2026-02-30 10:00"])
 def test_upload_at_rejects_past_or_invalid_values(value):
     with pytest.raises(ValueError):
@@ -303,6 +312,39 @@ def test_new_slot_evidence_reaches_slot_rules(tracker_stage, monkeypatch):
 
     assert evaluated == ["BETA"]
     assert tracker_stage.uploads == ["ALPHA"]
+
+
+@pytest.mark.parametrize(("unattended", "uploaded"), [(False, ["ALPHA"]), (True, ["ALPHA", "BETA"])])
+def test_new_slot_review_conflict_follows_the_review_policy(tracker_stage, monkeypatch, unattended, uploaded):
+    known = {"name": "Fictional.Film.2020.1080p-GRP", "size": 1}
+    hidden = {"name": "Fictional.Film.2020.1080p.DV-NEW", "size": 3}
+    tracker_stage.results = {"ALPHA": [known], "BETA": [known]}
+
+    class _Review:
+        verdict = trackerhandle.Verdict.REVIEW
+        conflicts = ("fictional conflict",)
+
+    async def _slots(_dupes, meta, tracker, _config):
+        return _Review() if hidden in meta.get(f"{tracker}_title_releases", []) else None
+
+    original_search = _Tracker.search_existing
+
+    async def _search(self, meta):
+        meta[f"{self.tracker}_title_releases"] = [known, hidden] if self.tracker == "BETA" else [known]
+        return await original_search(self, meta)
+
+    monkeypatch.setattr(trackerhandle, "evaluate_slots", _slots)
+    monkeypatch.setattr(_Tracker, "search_existing", _search)
+    meta = Meta(
+        unattended=unattended,
+        upload_waited=True,
+        initial_dupes={"ALPHA": [known], "BETA": [known]},
+        initial_title_releases={"ALPHA": [known], "BETA": [known]},
+    )
+
+    _run_trackers(meta)
+
+    assert sorted(tracker_stage.uploads) == uploaded
 
 
 def test_no_dupe_recheck_without_a_wait(tracker_stage):
