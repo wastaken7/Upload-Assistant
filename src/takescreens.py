@@ -147,6 +147,8 @@ XXX_CONTACT_SHEET_MAX_BYTES = 10_000_000
 _XXX_WEBP_QUALITIES = (75, 60, 45, 30)
 # Static tiles stay this far from the end, where the video stream may already have ended.
 _XXX_STATIC_TILE_MARGIN = 1.0
+# One tile or one stack of a sheet; generous for slow 4K decodes and network drives.
+_XXX_FFMPEG_TIMEOUT_SECONDS = 600
 
 
 def _xxx_contact_sheet_signature(rows: int, columns: int, animated: bool, animation_seconds: float) -> dict[str, Any]:
@@ -178,6 +180,18 @@ def _xxx_contact_sheet_grid(tiles: list[Path], columns: int, rows: int, title: s
     rows_streams = [inputs[row * columns] if columns == 1 else _ffmpeg.filter(inputs[row * columns : (row + 1) * columns], "hstack", inputs=columns) for row in range(rows)]
     sheet = rows_streams[0] if rows == 1 else _ffmpeg.filter(rows_streams, "vstack", inputs=rows)
     return _xxx_contact_sheet_title_filter(sheet, title, include_title, fontfile)
+
+
+async def _run_xxx_contact_sheet_ffmpeg(command: Any, loglevel: str) -> tuple[int | None, bytes]:
+    """Run one tile or stack command, giving up on a stalled ffmpeg instead of waiting forever.
+
+    Cancelling ``run_ffmpeg`` on timeout terminates its ffmpeg process.
+    """
+    try:
+        return_code, _stdout, stderr = await asyncio.wait_for(run_ffmpeg(command.global_args("-y", "-loglevel", loglevel)), timeout=_XXX_FFMPEG_TIMEOUT_SECONDS)
+    except TimeoutError:
+        return None, f"FFmpeg did not finish within {_XXX_FFMPEG_TIMEOUT_SECONDS} seconds".encode()
+    return return_code, stderr
 
 
 async def _render_xxx_contact_sheet_grid(
@@ -216,7 +230,7 @@ async def _render_xxx_contact_sheet_grid(
             tile = _xxx_contact_sheet_tile(video_path, start_time, clip_seconds, fontfile)
             # Animated tiles use a lossless intermediate; the clips are re-encoded once, into WebP.
             command = _ffmpeg.output(tile, str(tile_path), vcodec="ffv1", an=None) if animated else _ffmpeg.output(tile, str(tile_path), vframes=1)
-            return_code, _stdout, stderr = await run_ffmpeg(command.global_args("-y", "-loglevel", loglevel))
+            return_code, stderr = await _run_xxx_contact_sheet_ffmpeg(command, loglevel)
             if return_code != 0 or not tile_path.is_file():
                 # run_ffmpeg writes its report beside the output; keep the
                 # failed tile's report once the tile directory is removed.
@@ -232,7 +246,7 @@ async def _render_xxx_contact_sheet_grid(
                 command = _ffmpeg.output(sheet, str(output_path), vcodec="libwebp_anim", quality=quality, loop=0, r=8, t=animation_seconds)
             else:
                 command = _ffmpeg.output(sheet, str(output_path), vframes=1, compression_level=ffmpeg_compression)
-            return_code, _stdout, stderr = await run_ffmpeg(command.global_args("-y", "-loglevel", loglevel))
+            return_code, stderr = await _run_xxx_contact_sheet_ffmpeg(command, loglevel)
             if return_code != 0 or not output_path.is_file():
                 raise RuntimeError(stderr.decode(errors="replace").strip() or "FFmpeg could not stack the contact sheet")
             if output_path.stat().st_size <= XXX_CONTACT_SHEET_MAX_BYTES:
@@ -466,11 +480,18 @@ async def xxx_contact_sheets(paths: list[str], folder_id: str, base_dir: str, me
         # Replacements are forced so the hosted-image cutoff cannot skip them.
         force_capture = extra_screens > 0
         screens_to_request = extra_screens if force_capture else len(sheets) + normal_screens
-        await screenshots(
-            str(video_paths[0]), video_paths[0].name, folder_id, base_dir, meta, screens_to_request, force_capture, cleanup_after_capture=False, capture_group=capture_group
-        )
+        # The group was already cleared above on a retake; clearing it again
+        # inside screenshots() would delete the sheets just made.
+        retake = meta.retake
+        meta.retake = False
+        try:
+            await screenshots(
+                str(video_paths[0]), video_paths[0].name, folder_id, base_dir, meta, screens_to_request, force_capture, cleanup_after_capture=False, capture_group=capture_group
+            )
+        finally:
+            meta.retake = retake
     meta.screens = len(manifest_files(base_dir, folder_id, capture_group))
-    return sheets
+    return [sheet for sheet in sheets if Path(sheet).is_file()]
 
 
 async def xxx_fallback_cover(paths: list[str], folder_id: str, base_dir: str, meta: Meta, random_frame: bool = False) -> str | None:

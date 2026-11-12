@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 
 import pytest
@@ -400,6 +401,81 @@ async def test_deleted_sheet_is_not_replaced_by_a_single_frame(tmp_path, monkeyp
     assert Path(new_sheet) != frame
     assert takescreens.is_xxx_contact_sheet(meta.base_dir, meta.uuid, Path(new_sheet))
     assert frame in manifest_files(meta.base_dir, meta.uuid, "main")
+
+
+@pytest.mark.asyncio
+async def test_retake_keeps_the_new_sheet_when_single_frames_are_added(tmp_path, monkeypatch):
+    video = tmp_path / "Studio.Performer.mp4"
+    video.write_bytes(b"video")
+    takescreens._apply_config({"DEFAULT": {"xxx_contact_sheet_rows": 1, "xxx_contact_sheet_columns": 2, "xxx_single_file_screens": 1}})
+    commands = []
+    _fake_ffmpeg(monkeypatch, commands)
+    retake_seen = []
+
+    async def fake_screenshots(_path, _filename, folder_id, base_dir, meta, num_screens, _force, *_args, capture_group="main", **_kwargs):
+        retake_seen.append(meta.retake)
+        if meta.retake:
+            takescreens.clear_screenshot_group(base_dir, folder_id, capture_group)
+        frame = takescreens.screenshots_dir(base_dir, folder_id) / "frame.png"
+        frame.write_bytes(b"frame")
+        takescreens.register_screenshots(base_dir, folder_id, [frame], capture_group)
+
+    monkeypatch.setattr(takescreens, "screenshots", fake_screenshots)
+    meta = Meta(base_dir=str(tmp_path), uuid="retake-xxx", category="XXX", retake=True)
+
+    (sheet,) = await takescreens.xxx_contact_sheets([str(video)], meta.uuid, meta.base_dir, meta)
+
+    assert retake_seen == [False]
+    assert meta.retake is True
+    assert Path(sheet).is_file()
+    assert Path(sheet) in manifest_files(meta.base_dir, meta.uuid, "main")
+    assert meta.screens == 2
+
+
+@pytest.mark.asyncio
+async def test_a_stalled_ffmpeg_fails_the_sheet_instead_of_hanging(tmp_path, monkeypatch):
+    video = tmp_path / "Studio.Scene.mp4"
+    video.write_bytes(b"video")
+    takescreens._apply_config({"DEFAULT": {"xxx_contact_sheet_rows": 1, "xxx_contact_sheet_columns": 2}})
+    commands = []
+    _fake_ffmpeg(monkeypatch, commands)
+    cancelled = []
+
+    async def stalled_ffmpeg(_command):
+        try:
+            await asyncio.sleep(60)
+        except asyncio.CancelledError:
+            cancelled.append(True)
+            raise
+
+    monkeypatch.setattr(takescreens, "run_ffmpeg", stalled_ffmpeg)
+    monkeypatch.setattr(takescreens, "_XXX_FFMPEG_TIMEOUT_SECONDS", 0.01)
+    meta = Meta(base_dir=str(tmp_path), uuid="stalled-xxx", category="XXX")
+
+    assert await takescreens.xxx_contact_sheets([str(video)], meta.uuid, meta.base_dir, meta) == []
+    assert cancelled == [True]
+
+
+def test_replace_file_keeps_the_old_file_when_the_manifest_save_fails(tmp_path, monkeypatch):
+    from src import screenshot_manifest
+
+    screens = takescreens.screenshots_dir(tmp_path, "save-fails")
+    screens.mkdir(parents=True, exist_ok=True)
+    old = screens / "sheet.webp"
+    old.write_bytes(b"old")
+    (registered,) = takescreens.register_screenshots(tmp_path, "save-fails", [old], "main")
+    new = screens / "new.png"
+    new.write_bytes(b"new")
+
+    def failing_save(*_args):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(screenshot_manifest, "_save", failing_save)
+    with pytest.raises(OSError, match="disk full"):
+        screenshot_manifest.replace_file(tmp_path, "save-fails", registered, new)
+
+    assert registered.read_bytes() == b"old"
+    assert manifest_files(tmp_path, "save-fails", "main") == [registered]
 
 
 @pytest.mark.asyncio

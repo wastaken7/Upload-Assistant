@@ -143,12 +143,13 @@ def replace_file(base_dir: str | Path, release_id: str, path: Path, new_file: Pa
             raise FileNotFoundError("Screenshot not found")
         target = path.with_suffix(new_file.suffix.lower() or path.suffix)
         new_file.replace(target)
-        if target != path:
-            path.unlink(missing_ok=True)
         entry["file"] = target.name
         if details:
             entry.update({key: value for key, value in details.items() if key not in {"file", "group"}})
         _save(base_dir, release_id, manifest)
+        # Only after the save: if it fails, the saved manifest still names the old file.
+        if target != path:
+            path.unlink(missing_ok=True)
         return target
 
 
