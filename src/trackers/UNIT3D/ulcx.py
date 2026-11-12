@@ -273,7 +273,9 @@ class ULCX(UNIT3D):
                     if orig_lang in ("en", "eng", "english"):
                         for s in sub_tracks:
                             is_default = str(s.get("Default", "")).lower() == "yes"
-                            if is_default:
+                            # Forced subs (section 6.6) cover foreign-language parts and are meant to show by default.
+                            is_forced = str(s.get("Forced", "")).lower() == "yes"
+                            if is_default and not is_forced:
                                 logger.info(f"{self.tracker}: [bold red]Subtitles should not be marked default on English content.[/bold red]")
                                 return False
 
