@@ -311,6 +311,9 @@ class TrackerStatusManager:
                         if "initial_dupes" not in meta:
                             meta.initial_dupes = {}
                         meta.initial_dupes[tracker_name] = copy.deepcopy(dupes)
+                        title_releases = local_meta.get(f"{tracker_name}_title_releases")
+                        if isinstance(title_releases, list):
+                            meta.initial_title_releases[tracker_name] = copy.deepcopy(title_releases)
 
                     if ("skipping" not in local_meta or local_meta["skipping"] is None) and not local_tracker_status["skipped"]:
                         # Slot rules need the unfiltered results; the basic filter drops releases they compare against.

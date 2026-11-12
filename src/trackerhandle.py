@@ -42,6 +42,7 @@ async def recheck_dupes_after_wait(meta: Meta, config: dict[str, Any], tracker_n
     user already accepted does not stop the upload.
     """
     logger.info(f"[yellow]{tracker_name}: Redoing dupe check after {reason} wait...[/yellow]")
+    title_key = f"{tracker_name}_title_releases"
     try:
         if tracker_name not in {"PASSTHEPOPCORN"}:
             new_dupes = cast(list[Any], await t_class.search_existing(meta))
@@ -55,19 +56,27 @@ async def recheck_dupes_after_wait(meta: Meta, config: dict[str, Any], tracker_n
         status["status_message"] = f"Skipped: Error redoing dupe check after {reason} wait: {e}"
         return False
 
-    initial_dupes = meta.initial_dupes.get(tracker_name, [])
-
-    def is_in_initial(dupe: Any) -> bool:
-        for initial_dupe in initial_dupes:
-            if _is_str_dict(dupe) and _is_str_dict(initial_dupe):
-                if dupe.get("name") == initial_dupe.get("name") and dupe.get("size") == initial_dupe.get("size"):
+    def is_known(dupe: Any, known: Sequence[Any]) -> bool:
+        for known_dupe in known:
+            if _is_str_dict(dupe) and _is_str_dict(known_dupe):
+                if dupe.get("name") == known_dupe.get("name") and dupe.get("size") == known_dupe.get("size"):
                     return True
-            elif isinstance(dupe, str) and isinstance(initial_dupe, str) and dupe == initial_dupe:
+            elif isinstance(dupe, str) and isinstance(known_dupe, str) and dupe == known_dupe:
                 return True
         return False
 
-    real_new_dupes = [d for d in new_dupes if not is_in_initial(d)]
-    if not real_new_dupes:
+    initial_dupes = cast(list[Any], meta.initial_dupes.get(tracker_name, []))
+    real_new_dupes = [d for d in new_dupes if not is_known(d, initial_dupes)]
+    # Whole-title searches also refresh the slot-rule evidence, which can hold
+    # releases the basic duplicate search leaves out (other HDR layers, codecs).
+    initial_title_releases = meta.initial_title_releases.get(tracker_name)
+    refreshed_title_releases = meta.get(title_key)
+    new_title_releases = (
+        [release for release in cast(list[Any], refreshed_title_releases) if not is_known(release, cast(list[Any], initial_title_releases))]
+        if isinstance(initial_title_releases, list) and isinstance(refreshed_title_releases, list)
+        else []
+    )
+    if not real_new_dupes and not new_title_releases:
         return True
 
     slot_decision = await evaluate_slots(new_dupes, meta, tracker_name, config)
@@ -77,6 +86,8 @@ async def recheck_dupes_after_wait(meta: Meta, config: dict[str, Any], tracker_n
     if slot_decision is not None and slot_decision.verdict is Verdict.BLOCK:
         logger.info(f"[red]{tracker_name}: a release that fills this slot appeared during the wait. Automatically skipping upload.[/red]")
         return False
+    if not real_new_dupes:
+        return True
     dupe_checker = DupeChecker(config)
     real_new_dupes = cast(list[Any], await dupe_checker.filter_dupes(real_new_dupes, meta, tracker_name))
     if real_new_dupes:

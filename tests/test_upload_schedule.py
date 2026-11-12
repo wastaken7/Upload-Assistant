@@ -1,12 +1,14 @@
 # ruff: noqa: S101
 
 import asyncio
+import time
 from datetime import datetime
 
 import pytest
 
 from src import trackerhandle
 from src.args import Args
+from src.configvalidator import validate_config
 from src.meta import Meta
 from src.upload_schedule import UploadPacer, configured_upload_interval, format_duration, parse_duration, resolve_upload_at, wait_before_upload
 
@@ -28,18 +30,43 @@ def test_parse_duration_rejects_invalid_values(value):
         parse_duration(value)
 
 
+def _wall(value: datetime) -> datetime:
+    assert value.tzinfo is not None
+    return value.replace(tzinfo=None)
+
+
 def test_time_of_day_later_today():
-    assert resolve_upload_at("23:30", NOW) == datetime(2026, 3, 10, 23, 30)
+    assert _wall(resolve_upload_at("23:30", NOW)) == datetime(2026, 3, 10, 23, 30)
 
 
 def test_time_of_day_already_passed_means_tomorrow():
-    assert resolve_upload_at("7:05", NOW) == datetime(2026, 3, 11, 7, 5)
-    assert resolve_upload_at("20:00", NOW) == datetime(2026, 3, 11, 20, 0)
+    assert _wall(resolve_upload_at("7:05", NOW)) == datetime(2026, 3, 11, 7, 5)
+    assert _wall(resolve_upload_at("20:00", NOW)) == datetime(2026, 3, 11, 20, 0)
 
 
 def test_full_date_in_the_future():
-    assert resolve_upload_at("2026-03-12 01:15", NOW) == datetime(2026, 3, 12, 1, 15)
-    assert resolve_upload_at("2026-03-12T01:15:30", NOW) == datetime(2026, 3, 12, 1, 15, 30)
+    assert _wall(resolve_upload_at("2026-03-12 01:15", NOW)) == datetime(2026, 3, 12, 1, 15)
+    assert _wall(resolve_upload_at("2026-03-12T01:15:30", NOW)) == datetime(2026, 3, 12, 1, 15, 30)
+
+
+@pytest.fixture
+def new_york_time(monkeypatch):
+    if not hasattr(time, "tzset"):
+        pytest.skip("changing the local timezone needs time.tzset")
+    monkeypatch.setenv("TZ", "America/New_York")
+    time.tzset()
+    yield
+    monkeypatch.undo()
+    time.tzset()
+
+
+def test_repeated_dst_hour_uses_the_second_occurrence(new_york_time):
+    # 01:45 EDT on the night clocks go back: the second 01:30 (EST) is 45 minutes away.
+    now = datetime(2026, 11, 1, 1, 45).astimezone()
+
+    target = resolve_upload_at("01:30", now)
+
+    assert target.timestamp() - now.timestamp() == 45 * 60
 
 
 @pytest.mark.parametrize("value", ["2026-03-09 23:00", "2026-03-12", "24:00", "12:60", "tomorrow", "2026-02-30 10:00"])
@@ -57,7 +84,7 @@ def test_args_parse_scheduling_options(tmp_path):
     meta, _, _ = Args({"DEFAULT": {"screens": 1}}).parse([str(tmp_path), "--upload-interval", "1h30m", "--upload-at", "2099-01-02 03:04"], Meta())
 
     assert meta.upload_interval == 5400
-    assert meta.upload_at == "2099-01-02T03:04:00"
+    assert _wall(datetime.fromisoformat(meta.upload_at)) == datetime(2099, 1, 2, 3, 4)
 
 
 @pytest.mark.parametrize("option", [["--upload-at", "25:00"], ["--upload-at", "2000-01-01 10:00"], ["--upload-interval", "soon"]])
@@ -68,9 +95,27 @@ def test_args_reject_invalid_scheduling_options(tmp_path, option):
 
 def test_configured_upload_interval_prefers_the_command_line():
     assert configured_upload_interval(Meta(upload_interval=60), {"DEFAULT": {"upload_interval": "1h"}}) == 60
+    assert configured_upload_interval(Meta(upload_interval=0), {"DEFAULT": {"upload_interval": "1h"}}) == 0
     assert configured_upload_interval(Meta(), {"DEFAULT": {"upload_interval": "1h"}}) == 3600
-    assert configured_upload_interval(Meta(), {"DEFAULT": {"upload_interval": "later"}}) == 0
     assert configured_upload_interval(Meta(), {"DEFAULT": {}}) == 0
+    with pytest.raises(ValueError):
+        configured_upload_interval(Meta(), {"DEFAULT": {"upload_interval": "30min"}})
+
+
+def test_explicit_zero_interval_on_the_command_line(tmp_path):
+    meta, _, _ = Args({"DEFAULT": {"screens": 1}}).parse([str(tmp_path), "--upload-interval", "0"], Meta())
+
+    assert meta.upload_interval == 0
+    assert configured_upload_interval(meta, {"DEFAULT": {"upload_interval": "1h"}}) == 0
+
+
+@pytest.mark.parametrize(("value", "valid"), [("30m", True), (90, True), ("30min", False)])
+def test_config_validation_rejects_invalid_intervals(value, valid):
+    config = {"DEFAULT": {"tmdb_api": "fictional", "upload_interval": value}, "TRACKERS": {}, "TORRENT_CLIENTS": {}}
+
+    _is_valid, errors, _warnings = validate_config(config, [], None)
+
+    assert any("upload_interval" in error for error in errors) is not valid
 
 
 class _Clock:
@@ -225,6 +270,39 @@ def test_scheduled_wait_skips_trackers_with_new_dupes(tracker_stage):
     assert sorted(tracker_stage.searches) == ["ALPHA", "BETA"]
     assert tracker_stage.uploads == ["ALPHA"]
     assert meta.tracker_status["BETA"]["status_message"] == "Skipped due to new dupe found after waiting to upload"
+
+
+def test_new_slot_evidence_reaches_slot_rules(tracker_stage, monkeypatch):
+    known = {"name": "Fictional.Film.2020.1080p-GRP", "size": 1}
+    hidden = {"name": "Fictional.Film.2020.1080p.DV-NEW", "size": 3}
+    tracker_stage.results = {"ALPHA": [known], "BETA": [known]}
+    evaluated: list[str] = []
+
+    class _Block:
+        verdict = trackerhandle.Verdict.BLOCK
+
+    async def _slots(_dupes, meta, tracker, _config):
+        evaluated.append(tracker)
+        return _Block() if hidden in meta.get(f"{tracker}_title_releases", []) else None
+
+    original_search = _Tracker.search_existing
+
+    async def _search(self, meta):
+        meta[f"{self.tracker}_title_releases"] = [known, hidden] if self.tracker == "BETA" else [known]
+        return await original_search(self, meta)
+
+    monkeypatch.setattr(trackerhandle, "evaluate_slots", _slots)
+    monkeypatch.setattr(_Tracker, "search_existing", _search)
+    meta = Meta(
+        upload_waited=True,
+        initial_dupes={"ALPHA": [known], "BETA": [known]},
+        initial_title_releases={"ALPHA": [known], "BETA": [known]},
+    )
+
+    _run_trackers(meta)
+
+    assert evaluated == ["BETA"]
+    assert tracker_stage.uploads == ["ALPHA"]
 
 
 def test_no_dupe_recheck_without_a_wait(tracker_stage):

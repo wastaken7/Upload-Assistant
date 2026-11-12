@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, TypeIs, cast
 
 from src.app_paths import STATE_DIR
+from src.upload_schedule import parse_duration
 
 # Required top-level sections
 REQUIRED_SECTIONS = ["DEFAULT", "TRACKERS"]
@@ -588,6 +589,12 @@ def _validate_default_section(default: dict[str, Any]) -> tuple[list[str], list[
                     f"Invalid value '{upload_order}' for upload_order. Must be one of: 'concurrent', 'usenet', 'tracker'", key="upload_order", section="DEFAULT"
                 )
             )
+
+    if default.get("upload_interval") is not None:
+        try:
+            parse_duration(default["upload_interval"])
+        except ValueError as error:
+            errors.append(f"DEFAULT['upload_interval'] is invalid: {error}")
 
     retention = default.get("history_retention_days")
     if retention is not None:

@@ -42,23 +42,32 @@ def parse_duration(value: object) -> int:
     return sum(int(amount) * _UNIT_SECONDS[unit] for amount, unit in _DURATION_PART_RE.findall(text))
 
 
-def resolve_upload_at(value: str, now: datetime | None = None) -> datetime:
-    """Resolve ``HH:MM[:SS]`` or ``YYYY-MM-DD HH:MM[:SS]`` to a local, naive datetime in the future.
+def _local_instants(wall_time: datetime) -> list[datetime]:
+    """Return the local instants for a naive wall time, earliest first (two during a repeated DST hour)."""
+    instants = {wall_time.replace(fold=fold).astimezone() for fold in (0, 1)}
+    return sorted(instants, key=lambda instant: instant.timestamp())
 
-    A time of day that has already passed today means tomorrow. A full date in
-    the past is an error, so a typo cannot start an upload immediately.
+
+def resolve_upload_at(value: str, now: datetime | None = None) -> datetime:
+    """Resolve ``HH:MM[:SS]`` or ``YYYY-MM-DD HH:MM[:SS]`` to a timezone-aware local datetime in the future.
+
+    A time of day means its next occurrence: later today, the second occurrence
+    of a repeated DST hour, or tomorrow. A full date in the past is an error,
+    so a typo cannot start an upload immediately.
     """
-    now = now or datetime.now().astimezone().replace(tzinfo=None)
+    now_ts = (now or datetime.now().astimezone()).timestamp()
     text = str(value).strip()
     time_match = _TIME_ONLY_RE.fullmatch(text)
     if time_match:
         hour, minute, second = (int(part or 0) for part in time_match.groups())
         if hour > 23 or minute > 59 or second > 59:
             raise ValueError(f"invalid time '{value}'")
-        target = now.replace(hour=hour, minute=minute, second=second, microsecond=0)
-        if target <= now:
-            target += timedelta(days=1)
-        return target
+        today = datetime.fromtimestamp(now_ts).astimezone().replace(hour=hour, minute=minute, second=second, microsecond=0, tzinfo=None)
+        for day in (today, today + timedelta(days=1)):
+            for instant in _local_instants(day):
+                if instant.timestamp() > now_ts:
+                    return instant
+        raise ValueError(f"could not resolve upload time '{value}'")
 
     if ":" not in text:
         raise ValueError(f"invalid upload time '{value}': include a time, for example 23:30 or '2026-11-15 23:30'")
@@ -66,9 +75,8 @@ def resolve_upload_at(value: str, now: datetime | None = None) -> datetime:
         target = datetime.fromisoformat(text)
     except ValueError:
         raise ValueError(f"invalid upload time '{value}': use HH:MM or 'YYYY-MM-DD HH:MM'") from None
-    if target.tzinfo is not None:
-        target = target.astimezone().replace(tzinfo=None)
-    if target <= now:
+    target = _local_instants(target)[0] if target.tzinfo is None else target.astimezone()
+    if target.timestamp() <= now_ts:
         raise ValueError(f"upload time '{value}' is in the past")
     return target
 
@@ -89,15 +97,13 @@ def format_duration(seconds: float) -> str:
 
 
 def configured_upload_interval(meta: Meta, config: Mapping[str, Any]) -> int:
-    """Return the interval from the command line, or else from ``DEFAULT.upload_interval``."""
-    if meta.upload_interval:
+    """Return the interval from the command line (``0`` disables it), or else from ``DEFAULT.upload_interval``.
+
+    An invalid configured value raises ``ValueError``; config validation reports it before the run starts.
+    """
+    if meta.upload_interval is not None:
         return int(meta.upload_interval)
-    raw = config.get("DEFAULT", {}).get("upload_interval", 0)
-    try:
-        return parse_duration(raw)
-    except ValueError as error:
-        logger.warning(f"[yellow]Ignoring DEFAULT.upload_interval: {error}[/yellow]")
-        return 0
+    return parse_duration(config.get("DEFAULT", {}).get("upload_interval", 0))
 
 
 class UploadPacer:

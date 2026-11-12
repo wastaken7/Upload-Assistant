@@ -283,6 +283,8 @@ class Meta:
     imghost_from_cli: bool = False
     infohash: str = ""
     initial_dupes: dict[str, Any] = field(default_factory=dict[str, Any])
+    # Whole-title search results from the first duplicate check, compared with slot rules after a wait.
+    initial_title_releases: dict[str, Any] = field(default_factory=dict[str, Any])
     is_disc: str = ""
     is_sports: bool = False
     pre_release: bool = False
@@ -600,10 +602,10 @@ class Meta:
     unattended: bool = False
     unit3d: bool | None = None
     untouched: bool = False
-    # Local ISO datetime from --upload-at; the upload waits for it after preparation.
+    # Timezone-aware ISO datetime from --upload-at; the upload waits for it after preparation.
     upload_at: str = ""
-    # Minimum seconds between uploads in one run (--upload-interval / DEFAULT.upload_interval).
-    upload_interval: int = 0
+    # Minimum seconds between uploads in one run from --upload-interval; None uses DEFAULT.upload_interval.
+    upload_interval: int | None = None
     upload_order: str | None = None
     upload_timer: bool = True
     # Set after a scheduled wait so each tracker repeats its duplicate check.
