@@ -1,9 +1,23 @@
-FROM python:3.15
+# ── Build stage: compile the Python environment ─────────────────────
+# The full image has compilers for any dependency without a prebuilt wheel;
+# only the finished virtualenv is copied into the slim runtime image.
+FROM python:3.15 AS builder
+
+ENV PYTHONDONTWRITEBYTECODE=1
+RUN python -m venv /venv
+ENV PATH="/venv/bin:$PATH"
+
+RUN pip install --no-cache-dir --upgrade pip==25.3 wheel==0.45.1
+
+COPY requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
+
+# ── Runtime stage ───────────────────────────────────────────────────
+FROM python:3.15-slim
 
 # ── System dependencies ──────────────────────────────────────────────
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-    git \
     ffmpeg \
     nano \
     ca-certificates \
@@ -18,23 +32,14 @@ RUN apt-get update && \
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 
-RUN python -m venv /venv
+COPY --from=builder /venv /venv
 ENV PATH="/venv/bin:$PATH"
-
-RUN pip install --no-cache-dir --upgrade pip==25.3 wheel==0.45.1
 
 # ── Application setup ────────────────────────────────────────────────
 WORKDIR /Upload-Assistant
 
-# Copy the Python requirements file and install Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
 # Copy the rest of the application
 COPY . .
-
-# Download the pinned official MediaInfo CLI used by the application.
-RUN python3 -c "import asyncio; from bin.get_mediainfo import MediaInfoBinaryManager; asyncio.run(MediaInfoBinaryManager.ensure_mediainfo_binary('/Upload-Assistant'))"
 
 # Preserve the built-in data/ directory outside the mount-point so that
 # volume mounts over /Upload-Assistant/data/ don't hide critical files
@@ -45,20 +50,18 @@ RUN rm -rf /Upload-Assistant/defaults \
     && cp -a data /Upload-Assistant/defaults/ \
     && find /Upload-Assistant/defaults/ -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 
-# Download only the required mkbrr binary (requires full repo for src imports)
-RUN python3 -c "from bin.get_mkbrr import MkbrrBinaryManager; MkbrrBinaryManager.download_mkbrr_for_docker()"
-
-# Download bdinfo binary for the container architecture using the docker helper
-RUN python3 bin/get_bdinfo_docker.py
-
-# Ensure downloaded binaries are executable
-RUN find bin/mkbrr -name "mkbrr" -print0 | xargs -0 chmod +x && \
-    find bin/bdinfo -name "bdinfo" -print0 | xargs -0 chmod +x
-
-# ── Permissions ──────────────────────────────────────────────────────
-# Give UID 1000 ownership (runtime binary updates need chmod) and let
-# any other UID (e.g. Unraid 99:100) read/execute.
-RUN mkdir -p /Upload-Assistant/bin/MI \
+# ── Bundled binaries and permissions ─────────────────────────────────
+# Download the pinned MediaInfo CLI, the mkbrr binary (requires the full repo
+# for src imports) and bdinfo for the container architecture, then fix their
+# permissions in the same layer so each binary is stored in the image once.
+# UID 1000 owns them (runtime binary updates need chmod) and any other UID
+# (e.g. Unraid 99:100) can read/execute.
+RUN python3 -c "import asyncio; from bin.get_mediainfo import MediaInfoBinaryManager; asyncio.run(MediaInfoBinaryManager.ensure_mediainfo_binary('/Upload-Assistant'))" \
+    && python3 -c "from bin.get_mkbrr import MkbrrBinaryManager; MkbrrBinaryManager.download_mkbrr_for_docker()" \
+    && python3 bin/get_bdinfo_docker.py \
+    && find bin/mkbrr -name "mkbrr" -print0 | xargs -0 chmod +x \
+    && find bin/bdinfo -name "bdinfo" -print0 | xargs -0 chmod +x \
+    && mkdir -p /Upload-Assistant/bin/MI \
     && chown -R 1000:1000 /Upload-Assistant/bin/mkbrr \
     && chown -R 1000:1000 /Upload-Assistant/bin/MI \
     && chown -R 1000:1000 /Upload-Assistant/bin/bdinfo \
