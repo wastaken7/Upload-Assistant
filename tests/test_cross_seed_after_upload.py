@@ -41,8 +41,8 @@ async def test_cross_seed_skips_tracker_that_received_the_upload(tmp_path, monke
 
     await upload.process_cross_seeds(meta)
 
-    download.assert_not_awaited()
-    add_to_client.assert_not_awaited()
+    download.assert_not_called()
+    add_to_client.assert_not_called()
 
 
 @pytest.mark.asyncio
