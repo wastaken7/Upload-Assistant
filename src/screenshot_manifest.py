@@ -57,8 +57,13 @@ def register(
     timestamps: dict[str, float] | None = None,
     slot_timestamps: dict[str, float] | None = None,
     pages: dict[str, int] | None = None,
+    details: dict[str, dict[str, Any]] | None = None,
 ) -> list[Path]:
-    """Publish capture files under UUID names and return their new paths."""
+    """Publish capture files under UUID names and return their new paths.
+
+    ``details`` adds extra fields, such as what kind of image a file is, to the
+    entries of the given source paths.
+    """
     with _lock(base_dir, release_id):
         manifest = _load(base_dir, release_id)
         entries: object = manifest.setdefault("screenshots", {})
@@ -83,25 +88,93 @@ def register(
                 entries[screenshot_id]["slot_timestamp"] = slot_timestamps[str(source)]
             if pages is not None and str(source) in pages:
                 entries[screenshot_id]["page"] = pages[str(source)]
+            if details is not None and str(source) in details:
+                extra = {key: value for key, value in details[str(source)].items() if key not in {"file", "group"}}
+                entries[screenshot_id].update(extra)
             result.append(target)
         _save(base_dir, release_id, manifest)
         return result
 
 
-def files(base_dir: str | Path, release_id: str, group: str | None = None) -> list[Path]:
-    """Return active screenshots in registration order, optionally by group."""
+def entries(base_dir: str | Path, release_id: str, group: str | None = None) -> list[tuple[Path, dict[str, Any]]]:
+    """Return active screenshots with a copy of their manifest entry, in registration order."""
     directory = screenshots_dir(base_dir, release_id)
-    entries: object = _load(base_dir, release_id).get("screenshots", {})
-    if not _is_str_dict(entries):
+    values: object = _load(base_dir, release_id).get("screenshots", {})
+    if not _is_str_dict(values):
         return []
-    result: list[Path] = []
-    for screenshot_id, value in entries.items():
+    result: list[tuple[Path, dict[str, Any]]] = []
+    for screenshot_id, value in values.items():
         if not _is_str_dict(value) or (group is not None and value.get("group") != group):
             continue
         path = directory / str(value.get("file", f"{screenshot_id}.png"))
         if path.is_file():
-            result.append(path)
+            result.append((path, dict(value)))
     return result
+
+
+def files(base_dir: str | Path, release_id: str, group: str | None = None) -> list[Path]:
+    """Return active screenshots in registration order, optionally by group."""
+    return [path for path, _entry in entries(base_dir, release_id, group)]
+
+
+def entry_for(base_dir: str | Path, release_id: str, path: Path) -> dict[str, Any] | None:
+    """Return a copy of the manifest entry of a local screenshot, if it has one."""
+    values: object = _load(base_dir, release_id).get("screenshots", {})
+    if _is_str_dict(values):
+        for value in values.values():
+            if _is_str_dict(value) and value.get("file") == path.name:
+                return dict(value)
+    return None
+
+
+def replace_file(base_dir: str | Path, release_id: str, path: Path, new_file: Path, details: dict[str, Any] | None = None) -> Path:
+    """Move ``new_file`` over an active screenshot, keeping its manifest entry.
+
+    The file keeps its UUID name; only the extension follows ``new_file``.
+    Returns the screenshot's path after the move.
+    """
+    with _lock(base_dir, release_id):
+        manifest = _load(base_dir, release_id)
+        values: object = manifest.get("screenshots")
+        if not _is_str_dict(values):
+            raise FileNotFoundError("Screenshot not found")
+        entry = next((value for value in values.values() if _is_str_dict(value) and value.get("file") == path.name), None)
+        if entry is None:
+            raise FileNotFoundError("Screenshot not found")
+        target = path.with_suffix(new_file.suffix.lower() or path.suffix)
+        new_file.replace(target)
+        if target != path:
+            path.unlink(missing_ok=True)
+        entry["file"] = target.name
+        if details:
+            entry.update({key: value for key, value in details.items() if key not in {"file", "group"}})
+        _save(base_dir, release_id, manifest)
+        return target
+
+
+def has_flag(base_dir: str | Path, release_id: str, flag: str) -> bool:
+    """Return whether a release-wide manifest flag is set."""
+    flags: object = _load(base_dir, release_id).get("flags", {})
+    return _is_str_dict(flags) and flags.get(flag) is True
+
+
+def set_flag(base_dir: str | Path, release_id: str, flag: str) -> None:
+    """Set a release-wide manifest flag; clearing a group keeps it."""
+    with _lock(base_dir, release_id):
+        manifest = _load(base_dir, release_id)
+        flags: object = manifest.setdefault("flags", {})
+        if not _is_str_dict(flags):
+            flags = manifest["flags"] = {}
+        if flags.get(flag) is not True:
+            flags[flag] = True
+            _save(base_dir, release_id, manifest)
+
+
+def discard_file(base_dir: str | Path, release_id: str, path: Path) -> None:
+    """Delete an active screenshot and its manifest entry."""
+    with _lock(base_dir, release_id):
+        path.unlink(missing_ok=True)
+        forget_file(base_dir, release_id, path)
 
 
 def capture_timestamps(base_dir: str | Path, release_id: str, group: str, *, original_slots: bool = False) -> list[float]:

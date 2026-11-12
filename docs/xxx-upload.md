@@ -98,7 +98,11 @@ XXX releases generate one evenly sampled contact sheet per video instead of the 
 "xxx_single_file_screens": "0",
 ```
 
-Set `xxx_contact_sheet_animated_webp` to create animated WebP sheets. For a release containing one video, `xxx_single_file_screens` adds that many normal screenshots alongside its contact sheet; BJShare expects at least two screenshots for single-file XXX uploads.
+Set `xxx_contact_sheet_animated_webp` to create animated WebP sheets. Image hosts such as imgbox and pixhost, and BitPorn, reject images over 10 MB, so an animated sheet is re-encoded at lower quality until it fits. If it still does not fit, a static PNG sheet is used instead and a warning is shown; fewer rows, columns or animation seconds keep it animated. A default 12 × 5 sheet from a 1080p video is close to that limit.
+
+Sheets are cached per video. Changing any of the settings above makes the next run regenerate them. In the Web UI screenshot review, replacing a contact sheet renders a new sheet of the same video at different times.
+
+For a release containing one video, `xxx_single_file_screens` adds that many normal screenshots alongside its contact sheet; BJShare expects at least two screenshots for single-file XXX uploads.
 
 If no artwork is available, Upload Assistant creates a fallback poster from a source-video frame. `--poster` and `--banner` accept either an existing local image or a public HTTP(S) URL and take precedence over generated artwork:
 

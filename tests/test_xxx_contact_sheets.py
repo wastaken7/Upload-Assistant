@@ -9,6 +9,7 @@ from PIL import Image
 
 from src import takescreens
 from src.meta import Meta
+from src.screenshot_manifest import entries as manifest_entries
 from src.screenshot_manifest import files as manifest_files
 
 
@@ -68,13 +69,38 @@ async def test_xxx_contact_sheets_create_one_grid_per_video_up_to_configured_lim
     sheets = await takescreens.xxx_contact_sheets(videos, meta.uuid, meta.base_dir, meta)
 
     assert len(sheets) == 2
+    assert all(Path(sheet).suffix == ".png" for sheet in sheets)
     assert meta.screens == 2
     assert len(manifest_files(meta.base_dir, meta.uuid, "main")) == 2
-    assert all("tile=layout=3x2" in command for command in commands)
-    assert all("drawtext" in command for command in commands)
-    assert all("fontfile" in command for command in commands)
-    assert all("pts" in command for command in commands)
+    # Each video: one seeking capture per tile, then one stack of the 3x2 grid.
+    assert len(commands) == 2 * (6 + 1)
+    tile_commands = [command for command in commands if "xxx-contact-sheet-" not in command]
+    stack_commands = [command for command in commands if "xxx-contact-sheet-" in command]
+    assert len(tile_commands) == 12
+    assert all(command.count(" -i ") == 1 and "-ss " in command and "-vframes 1" in command for command in tile_commands)
+    assert all("drawtext" in command and "fontfile" in command for command in tile_commands)
+    assert all("vstack=inputs=2" in command and "hstack=inputs=3" in command for command in stack_commands)
     assert recorded == [("artifact", {"service": "screenshot", "operation": "created", "category": "standard", "count": 2})]
+
+
+def test_static_tile_draws_a_literal_timestamp_after_scaling():
+    """ffmpeg rejected the escaped pts expression, and text drawn before scaling was ~3 px tall."""
+    tile = takescreens._xxx_contact_sheet_tile(Path("Studio.Scene.mp4"), 3661.9, 0.0, "C:/Windows/Fonts/arial.ttf")
+    graph = takescreens.compile_ffmpeg_command(takescreens._ffmpeg.output(tile, "tile.png", vframes=1))
+    filters = graph[graph.index("-filter_complex") + 1]
+
+    assert "pts" not in filters
+    assert "text=01\\\\:01\\\\:01:" in filters
+    assert filters.index("scale=320:-2") < filters.index("drawtext")
+    assert graph[graph.index("-ss") + 1] == "3661.9"
+
+
+def test_contact_sheet_tiles_skip_the_opening_frame_and_stay_inside_the_video():
+    starts = takescreens._xxx_contact_sheet_start_times(4, 100.0, 1.0)
+
+    assert starts == pytest.approx([12.375, 37.125, 61.875, 86.625])
+    assert starts[0] > 0
+    assert starts[-1] < 100.0 - 1.0
 
 
 @pytest.mark.asyncio
@@ -111,6 +137,7 @@ async def test_animated_xxx_contact_sheet_is_registered_as_webp(tmp_path, monkey
     assert all("ffv1" in command and "drawtext" in command for command in tile_commands)
     assert stack_command.count(" -i ") == 2
     assert "libwebp_anim" in stack_command
+    assert "-quality 75" in stack_command
     assert "-t 5.0" in stack_command
     assert "hstack" in stack_command
     # The intermediate clips are removed once the sheet is written.
@@ -234,6 +261,170 @@ async def test_xxx_single_file_screens_stay_fixed_across_reruns(tmp_path, monkey
 
     assert requested[-1] == (2, True)
     assert meta.screens == 5
+
+
+def _fake_ffmpeg(monkeypatch, commands, sheet_bytes=b"contact sheet"):
+    """Patch probe and ffmpeg so every output is written; sheet outputs get ``sheet_bytes``."""
+
+    def fake_probe(_path):
+        return {"format": {"duration": "60"}, "streams": [{"codec_type": "video"}]}
+
+    async def fake_run_ffmpeg(command):
+        command_args = takescreens.compile_ffmpeg_command(command)
+        commands.append(" ".join(command_args))
+        output = Path(takescreens.get_ffmpeg_output_path(command, command_args))
+        output.parent.mkdir(parents=True, exist_ok=True)
+        is_tile = output.name.startswith("tile-")
+        output.write_bytes(b"tile" if is_tile else sheet_bytes(output) if callable(sheet_bytes) else sheet_bytes)
+        return 0, b"", b""
+
+    async def fake_record_event(_family, **_values):
+        return None
+
+    monkeypatch.setattr(takescreens.ffmpeg, "probe", fake_probe)
+    monkeypatch.setattr(takescreens, "run_ffmpeg", fake_run_ffmpeg)
+    monkeypatch.setattr(takescreens, "_xxx_contact_sheet_fontfile", lambda: None)
+    monkeypatch.setattr(takescreens, "record_event_async", fake_record_event)
+
+
+@pytest.mark.asyncio
+async def test_oversized_animated_sheet_lowers_quality_then_falls_back_to_png(tmp_path, monkeypatch):
+    video = tmp_path / "Studio.Scene.mp4"
+    video.write_bytes(b"video")
+    takescreens._apply_config({"DEFAULT": {"xxx_contact_sheet_rows": 1, "xxx_contact_sheet_columns": 2, "xxx_contact_sheet_animated_webp": True}})
+    monkeypatch.setattr(takescreens, "XXX_CONTACT_SHEET_MAX_BYTES", 10)
+    commands = []
+    # Every WebP is too large; the PNG fits.
+    _fake_ffmpeg(monkeypatch, commands, lambda output: b"x" * 50 if output.suffix == ".webp" else b"png")
+    meta = Meta(base_dir=str(tmp_path), uuid="oversized-xxx", category="XXX")
+
+    sheets = await takescreens.xxx_contact_sheets([str(video)], meta.uuid, meta.base_dir, meta)
+
+    webp_commands = [command for command in commands if "libwebp_anim" in command]
+    assert [command.split("-quality ")[1].split()[0] for command in webp_commands] == ["75", "60", "45", "30"]
+    assert len(sheets) == 1
+    assert Path(sheets[0]).suffix == ".png"
+    assert not list(takescreens.screenshots_dir(meta.base_dir, meta.uuid).glob("*.webp"))
+
+
+@pytest.mark.asyncio
+async def test_animated_sheet_stops_lowering_quality_once_it_fits(tmp_path, monkeypatch):
+    video = tmp_path / "Studio.Scene.mp4"
+    video.write_bytes(b"video")
+    takescreens._apply_config({"DEFAULT": {"xxx_contact_sheet_rows": 1, "xxx_contact_sheet_columns": 2, "xxx_contact_sheet_animated_webp": True}})
+    monkeypatch.setattr(takescreens, "XXX_CONTACT_SHEET_MAX_BYTES", 10)
+    commands = []
+    sizes = iter([50, 5])
+    _fake_ffmpeg(monkeypatch, commands, lambda _output: b"x" * next(sizes))
+    meta = Meta(base_dir=str(tmp_path), uuid="fits-xxx", category="XXX")
+
+    sheets = await takescreens.xxx_contact_sheets([str(video)], meta.uuid, meta.base_dir, meta)
+
+    assert len([command for command in commands if "libwebp_anim" in command]) == 2
+    assert Path(sheets[0]).suffix == ".webp"
+
+
+@pytest.mark.asyncio
+async def test_cached_sheets_are_marked_and_regenerated_when_settings_change(tmp_path, monkeypatch):
+    video = tmp_path / "Studio.Scene.mp4"
+    video.write_bytes(b"video")
+    commands = []
+    _fake_ffmpeg(monkeypatch, commands)
+    meta = Meta(base_dir=str(tmp_path), uuid="cached-xxx", category="XXX")
+
+    takescreens._apply_config({"DEFAULT": {"xxx_contact_sheet_rows": 1, "xxx_contact_sheet_columns": 2}})
+    first = await takescreens.xxx_contact_sheets([str(video)], meta.uuid, meta.base_dir, meta)
+    entries = manifest_entries(meta.base_dir, meta.uuid, "main")
+    assert entries[0][1]["kind"] == takescreens.XXX_CONTACT_SHEET_KIND
+    assert entries[0][1]["source"] == str(video)
+    assert takescreens.is_xxx_contact_sheet(meta.base_dir, meta.uuid, Path(first[0]))
+
+    commands.clear()
+    assert await takescreens.xxx_contact_sheets([str(video)], meta.uuid, meta.base_dir, meta) == first
+    assert commands == []
+
+    takescreens._apply_config({"DEFAULT": {"xxx_contact_sheet_rows": 1, "xxx_contact_sheet_columns": 2, "xxx_contact_sheet_animated_webp": True}})
+    second = await takescreens.xxx_contact_sheets([str(video)], meta.uuid, meta.base_dir, meta)
+
+    assert Path(second[0]).suffix == ".webp"
+    assert not Path(first[0]).exists()
+    assert manifest_files(meta.base_dir, meta.uuid, "main") == [Path(second[0])]
+
+
+@pytest.mark.asyncio
+async def test_unmarked_screenshots_from_older_runs_are_regenerated(tmp_path, monkeypatch):
+    video = tmp_path / "Studio.Scene.mp4"
+    video.write_bytes(b"video")
+    takescreens._apply_config({"DEFAULT": {"xxx_contact_sheet_rows": 1, "xxx_contact_sheet_columns": 2}})
+    commands = []
+    _fake_ffmpeg(monkeypatch, commands)
+    meta = Meta(base_dir=str(tmp_path), uuid="legacy-xxx", category="XXX")
+    legacy = takescreens.screenshots_dir(meta.base_dir, meta.uuid) / "old-sheet.png"
+    legacy.parent.mkdir(parents=True, exist_ok=True)
+    legacy.write_bytes(b"old sheet")
+    (old,) = takescreens.register_screenshots(meta.base_dir, meta.uuid, [legacy], "main")
+
+    sheets = await takescreens.xxx_contact_sheets([str(video)], meta.uuid, meta.base_dir, meta)
+
+    assert not old.exists()
+    assert manifest_files(meta.base_dir, meta.uuid, "main") == [Path(sheets[0])]
+    assert takescreens.is_xxx_contact_sheet(meta.base_dir, meta.uuid, Path(sheets[0]))
+
+
+@pytest.mark.asyncio
+async def test_deleted_sheet_is_not_replaced_by_a_single_frame(tmp_path, monkeypatch):
+    video = tmp_path / "Studio.Performer.mp4"
+    video.write_bytes(b"video")
+    takescreens._apply_config({"DEFAULT": {"xxx_contact_sheet_rows": 1, "xxx_contact_sheet_columns": 2, "xxx_single_file_screens": 1}})
+    commands = []
+    _fake_ffmpeg(monkeypatch, commands)
+
+    async def fake_screenshots(_path, _filename, folder_id, base_dir, _meta, num_screens, _force, *_args, capture_group="main", **_kwargs):
+        existing = len(manifest_files(base_dir, folder_id, capture_group))
+        frames = []
+        for index in range(existing, num_screens):
+            frame = takescreens.screenshots_dir(base_dir, folder_id) / f"frame-{index}.png"
+            frame.write_bytes(b"frame")
+            frames.append(str(frame))
+        takescreens.register_screenshots(base_dir, folder_id, frames, capture_group)
+
+    monkeypatch.setattr(takescreens, "screenshots", fake_screenshots)
+    meta = Meta(base_dir=str(tmp_path), uuid="deleted-sheet", category="XXX")
+    (sheet,) = await takescreens.xxx_contact_sheets([str(video)], meta.uuid, meta.base_dir, meta)
+    frame = next(path for path in manifest_files(meta.base_dir, meta.uuid, "main") if str(path) != sheet)
+
+    # The Web UI review deletes the sheet and keeps the frame.
+    takescreens.discard_screenshot_file(meta.base_dir, meta.uuid, Path(sheet))
+    (new_sheet,) = await takescreens.xxx_contact_sheets([str(video)], meta.uuid, meta.base_dir, meta)
+
+    assert Path(new_sheet) != frame
+    assert takescreens.is_xxx_contact_sheet(meta.base_dir, meta.uuid, Path(new_sheet))
+    assert frame in manifest_files(meta.base_dir, meta.uuid, "main")
+
+
+@pytest.mark.asyncio
+async def test_regenerating_a_sheet_keeps_its_entry_and_uses_its_video(tmp_path, monkeypatch):
+    videos = [tmp_path / f"Studio.Scene.{index}.mp4" for index in range(2)]
+    for video in videos:
+        video.write_bytes(b"video")
+    takescreens._apply_config({"DEFAULT": {"xxx_contact_sheet_rows": 1, "xxx_contact_sheet_columns": 2}})
+    commands = []
+    _fake_ffmpeg(monkeypatch, commands)
+    meta = Meta(base_dir=str(tmp_path), uuid="regenerate-xxx", category="XXX")
+    sheets = await takescreens.xxx_contact_sheets([str(video) for video in videos], meta.uuid, meta.base_dir, meta)
+
+    commands.clear()
+    regenerated = await takescreens.regenerate_xxx_contact_sheet(meta.base_dir, meta.uuid, Path(sheets[1]), meta)
+
+    assert regenerated == Path(sheets[1])
+    assert all(str(videos[1]) in command for command in commands if "-ss " in command)
+    assert manifest_files(meta.base_dir, meta.uuid, "main") == [Path(sheet) for sheet in sheets]
+    assert not [path for path in takescreens.screenshots_dir(meta.base_dir, meta.uuid).iterdir() if path.name.startswith(".")]
+
+    frame = takescreens.screenshots_dir(meta.base_dir, meta.uuid) / "frame.png"
+    frame.write_bytes(b"frame")
+    (registered_frame,) = takescreens.register_screenshots(meta.base_dir, meta.uuid, [frame], "main")
+    assert await takescreens.regenerate_xxx_contact_sheet(meta.base_dir, meta.uuid, registered_frame, meta) is None
 
 
 @pytest.mark.asyncio
@@ -409,5 +600,6 @@ async def test_nested_pack_contact_sheets_cover_each_part(tmp_path, monkeypatch)
 
     assert len(sheets) == 2
     # The title is checked in the drawtext filter, not in the input path.
-    assert any("drawtext" in argument and "Part 1/Scene.0.mp4" in argument for argument in commands[0])
-    assert any("drawtext" in argument and "Part 2/Scene.0.mp4" in argument for argument in commands[1])
+    # Each 1x1 sheet is one tile capture, then the titled stack.
+    assert any("drawtext" in argument and "Part 1/Scene.0.mp4" in argument for argument in commands[1])
+    assert any("drawtext" in argument and "Part 2/Scene.0.mp4" in argument for argument in commands[3])
