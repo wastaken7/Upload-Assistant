@@ -221,3 +221,92 @@ async def test_create_torrent_for_upload_rejects_missing_manifest_base(tmp_path)
 
     with pytest.raises(FileNotFoundError, match="TEST: no selected base torrent"):
         await Common({"TRACKERS": {"TEST": {}}}).create_torrent_for_upload(meta, "TEST", "TEST")
+
+
+def _register_two_variants(tmp_path, first_piece_size: int, second_piece_size: int):
+    first = tmp_path / "first.torrent"
+    second = tmp_path / "second.torrent"
+    write_torrent(first, first_piece_size, 64 * MIB)
+    write_torrent(second, second_piece_size, 64 * MIB)
+    manifest = TorrentManifest(tmp_path, "release")
+    first_entry = manifest.register(first, "base", "client:first")
+    second_entry = manifest.register(second, "base", "client:second")
+    return manifest, first_entry, second_entry
+
+
+def test_selection_keeps_the_preferred_variant_over_a_smaller_one(tmp_path):
+    manifest, small, large = _register_two_variants(tmp_path, 16 * MIB, 32 * MIB)
+
+    selected = manifest.select("TEST", "base", preferred=[manifest.entry_path(large)])
+
+    assert selected == large
+    assert manifest.selected_path("TEST") == manifest.entry_path(large)
+    assert small.piece_size < large.piece_size
+
+
+def test_selection_keeps_the_preferred_variant_when_the_policy_accepts_it(tmp_path):
+    manifest, _small, large = _register_two_variants(tmp_path, 8 * MIB, 16 * MIB)
+
+    selected = manifest.select("PASSTHEPOPCORN", "base", PASSTHEPOPCORN_POLICY, preferred=[manifest.entry_path(large)])
+
+    assert selected == large
+
+
+def test_selection_falls_back_to_the_smallest_variant_when_the_policy_rejects_the_preferred_one(tmp_path):
+    manifest, small, large = _register_two_variants(tmp_path, 16 * MIB, 32 * MIB)
+
+    selected = manifest.select("PASSTHEPOPCORN", "base", PASSTHEPOPCORN_POLICY, preferred=[None, manifest.entry_path(large)])
+
+    assert selected == small
+
+
+class _TrackerWithoutPolicy:
+    pass
+
+
+@pytest.mark.asyncio
+async def test_provision_keeps_the_torrent_chosen_for_the_run(tmp_path):
+    from src.meta import Meta
+
+    manifest, _small, large = _register_two_variants(tmp_path, 16 * MIB, 32 * MIB)
+    media = tmp_path / "release.mkv"
+    media.touch()
+    meta = Meta(base_dir=str(tmp_path), uuid="release", path=str(media), filelist=[str(media)], trackers=["TEST"])
+    meta.reuse_torrent_path = str(manifest.entry_path(large))
+
+    blocked = await provision_tracker_torrents(meta, {"TRACKERS": {"TEST": {}}}, ["TEST"], {"TEST": _TrackerWithoutPolicy})
+
+    assert blocked == set()
+    assert manifest.selected_path("TEST") == manifest.entry_path(large)
+
+
+@pytest.mark.asyncio
+async def test_provision_uses_the_default_base_when_the_run_chose_none(tmp_path):
+    from src.meta import Meta
+
+    manifest, large, _small = _register_two_variants(tmp_path, 32 * MIB, 16 * MIB)
+    media = tmp_path / "release.mkv"
+    media.touch()
+    meta = Meta(base_dir=str(tmp_path), uuid="release", path=str(media), filelist=[str(media)], trackers=["TEST"])
+
+    blocked = await provision_tracker_torrents(meta, {"TRACKERS": {"TEST": {}}}, ["TEST"], {"TEST": _TrackerWithoutPolicy})
+
+    assert blocked == set()
+    assert manifest.default_path("base") == manifest.entry_path(large)
+    assert manifest.selected_path("TEST") == manifest.entry_path(large)
+
+
+@pytest.mark.asyncio
+async def test_provision_still_picks_a_compliant_variant_for_a_tracker_with_a_piece_limit(tmp_path):
+    from src.meta import Meta
+
+    manifest, small, large = _register_two_variants(tmp_path, 16 * MIB, 32 * MIB)
+    media = tmp_path / "release.mkv"
+    media.touch()
+    meta = Meta(base_dir=str(tmp_path), uuid="release", path=str(media), filelist=[str(media)], trackers=["PASSTHEPOPCORN"], nohash=True)
+    meta.reuse_torrent_path = str(manifest.entry_path(large))
+
+    blocked = await provision_tracker_torrents(meta, {"TRACKERS": {"PASSTHEPOPCORN": {}}}, ["PASSTHEPOPCORN"], {"PASSTHEPOPCORN": PassThePopcorn})
+
+    assert blocked == set()
+    assert manifest.selected_path("PASSTHEPOPCORN") == manifest.entry_path(small)
