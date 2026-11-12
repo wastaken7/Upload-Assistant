@@ -31,7 +31,9 @@ class UlcxSlotRules(SlotRules):
         if ceiling is None:
             raise UnknownTraitError(f"ULCX does not define size tiers for {res} encodes.")
         bitrate = self.require(profile.video_bitrate_kbps, "video bitrate (it decides between the Compact and Transparent slots)")
-        return "Compact" if bitrate <= ceiling else "Transparent"
+        # MediaInfo shows these bitrates to 0.1 Mb/s, so an encode listed as "12.0 Mb/s" is Compact.
+        shown = (bitrate + 50) // 100 * 100
+        return "Compact" if shown <= ceiling else "Transparent"
 
     def key(self, profile: ReleaseProfile) -> SlotKey:
         res = self.require(profile.resolution, "resolution")

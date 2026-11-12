@@ -8,7 +8,7 @@ from typing import Any
 from src.meta import Meta
 from src.slot_rules.base import SlotRules
 from src.slot_rules.models import Verdict
-from src.slot_rules.profile import ReleaseProfile, profile_from_entry
+from src.slot_rules.profile import ReleaseProfile, _traits_from_mediainfo_json, profile_from_entry
 from src.slot_rules.trackers.aither import AitherSlotRules
 from src.slot_rules.trackers.anthelion import AnthelionSlotRules
 from src.slot_rules.trackers.avistaz import AvistaZSlotRules, CinemaZSlotRules, PrivateHDSlotRules
@@ -152,6 +152,22 @@ class TestUlcx:
 
     def test_missing_bitrate_needs_review(self) -> None:
         assert verdict(self.rules, prof(f"{T}.1080p.BluRay.DD5.1.x264-NOGRPA")) is REVIEW
+
+    def test_bitrate_shown_as_ceiling_is_compact(self) -> None:
+        # MediaInfo shows 12 040 kb/s as "12.0 Mb/s", which is still the Compact tier.
+        transparent = prof(f"{T}.1080p.BluRay.DTS.x264-NOGRPB", media_info=mediainfo(bitrate="20.0 Mb/s"))
+        for kbps in (12_040, 12_000):
+            upload = replace(prof(f"{T}.1080p.BluRay.DD5.1.x264-NOGRPA"), video_bitrate_kbps=kbps)
+            assert verdict(self.rules, upload, transparent) is ALLOW
+        upload = replace(prof(f"{T}.1080p.BluRay.DD5.1.x264-NOGRPA"), video_bitrate_kbps=12_050)
+        assert verdict(self.rules, upload, transparent) is BLOCK
+        upload_2160p = replace(prof(f"{T}.2160p.BluRay.DD5.1.x265-NOGRPA"), video_bitrate_kbps=18_049, hdr=frozenset())
+        transparent_2160p = prof(f"{T}.2160p.BluRay.DTS.x265-NOGRPB", media_info=mediainfo(bitrate="30.0 Mb/s"))
+        assert verdict(self.rules, upload_2160p, transparent_2160p) is ALLOW
+
+    def test_overall_bitrate_is_not_video_bitrate(self) -> None:
+        mediainfo_json = {"media": {"track": [{"@type": "General", "OverallBitRate": "15000000"}, {"@type": "Video", "Format": "AVC"}]}}
+        assert _traits_from_mediainfo_json(mediainfo_json).video_bitrate_kbps is None
 
     def test_sd_encode_not_allowed(self) -> None:
         assert verdict(self.rules, prof(f"{T}.480p.DVDRip.x264-NOGRPA", type="Encode")) is BLOCK

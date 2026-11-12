@@ -381,11 +381,11 @@ def _traits_from_mediainfo_json(mediainfo: Mapping[str, Any] | None) -> _MediaIn
     traits = _MediaInfoTraits()
     tracks_value = cast(list[Any], cast(Mapping[str, Any], (mediainfo or {}).get("media") or {}).get("track") or [])
     tracks = [cast(dict[str, Any], track) for track in tracks_value if isinstance(track, dict)]
-    general = next((track for track in tracks if track.get("@type") == "General"), {})
     video = next((track for track in tracks if track.get("@type") == "Video"), {})
     audios = [track for track in tracks if track.get("@type") == "Audio"]
     subtitles = [track for track in tracks if track.get("@type") == "Text"]
-    raw_bitrate = video.get("BitRate") or video.get("BitRate_Nominal") or general.get("OverallBitRate")
+    # The overall bitrate includes audio and subtitles, so it cannot stand in for the video bitrate.
+    raw_bitrate = video.get("BitRate") or video.get("BitRate_Nominal")
     try:
         traits.video_bitrate_kbps = int(float(str(raw_bitrate)) / 1000) if raw_bitrate else None
     except ValueError:
