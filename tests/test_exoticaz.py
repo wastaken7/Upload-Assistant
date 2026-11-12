@@ -120,6 +120,20 @@ def test_rules_require_sheet_full_screenshot_and_minimum_size(tmp_path: Path) ->
     assert "Sample files" not in warnings  # noqa: S101
 
 
+def test_marked_sheet_counts_as_a_sheet_whatever_its_shape(tmp_path: Path) -> None:
+    # A one-tile sheet has the video's aspect ratio, so only the manifest mark tells it apart.
+    screens_dir = tmp_path / "tmp" / "exz-uuid" / "screenshots"
+    screens_dir.mkdir(parents=True, exist_ok=True)
+    sheet = screens_dir / "sheet.png"
+    sheet.write_bytes(FRAME)
+    register(tmp_path, "exz-uuid", [sheet], "main", details={str(sheet): {"kind": "xxx_contact_sheet"}})
+
+    warnings = make_tracker().rules(make_meta(tmp_path))
+
+    assert "video sheet (contact sheet)" not in warnings  # noqa: S101
+    assert "full size screenshot" in warnings  # noqa: S101
+
+
 def test_rules_report_missing_video_sheet(tmp_path: Path) -> None:
     register_images(tmp_path, {"frame.png": FRAME})
 

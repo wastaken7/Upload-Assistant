@@ -3,6 +3,7 @@ import re
 from pathlib import Path
 from typing import Any, ClassVar
 
+from src.console import logger
 from src.get_desc import DescriptionBuilder
 from src.media_extensions import VIDEO_EXTENSIONS
 from src.meta import Meta
@@ -11,6 +12,7 @@ from src.trackers.UNIT3D import UNIT3D
 from src.xxx_match import XxxRelease, is_pack_name
 
 Config = dict[str, Any]
+DESCRIPTION_IMAGE_MAX_BYTES = 10 * 1024 * 1024
 
 
 class BitPorn(UNIT3D):
@@ -248,13 +250,15 @@ class BitPorn(UNIT3D):
                 return {"resolution_id": self._resolution_heights[closest]}
         return {"resolution_id": self.resolution_ids["OTHER"]}
 
-    async def _description_image_files(self, meta: Meta) -> list[tuple[str, bytes, str]]:
+    async def _description_image_files(self, meta: Meta, warn: bool = False) -> list[tuple[str, bytes, str]]:
         """Return local XXX contact sheets for BitPorn to host during upload."""
         images: list[tuple[str, bytes, str]] = []
         for path in manifest_files(meta.base_dir, meta.uuid, "main"):
-            image = await self.get_image_file(path, max_size=10 * 1024 * 1024)
+            image = await self.get_image_file(path, max_size=DESCRIPTION_IMAGE_MAX_BYTES)
             if image:
                 images.append(image)
+            elif warn and path.is_file() and path.stat().st_size > DESCRIPTION_IMAGE_MAX_BYTES:
+                logger.warning(f"{self.tracker}: [yellow]Skipping {path.name}: it is over BitPorn's 10 MiB image limit.[/yellow]")
         return images
 
     async def get_description(self, meta: Meta) -> dict[str, str]:
@@ -304,6 +308,6 @@ class BitPorn(UNIT3D):
         if banner := files.pop("torrent-banner", None):
             files["banner"] = banner
 
-        for index, image in enumerate(await self._description_image_files(meta)):
+        for index, image in enumerate(await self._description_image_files(meta, warn=True)):
             files[f"description_images[{index}]"] = image
         return files

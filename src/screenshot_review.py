@@ -21,7 +21,16 @@ from src.meta import Meta
 from src.screenshot_manifest import capture_pages, forget_file, group_for, set_page
 from src.screenshot_manifest import files as manifest_files
 from src.screenshot_manifest import register as register_screenshots
-from src.takescreens import capture_ebook_page, capture_screenshot, determine_tonemapping, disc_screenshots, get_frame_info, screenshot_par_scale_factors
+from src.takescreens import (
+    capture_ebook_page,
+    capture_screenshot,
+    determine_tonemapping,
+    disc_screenshots,
+    get_frame_info,
+    is_xxx_contact_sheet,
+    regenerate_xxx_contact_sheet,
+    screenshot_par_scale_factors,
+)
 
 _review_locks: dict[str, threading.Lock] = {}
 _review_locks_guard = threading.Lock()
@@ -305,6 +314,14 @@ async def replace_screenshot(temp_dir: Path, meta_data: Mapping[str, object], sc
             return target
         items = list_screenshots(temp_dir, meta_data)
         target = _find_item(items, screenshot_id)
+        if target.path is not None and is_xxx_contact_sheet(temp_dir.parent.parent, temp_dir.name, target.path):
+            # A contact sheet is replaced by a new sheet of the same video, not by a single frame.
+            sheet = await regenerate_xxx_contact_sheet(str(temp_dir.parent.parent), temp_dir.name, target.path, Meta(dict(meta_data)))
+            if sheet is None:
+                raise FileNotFoundError("Screenshot not found")
+            sheet_id = _local_id(temp_dir, sheet)
+            _record_capture(temp_dir, sheet_id, len(items), None)
+            return ReviewedScreenshot(sheet_id, sheet, target.index, group=target.group)
         timestamp = await _capture_fresh_frame(temp_dir, meta_data, target)
         _record_capture(temp_dir, screenshot_id, len(items), timestamp)
         return target
@@ -454,13 +471,17 @@ async def _replace_book_page(temp_dir: Path, meta_data: Mapping[str, object], sc
     return target
 
 
-def _record_capture(temp_dir: Path, screenshot_id: str, count: int, timestamp: float, review: dict[str, object] | None = None) -> None:
+def _record_capture(temp_dir: Path, screenshot_id: str, count: int, timestamp: float | None, review: dict[str, object] | None = None) -> None:
+    """Record a new capture; ``timestamp`` is None for images that are not one frame, like contact sheets."""
     review = review if review is not None else _load_review(temp_dir)
     raw_times = review.get("replacement_times")
     timestamps: dict[str, object] = dict(raw_times) if _is_str_dict(raw_times) else {}
     raw_gens = review.get("generations")
     generations: dict[str, object] = dict(raw_gens) if _is_str_dict(raw_gens) else {}
-    timestamps[screenshot_id] = round(timestamp, 3)
+    if timestamp is None:
+        timestamps.pop(screenshot_id, None)
+    else:
+        timestamps[screenshot_id] = round(timestamp, 3)
     raw_gen = generations.get(screenshot_id, 0)
     gen_val = int(raw_gen) if isinstance(raw_gen, (int, str, float)) else 0
     generations[screenshot_id] = gen_val + 1

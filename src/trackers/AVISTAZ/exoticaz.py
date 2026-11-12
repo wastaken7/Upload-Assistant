@@ -19,6 +19,7 @@ from src.console import logger
 from src.manual_input import Question, ask, choices_from, has_answer
 from src.meta import Meta
 from src.screenshot_manifest import files as manifest_files
+from src.takescreens import is_xxx_contact_sheet
 from src.trackers.AVISTAZ import AZTrackerBase
 from src.xxx_platforms import XXX_PLATFORM_KEYWORDS
 
@@ -340,7 +341,13 @@ class ExoticaZ(AZTrackerBase):
         return []
 
     def is_full_size_screenshot(self, meta: Meta, path: Path) -> bool:
-        """Tell single frames from video sheets, whose grid changes the aspect ratio."""
+        """Tell single frames from video sheets.
+
+        Sheets are marked in the screenshot manifest; unmarked images fall back
+        to the aspect ratio, which a sheet's grid changes.
+        """
+        if is_xxx_contact_sheet(meta.base_dir, meta.uuid, path):
+            return False
         video_width, video_height = self.video_dimensions(meta)
         if not video_width or not video_height:
             return False
