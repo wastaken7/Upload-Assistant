@@ -35,6 +35,56 @@ def _is_str_dict(val: object) -> TypeIs[dict[str, object]]:
     return isinstance(val, dict)
 
 
+async def recheck_dupes_after_wait(meta: Meta, config: dict[str, Any], tracker_name: str, t_class: Any, reason: str) -> bool:
+    """Repeat a tracker's duplicate search after a wait; return False when a new duplicate blocks the upload.
+
+    Only releases that were not in the first search count, so a duplicate the
+    user already accepted does not stop the upload.
+    """
+    logger.info(f"[yellow]{tracker_name}: Redoing dupe check after {reason} wait...[/yellow]")
+    try:
+        if tracker_name not in {"PASSTHEPOPCORN"}:
+            new_dupes = cast(list[Any], await t_class.search_existing(meta))
+        else:
+            ptp = PassThePopcorn(config=config)
+            group_id = meta.ptp_groupid
+            new_dupes = cast(list[Any], await ptp.search_existing(group_id or "", meta))
+    except Exception as e:
+        logger.info(f"[bold red]{tracker_name}: Error redoing duplicate check after {reason} wait: {e}[/bold red]")
+        status = meta.tracker_status.setdefault(tracker_name, {})
+        status["status_message"] = f"Skipped: Error redoing dupe check after {reason} wait: {e}"
+        return False
+
+    initial_dupes = meta.initial_dupes.get(tracker_name, [])
+
+    def is_in_initial(dupe: Any) -> bool:
+        for initial_dupe in initial_dupes:
+            if _is_str_dict(dupe) and _is_str_dict(initial_dupe):
+                if dupe.get("name") == initial_dupe.get("name") and dupe.get("size") == initial_dupe.get("size"):
+                    return True
+            elif isinstance(dupe, str) and isinstance(initial_dupe, str) and dupe == initial_dupe:
+                return True
+        return False
+
+    real_new_dupes = [d for d in new_dupes if not is_in_initial(d)]
+    if not real_new_dupes:
+        return True
+
+    slot_decision = await evaluate_slots(new_dupes, meta, tracker_name, config)
+    if slot_decision is not None and slot_decision.verdict is Verdict.ALLOW:
+        logger.info(f"[green]{tracker_name}: new releases appeared during the wait, but slot rules still allow this upload.[/green]")
+        return True
+    if slot_decision is not None and slot_decision.verdict is Verdict.BLOCK:
+        logger.info(f"[red]{tracker_name}: a release that fills this slot appeared during the wait. Automatically skipping upload.[/red]")
+        return False
+    dupe_checker = DupeChecker(config)
+    real_new_dupes = cast(list[Any], await dupe_checker.filter_dupes(real_new_dupes, meta, tracker_name))
+    if real_new_dupes:
+        logger.info(f"[red]New dupe found on {tracker_name} during wait! Automatically skipping upload.[/red]")
+        return False
+    return True
+
+
 async def process_trackers(
     meta: Meta,
     config: dict[str, Any],
@@ -178,6 +228,7 @@ async def process_trackers(
         async def check_bandwidth_and_dupes(tracker_name: str, t_class: Any) -> bool:
             if t_class and getattr(t_class, "is_usenet", False):
                 return True
+            waited_for_bandwidth = False
             if bandwidth_control:
                 logger.info(f"\n[yellow]{tracker_name}: Checking bandwidth...[/yellow]")
                 waiter = Wait(config)
@@ -192,48 +243,10 @@ async def process_trackers(
                     bw_time = 0
 
                 if bw_thresh > 0 and bw_time > 0:
-                    waited = await waiter.wait_for_bandwidth(bw_thresh, bw_time)
-                    if waited:
-                        logger.info(f"[yellow]{tracker_name}: Redoing dupe check after bandwidth wait...[/yellow]")
-                        try:
-                            if tracker_name not in {"PASSTHEPOPCORN"}:
-                                new_dupes = cast(list[Any], await t_class.search_existing(meta))
-                            else:
-                                ptp = PassThePopcorn(config=config)
-                                group_id = meta.ptp_groupid
-                                new_dupes = cast(list[Any], await ptp.search_existing(group_id or "", meta))
-                        except Exception as e:
-                            logger.info(f"[bold red]{tracker_name}: Error redoing duplicate check after bandwidth wait: {e}[/bold red]")
-                            status = meta.tracker_status.setdefault(tracker_name, {})
-                            status["status_message"] = f"Skipped: Error redoing dupe check after bandwidth wait: {e}"
-                            return False
-
-                        initial_dupes = meta.initial_dupes.get(tracker_name, [])
-
-                        def is_in_initial(dupe: Any) -> bool:
-                            for initial_dupe in initial_dupes:
-                                if _is_str_dict(dupe) and _is_str_dict(initial_dupe):
-                                    if dupe.get("name") == initial_dupe.get("name") and dupe.get("size") == initial_dupe.get("size"):
-                                        return True
-                                elif isinstance(dupe, str) and isinstance(initial_dupe, str) and dupe == initial_dupe:
-                                    return True
-                            return False
-
-                        real_new_dupes = [d for d in new_dupes if not is_in_initial(d)]
-
-                        if real_new_dupes:
-                            slot_decision = await evaluate_slots(new_dupes, meta, tracker_name, config)
-                            if slot_decision is not None and slot_decision.verdict is Verdict.ALLOW:
-                                logger.info(f"[green]{tracker_name}: new releases appeared during the wait, but slot rules still allow this upload.[/green]")
-                                return True
-                            if slot_decision is not None and slot_decision.verdict is Verdict.BLOCK:
-                                logger.info(f"[red]{tracker_name}: a release that fills this slot appeared during the wait. Automatically skipping upload.[/red]")
-                                return False
-                            dupe_checker = DupeChecker(config)
-                            real_new_dupes = cast(list[Any], await dupe_checker.filter_dupes(real_new_dupes, meta, tracker_name))
-                            if real_new_dupes:
-                                logger.info(f"[red]New dupe found on {tracker_name} during wait! Automatically skipping upload.[/red]")
-                                return False
+                    waited_for_bandwidth = await waiter.wait_for_bandwidth(bw_thresh, bw_time)
+            if waited_for_bandwidth or meta.upload_waited:
+                reason = "bandwidth" if waited_for_bandwidth else "scheduled"
+                return await recheck_dupes_after_wait(meta, config, tracker_name, t_class, reason)
             return True
 
         if tracker in api_trackers:
@@ -245,7 +258,7 @@ async def process_trackers(
                     try:
                         if not await check_bandwidth_and_dupes(tracker, tracker_class):
                             status = meta.tracker_status.setdefault(tracker_class.tracker, {})
-                            status["status_message"] = "Skipped due to new dupe found after bandwidth wait"
+                            status["status_message"] = "Skipped due to new dupe found after waiting to upload"
                             print_tracker_result(tracker, tracker_class, status, False)
                             return
                         await check_tracker_image_hosts(meta, tracker_class)
@@ -287,7 +300,7 @@ async def process_trackers(
                     try:
                         if not await check_bandwidth_and_dupes(tracker, tracker_class):
                             status = meta.tracker_status.setdefault(tracker_class.tracker, {})
-                            status["status_message"] = "Skipped due to new dupe found after bandwidth wait"
+                            status["status_message"] = "Skipped due to new dupe found after waiting to upload"
                             print_tracker_result(tracker, tracker_class, status, False)
                             return
                         await check_tracker_image_hosts(meta, tracker_class)
@@ -369,6 +382,11 @@ async def process_trackers(
                 try:
                     ptp = PassThePopcorn(config=config)
                     group_id = meta.ptp_groupid
+                    if meta.upload_waited and not await recheck_dupes_after_wait(meta, config, tracker, ptp, "scheduled"):
+                        status = meta.tracker_status.setdefault(ptp.tracker, {})
+                        status["status_message"] = "Skipped due to new dupe found after waiting to upload"
+                        print_tracker_result(tracker, ptp, status, False)
+                        return
                     await check_tracker_image_hosts(meta, ptp)
                     ptp_url, ptp_data = await ptp.fill_upload_form(group_id, meta)
                     is_uploaded = False

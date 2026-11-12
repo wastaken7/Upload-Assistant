@@ -600,8 +600,14 @@ class Meta:
     unattended: bool = False
     unit3d: bool | None = None
     untouched: bool = False
+    # Local ISO datetime from --upload-at; the upload waits for it after preparation.
+    upload_at: str = ""
+    # Minimum seconds between uploads in one run (--upload-interval / DEFAULT.upload_interval).
+    upload_interval: int = 0
     upload_order: str | None = None
     upload_timer: bool = True
+    # Set after a scheduled wait so each tracker repeats its duplicate check.
+    upload_waited: bool = False
     uploader_comments: str = ""
     use_bluray_images: bool = False
     usenet_archive_password_is_random: bool | None = None

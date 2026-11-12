@@ -48,6 +48,8 @@ This option is available in the CLI only. In the Web UI, select paths with the b
 
 - `--queue QUEUE_NAME`: Process an entire folder (including files/subfolders) in a named queue.
 - `-lq`, `--limit-queue N`: Limit the amount of sucessfull uploads processed when running the queue (default `0` unlimited).
+- `--upload-at TIME`: Prepare the release, then wait until this local time to upload. Use `HH:MM` (the next occurrence, so a time already passed today means tomorrow) or `"YYYY-MM-DD HH:MM"`. Each torrent tracker repeats its duplicate check before uploading. See [scheduled uploads](upload-order-and-bandwidth-control.md#scheduled-uploads).
+- `--upload-interval DURATION`: Keep at least this much time between uploads in one run, such as a `--queue`. Accepts seconds or values such as `90s`, `30m` and `1h30m`; overrides `DEFAULT.upload_interval`.
 - `-sc`, `--site-check`: Search trackers for suitable uploads and create a log file (no uploading).
 - `-su`, `--site-upload TRACKER`: Process site searches and upload to a single tracker (the tracker identifier is normalized to uppercase).
 - `--unit3d`: Parse a text output file from `UNIT3D-Upload-Checker`.

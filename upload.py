@@ -132,6 +132,7 @@ from src.trackersetup import TrackerSetup, api_trackers, http_trackers, other_ap
 from src.trackerstatus import TrackerStatusManager, run_tracker_checks
 from src.tvdb import close_tvdb
 from src.uphelper import UploadHelper
+from src.upload_schedule import UploadPacer, wait_before_upload
 from src.uploadorder import run_upload_order
 from src.uploadscreens import UploadScreensManager
 from src.webui_paths import is_generated_queue_path, subprocess_roots, validate_argument_paths, validate_subprocess_path, validate_subprocess_queue
@@ -2598,6 +2599,7 @@ async def _execute_upload_flows(
     other_api_trackers: list[str],
     successful_trackers: int,
     skip_uploading_int: int,
+    pacer: UploadPacer | None = None,
 ) -> None:
     from src.stats import accumulate_upload_durations
 
@@ -2870,6 +2872,16 @@ async def _execute_upload_flows(
         ) -> None:
             await upload_torrent_flow(meta, torrent_trackers, bandwidth_control)
 
+        # --upload-at and --upload-interval wait here, after preparation and
+        # outside the shared bandwidth slot, so other runs are not blocked.
+        has_torrent_upload = any(
+            cast(Mapping[str, Any], meta.tracker_status.get(tracker.replace(" ", "").upper().strip(), {})).get("upload", False)
+            for tracker in torrent_trackers
+            if tracker.replace(" ", "").upper().strip() != "MANUAL"
+        )
+        if (has_torrent_upload or need_usenet_post) and await wait_before_upload(meta, config, pacer):
+            meta.upload_waited = True
+
         await run_upload_order(
             upload_order,
             run_usenet_flow,
@@ -2880,6 +2892,8 @@ async def _execute_upload_flows(
             has_usenet_upload=need_usenet_post,
             has_torrent_trackers=bool(torrent_trackers),
         )
+        if pacer is not None:
+            pacer.record(meta)
         webui_events.stage("upload", "done")
         if config["DEFAULT"].get("cross_seeding", True):
             await process_cross_seeds(meta)
@@ -3194,6 +3208,7 @@ async def do_the_thing(base_dir: str) -> None:
 
         processed_files_count = 0
         skipped_files_count = 0
+        upload_pacer = UploadPacer()
         base_meta = meta.copy()
 
         for item_number, queue_item in enumerate(queue_list, start=1):
@@ -3412,6 +3427,7 @@ async def do_the_thing(base_dir: str) -> None:
                     list(other_api_trackers),
                     successful_trackers,
                     skip_uploading_int,
+                    upload_pacer,
                 )
                 if "queue" in meta and meta.queue is not None:
                     processed_files_count += 1

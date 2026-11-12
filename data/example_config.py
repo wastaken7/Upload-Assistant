@@ -534,6 +534,10 @@ config: dict[str, Any] = {
         "qbit_bandwidth_control_after_usenet": False,
         "qbit_bandwidth_threshold": 0,
         "qbit_bandwidth_time": 0,
+        # Minimum time between uploads when processing several releases in one run, such as a --queue.
+        # Use seconds or a value such as "90s", "30m" or "1h30m". 0 disables it. --upload-interval overrides it.
+        # The next release is prepared during the wait, and each tracker repeats its duplicate check before uploading.
+        "upload_interval": 0,
         # Number of retry attempts after network or server errors, such as HTTP 500 responses or timeouts.
         # Can be overridden per tracker by adding the same setting to its configuration.
         "max_retries": 3,

@@ -155,6 +155,7 @@ DEFAULT_KEY_TYPES: dict[str, tuple[type, ...]] = {
     "qbit_bandwidth_control_after_usenet": (bool,),
     "qbit_bandwidth_threshold": (str, int),
     "qbit_bandwidth_time": (str, int),
+    "upload_interval": (str, int),
     "music_enrichment_enabled": (bool,),
     "music_discogs_token": (str,),
     "stats_enabled": (bool,),

@@ -17,6 +17,7 @@ from src.app_paths import DATA_DIR
 from src.audible import normalize_audible_url
 from src.bluray_com import normalize_bluray_url
 from src.meta import Meta
+from src.upload_schedule import parse_duration, resolve_upload_at
 
 MUSIC_MEDIA_CHOICES = ("cd", "web", "vinyl", "dvd", "bd", "soundboard", "sacd", "dat", "cassette")
 MUSIC_RELEASE_TYPE_CHOICES = (
@@ -161,6 +162,21 @@ def read_paths_from_stdin(argv: Sequence[str], stream: TextIO) -> tuple[list[str
     return args, paths
 
 
+def _upload_at_arg(value: str) -> str:
+    """Validate --upload-at while parsing, so a typo fails before the release is prepared."""
+    try:
+        return resolve_upload_at(value).isoformat(timespec="seconds")
+    except ValueError as error:
+        raise argparse.ArgumentTypeError(str(error)) from None
+
+
+def _duration_arg(value: str) -> int:
+    try:
+        return parse_duration(value)
+    except ValueError as error:
+        raise argparse.ArgumentTypeError(str(error)) from None
+
+
 class ShortHelpFormatter(argparse.HelpFormatter):
     """
     Custom formatter for short help (-h)
@@ -184,6 +200,8 @@ Common options:
   -tvmaze, --tvmaze          Specify the TVMaze id to use
   -tvdb, --tvdb              Specify the TVDB id to use
   --queue (queue name)       Process an entire folder (including files/subfolders) in a queue
+  --upload-at TIME           Upload at HH:MM or 'YYYY-MM-DD HH:MM' (duplicates are checked again)
+  --upload-interval DURATION Minimum time between uploads in a queue (e.g. 30m, 1h30m)
   -mf, --manual_frames       Comma-separated list of frame numbers to use for screenshots
   --description              Inline custom description block
   -df, --descfile            Path to custom description file
@@ -523,6 +541,22 @@ class Args:
         )
         parser.add_argument("--queue", nargs=1, required=False, help="(--queue queue_name) Process an entire folder (files/subfolders) in a queue")
         parser.add_argument("-lq", "--limit-queue", dest="limit_queue", nargs=1, required=False, help="Limit the amount of queue files processed", default=0)
+        parser.add_argument(
+            "--upload-at",
+            dest="upload_at",
+            type=_upload_at_arg,
+            required=False,
+            metavar="TIME",
+            help="Wait until this local time to upload, after preparing the release: HH:MM (next occurrence) or 'YYYY-MM-DD HH:MM'. Duplicates are checked again before the upload.",
+        )
+        parser.add_argument(
+            "--upload-interval",
+            dest="upload_interval",
+            type=_duration_arg,
+            required=False,
+            metavar="DURATION",
+            help="Minimum time between uploads in one run, for example 90s, 30m or 1h30m (default: DEFAULT.upload_interval). Duplicates are checked again after a wait.",
+        )
         parser.add_argument(
             "-sc",
             "--site-check",
